@@ -9,8 +9,8 @@ function App() {
   const { settings, initializeApp, isLoading } = useAppStore();
   const hasInitialized = useRef(false);
   const [showSplash, setShowSplash] = useState(() => {
-    // Check if user has seen the splash before
-    return !localStorage.getItem('hasSeenWelcome');
+    // Check if user has seen the splash in this session (per tab)
+    return !sessionStorage.getItem('hasSeenWelcome');
   });
 
   useEffect(() => {
@@ -42,7 +42,7 @@ function App() {
 
   // Handle splash screen continuation
   const handleContinue = () => {
-    localStorage.setItem('hasSeenWelcome', 'true');
+    sessionStorage.setItem('hasSeenWelcome', 'true');
     setShowSplash(false);
   };
 
