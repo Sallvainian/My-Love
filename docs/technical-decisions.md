@@ -46,8 +46,654 @@ This document tracks technical decisions, constraints, preferences, and consider
 - **Service Worker:** Workbox for offline caching and PWA functionality
 **Date:** 2025-10-30
 
+### Pre-configured Relationship Data
+
+**Context:** Story 1.4 will remove onboarding flow and pre-configure relationship data
+**Decision:** Hardcode relationship configuration for single-user deployment
+**Configuration Values:**
+- Partner Name: Gracie
+- Relationship Start Date: October 18, 2025
+- User Name: Frank
+**Rationale:** App is personal project for specific relationship, no need for generic onboarding flow. Pre-configuration simplifies UX and removes setup friction.
+**Impact:** Story 1.4 will hardcode these values in default Settings state
+**Date:** 2025-10-30
+
 ---
 
 ## Future Decisions
 
 _Technical decisions will be appended here as they arise during planning and development_
+
+---
+
+# Technical Debt Audit Report
+
+**Generated:** 2025-10-30
+**Story:** 1.1 - Technical Debt Audit & Refactoring Plan
+**Audited By:** Claude Sonnet 4.5 (Dev Agent)
+**Purpose:** Comprehensive technical debt audit of vibe-coded v0.1.0 prototype
+
+---
+
+## Executive Summary
+
+This audit systematically reviewed the My-Love codebase to identify technical debt, architectural concerns, and refactoring opportunities prior to Epic 2-4 feature development.
+
+### Key Findings
+
+- ✅ TypeScript strict mode is **ALREADY ENABLED** (corrects Story 1.5 assumption)
+- ✅ Codebase is relatively clean with good separation of concerns
+- ⚠️ 3 ESLint issues in app code (1 error, 1 warning) + 2 errors in BMAD infrastructure
+- ⚠️ Missing error boundaries and inconsistent error handling patterns
+- ⚠️ No environment variable support for deployment configuration
+- ⚠️ Zustand persist middleware lacks error recovery (Story 1.2 known bug)
+- ⚠️ IndexedDB service lacks quota management (blocks Epic 3) and migration strategy
+
+### Overall Assessment
+
+The rapid vibe-coding produced **surprisingly clean code** with good architecture. Most issues are **Nice-to-have** improvements rather than **Critical** blockers. The foundation is solid for feature development.
+
+### Critical Items (3)
+
+1. **Story 1.2** - Fix Zustand persist middleware error handling
+2. **Story 1.3** - Resolve IndexedDB/Service Worker compatibility issue
+3. **Story 1.6** - Add environment variable support for deployment
+
+### Epic 3 Blocker (1)
+
+4. **Before Epic 3** - Add IndexedDB quota management for photo uploads
+
+---
+
+## Table of Contents
+
+1. [Configuration & Tooling](#1-configuration--tooling)
+2. [State Management (Zustand)](#2-state-management-zustand)
+3. [Data Layer (IndexedDB)](#3-data-layer-indexeddb)
+4. [Component Architecture](#4-component-architecture)
+5. [Build & Deployment](#5-build--deployment)
+6. [Code Quality](#6-code-quality)
+7. [Security Assessment](#7-security-assessment)
+8. [Dependencies Audit](#8-dependencies-audit)
+9. [Prioritized Refactoring Checklist](#9-prioritized-refactoring-checklist)
+10. [Effort Estimates](#10-effort-estimates)
+
+---
+
+## 1. Configuration & Tooling
+
+### 1.1 TypeScript Configuration ✅ EXCELLENT
+
+**Finding:** TypeScript strict mode is **ALREADY ENABLED** in [tsconfig.app.json:20](../tsconfig.app.json#L20).
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}
+```
+
+**Implication:** Story 1.5's assumption that strict mode needs to be enabled is **incorrect**. The codebase is already TypeScript strict mode compliant.
+
+**Severity:** NONE
+**Recommendation:** Update Story 1.5 description. Focus should shift to ensuring all new code maintains strict mode compliance.
+
+---
+
+### 1.2 ESLint Baseline ⚠️ NEEDS ATTENTION
+
+**ESLint Run Results (2025-10-30):**
+
+```
+✖ 4 problems (3 errors, 1 warning)
+```
+
+**Breakdown:**
+
+1. **bmad/bmb/workflows/create-module/installer-templates/installer.js (2 errors)**
+   - Rules: `unicorn/prefer-module`, `unicorn/prefer-node-protocol` (definitions not found)
+   - **Severity:** Low - BMAD infrastructure only, not application code
+   - **Action:** Exclude bmad/ from ESLint scope
+
+2. **[src/App.tsx:20](../src/App.tsx#L20) (1 warning)**
+   - Rule: `react-hooks/exhaustive-deps`
+   - Issue: useEffect missing dependency 'settings'
+   ```typescript
+   useEffect(() => {
+     if (settings) {
+       applyTheme(settings.themeName);
+     }
+   }, [settings?.themeName]); // ⚠️ Should be [settings]
+   ```
+   - **Severity:** Medium - Potential stale closure bug
+   - **Action:** Story 1.5 - Fix dependency array
+
+3. **[src/components/DailyMessage/DailyMessage.tsx:36](../src/components/DailyMessage/DailyMessage.tsx#L36) (1 error)**
+   - Rule: `@typescript-eslint/no-unused-vars`
+   - Issue: 'error' variable defined but never used in catch block
+   ```typescript
+   } catch (error) {  // ❌ error unused
+     console.log('Share cancelled');
+   }
+   ```
+   - **Severity:** Low - Dead code
+   - **Action:** Story 1.5 - Remove unused variable or use underscore prefix
+
+**Severity:** Medium (App.tsx), Low (DailyMessage, BMAD)
+**Recommendation:** Story 1.5 - Fix exhaustive-deps (critical), remove unused var, exclude bmad/ from linting
+
+---
+
+## 2. State Management (Zustand)
+
+### 2.1 Persist Middleware Configuration ⚠️ CRITICAL
+
+**Location:** [src/stores/useAppStore.ts:282-291](../src/stores/useAppStore.ts#L282-L291)
+
+**Current Implementation:**
+
+```typescript
+persist(
+  (set, get) => ({ /* store definition */ }),
+  {
+    name: 'my-love-storage',
+    partialize: (state) => ({
+      settings: state.settings,
+      isOnboarded: state.isOnboarded,
+      messageHistory: state.messageHistory,
+      moods: state.moods,
+    }),
+  }
+)
+```
+
+**Analysis:**
+
+✅ **Good:**
+- Proper partialize strategy: Only persists settings/metadata, not heavy data
+- Messages and photos correctly excluded (stored in IndexedDB)
+- currentMessage excluded (computed on-the-fly)
+
+⚠️ **Critical Issues:**
+
+1. **No Error Handling for Persist Failures**
+   - If LocalStorage quota exceeded, persist middleware silently fails
+   - No user feedback for persistence errors
+   - No fallback strategy
+
+2. **No Versioning/Migration Strategy**
+   - Store structure changes will break existing persisted state
+   - No migration path for schema updates
+
+**This is the "known bug" mentioned in Story 1.2.**
+
+**Recommended Fix:**
+
+```typescript
+persist(storeFactory, {
+  name: 'my-love-storage',
+  partialize,
+  version: 1, // Add versioning
+  onRehydrateStorage: () => (state, error) => {
+    if (error) {
+      console.error('Failed to rehydrate state:', error);
+      // Fallback: clear corrupted state
+      localStorage.removeItem('my-love-storage');
+    }
+  },
+})
+```
+
+**Severity:** **CRITICAL** - Story 1.2 dependency
+**Recommendation:** Story 1.2 must add error handling, versioning, and user feedback
+
+---
+
+### 2.2 Store Architecture ✅ GOOD
+
+**Location:** [src/stores/useAppStore.ts](../src/stores/useAppStore.ts)
+
+**Strengths:**
+- Clean imperative action pattern
+- Good separation between persisted and in-memory state
+- Async actions properly handle errors (mostly)
+- Type-safe with TypeScript interfaces
+
+**Minor Issue:** Inconsistent error handling - some actions catch errors silently with `console.error`, no user-facing feedback.
+
+**Severity:** Nice-to-have
+**Recommendation:** Story 1.5 - Establish consistent error handling pattern
+
+---
+
+## 3. Data Layer (IndexedDB)
+
+### 3.1 StorageService Implementation ⚠️ CRITICAL FOR EPIC 3
+
+**Location:** [src/services/storage.ts](../src/services/storage.ts)
+
+✅ **Good:**
+- Clean wrapper around `idb` library
+- Proper schema definition with indexes
+- Singleton pattern appropriate
+- Transaction handling in bulk operations
+
+⚠️ **Critical Concerns:**
+
+1. **No Quota Management for Photos** - **BLOCKS EPIC 3**
+   - Photos stored as Blobs in IndexedDB
+   - No handling of `QuotaExceededError`
+   - No size limits or compression
+
+```typescript
+// Current: No quota checking
+async addPhoto(photo: Omit<Photo, 'id'>): Promise<number> {
+  await this.init();
+  return this.db!.add('photos', photo as Photo); // ❌ Can throw QuotaExceededError
+}
+```
+
+**Impact:** Photo upload feature in Epic 3 will crash without quota management.
+
+2. **No Database Migration Strategy**
+   - DB_VERSION hardcoded to 1
+   - No strategy for schema updates
+
+3. **Service Worker Compatibility (Story 1.3)**
+   - Context notes mention "compatibility issues"
+   - Code review shows standard idb usage - no obvious conflicts
+   - **Hypothesis:** Race condition between SW cache and IndexedDB transactions?
+
+**Severity:**
+- **CRITICAL** for Epic 3 (quota management)
+- Medium for Story 1.3 (SW compatibility)
+- Nice-to-have for migrations
+
+**Recommendation:**
+- Story 1.3: Investigate and document SW compatibility issue
+- **Before Epic 3:** Add quota management (3-4 hours estimated)
+- Story 1.5: Add database versioning strategy
+
+---
+
+## 4. Component Architecture
+
+### 4.1 App Component ⚠️ NEEDS FIX
+
+**Location:** [src/App.tsx](../src/App.tsx)
+
+**Issues:**
+
+1. **ESLint Warning: Exhaustive Deps** [App.tsx:20](../src/App.tsx#L20)
+   - **Severity:** Medium - Potential stale closure bug
+   - **Fix:** Change dependency array to `[settings]`
+
+2. **No Error Boundary**
+   - App can crash completely if child components throw
+   - No graceful degradation
+
+**Severity:** Medium (exhaustive deps), Nice-to-have (error boundary)
+**Recommendation:** Story 1.5 - Fix deps, add error boundary
+
+---
+
+### 4.2 DailyMessage Component ⚠️ MINOR FIX
+
+**Location:** [src/components/DailyMessage/DailyMessage.tsx](../src/components/DailyMessage/DailyMessage.tsx)
+
+**Issues:**
+
+1. **Unused Error Variable** [DailyMessage.tsx:36](../src/components/DailyMessage/DailyMessage.tsx#L36) - ESLint error
+2. **Animation Performance Concern** - Floating hearts create 10 motion.div elements, uses `window.innerWidth`
+
+**Severity:** Low
+**Recommendation:** Story 1.5 - Fix unused var, optionally optimize animation
+
+---
+
+### 4.3 Onboarding Component ⚠️ DEPRECATED
+
+**Location:** [src/components/Onboarding/Onboarding.tsx](../src/components/Onboarding/Onboarding.tsx)
+
+- Will be removed in Story 1.4
+- Code is clean, no immediate issues
+- **Action Required:** Audit dependencies after removal (framer-motion usage)
+
+**Severity:** None (will be removed)
+**Recommendation:** Story 1.4 - Audit dependencies, consider lighter animation library
+
+---
+
+## 5. Build & Deployment
+
+### 5.1 Vite Configuration ⚠️ CRITICAL FOR STORY 1.6
+
+**Location:** [vite.config.ts](../vite.config.ts)
+
+**Missing Critical Features:**
+
+1. **No Environment Variable Support**
+   - Base path hard-coded as `/My-Love/`
+   - No staging vs production configuration
+   - No feature flags
+   - **Blocks:** Story 1.6 deployment improvements
+
+2. **No Build Optimizations**
+   - No chunk splitting strategy
+   - No manual chunks for vendor code
+
+**Recommended Fix:**
+
+```typescript
+export default defineConfig({
+  base: process.env.VITE_BASE_PATH || '/My-Love/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-animation': ['framer-motion'],
+          'vendor-db': ['idb', 'zustand'],
+        },
+      },
+    },
+  },
+})
+```
+
+**Severity:** **CRITICAL** for Story 1.6
+**Recommendation:** Story 1.6 - Add env var support and build optimizations
+
+---
+
+### 5.2 PWA Configuration ✅ GOOD
+
+**Location:** [vite.config.ts:10-55](../vite.config.ts#L10-L55)
+
+PWA plugin properly configured. No issues found.
+
+---
+
+### 5.3 Deployment Scripts ⚠️ BASIC
+
+**Location:** [package.json:11-12](../package.json#L11-L12)
+
+**Missing:**
+- No smoke tests before deployment
+- No deployment environment validation
+- No rollback strategy
+
+**Severity:** Medium
+**Recommendation:** Story 1.6 - Add smoke test infrastructure
+
+---
+
+## 6. Code Quality
+
+### 6.1 Error Handling ⚠️ INCONSISTENT
+
+**Observed Patterns:**
+
+1. **Silent Console Errors** (most common)
+   ```typescript
+   } catch (error) {
+     console.error('Error loading messages:', error);
+     // No user feedback, no recovery
+   }
+   ```
+
+2. **Error State Set But Not Used**
+   - Store has `error` state field, but no component displays it
+
+**Issue:** No consistent error handling strategy. Errors logged but not surfaced to users.
+
+**Severity:** Nice-to-have
+**Recommendation:** Story 1.5 - Establish error handling pattern + error boundary
+
+---
+
+### 6.2 Console Statements ⚠️ CLEANUP NEEDED
+
+- `console.error` used in 7 locations
+- `console.log` used in 2 locations
+- No structured logging
+
+**Severity:** Low
+**Recommendation:** Story 1.5 - Replace with structured logging utility
+
+---
+
+### 6.3 Minor Code Smells
+
+1. **Magic Numbers** [messageRotation.ts:39](../src/utils/messageRotation.ts#L39)
+   - Hardcoded `% 3` for favorite rotation interval
+   - Should be named constant: `FAVORITE_ROTATION_INTERVAL`
+
+2. **Duplicate Date Calculations**
+   - Date arithmetic repeated across utility files
+   - Could be DRY-er
+
+3. **Large Data File** [defaultMessages.ts](../src/data/defaultMessages.ts)
+   - 123 lines of message data
+   - Could be extracted to JSON for easier editing
+
+**Severity:** Low
+**Recommendation:** Nice-to-have cleanup in Story 1.5
+
+---
+
+## 7. Security Assessment
+
+### 7.1 Data Security ✅ APPROPRIATE
+
+- No sensitive data (passwords, tokens, API keys)
+- User data stored locally only (LocalStorage + IndexedDB)
+- No external API calls
+- No authentication needed
+
+**Severity:** None
+**Recommendation:** No action needed
+
+---
+
+### 7.2 XSS/Injection Risks ✅ SAFE
+
+- React's JSX escaping handles user input safely
+- No `dangerouslySetInnerHTML` usage
+- User-generated content properly sanitized by React
+
+**Severity:** None
+**Recommendation:** No action needed
+
+---
+
+### 7.3 Dependencies Vulnerabilities
+
+Run `npm audit` to check for known vulnerabilities (not performed in this audit).
+
+**Recommendation:** Story 1.6 - Add `npm audit` to CI/CD pipeline
+
+---
+
+## 8. Dependencies Audit
+
+### 8.1 Production Dependencies ✅ ALL USED
+
+| Package | Version | Usage | Notes |
+|---------|---------|-------|-------|
+| react | 19.1.1 | Core framework | Latest |
+| react-dom | 19.1.1 | Rendering | Latest |
+| zustand | 5.0.8 | State management | Core to app |
+| idb | 8.0.3 | IndexedDB wrapper | Used in storage.ts |
+| framer-motion | 12.23.24 | Animations | Heavy (~150KB), re-evaluate after Story 1.4 |
+| lucide-react | 0.548.0 | Icons | Multiple components |
+| workbox-window | 7.3.0 | PWA | Required by vite-plugin-pwa |
+
+**framer-motion Note:**
+- Large bundle size (~150KB gzipped)
+- Used extensively in Onboarding (removed in Story 1.4) and DailyMessage
+- **Action:** Story 1.4 - Re-evaluate after Onboarding removal
+
+**Severity:** Low
+**Recommendation:** Story 1.4 - Consider lighter animation library alternative
+
+---
+
+### 8.2 Development Dependencies ✅ ALL USED
+
+All dev dependencies verified as necessary. No unused dependencies found.
+
+---
+
+## 9. Prioritized Refactoring Checklist
+
+### Critical Priority
+
+**Definition:** Blocks Epic 2-4 features OR high crash risk
+
+1. ✅ **[Story 1.2] Fix Zustand Persist Middleware**
+   - Add error handling for persist/rehydrate failures
+   - Add state versioning for migrations
+   - Add user feedback for persistence errors
+   - **Rationale:** Known bug, blocks reliable state management
+   - **Estimate:** 2-3 hours
+
+2. ✅ **[Story 1.3] Investigate IndexedDB Service Worker Compatibility**
+   - Document specific SW compatibility issue
+   - Implement fix or workaround
+   - Add tests to prevent regression
+   - **Rationale:** Known issue, may cause data loss
+   - **Estimate:** 3-4 hours
+
+3. ✅ **[Story 1.6] Add Environment Variable Support**
+   - Support VITE_BASE_PATH for deployment
+   - Support feature flags
+   - Add staging vs production configs
+   - **Rationale:** Blocks proper deployment configuration
+   - **Estimate:** 1 hour (part of Story 1.6)
+
+4. ✅ **[Epic 3 Blocker] Add IndexedDB Quota Management**
+   - Handle QuotaExceededError for photos
+   - Implement photo size limits or compression
+   - Add user feedback for storage limits
+   - **Rationale:** Without this, photo upload will crash
+   - **Timing:** Before starting Epic 3
+   - **Estimate:** 3-4 hours
+
+### Nice-to-Have Priority
+
+**Definition:** Code style improvements, minor optimizations
+
+5. ✅ **[Story 1.5] Fix ESLint Issues**
+   - Fix App.tsx exhaustive-deps warning
+   - Remove unused error variable in DailyMessage.tsx
+   - Exclude bmad/ from ESLint scope
+   - **Estimate:** 1 hour
+
+6. ✅ **[Story 1.5] Add Error Boundaries**
+   - Add top-level error boundary in App.tsx
+   - Add component-level boundaries for features
+   - Implement graceful error UI
+   - **Estimate:** 2 hours
+
+7. ✅ **[Story 1.5] Establish Consistent Error Handling**
+   - Define error handling pattern
+   - Replace console.error with structured logging
+   - Surface errors to users appropriately
+   - **Estimate:** 2 hours
+
+8. ✅ **[Story 1.4] Audit Dependencies After Onboarding Removal**
+   - Check if framer-motion still needed
+   - Consider lighter animation library
+   - Remove any orphaned dependencies
+   - **Estimate:** 30 minutes
+
+9. ✅ **[Story 1.5] Database Migration Strategy**
+   - Add version field to IndexedDB schema
+   - Implement migration utility
+   - Plan for future schema changes
+   - **Estimate:** 1 hour
+
+10. ✅ **[Story 1.6] Add Smoke Test Infrastructure**
+    - Add basic smoke tests
+    - Run before deployment
+    - Validate critical paths
+    - **Estimate:** 2 hours
+
+11. ✅ **[Story 1.5] Code Quality Improvements**
+    - Extract magic numbers to constants
+    - DRY up date utility functions
+    - Move defaultMessages to JSON (optional)
+    - **Estimate:** 1-2 hours
+
+12. ✅ **[Story 1.6] Optimize Build Configuration**
+    - Configure manual chunks for vendors
+    - Optimize Vite build settings
+    - Add bundle size analysis
+    - **Estimate:** 1 hour
+
+---
+
+## 10. Effort Estimates
+
+### Story 1.2: Fix Zustand Persist Middleware Configuration
+- **Estimate:** 2-3 hours
+- **Complexity:** Medium
+- **Dependencies:** None
+
+### Story 1.3: IndexedDB Service Worker Cache Fix
+- **Estimate:** 3-4 hours
+- **Complexity:** Medium-High (investigative)
+- **Dependencies:** Story 1.2
+
+### Story 1.4: Remove Onboarding Flow
+- **Estimate:** 2-3 hours
+- **Complexity:** Low-Medium
+- **Dependencies:** None
+
+### Story 1.5: Critical Refactoring & Code Quality
+- **Estimate:** 6-8 hours (can be split)
+- **Complexity:** Medium
+- **Dependencies:** Stories 1.2, 1.3, 1.4
+
+### Story 1.6: Build, Deployment & Configuration
+- **Estimate:** 4-5 hours
+- **Complexity:** Medium
+- **Dependencies:** All previous stories
+
+### Epic 3 Blocker: IndexedDB Quota Management
+- **Estimate:** 3-4 hours
+- **Complexity:** Medium
+- **Dependencies:** Story 1.3
+- **Timing:** Before starting Epic 3
+
+**Total Epic 1 Effort:** 17-23 hours (approx 3-4 working days)
+
+---
+
+## Conclusion
+
+The My-Love codebase is in **good shape** for a rapid vibe-coded prototype. The foundation is solid, and most issues are refinements rather than critical blockers.
+
+**Key Takeaways:**
+
+1. ✅ **Strong foundation** - Good separation of concerns, proper TypeScript usage
+2. ✅ **Minimal critical debt** - Only 3 critical items block future epics
+3. ✅ **Strict mode already enabled** - Story 1.5 assumption corrected
+4. ⚠️ **Polish needed** - Error handling, testing, deployment config
+5. 📦 **Bundle optimization opportunity** - Evaluate framer-motion after Onboarding removal
+
+**Next Steps:**
+
+1. ✅ Update Story 1.5 description (strict mode already enabled)
+2. ✅ Proceed with Stories 1.2-1.6 as planned
+3. ✅ Add Epic 3 blocker (quota management) to backlog before starting Epic 3
+4. ✅ Use this document as reference for all Story 1.x implementations
+
+---
+
+*End of Technical Debt Audit Report*
