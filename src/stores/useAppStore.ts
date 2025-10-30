@@ -281,12 +281,44 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'my-love-storage',
+      version: 1, // State schema version for future migrations
       partialize: (state) => ({
+        // Only persist small, critical state to LocalStorage
+        // Large data (messages, photos) is stored in IndexedDB via storageService
         settings: state.settings,
         isOnboarded: state.isOnboarded,
         messageHistory: state.messageHistory,
         moods: state.moods,
+        // NOT persisted (computed or transient):
+        // - messages: Loaded from IndexedDB on init
+        // - currentMessage: Computed from messages + messageHistory
+        // - isLoading, error: Runtime UI state only
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error(
+            '[Zustand Persist] Failed to rehydrate state from LocalStorage:',
+            error
+          );
+
+          // Attempt to recover: clear corrupted state
+          try {
+            localStorage.removeItem('my-love-storage');
+            console.warn(
+              '[Zustand Persist] Corrupted state cleared. App will reinitialize with defaults.'
+            );
+          } catch (clearError) {
+            console.error('[Zustand Persist] Failed to clear corrupted state:', clearError);
+          }
+
+          // App will continue with default initial state
+          return;
+        }
+
+        if (state) {
+          console.log('[Zustand Persist] State successfully rehydrated from LocalStorage');
+        }
+      },
     }
   )
 );
