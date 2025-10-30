@@ -12,10 +12,7 @@ dist
 dist-ssr
 *.local
 
-# Environment variables with personal relationship data
-# Never commit to version control
-.env.production
-.env.development
+# Local environment overrides (optional)
 .env.local
 
 # Editor directories and files

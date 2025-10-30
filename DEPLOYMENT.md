@@ -52,9 +52,8 @@ This guide covers the complete deployment process for the My-Love Progressive We
 For experienced developers who want to deploy immediately:
 
 ```bash
-# 1. Create and configure environment file
-cp .env.production.example .env.production
-# Edit .env.production with your relationship data
+# 1. Edit src/config/constants.ts with your relationship data
+nano src/config/constants.ts
 
 # 2. Install dependencies (if not already done)
 npm install
@@ -67,54 +66,37 @@ That's it! Your site will be live at `https://yourusername.github.io/My-Love/`
 
 ---
 
-## Environment Configuration
+## Configuration
 
-### Step 1: Create Production Environment File
+### Edit the App Constants
 
-The app requires environment variables for pre-configured relationship data.
+The app uses pre-configured constants for relationship data. Edit `src/config/constants.ts`:
 
-```bash
-# Copy the template to create your production environment file
-cp .env.production.example .env.production
-```
-
-### Step 2: Edit Environment Variables
-
-Open `.env.production` and set your values:
-
-```bash
-# Partner's name (displayed throughout the app)
-VITE_PARTNER_NAME=YourPartnerName
-
-# Relationship start date (YYYY-MM-DD format)
-VITE_RELATIONSHIP_START_DATE=2024-01-15
+```typescript
+// src/config/constants.ts
+export const APP_CONFIG = {
+  defaultPartnerName: 'YourPartnerName',     // Partner's name (displayed throughout the app)
+  defaultStartDate: '2024-01-15',             // Relationship start date (YYYY-MM-DD format)
+  isPreConfigured: true,
+} as const;
 ```
 
 **Format Requirements:**
-- `VITE_PARTNER_NAME`: Any string (first name or nickname recommended)
-- `VITE_RELATIONSHIP_START_DATE`: ISO 8601 date (YYYY-MM-DD), must be a valid past date
+- `defaultPartnerName`: Any string (first name or nickname recommended)
+- `defaultStartDate`: ISO 8601 date (YYYY-MM-DD), must be a valid past date
 
 **Examples:**
-```bash
-VITE_PARTNER_NAME=Sarah
-VITE_RELATIONSHIP_START_DATE=2024-01-15
+```typescript
+// Option 1
+defaultPartnerName: 'Sarah',
+defaultStartDate: '2024-01-15',
 
-# Or
-VITE_PARTNER_NAME=My Love
-VITE_RELATIONSHIP_START_DATE=2025-10-18
+// Option 2
+defaultPartnerName: 'My Love',
+defaultStartDate: '2025-10-18',
 ```
 
-### Step 3: Verify Configuration
-
-**.env.production is gitignored**: Verify with `grep ".env.production" .gitignore`
-
-✅ **Expected result**: `.env.production` should be listed
-
-**Important Notes:**
-- Never commit `.env.production` to version control
-- These values are embedded in the public JavaScript bundle (not secret)
-- They are personal relationship data for single-user PWA deployment
-- Anyone with access to your deployed app can inspect these values in browser DevTools
+**That's it!** When you build and deploy, these values will be hardcoded into the app.
 
 ---
 
@@ -398,24 +380,23 @@ npm run build
 - Check `dist/` directory exists
 - Rebuild: `npm run build`
 
-#### Test 5: Environment Variable Injection
+#### Test 5: Configuration Constants
 
 **Warning:** `⚠️ Warning: APP_CONFIG constants not found in bundle`
 
-**Cause:** `.env.production` was not present during build
+**Cause:** `src/config/constants.ts` values were not properly set during build
 
 **Solution:**
 ```bash
-# 1. Verify .env.production exists
-ls -la .env.production
+# 1. Edit src/config/constants.ts
+nano src/config/constants.ts
 
-# 2. If missing, create from template
-cp .env.production.example .env.production
+# 2. Verify defaultPartnerName and defaultStartDate are set with non-empty values
+# Example:
+#   defaultPartnerName: 'Gracie',
+#   defaultStartDate: '2025-10-18',
 
-# 3. Edit with your values
-nano .env.production
-
-# 4. Rebuild
+# 3. Save the file and rebuild
 npm run build
 ```
 
@@ -482,18 +463,18 @@ npm run deploy
 **Symptom:** App loads but partner name is empty or "Unknown"
 
 **Checklist:**
-1. ✅ `.env.production` exists in project root (not in `dist/` or `src/`)
-2. ✅ Variable names spelled correctly: `VITE_PARTNER_NAME` (case-sensitive)
-3. ✅ Rebuilt after creating `.env.production`: `npm run build`
+1. ✅ `src/config/constants.ts` exists in project root
+2. ✅ `defaultPartnerName` is set to a non-empty string
+3. ✅ Rebuilt after editing `constants.ts`: `npm run build`
 4. ✅ Check browser console for APP_CONFIG warnings
 
 **Debug steps:**
 ```bash
-# Verify env vars were injected
-grep -r "defaultPartnerName" dist/assets/*.js
+# Verify constants were set correctly
+cat src/config/constants.ts | grep defaultPartnerName
 
-# Should find your partner name in the output
-# If not found, rebuild with .env.production present
+# Should show: defaultPartnerName: 'YourName',
+# If not set, edit the file and rebuild with: npm run build
 ```
 
 #### Relationship Duration Shows "NaN"
@@ -507,11 +488,11 @@ grep -r "defaultPartnerName" dist/assets/*.js
 
 **Solution:**
 ```bash
-# Verify date format in .env.production
-cat .env.production
+# Verify date format in src/config/constants.ts
+cat src/config/constants.ts | grep defaultStartDate
 
 # Correct format example:
-VITE_RELATIONSHIP_START_DATE=2024-01-15
+defaultStartDate: '2024-01-15',
 
 # Rebuild after fixing
 npm run build && npm run deploy
@@ -626,66 +607,50 @@ git checkout main
 ### What Gets Committed
 
 **✅ Safe to commit:**
-- `.env.production.example` (template with placeholder values)
-- `src/config/constants.ts` (references to env vars, no actual values)
+- `src/config/constants.ts` (your relationship data)
 - `vite.config.ts` (build configuration)
 - All source code
 
 **❌ Never commit:**
-- `.env.production` (contains your relationship data)
 - `dist/` directory (build output, regenerated on each build)
 - `node_modules/` (dependencies, installed via npm)
 
-### Secrets and Privacy
+### Relationship Data Storage
 
-**Environment variables are NOT secrets:**
-- Values from `.env.production` are embedded in the JavaScript bundle at build time
-- Anyone with access to your deployed app can inspect these values in browser DevTools
-- They are publicly visible in the bundled JavaScript files
-- Use `.env.production` for convenience, not security
+**Your relationship data is stored in source code:**
+- `defaultPartnerName` and `defaultStartDate` values are in `src/config/constants.ts`
+- This file IS committed to version control (it's part of your app)
+- Anyone with repository access can see these values
+- The app is designed for single-user deployment by you for your partner
 
 **Privacy considerations:**
 - Relationship data (partner name, start date) is personal but not sensitive
 - Single-user PWA deployment assumes you control access to the URL
+- The data is publicly visible in the deployed app (browser DevTools)
 - If you need true privacy:
   - Deploy to a private server with authentication
-  - Use environment variables on your hosting platform (e.g., Vercel, Netlify)
+  - Use a deployment platform with environment variables (e.g., Vercel, Netlify)
   - Implement authentication and server-side rendering
 
-### .gitignore Configuration
+### How Configuration Works
 
-Verify `.env.production` is gitignored:
+The constants are directly embedded in your source code:
 
-```bash
-# Should return: .env.production
-grep ".env.production" .gitignore
-```
+1. **You edit**: `src/config/constants.ts` with your values
+2. **Build time**: Vite bundles the constants as hardcoded values
+3. **Runtime**: App reads the hardcoded values from `APP_CONFIG` object
+4. **Deployment**: Bundle is deployed with values permanently embedded
 
-**Already configured** in this project:
-```gitignore
-# Environment variables with personal relationship data
-# Never commit to version control
-.env.production
-.env.development
-.env.local
-```
+**How it works:**
+```typescript
+// Your source: src/config/constants.ts
+export const APP_CONFIG = {
+  defaultPartnerName: 'Gracie',
+  defaultStartDate: '2025-10-18',
+} as const;
 
-### Build-Time Injection
-
-How environment variables work:
-
-1. **Build time**: Vite reads `.env.production` and replaces all `import.meta.env.VITE_*` references with literal string values
-2. **Bundle**: Final JavaScript bundle contains hardcoded strings (no runtime lookup)
-3. **Deployment**: Bundle is deployed with values embedded
-4. **Runtime**: App reads from APP_CONFIG object (values already in bundle)
-
-**Example transformation:**
-```javascript
-// Source code:
-const name = import.meta.env.VITE_PARTNER_NAME;
-
-// After Vite build (minified):
-const name = "YourPartnerName";  // Literal string in bundle
+// After build: Embedded directly in the app
+// At runtime: APP_CONFIG.defaultPartnerName === 'Gracie'
 ```
 
 ---
@@ -696,9 +661,9 @@ Use this checklist before each deployment:
 
 ### Pre-Deployment
 
-- [ ] `.env.production` exists with correct values
+- [ ] `src/config/constants.ts` edited with partner name and relationship start date
 - [ ] Date format is YYYY-MM-DD
-- [ ] Partner name is set
+- [ ] Partner name is not an empty string
 - [ ] Code committed to main branch
 - [ ] TypeScript compiles with zero errors: `npx tsc -b`
 - [ ] ESLint passes with zero warnings: `npm run lint`

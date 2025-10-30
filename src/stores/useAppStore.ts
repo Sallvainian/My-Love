@@ -92,13 +92,13 @@ export const useAppStore = create<AppState>()(
         set({ isLoading: true, error: null });
 
         try {
-          // Pre-configure settings if first load and env vars are present
+          // Pre-configure settings if first load
           // This implements Story 1.4: Remove Onboarding Flow & Pre-Configure Relationship Data
           const { settings } = get();
 
-          if (settings === null && APP_CONFIG.isPreConfigured) {
-            // First load AND env vars present → inject pre-configured settings
-            console.log('[App Init] Pre-configuring settings from environment variables');
+          if (settings === null) {
+            // First load → inject pre-configured settings from constants
+            console.log('[App Init] Pre-configuring settings from hardcoded constants');
 
             const preConfiguredSettings: Settings = {
               themeName: 'sunset', // Default theme
@@ -126,18 +126,10 @@ export const useAppStore = create<AppState>()(
             console.log(
               `[App Init] Pre-configured with partner: "${APP_CONFIG.defaultPartnerName}", start date: ${APP_CONFIG.defaultStartDate}`
             );
-          } else if (settings === null && !APP_CONFIG.isPreConfigured) {
-            // First load BUT no env vars → log warning (graceful degradation)
-            console.warn(
-              '[App Init] Environment variables not configured. Expected VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE in .env.production'
-            );
-            console.warn(
-              '[App Init] App will not function correctly without pre-configured relationship data.'
-            );
-          } else if (settings !== null) {
+          } else {
             // Settings already exist → preserve them (don't override user edits)
             console.log(
-              '[App Init] Existing settings detected. Preserving user configuration (not overwriting with env vars).'
+              '[App Init] Existing settings detected. Preserving user configuration.'
             );
           }
 

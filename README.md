@@ -35,82 +35,47 @@ cd My-Love
 npm install
 ```
 
-3. **Configure development environment variables**:
-   ```bash
-   cp .env.production.example .env.development
+3. **Configure the app constants** by editing `src/config/constants.ts`:
+   ```typescript
+   export const APP_CONFIG = {
+     defaultPartnerName: 'Gracie',           // Edit this with your partner's name
+     defaultStartDate: '2025-10-18',          // Edit this with the relationship start date (YYYY-MM-DD)
+     isPreConfigured: true,
+   } as const;
    ```
 
-4. **Edit `.env.development`** with your relationship data:
-   ```bash
-   # Partner's name displayed throughout the app
-   VITE_PARTNER_NAME=YourPartnerName
-
-   # Relationship start date in ISO 8601 format (YYYY-MM-DD)
-   VITE_RELATIONSHIP_START_DATE=2025-10-18
-   ```
-
-5. Start the development server:
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
 6. Open http://localhost:5173/My-Love/ in your browser
 
-## ⚙️ Environment Configuration
+## ⚙️ Configuration
 
-### Development vs Production
+### How to Customize the App
 
-Vite loads different environment files based on the mode:
+The app uses pre-configured constants for relationship data. To customize for your relationship, edit `src/config/constants.ts`:
 
-- **Development mode** (`npm run dev`):
-  - Loads `.env`, `.env.local`, or `.env.development`
-  - Use `.env.development` for local development with your test data
+```typescript
+// src/config/constants.ts
+export const APP_CONFIG = {
+  defaultPartnerName: 'Gracie',              // Change to your partner's name
+  defaultStartDate: '2025-10-18',             // Change to relationship start date (YYYY-MM-DD)
+  isPreConfigured: true,
+} as const;
+```
 
-- **Production mode** (`npm run build`):
-  - Loads `.env`, `.env.local`, or `.env.production`
-  - Use `.env.production` for production builds with real relationship data
+**That's it!** The app will automatically use these values when it starts. No environment files, no build configuration needed.
 
-**Important**: Both `.env.development` and `.env.production` are in `.gitignore` to protect your personal data.
+### What Gets Pre-Configured
 
-**Story 1.4 Update**: The app now requires environment variables to pre-configure relationship data, eliminating the onboarding flow for single-user deployment.
-
-### Production Environment Setup
-
-1. **Create the environment file**:
-   ```bash
-   cp .env.production.example .env.production
-   ```
-
-2. **Edit `.env.production`** with your relationship data:
-   ```bash
-   # Partner's name displayed throughout the app
-   VITE_PARTNER_NAME=YourPartnerName
-
-   # Relationship start date in ISO 8601 format (YYYY-MM-DD)
-   VITE_RELATIONSHIP_START_DATE=2025-10-18
-   ```
-
-3. **Security Notes**:
-   - ⚠️ **NEVER commit `.env.production` to version control** (already in `.gitignore`)
-   - This file contains personal relationship data
-   - Only `.env.production.example` (template) should be committed to git
-   - When deploying, ensure `.env.production` exists locally before building
-
-### How It Works
-
-- Environment variables are **injected at build time** via Vite
-- Values are statically replaced in the production bundle
-- No runtime configuration needed - values are "baked in" during build
-- Settings are automatically initialized on first app load
-- Users can still edit settings later if needed (via Settings component, if implemented)
-
-### Fallback Behavior
-
-If `.env.production` is missing during build:
-- App will build successfully (no hard failure)
-- Console warnings logged on app initialization
-- App may not function correctly without pre-configured data
-- **Always ensure `.env.production` exists before production builds**
+When you set `defaultPartnerName` and `defaultStartDate` in `constants.ts`:
+- Partner name displays throughout the app
+- Relationship duration counter calculates automatically
+- No onboarding wizard shown (pre-configured mode is always active)
+- Settings are initialized on first app load
+- Users can still edit these values later if needed (via Settings panel, when available)
 
 ## 📱 Deploying to GitHub Pages
 
@@ -136,17 +101,15 @@ git push -u origin main
 
 ### Deploy
 
-**Important**: Ensure `.env.production` exists locally before deploying!
+Before deploying, make sure you've edited `src/config/constants.ts` with your relationship data. Then run:
 
-Run the deploy script:
 ```bash
 npm run deploy
 ```
 
 This will:
-- Read environment variables from `.env.production`
-- Inject values into the production build
-- Build the production version
+- Build the production version with your configured constants
+- Run automated smoke tests to verify everything is correct
 - Deploy to GitHub Pages
 - Make your app available at: `https://YOUR_USERNAME.github.io/My-Love/`
 
@@ -160,14 +123,13 @@ This will:
 
 ### Deployment Checklist
 
-- [ ] `.env.production` file created with correct values
-- [ ] `.env.production` is in `.gitignore` (never commit!)
-- [ ] Verified `VITE_PARTNER_NAME` and `VITE_RELATIONSHIP_START_DATE` are set
+- [ ] Edited `src/config/constants.ts` with your partner name and relationship start date
 - [ ] Ran `npm run build` successfully locally
 - [ ] Tested with `npm run preview` before deploying
-- [ ] Committed all code changes except `.env.production`
+- [ ] Committed all code changes
 - [ ] Ran `npm run deploy`
 - [ ] Verified app works on GitHub Pages URL
+- [ ] Checked that partner name and relationship duration display correctly
 
 ## 📝 Customizing Messages
 
@@ -295,22 +257,21 @@ Created with care to help you express your love every single day.
 ## 🐛 Troubleshooting
 
 ### App shows "Loading your daily message..." forever
-**Cause**: Missing environment variables in development mode
+**Cause**: Missing or invalid configuration in `src/config/constants.ts`
 
 **Solution**:
-1. Create `.env.development` file: `cp .env.production.example .env.development`
-2. Edit `.env.development` with your relationship data
-3. Clear browser IndexedDB:
+1. Edit `src/config/constants.ts` and verify your values are set
+2. Clear browser IndexedDB:
    - Open DevTools → Application → IndexedDB
    - Delete the `my-love-db` database
-4. Refresh the page
+3. Refresh the page
 
-### Console errors about environment variables
-**Symptom**: `Environment variables not configured` warnings in console
+### Console errors about configuration
+**Symptom**: `Configuration not set` warnings in console
 
 **Solution**:
-- For development: Create `.env.development` file (see above)
-- For production: Create `.env.production` before building
+- Edit `src/config/constants.ts` with your partner name and relationship start date
+- Ensure `defaultPartnerName` and `defaultStartDate` are not empty strings
 
 ### ConstraintError: Key already exists
 **Cause**: IndexedDB schema mismatch or duplicate initialization

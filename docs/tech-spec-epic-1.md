@@ -119,15 +119,18 @@ interface MyLoveDB {
 }
 ```
 
-**Environment Variables** (Story 1.4):
+**Configuration Constants** (Story 1.4):
 ```typescript
-// .env.production (not committed)
-VITE_PARTNER_NAME=<girlfriend_name>
-VITE_RELATIONSHIP_START_DATE=YYYY-MM-DD
+// src/config/constants.ts
+export const APP_CONFIG = {
+  defaultPartnerName: 'Gracie',
+  defaultStartDate: '2025-10-18',
+  isPreConfigured: true,
+} as const;
 
-// Injected at build time → available as:
-import.meta.env.VITE_PARTNER_NAME
-import.meta.env.VITE_RELATIONSHIP_START_DATE
+// Available at runtime as:
+APP_CONFIG.defaultPartnerName
+APP_CONFIG.defaultStartDate
 ```
 
 **Migration Strategy:**
@@ -182,13 +185,13 @@ interface AppStore extends AppState {
 }
 ```
 
-**3. Environment Configuration Interface (Story 1.4, 1.6)**
+**3. Configuration Constants Module (Story 1.4, 1.6)**
 ```typescript
-// src/config/constants.ts (new file)
+// src/config/constants.ts
 export const APP_CONFIG = {
-  defaultPartnerName: import.meta.env.VITE_PARTNER_NAME || '',
-  defaultStartDate: import.meta.env.VITE_RELATIONSHIP_START_DATE || '',
-  isPreConfigured: Boolean(import.meta.env.VITE_PARTNER_NAME),
+  defaultPartnerName: 'Gracie',              // Edit this value directly
+  defaultStartDate: '2025-10-18',             // Edit this value directly (YYYY-MM-DD)
+  isPreConfigured: true,                      // Set to true if both values are configured
 } as const;
 ```
 

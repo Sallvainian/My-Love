@@ -10,7 +10,7 @@
  * 1. File existence (index.html, manifest.webmanifest, sw.js)
  * 2. Manifest validation (valid JSON, required fields)
  * 3. Service worker validation (contains expected cache routes)
- * 4. Environment variable injection (APP_CONFIG constants in bundle)
+ * 4. Configuration constants validation (APP_CONFIG in bundle)
  * 5. Bundle size validation (<200KB gzipped total)
  * 6. Critical assets (icons, CSS, JS bundles)
  *
@@ -259,8 +259,8 @@ function testEnvironmentVariables() {
     // Check for APP_CONFIG-related constants
     // The minified bundle may not have "APP_CONFIG" as a literal,
     // but should have defaultPartnerName and defaultStartDate constants
-    const hasPartnerName = content.includes('defaultPartnerName') || content.includes('VITE_PARTNER_NAME');
-    const hasStartDate = content.includes('defaultStartDate') || content.includes('VITE_RELATIONSHIP_START_DATE');
+    const hasPartnerName = content.includes('defaultPartnerName');
+    const hasStartDate = content.includes('defaultStartDate');
 
     if (hasPartnerName && hasStartDate) {
       foundConfig = true;
@@ -272,11 +272,11 @@ function testEnvironmentVariables() {
   if (!foundConfig) {
     // This is a warning, not a blocker - app may work without pre-configuration
     console.warn(`${colors.yellow}⚠️  Warning: APP_CONFIG constants not found in bundle${colors.reset}`);
-    console.warn(`${colors.yellow}   This likely means .env.production was not present during build${colors.reset}`);
+    console.warn(`${colors.yellow}   Verify that src/config/constants.ts has been configured with your relationship data${colors.reset}`);
     console.warn(`${colors.yellow}   App will function but without pre-configured relationship data${colors.reset}`);
-    logTest('Environment variables injected', false, 'Missing (non-blocking)');
+    logTest('Configuration constants present', false, 'Missing (non-blocking)');
   } else {
-    logTest('Environment variables injected', true, configDetails);
+    logTest('Configuration constants present', true, configDetails);
   }
 }
 
