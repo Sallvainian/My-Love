@@ -24,37 +24,43 @@
 
 ### 1. Component-Based Architecture
 
-The application follows a hierarchical component structure:
+**Story 1.4 Update**: Onboarding component removed from render path for single-user deployment.
+**Story 1.5 Update**: ErrorBoundary component added for graceful error handling; Onboarding files deleted.
+
+The application follows a simple component structure:
 
 ```
 App (Root)
-├── Onboarding (First-time setup)
-│   ├── Welcome Step
-│   ├── Details Step (name, start date)
-│   ├── Notifications Step
-│   └── Ready Step
-│
-└── DailyMessage (Main app view)
-    ├── Header (relationship stats)
-    ├── Message Card (animated content)
-    │   ├── Category Badge
-    │   ├── Message Text
-    │   └── Action Buttons (favorite, share)
-    └── Navigation Hint
+└── ErrorBoundary (Story 1.5 - Graceful error handling)
+    └── DailyMessage (Main app view - always rendered)
+        ├── Header (relationship stats)
+        ├── Message Card (animated content)
+        │   ├── Category Badge
+        │   ├── Message Text
+        │   └── Action Buttons (favorite, share)
+        └── Navigation Hint
 ```
+
+**Removed Components** (Story 1.5):
+- ~~Onboarding~~ - First-time setup wizard (removed in Story 1.4, files deleted in Story 1.5)
+  - Functionality replaced by environment-based pre-configuration
+  - Dead code cleanup completed
 
 **Future Components** (planned but not yet implemented):
 - PhotoMemory - Photo gallery with captions
 - MoodTracker - Daily mood logging interface
 - CountdownTimer - Anniversary countdown display
 - CustomNotes - User-created custom messages
-- Settings - App configuration panel
+- Settings - App configuration panel (can edit pre-configured values)
 - Layout - Shared layout components (header, footer, navigation)
 
 ### 2. Single Page Application (SPA)
 
-- **No routing library**: App conditionally renders based on `isOnboarded` state
-- **Simple navigation**: Two main views (Onboarding vs DailyMessage)
+**Story 1.4 Update**: Simplified to single-view architecture.
+
+- **No routing library**: Single main view (DailyMessage)
+- **No conditional rendering**: Always renders DailyMessage
+- **Pre-configuration**: Settings initialized from environment variables at build time
 - **Future enhancement**: React Router for multi-page navigation when features expand
 
 ### 3. Offline-First Architecture
@@ -160,26 +166,30 @@ User Action → Component → Zustand Store Action → Service Layer → Indexed
 - Decorative hearts: continuous subtle pulse
 - Category badge: scale pop-in
 
-#### Onboarding Component
-**Purpose**: First-time user setup wizard
+#### ErrorBoundary Component (Story 1.5)
+**Purpose**: Graceful error handling with fallback UI
 
 **Features**:
-- Multi-step wizard (4 steps)
-- Progress indicator with animated bars
-- Partner name and relationship start date collection
-- Notification preferences configuration
-- Notification permission request
-- Form validation
+- Catches React component errors using `getDerivedStateFromError()`
+- Logs errors with context using `componentDidCatch()`
+- Displays user-friendly error screen with retry button
+- Prevents entire app crash from propagating errors
+- Resets error state on retry to allow recovery
 
-**Steps**:
-1. **Welcome** - Feature introduction with icons
-2. **Details** - Partner name and start date input
-3. **Notifications** - Toggle and time selection
-4. **Ready** - Completion message with PWA installation tip
+**Error UI Components**:
+- Broken heart emoji (💔) for visual indication
+- Clear error message: "Something went wrong"
+- Technical error details (error.message) for debugging
+- Retry button to reset error state and attempt recovery
 
-**State Management**:
-- Local component state for form inputs
-- Updates global store on completion (`setSettings`, `setOnboarded`)
+#### ~~Onboarding Component~~ (REMOVED - Story 1.5)
+**Status**: Files deleted in Story 1.5, no longer in codebase
+
+**Original Purpose**: First-time user setup wizard
+
+**Replacement**: Environment-based pre-configuration via `VITE_PARTNER_NAME` and `VITE_RELATIONSHIP_START_DATE` environment variables injected at build time. Settings automatically initialized on first app load without user interaction.
+
+**Rationale for Removal**: Single-user deployment pattern doesn't require generic onboarding flow. Pre-configuration provides frictionless experience for target use case.
 
 ### Planned Components
 
@@ -236,16 +246,29 @@ interface AppState {
 
 ### State Initialization Flow
 
+**Story 1.4 Update**: Pre-configuration injection added before IndexedDB initialization.
+
 ```
 1. App.tsx mounts
 2. useEffect calls initializeApp()
-3. initializeApp initializes IndexedDB
-4. Loads messages from IndexedDB
-5. If empty, populates with 100 default messages
-6. Updates currentMessage based on date
-7. Sets isLoading = false
-8. App renders DailyMessage or Onboarding
+3. initializeApp checks if settings === null
+   - If null AND env vars present → inject pre-configured Settings
+   - If null AND env vars missing → log warning (graceful degradation)
+   - If settings exist → preserve (don't override user edits)
+4. initializeApp initializes IndexedDB
+5. Loads messages from IndexedDB
+6. If empty, populates with 100 default messages
+7. Updates currentMessage based on date
+8. Sets isLoading = false
+9. App renders DailyMessage (always, no conditional)
 ```
+
+**Environment Configuration**:
+- Source: `src/config/constants.ts` exports `APP_CONFIG` object
+- Variables: `VITE_PARTNER_NAME`, `VITE_RELATIONSHIP_START_DATE` from `.env.production`
+- Injection: Vite statically replaces `import.meta.env` values at build time
+- Validation: `APP_CONFIG.isPreConfigured` flag verifies env vars present
+- Security: `.env.production` in `.gitignore`, never committed to version control
 
 ## PWA Architecture
 

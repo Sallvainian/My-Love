@@ -39,10 +39,10 @@ development_status:
   epic-1: contexted
   1-1-technical-debt-audit-refactoring-plan: done
   1-2-fix-zustand-persist-middleware-configuration: done
-  1-3-indexeddb-service-worker-cache-fix: backlog
-  1-4-remove-onboarding-flow-pre-configure-relationship-data: backlog
-  1-5-critical-refactoring-code-quality-improvements: backlog
-  1-6-build-deployment-configuration-hardening: backlog
+  1-3-indexeddb-service-worker-cache-fix: done
+  1-4-remove-onboarding-flow-pre-configure-relationship-data: done
+  1-5-critical-refactoring-code-quality-improvements: done
+  1-6-build-deployment-configuration-hardening: done
   epic-1-retrospective: optional
 
   epic-2: backlog

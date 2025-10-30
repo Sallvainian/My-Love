@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Environment variables with personal relationship data
+# Never commit to version control
+.env.production
+.env.development
+.env.local
 
 # Editor directories and files
 .vscode/*

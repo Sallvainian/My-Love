@@ -11,6 +11,7 @@ import type {
 import { storageService } from '../services/storage';
 import defaultMessages from '../data/defaultMessages';
 import { getTodayMessage, isNewDay } from '../utils/messageRotation';
+import { APP_CONFIG } from '../config/constants';
 
 interface AppState {
   // Settings
@@ -53,6 +54,10 @@ interface AppState {
   setTheme: (theme: ThemeName) => void;
 }
 
+// Initialization guards to prevent concurrent/duplicate initialization (StrictMode protection)
+let isInitializing = false;
+let isInitialized = false;
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -73,9 +78,69 @@ export const useAppStore = create<AppState>()(
 
       // Initialize app
       initializeApp: async () => {
+        // Guard: Prevent concurrent/duplicate initialization (StrictMode protection)
+        if (isInitializing) {
+          console.log('[App Init] Skipping - initialization already in progress');
+          return;
+        }
+        if (isInitialized) {
+          console.log('[App Init] Skipping - app already initialized');
+          return;
+        }
+
+        isInitializing = true;
         set({ isLoading: true, error: null });
 
         try {
+          // Pre-configure settings if first load and env vars are present
+          // This implements Story 1.4: Remove Onboarding Flow & Pre-Configure Relationship Data
+          const { settings } = get();
+
+          if (settings === null && APP_CONFIG.isPreConfigured) {
+            // First load AND env vars present → inject pre-configured settings
+            console.log('[App Init] Pre-configuring settings from environment variables');
+
+            const preConfiguredSettings: Settings = {
+              themeName: 'sunset', // Default theme
+              notificationTime: '09:00', // Default notification time
+              relationship: {
+                startDate: APP_CONFIG.defaultStartDate,
+                partnerName: APP_CONFIG.defaultPartnerName,
+                anniversaries: [], // Empty initially, can be added via Settings later
+              },
+              customization: {
+                accentColor: '#ff6b9d', // Default accent color (matches sunset theme)
+                fontFamily: 'system-ui', // Default font family
+              },
+              notifications: {
+                enabled: true, // Default notifications enabled
+                time: '09:00', // Default notification time
+              },
+            };
+
+            set({
+              settings: preConfiguredSettings,
+              isOnboarded: true, // Mark as onboarded (skips onboarding flow)
+            });
+
+            console.log(
+              `[App Init] Pre-configured with partner: "${APP_CONFIG.defaultPartnerName}", start date: ${APP_CONFIG.defaultStartDate}`
+            );
+          } else if (settings === null && !APP_CONFIG.isPreConfigured) {
+            // First load BUT no env vars → log warning (graceful degradation)
+            console.warn(
+              '[App Init] Environment variables not configured. Expected VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE in .env.production'
+            );
+            console.warn(
+              '[App Init] App will not function correctly without pre-configured relationship data.'
+            );
+          } else if (settings !== null) {
+            // Settings already exist → preserve them (don't override user edits)
+            console.log(
+              '[App Init] Existing settings detected. Preserving user configuration (not overwriting with env vars).'
+            );
+          }
+
           // Initialize IndexedDB
           await storageService.init();
 
@@ -84,15 +149,18 @@ export const useAppStore = create<AppState>()(
 
           // If no messages exist, populate with default messages
           if (storedMessages.length === 0) {
-            const messagesToAdd = defaultMessages.map((msg, index) => ({
+            const messagesToAdd = defaultMessages.map((msg) => ({
               ...msg,
-              id: index + 1,
+              // Remove explicit ID - let IndexedDB autoIncrement generate IDs
               createdAt: new Date(),
               isCustom: false,
             }));
 
             await storageService.addMessages(messagesToAdd);
-            set({ messages: messagesToAdd });
+
+            // Reload messages from IndexedDB to get auto-generated IDs
+            const messagesWithIds = await storageService.getAllMessages();
+            set({ messages: messagesWithIds });
           } else {
             set({ messages: storedMessages });
           }
@@ -101,9 +169,13 @@ export const useAppStore = create<AppState>()(
           get().updateCurrentMessage();
 
           set({ isLoading: false });
+          isInitialized = true;
+          console.log('[App Init] Initialization completed successfully');
         } catch (error) {
           console.error('Error initializing app:', error);
           set({ error: 'Failed to initialize app', isLoading: false });
+        } finally {
+          isInitializing = false;
         }
       },
 
