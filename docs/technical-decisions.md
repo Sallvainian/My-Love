@@ -40,6 +40,10 @@ This document tracks technical decisions, constraints, preferences, and consider
 **Decision:** Maintain client-side first architecture (IndexedDB + LocalStorage)
 **Rationale:** Aligns with privacy goals, offline-first approach, and zero-cost hosting. Persistence bug is fixable via Zustand persist configuration, not an architectural flaw.
 **Impact:** No backend needed for photos, messages, or personal data
+**Implementation Details:**
+- **Storage Layer:** IndexedDB for large data (photos, message library), LocalStorage for settings and small state
+- **State Management:** Zustand with persist middleware for state hydration across sessions
+- **Service Worker:** Workbox for offline caching and PWA functionality
 **Date:** 2025-10-30
 
 ---
