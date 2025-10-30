@@ -296,11 +296,11 @@ Manual testing via browser with comprehensive regression checklist:
 
 **Fresh Install Scenario:**
 1. Clear all browser data (DevTools → Application → Clear storage)
-2. Create `.env.production` with test values (if not already present)
+2. Configuration is done by editing `src/config/constants.ts` directly with hardcoded values
 3. Run `npm run build` then `npm run preview`
 4. Open app in browser
 5. Verify: No onboarding shown, DailyMessage renders immediately
-6. Verify: Settings populated from env vars (partner name, start date correct)
+6. Verify: Settings populated from constants (partner name = 'Gracie', start date = '2025-10-18')
 7. Verify: Relationship duration counter shows correct days
 
 **Message Display:**

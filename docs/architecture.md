@@ -60,7 +60,8 @@ App (Root)
 
 - **No routing library**: Single main view (DailyMessage)
 - **No conditional rendering**: Always renders DailyMessage
-- **Pre-configuration**: Settings initialized from environment variables at build time
+- **Pre-configuration**: Settings initialized from hardcoded constants at build time
+- **Configuration**: Edit `src/config/constants.ts` directly with hardcoded values
 - **Future enhancement**: React Router for multi-page navigation when features expand
 
 ### 3. Offline-First Architecture
@@ -187,7 +188,7 @@ User Action → Component → Zustand Store Action → Service Layer → Indexed
 
 **Original Purpose**: First-time user setup wizard
 
-**Replacement**: Environment-based pre-configuration via `VITE_PARTNER_NAME` and `VITE_RELATIONSHIP_START_DATE` environment variables injected at build time. Settings automatically initialized on first app load without user interaction.
+**Replacement**: Hardcoded pre-configuration via constants in `src/config/constants.ts`. Settings automatically initialized on first app load without user interaction.
 
 **Rationale for Removal**: Single-user deployment pattern doesn't require generic onboarding flow. Pre-configuration provides frictionless experience for target use case.
 

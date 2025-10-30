@@ -94,11 +94,11 @@ So that photos and messages persist reliably offline.
 **Story 1.4: Remove Onboarding Flow & Pre-Configure Relationship Data**
 
 As the app developer,
-I want to pre-configure relationship data at build time,
+I want to pre-configure relationship data via hardcoded constants,
 So that my girlfriend never sees the onboarding wizard.
 
 **Acceptance Criteria:**
-1. Create environment variables or config file for: partner name, relationship start date
+1. Create configuration constants in `src/config/constants.ts` for: partner name, relationship start date
 2. Remove Onboarding component from render path
 3. App initializes with pre-configured data on first load
 4. Relationship duration calculates correctly from pre-configured start date
@@ -134,7 +134,7 @@ I want to ensure build and deployment process is robust,
 So that production deployments are reliable and pre-configuration works correctly.
 
 **Acceptance Criteria:**
-1. Vite build process includes environment variable injection for relationship data
+1. Vite build process bundles configuration constants correctly
 2. GitHub Pages deployment correctly serves PWA with pre-configured data
 3. Service worker generation works correctly in production build
 4. Build produces optimized, minified bundles

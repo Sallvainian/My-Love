@@ -18,10 +18,10 @@ This epic delivers a stable, production-ready foundation by fixing Zustand persi
 **In Scope:**
 - Fix Zustand persist middleware to correctly save/restore state from LocalStorage (Story 1.2)
 - Ensure IndexedDB transactions complete successfully when service worker is active (Story 1.3)
-- Remove Onboarding component from render path and pre-configure relationship data via environment variables (Story 1.4)
+- Remove Onboarding component from render path and pre-configure relationship data via hardcoded constants (Story 1.4)
 - Conduct technical debt audit documenting code smells, architectural issues, and unused dependencies (Story 1.1)
 - Refactor critical code quality issues: TypeScript strict mode compliance, error boundaries, unused code removal (Story 1.5)
-- Harden build process with environment variable injection and deployment smoke tests (Story 1.6)
+- Harden build process with configuration constant bundling and deployment smoke tests (Story 1.6)
 - Maintain 100% feature parity - no regressions in existing functionality
 - Document all architectural decisions in technical-decisions.md
 
@@ -44,7 +44,7 @@ This epic aligns with and strengthens the existing architecture documented in [a
 
 **PWA Service Worker:** No changes to caching strategies or manifest configuration. Ensures IndexedDB transactions don't conflict with CacheFirst strategy for app shell assets.
 
-**Build/Deploy:** Hardens existing Vite build → gh-pages deployment pipeline with environment variable support for pre-configured relationship data and automated smoke testing.
+**Build/Deploy:** Hardens existing Vite build → gh-pages deployment pipeline with configuration constant bundling and automated smoke testing.
 
 **Constraints:**
 - Must maintain offline-first capability (FR002, NFR002)
@@ -63,7 +63,7 @@ This epic aligns with and strengthens the existing architecture documented in [a
 | **storageService (idb wrapper)** | IndexedDB CRUD operations | Photo/message data | Promise<result> | Story 1.3 |
 | **App.tsx** | Root component, initialization flow | None | Rendered UI tree | Story 1.4, 1.5 |
 | **DailyMessage component** | Main app view with message display | currentMessage from store | Message card UI | No changes |
-| **Environment config** | Build-time configuration injection | .env variables | Runtime constants | Story 1.4, 1.6 |
+| **Configuration constants** | Build-time configuration bundling | src/config/constants.ts | Runtime constants | Story 1.4, 1.6 |
 | **Build pipeline** | TypeScript → Vite bundle → PWA generation | Source files | dist/ output | Story 1.6 |
 | **Deployment script** | GitHub Pages deploy with smoke tests | dist/ directory | Live URL + validation | Story 1.6 |
 
@@ -121,11 +121,10 @@ interface MyLoveDB {
 
 **Configuration Constants** (Story 1.4):
 ```typescript
-// src/config/constants.ts
+// src/config/constants.ts - Edit this file directly to configure
 export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie',
-  defaultStartDate: '2025-10-18',
-  isPreConfigured: true,
+  defaultPartnerName: 'Gracie',          // Edit this value directly
+  defaultStartDate: '2025-10-18',         // Edit this value directly (YYYY-MM-DD format)
 } as const;
 
 // Available at runtime as:
@@ -135,7 +134,7 @@ APP_CONFIG.defaultStartDate
 
 **Migration Strategy:**
 - Story 1.2: Fix persist middleware without changing data shape
-- Story 1.4: Initialize settings from env vars on first load, preserve if already exists
+- Story 1.4: Initialize settings from hardcoded constants on first load, preserve if already exists
 - No user data migration required - backward compatible
 
 ### APIs and Interfaces
@@ -187,11 +186,10 @@ interface AppStore extends AppState {
 
 **3. Configuration Constants Module (Story 1.4, 1.6)**
 ```typescript
-// src/config/constants.ts
+// src/config/constants.ts - Hardcoded configuration constants
 export const APP_CONFIG = {
   defaultPartnerName: 'Gracie',              // Edit this value directly
-  defaultStartDate: '2025-10-18',             // Edit this value directly (YYYY-MM-DD)
-  isPreConfigured: true,                      // Set to true if both values are configured
+  defaultStartDate: '2025-10-18',             // Edit this value directly (YYYY-MM-DD format)
 } as const;
 ```
 
@@ -282,10 +280,8 @@ predeploy hook triggers: npm run build
     ↓
 TypeScript compilation: tsc -b (type checking)
     ↓
-[Story 1.6 ADD] Verify .env.production exists with required vars
-    ↓
 Vite build process:
-  - Bundle React app with env var injection
+  - Bundle React app with configuration constants from src/config/constants.ts
   - Process Tailwind CSS
   - Generate PWA assets (SW, manifest)
   - Minify and hash assets
@@ -296,7 +292,7 @@ Output to dist/ directory
   - Verify index.html exists
   - Verify manifest.webmanifest exists
   - Verify sw.js contains expected routes
-  - Verify env vars injected (grep bundle for VITE_ constants)
+  - Verify constants bundled (grep bundle for APP_CONFIG constants)
     ↓
 If smoke tests pass → gh-pages deploys dist/ to gh-pages branch
     ↓
@@ -376,9 +372,9 @@ Click retry → ErrorBoundary resets state → re-render
 **Epic 1 Security Considerations:**
 
 **Story 1.4 (Pre-Configuration):**
-- **CRITICAL:** `.env.production` file must be gitignored (never commit sensitive data)
-- Environment variables only contain non-sensitive data: partner name, relationship date (not secrets)
-- Document in deployment guide: create `.env.production` locally before deploy
+- Configuration constants are hardcoded in `src/config/constants.ts`
+- Constants are committed to version control (intentional for single-user app)
+- Only non-sensitive data: partner name, relationship date (not secrets)
 - No secrets or API keys involved (client-side only app)
 
 **Story 1.5 (Code Quality):**
@@ -542,7 +538,7 @@ Click retry → ErrorBoundary resets state → re-render
 - **Notification API** - No changes (permission requested in onboarding, unused after removal)
 
 **Build-Time Integrations:**
-- **Vite Environment Variables** - Story 1.4, 1.6 adds `.env.production` support
+- **Configuration Constants** - Story 1.4, 1.6 bundles src/config/constants.ts into app
 - **TypeScript Compiler** - Story 1.5 enforces strict mode
 - **ESLint** - Story 1.5 eliminates warnings
 - **PostCSS + Tailwind** - No changes to CSS pipeline
@@ -657,7 +653,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 | **AC-1.3.3** | System Architecture | vite.config.ts, SW config | Review SW cache strategy code |
 | **AC-1.3.4** | Workflows | Photo storage (future) | Manual test: offline photo add → online verification |
 | **AC-1.3.5** | Workflows | Message favoriting | Manual test: favorite → restart → verify persists |
-| **AC-1.4.1** | Data Models, APIs | .env.production, constants.ts | Verify env vars exist and loaded correctly |
+| **AC-1.4.1** | Data Models, APIs | src/config/constants.ts | Verify constants exist and loaded correctly |
 | **AC-1.4.2** | Services | App.tsx | Code review: Onboarding component removed from render |
 | **AC-1.4.3** | Workflows | useAppStore.initializeApp() | Integration test: first load → settings populated from env |
 | **AC-1.4.4** | Services | DailyMessage, relationship duration logic | Unit test: verify duration calculation from env start date |
@@ -707,7 +703,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 **R3: Pre-Configuration Deployment Complexity (MEDIUM)**
 - **Risk:** Environment variable injection at build time may fail in GitHub Actions or require additional configuration
 - **Impact:** Deployment pipeline breaks; may need alternative config approach
-- **Mitigation:** Test .env.production locally before pushing; document fallback to config.json if needed
+- **Mitigation:** Constants properly configured in src/config/constants.ts before pushing
 - **Owner:** Story 1.6
 
 **R4: TypeScript Strict Mode Migration Effort (MEDIUM)**
@@ -872,7 +868,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 8. **Acceptance Criteria Validated:** AC-1.3.1, AC-1.3.2, AC-1.3.5
 
 **Scenario 4: Build and Deploy Pipeline**
-1. Create .env.production with test values
+1. Edit src/config/constants.ts with test values
 2. Run: npm run deploy
 3. Verify: Build succeeds, smoke tests pass
 4. Access live GitHub Pages URL
@@ -919,7 +915,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 - Cache out of date (stale assets)
 
 **Build/Deploy Edge Cases:**
-- .env.production missing (should fail gracefully)
+- Configuration constants not set (should fail gracefully)
 - GitHub Pages down (deployment fails)
 - Smoke tests fail (halt deployment)
 
