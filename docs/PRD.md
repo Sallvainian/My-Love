@@ -33,8 +33,8 @@ However, the current implementation has critical usability issues that prevent i
 ### Functional Requirements
 
 **Core Data Persistence**
-- FR001: System SHALL persist all user data (messages, photos, mood entries, settings) across browser sessions using IndexedDB and LocalStorage
-- FR002: System SHALL correctly hydrate Zustand state from persisted storage on app initialization
+- FR001: System SHALL persist all user data (messages, photos, mood entries, settings) across browser sessions
+- FR002: System SHALL correctly restore application state from persisted storage on app initialization
 - FR003: System SHALL handle storage quota limits gracefully with user notification
 
 **Pre-Configured Experience**
@@ -62,12 +62,12 @@ However, the current implementation has critical usability issues that prevent i
 
 **Mood Tracking & Sync**
 - FR019: System SHALL allow user to log daily mood (5 mood types: loved, happy, content, thoughtful, grateful)
-- FR020: System SHALL sync mood entries to NocoDB backend for partner visibility
+- FR020: System SHALL sync mood entries to backend service for partner visibility
 - FR021: System SHALL display mood history in calendar view
 - FR022: System SHALL support optional notes with each mood entry
 
 **Interactive Connection Features**
-- FR023: System SHALL support "poke" and "kiss" actions that send notifications to partner via NocoDB
+- FR023: System SHALL support "poke" and "kiss" actions that send notifications to partner via backend service
 - FR024: System SHALL display animated reactions when poke/kiss is received
 - FR025: System SHALL maintain interaction history for sentimental value
 
