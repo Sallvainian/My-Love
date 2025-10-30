@@ -15,7 +15,7 @@ So that production deployments are reliable and pre-configuration works correctl
 Story 1.6 completes Epic 1 (Foundation & Core Fixes) by hardening the build and deployment pipeline to ensure production deployments are reliable and pre-configured relationship data is correctly injected at build time.
 
 **Core Requirements:**
-- **Build Process Hardening**: Vite build must inject environment variables (`VITE_PARTNER_NAME`, `VITE_RELATIONSHIP_START_DATE`) from `.env.production` into the bundled application for runtime access
+- **Build Process Hardening**: Vite build must include configuration constants from `src/config/constants.ts` in the bundled application for runtime access
 - **Deployment Reliability**: GitHub Pages deployment must correctly serve the PWA with pre-configured data, service worker, and manifest
 - **Quality Assurance**: Automated smoke tests must validate build output before deployment to catch configuration errors early
 - **Documentation**: Deployment process must be documented for maintainability
@@ -27,22 +27,22 @@ Story 1.6 completes Epic 1 (Foundation & Core Fixes) by hardening the build and 
 **From [tech-spec-epic-1.md#Story-1.6](../../docs/tech-spec-epic-1.md#Story-1.6):**
 
 **Build Architecture:**
-- Vite build process injects environment variables at compile time using `import.meta.env` API
-- `.env.production` file (gitignored) contains sensitive pre-configuration values
+- Vite build process includes configuration constants from `src/config/constants.ts`
+- Constants are directly embedded in the source code (committed to repository)
 - Build validation includes smoke tests to verify dist/ output integrity before GitHub Pages push
 
 **Deployment Flow:**
 ```
 npm run deploy
   → predeploy hook: npm run build
-  → Vite build with env injection
-  → Smoke tests (file existence, bundle validation, env var verification)
+  → Vite build with constants bundled
+  → Smoke tests (file existence, bundle validation, constant verification)
   → gh-pages push to gh-pages branch
   → GitHub Pages serves from branch root
 ```
 
 **Critical Validations:**
-1. Environment variables correctly injected into bundle (grep for constants)
+1. Configuration constants correctly bundled into bundle (grep for constant names)
 2. Service worker generated with correct routes and caching strategies
 3. PWA manifest valid and includes all required fields
 4. Build output optimized and minified (target: <200KB gzipped)
@@ -121,11 +121,10 @@ npm run deploy
   - [x] Confirm APP_CONFIG in src/config/constants.ts exists (Story 1.4)
   - [x] Review package.json build and deploy scripts
 
-- [x] Create and validate .env.production template (AC: 1, 6)
-  - [x] Create .env.production.example file with placeholder values
-  - [x] Document required variables: VITE_PARTNER_NAME, VITE_RELATIONSHIP_START_DATE
-  - [x] Add .env.production to .gitignore (verify not already present)
-  - [x] Test env var injection: create local .env.production → build → verify values in dist/
+- [x] Validate configuration constants in build (AC: 1, 6)
+  - [x] Verify src/config/constants.ts is properly integrated
+  - [x] Document required constants: defaultPartnerName, defaultStartDate
+  - [x] Test constant bundling: edit constants.ts → build → verify values in dist/
   - [x] Document format and validation rules in deployment guide
 
 - [x] Implement pre-deploy smoke tests (AC: 5)
@@ -133,7 +132,7 @@ npm run deploy
   - [x] Test 1: Verify dist/index.html exists and contains viewport meta tag
   - [x] Test 2: Verify dist/manifest.webmanifest exists and is valid JSON
   - [x] Test 3: Verify dist/sw.js exists and contains expected cache routes
-  - [x] Test 4: Verify env vars injected (search dist/ bundle for APP_CONFIG constants)
+  - [x] Test 4: Verify constants are bundled (search dist/ bundle for APP_CONFIG constants)
   - [x] Test 5: Verify bundle size <200KB gzipped (use gzip-size or similar)
   - [x] Test 6: Verify critical assets present (icons, CSS, JS bundles)
   - [x] Make tests fail-fast (exit on first failure with clear error message)

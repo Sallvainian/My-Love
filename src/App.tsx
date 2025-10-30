@@ -1,12 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from './stores/useAppStore';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
+import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { applyTheme } from './utils/themes';
 
 function App() {
   const { settings, initializeApp, isLoading } = useAppStore();
   const hasInitialized = useRef(false);
+  const [showSplash, setShowSplash] = useState(() => {
+    // Check if user has seen the splash before
+    return !localStorage.getItem('hasSeenWelcome');
+  });
 
   useEffect(() => {
     // Initialize the app on mount (useRef ensures single init even in StrictMode)
@@ -35,8 +40,23 @@ function App() {
     );
   }
 
+  // Handle splash screen continuation
+  const handleContinue = () => {
+    localStorage.setItem('hasSeenWelcome', 'true');
+    setShowSplash(false);
+  };
+
+  // Show welcome splash on first visit
+  if (showSplash) {
+    return (
+      <ErrorBoundary>
+        <WelcomeSplash onContinue={handleContinue} />
+      </ErrorBoundary>
+    );
+  }
+
   // Story 1.4: Always render DailyMessage (onboarding removed for single-user deployment)
-  // Settings are pre-configured via environment variables at build time
+  // Settings are pre-configured via hardcoded constants
   return (
     <ErrorBoundary>
       <div className="min-h-screen">

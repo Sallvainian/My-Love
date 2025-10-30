@@ -263,12 +263,12 @@ interface AppState {
 9. App renders DailyMessage (always, no conditional)
 ```
 
-**Environment Configuration**:
-- Source: `src/config/constants.ts` exports `APP_CONFIG` object
-- Variables: `VITE_PARTNER_NAME`, `VITE_RELATIONSHIP_START_DATE` from `.env.production`
-- Injection: Vite statically replaces `import.meta.env` values at build time
-- Validation: `APP_CONFIG.isPreConfigured` flag verifies env vars present
-- Security: `.env.production` in `.gitignore`, never committed to version control
+**Configuration**:
+- Source: `src/config/constants.ts` exports `APP_CONFIG` object with hardcoded values
+- Values: `defaultPartnerName`, `defaultStartDate` directly set in source code
+- How it works: Developer edits constants.ts, values are bundled at build time
+- Validation: `APP_CONFIG.isPreConfigured` flag indicates if values are set
+- Transparency: Constants committed to version control (intentional for single-user app)
 
 ## PWA Architecture
 
