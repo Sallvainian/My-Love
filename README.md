@@ -35,27 +35,99 @@ cd My-Love
 npm install
 ```
 
-3. Start the development server:
+3. **Configure development environment variables**:
+   ```bash
+   cp .env.production.example .env.development
+   ```
+
+4. **Edit `.env.development`** with your relationship data:
+   ```bash
+   # Partner's name displayed throughout the app
+   VITE_PARTNER_NAME=YourPartnerName
+
+   # Relationship start date in ISO 8601 format (YYYY-MM-DD)
+   VITE_RELATIONSHIP_START_DATE=2025-10-18
+   ```
+
+5. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open http://localhost:5173/My-Love/ in your browser
+6. Open http://localhost:5173/My-Love/ in your browser
+
+## ⚙️ Environment Configuration
+
+### Development vs Production
+
+Vite loads different environment files based on the mode:
+
+- **Development mode** (`npm run dev`):
+  - Loads `.env`, `.env.local`, or `.env.development`
+  - Use `.env.development` for local development with your test data
+
+- **Production mode** (`npm run build`):
+  - Loads `.env`, `.env.local`, or `.env.production`
+  - Use `.env.production` for production builds with real relationship data
+
+**Important**: Both `.env.development` and `.env.production` are in `.gitignore` to protect your personal data.
+
+**Story 1.4 Update**: The app now requires environment variables to pre-configure relationship data, eliminating the onboarding flow for single-user deployment.
+
+### Production Environment Setup
+
+1. **Create the environment file**:
+   ```bash
+   cp .env.production.example .env.production
+   ```
+
+2. **Edit `.env.production`** with your relationship data:
+   ```bash
+   # Partner's name displayed throughout the app
+   VITE_PARTNER_NAME=YourPartnerName
+
+   # Relationship start date in ISO 8601 format (YYYY-MM-DD)
+   VITE_RELATIONSHIP_START_DATE=2025-10-18
+   ```
+
+3. **Security Notes**:
+   - ⚠️ **NEVER commit `.env.production` to version control** (already in `.gitignore`)
+   - This file contains personal relationship data
+   - Only `.env.production.example` (template) should be committed to git
+   - When deploying, ensure `.env.production` exists locally before building
+
+### How It Works
+
+- Environment variables are **injected at build time** via Vite
+- Values are statically replaced in the production bundle
+- No runtime configuration needed - values are "baked in" during build
+- Settings are automatically initialized on first app load
+- Users can still edit settings later if needed (via Settings component, if implemented)
+
+### Fallback Behavior
+
+If `.env.production` is missing during build:
+- App will build successfully (no hard failure)
+- Console warnings logged on app initialization
+- App may not function correctly without pre-configured data
+- **Always ensure `.env.production` exists before production builds**
 
 ## 📱 Deploying to GitHub Pages
 
 ### First Time Setup
 
-1. Initialize git repository (if not already done):
+1. **Configure environment variables** (see Environment Configuration section above)
+
+2. Initialize git repository (if not already done):
 ```bash
 git init
 git add .
 git commit -m "Initial commit: My Love app"
 ```
 
-2. Create a new repository on GitHub named `My-Love`
+3. Create a new repository on GitHub named `My-Love`
 
-3. Connect your local repository to GitHub:
+4. Connect your local repository to GitHub:
 ```bash
 git remote add origin https://github.com/YOUR_USERNAME/My-Love.git
 git branch -M main
@@ -64,12 +136,16 @@ git push -u origin main
 
 ### Deploy
 
+**Important**: Ensure `.env.production` exists locally before deploying!
+
 Run the deploy script:
 ```bash
 npm run deploy
 ```
 
 This will:
+- Read environment variables from `.env.production`
+- Inject values into the production build
 - Build the production version
 - Deploy to GitHub Pages
 - Make your app available at: `https://YOUR_USERNAME.github.io/My-Love/`
@@ -81,6 +157,17 @@ This will:
 3. Under **Source**, select `gh-pages` branch
 4. Click **Save**
 5. Your app will be live in a few minutes!
+
+### Deployment Checklist
+
+- [ ] `.env.production` file created with correct values
+- [ ] `.env.production` is in `.gitignore` (never commit!)
+- [ ] Verified `VITE_PARTNER_NAME` and `VITE_RELATIONSHIP_START_DATE` are set
+- [ ] Ran `npm run build` successfully locally
+- [ ] Tested with `npm run preview` before deploying
+- [ ] Committed all code changes except `.env.production`
+- [ ] Ran `npm run deploy`
+- [ ] Verified app works on GitHub Pages URL
 
 ## 📝 Customizing Messages
 
@@ -135,13 +222,17 @@ The app will now appear on your home screen like a native app!
 
 ```
 My-Love/
+├── .env.production.example  # Template for environment variables
+├── .env.production          # Your actual env vars (gitignored)
 ├── public/
 │   └── icons/          # App icons for PWA
 ├── src/
 │   ├── components/
 │   │   ├── DailyMessage/    # Main message card component
-│   │   ├── Onboarding/      # First-time setup flow
+│   │   ├── Onboarding/      # DEPRECATED (Story 1.4) - To be removed in Story 1.5
 │   │   └── ...
+│   ├── config/
+│   │   └── constants.ts     # Environment configuration constants
 │   ├── stores/
 │   │   └── useAppStore.ts   # Zustand state management
 │   ├── services/
@@ -203,6 +294,33 @@ Created with care to help you express your love every single day.
 
 ## 🐛 Troubleshooting
 
+### App shows "Loading your daily message..." forever
+**Cause**: Missing environment variables in development mode
+
+**Solution**:
+1. Create `.env.development` file: `cp .env.production.example .env.development`
+2. Edit `.env.development` with your relationship data
+3. Clear browser IndexedDB:
+   - Open DevTools → Application → IndexedDB
+   - Delete the `my-love-db` database
+4. Refresh the page
+
+### Console errors about environment variables
+**Symptom**: `Environment variables not configured` warnings in console
+
+**Solution**:
+- For development: Create `.env.development` file (see above)
+- For production: Create `.env.production` before building
+
+### ConstraintError: Key already exists
+**Cause**: IndexedDB schema mismatch or duplicate initialization
+
+**Solution**:
+1. Clear browser IndexedDB (DevTools → Application → IndexedDB)
+2. Delete `my-love-db` database
+3. Refresh the page
+4. If persists, clear all browser data for localhost
+
 ### Development server won't start
 - Make sure Node.js v18+ is installed
 - Delete `node_modules` and run `npm install` again
@@ -210,6 +328,7 @@ Created with care to help you express your love every single day.
 ### Build fails
 - Run `npm run lint` to check for errors
 - Make sure all dependencies are installed
+- Verify `.env.production` exists before building
 
 ### PWA not installing
 - Must be served over HTTPS (GitHub Pages does this automatically)

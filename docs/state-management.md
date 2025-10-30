@@ -1193,6 +1193,428 @@ location.reload();
 
 ---
 
+## IndexedDB and Service Worker Configuration
+
+### Overview
+
+**My Love** uses IndexedDB for large data storage (messages, photos) and a service worker (via vite-plugin-pwa with Workbox) for offline-first PWA capabilities. This section documents how these systems interact and the error handling patterns applied.
+
+**Key Insight**: IndexedDB operations are **browser API calls** (not HTTP requests), so service workers do **NOT** intercept them. This means:
+- No special service worker configuration is needed to "exclude" IndexedDB
+- IndexedDB transactions complete independently of service worker cache state
+- The service worker only intercepts `fetch` events (network requests for HTML, JS, CSS, images, etc.)
+
+### Service Worker Configuration
+
+**File**: `/vite.config.ts`
+
+**Workbox Configuration**:
+```typescript
+workbox: {
+  // IndexedDB operations are browser API calls (not HTTP requests),
+  // so service worker caching strategies do NOT intercept them.
+  // No navigateFallbackDenylist or exclusions needed for IndexedDB.
+  globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'google-fonts-cache',
+        expiration: {
+          maxEntries: 10,
+          maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
+        }
+      }
+    }
+  ]
+}
+```
+
+**What gets cached:**
+- Static app shell assets (JS, CSS, HTML, images) via `globPatterns`
+- Google Fonts (external API) via `runtimeCaching`
+
+**What does NOT get cached:**
+- IndexedDB operations (not HTTP requests)
+- `storageService` method calls (pure JavaScript API calls)
+
+**Conclusion**: No service worker configuration changes are needed for IndexedDB compatibility.
+
+### StorageService Error Handling
+
+**File**: `/src/services/storage.ts`
+
+All IndexedDB operations now include comprehensive error handling following the Story 1.2 pattern:
+
+**Pattern**:
+1. **Try-catch blocks** wrap all async IndexedDB operations
+2. **Comprehensive console logging** for debugging (all logs prefixed with `[StorageService]`)
+3. **Fallback behavior**:
+   - Read operations (get, getAll): Return `undefined` or `[]` on failure (graceful degradation)
+   - Write operations (add, update, delete): Re-throw errors for caller to handle (preserve data integrity)
+4. **Edge cases handled**: Permission denied, quota exceeded, corrupted database, blocked transactions
+
+**Example - Read Operation (Graceful Fallback)**:
+```typescript
+async getAllMessages(): Promise<Message[]> {
+  try {
+    await this.init();
+    const messages = await this.db!.getAll('messages');
+    console.log('[StorageService] Retrieved all messages, count:', messages.length);
+    return messages;
+  } catch (error) {
+    console.error('[StorageService] Failed to get all messages:', error);
+    return []; // Graceful fallback: return empty array
+  }
+}
+```
+
+**Example - Write Operation (Throw for Integrity)**:
+```typescript
+async addMessage(message: Omit<Message, 'id'>): Promise<number> {
+  try {
+    await this.init();
+    console.log('[StorageService] Adding message to IndexedDB');
+    const id = await this.db!.add('messages', message as Message);
+    console.log('[StorageService] Message added successfully, id:', id);
+    return id;
+  } catch (error) {
+    console.error('[StorageService] Failed to add message:', error);
+    console.error('[StorageService] Message data:', message);
+    throw error; // Re-throw to allow caller to handle
+  }
+}
+```
+
+**Store Integration**:
+
+The `useAppStore.initializeApp()` method already has try-catch error handling that works with the enhanced StorageService:
+
+```typescript
+initializeApp: async () => {
+  set({ isLoading: true, error: null });
+
+  try {
+    await storageService.init(); // May throw if IndexedDB fails
+    const storedMessages = await storageService.getAllMessages(); // Returns [] on failure
+
+    if (storedMessages.length === 0) {
+      await storageService.addMessages(messagesToAdd); // May throw if write fails
+      set({ messages: messagesToAdd });
+    } else {
+      set({ messages: storedMessages });
+    }
+
+    get().updateCurrentMessage();
+    set({ isLoading: false });
+  } catch (error) {
+    console.error('Error initializing app:', error);
+    set({ error: 'Failed to initialize app', isLoading: false });
+    // App continues with default state - graceful degradation
+  }
+}
+```
+
+**Error Recovery Strategy**:
+1. If IndexedDB initialization fails → App shows error state but doesn't crash
+2. If message loading fails → Returns empty array, app populates defaults
+3. If write operations fail → Error logged, user sees failure (data integrity preserved)
+
+### Offline Testing Procedures
+
+Since no automated test infrastructure exists yet (per Story 1.1 audit), manual browser-based testing is required.
+
+**Prerequisites**:
+- Chrome or Edge browser (DevTools has best IndexedDB inspection tools)
+- Built and running app (`npm run dev` or `npm run build && npm run preview`)
+
+---
+
+#### Test 1: Offline Message Favorite Persistence (AC: 5)
+
+**Goal**: Verify favorites persist when offline and survive app restart
+
+**Steps**:
+1. Open app in browser
+2. Open DevTools (F12) → **Network** tab
+3. Enable **Offline** mode (checkbox or dropdown)
+4. Click favorite/heart icon on a message
+5. **Verify**: Console shows `[StorageService] Favorite toggled successfully`
+6. Open DevTools → **Application** tab → **IndexedDB** → `my-love-db` → `messages`
+7. **Verify**: Message has `isFavorite: true` in IndexedDB
+8. Hard refresh (Cmd+Shift+R / Ctrl+Shift+R)
+9. **Verify**: Favorite persists after restart
+10. Toggle favorite multiple times offline
+11. **Verify**: All changes persist in IndexedDB
+
+**Expected Console Logs**:
+```
+[StorageService] Favorite toggled successfully, id: 42, new value: true
+[StorageService] Message updated successfully, id: 42
+```
+
+**Expected Behavior**:
+- ✅ Favorite toggles work offline
+- ✅ Changes visible in IndexedDB immediately
+- ✅ Favorites persist after hard refresh
+- ✅ No network errors in console
+
+---
+
+#### Test 2: Offline Photo Persistence (AC: 4)
+
+**Goal**: Verify photos persist offline and remain accessible
+
+**Steps**:
+1. Enable **Offline** mode in DevTools
+2. Navigate to Photos tab (if implemented) or use photo upload feature
+3. Add a photo
+4. **Verify**: Console shows `[StorageService] Photo added successfully`
+5. Open DevTools → **Application** → **IndexedDB** → `my-love-db` → `photos`
+6. **Verify**: Photo entry exists with correct data
+7. Disable offline mode (go online)
+8. **Verify**: Photo displays correctly
+9. Close app offline → Reopen offline
+10. **Verify**: Photo still accessible
+
+**Expected Console Logs**:
+```
+[StorageService] Adding photo to IndexedDB
+[StorageService] Photo added successfully, id: 1
+```
+
+**Expected Behavior**:
+- ✅ Photo upload works offline
+- ✅ Photo stored in IndexedDB
+- ✅ Photo persists after network changes
+- ✅ Photo accessible after app restart offline
+
+---
+
+#### Test 3: Service Worker Non-Interference (AC: 2)
+
+**Goal**: Verify service worker doesn't block IndexedDB operations
+
+**Steps**:
+1. Ensure service worker is active: DevTools → **Application** → **Service Workers**
+2. **Verify**: Service worker status shows "activated and running"
+3. Perform IndexedDB operations (favorite message, add message)
+4. Check **Console** for errors
+5. Check **Network** tab
+6. **Verify**: IndexedDB operations do NOT appear in Network tab (they're not HTTP requests)
+7. Disable service worker temporarily (click "Unregister")
+8. Repeat IndexedDB operations
+9. **Compare behavior**: Should be identical with or without service worker
+
+**Expected Console Logs**:
+```
+[StorageService] Favorite toggled successfully, id: 5, new value: true
+```
+
+**Expected Behavior**:
+- ✅ No "failed to execute transaction" errors
+- ✅ IndexedDB operations NOT in Network tab
+- ✅ Same behavior with SW enabled/disabled
+- ✅ No blocking or delays
+
+---
+
+#### Test 4: Fresh Install Offline (AC: 1, 3)
+
+**Goal**: Verify app initializes with default messages when offline
+
+**Steps**:
+1. Clear all site data: DevTools → **Application** → **Clear storage** → "Clear site data"
+2. Enable **Offline** mode
+3. Hard refresh (Cmd+Shift+R)
+4. **Verify**: App loads successfully
+5. Check **Console** for initialization logs
+6. Open IndexedDB → `my-love-db` → `messages`
+7. **Verify**: Default messages populated (e.g., 100 messages)
+8. Check message display on screen
+9. **Verify**: Daily message appears
+
+**Expected Console Logs**:
+```
+[StorageService] Initializing IndexedDB...
+[StorageService] Created messages object store
+[StorageService] IndexedDB initialized successfully
+[StorageService] Adding bulk messages to IndexedDB, count: 100
+[StorageService] Bulk messages added successfully
+```
+
+**Expected Behavior**:
+- ✅ App initializes offline successfully
+- ✅ Default messages populate IndexedDB
+- ✅ No network errors prevent initialization
+- ✅ Daily message displays correctly
+
+---
+
+#### Test 5: Service Worker Update Scenario (AC: 3)
+
+**Goal**: Verify IndexedDB data intact after service worker updates
+
+**Steps**:
+1. With app loaded, favorite some messages
+2. Make a code change (e.g., add comment to `vite.config.ts`)
+3. Rebuild app (`npm run build`)
+4. Reload page → Service worker will update
+5. DevTools → **Application** → **Service Workers**
+6. **Verify**: New service worker activated
+7. Check IndexedDB → `messages`
+8. **Verify**: Favorites still present
+9. Check all persisted data (moods, settings)
+10. **Verify**: No data loss
+
+**Expected Behavior**:
+- ✅ Service worker updates successfully
+- ✅ IndexedDB data intact
+- ✅ Favorites preserved
+- ✅ No data corruption
+
+---
+
+#### Test 6: Network Toggle Stress Test (AC: 1, 3)
+
+**Goal**: Verify no data loss during rapid online/offline changes
+
+**Steps**:
+1. Start online, perform operations (favorite, add message)
+2. Toggle to **Offline** in DevTools
+3. Perform more operations
+4. Toggle back to **Online**
+5. Perform more operations
+6. Repeat cycle 3-5 times rapidly
+7. Check IndexedDB data integrity
+8. Check console for errors
+9. Verify all changes persisted
+
+**Expected Behavior**:
+- ✅ No data loss during network changes
+- ✅ All operations complete successfully
+- ✅ No race conditions or transaction failures
+- ✅ Console shows successful operations
+
+---
+
+#### Test 7: Regression Test - All Features (AC: 1, 2, 3)
+
+**Goal**: Verify existing features still work correctly
+
+**Test Matrix**:
+| Feature | Offline? | Expected Result |
+|---------|----------|----------------|
+| Display daily message | ✅ | Works |
+| Toggle favorite | ✅ | Persists |
+| Add custom message | ✅ | Stored |
+| Navigate between categories | ✅ | Works |
+| Theme switching | ✅ | Persists |
+| Mood entry | ✅ | Saved |
+| Settings changes | ✅ | Persisted |
+
+**Steps**:
+1. Enable **Offline** mode
+2. Test each feature in the matrix
+3. Verify console logs show successful operations
+4. Check IndexedDB for persisted data
+5. Verify no errors or warnings
+
+**Expected Behavior**:
+- ✅ All features functional offline
+- ✅ Data persists correctly
+- ✅ No feature regressions
+
+---
+
+### Debugging IndexedDB Issues
+
+**Common Problems**:
+
+**1. "Failed to execute 'transaction' on 'IDBDatabase'"**
+- **Cause**: Attempting transaction on closed or version-changing database
+- **Check Console**: Look for `[StorageService]` error logs
+- **Solution**: Automatic retry via `this.init()` in each method
+
+**2. "QuotaExceededError"**
+- **Cause**: Browser storage quota exceeded (typically 10-50% of available disk space)
+- **Check**: DevTools → Application → Storage → Check quota usage
+- **Solution**: Delete large photos, clear unused messages, or increase browser quota
+
+**3. "UnknownError" or "AbortError"**
+- **Cause**: Database corruption, permission issues, or browser bug
+- **Check Console**: Detailed error logs from StorageService
+- **Solution**: Clear site data and reinitialize
+
+**4. Operations Silently Failing**
+- **Symptom**: No errors, but changes don't persist
+- **Check**: DevTools → Application → IndexedDB → Verify data written
+- **Possible Cause**: Private browsing mode (IndexedDB may be disabled)
+- **Solution**: Use normal browsing mode
+
+**Debugging Tools**:
+
+**Inspect IndexedDB**:
+```javascript
+// In browser console
+indexedDB.databases().then(dbs => console.log(dbs));
+```
+
+**Check StorageService Logs**:
+- All operations log to console with `[StorageService]` prefix
+- Look for error logs with operation context
+- Example: `[StorageService] Failed to add message:` followed by error details
+
+**Manual Database Reset**:
+```javascript
+// In browser console
+indexedDB.deleteDatabase('my-love-db');
+location.reload(); // Will reinitialize with defaults
+```
+
+**Verify Service Worker Not Caching**:
+- Open DevTools → Network tab
+- Perform IndexedDB operations
+- Verify NO network requests appear (IndexedDB is local API calls)
+
+---
+
+### Technical Details
+
+**IndexedDB Schema**:
+- Database: `my-love-db` (version 1)
+- Object Stores:
+  - `photos`: Auto-increment key, index on `uploadDate`
+  - `messages`: Auto-increment key, indexes on `category` and `createdAt`
+
+**Service Worker Lifecycle**:
+1. App loads → Service worker registers
+2. Service worker installs → Precaches static assets
+3. Service worker activates → Intercepts fetch events
+4. IndexedDB operations happen independently (not intercepted)
+
+**Data Flow**:
+```
+User Action → Component → Store Action → storageService → IndexedDB
+                                      ↓
+                              Console Logging (debugging)
+```
+
+**Error Handling Flow**:
+```
+IndexedDB Operation Attempt
+  ├─ Success → Log success → Return data
+  └─ Failure → Log error with context
+       ├─ Read operation → Return fallback (undefined/[])
+       └─ Write operation → Throw error → Caller handles
+```
+
+---
+
 ## Related Documentation
 
 - **Data Models**: See `/docs/data-models.md`

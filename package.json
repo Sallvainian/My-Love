@@ -8,8 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "test:smoke": "node scripts/smoke-tests.cjs",
+    "predeploy": "npm run build && npm run test:smoke",
+    "deploy": "gh-pages -d dist",
+    "postdeploy": "echo 'Deployment complete! Run: node scripts/post-deploy-check.cjs [YOUR_URL]'"
   },
   "dependencies": {
     "framer-motion": "^12.23.24",
