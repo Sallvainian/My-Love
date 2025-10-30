@@ -1,18 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { Heart, Share2, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Heart, Share2, Sparkles } from 'lucide-react';
 import { formatRelationshipDuration, getDaysSinceStart } from '../../utils/messageRotation';
 
 export function DailyMessage() {
   const { currentMessage, settings, toggleFavorite } = useAppStore();
-  const [isAnimating, setIsAnimating] = useState(false);
   const [showHearts, setShowHearts] = useState(false);
-
-  useEffect(() => {
-    // Trigger animation on component mount
-    setIsAnimating(true);
-  }, [currentMessage?.id]);
 
   if (!currentMessage || !settings) {
     return (

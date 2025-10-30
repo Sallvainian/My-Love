@@ -1,4 +1,4 @@
-import type { Message, MessageCategory } from '../types';
+import type { Message } from '../types';
 
 /**
  * 100 pre-written sweet messages for the girlfriend

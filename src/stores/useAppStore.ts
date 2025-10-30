@@ -8,7 +8,7 @@ import type {
   ThemeName,
   Anniversary,
 } from '../types';
-import { storageService, localStorageHelper } from '../services/storage';
+import { storageService } from '../services/storage';
 import defaultMessages from '../data/defaultMessages';
 import { getTodayMessage, isNewDay } from '../utils/messageRotation';
 
