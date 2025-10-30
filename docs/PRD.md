@@ -105,30 +105,30 @@ However, the current implementation has critical usability issues that prevent i
 **Happy Path:**
 
 1. Opens My Love PWA from home screen (or browser bookmark)
-2. App loads instantly (cached offline)
+2. App loads instantly - cached offline (NFR002)
 3. Sees today's message displayed with:
-   - Relationship duration counter ("87 days together")
-   - Daily message card with category badge
-   - Smooth entrance animation
+   - Relationship duration counter "87 days together" (FR005)
+   - Daily message card with category badge (FR007)
+   - Smooth entrance animation (NFR001)
 4. Reads the heartfelt message
-5. Smiles and taps the heart icon to favorite it
+5. Smiles and taps the heart icon to favorite it (FR010)
    - Heart bursts with floating hearts animation
-6. Swipes left to see yesterday's message
+6. Swipes left to see yesterday's message (FR008)
    - Smooth transition animation
    - Can continue swiping back through message history
-7. Tries to swipe right beyond today - blocked with subtle indicator
-8. Navigates to Mood Tracker tab
-9. Logs mood as "Loved" with note "Made my morning ❤️"
-   - Mood syncs to NocoDB backend
-10. Sees notification badge - you sent her a "kiss"
-11. Taps to see kiss animation play
-12. Sends you a "kiss" back
+7. Tries to swipe right beyond today - blocked with subtle indicator (FR009)
+8. Navigates to Mood Tracker tab (FR031)
+9. Logs mood as "Loved" with note "Made my morning ❤️" (FR019, FR022)
+   - Mood syncs to NocoDB backend (FR020)
+10. Sees notification badge - you sent her a "kiss" (FR023)
+11. Taps to see kiss animation play (FR024)
+12. Sends you a "kiss" back (FR023)
 13. Closes app feeling connected and appreciated
 
 **Alternative Flows:**
-- If first visit of the day: sees new message
-- If returning later: sees same message as earlier (one per day)
-- If offline: everything works except mood sync and poke/kiss features
+- If first visit of the day: sees new message (FR007)
+- If returning later: sees same message as earlier - one per day (FR007)
+- If offline: everything works except mood sync and poke/kiss features (NFR002, FR020, FR023)
 
 ---
 
