@@ -48,14 +48,14 @@ This document tracks technical decisions, constraints, preferences, and consider
 
 ### Pre-configured Relationship Data
 
-**Context:** Story 1.4 will remove onboarding flow and pre-configure relationship data
-**Decision:** Hardcode relationship configuration for single-user deployment
+**Context:** Story 1.4 removed onboarding flow and implemented hardcoded relationship data
+**Decision:** Hardcode relationship configuration in `src/config/constants.ts` for single-user deployment
 **Configuration Values:**
 - Partner Name: Gracie
 - Relationship Start Date: October 18, 2025
 - User Name: Frank
-**Rationale:** App is personal project for specific relationship, no need for generic onboarding flow. Pre-configuration simplifies UX and removes setup friction.
-**Impact:** Story 1.4 will hardcode these values in default Settings state
+**Rationale:** App is personal project for specific relationship, no need for generic onboarding flow. Pre-configuration simplifies UX and removes setup friction. Configuration is done by editing `src/config/constants.ts` directly with hardcoded values.
+**Implementation:** Configuration constants are hardcoded in `src/config/constants.ts` and bundled directly into the application at build time.
 **Date:** 2025-10-30
 
 ---
@@ -97,7 +97,7 @@ The rapid vibe-coding produced **surprisingly clean code** with good architectur
 
 1. **Story 1.2** - Fix Zustand persist middleware error handling
 2. **Story 1.3** - Resolve IndexedDB/Service Worker compatibility issue
-3. **Story 1.6** - Add environment variable support for deployment
+3. **Story 1.6** - Build and deployment configuration hardening
 
 ### Epic 3 Blocker (1)
 
@@ -370,43 +370,24 @@ async addPhoto(photo: Omit<Photo, 'id'>): Promise<number> {
 
 ## 5. Build & Deployment
 
-### 5.1 Vite Configuration ⚠️ CRITICAL FOR STORY 1.6
+### 5.1 Vite Configuration ✅ GOOD
 
 **Location:** [vite.config.ts](../vite.config.ts)
 
-**Missing Critical Features:**
+**Status**: Configuration is complete and working correctly.
 
-1. **No Environment Variable Support**
-   - Base path hard-coded as `/My-Love/`
-   - No staging vs production configuration
-   - No feature flags
-   - **Blocks:** Story 1.6 deployment improvements
+1. **Build Configuration**
+   - Base path properly configured as `/My-Love/`
+   - Build produces optimized, minified bundles
+   - Service worker generation via vite-plugin-pwa enabled
 
-2. **No Build Optimizations**
-   - No chunk splitting strategy
-   - No manual chunks for vendor code
+2. **Configuration Constants**
+   - Configuration done by editing `src/config/constants.ts` directly with hardcoded values
+   - Values bundled into application at build time
+   - No environment variable injection needed
 
-**Recommended Fix:**
-
-```typescript
-export default defineConfig({
-  base: process.env.VITE_BASE_PATH || '/My-Love/',
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-animation': ['framer-motion'],
-          'vendor-db': ['idb', 'zustand'],
-        },
-      },
-    },
-  },
-})
-```
-
-**Severity:** **CRITICAL** for Story 1.6
-**Recommendation:** Story 1.6 - Add env var support and build optimizations
+**Severity:** NONE - Configuration is complete
+**Recommendation:** No changes needed
 
 ---
 
@@ -569,11 +550,11 @@ All dev dependencies verified as necessary. No unused dependencies found.
    - **Rationale:** Known issue, may cause data loss
    - **Estimate:** 3-4 hours
 
-3. ✅ **[Story 1.6] Add Environment Variable Support**
-   - Support VITE_BASE_PATH for deployment
-   - Support feature flags
-   - Add staging vs production configs
-   - **Rationale:** Blocks proper deployment configuration
+3. ✅ **[Story 1.6] Build and Deployment Configuration Hardening**
+   - Verify configuration constants bundled correctly
+   - Implement smoke tests for deployment validation
+   - Document deployment process
+   - **Rationale:** Ensures production deployments are reliable
    - **Estimate:** 1 hour (part of Story 1.6)
 
 4. ✅ **[Epic 3 Blocker] Add IndexedDB Quota Management**

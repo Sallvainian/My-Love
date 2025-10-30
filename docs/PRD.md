@@ -38,7 +38,7 @@ However, the current implementation has critical usability issues that prevent i
 - FR003: System SHALL handle storage quota limits gracefully with user notification
 
 **Pre-Configured Experience**
-- FR004: System SHALL eliminate onboarding flow by pre-configuring relationship data (partner name, relationship start date) at build/deploy time
+- FR004: System SHALL eliminate onboarding flow by pre-configuring relationship data (partner name, relationship start date) via hardcoded constants in src/config/constants.ts
 - FR005: System SHALL display relationship duration automatically without user input
 
 **Message Library & Navigation**
