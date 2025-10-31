@@ -43,30 +43,39 @@ development_status:
   1-4-remove-onboarding-flow-pre-configure-relationship-data: done
   1-5-critical-refactoring-code-quality-improvements: done
   1-6-build-deployment-configuration-hardening: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: completed
 
-  epic-2: backlog
-  2-1-expand-message-library-to-365-messages: backlog
-  2-2-implement-horizontal-swipe-navigation-backward-only: backlog
-  2-3-message-history-state-management: backlog
-  2-4-admin-interface-custom-message-management-phase-1-ui: backlog
-  2-5-admin-interface-message-persistence-integration: backlog
-  2-6-ai-message-suggestion-review-interface-optional-enhancement: backlog
+  epic-2: contexted
+  2-1-testing-framework-setup: done
+  2-2-testing-component-integration: done
+  2-3-add-data-testid-attributes: backlog
+  2-4-configure-auto-start-preview-server: backlog
+  2-5-run-validate-tests-pass: backlog
+  2-6-add-ci-integration-github-actions: backlog
   epic-2-retrospective: optional
 
   epic-3: backlog
-  3-1-photo-upload-storage: backlog
-  3-2-photo-gallery-grid-view: backlog
-  3-3-photo-carousel-with-animated-transitions: backlog
-  3-4-photo-edit-delete-functionality: backlog
-  3-5-photo-gallery-navigation-integration: backlog
+  3-1-expand-message-library-to-365-messages: backlog
+  3-2-implement-horizontal-swipe-navigation-backward-only: backlog
+  3-3-message-history-state-management: backlog
+  3-4-admin-interface-custom-message-management-phase-1-ui: backlog
+  3-5-admin-interface-message-persistence-integration: backlog
+  3-6-ai-message-suggestion-review-interface-optional-enhancement: backlog
   epic-3-retrospective: optional
 
   epic-4: backlog
-  4-1-nocodb-backend-setup-api-integration: backlog
-  4-2-mood-tracking-ui-local-storage: backlog
-  4-3-mood-history-calendar-view: backlog
-  4-4-mood-sync-partner-visibility: backlog
-  4-5-poke-kiss-interactions: backlog
-  4-6-anniversary-countdown-timers: backlog
+  4-1-photo-upload-storage: backlog
+  4-2-photo-gallery-grid-view: backlog
+  4-3-photo-carousel-with-animated-transitions: backlog
+  4-4-photo-edit-delete-functionality: backlog
+  4-5-photo-gallery-navigation-integration: backlog
   epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-nocodb-backend-setup-api-integration: backlog
+  5-2-mood-tracking-ui-local-storage: backlog
+  5-3-mood-history-calendar-view: backlog
+  5-4-mood-sync-partner-visibility: backlog
+  5-5-poke-kiss-interactions: backlog
+  5-6-anniversary-countdown-timers: backlog
+  epic-5-retrospective: optional

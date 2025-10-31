@@ -7,9 +7,12 @@ import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { APP_CONFIG } from '../../config/constants';
 
 export function DailyMessage() {
-  const { currentMessage, settings, toggleFavorite, error, initializeApp } = useAppStore();
+  const { currentMessage, settings, messageHistory, toggleFavorite, error, initializeApp } = useAppStore();
   const [showHearts, setShowHearts] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Check if current message is favorited (source of truth: messageHistory.favoriteIds)
+  const isFavorited = currentMessage && messageHistory.favoriteIds.includes(currentMessage.id);
 
   // Timeout after 10 seconds if still loading
   useEffect(() => {
@@ -202,11 +205,11 @@ export function DailyMessage() {
               <button
                 onClick={handleFavorite}
                 className="btn-icon group"
-                aria-label={currentMessage.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
               >
                 <Heart
                   className={`w-6 h-6 transition-all duration-300 ${
-                    currentMessage.isFavorite
+                    isFavorited
                       ? 'fill-pink-500 text-pink-500 animate-heart'
                       : 'text-pink-400 group-hover:text-pink-500 group-hover:scale-110'
                   }`}

@@ -9,6 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:smoke": "node scripts/smoke-tests.cjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
     "predeploy": "npm run build && npm run test:smoke",
     "deploy": "gh-pages -d dist",
     "postdeploy": "echo 'Deployment complete! Run: node scripts/post-deploy-check.cjs [YOUR_URL]'"
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^24.6.0",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
