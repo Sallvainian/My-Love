@@ -19,9 +19,122 @@ Comprehensive guide for writing, running, and debugging end-to-end tests for the
 
 ### Prerequisites
 
-- Node.js 18+ installed
-- npm or yarn package manager
-- My-Love project cloned and dependencies installed
+#### System Requirements
+
+**Operating System:**
+- Linux (Ubuntu 20.04+, Debian 11+, or similar)
+- macOS 11+ (Big Sur or later)
+- Windows 10/11 with WSL2 (recommended) or native
+
+**Hardware:**
+- **CPU:** 4+ cores recommended (tests run in parallel)
+- **RAM:** 8 GB minimum, 16 GB recommended
+- **Disk Space:** 5 GB minimum (includes browsers, node_modules, build artifacts)
+
+#### Software Dependencies
+
+**Node.js and Package Manager:**
+- **Node.js:** 18.x or 20.x LTS (tested with 18.19.0 and 20.11.0)
+- **npm:** 9.x or 10.x (comes with Node.js)
+- **pnpm:** 8.x+ (optional alternative)
+- **yarn:** 4.x+ (optional alternative)
+
+**Version check:**
+```bash
+node --version  # Should show v18.x.x or v20.x.x
+npm --version   # Should show 9.x.x or 10.x.x
+```
+
+**Browser Binaries:**
+- Playwright will download browser binaries automatically (~1.5 GB)
+- Chromium (latest stable)
+- Firefox (latest stable)
+- WebKit (Safari engine) - *optional, requires additional system libraries*
+
+#### Project Dependencies
+
+**Core Dependencies** (from package.json):
+- **react:** ^19.1.1 - UI framework
+- **react-dom:** ^19.1.1 - React DOM renderer
+- **zustand:** ^5.0.8 - State management with persist middleware
+- **idb:** ^8.0.3 - IndexedDB wrapper for PWA storage
+- **workbox-window:** ^7.3.0 - Service worker integration
+
+**Development Dependencies:**
+- **@playwright/test:** ^1.56.1 - E2E testing framework
+- **vite:** ^7.1.7 - Dev server and build tool
+- **typescript:** ^5.8.3 - Type checking
+- **@vitejs/plugin-react:** ^4.3.4 - Vite React plugin
+- **vite-plugin-pwa:** ^0.21.6 - PWA generation (service worker, manifest)
+
+**Additional System Dependencies for WebKit (Linux only):**
+
+On Ubuntu/Debian:
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  libicu66 \
+  libwebp6 \
+  libffi7 \
+  libgstreamer1.0-0 \
+  libgstreamer-plugins-base1.0-0
+```
+
+On Fedora/RHEL:
+```bash
+sudo dnf install -y \
+  libicu \
+  libwebp \
+  libffi \
+  gstreamer1 \
+  gstreamer1-plugins-base
+```
+
+**Note:** WebKit tests are currently disabled in `playwright.config.ts` due to missing system dependencies. See [Known Limitations](#webkit-browser-support) section below.
+
+#### Git and Version Control
+
+- **Git:** 2.x+ for repository management
+- **GitHub CLI (gh):** 2.x+ for PR creation (optional but recommended)
+
+```bash
+git --version   # Should show 2.x.x
+gh --version    # Should show 2.x.x (optional)
+```
+
+#### Environment Setup Summary
+
+**Quick Start (Linux/macOS):**
+```bash
+# 1. Verify Node.js version
+node --version  # 18.x or 20.x
+
+# 2. Clone repository
+git clone https://github.com/Sallvainian/My-Love.git
+cd My-Love
+
+# 3. Install project dependencies
+npm install
+
+# 4. Install Playwright browsers
+npx playwright install
+
+# 5. Verify setup
+npm run test:e2e -- --version
+
+# 6. Run tests
+npm run test:e2e
+```
+
+**For Windows Users:**
+- Install WSL2 with Ubuntu 20.04+ (recommended)
+- Follow Linux quick start steps in WSL2 terminal
+- Native Windows testing supported but WSL2 provides better compatibility
+
+**For CI/CD Environments:**
+- Use official Playwright Docker image: `mcr.microsoft.com/playwright:v1.56.1-jammy`
+- Pre-installed browsers and system dependencies
+- See `.github/workflows` for GitHub Actions setup example
 
 ### Installation
 
