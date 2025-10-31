@@ -18,7 +18,7 @@ import { getLocalStorageItem, setLocalStorageItem } from '../support/helpers/pwa
 test.describe('Settings Persistence', () => {
   test('should load pre-configured partner name on first init', async ({ cleanApp }) => {
     // Wait for app to initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Get settings from LocalStorage (Zustand persist)
     const storedSettings = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -33,7 +33,7 @@ test.describe('Settings Persistence', () => {
 
   test('should load pre-configured start date on first init', async ({ cleanApp }) => {
     // Wait for app to initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Get settings from LocalStorage
     const storedSettings = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -54,7 +54,7 @@ test.describe('Settings Persistence', () => {
 
   test('should persist settings changes across browser refresh', async ({ cleanApp }) => {
     // Wait for app to initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Programmatically update settings via the store
     await cleanApp.evaluate(() => {
@@ -92,7 +92,7 @@ test.describe('Settings Persistence', () => {
     }
 
     // Wait for app to re-initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify settings still persisted after refresh
     const storedAfterRefresh = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -105,7 +105,7 @@ test.describe('Settings Persistence', () => {
 
   test('should update duration counter when start date changes', async ({ cleanApp }) => {
     // Wait for app to initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Get initial duration
     const initialDuration = await cleanApp.locator('h2:has-text("Day")').first().textContent();
@@ -147,7 +147,7 @@ test.describe('Settings Persistence', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Get updated duration
     const updatedDuration = await cleanApp.locator('h2:has-text("Day")').first().textContent();
@@ -163,7 +163,7 @@ test.describe('Settings Persistence', () => {
 
   test('should persist settings across 24-hour gap', async ({ cleanApp }) => {
     // Wait for app to initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Update settings
     await cleanApp.evaluate(() => {
@@ -218,7 +218,7 @@ test.describe('Settings Persistence', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify settings still persisted 24 hours later
     const storedSettings = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -231,7 +231,7 @@ test.describe('Settings Persistence', () => {
 
   test('should initialize with pre-configured values on clean state', async ({ cleanApp }) => {
     // cleanApp fixture clears all storage before test
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify settings initialized from APP_CONFIG constants
     const storedSettings = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -258,7 +258,7 @@ test.describe('Settings UI (Future Story)', () => {
     // 4. Save changes
     // 5. Verify persistence
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Navigate to Settings (UI component doesn't exist yet)
     // const settingsButton = cleanApp.locator('button[aria-label="Settings"]');
@@ -279,7 +279,7 @@ test.describe('Settings UI (Future Story)', () => {
 
   test.skip('should edit start date via Settings UI', async ({ cleanApp }) => {
     // This test will be enabled when Settings UI component is added
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Navigate to Settings
     // const settingsButton = cleanApp.locator('button[aria-label="Settings"]');

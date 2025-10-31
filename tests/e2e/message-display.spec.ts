@@ -18,11 +18,11 @@ import { getDaysSinceStart, formatRelationshipDuration } from '../../src/utils/m
 test.describe('Message Display', () => {
   test('should display today\'s message correctly', async ({ cleanApp }) => {
     // Wait for message card to be visible
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
 
     // Assert message text is not empty
-    const messageText = cleanApp.locator('.font-serif.text-gray-800');
+    const messageText = cleanApp.getByTestId('message-text');
     await expect(messageText).toBeVisible();
     const text = await messageText.textContent();
     expect(text).toBeTruthy();
@@ -33,10 +33,10 @@ test.describe('Message Display', () => {
 
   test('should rotate message based on date', async ({ cleanApp }) => {
     // Get today's message as baseline
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
 
-    const messageText1 = cleanApp.locator('.font-serif.text-gray-800');
+    const messageText1 = cleanApp.getByTestId('message-text');
     await expect(messageText1).toBeVisible();
     const todayMessage = await messageText1.textContent();
 
@@ -67,7 +67,7 @@ test.describe('Message Display', () => {
 
     // Reload app to trigger message rotation with new date
     await cleanApp.reload();
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Handle welcome screen if it appears
     const continueButton = cleanApp.locator('button:has-text("Continue")');
@@ -77,7 +77,7 @@ test.describe('Message Display', () => {
     }
 
     // Get tomorrow's message
-    const messageText2 = cleanApp.locator('.font-serif.text-gray-800');
+    const messageText2 = cleanApp.getByTestId('message-text');
     await expect(messageText2).toBeVisible();
     const tomorrowMessage = await messageText2.textContent();
 
@@ -89,11 +89,11 @@ test.describe('Message Display', () => {
 
   test('should display correct category badge', async ({ cleanApp }) => {
     // Wait for message to load
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
 
     // Find category badge
-    const categoryBadge = cleanApp.locator('.bg-gradient-to-r.from-pink-500.to-rose-500.text-white');
+    const categoryBadge = cleanApp.getByTestId('message-category-badge');
     await expect(categoryBadge).toBeVisible();
 
     // Assert badge shows a valid category
@@ -116,11 +116,12 @@ test.describe('Message Display', () => {
 
   test('should calculate relationship duration correctly', async ({ cleanApp }) => {
     // Wait for message to load
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
 
     // Get the duration counter element
-    const durationHeader = cleanApp.locator('h2:has-text("Day")').first();
+    const durationCounter = cleanApp.getByTestId('message-duration-counter');
+    const durationHeader = durationCounter.locator('h2:has-text("Day")');
     await expect(durationHeader).toBeVisible();
 
     const headerText = await durationHeader.textContent();
@@ -139,7 +140,7 @@ test.describe('Message Display', () => {
     expect(displayedDays).toBe(expectedDays);
 
     // Also check formatted duration text
-    const durationText = cleanApp.locator('p.text-sm.text-gray-500').first();
+    const durationText = durationCounter.locator('p.text-sm.text-gray-500');
     await expect(durationText).toBeVisible();
     const formattedText = await durationText.textContent();
 
@@ -151,7 +152,7 @@ test.describe('Message Display', () => {
 
   test('should render message card with entrance animation', async ({ cleanApp }) => {
     // Navigate to app and immediately check for animation classes
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
 
     // Wait for card to appear
     await expect(messageCard).toBeVisible({ timeout: 10000 });
@@ -172,11 +173,11 @@ test.describe('Message Display', () => {
 
   test('should handle long message text without overflow', async ({ cleanApp }) => {
     // Wait for message to load
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
 
     // Get message text element
-    const messageText = cleanApp.locator('.font-serif.text-gray-800');
+    const messageText = cleanApp.getByTestId('message-text');
     await expect(messageText).toBeVisible();
 
     // Get text content
@@ -212,14 +213,18 @@ test.describe('Message Display', () => {
 
   test('should display relationship duration in header', async ({ cleanApp }) => {
     // Wait for message to load
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    // Check for duration counter container
+    const durationCounter = cleanApp.getByTestId('message-duration-counter');
+    await expect(durationCounter).toBeVisible();
 
     // Check for "Day X Together" header
-    const dayHeader = cleanApp.locator('h2:has-text("Day")');
+    const dayHeader = durationCounter.locator('h2:has-text("Day")');
     await expect(dayHeader).toBeVisible();
 
     // Check for formatted duration text below
-    const durationText = cleanApp.locator('p.text-sm.text-gray-500').first();
+    const durationText = durationCounter.locator('p.text-sm.text-gray-500');
     await expect(durationText).toBeVisible();
 
     const formattedDuration = await durationText.textContent();
@@ -237,7 +242,7 @@ test.describe('Message Display', () => {
 
     // Wait for either loading state or message
     const loadingIndicator = cleanApp.locator('text=Loading your daily message');
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
 
     // One of these should be visible
     await Promise.race([
@@ -253,10 +258,10 @@ test.describe('Message Display', () => {
 
   test('should display heart button for favorites', async ({ cleanApp }) => {
     // Wait for message to load
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Find heart button (favorite button)
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]');
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await expect(heartButton).toBeVisible();
 
     // Button should have heart icon
@@ -268,10 +273,10 @@ test.describe('Message Display', () => {
 
   test('should display share button', async ({ cleanApp }) => {
     // Wait for message to load
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Find share button
-    const shareButton = cleanApp.locator('button[aria-label="Share message"]');
+    const shareButton = cleanApp.getByTestId('message-share-button');
     await expect(shareButton).toBeVisible();
 
     // Button should have share icon
@@ -283,7 +288,7 @@ test.describe('Message Display', () => {
 
   test('should display decorative elements', async ({ cleanApp }) => {
     // Wait for message to load
-    const messageCard = cleanApp.locator('.card').first();
+    const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
 
     // Check for Sparkles icons in header
@@ -303,9 +308,10 @@ test.describe('Message Duration Calculation Edge Cases', () => {
     // This test validates duration counter handles edge case of relationship starting today
     // Note: Can't modify APP_CONFIG at runtime, but validates current calculation
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
-    const durationHeader = cleanApp.locator('h2:has-text("Day")').first();
+    const durationCounter = cleanApp.getByTestId('message-duration-counter');
+    const durationHeader = durationCounter.locator('h2:has-text("Day")');
     const headerText = await durationHeader.textContent();
 
     // Should show "Day X Together" where X >= 1
@@ -318,9 +324,10 @@ test.describe('Message Duration Calculation Edge Cases', () => {
   });
 
   test('should display duration text in consistent format', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
-    const durationText = cleanApp.locator('p.text-sm.text-gray-500').first();
+    const durationCounter = cleanApp.getByTestId('message-duration-counter');
+    const durationText = durationCounter.locator('p.text-sm.text-gray-500');
     const text = await durationText.textContent();
 
     // Should match one of the expected formats:

@@ -1,0 +1,293 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Add data-testid Attributes to Components</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-3-add-data-testid-attributes.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>semantic data-testid attributes on all interactive elements</iWant>
+    <soThat>tests are maintainable and resilient to UI changes</soThat>
+    <tasks>
+- Add data-testid attributes to DailyMessage component (AC: 1, 2)
+  - Locate DailyMessage component file (src/components/DailyMessage.tsx)
+  - Add data-testid="message-card" to main message container
+  - Add data-testid="message-text" to message text display
+  - Add data-testid="message-category-badge" to category badge
+  - Add data-testid="message-duration-counter" to relationship duration display
+  - Add data-testid="message-favorite-button" to favorite toggle button
+  - Add data-testid="message-share-button" to share button
+
+- Add data-testid attributes to theme selector (AC: 1)
+- Add data-testid attributes to Settings component if exists (AC: 3)
+- Add data-testid attributes to Navigation elements if exists (AC: 4)
+
+- Migrate message-display.spec.ts to data-testid selectors (AC: 6)
+- Migrate favorites.spec.ts to data-testid selectors (AC: 6)
+- Migrate settings.spec.ts to data-testid selectors (AC: 6)
+- Migrate navigation.spec.ts to data-testid selectors (AC: 6)
+- Migrate persistence.spec.ts to data-testid selectors (AC: 6)
+
+- Run full test suite validation (AC: 6)
+- Document data-testid strategy in tests/README.md (AC: 7)</tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC-2.3.1: Add data-testid to all buttons (favorites, navigation, settings actions)
+- Favorite toggle button: message-favorite-button
+- Share button: message-share-button
+- Theme selector: theme-selector
+- Follow naming convention [component]-[element]-[action]
+
+AC-2.3.2: Add data-testid to message display areas
+- Message card container: message-card
+- Message text: message-text
+- Category badge: message-category-badge
+- Relationship duration counter: message-duration-counter
+
+AC-2.3.3: Add data-testid to input fields (settings form)
+- Partner name input: settings-partner-name-input
+- Start date input: settings-start-date-input
+
+AC-2.3.4: Add data-testid to navigation elements
+- Pattern: navigation-[view]-link
+- Future-ready for full navigation implementation
+
+AC-2.3.5: Follow naming convention: [component]-[element]-[action]
+- Lowercase, hyphen-separated
+- No uppercase, underscores, or camelCase
+
+AC-2.3.6: Update existing tests to use data-testid selectors
+- Migrate all 5 test suites (106 tests)
+- Replace CSS selectors with getByTestId()
+- Maintain 100% pass rate in Chromium and Firefox
+
+AC-2.3.7: Document data-testid strategy in tests/README.md
+- Explain naming convention
+- Provide examples
+- Document migration guidance
+- Include guidelines for new components</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic 2 - Testing Infrastructure</title>
+        <section>Story 2.3: Add data-testid Attributes to Components</section>
+        <snippet>User story defines semantic data-testid attributes on all interactive elements for test maintainability and resilience to UI changes. Prerequisites: Story 2.2 complete (106 tests with CSS selectors).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Data-testid Naming Convention</section>
+        <snippet>Naming pattern: [component]-[element]-[action]. Examples: 'message-card', 'message-favorite-button', 'settings-partner-name-input'. Story 2.3 adds semantic data-testid attributes following consistent convention.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Critical Workflow 3: Adding data-testid to Components</section>
+        <snippet>Tests locate elements via data-testid selectors (Story 2.3). Migration from CSS selectors to getByTestId() for all 106 tests across 5 test suites.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>NFR006: Code Quality</section>
+        <snippet>App SHALL maintain TypeScript strict mode, ESLint compliance, and &lt;10% code duplication. Testing quality goals require test selectors resilient to styling changes.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Component Architecture</section>
+        <snippet>App.tsx → ErrorBoundary → DailyMessage (Main app view - always rendered). DailyMessage includes Header, Message Card (Category Badge, Message Text, Action Buttons), and Navigation Hint.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/components/DailyMessage/DailyMessage.tsx</path>
+        <kind>component</kind>
+        <symbol>DailyMessage</symbol>
+        <lines>9-end</lines>
+        <reason>Primary component containing all interactive elements that need data-testid attributes: message card, message text, category badge, duration counter, favorite button, share button.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-end</lines>
+        <reason>Root component that may contain theme selector element requiring data-testid attribute.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/message-display.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Message Display</symbol>
+        <lines>18-end</lines>
+        <reason>Primary test suite using CSS selectors (.card, .font-serif.text-gray-800) that must be migrated to getByTestId(). Tests message display and rotation (AC-2.2.1, AC-2.2.4).</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/favorites.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Favorites</symbol>
+        <lines>1-end</lines>
+        <reason>Test suite for favorite functionality that must migrate from CSS/attribute selectors to data-testid. Tests favorite button interactions and state persistence.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/settings.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Settings</symbol>
+        <lines>1-end</lines>
+        <reason>Test suite for settings functionality. May need to add data-testid to settings inputs if Settings component exists (Story 1.4 added pre-configuration).</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/navigation.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Navigation</symbol>
+        <lines>1-end</lines>
+        <reason>Test suite for navigation and theme switching. Must migrate theme selector tests to data-testid. Navigation elements may be future-ready placeholders.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/persistence.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Persistence</symbol>
+        <lines>1-end</lines>
+        <reason>Test suite for state persistence (IndexedDB, LocalStorage). May use selectors for state validation that should migrate to data-testid.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>
+        <name>React</name>
+        <version>19.1.1</version>
+        <purpose>UI framework for component architecture</purpose>
+      </framework>
+      <framework>
+        <name>Playwright</name>
+        <version>1.56.1</version>
+        <purpose>E2E testing framework - tests will use getByTestId() for element selection</purpose>
+      </framework>
+      <framework>
+        <name>TypeScript</name>
+        <version>5.9.3</version>
+        <purpose>Type safety - strict mode enforced per NFR006</purpose>
+      </framework>
+      <framework>
+        <name>Framer Motion</name>
+        <version>12.23.24</version>
+        <purpose>Animations in DailyMessage component (entrance animations, floating hearts)</purpose>
+      </framework>
+      <framework>
+        <name>Zustand</name>
+        <version>5.0.8</version>
+        <purpose>State management - no changes needed for data-testid</purpose>
+      </framework>
+      <framework>
+        <name>Tailwind CSS</name>
+        <version>3.4.18</version>
+        <purpose>Styling - data-testid attributes independent of CSS classes</purpose>
+      </framework>
+      <devDependency>
+        <name>Vite</name>
+        <version>7.1.7</version>
+        <purpose>Build tool - no changes needed for data-testid</purpose>
+      </devDependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+- **Zero Functional Impact**: Adding data-testid attributes must not change any component behavior, styling, or user interactions
+- **HTML5 Standard**: data-testid is standard HTML5 data attribute - no compatibility concerns
+- **Naming Convention Strictness**: ALL attributes must follow [component]-[element]-[action] pattern consistently
+- **Lowercase Hyphen-Separated**: No uppercase, underscores, or camelCase in attribute values
+- **No New CSS Classes**: Migration is attribute-only, do not modify existing CSS classes or styles
+- **Test Isolation**: Each test suite migration should be validated independently before full suite run
+- **100% Pass Rate Maintained**: All 106 tests must pass after migration (same count as Story 2.2)
+- **Multi-Browser Validation**: Tests must pass in Chromium and Firefox after migration
+- **Performance**: data-testid adds negligible overhead (~200 bytes HTML per attribute)
+- **Semantic Naming**: Attribute values should clearly describe element purpose (e.g., 'message-favorite-button' not 'btn1')
+- **Future-Ready**: Add navigation data-testid attributes even if navigation not fully implemented (Epic 3 readiness)
+- **Documentation Required**: tests/README.md must document strategy, examples, and guidelines (AC-2.3.7)
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Playwright Test API</name>
+      <kind>Testing Framework API</kind>
+      <signature>page.getByTestId(testId: string) => Locator</signature>
+      <description>Primary method for selecting elements by data-testid attribute. Replaces page.locator() with CSS selectors.</description>
+    </interface>
+    <interface>
+      <name>data-testid HTML Attribute</name>
+      <kind>HTML5 Data Attribute</kind>
+      <signature>&lt;element data-testid="value"&gt;</signature>
+      <description>Standard HTML5 custom data attribute for test selection. Non-visual, does not affect styling or behavior.</description>
+    </interface>
+    <interface>
+      <name>DailyMessage Component Props</name>
+      <kind>React Component Interface</kind>
+      <signature>function DailyMessage(): JSX.Element</signature>
+      <description>Main message display component with no props. Contains all interactive elements requiring data-testid attributes.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Playwright E2E testing framework established in Story 2.1. Tests use fixtures (cleanApp, appWithMessages, appWithFavorites) for test isolation. Multi-browser testing in Chromium and Firefox. Tests run via 'npm run test:e2e' command. PWA helpers (clearIndexedDB, clearLocalStorage, waitForServiceWorker) handle storage cleanup. Story 2.2 established 106 passing tests using temporary CSS selectors - Story 2.3 migrates to stable data-testid selectors. Test execution time target: &lt;5 minutes. Flakiness validation: 100% pass rate across 10 consecutive runs required.
+    </standards>
+    <locations>
+      <location>tests/e2e/</location>
+      <location>tests/e2e/message-display.spec.ts</location>
+      <location>tests/e2e/favorites.spec.ts</location>
+      <location>tests/e2e/settings.spec.ts</location>
+      <location>tests/e2e/navigation.spec.ts</location>
+      <location>tests/e2e/persistence.spec.ts</location>
+      <location>tests/support/fixtures/</location>
+      <location>tests/support/helpers/</location>
+    </locations>
+    <ideas>
+      <idea criteriaId="AC-2.3.1">
+        Test that all button data-testid attributes are present and accessible via getByTestId():
+        - await page.getByTestId('message-favorite-button').click()
+        - await page.getByTestId('message-share-button').click()
+        - await page.getByTestId('theme-selector').click()
+        Verify functionality works after attribute addition.
+      </idea>
+      <idea criteriaId="AC-2.3.2">
+        Test that all message display data-testid attributes are present:
+        - await expect(page.getByTestId('message-card')).toBeVisible()
+        - await expect(page.getByTestId('message-text')).toHaveText(/\w+/)
+        - await expect(page.getByTestId('message-category-badge')).toBeVisible()
+        - await expect(page.getByTestId('message-duration-counter')).toContainText('days')
+        Verify content renders correctly after attribute addition.
+      </idea>
+      <idea criteriaId="AC-2.3.6">
+        Incremental test migration strategy:
+        1. Migrate message-display.spec.ts first (most tests, ~15-20 selectors)
+        2. Run suite: npm run test:e2e message-display.spec.ts
+        3. Verify all 14 tests pass before proceeding
+        4. Migrate favorites.spec.ts, then settings, navigation, persistence
+        5. Run full suite after each migration to catch issues early
+        6. Final validation: npm run test:e2e (all 106 tests pass)
+      </idea>
+      <idea criteriaId="AC-2.3.6">
+        Regression testing checklist after migration:
+        - All 106 tests pass (no new failures)
+        - Test execution time remains &lt;5 minutes
+        - Tests pass in Chromium and Firefox
+        - No visual regressions in app
+        - Test code more readable (getByTestId vs complex CSS selectors)
+        - Run flakiness validation: 10 consecutive full suite runs
+      </idea>
+      <idea criteriaId="AC-2.3.7">
+        Documentation content for tests/README.md:
+        - Explain [component]-[element]-[action] naming convention
+        - Provide examples of correct data-testid usage
+        - Document migration pattern: page.locator('.class') → page.getByTestId('component-element')
+        - Include guidelines: when to add data-testid to new components
+        - List benefits: test stability, refactoring resilience, selector clarity
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

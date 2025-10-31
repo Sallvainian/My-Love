@@ -73,7 +73,7 @@ test.describe('LocalStorage Persistence', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify state hydrated from LocalStorage
     const hydratedState = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -88,10 +88,10 @@ test.describe('LocalStorage Persistence', () => {
   });
 
   test('should persist LocalStorage after state changes', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Make state change (favorite a message)
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await heartButton.click();
     await cleanApp.waitForTimeout(500);
 
@@ -105,7 +105,7 @@ test.describe('LocalStorage Persistence', () => {
   });
 
   test('should persist state across 24-hour gap', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Set known state
     await cleanApp.evaluate(() => {
@@ -165,7 +165,7 @@ test.describe('LocalStorage Persistence', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify state persisted 24 hours later
     const afterState = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -176,7 +176,7 @@ test.describe('LocalStorage Persistence', () => {
   });
 
   test('should handle LocalStorage quota exceeded gracefully', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Attempt to fill LocalStorage to near quota
     // Note: Most browsers have 5-10MB limit per origin
@@ -203,11 +203,11 @@ test.describe('LocalStorage Persistence', () => {
     }
 
     // App should still function after quota error
-    await expect(cleanApp.locator('.card').first()).toBeVisible();
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible();
   });
 
   test('should clear LocalStorage correctly', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify LocalStorage has data
     const beforeClear = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -224,7 +224,7 @@ test.describe('LocalStorage Persistence', () => {
   });
 
   test('should preserve in-memory state not in persist partialize', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Get current persisted state
     const persistedState = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -251,7 +251,7 @@ test.describe('LocalStorage Persistence', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify in-memory state reset (messages re-loaded from defaultMessages.ts)
     // Verify persisted state restored (settings, messageHistory)
@@ -268,7 +268,7 @@ test.describe('LocalStorage Persistence', () => {
 
 test.describe('IndexedDB Persistence', () => {
   test('should clear IndexedDB correctly', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Clear IndexedDB
     await clearIndexedDB(cleanApp, 'my-love-db');
@@ -291,13 +291,13 @@ test.describe('IndexedDB Persistence', () => {
     // Service workers don't register in Vite dev mode
     // Will be enabled after Story 2.4 configures auto-start preview server
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Wait for service worker registration
     // await waitForServiceWorker(cleanApp);
 
     // Favorite a message (IndexedDB write)
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await heartButton.click();
     await cleanApp.waitForTimeout(500);
 
@@ -313,7 +313,7 @@ test.describe('IndexedDB Persistence', () => {
     await cleanApp.waitForLoadState('networkidle');
 
     // Verify favorite persists offline
-    // const heartIcon = cleanApp.locator('button[aria-label*="favorite"]').first().locator('svg');
+    // const heartIcon = cleanApp.getByTestId('message-favorite-button').locator('svg');
     // const isFilled = await heartIcon.evaluate((el) => el.classList.contains('fill-pink-500'));
     // expect(isFilled).toBe(true);
 
@@ -328,7 +328,7 @@ test.describe('IndexedDB Persistence', () => {
     // Browser quotas vary (typically 50MB-500MB+)
     // Skipping to avoid long test execution and potential browser hangs
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Attempt to add large number of photos to trigger quota
     // Note: This would require writing many large blob objects
@@ -346,7 +346,7 @@ test.describe('IndexedDB Persistence', () => {
 
 test.describe('Zustand Persist Middleware', () => {
   test('should use correct LocalStorage key', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify Zustand persist uses 'my-love-storage' key
     const storedData = await cleanApp.evaluate(() => {
@@ -362,7 +362,7 @@ test.describe('Zustand Persist Middleware', () => {
   });
 
   test('should include version in persisted state', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     const storedData = await getLocalStorageItem(cleanApp, 'my-love-storage');
     const parsed = JSON.parse(storedData!);
@@ -409,7 +409,7 @@ test.describe('Zustand Persist Middleware', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify migration handled gracefully (app doesn't crash)
     const migratedState = await getLocalStorageItem(cleanApp, 'my-love-storage');

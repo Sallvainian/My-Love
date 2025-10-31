@@ -48,9 +48,9 @@ development_status:
   epic-2: contexted
   2-1-testing-framework-setup: done
   2-2-testing-component-integration: done
-  2-3-add-data-testid-attributes: backlog
-  2-4-configure-auto-start-preview-server: backlog
-  2-5-run-validate-tests-pass: backlog
+  2-3-add-data-testid-attributes: done
+  2-4-configure-auto-start-preview-server: done
+  2-5-run-validate-tests-pass: in-progress
   2-6-add-ci-integration-github-actions: backlog
   epic-2-retrospective: optional
 

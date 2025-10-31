@@ -23,7 +23,7 @@ import { getLocalStorageItem } from '../support/helpers/pwaHelpers';
 test.describe('Theme Switching', () => {
   test('should switch theme to Sunset Romance', async ({ cleanApp }) => {
     // Wait for app to initialize
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to sunset theme programmatically
     await cleanApp.evaluate(() => {
@@ -53,7 +53,7 @@ test.describe('Theme Switching', () => {
   });
 
   test('should switch theme to Ocean Breeze', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to ocean theme
     await cleanApp.evaluate(() => {
@@ -80,7 +80,7 @@ test.describe('Theme Switching', () => {
   });
 
   test('should switch theme to Lavender Dreams', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to lavender theme
     await cleanApp.evaluate(() => {
@@ -107,7 +107,7 @@ test.describe('Theme Switching', () => {
   });
 
   test('should switch theme to Rose Garden', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to rose theme
     await cleanApp.evaluate(() => {
@@ -134,7 +134,7 @@ test.describe('Theme Switching', () => {
   });
 
   test('should persist theme across browser refresh', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to ocean theme
     await cleanApp.evaluate(() => {
@@ -161,7 +161,7 @@ test.describe('Theme Switching', () => {
       await cleanApp.waitForLoadState('networkidle');
     }
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify theme still ocean after refresh
     const afterRefresh = await getLocalStorageItem(cleanApp, 'my-love-storage');
@@ -178,7 +178,7 @@ test.describe('Theme Switching', () => {
   });
 
   test('should update all CSS variables on theme change', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to lavender theme
     await cleanApp.evaluate(() => {
@@ -213,7 +213,7 @@ test.describe('Theme Switching', () => {
   });
 
   test('should apply theme to body background', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Switch to sunset theme
     await cleanApp.evaluate(() => {
@@ -249,7 +249,7 @@ test.describe('Theme Selector UI (Future Story)', () => {
     // 3. Verify theme applied immediately
     // 4. Verify persistence
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Open theme selector
     // const themeButton = cleanApp.locator('button[aria-label="Change theme"]');
@@ -270,7 +270,7 @@ test.describe('Theme Selector UI (Future Story)', () => {
 
   test.skip('should show visual preview of themes', async ({ cleanApp }) => {
     // This test will validate theme preview/showcase when UI is added
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Open theme selector
     // const themeButton = cleanApp.locator('button[aria-label="Change theme"]');
@@ -301,7 +301,7 @@ test.describe('Navigation State (Future Story)', () => {
     // 2. Refresh page
     // 3. Verify still on Favorites view (navigation state persisted)
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Navigate to favorites
     // const favoritesButton = cleanApp.locator('button[aria-label="Favorites"]');

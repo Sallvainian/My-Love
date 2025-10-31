@@ -5,6 +5,7 @@ Comprehensive guide for writing, running, and debugging end-to-end tests for the
 ## Table of Contents
 
 - [Testing Infrastructure Setup](#testing-infrastructure-setup)
+- [Development Server Auto-Start (webServer Configuration)](#development-server-auto-start-webserver-configuration)
 - [PWA Test Helpers API](#pwa-test-helpers-api)
 - [data-testid Naming Convention](#data-testid-naming-convention)
 - [Test Organization Patterns](#test-organization-patterns)
@@ -84,6 +85,417 @@ npx playwright test --project=chromium
 npx playwright test --project=firefox
 npx playwright test --project=webkit
 ```
+
+---
+
+## Development Server Auto-Start (webServer Configuration)
+
+Playwright automatically manages the Vite development server lifecycle during test execution, eliminating manual setup steps and enabling single-command test workflows.
+
+### How It Works
+
+**Configuration** (`playwright.config.ts` lines 90-98):
+```typescript
+webServer: {
+  command: 'npm run dev',                      // Command to start server
+  url: 'http://localhost:5173/My-Love/',       // URL to poll for readiness
+  reuseExistingServer: !process.env.CI,        // Reuse in local, fresh in CI
+  timeout: 120000,                             // 2-minute startup timeout
+}
+```
+
+**Behavior:**
+1. **Before tests start:** Playwright spawns `npm run dev` process
+2. **Readiness check:** Polls URL until HTTP 200 response (typically 10-30 seconds)
+3. **Test execution:** Runs all tests against the ready server
+4. **After tests complete:** Sends SIGTERM to gracefully shut down server
+
+**Environment-Aware:**
+- **Local Development:** Reuses existing server if port 5173 is occupied (`reuseExistingServer: true`)
+- **CI Environment:** Always starts fresh server ignoring existing processes (`reuseExistingServer: false` when `CI=true`)
+
+---
+
+### Usage Workflows
+
+#### Cold Start (No Server Running)
+
+Most common scenario - tests start server automatically from clean state.
+
+**Command:**
+```bash
+npm run test:e2e
+```
+
+**What happens:**
+1. Playwright checks port 5173 - finds it empty
+2. Spawns `npm run dev` process
+3. Waits for `http://localhost:5173/My-Love/` to respond (HTTP 200)
+4. Runs all 124 tests
+5. Shuts down server gracefully
+6. Port 5173 released
+
+**Startup time:** ~10-30 seconds including PWA service worker registration
+
+**Use when:**
+- Running full test suite
+- CI/CD pipeline execution
+- Clean environment testing
+
+---
+
+#### Warm Start (Server Already Running)
+
+When dev server is already running (e.g., in separate terminal for development), Playwright detects and reuses it.
+
+**Setup:**
+```bash
+# Terminal 1: Start dev server manually
+npm run dev
+
+# Terminal 2: Run tests
+npm run test:e2e
+```
+
+**What happens:**
+1. Playwright checks port 5173 - finds existing server
+2. Reuses existing server (no new process spawned)
+3. Runs tests immediately (no startup delay)
+4. Server continues running after tests complete
+5. Original server process unchanged
+
+**Startup time:** ~0 seconds (immediate test execution)
+
+**Use when:**
+- Local development with live server
+- Iterative test development
+- Debugging UI changes while running tests
+
+**How to identify:**
+- No "Starting server..." message in console
+- Tests begin immediately without 10-30 second wait
+- Dev server terminal shows no restart
+
+---
+
+#### CI Environment (Fresh Start Every Time)
+
+In CI environments (`CI=true`), Playwright always starts a fresh server regardless of port availability.
+
+**Configuration:**
+```bash
+export CI=true  # Set in GitHub Actions automatically
+npm run test:e2e
+```
+
+**What happens:**
+1. Playwright starts fresh `npm run dev` process
+2. Ignores any existing process on port 5173
+3. Runs tests against fresh server
+4. Shuts down server after tests
+5. Clean environment for next run
+
+**Use when:**
+- GitHub Actions workflows
+- CI/CD pipelines
+- Reproducible test environments
+
+**Why fresh start in CI:**
+- Ensures consistent test environment
+- No contamination from previous runs
+- Catches port conflicts before deployment
+- Validates server startup reliability
+
+---
+
+### Configuration Parameters
+
+#### `command: 'npm run dev'`
+
+Shell command to start the development server.
+
+**Requirements:**
+- Must match a valid script in `package.json`
+- Server must start within `timeout` period
+- Server must respond to `url` with HTTP 200
+
+**Current setup:**
+```json
+// package.json
+{
+  "scripts": {
+    "dev": "vite"  // Starts Vite dev server on port 5173
+  }
+}
+```
+
+---
+
+#### `url: 'http://localhost:5173/My-Love/'`
+
+URL that Playwright polls to determine server readiness.
+
+**Requirements:**
+- Must match Vite base path configuration
+- Server must return HTTP 200 when ready
+- Must include base path from `vite.config.ts`
+
+**Current setup:**
+```typescript
+// vite.config.ts
+export default defineConfig({
+  base: '/My-Love/',  // Must match webServer url path
+  // ...
+});
+```
+
+**Validation:**
+```bash
+# After server starts, should return HTTP 200
+curl -I http://localhost:5173/My-Love/
+```
+
+---
+
+#### `reuseExistingServer: !process.env.CI`
+
+Controls server reuse behavior based on environment.
+
+**Local Development** (`CI` not set):
+- Value: `true`
+- Behavior: Reuses existing server if port 5173 occupied
+- Use case: Developer has server running for UI work
+
+**CI Environment** (`CI=true`):
+- Value: `false`
+- Behavior: Always starts fresh server
+- Use case: Reproducible, isolated test environment
+
+**Example:**
+```bash
+# Local: Reuses existing server
+npm run test:e2e
+
+# CI mode: Fresh server every time
+export CI=true
+npm run test:e2e
+unset CI  # Restore local mode
+```
+
+---
+
+#### `timeout: 120000`
+
+Maximum time (in milliseconds) to wait for server readiness.
+
+**Current setting:** 2 minutes (120,000 ms)
+
+**Why 2 minutes:**
+- Typical startup: 10-30 seconds (including PWA service worker)
+- Slow CI environments: 60-90 seconds
+- Generous buffer for dependency loading
+- Accommodates service worker registration delay (2-5 seconds)
+
+**When to increase:**
+- Very slow CI environments (resource-constrained)
+- Large dependency trees
+- Complex build steps in dev mode
+
+**When server fails to start:**
+- Error message: "Server did not start in 120000ms"
+- Check: `npm run dev` works independently
+- Check: Port 5173 not occupied by other process
+- Check: No firewall blocking localhost:5173
+
+---
+
+### Troubleshooting
+
+#### Server Fails to Start
+
+**Symptom:** Tests timeout with "Server did not start in 120000ms"
+
+**Causes:**
+1. Port 5173 occupied by another process
+2. `npm run dev` fails independently
+3. Vite base path mismatch
+4. Dependencies not installed
+
+**Solutions:**
+```bash
+# 1. Check if port is occupied
+lsof -ti:5173
+# If returns PID, kill process:
+lsof -ti:5173 | xargs kill
+
+# 2. Verify dev server works independently
+npm run dev
+# Should see: "Local: http://localhost:5173/My-Love/"
+
+# 3. Verify base path in vite.config.ts matches webServer URL
+grep "base:" vite.config.ts
+# Should see: base: '/My-Love/',
+
+# 4. Reinstall dependencies
+npm install
+```
+
+---
+
+#### Server Won't Stop After Tests
+
+**Symptom:** Port 5173 still occupied after tests complete
+
+**Cause:** Server process didn't receive SIGTERM signal
+
+**Solution:**
+```bash
+# Find and kill orphaned process
+lsof -ti:5173 | xargs kill
+
+# If process won't die, force kill
+lsof -ti:5173 | xargs kill -9
+```
+
+**Prevention:**
+- Ensure tests complete normally (no Ctrl+C during execution)
+- Use background processes properly (`&` operator)
+- Let Playwright manage server lifecycle
+
+---
+
+#### Tests Start Before Server Ready
+
+**Symptom:** "Connection refused" errors in early tests
+
+**Cause:** Server not responding at `url` yet
+
+**Diagnosis:**
+```bash
+# Check if URL returns HTTP 200
+curl -I http://localhost:5173/My-Love/
+# Should return: HTTP/1.1 200 OK
+```
+
+**Solutions:**
+1. **Base path mismatch:** Ensure `vite.config.ts` base matches webServer URL
+2. **Increase timeout:** Change `timeout: 180000` (3 minutes) if CI is very slow
+3. **Service worker delay:** 120-second timeout already accommodates PWA startup
+
+---
+
+#### Port Conflicts
+
+**Symptom:** Vite fails with "Port 5173 is in use"
+
+**Cause:** Another process (previous test run, manual server, other app) occupies port 5173
+
+**Known limitation:** Port 5173 is hardcoded (no dynamic port fallback)
+
+**Solutions:**
+```bash
+# Option 1: Kill process on port 5173
+lsof -ti:5173 | xargs kill
+
+# Option 2: Change Vite port (requires updating playwright.config.ts URL)
+# vite.config.ts:
+server: { port: 5174 }
+
+# playwright.config.ts:
+url: 'http://localhost:5174/My-Love/',
+```
+
+**Why hardcoded port:**
+- Port 5173 is Vite's default and rarely conflicts
+- Dynamic port detection requires parsing Vite output (complex)
+- Single-developer project doesn't benefit from dynamic ports
+- Acceptable trade-off for simplicity
+
+---
+
+#### CI Tests Pass Locally But Fail in CI
+
+**Symptom:** Tests pass with manual server but fail in CI
+
+**Diagnosis:**
+```bash
+# Simulate CI environment locally
+export CI=true
+npm run test:e2e
+unset CI  # Restore after test
+```
+
+**Common causes:**
+1. **Local server reuse hiding bugs:** CI starts fresh, exposes startup issues
+2. **Port conflicts in CI:** Previous job didn't clean up
+3. **Timeout too short:** Slow CI environment needs >120 seconds
+4. **Base path mismatch:** Works with manual server but not auto-start
+
+**Solutions:**
+1. Always test with `CI=true` before pushing
+2. Increase timeout for slow CI: `timeout: 180000`
+3. Verify `npm run dev` succeeds in clean CI environment
+4. Check GitHub Actions artifacts for detailed error logs
+
+---
+
+### Verification Checklist
+
+Before relying on webServer auto-start:
+
+- [ ] `npm run dev` works independently
+- [ ] Dev server responds at `http://localhost:5173/My-Love/` (HTTP 200)
+- [ ] Base path in `vite.config.ts` matches webServer URL
+- [ ] Port 5173 is not occupied by other processes
+- [ ] Tests pass in cold start scenario: `npm run test:e2e`
+- [ ] Tests pass in CI mode: `export CI=true && npm run test:e2e`
+- [ ] Server shuts down cleanly after tests (port 5173 released)
+
+---
+
+### Known Limitations
+
+**1. Port 5173 is hardcoded**
+- No dynamic port fallback if port occupied
+- Workaround: Kill process on port 5173 or change Vite port
+
+**2. Timeout applies to entire startup**
+- 120-second timeout includes Vite bundling + service worker registration
+- Slow CI environments may need increased timeout
+
+**3. No parallel server instances**
+- Cannot run multiple test suites simultaneously (port conflict)
+- Playwright handles parallelization at worker level, not server level
+
+**4. Environment variable dependency**
+- `reuseExistingServer` behavior depends on `CI` environment variable
+- Must be set correctly in CI/CD configuration
+
+---
+
+### Best Practices
+
+**✅ Do:**
+- Let Playwright manage server lifecycle (don't start manually for tests)
+- Use cold start for CI and full regression testing
+- Use warm start for iterative test development
+- Verify configuration with checklist before troubleshooting
+- Monitor test startup time (should be consistent 10-30 seconds)
+
+**❌ Don't:**
+- Start multiple servers on port 5173 simultaneously
+- Modify server configuration during test execution
+- Rely on server reuse in CI (use `CI=true`)
+- Skip server shutdown verification (check port released)
+
+---
+
+### Additional Resources
+
+- [Playwright webServer Documentation](https://playwright.dev/docs/test-webserver)
+- [Vite Server Options](https://vite.dev/config/server-options.html)
+- [Story 2.4 Implementation](../docs/stories/2-4-configure-auto-start-preview-server.md)
+- [Tech Spec Epic 2: Test Suite Execution Workflow](../docs/tech-spec-epic-2.md#critical-workflow-1-test-suite-execution)
 
 ---
 
@@ -297,15 +709,16 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 
 **Components:** `message`, `photo`, `settings`, `gallery`, `mood`, `admin`
 
-**Elements:** `button`, `input`, `display`, `card`, `modal`, `list`, `item`
+**Elements:** `button`, `input`, `display`, `card`, `modal`, `list`, `item`, `counter`, `badge`, `text`
 
-**Actions (optional):** `submit`, `cancel`, `delete`, `edit`, `favorite`, `upload`
+**Actions (optional):** `submit`, `cancel`, `delete`, `edit`, `favorite`, `upload`, `share`
 
 ### Examples
 
 **Buttons:**
 ```html
 <button data-testid="message-favorite-button">Favorite</button>
+<button data-testid="message-share-button">Share</button>
 <button data-testid="photo-delete-button">Delete</button>
 <button data-testid="settings-save-button">Save</button>
 ```
@@ -319,17 +732,29 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 
 **Display Elements:**
 ```html
-<div data-testid="message-text-display">Daily message content</div>
+<div data-testid="message-text">Daily message content</div>
+<div data-testid="message-duration-counter">Day 42 Together</div>
+<span data-testid="message-category-badge">💖 Why I Love You</span>
 <span data-testid="partner-name-display">Partner Name</span>
 <div data-testid="gallery-photo-count">10 photos</div>
 ```
 
-**List Items:**
+**Container Elements:**
 ```html
 <div data-testid="message-card">...</div>
 <div data-testid="photo-item">...</div>
 <div data-testid="mood-entry">...</div>
 ```
+
+### Component-Specific Conventions
+
+**DailyMessage Component:**
+- `data-testid="message-duration-counter"` - Relationship duration header
+- `data-testid="message-card"` - Main message card container
+- `data-testid="message-category-badge"` - Category badge (e.g., "Why I Love You")
+- `data-testid="message-text"` - Message text content
+- `data-testid="message-favorite-button"` - Favorite toggle button
+- `data-testid="message-share-button"` - Share button
 
 ### Rationale
 
@@ -337,6 +762,102 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 - **Semantic naming:** Clear purpose from the name alone
 - **Grep-able:** Easy to search codebase for test IDs
 - **No coupling to styling:** Decoupled from Tailwind classes
+- **Migration-friendly:** Easy to replace CSS selectors with getByTestId()
+
+### Migration Guide: CSS Selectors → data-testid
+
+When migrating existing tests from CSS selectors to data-testid:
+
+**Step 1: Add data-testid attributes to components**
+
+```tsx
+// Before
+<div className="card card-hover relative overflow-hidden">
+
+// After
+<div className="card card-hover relative overflow-hidden" data-testid="message-card">
+```
+
+**Step 2: Update test selectors**
+
+```typescript
+// Before (CSS class selector)
+const messageCard = cleanApp.locator('.card').first();
+const messageText = cleanApp.locator('.font-serif.text-gray-800');
+const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+
+// After (data-testid selector)
+const messageCard = cleanApp.getByTestId('message-card');
+const messageText = cleanApp.getByTestId('message-text');
+const heartButton = cleanApp.getByTestId('message-favorite-button');
+```
+
+**Benefits of migration:**
+- **Stability:** Tests survive Tailwind class changes, theme updates, and styling refactors
+- **Clarity:** `getByTestId('message-card')` is more readable than `.locator('.card').first()`
+- **Speed:** Direct element targeting without traversing CSS class combinations
+- **Maintainability:** Adding/removing CSS classes doesn't break tests
+
+**Common replacements:**
+- `.card` → `getByTestId('message-card')`
+- `.font-serif.text-gray-800` → `getByTestId('message-text')`
+- `button[aria-label*="favorite"]` → `getByTestId('message-favorite-button')`
+- `locator('h2:has-text("Day")').first()` → `getByTestId('message-duration-counter').locator('h2')`
+
+**Bulk migration using sed:**
+```bash
+# Replace common CSS selectors across test files
+sed -i "s/cleanApp\.locator('\.card')\.first()/cleanApp.getByTestId('message-card')/g" tests/e2e/*.spec.ts
+sed -i "s/cleanApp\.locator('button\[aria-label\*=\"favorite\"\]')\.first()/cleanApp.getByTestId('message-favorite-button')/g" tests/e2e/*.spec.ts
+```
+
+### Adding data-testid to New Components
+
+When creating new components, add data-testid attributes immediately:
+
+**Checklist:**
+- [ ] All interactive elements (buttons, inputs, links) have data-testid
+- [ ] Main container elements have data-testid
+- [ ] Display elements that tests will query have data-testid
+- [ ] Follow naming convention: `[component]-[element]-[action?]`
+- [ ] All lowercase, hyphen-separated
+
+**Example:**
+```tsx
+export const PhotoGallery: React.FC = () => {
+  return (
+    <div data-testid="gallery-container">
+      <h2 data-testid="gallery-header">Photo Gallery</h2>
+      <button data-testid="gallery-upload-button">
+        Upload Photo
+      </button>
+      <div data-testid="gallery-grid">
+        {photos.map((photo) => (
+          <div key={photo.id} data-testid="gallery-photo-item">
+            <img src={photo.url} data-testid="gallery-photo-image" />
+            <button data-testid="gallery-photo-delete-button">Delete</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+```
+
+### Test Suite Standards
+
+**As of Story 2.3 (Epic 2):**
+- ✅ All 106 active E2E tests migrated to data-testid selectors
+- ✅ 100% test pass rate maintained (Chromium + Firefox)
+- ✅ Zero CSS class selectors in test suite
+- ✅ All DailyMessage component elements tagged
+
+**Coverage:**
+- `tests/e2e/message-display.spec.ts` - 14 tests
+- `tests/e2e/favorites.spec.ts` - 8 tests
+- `tests/e2e/settings.spec.ts` - 6 tests
+- `tests/e2e/navigation.spec.ts` - 7 tests
+- `tests/e2e/persistence.spec.ts` - 7 tests
 
 ---
 
@@ -800,6 +1321,6 @@ WebKit tests require additional system libraries that may not be installed by de
 
 ---
 
-**Last Updated:** 2025-10-30
+**Last Updated:** 2025-10-31 (Story 2.4: webServer Auto-Start Documentation Added)
 **Testing Framework Version:** Playwright 1.56.1
 **Maintained By:** My-Love Development Team
