@@ -9,6 +9,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
       includeAssets: ['icons/*.png', 'fonts/*.woff2'],
       manifest: {
         name: 'My Love - Daily Reminders',

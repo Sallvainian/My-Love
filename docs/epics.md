@@ -152,7 +152,141 @@ So that production deployments are reliable and pre-configuration works correctl
 
 ---
 
-## Epic 2: Enhanced Message Experience
+## Epic 2: Testing Infrastructure & Quality Assurance
+
+### Goal
+
+Establish comprehensive end-to-end testing infrastructure using Playwright to achieve 100% test coverage, ensuring all features are validated and regression-free before deployment.
+
+### Value Delivery
+
+By completing this epic, the app will have automated testing that catches bugs before production, validates PWA functionality (offline mode, service workers, IndexedDB), and provides confidence for rapid feature development without breaking existing functionality.
+
+### Stories
+
+**Story 2.1: Testing Framework Setup**
+
+As a developer,
+I want to scaffold Playwright testing framework with PWA-specific helpers,
+So that I can write comprehensive E2E tests for all app features.
+
+**Acceptance Criteria:**
+1. Install @playwright/test and configure playwright.config.ts
+2. Set up test directory structure: tests/e2e/, tests/support/fixtures/, tests/support/helpers/
+3. Create PWA testing helpers: waitForServiceWorker, clearIndexedDB, goOffline, goOnline
+4. Configure multi-browser support (Chromium, Firefox, WebKit)
+5. Set up test scripts in package.json (test:e2e, test:e2e:ui, test:e2e:debug)
+6. Create .env.test.example with test environment variables
+7. Add tests/README.md with testing guidelines and patterns
+
+**Prerequisites:** Epic 1 complete (stable foundation to test against)
+
+---
+
+**Story 2.2: Component Integration Tests**
+
+As a developer,
+I want integration tests for all Epic 1 features,
+So that I can verify core functionality works as expected.
+
+**Acceptance Criteria:**
+1. Test suite for message display and rotation logic
+2. Test suite for favorites functionality (add, remove, persist)
+3. Test suite for settings page (edit name/date, persist changes)
+4. Test suite for relationship duration calculation accuracy
+5. Test suite for navigation between Home, Favorites, Settings
+6. All tests pass consistently (no flakiness)
+7. Tests validate both UI state and data persistence (LocalStorage, IndexedDB)
+
+**Prerequisites:** Story 2.1
+
+---
+
+**Story 2.3: Add data-testid Attributes to Components**
+
+As a developer,
+I want semantic data-testid attributes on all interactive elements,
+So that tests are maintainable and resilient to UI changes.
+
+**Acceptance Criteria:**
+1. Add data-testid to all buttons (favorites, navigation, settings actions)
+2. Add data-testid to message display areas
+3. Add data-testid to input fields (settings form)
+4. Add data-testid to navigation elements
+5. Follow naming convention: [component]-[element]-[action] (e.g., "message-favorite-button")
+6. Update existing tests to use data-testid selectors (no CSS class dependencies)
+7. Document data-testid strategy in tests/README.md
+
+**Prerequisites:** Story 2.2
+
+---
+
+**Story 2.4: Configure Auto-Start Preview Server for Tests**
+
+As a developer,
+I want tests to automatically start the dev server,
+So that I can run tests without manual setup.
+
+**Acceptance Criteria:**
+1. Configure playwright.config.ts webServer option to auto-start Vite dev server
+2. Server starts on available port (dynamic port detection)
+3. Tests wait for server readiness before execution
+4. Server shuts down gracefully after tests complete
+5. Works in both local development and CI environments
+6. Add timeout handling for slow server starts
+7. Test command runs end-to-end without manual intervention
+
+**Prerequisites:** Story 2.3
+
+---
+
+**Story 2.5: Run & Validate Tests Pass**
+
+As a developer,
+I want all tests to pass with 100% coverage of Epic 1 features,
+So that I have confidence in the stability of the foundation.
+
+**Acceptance Criteria:**
+1. All Epic 1 features have corresponding E2E tests
+2. Test coverage report shows 100% of critical user paths covered
+3. All tests pass in all configured browsers (Chromium, Firefox, WebKit)
+4. Tests run in under 5 minutes total
+5. No flaky tests (consistent pass rate across 10 runs)
+6. Generate HTML test report with screenshots on failure
+7. Document any known limitations or edge cases not covered
+
+**Prerequisites:** Story 2.4
+
+---
+
+**Story 2.6: Add CI Integration (GitHub Actions)**
+
+As a developer,
+I want tests to run automatically on every push and pull request,
+So that regressions are caught before merging code.
+
+**Acceptance Criteria:**
+1. Create .github/workflows/playwright.yml workflow file
+2. Workflow triggers on push to main and all pull requests
+3. Workflow runs tests on Ubuntu (latest) with all browsers
+4. Workflow uploads test artifacts (reports, screenshots) on failure
+5. Workflow fails if any tests fail (blocking PR merge)
+6. Add status badge to README.md showing test status
+7. Test execution time in CI under 10 minutes
+8. Document CI setup and troubleshooting in tests/README.md
+
+**Prerequisites:** Story 2.5
+
+---
+
+**Epic 2 Summary:**
+- **Total Stories:** 6
+- **Estimated Effort:** Medium (framework setup + comprehensive test writing)
+- **Deliverable:** 100% test coverage of Epic 1 features with automated CI validation
+
+---
+
+## Epic 3: Enhanced Message Experience
 
 ### Goal
 
@@ -164,7 +298,7 @@ Your girlfriend gets a full year of unique daily messages without repetition, ca
 
 ### Stories
 
-**Story 2.1: Expand Message Library to 365 Messages**
+**Story 3.1: Expand Message Library to 365 Messages**
 
 As the app creator,
 I want to expand the message library from 100 to 365 unique messages,
@@ -182,7 +316,7 @@ So that my girlfriend receives a different message every day for a full year.
 
 ---
 
-**Story 2.2: Implement Horizontal Swipe Navigation - Backward Only**
+**Story 3.2: Implement Horizontal Swipe Navigation - Backward Only**
 
 As your girlfriend,
 I want to swipe left to see yesterday's message,
@@ -197,11 +331,11 @@ So that I can revisit recent messages that made me smile.
 6. Swipe gesture works on touch devices and trackpad (desktop)
 7. Accessibility: keyboard navigation (arrow keys) also works
 
-**Prerequisites:** Story 2.1 (need full message library to navigate)
+**Prerequisites:** Story 3.1 (need full message library to navigate)
 
 ---
 
-**Story 2.3: Message History State Management**
+**Story 3.3: Message History State Management**
 
 As a developer,
 I want to track message history in the Zustand store,
@@ -215,11 +349,11 @@ So that swipe navigation knows which messages have been shown and can prevent fu
 5. Handles edge case: first-time user has no history (starts with today only)
 6. Handles edge case: user skipped days (show missed messages when swiping back)
 
-**Prerequisites:** Story 2.2
+**Prerequisites:** Story 3.2
 
 ---
 
-**Story 2.4: Admin Interface - Custom Message Management (Phase 1: UI)**
+**Story 3.4: Admin Interface - Custom Message Management (Phase 1: UI)**
 
 As the app creator,
 I want an admin settings panel to manage custom messages,
@@ -235,11 +369,11 @@ So that I can add personalized messages to the rotation.
 7. All UI is styled consistently with app theme
 8. No backend integration yet (save to LocalStorage temporarily)
 
-**Prerequisites:** Story 2.3
+**Prerequisites:** Story 3.3
 
 ---
 
-**Story 2.5: Admin Interface - Message Persistence & Integration**
+**Story 3.5: Admin Interface - Message Persistence & Integration**
 
 As the app creator,
 I want custom messages to persist in IndexedDB and integrate into daily rotation,
@@ -254,11 +388,11 @@ So that my personalized messages appear alongside default messages.
 6. Import/export feature to back up custom messages (JSON format)
 7. Test: Create custom message, verify it appears in rotation next day
 
-**Prerequisites:** Story 2.4
+**Prerequisites:** Story 3.4
 
 ---
 
-**Story 2.6: AI Message Suggestion Review Interface (Optional Enhancement)**
+**Story 3.6: AI Message Suggestion Review Interface (Optional Enhancement)**
 
 As the app creator,
 I want to review AI-generated message suggestions and approve/reject them,
@@ -273,18 +407,18 @@ So that I can quickly expand the library with quality-controlled content.
 6. Can regenerate new batch of suggestions
 7. Rate limiting or cost control to prevent excessive API usage
 
-**Prerequisites:** Story 2.5
+**Prerequisites:** Story 3.5
 
 ---
 
-**Epic 2 Summary:**
+**Epic 3 Summary:**
 - **Total Stories:** 6 (one optional)
 - **Estimated Effort:** Medium-High
 - **Deliverable:** 365-message library, swipe navigation, custom message management
 
 ---
 
-## Epic 3: Photo Gallery & Memories
+## Epic 4: Photo Gallery & Memories
 
 ### Goal
 
@@ -296,7 +430,7 @@ Photos become a core part of the daily experience, allowing her to relive memori
 
 ### Stories
 
-**Story 3.1: Photo Upload & Storage**
+**Story 4.1: Photo Upload & Storage**
 
 As your girlfriend,
 I want to upload photos with captions,
@@ -317,7 +451,7 @@ So that I can preserve special memories in the app.
 
 ---
 
-**Story 3.2: Photo Gallery Grid View**
+**Story 4.2: Photo Gallery Grid View**
 
 As your girlfriend,
 I want to see all my uploaded photos in a grid,
@@ -330,13 +464,13 @@ So that I can browse my photo collection.
 4. Lazy loading for performance (load 20 photos at a time)
 5. Empty state message if no photos uploaded yet
 6. Loading spinner while fetching photos
-7. Tap photo to open carousel/lightbox view (Story 3.3)
+7. Tap photo to open carousel/lightbox view (Story 4.3)
 
-**Prerequisites:** Story 3.1
+**Prerequisites:** Story 4.1
 
 ---
 
-**Story 3.3: Photo Carousel with Animated Transitions**
+**Story 4.3: Photo Carousel with Animated Transitions**
 
 As your girlfriend,
 I want to view photos in a full-screen carousel,
@@ -352,11 +486,11 @@ So that I can enjoy photos in detail with smooth animations.
 7. Framer Motion animations: entrance fade-in, swipe transitions
 8. Edit and Delete buttons visible in carousel view
 
-**Prerequisites:** Story 3.2
+**Prerequisites:** Story 4.2
 
 ---
 
-**Story 3.4: Photo Edit & Delete Functionality**
+**Story 4.4: Photo Edit & Delete Functionality**
 
 As your girlfriend,
 I want to edit captions/tags or delete photos,
@@ -371,11 +505,11 @@ So that I can manage my photo collection.
 6. Deleted photos no longer appear in grid or carousel
 7. Undo delete (optional enhancement: trash/archive folder)
 
-**Prerequisites:** Story 3.3
+**Prerequisites:** Story 4.3
 
 ---
 
-**Story 3.5: Photo Gallery Navigation Integration**
+**Story 4.5: Photo Gallery Navigation Integration**
 
 As your girlfriend,
 I want seamless navigation between Home and Photos,
@@ -389,18 +523,18 @@ So that I can easily access my photo memories.
 5. Deep linking: can share direct link to photo gallery
 6. Back navigation works correctly (browser back button)
 
-**Prerequisites:** Story 3.4
+**Prerequisites:** Story 4.4
 
 ---
 
-**Epic 3 Summary:**
+**Epic 4 Summary:**
 - **Total Stories:** 5
 - **Estimated Effort:** Medium
 - **Deliverable:** Full-featured photo gallery with carousel and management
 
 ---
 
-## Epic 4: Interactive Connection Features
+## Epic 5: Interactive Connection Features
 
 ### Goal
 
@@ -412,7 +546,7 @@ She can log daily moods that you can see, you can send spontaneous "kisses" or "
 
 ### Stories
 
-**Story 4.1: NocoDB Backend Setup & API Integration**
+**Story 5.1: NocoDB Backend Setup & API Integration**
 
 As a developer,
 I want to set up NocoDB backend and create API integration layer,
@@ -430,7 +564,7 @@ So that I can sync mood and interaction data between devices.
 
 ---
 
-**Story 4.2: Mood Tracking UI & Local Storage**
+**Story 5.2: Mood Tracking UI & Local Storage**
 
 As your girlfriend,
 I want to log my daily mood,
@@ -445,11 +579,11 @@ So that I can track how I'm feeling and you can see it.
 6. Can only log one mood per day (edit if logging again same day)
 7. UI shows if mood synced successfully or pending (offline indicator)
 
-**Prerequisites:** Story 4.1
+**Prerequisites:** Story 5.1
 
 ---
 
-**Story 4.3: Mood History Calendar View**
+**Story 5.3: Mood History Calendar View**
 
 As your girlfriend,
 I want to see my mood history in a calendar,
@@ -463,11 +597,11 @@ So that I can reflect on patterns over time.
 5. Current date highlighted
 6. Responsive layout (mobile and desktop)
 
-**Prerequisites:** Story 4.2
+**Prerequisites:** Story 5.2
 
 ---
 
-**Story 4.4: Mood Sync & Partner Visibility**
+**Story 5.4: Mood Sync & Partner Visibility**
 
 As the app creator,
 I want to see my girlfriend's mood logs,
@@ -481,11 +615,11 @@ So that I can check in on how she's feeling.
 5. Handles sync conflicts gracefully
 6. Offline mode: displays cached moods, syncs when back online
 
-**Prerequisites:** Story 4.3
+**Prerequisites:** Story 5.3
 
 ---
 
-**Story 4.5: Poke & Kiss Interactions**
+**Story 5.5: Poke & Kiss Interactions**
 
 As your girlfriend (and you),
 I want to send spontaneous pokes or kisses,
@@ -502,11 +636,11 @@ So that we can share small moments of affection throughout the day.
 6. Interaction history viewable (last 7 days)
 7. Can send unlimited interactions (no daily limit)
 
-**Prerequisites:** Story 4.4
+**Prerequisites:** Story 5.4
 
 ---
 
-**Story 4.6: Anniversary Countdown Timers**
+**Story 5.6: Anniversary Countdown Timers**
 
 As your girlfriend,
 I want to see countdowns to our anniversaries,
@@ -521,11 +655,11 @@ So that I can look forward to special dates.
 6. Past anniversaries marked as "Celebrated" with date passed
 7. Edit and delete countdowns in settings
 
-**Prerequisites:** Story 4.2 (mood tracking sets pattern for settings/features)
+**Prerequisites:** Story 5.2 (mood tracking sets pattern for settings/features)
 
 ---
 
-**Epic 4 Summary:**
+**Epic 5 Summary:**
 - **Total Stories:** 6
 - **Estimated Effort:** Medium-High (backend integration adds complexity)
 - **Deliverable:** Mood tracking, poke/kiss interactions, anniversary countdowns
