@@ -41,6 +41,9 @@ export default defineConfig({
     // Base URL (matches Vite dev server with base path)
     baseURL: 'http://localhost:5173/My-Love/',
 
+    // Run in headless mode for massive speed improvement (30-50% faster)
+    headless: true,
+
     // Trace collection (debugging on retry)
     trace: 'on-first-retry',
 
@@ -61,6 +64,8 @@ export default defineConfig({
         launchOptions: {
           args: [
             '--disable-blink-features=AutomationControlled', // Reduce automation detection overhead
+            '--disable-dev-shm-usage', // Reduce memory overhead
+            '--disable-gpu', // Disable GPU hardware acceleration (not needed for tests)
           ],
         },
       },

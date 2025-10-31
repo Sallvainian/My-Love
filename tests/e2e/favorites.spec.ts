@@ -17,10 +17,10 @@ import { getIndexedDBStore } from '../support/helpers/pwaHelpers';
 test.describe('Favorites Functionality', () => {
   test('should toggle favorite on button click', async ({ cleanApp }) => {
     // Wait for message to load
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Find heart button
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await expect(heartButton).toBeVisible();
 
     // Click to favorite
@@ -55,13 +55,13 @@ test.describe('Favorites Functionality', () => {
 
   test('should persist favorite across browser refresh', async ({ cleanApp }) => {
     // Wait for message to load
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Get message text to identify it after refresh
-    const messageText = await cleanApp.locator('.font-serif.text-gray-800').first().textContent();
+    const messageText = await cleanApp.getByTestId('message-text').textContent();
 
     // Click heart button to favorite
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await heartButton.click();
     await cleanApp.waitForTimeout(500);
 
@@ -70,10 +70,10 @@ test.describe('Favorites Functionality', () => {
     await cleanApp.waitForLoadState('networkidle');
 
     // Wait for message to load again
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Check if same message is still favorited
-    const heartIconAfterRefresh = cleanApp.locator('button[aria-label*="favorite"]').first().locator('svg');
+    const heartIconAfterRefresh = cleanApp.getByTestId('message-favorite-button').locator('svg');
     const isStillFilled = await heartIconAfterRefresh.evaluate((el) => {
       return el.classList.contains('fill-pink-500');
     });
@@ -85,10 +85,10 @@ test.describe('Favorites Functionality', () => {
 
   test('should play heart animation on favorite', async ({ cleanApp }) => {
     // Wait for message to load
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Click heart button
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await heartButton.click();
 
     // Check for floating heart animation elements
@@ -109,9 +109,9 @@ test.describe('Favorites Functionality', () => {
   });
 
   test('should display heart button correctly', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await expect(heartButton).toBeVisible();
 
     // Button should have aria-label
@@ -123,9 +123,9 @@ test.describe('Favorites Functionality', () => {
   });
 
   test('should update favorite state immediately', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     const heartIcon = heartButton.locator('svg');
 
     // Get initial state
@@ -143,9 +143,9 @@ test.describe('Favorites Functionality', () => {
   });
 
   test('should handle multiple favorite toggles', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
 
     // Toggle multiple times rapidly
     for (let i = 0; i < 5; i++) {
@@ -163,7 +163,7 @@ test.describe('Favorites Functionality', () => {
 
   test('should show favorited state visually', async ({ appWithFavorites }) => {
     // This fixture pre-populates with 5 favorited messages (IDs 1-5)
-    await expect(appWithFavorites.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(appWithFavorites.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify favoriteIds are in LocalStorage
     const storedSettings = await appWithFavorites.evaluate(() => {
@@ -181,7 +181,7 @@ test.describe('Favorites Functionality', () => {
 
     // If current message is one of the favorited IDs (1-5), heart should be filled
     if (currentMessageId && [1, 2, 3, 4, 5].includes(currentMessageId)) {
-      const heartButton = appWithFavorites.locator('button[aria-label*="favorite"]').first();
+      const heartButton = appWithFavorites.getByTestId('message-favorite-button');
       const heartIcon = heartButton.locator('svg');
       const isFilled = await heartIcon.evaluate((el) => el.classList.contains('fill-pink-500'));
       expect(isFilled).toBe(true);
@@ -193,10 +193,10 @@ test.describe('Favorites Functionality', () => {
   });
 
   test('should preserve favorites in localStorage', async ({ cleanApp }) => {
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Favorite a message
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await heartButton.click();
     await cleanApp.waitForTimeout(500);
 
@@ -222,13 +222,13 @@ test.describe('Favorites Functionality', () => {
     // Service workers don't register in Vite dev mode, only in production build
     // Will be enabled after Story 2.4 configures auto-start preview server
 
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Wait for service worker registration (requires production build)
     // await waitForServiceWorker(cleanApp);
 
     // Click heart button to favorite
-    const heartButton = cleanApp.locator('button[aria-label*="favorite"]').first();
+    const heartButton = cleanApp.getByTestId('message-favorite-button');
     await heartButton.click();
     await cleanApp.waitForTimeout(500);
 
@@ -240,8 +240,8 @@ test.describe('Favorites Functionality', () => {
     await cleanApp.waitForLoadState('networkidle');
 
     // Assert favorite persists (IndexedDB accessible offline)
-    await expect(cleanApp.locator('.card').first()).toBeVisible({ timeout: 10000 });
-    const heartIcon = cleanApp.locator('button[aria-label*="favorite"]').first().locator('svg');
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+    const heartIcon = cleanApp.getByTestId('message-favorite-button').locator('svg');
     const isStillFilled = await heartIcon.evaluate((el) => el.classList.contains('fill-pink-500'));
     expect(isStillFilled).toBe(true);
 
@@ -257,7 +257,7 @@ test.describe('Favorites Functionality', () => {
     // This test will be enabled when Epic 3 adds favorites list view
     // Currently app architecture is single-view with daily message only
 
-    await expect(appWithFavorites.locator('.card').first()).toBeVisible({ timeout: 10000 });
+    await expect(appWithFavorites.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Navigate to favorites view (will exist in Epic 3)
     // const favoritesButton = appWithFavorites.locator('button:has-text("Favorites")');

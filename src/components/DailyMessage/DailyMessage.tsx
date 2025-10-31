@@ -139,6 +139,7 @@ export function DailyMessage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: ANIMATION_TIMING.HEADER_FADE_DELAY }}
         className="text-center mb-6"
+        data-testid="message-duration-counter"
       >
         <div className="flex items-center justify-center gap-2 mb-2">
           <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
@@ -163,7 +164,7 @@ export function DailyMessage() {
         }}
         className="relative"
       >
-        <div className="card card-hover relative overflow-hidden">
+        <div className="card card-hover relative overflow-hidden" data-testid="message-card">
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50 pointer-events-none" />
 
@@ -176,7 +177,7 @@ export function DailyMessage() {
               transition={{ delay: ANIMATION_TIMING.BADGE_FADE_DELAY, type: 'spring' }}
               className="inline-block mb-4"
             >
-              <span className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-medium rounded-full shadow-lg">
+              <span className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-medium rounded-full shadow-lg" data-testid="message-category-badge">
                 {currentMessage.category === 'reason' && '💖 Why I Love You'}
                 {currentMessage.category === 'memory' && '✨ Beautiful Memory'}
                 {currentMessage.category === 'affirmation' && '🌟 Daily Affirmation'}
@@ -191,6 +192,7 @@ export function DailyMessage() {
               animate={{ opacity: 1 }}
               transition={{ delay: ANIMATION_TIMING.TEXT_FADE_DELAY, duration: 0.8 }}
               className="text-2xl md:text-3xl font-serif text-gray-800 leading-relaxed mb-8"
+              data-testid="message-text"
             >
               {currentMessage.text}
             </motion.p>
@@ -206,6 +208,7 @@ export function DailyMessage() {
                 onClick={handleFavorite}
                 className="btn-icon group"
                 aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                data-testid="message-favorite-button"
               >
                 <Heart
                   className={`w-6 h-6 transition-all duration-300 ${
@@ -220,6 +223,7 @@ export function DailyMessage() {
                 onClick={handleShare}
                 className="btn-icon group"
                 aria-label="Share message"
+                data-testid="message-share-button"
               >
                 <Share2 className="w-6 h-6 text-pink-400 group-hover:text-pink-500 transition-colors" />
               </button>

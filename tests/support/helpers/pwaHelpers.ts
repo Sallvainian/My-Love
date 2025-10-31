@@ -103,47 +103,58 @@ export async function waitForServiceWorker(
  * ```
  */
 export async function clearIndexedDB(page: Page, dbName: string): Promise<void> {
-  await withTimeout(
-    page.evaluate((name) => {
-      return new Promise<void>((resolve) => {
-        const request = indexedDB.deleteDatabase(name);
-        let eventFired = false;
+  try {
+    await withTimeout(
+      page.evaluate((name) => {
+        return new Promise<void>((resolve) => {
+          const request = indexedDB.deleteDatabase(name);
+          let eventFired = false;
 
-        // Set up a fallback timeout for when no event fires (e.g., non-existent DB in Firefox)
-        const diagnosticTimeout = setTimeout(() => {
-          if (!eventFired) {
-            console.warn(`⚠️  No deleteDatabase event fired after 4s for '${name}' - assuming success for non-existent DB`);
+          // Set up a fallback timeout for when no event fires (e.g., non-existent DB in Firefox)
+          const diagnosticTimeout = setTimeout(() => {
+            if (!eventFired) {
+              console.warn(`⚠️  No deleteDatabase event fired after 4s for '${name}' - assuming success for non-existent DB`);
+              eventFired = true;
+              resolve(); // Resolve promise - database likely doesn't exist
+            }
+          }, 4000);
+
+          request.onsuccess = () => {
             eventFired = true;
-            resolve(); // Resolve promise - database likely doesn't exist
-          }
-        }, 4000);
+            clearTimeout(diagnosticTimeout);
+            console.log(`✓ IndexedDB '${name}' deleteDatabase SUCCESS`);
+            resolve();
+          };
 
-        request.onsuccess = () => {
-          eventFired = true;
-          clearTimeout(diagnosticTimeout);
-          console.log(`✓ IndexedDB '${name}' deleteDatabase SUCCESS`);
-          resolve();
-        };
+          request.onerror = () => {
+            eventFired = true;
+            clearTimeout(diagnosticTimeout);
+            console.warn(`✗ IndexedDB '${name}' deleteDatabase ERROR:`, request.error);
+            resolve(); // Resolve anyway - database may not exist
+          };
 
-        request.onerror = () => {
-          eventFired = true;
-          clearTimeout(diagnosticTimeout);
-          console.warn(`✗ IndexedDB '${name}' deleteDatabase ERROR:`, request.error);
-          resolve(); // Resolve anyway - database may not exist
-        };
-
-        request.onblocked = () => {
-          eventFired = true;
-          clearTimeout(diagnosticTimeout);
-          console.warn(`⚠️  IndexedDB '${name}' deleteDatabase BLOCKED - resolving after 2s`);
-          // Increased from 100ms to 2000ms for better handling
-          setTimeout(() => resolve(), 2000);
-        };
-      });
-    }, dbName),
-    5000, // 5 second timeout - prevents indefinite hangs
-    undefined
-  );
+          request.onblocked = () => {
+            eventFired = true;
+            clearTimeout(diagnosticTimeout);
+            console.warn(`⚠️  IndexedDB '${name}' deleteDatabase BLOCKED - resolving after 2s`);
+            // Increased from 100ms to 2000ms for better handling
+            setTimeout(() => resolve(), 2000);
+          };
+        });
+      }, dbName),
+      5000, // 5 second timeout - prevents indefinite hangs
+      undefined
+    );
+  } catch (error: any) {
+    // Firefox can close page context before evaluate completes for non-existent DBs
+    // Treat "Test ended" and similar errors as success (no DB to delete)
+    if (error.message && (error.message.includes('Test ended') || error.message.includes('Target closed'))) {
+      console.warn(`⚠️  Page context closed during deleteDatabase('${dbName}') - assuming non-existent DB`);
+      return; // Successfully handled - no database existed
+    }
+    // Re-throw unexpected errors
+    throw error;
+  }
 }
 
 /**
