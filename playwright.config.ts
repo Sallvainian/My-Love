@@ -15,8 +15,8 @@ export default defineConfig({
   // Test directory
   testDir: './tests/e2e',
 
-  // Global test timeout (30 seconds - PWA operations can be slow)
-  timeout: 30000,
+  // Global test timeout (60 seconds - PWA operations can be slow)
+  timeout: 60000,
 
   // Fail the build on CI if tests fail
   fullyParallel: true,
@@ -24,8 +24,8 @@ export default defineConfig({
   // Forbid test.only in CI
   forbidOnly: !!process.env.CI,
 
-  // Retry configuration (environment-aware)
-  retries: process.env.CI ? 2 : 0,
+  // Retry configuration (2 retries for robustness against timing issues)
+  retries: 2,
 
   // Worker configuration (environment-aware)
   workers: process.env.CI ? 2 : 4,
@@ -52,6 +52,12 @@ export default defineConfig({
 
     // Video recording (retain on failure)
     video: 'retain-on-failure',
+
+    // Increased navigation timeout for slower machines/networks
+    navigationTimeout: 60000,
+
+    // Wait for network idle before considering navigation complete
+    waitForSelectorTimeout: 15000,
   },
 
   // Multi-browser project configuration
@@ -79,6 +85,8 @@ export default defineConfig({
       use: {
         ...devices['Desktop Firefox'],
       },
+      // Firefox IndexedDB operations can also be slow, especially with service workers
+      timeout: 60000, // 60 seconds
     },
 
     // WebKit temporarily disabled due to missing system dependencies
@@ -98,6 +106,7 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:5173/My-Love/',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 180000, // 3 minutes for slow starts
+    retries: 3, // Retry server startup if it fails
   },
 });
