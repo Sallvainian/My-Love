@@ -1,0 +1,378 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>6</storyId>
+    <title>Build & Deployment Configuration Hardening</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-6-build-deployment-configuration-hardening.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>ensure build and deployment process is robust</iWant>
+    <soThat>production deployments are reliable and pre-configuration works correctly</soThat>
+    <tasks>
+      - Review and verify current build configuration (AC: 1)
+        - Read vite.config.ts to understand current build setup
+        - Verify vite-plugin-pwa configuration for service worker generation
+        - Check current environment variable usage in codebase
+        - Confirm APP_CONFIG in src/config/constants.ts exists (Story 1.4)
+        - Review package.json build and deploy scripts
+      - Create and validate .env.production template (AC: 1, 6)
+        - Create .env.production.example file with placeholder values
+        - Document required variables: VITE_PARTNER_NAME, VITE_RELATIONSHIP_START_DATE
+        - Add .env.production to .gitignore (verify not already present)
+        - Test env var injection: create local .env.production → build → verify values in dist/
+        - Document format and validation rules in deployment guide
+      - Implement pre-deploy smoke tests (AC: 5)
+        - Create scripts/smoke-tests.js (or .sh) for automated validation
+        - Test 1: Verify dist/index.html exists and contains viewport meta tag
+        - Test 2: Verify dist/manifest.webmanifest exists and is valid JSON
+        - Test 3: Verify dist/sw.js exists and contains expected cache routes
+        - Test 4: Verify env vars injected (search dist/ bundle for APP_CONFIG constants)
+        - Test 5: Verify bundle size &lt;200KB gzipped (use gzip-size or similar)
+        - Test 6: Verify critical assets present (icons, CSS, JS bundles)
+        - Make tests fail-fast (exit on first failure with clear error message)
+      - Update package.json scripts with smoke test integration (AC: 5)
+        - Modify predeploy script: "build && node scripts/smoke-tests.js"
+        - Or create "test:smoke" script and call from predeploy
+        - Verify deploy script still uses gh-pages package
+        - Test full pipeline: npm run deploy → verify smoke tests run before push
+        - Document script execution order in deployment guide
+      - Implement post-deploy validation (AC: 2, 3, 5)
+        - Create scripts/post-deploy-check.js for live site validation
+        - Test 1: HTTP GET live URL → verify 200 status code
+        - Test 2: Parse HTML response → verify manifest link present
+        - Test 3: Fetch manifest → verify valid JSON and correct theme colors
+        - Test 4: Check console for service worker registration (manual step documented)
+        - Test 5: Verify pre-configured data visible (partner name in UI)
+        - Make post-deploy tests informational (don't block, log results)
+        - Add to deployment guide as optional validation step
+      - Optimize build output and verify bundle size (AC: 4)
+        - Run npm run build and analyze output
+        - Use vite-bundle-visualizer or similar to inspect bundle composition
+        - Verify Tailwind CSS purge working (unused styles removed)
+        - Verify tree-shaking eliminating dead code
+        - Check asset hashing (filenames include content hash)
+        - Verify source maps generated in dist/assets/*.map
+        - Measure gzipped bundle size: target &lt;200KB total
+        - Document bundle size baseline in deployment guide
+      - Test complete deployment pipeline end-to-end (AC: 1, 2, 3, 5)
+        - Create test .env.production with dummy values (TestPartner, 2024-01-01)
+        - Run npm run deploy locally
+        - Verify smoke tests pass during build
+        - Verify gh-pages push succeeds
+        - Open live GitHub Pages URL in browser
+        - Verify pre-configured data displays (TestPartner visible)
+        - Open DevTools → Application → Service Workers
+        - Verify service worker registered and activated
+        - Open DevTools → Network → Offline checkbox
+        - Verify app loads offline (service worker caching works)
+        - Run Lighthouse audit → verify PWA score 100
+      - Document deployment process (AC: 6)
+        - Create DEPLOYMENT.md or update README.md with deployment section
+        - Document prerequisites: Node.js version, GitHub Pages setup
+        - Document .env.production creation with example values
+        - Document build command and expected output
+        - Document smoke tests and what they validate
+        - Document deploy command and gh-pages behavior
+        - Document post-deploy validation steps
+        - Document rollback procedure (revert gh-pages commit)
+        - Document troubleshooting: env vars missing, smoke tests fail, SW not registering
+        - Document security: .env.production in gitignore, no secrets in bundle
+      - Verify Story 1.4 integration (AC: 2)
+        - Confirm APP_CONFIG.isPreConfigured flag works correctly
+        - Test: env vars present → isPreConfigured = true
+        - Test: env vars missing → isPreConfigured = false, graceful degradation
+        - Test: settings already exist in LocalStorage → don't override
+        - Test: no settings + isPreConfigured true → inject from env
+        - Verify relationship duration counter uses pre-configured start date
+        - Verify no onboarding component rendered
+      - Final regression testing (AC: 6)
+        - Run npm run build → zero TypeScript errors
+        - Run npm run lint → zero ESLint warnings
+        - Deploy to GitHub Pages with test values
+        - Fresh browser (clear data) → verify app works
+        - Favorite message → refresh → verify persists
+        - Change theme → refresh → verify persists
+        - Offline mode → verify app loads from cache
+        - Verify all 4 themes work
+        - Verify animations smooth (60fps)
+        - Verify no console errors in normal operation
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. AC-1.6.1: Vite build process includes environment variable injection for relationship data
+       - .env.production file read during build
+       - VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE accessible via import.meta.env
+       - APP_CONFIG constants correctly populated in bundled output
+       - Warning if env vars missing (graceful degradation documented)
+
+    2. AC-1.6.2: GitHub Pages deployment correctly serves PWA with pre-configured data
+       - Live site loads at https://&lt;username&gt;.github.io/My-Love/
+       - Pre-configured partner name and start date visible in app
+       - No onboarding shown (Story 1.4 integration verified)
+       - Relationship duration calculates correctly from env start date
+
+    3. AC-1.6.3: Service worker generation works correctly in production build
+       - dist/sw.js generated by vite-plugin-pwa
+       - Service worker registers successfully on live site
+       - Pre-cached assets include all app shell files (JS, CSS, HTML)
+       - Offline functionality works after first load
+
+    4. AC-1.6.4: Build produces optimized, minified bundles
+       - TypeScript compilation succeeds with zero errors
+       - JavaScript bundles minified and hashed
+       - CSS optimized via Tailwind purge and PostCSS
+       - Total bundle size &lt;200KB gzipped
+       - Source maps generated for debugging
+
+    5. AC-1.6.5: Deployment script includes smoke test verification
+       - Pre-deploy smoke tests validate dist/ output
+       - Tests verify: index.html exists, manifest valid, sw.js contains routes, env vars in bundle
+       - Deployment halts if any smoke test fails
+       - Post-deploy validation checks live site (HTTP 200, SW registered)
+
+    6. AC-1.6.6: Document deployment process in README or deployment guide
+       - Step-by-step deployment instructions
+       - Environment variable setup (.env.production creation)
+       - Smoke test explanations
+       - Troubleshooting common deployment issues
+       - Security notes (gitignore, no secrets in bundle)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Build Process (lines 339-377)</section>
+        <snippet>Defines build pipeline: TypeScript compilation → Vite bundling → CSS processing → Asset optimization → PWA generation. Output structure includes dist/assets/, manifest.webmanifest, and sw.js.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Deployment Architecture (lines 378-400)</section>
+        <snippet>GitHub Pages deployment using gh-pages package. Base path /My-Love/ configured in vite.config.ts. HTTPS enforced automatically by GitHub Pages (required for PWA features).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>PWA Architecture (lines 273-321)</section>
+        <snippet>Service worker strategy using vite-plugin-pwa with Workbox. CacheFirst for app shell, pre-cached assets via globPatterns. PWA manifest defines standalone display, portrait orientation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Story 1.6 Build &amp; Deployment Hardening</section>
+        <snippet>Build workflow adds environment variable injection from .env.production, smoke test validation pre-deploy, and post-deploy verification. Critical validations include env var injection, SW generation, manifest validity, bundle size &lt;200KB.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Test Strategy - Story 1.6</section>
+        <snippet>Smoke tests: automated post-build checks (6 checks). Manual tests: deploy to GitHub Pages, verify live site. Performance tests: bundle size validation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR004, FR005</section>
+        <snippet>FR004: System SHALL eliminate onboarding flow by pre-configuring relationship data at build/deploy time. FR005: System SHALL display relationship duration automatically without user input.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>NFR001, NFR002, NFR006</section>
+        <snippet>NFR001: Performance - app SHALL load in &lt;2 seconds on 3G, maintain 60fps. NFR002: Offline Support - app SHALL function fully offline after initial load. NFR006: Code Quality - TypeScript strict mode, ESLint compliance.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 1.6</section>
+        <snippet>Completes Epic 1 by hardening build and deployment pipeline. Ensures production deployments are reliable and pre-configured relationship data is correctly injected at build time.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>build configuration</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-61</lines>
+        <reason>Core build configuration with base path /My-Love/, vite-plugin-pwa setup for service worker and manifest generation. Pre-caches assets via globPatterns. Configuration validated in AC-1.6.1, AC-1.6.3.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>project manifest</kind>
+        <symbol>scripts</symbol>
+        <lines>6-12</lines>
+        <reason>Build and deployment scripts. Current predeploy: "npm run build", deploy: "gh-pages -d dist". Story 1.6 will modify predeploy to include smoke tests.</reason>
+      </artifact>
+      <artifact>
+        <path>src/config/constants.ts</path>
+        <kind>configuration module</kind>
+        <symbol>APP_CONFIG</symbol>
+        <lines>32-52</lines>
+        <reason>Environment variable handling from Story 1.4. Exposes import.meta.env.VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE as APP_CONFIG constants. Used to verify env injection in AC-1.6.1.</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>state management</kind>
+        <symbol>initializeApp</symbol>
+        <lines>reference</lines>
+        <reason>Store initialization that uses APP_CONFIG.isPreConfigured flag to determine if env vars should be applied. Integration point for AC-1.6.2 verification.</reason>
+      </artifact>
+      <artifact>
+        <path>.gitignore</path>
+        <kind>version control config</kind>
+        <symbol>N/A</symbol>
+        <lines>full file</lines>
+        <reason>Must verify .env.production is listed (should be from Story 1.4). Critical for security - prevents committing sensitive relationship data.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>root component</kind>
+        <symbol>App</symbol>
+        <lines>reference</lines>
+        <reason>Root component that renders DailyMessage (no Onboarding). Used for regression testing AC-1.6.2 to verify no onboarding shown after deployment.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="Node.js">
+        <package name="react" version="^19.1.1" />
+        <package name="react-dom" version="^19.1.1" />
+        <package name="typescript" version="~5.9.3" />
+        <package name="vite" version="^7.1.7" />
+        <package name="vite-plugin-pwa" version="^1.1.0" />
+        <package name="gh-pages" version="^6.3.0" />
+        <package name="zustand" version="^5.0.8" />
+        <package name="idb" version="^8.0.3" />
+        <package name="framer-motion" version="^12.23.24" />
+        <package name="tailwindcss" version="^3.4.18" />
+        <package name="eslint" version="^9.36.0" />
+        <package name="workbox-window" version="^7.3.0" />
+      </ecosystem>
+      <notes>
+        Key dependencies for Story 1.6:
+        - vite: Build tool with environment variable injection via import.meta.env
+        - vite-plugin-pwa: Generates service worker (sw.js) and manifest.webmanifest
+        - gh-pages: Deploys dist/ to GitHub Pages gh-pages branch
+        - typescript: Type checking via tsc -b before build
+        - workbox-window: Service worker runtime for offline caching
+      </notes>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>TypeScript strict mode must remain enabled - build must succeed with zero TypeScript errors (from Story 1.5)</constraint>
+    <constraint>ESLint must pass with zero warnings before deployment (from Story 1.5)</constraint>
+    <constraint>Total bundle size must be &lt;200KB gzipped (NFR001 performance target)</constraint>
+    <constraint>Must maintain offline-first PWA functionality - service worker pre-caching required</constraint>
+    <constraint>Environment variables (.env.production) must never be committed to version control</constraint>
+    <constraint>Base path /My-Love/ must be preserved in vite.config.ts for GitHub Pages routing</constraint>
+    <constraint>HTTPS required for service worker registration (automatically enforced by GitHub Pages)</constraint>
+    <constraint>Must not break existing features - full regression testing required (AC-1.6.6)</constraint>
+    <constraint>Smoke tests must fail fast - exit on first failure with clear error message</constraint>
+    <constraint>Build process must support graceful degradation if .env.production is missing</constraint>
+    <constraint>No new runtime dependencies - smoke tests should use Node.js built-in modules only</constraint>
+    <constraint>PWA Lighthouse score must remain 100 (no regression from Story 1.5)</constraint>
+    <constraint>Follow existing error logging pattern: console.error('[Context]:', error) from Story 1.5</constraint>
+    <constraint>Deployment rollback must be possible via git revert on gh-pages branch</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Vite Environment Variables API</name>
+      <kind>build-time injection</kind>
+      <signature>import.meta.env.VITE_PARTNER_NAME: string | undefined, import.meta.env.VITE_RELATIONSHIP_START_DATE: string | undefined</signature>
+      <path>vite.config.ts (configuration), src/config/constants.ts (usage)</path>
+    </interface>
+    <interface>
+      <name>APP_CONFIG</name>
+      <kind>runtime configuration object</kind>
+      <signature>{ defaultPartnerName: string, defaultStartDate: string, isPreConfigured: boolean }</signature>
+      <path>src/config/constants.ts</path>
+    </interface>
+    <interface>
+      <name>Service Worker Registration</name>
+      <kind>browser API</kind>
+      <signature>navigator.serviceWorker.register('/sw.js')</signature>
+      <path>dist/sw.js (generated by vite-plugin-pwa)</path>
+    </interface>
+    <interface>
+      <name>PWA Manifest</name>
+      <kind>web manifest</kind>
+      <signature>{ name, short_name, description, theme_color, background_color, display, orientation, start_url, icons[] }</signature>
+      <path>dist/manifest.webmanifest (generated by vite-plugin-pwa)</path>
+    </interface>
+    <interface>
+      <name>gh-pages CLI</name>
+      <kind>deployment tool</kind>
+      <signature>gh-pages -d dist</signature>
+      <path>package.json scripts.deploy</path>
+    </interface>
+    <interface>
+      <name>Smoke Test Script</name>
+      <kind>validation script (NEW)</kind>
+      <signature>node scripts/smoke-tests.js (exit 0 on success, exit 1 on failure)</signature>
+      <path>scripts/smoke-tests.js (to be created)</path>
+    </interface>
+    <interface>
+      <name>Post-Deploy Validation Script</name>
+      <kind>validation script (NEW)</kind>
+      <signature>node scripts/post-deploy-check.js [url] (informational, non-blocking)</signature>
+      <path>scripts/post-deploy-check.js (to be created)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Manual testing approach for Epic 1. No test framework (Vitest, Jest, Playwright) currently installed. Story 1.6 introduces automated smoke tests as Node.js scripts using built-in modules (fs, path, zlib) for post-build validation. Tests validate build output (dist/ directory) before deployment, not runtime behavior. TypeScript compilation (tsc -b) and ESLint serve as pre-build quality gates. Smoke tests are fail-fast: exit on first failure with actionable error messages. Post-deploy validation is optional and informational only (does not block deployment).
+    </standards>
+    <locations>
+      No existing test directories. Story 1.6 creates:
+      - scripts/smoke-tests.js (pre-deploy validation)
+      - scripts/post-deploy-check.js (optional post-deploy validation)
+
+      Manual testing via browser DevTools:
+      - Application tab: Service Worker status, LocalStorage, IndexedDB
+      - Network tab: Offline mode testing, cache validation
+      - Console: Error logging and debug output
+      - Lighthouse: PWA score validation (target: 100)
+    </locations>
+    <ideas>
+      Smoke Test Suite (AC-1.6.5):
+      - Test 1: File existence (dist/index.html, dist/manifest.webmanifest, dist/sw.js)
+      - Test 2: Manifest validation (JSON parse, required fields: name, icons)
+      - Test 3: Service worker routes (search dist/sw.js for cache route patterns)
+      - Test 4: Environment variable injection (grep dist/assets/*.js for APP_CONFIG constants)
+      - Test 5: Bundle size validation (calculate gzipped size, verify &lt;200KB total)
+      - Test 6: Critical assets present (icons/*.png, dist/assets/*.css, dist/assets/*.js)
+
+      Post-Deploy Validation (AC-1.6.5):
+      - HTTP GET to live URL, verify 200 response code
+      - Parse HTML, verify manifest link tag present
+      - Fetch manifest.webmanifest, verify valid JSON
+      - Log service worker registration status (manual verification in DevTools)
+      - Verify pre-configured data visible in rendered HTML (optional check)
+
+      Regression Testing (AC-1.6.6):
+      - Verify all acceptance criteria from Story 1.4 (no onboarding, pre-config works)
+      - Verify all acceptance criteria from Story 1.5 (error boundaries, TypeScript strict, ESLint clean)
+      - Test offline mode after deployment (service worker caching)
+      - Test all 4 themes still work
+      - Test favorite/share buttons persist state
+      - Run Lighthouse audit, verify PWA score 100
+
+      Manual Integration Tests (AC-1.6.2):
+      - Deploy with test .env.production (TestPartner, 2024-01-01)
+      - Open live GitHub Pages URL
+      - Verify partner name displays correctly in UI
+      - Verify relationship duration calculates from env start date
+      - DevTools → Application → Service Workers → verify activated
+      - DevTools → Network → Offline → verify app loads from cache
+    </ideas>
+  </tests>
+</story-context>
