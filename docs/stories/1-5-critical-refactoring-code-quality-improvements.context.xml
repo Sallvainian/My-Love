@@ -1,0 +1,262 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>5</storyId>
+    <title>Critical Refactoring - Code Quality Improvements</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-5-critical-refactoring-code-quality-improvements.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>to refactor critical code quality issues identified in audit</iWant>
+    <soThat>the codebase is maintainable and follows best practices</soThat>
+    <tasks>
+      <task id="1">Review Story 1.1 Technical Debt Audit Report (AC: 1)
+        - Load technical-decisions.md from Story 1.1
+        - Extract complete list of "critical" priority refactoring items
+        - Create checklist of critical items to address in this story
+        - Validate each item is truly critical (blocks Epic 2-4 or high crash risk)
+      </task>
+      <task id="2">Enable TypeScript Strict Mode (AC: 2)
+        - Update tsconfig.json: set strict: true
+        - Run tsc -b to identify all strict mode violations
+        - Fix type errors in order of severity: null checks, any types, implicit anys
+        - Add explicit type annotations where TypeScript can't infer
+        - Document any intentional 'any' types with justification comments
+        - Verify: Zero TypeScript compilation errors with strict mode enabled
+      </task>
+      <task id="3">Implement Error Boundary Component (AC: 3)
+        - Create src/components/ErrorBoundary/ErrorBoundary.tsx class component
+        - Implement getDerivedStateFromError() lifecycle method
+        - Implement componentDidCatch() with console error logging
+        - Create fallback UI: "Something went wrong" message with retry button
+        - Wrap App.tsx root component with ErrorBoundary
+        - Add ErrorBoundary around async-heavy components (if any)
+        - Test: Throw error in DailyMessage → verify boundary catches and shows fallback
+      </task>
+      <task id="4">Remove Dead Code and Unused Dependencies (AC: 4)
+        - Delete Onboarding component files (flagged in Story 1.4)
+        - Run npm audit to identify unused dependencies
+        - Analyze imports: Find packages in package.json not imported anywhere
+        - Remove unused dependencies from package.json (if any found)
+        - Delete orphaned files: unused utilities, components, types
+        - Verify: Build succeeds after deletions, bundle size reduced
+      </task>
+      <task id="5">Fix ESLint Warnings (AC: 5)
+        - Run npm run lint to list all current warnings
+        - Document warning count baseline
+        - Fix warnings in priority order: a11y, React hooks, unused variables, TypeScript-eslint, code style
+        - Update ESLint config if any rules are outdated or conflicting
+        - Verify: npm run lint shows 0 warnings
+      </task>
+      <task id="6">Code Quality Improvements from Story 1.1 Checklist (AC: 1)
+        - Each critical item from checklist gets a dedicated subtask
+        - Examples: Add error handling, fix race conditions, remove console.log, consolidate duplicate code, fix architectural inconsistencies
+      </task>
+      <task id="7">Regression Testing (AC: 6)
+        - Fresh install: Clear browser data → verify no onboarding, data pre-configured
+        - Message display: Verify today's message renders correctly
+        - Favorite button: Verify heart icon works, animation plays
+        - Share button: Verify Web Share API or clipboard works
+        - Theme switching: Verify all 4 themes work
+        - Build verification: npm run build succeeds with zero errors
+      </task>
+      <task id="8">Documentation Updates (AC: 1, 2, 3)
+        - Update architecture.md: Remove Onboarding references, document ErrorBoundary
+        - Update README.md: Note strict mode enabled, improved code quality
+        - Document any new architectural patterns introduced
+        - Update technical-decisions.md: Mark critical items as resolved
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">Address all "critical" items from Story 1.1 refactoring checklist</criterion>
+    <criterion id="AC-2">Ensure TypeScript strict mode compliance (no 'any' types without justification)</criterion>
+    <criterion id="AC-3">Add error boundaries for graceful error handling</criterion>
+    <criterion id="AC-4">Remove unused dependencies and dead code</criterion>
+    <criterion id="AC-5">ESLint warnings reduced to zero</criterion>
+    <criterion id="AC-6">All existing features continue working (regression testing)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1</title>
+        <section>Story 1.5: Critical Refactoring - Code Quality Improvements</section>
+        <snippet>AC-1.5.1 through AC-1.5.6 define acceptance criteria: Address all "critical" items from Story 1.1, ensure TypeScript strict mode compliance, add error boundaries, remove unused dependencies and dead code, ESLint warnings reduced to zero, all existing features continue working.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>NFR006: Code Quality</section>
+        <snippet>App SHALL maintain TypeScript strict mode, ESLint compliance, and less than 10% code duplication. This establishes the quality baseline for maintainable code.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 1.5: Critical Refactoring - Code Quality Improvements</section>
+        <snippet>As a developer, I want to refactor critical code quality issues identified in audit, so that the codebase is maintainable and follows best practices. Includes 6 acceptance criteria covering TypeScript strict mode, error boundaries, dead code removal, and ESLint compliance.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions.md</path>
+        <title>Technical Decisions</title>
+        <section>Section 9: Prioritized Refactoring Checklist</section>
+        <snippet>Contains 12 refactoring items divided into Critical Priority (4 items blocking Epic 2-4 or high crash risk) and Nice-to-Have Priority (8 items for code style/optimizations). Story 1.5 focuses on ESLint fixes, error boundaries, and code quality improvements.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-1-technical-debt-audit-refactoring-plan.md</path>
+        <title>Technical Debt Audit Report</title>
+        <section>Complete Audit</section>
+        <snippet>Comprehensive 634-line audit identifying code smells, architectural issues, missing error handling, and unused dependencies. Identifies 3 critical blockers for future epics and provides detailed effort estimates. TypeScript strict mode already enabled; ESLint warnings to be addressed in Story 1.5.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Component-Based Architecture</section>
+        <snippet>Component-based SPA with centralized state management (Zustand) and offline-first data persistence. Story 1.4 removed Onboarding component from render path. Story 1.5 will add ErrorBoundary component for graceful error handling and complete Onboarding file deletion.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>tsconfig.app.json</path>
+        <kind>configuration</kind>
+        <symbol>compilerOptions</symbol>
+        <lines>2-26</lines>
+        <reason>TypeScript strict mode ALREADY ENABLED (line 20: "strict": true). Story 1.5 AC-2 assumption corrected per Story 1.1 audit. No changes needed here, but must verify all code compiles cleanly with strict mode.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>6-41</lines>
+        <reason>Root component where ErrorBoundary will wrap the application. Currently renders DailyMessage directly after Story 1.4 removed onboarding. Need to wrap return statement with ErrorBoundary component.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/Onboarding/Onboarding.tsx</path>
+        <kind>component</kind>
+        <symbol>Onboarding</symbol>
+        <lines>all</lines>
+        <reason>DEPRECATED component to be DELETED per Story 1.4 TODO. Currently exists but not rendered. AC-4 requires complete removal of this file and directory.</reason>
+      </artifact>
+      <artifact>
+        <path>eslint.config.js</path>
+        <kind>configuration</kind>
+        <symbol>default export</symbol>
+        <lines>8-23</lines>
+        <reason>ESLint configuration using flat config format. Current setup includes recommended rules from @eslint/js, typescript-eslint, react-hooks, and react-refresh. May need rule adjustments based on warning analysis.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>configuration</kind>
+        <symbol>dependencies, devDependencies</symbol>
+        <lines>14-41</lines>
+        <reason>Project dependencies. 7 production dependencies (framer-motion, idb, lucide-react, react, react-dom, workbox-window, zustand) and 14 dev dependencies. Need to verify all are actually used in codebase.</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAppStore</symbol>
+        <lines>all</lines>
+        <reason>Zustand state management store with persist middleware. Fixed in Story 1.2. May need type safety improvements for strict mode compliance.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/storage.ts</path>
+        <kind>service</kind>
+        <symbol>storage service</symbol>
+        <lines>all</lines>
+        <reason>IndexedDB service layer. Fixed in Story 1.3. Should review for error handling patterns and type safety.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/DailyMessage/DailyMessage.tsx</path>
+        <kind>component</kind>
+        <symbol>DailyMessage</symbol>
+        <lines>all</lines>
+        <reason>Main message display component. Should be wrapped by ErrorBoundary in App.tsx. Review for strict mode type compliance.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="Node.js/npm">
+        <package name="react" version="^19.1.1" scope="production">Core UI framework</package>
+        <package name="react-dom" version="^19.1.1" scope="production">React DOM rendering</package>
+        <package name="zustand" version="^5.0.8" scope="production">State management with persist</package>
+        <package name="idb" version="^8.0.3" scope="production">IndexedDB wrapper for data persistence</package>
+        <package name="framer-motion" version="^12.23.24" scope="production">Animation library for UI effects</package>
+        <package name="lucide-react" version="^0.548.0" scope="production">Icon library</package>
+        <package name="workbox-window" version="^7.3.0" scope="production">Service worker integration</package>
+        <package name="typescript" version="~5.9.3" scope="development">TypeScript compiler with strict mode</package>
+        <package name="eslint" version="^9.36.0" scope="development">Linting tool - must achieve zero warnings</package>
+        <package name="typescript-eslint" version="^8.45.0" scope="development">TypeScript ESLint integration</package>
+        <package name="vite" version="^7.1.7" scope="development">Build tool and dev server</package>
+        <package name="tailwindcss" version="^3.4.18" scope="development">CSS utility framework</package>
+        <package name="vite-plugin-pwa" version="^1.1.0" scope="development">PWA manifest and service worker generation</package>
+      </ecosystem>
+      <note>All 7 production and 14 dev dependencies should be verified as actually used. Story 1.1 audit found no unused dependencies, but AC-4 requires re-verification after code changes.</note>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Must maintain 100% feature parity - NO regressions allowed. All existing features (message display, favorites, sharing, themes, animations, offline mode) must continue working exactly as before.</constraint>
+    <constraint>TypeScript strict mode is ALREADY ENABLED in tsconfig.app.json. Task is to verify all code compiles cleanly with strict mode, not to enable it.</constraint>
+    <constraint>Zero ESLint warnings is MANDATORY for story completion. Must run 'npm run lint' and address all warnings.</constraint>
+    <constraint>Zero TypeScript compilation errors required. Must run 'tsc -b' with no errors.</constraint>
+    <constraint>No breaking changes to existing data schemas. IndexedDB and LocalStorage structures must remain backward compatible.</constraint>
+    <constraint>Follow patterns from Story 1.4: APP_CONFIG for constants, consistent error logging format, comprehensive inline documentation.</constraint>
+    <constraint>Refactor for maintainability, not perfection. Only address critical items - defer nice-to-have items to Epic 2+.</constraint>
+    <constraint>No automated test infrastructure exists yet (per Story 1.1 audit). Testing approach is manual via browser DevTools with comprehensive regression checklist.</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>ErrorBoundary</name>
+      <kind>React Class Component</kind>
+      <signature>class ErrorBoundary extends React.Component&lt;Props, State&gt; {
+  static getDerivedStateFromError(error: Error): State;
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void;
+  render(): React.ReactNode;
+}</signature>
+      <path>src/components/ErrorBoundary/ErrorBoundary.tsx (NEW)</path>
+    </interface>
+    <interface>
+      <name>App Component Wrapping Pattern</name>
+      <kind>Component Composition</kind>
+      <signature>&lt;ErrorBoundary&gt;
+  &lt;div className="min-h-screen"&gt;
+    &lt;DailyMessage /&gt;
+  &lt;/div&gt;
+&lt;/ErrorBoundary&gt;</signature>
+      <path>src/App.tsx</path>
+    </interface>
+    <interface>
+      <name>Console Error Logging Pattern</name>
+      <kind>Error Handling Standard</kind>
+      <signature>try {
+  // operation
+} catch (error) {
+  console.error('[Context]:', error);
+}</signature>
+      <path>Multiple files - established pattern from Story 1.4</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>No automated test infrastructure exists yet (confirmed by Story 1.1 audit). Testing approach is manual via browser DevTools with comprehensive regression checklist. Story 1.1 deferred test infrastructure to Epic 2+ to avoid blocking Epic 1 deliverables. All testing for Story 1.5 will be manual: TypeScript compilation verification (tsc -b), ESLint validation (npm run lint), build verification (npm run build), and browser-based functional regression testing covering all features from v0.1.0.</standards>
+    <locations>
+      <location>No test directories exist yet</location>
+      <location>Manual testing: Browser DevTools (Console, Application tabs)</location>
+      <location>Build verification: Terminal output for tsc -b, npm run lint, npm run build</location>
+      <location>Future: Tests will be created in Epic 2+ when test infrastructure is added</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-2">TypeScript Strict Mode Verification: Run 'tsc -b' and verify zero compilation errors. If errors exist, fix all type safety issues including null checks, any types, and implicit anys.</idea>
+      <idea ac="AC-3">Error Boundary Functionality Test: Temporarily inject 'throw new Error("Test")' in DailyMessage component, verify ErrorBoundary catches error and displays fallback UI with retry button. Verify console logs error with component stack.</idea>
+      <idea ac="AC-4">Dead Code Removal Verification: Search codebase for "Onboarding" references using 'grep -r "Onboarding" src/', verify zero matches except TODO comments. Verify src/components/Onboarding/ directory deleted. Run 'npm run build' and verify bundle size reduced.</idea>
+      <idea ac="AC-4">Unused Dependencies Verification: Run 'npm audit' before and after changes. Analyze imports to identify packages in package.json not imported in any source file. Remove identified packages, run 'npm install', verify build succeeds.</idea>
+      <idea ac="AC-5">ESLint Zero Warnings: Run 'npm run lint' before changes and document warning count. Fix all warnings in priority order (a11y, React hooks, unused variables, TypeScript-eslint, code style). Run 'npm run lint' after fixes and verify "0 warnings" output.</idea>
+      <idea ac="AC-6">Comprehensive Regression Testing: Test all features from v0.1.0 including fresh install (clear browser data, verify no onboarding), message display, favorite functionality with IndexedDB persistence, share button, all 4 themes with persistence, relationship duration counter, animations (entrance, hearts burst, decorative), offline mode with service worker and IndexedDB, and build/TypeScript verification.</idea>
+      <idea ac="AC-1">Story 1.1 Critical Items Resolution: For each critical item from Story 1.1 checklist, verify issue addressed, test affected functionality, confirm fix doesn't introduce regressions. Document resolution status and update technical-decisions.md.</idea>
+    </ideas>
+  </tests>
+</story-context>
