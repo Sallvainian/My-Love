@@ -9,6 +9,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
       includeAssets: ['icons/*.png', 'fonts/*.woff2'],
       manifest: {
         name: 'My Love - Daily Reminders',
@@ -33,6 +37,9 @@ export default defineConfig({
           }
         ]
       },
+      // IndexedDB operations are browser API calls (not HTTP requests),
+      // so service worker caching strategies do NOT intercept them.
+      // No navigateFallbackDenylist or exclusions needed for IndexedDB.
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
         runtimeCaching: [

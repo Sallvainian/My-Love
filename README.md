@@ -35,27 +35,64 @@ cd My-Love
 npm install
 ```
 
-3. Start the development server:
+3. **Configure the app constants** by editing `src/config/constants.ts`:
+   ```typescript
+   export const APP_CONFIG = {
+     defaultPartnerName: 'Gracie',           // Edit this with your partner's name
+     defaultStartDate: '2025-10-18',          // Edit this with the relationship start date (YYYY-MM-DD)
+     isPreConfigured: true,
+   } as const;
+   ```
+
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open http://localhost:5173/My-Love/ in your browser
+6. Open http://localhost:5173/My-Love/ in your browser
+
+## ⚙️ Configuration
+
+### How to Customize the App
+
+The app uses pre-configured constants for relationship data. To customize for your relationship, edit `src/config/constants.ts`:
+
+```typescript
+// src/config/constants.ts
+export const APP_CONFIG = {
+  defaultPartnerName: 'Gracie',              // Change to your partner's name
+  defaultStartDate: '2025-10-18',             // Change to relationship start date (YYYY-MM-DD)
+  isPreConfigured: true,
+} as const;
+```
+
+**That's it!** The app will automatically use these values when it starts. No environment files, no build configuration needed.
+
+### What Gets Pre-Configured
+
+When you set `defaultPartnerName` and `defaultStartDate` in `constants.ts`:
+- Partner name displays throughout the app
+- Relationship duration counter calculates automatically
+- No onboarding wizard shown (pre-configured mode is always active)
+- Settings are initialized on first app load
+- Users can still edit these values later if needed (via Settings panel, when available)
 
 ## 📱 Deploying to GitHub Pages
 
 ### First Time Setup
 
-1. Initialize git repository (if not already done):
+1. **Configure environment variables** (see Environment Configuration section above)
+
+2. Initialize git repository (if not already done):
 ```bash
 git init
 git add .
 git commit -m "Initial commit: My Love app"
 ```
 
-2. Create a new repository on GitHub named `My-Love`
+3. Create a new repository on GitHub named `My-Love`
 
-3. Connect your local repository to GitHub:
+4. Connect your local repository to GitHub:
 ```bash
 git remote add origin https://github.com/YOUR_USERNAME/My-Love.git
 git branch -M main
@@ -64,13 +101,15 @@ git push -u origin main
 
 ### Deploy
 
-Run the deploy script:
+Before deploying, make sure you've edited `src/config/constants.ts` with your relationship data. Then run:
+
 ```bash
 npm run deploy
 ```
 
 This will:
-- Build the production version
+- Build the production version with your configured constants
+- Run automated smoke tests to verify everything is correct
 - Deploy to GitHub Pages
 - Make your app available at: `https://YOUR_USERNAME.github.io/My-Love/`
 
@@ -81,6 +120,16 @@ This will:
 3. Under **Source**, select `gh-pages` branch
 4. Click **Save**
 5. Your app will be live in a few minutes!
+
+### Deployment Checklist
+
+- [ ] Edited `src/config/constants.ts` with your partner name and relationship start date
+- [ ] Ran `npm run build` successfully locally
+- [ ] Tested with `npm run preview` before deploying
+- [ ] Committed all code changes
+- [ ] Ran `npm run deploy`
+- [ ] Verified app works on GitHub Pages URL
+- [ ] Checked that partner name and relationship duration display correctly
 
 ## 📝 Customizing Messages
 
@@ -135,13 +184,17 @@ The app will now appear on your home screen like a native app!
 
 ```
 My-Love/
+├── .env.production.example  # Template for environment variables
+├── .env.production          # Your actual env vars (gitignored)
 ├── public/
 │   └── icons/          # App icons for PWA
 ├── src/
 │   ├── components/
 │   │   ├── DailyMessage/    # Main message card component
-│   │   ├── Onboarding/      # First-time setup flow
+│   │   ├── Onboarding/      # DEPRECATED (Story 1.4) - To be removed in Story 1.5
 │   │   └── ...
+│   ├── config/
+│   │   └── constants.ts     # Environment configuration constants
 │   ├── stores/
 │   │   └── useAppStore.ts   # Zustand state management
 │   ├── services/
@@ -203,6 +256,32 @@ Created with care to help you express your love every single day.
 
 ## 🐛 Troubleshooting
 
+### App shows "Loading your daily message..." forever
+**Cause**: Missing or invalid configuration in `src/config/constants.ts`
+
+**Solution**:
+1. Edit `src/config/constants.ts` and verify your values are set
+2. Clear browser IndexedDB:
+   - Open DevTools → Application → IndexedDB
+   - Delete the `my-love-db` database
+3. Refresh the page
+
+### Console errors about configuration
+**Symptom**: `Configuration not set` warnings in console
+
+**Solution**:
+- Edit `src/config/constants.ts` with your partner name and relationship start date
+- Ensure `defaultPartnerName` and `defaultStartDate` are not empty strings
+
+### ConstraintError: Key already exists
+**Cause**: IndexedDB schema mismatch or duplicate initialization
+
+**Solution**:
+1. Clear browser IndexedDB (DevTools → Application → IndexedDB)
+2. Delete `my-love-db` database
+3. Refresh the page
+4. If persists, clear all browser data for localhost
+
 ### Development server won't start
 - Make sure Node.js v18+ is installed
 - Delete `node_modules` and run `npm install` again
@@ -210,6 +289,7 @@ Created with care to help you express your love every single day.
 ### Build fails
 - Run `npm run lint` to check for errors
 - Make sure all dependencies are installed
+- Verify `.env.production` exists before building
 
 ### PWA not installing
 - Must be served over HTTPS (GitHub Pages does this automatically)

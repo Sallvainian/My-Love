@@ -4,12 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "./scripts/dev-with-cleanup.sh",
+    "dev:raw": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "test:smoke": "node scripts/smoke-tests.cjs",
+    "test:e2e": "./scripts/test-with-cleanup.sh",
+    "test:e2e:raw": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "predeploy": "npm run build && npm run test:smoke",
+    "deploy": "gh-pages -d dist",
+    "postdeploy": "echo 'Deployment complete! Run: node scripts/post-deploy-check.cjs [YOUR_URL]'"
   },
   "dependencies": {
     "framer-motion": "^12.23.24",
@@ -22,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^24.6.0",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
