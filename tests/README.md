@@ -1317,7 +1317,7 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 1. **Increase timeout in `playwright.config.ts`:**
    ```typescript
    webServer: {
-     timeout: 120 * 1000, // Current: 120s, increase to 180s if needed
+     timeout: 180 * 1000, // Current: 180s
    }
    ```
 2. **Check CI logs for server errors:** Expand "Run Playwright tests" step, look for server output
