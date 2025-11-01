@@ -1,5 +1,7 @@
 # 💕 My Love - Daily Reminder App
 
+![Playwright Tests](https://github.com/Sallvainian/My-Love/actions/workflows/playwright.yml/badge.svg)
+
 A beautiful Progressive Web App (PWA) that sends daily love messages and reminders to your girlfriend. Built with React, TypeScript, Tailwind CSS, and Framer Motion for smooth animations.
 
 ## ✨ Features

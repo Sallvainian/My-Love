@@ -15,8 +15,8 @@ export default defineConfig({
   // Test directory
   testDir: './tests/e2e',
 
-  // Global test timeout (60 seconds - PWA operations can be slow)
-  timeout: 60000,
+  // Global test timeout (30 seconds - aggressive for speed)
+  timeout: 30000,
 
   // Fail the build on CI if tests fail
   fullyParallel: true,
@@ -24,11 +24,12 @@ export default defineConfig({
   // Forbid test.only in CI
   forbidOnly: !!process.env.CI,
 
-  // Retry configuration (2 retries for robustness against timing issues)
-  retries: 2,
+  // Retry configuration (environment-aware for CI reliability)
+  // CI: 2 retries for transient failures, Local: 0 for fast feedback
+  retries: process.env.CI ? 2 : 0,
 
   // Worker configuration (environment-aware)
-  workers: process.env.CI ? 2 : 4,
+  workers: process.env.CI ? 2 : 12, // Maximum parallelization
 
   // Reporter configuration
   reporter: [
@@ -44,20 +45,20 @@ export default defineConfig({
     // Run in headless mode for massive speed improvement (30-50% faster)
     headless: true,
 
-    // Trace collection (debugging on retry)
-    trace: 'on-first-retry',
+    // Trace collection (disabled for speed)
+    trace: 'off',
 
-    // Screenshot capture (only on failure)
-    screenshot: 'only-on-failure',
+    // Screenshot capture (disabled for speed)
+    screenshot: 'off',
 
-    // Video recording (retain on failure)
-    video: 'retain-on-failure',
+    // Video recording (disabled for speed)
+    video: 'off',
 
-    // Increased navigation timeout for slower machines/networks
-    navigationTimeout: 60000,
+    // Aggressive timeouts for speed
+    navigationTimeout: 30000,
 
     // Wait for network idle before considering navigation complete
-    waitForSelectorTimeout: 15000,
+    waitForSelectorTimeout: 10000,
   },
 
   // Multi-browser project configuration
@@ -69,24 +70,25 @@ export default defineConfig({
         // Chromium-specific optimizations for PWA testing
         launchOptions: {
           args: [
-            '--disable-blink-features=AutomationControlled', // Reduce automation detection overhead
-            '--disable-dev-shm-usage', // Reduce memory overhead
-            '--disable-gpu', // Disable GPU hardware acceleration (not needed for tests)
+            '--disable-blink-features=AutomationControlled',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-sandbox', // Speed boost
+            '--disable-setuid-sandbox', // Speed boost
+            '--disable-web-security', // Speed boost (test only!)
           ],
         },
       },
-      // Chromium's multi-process architecture makes IndexedDB operations 2-3x slower
-      // Increase timeout to accommodate this without failing tests unnecessarily
-      timeout: 45000, // 45 seconds (vs global 30s)
+      timeout: 30000, // Aggressive timeout
     },
 
+    // Firefox enabled for CI multi-browser testing (Story 2.6 requirement)
     {
       name: 'firefox',
       use: {
         ...devices['Desktop Firefox'],
       },
-      // Firefox IndexedDB operations can also be slow, especially with service workers
-      timeout: 60000, // 60 seconds
+      timeout: 60000,
     },
 
     // WebKit temporarily disabled due to missing system dependencies

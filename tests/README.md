@@ -1205,47 +1205,264 @@ npx playwright test --headed
 
 ## CI Integration
 
-GitHub Actions workflow automatically runs Playwright tests on every push and pull request.
+GitHub Actions workflow automatically runs Playwright tests on every push and pull request, providing continuous validation of code changes before they merge to main.
 
-### Workflow Configuration
+### Workflow Overview
 
 **File:** `.github/workflows/playwright.yml` (created in Story 2.6)
 
 **Triggers:**
-- Push to `main` branch
-- Pull requests
+- **Push to `main` branch:** Validates merged code stays healthy
+- **Pull requests:** Validates code before merge, blocks PRs if tests fail
+- **Manual dispatch:** Can manually trigger workflow from Actions tab (optional)
 
 **Environment:**
-- Ubuntu latest
-- Node.js 18.x
-- 2 workers (resource-constrained)
-- 2 retries (handle transient failures)
+- **Runner:** Ubuntu 22.04 (ubuntu-latest)
+- **Node.js:** 18.x (matches local development)
+- **Browsers:** Chromium, Firefox (automatically installed with system dependencies)
+- **Workers:** 2 (CI resource constraints: 2-core CPU, 7GB memory)
+- **Retries:** Configured in `playwright.config.ts` based on `CI` environment variable
+- **Timeout:** 10 minutes maximum workflow execution time
 
-### Artifact Uploads
+**CI-Specific Configuration:**
 
-**On test failure, CI uploads:**
-- HTML test report
-- Screenshots (only-on-failure)
-- Videos (retain-on-failure)
-- Traces (on-first-retry)
-
-**Accessing artifacts:**
-1. Go to GitHub Actions tab
-2. Click on failed workflow run
-3. Scroll to "Artifacts" section
-4. Download `playwright-report.zip`
+The Playwright config automatically adjusts for CI environments via the `process.env.CI` flag:
+- CI uses fewer workers (2 vs 12 local) due to resource constraints
+- Retries enabled in CI (2) to handle transient failures, disabled locally (0) for fast feedback
+- GitHub reporter enabled for better CI output formatting
+- HTML reporter generates artifacts for debugging failures
 
 ### Viewing Test Results
 
-**HTML Report:**
-1. Download `playwright-report.zip` artifact
-2. Extract locally
-3. Open `index.html` in browser
+#### GitHub Actions UI
 
-**GitHub Actions UI:**
-- Test results appear as annotations on the PR
-- Failed tests show as red X with error message
-- Click on annotation to see full error
+1. **Navigate to Actions tab** on GitHub repository
+2. **Select "Playwright Tests" workflow** from left sidebar
+3. **Click on a workflow run** to view details
+4. **Review test results:**
+   - ✅ Green checkmark = All tests passed
+   - ❌ Red X = Tests failed (blocks PR merge if branch protection enabled)
+   - 🟡 Yellow circle = Workflow in progress
+
+#### Test Annotations
+
+- Failed tests appear as **annotations** on the PR
+- Each failure shows **file, line number, and error message**
+- Click annotation to jump to exact failure location in workflow logs
+
+#### Workflow Logs
+
+- Expand each step to view detailed logs
+- **"Run Playwright tests"** step shows individual test results
+- Logs include test execution time, browser used, and failure details
+
+### Downloading Artifacts
+
+When tests fail (or if configured with `if: always()`), CI uploads test artifacts for debugging.
+
+**Artifacts included:**
+- **`playwright-report/`** - Full HTML test report with screenshots and traces
+- **`test-results/`** - Raw test output files (if present)
+
+**How to download:**
+
+1. Go to **GitHub Actions tab** → **Select failed workflow run**
+2. Scroll to **"Artifacts" section** at bottom of page
+3. Click **`playwright-report-{run-number}`** to download ZIP file
+4. **Extract the ZIP** to a local folder
+5. **Open `playwright-report/index.html`** in a web browser
+
+**Artifact retention:** 7 days (configurable in workflow file)
+
+**Viewing HTML report:**
+- Index page shows all test suites and pass/fail status
+- Click on failed test to see error details, screenshots, and traces
+- Use trace viewer for step-by-step debugging with DOM snapshots
+
+### Troubleshooting CI Failures
+
+#### Issue: Workflow fails with "Playwright browser install failed"
+
+**Symptoms:**
+- CI log shows error during `npx playwright install --with-deps` step
+- Error message: "Failed to install browsers" or "Failed to download browsers"
+
+**Causes:**
+- Network timeout downloading browser binaries (~1.5GB)
+- Corrupted npm cache in CI environment
+- GitHub Actions runner out of disk space
+
+**Solutions:**
+1. **Re-run workflow:** Often transient network issues resolve on retry
+2. **Check GitHub Actions status:** Verify no platform-wide outages
+3. **Review disk space:** Workflow logs show disk usage; artifact retention may need adjustment
+4. **Verify workflow syntax:** Ensure `--with-deps` flag is present (installs system dependencies)
+
+**Prevention:** CI workflow uses `actions/cache` for npm dependencies (optional optimization)
+
+#### Issue: Tests timeout waiting for dev server
+
+**Symptoms:**
+- CI log shows: "Timed out waiting 120000ms for dev server to start"
+- Tests never run, workflow fails during server startup
+- Local tests pass but CI fails
+
+**Causes:**
+- webServer timeout too aggressive for CI resource constraints
+- Port conflict or binding issue in CI environment
+- Missing environment variables or configuration
+- npm ci installed incompatible dependencies
+
+**Solutions:**
+1. **Increase timeout in `playwright.config.ts`:**
+   ```typescript
+   webServer: {
+     timeout: 120 * 1000, // Current: 120s, increase to 180s if needed
+   }
+   ```
+2. **Check CI logs for server errors:** Expand "Run Playwright tests" step, look for server output
+3. **Verify package-lock.json is committed:** CI uses `npm ci` which requires lock file
+4. **Test locally with CI configuration:** Use `CI=true npm run test:e2e` to simulate CI environment
+
+**Prevention:** Story 2.4 validated webServer works in CI; timeouts already tuned for typical startup (10-30s)
+
+#### Issue: Flaky tests in CI but pass locally
+
+**Symptoms:**
+- Tests pass consistently locally (12 workers, 0 retries, fast machine)
+- Tests fail intermittently in CI (2 workers, slower execution, transient issues)
+- Failures with "Timeout exceeded" or "Element not visible"
+
+**Causes:**
+- Timing issues due to slower CI resources (2-core CPU vs local multi-core)
+- Race conditions in test code not caught by fast local execution
+- CI-specific browser behavior (headless vs headed)
+- Network latency for external resources (if tests hit real URLs)
+
+**Solutions:**
+1. **Review test for timing assumptions:** Remove `waitForTimeout()`, use auto-waiting assertions
+2. **Increase retries temporarily:** Set `retries: 2` in `playwright.config.ts` for CI
+3. **Use explicit waits:** Replace fragile selectors with robust `data-testid` attributes
+4. **Check CI-specific logs:** Look for warnings about slow operations
+5. **Reproduce locally with CI settings:**
+   ```bash
+   CI=true npx playwright test --workers=2 --retries=2
+   ```
+
+**Prevention:** Follow [data-testid convention](#data-testid-naming-convention) and auto-waiting patterns
+
+#### Issue: Workflow doesn't trigger on PR
+
+**Symptoms:**
+- Push to PR branch, but no workflow appears in Actions tab
+- "Checks" section on PR shows nothing
+- Other repositories' workflows work fine
+
+**Causes:**
+- Workflow YAML syntax error (GitHub silently ignores invalid workflows)
+- Workflow file not in `main` branch yet (first PR with workflow won't trigger itself)
+- GitHub Actions disabled in repository settings
+- Branch protection rules misconfigured
+
+**Solutions:**
+1. **Validate YAML syntax:** Use [GitHub Actions YAML validator](https://rhysd.github.io/actionlint/)
+2. **Merge workflow to main first:** First-time workflow setup requires merge to main before triggering
+3. **Check repository settings:** Settings → Actions → General → ensure Actions enabled
+4. **Review branch filters:** Verify `on.pull_request.branches` allows your branch pattern
+5. **Check workflow permissions:** Settings → Actions → General → Workflow permissions
+
+**Prevention:** After merging workflow to main, all subsequent PRs will trigger it automatically
+
+#### Issue: Artifacts not uploading despite failures
+
+**Symptoms:**
+- Tests fail, but no artifacts appear in "Artifacts" section
+- Workflow completes without uploading reports
+
+**Causes:**
+- `if: failure()` condition not met (workflow canceled before upload step)
+- Artifact path incorrect (playwright-report/ not generated)
+- Artifact size exceeds GitHub limits (2GB per artifact)
+- Upload step failed silently
+
+**Solutions:**
+1. **Check artifact upload step logs:** Expand "Upload test artifacts" step for errors
+2. **Change condition to `if: always()`:** Uploads artifacts even on success (helpful for debugging)
+3. **Verify report generation:** Check "Run Playwright tests" logs for HTML reporter output
+4. **Check artifact size:** Large traces/videos may exceed limits; adjust retention policy
+5. **Review upload action version:** Ensure using `actions/upload-artifact@v4` (latest stable)
+
+**Prevention:** Workflow configured with `if: always()` to capture all runs; retention set to 7 days
+
+### Reproducing CI Failures Locally
+
+When CI fails but local tests pass, reproduce the exact CI environment to debug.
+
+**Step 1: Match Node.js version**
+
+```bash
+# Check current Node version
+node --version
+
+# If not 18.x, install via nvm:
+nvm install 18
+nvm use 18
+```
+
+**Step 2: Clean install dependencies (match CI)**
+
+```bash
+# Remove existing node_modules and package-lock changes
+rm -rf node_modules package-lock.json
+
+# Clean install from lock file (same as CI)
+npm ci
+```
+
+**Step 3: Install Playwright browsers with system dependencies**
+
+```bash
+# Install browsers exactly as CI does
+npx playwright install --with-deps
+```
+
+**Step 4: Run tests with CI environment settings**
+
+```bash
+# Set CI env var to trigger CI-specific config
+CI=true npm run test:e2e
+```
+
+**Alternative: Match CI worker/retry config**
+
+```bash
+# Run with same parallelization and retries as CI
+npx playwright test --workers=2 --retries=2
+```
+
+**Step 5: Compare outputs**
+
+- **Local output:** Fast execution, detailed terminal output
+- **CI output:** Slower execution, GitHub reporter format, resource constraints
+- **Key differences:** Worker count (12 local vs 2 CI), retries (0 local vs 2 CI)
+
+**If tests still pass locally:**
+
+1. **Check CI logs for system differences:** Browser version, OS, environment variables
+2. **Test in Docker with Ubuntu image:**
+   ```bash
+   docker run -it --rm -v $(pwd):/app -w /app node:18 bash
+   npm ci && npx playwright install --with-deps && CI=true npm run test:e2e
+   ```
+3. **Enable verbose logging in CI:** Add `--reporter=list,html` to see detailed test output
+4. **Download CI artifacts:** Review HTML report for screenshots/traces of exact failure
+
+**Common gotchas:**
+
+- **Timing differences:** CI is slower, exposes race conditions masked by fast local execution
+- **Headless vs headed:** CI always runs headless; local may default to headed (slower)
+- **Environment variables:** CI may have different env vars; check workflow file for secrets/vars
+- **File permissions:** Linux CI vs macOS/Windows local can have permission differences
 
 ---
 
