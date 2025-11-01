@@ -11,6 +11,7 @@ import type {
 import { storageService } from '../services/storage';
 import defaultMessages from '../data/defaultMessages';
 import { getTodayMessage, isNewDay } from '../utils/messageRotation';
+import { APP_CONFIG } from '../config/constants';
 
 interface AppState {
   // Settings
@@ -53,12 +54,34 @@ interface AppState {
   setTheme: (theme: ThemeName) => void;
 }
 
+// Initialization guards to prevent concurrent/duplicate initialization (StrictMode protection)
+let isInitializing = false;
+let isInitialized = false;
+let isHydrated = false; // Track if Zustand persist hydration has completed
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      // Initial state
-      settings: null,
-      isOnboarded: false,
+      // Initial state - use defaults that will be overridden by persist if data exists
+      // Story 1.4: Pre-configured settings for single-user deployment
+      settings: {
+        themeName: 'sunset' as ThemeName,
+        notificationTime: '09:00',
+        relationship: {
+          startDate: APP_CONFIG.defaultStartDate,
+          partnerName: APP_CONFIG.defaultPartnerName,
+          anniversaries: [],
+        },
+        customization: {
+          accentColor: '#ff6b9d',
+          fontFamily: 'system-ui',
+        },
+        notifications: {
+          enabled: true,
+          time: '09:00',
+        },
+      },
+      isOnboarded: true,
       messages: [],
       messageHistory: {
         lastShownDate: '',
@@ -73,9 +96,35 @@ export const useAppStore = create<AppState>()(
 
       // Initialize app
       initializeApp: async () => {
+        // Guard: Prevent concurrent/duplicate initialization (StrictMode protection)
+        if (isInitializing) {
+          console.log('[App Init] Skipping - initialization already in progress');
+          return;
+        }
+        if (isInitialized) {
+          console.log('[App Init] Skipping - app already initialized');
+          return;
+        }
+
+        isInitializing = true;
         set({ isLoading: true, error: null });
 
         try {
+          // CRITICAL: Wait for Zustand persist hydration to complete
+          // Hydration sets defaults if no persisted state found (see onRehydrateStorage)
+          // We must wait for hydration before proceeding with IndexedDB initialization
+          const maxWait = 1000; // 1 second max wait
+          const startTime = Date.now();
+          while (!isHydrated && (Date.now() - startTime) < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+
+          if (!isHydrated) {
+            console.warn('[App Init] Hydration timeout - proceeding anyway');
+          } else {
+            console.log('[App Init] Hydration complete - proceeding with IndexedDB initialization');
+          }
+
           // Initialize IndexedDB
           await storageService.init();
 
@@ -84,15 +133,18 @@ export const useAppStore = create<AppState>()(
 
           // If no messages exist, populate with default messages
           if (storedMessages.length === 0) {
-            const messagesToAdd = defaultMessages.map((msg, index) => ({
+            const messagesToAdd = defaultMessages.map((msg) => ({
               ...msg,
-              id: index + 1,
+              // Remove explicit ID - let IndexedDB autoIncrement generate IDs
               createdAt: new Date(),
               isCustom: false,
             }));
 
             await storageService.addMessages(messagesToAdd);
-            set({ messages: messagesToAdd });
+
+            // Reload messages from IndexedDB to get auto-generated IDs
+            const messagesWithIds = await storageService.getAllMessages();
+            set({ messages: messagesWithIds });
           } else {
             set({ messages: storedMessages });
           }
@@ -101,9 +153,13 @@ export const useAppStore = create<AppState>()(
           get().updateCurrentMessage();
 
           set({ isLoading: false });
+          isInitialized = true;
+          console.log('[App Init] Initialization completed successfully');
         } catch (error) {
           console.error('Error initializing app:', error);
           set({ error: 'Failed to initialize app', isLoading: false });
+        } finally {
+          isInitializing = false;
         }
       },
 
@@ -281,12 +337,58 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'my-love-storage',
+      version: 0, // State schema version (matches test fixtures)
       partialize: (state) => ({
+        // Only persist small, critical state to LocalStorage
+        // Large data (messages, photos) is stored in IndexedDB via storageService
         settings: state.settings,
         isOnboarded: state.isOnboarded,
         messageHistory: state.messageHistory,
         moods: state.moods,
+        // NOT persisted (computed or transient):
+        // - messages: Loaded from IndexedDB on init
+        // - currentMessage: Computed from messages + messageHistory
+        // - isLoading, error: Runtime UI state only
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error(
+            '[Zustand Persist] Failed to rehydrate state from LocalStorage:',
+            error
+          );
+
+          // Attempt to recover: clear corrupted state
+          try {
+            localStorage.removeItem('my-love-storage');
+            console.warn(
+              '[Zustand Persist] Corrupted state cleared. App will reinitialize with defaults.'
+            );
+          } catch (clearError) {
+            console.error('[Zustand Persist] Failed to clear corrupted state:', clearError);
+          }
+
+          // App will continue with default initial state
+          return;
+        }
+
+        // Log hydration result
+        if (state && state.settings) {
+          console.log(
+            '[Zustand Persist] State successfully rehydrated from LocalStorage',
+            `with settings (theme: ${state.settings.themeName})`
+          );
+        } else {
+          console.log('[Zustand Persist] No persisted state found - using initial defaults');
+        }
+
+        // Mark hydration as complete
+        isHydrated = true;
+      },
     }
   )
 );
+
+// Expose store to window object for E2E testing
+if (typeof window !== 'undefined') {
+  (window as any).__APP_STORE__ = useAppStore;
+}

@@ -21,130 +21,295 @@ const DB_VERSION = 1;
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDB> | null = null;
+  private initPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
-    if (this.db) return;
+    // Return existing promise if initialization already in progress
+    if (this.initPromise) {
+      console.log('[StorageService] Init already in progress, waiting...');
+      return this.initPromise;
+    }
 
-    this.db = await openDB<MyLoveDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        // Create photos store
-        if (!db.objectStoreNames.contains('photos')) {
-          const photoStore = db.createObjectStore('photos', {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          photoStore.createIndex('by-date', 'uploadDate');
-        }
+    // Return immediately if already initialized
+    if (this.db) {
+      console.log('[StorageService] Already initialized');
+      return Promise.resolve();
+    }
 
-        // Create messages store
-        if (!db.objectStoreNames.contains('messages')) {
-          const messageStore = db.createObjectStore('messages', {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          messageStore.createIndex('by-category', 'category');
-          messageStore.createIndex('by-date', 'createdAt');
-        }
-      },
-    });
+    // Store promise to prevent concurrent initialization
+    this.initPromise = this._doInit();
+
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async _doInit(): Promise<void> {
+    try {
+      console.log('[StorageService] Initializing IndexedDB...');
+      this.db = await openDB<MyLoveDB>(DB_NAME, DB_VERSION, {
+        upgrade(db) {
+          // Create photos store
+          if (!db.objectStoreNames.contains('photos')) {
+            const photoStore = db.createObjectStore('photos', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            photoStore.createIndex('by-date', 'uploadDate');
+            console.log('[StorageService] Created photos object store');
+          }
+
+          // Create messages store
+          if (!db.objectStoreNames.contains('messages')) {
+            const messageStore = db.createObjectStore('messages', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            messageStore.createIndex('by-category', 'category');
+            messageStore.createIndex('by-date', 'createdAt');
+            console.log('[StorageService] Created messages object store');
+          }
+        },
+      });
+      console.log('[StorageService] IndexedDB initialized successfully');
+    } catch (error) {
+      console.error('[StorageService] Failed to initialize IndexedDB:', error);
+      console.error('[StorageService] Error details:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+      });
+      
+      // Fallback: App will continue with default state (handled in useAppStore)
+      // Possible causes: permission denied, quota exceeded, corrupted database
+      throw error; // Re-throw to allow caller to handle gracefully
+    }
   }
 
   // Photo operations
   async addPhoto(photo: Omit<Photo, 'id'>): Promise<number> {
-    await this.init();
-    return this.db!.add('photos', photo as Photo);
+    try {
+      await this.init();
+      console.log('[StorageService] Adding photo to IndexedDB');
+      const id = await this.db!.add('photos', photo as Photo);
+      console.log('[StorageService] Photo added successfully, id:', id);
+      return id;
+    } catch (error) {
+      console.error('[StorageService] Failed to add photo:', error);
+      console.error('[StorageService] Photo data:', photo);
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async getPhoto(id: number): Promise<Photo | undefined> {
-    await this.init();
-    return this.db!.get('photos', id);
+    try {
+      await this.init();
+      const photo = await this.db!.get('photos', id);
+      if (photo) {
+        console.log('[StorageService] Photo retrieved successfully, id:', id);
+      } else {
+        console.warn('[StorageService] Photo not found, id:', id);
+      }
+      return photo;
+    } catch (error) {
+      console.error('[StorageService] Failed to get photo:', error);
+      console.error('[StorageService] Photo id:', id);
+      return undefined; // Graceful fallback: return undefined
+    }
   }
 
   async getAllPhotos(): Promise<Photo[]> {
-    await this.init();
-    return this.db!.getAll('photos');
+    try {
+      await this.init();
+      const photos = await this.db!.getAll('photos');
+      console.log('[StorageService] Retrieved all photos, count:', photos.length);
+      return photos;
+    } catch (error) {
+      console.error('[StorageService] Failed to get all photos:', error);
+      return []; // Graceful fallback: return empty array
+    }
   }
 
   async deletePhoto(id: number): Promise<void> {
-    await this.init();
-    await this.db!.delete('photos', id);
+    try {
+      await this.init();
+      await this.db!.delete('photos', id);
+      console.log('[StorageService] Photo deleted successfully, id:', id);
+    } catch (error) {
+      console.error('[StorageService] Failed to delete photo:', error);
+      console.error('[StorageService] Photo id:', id);
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async updatePhoto(id: number, updates: Partial<Photo>): Promise<void> {
-    await this.init();
-    const photo = await this.getPhoto(id);
-    if (photo) {
-      await this.db!.put('photos', { ...photo, ...updates });
+    try {
+      await this.init();
+      const photo = await this.getPhoto(id);
+      if (photo) {
+        await this.db!.put('photos', { ...photo, ...updates });
+        console.log('[StorageService] Photo updated successfully, id:', id);
+      } else {
+        console.warn('[StorageService] Cannot update - photo not found, id:', id);
+      }
+    } catch (error) {
+      console.error('[StorageService] Failed to update photo:', error);
+      console.error('[StorageService] Photo id:', id, 'updates:', updates);
+      throw error; // Re-throw to allow caller to handle
     }
   }
 
   // Message operations
   async addMessage(message: Omit<Message, 'id'>): Promise<number> {
-    await this.init();
-    return this.db!.add('messages', message as Message);
+    try {
+      await this.init();
+      console.log('[StorageService] Adding message to IndexedDB');
+      const id = await this.db!.add('messages', message as Message);
+      console.log('[StorageService] Message added successfully, id:', id);
+      return id;
+    } catch (error) {
+      console.error('[StorageService] Failed to add message:', error);
+      console.error('[StorageService] Message data:', message);
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async getMessage(id: number): Promise<Message | undefined> {
-    await this.init();
-    return this.db!.get('messages', id);
+    try {
+      await this.init();
+      const message = await this.db!.get('messages', id);
+      if (message) {
+        console.log('[StorageService] Message retrieved successfully, id:', id);
+      } else {
+        console.warn('[StorageService] Message not found, id:', id);
+      }
+      return message;
+    } catch (error) {
+      console.error('[StorageService] Failed to get message:', error);
+      console.error('[StorageService] Message id:', id);
+      return undefined; // Graceful fallback: return undefined
+    }
   }
 
   async getAllMessages(): Promise<Message[]> {
-    await this.init();
-    return this.db!.getAll('messages');
+    try {
+      await this.init();
+      const messages = await this.db!.getAll('messages');
+      console.log('[StorageService] Retrieved all messages, count:', messages.length);
+      return messages;
+    } catch (error) {
+      console.error('[StorageService] Failed to get all messages:', error);
+      return []; // Graceful fallback: return empty array
+    }
   }
 
   async getMessagesByCategory(category: string): Promise<Message[]> {
-    await this.init();
-    return this.db!.getAllFromIndex('messages', 'by-category', category);
+    try {
+      await this.init();
+      const messages = await this.db!.getAllFromIndex('messages', 'by-category', category);
+      console.log('[StorageService] Retrieved messages by category:', category, 'count:', messages.length);
+      return messages;
+    } catch (error) {
+      console.error('[StorageService] Failed to get messages by category:', error);
+      console.error('[StorageService] Category:', category);
+      return []; // Graceful fallback: return empty array
+    }
   }
 
   async updateMessage(id: number, updates: Partial<Message>): Promise<void> {
-    await this.init();
-    const message = await this.getMessage(id);
-    if (message) {
-      await this.db!.put('messages', { ...message, ...updates });
+    try {
+      await this.init();
+      const message = await this.getMessage(id);
+      if (message) {
+        await this.db!.put('messages', { ...message, ...updates });
+        console.log('[StorageService] Message updated successfully, id:', id);
+      } else {
+        console.warn('[StorageService] Cannot update - message not found, id:', id);
+      }
+    } catch (error) {
+      console.error('[StorageService] Failed to update message:', error);
+      console.error('[StorageService] Message id:', id, 'updates:', updates);
+      throw error; // Re-throw to allow caller to handle
     }
   }
 
   async deleteMessage(id: number): Promise<void> {
-    await this.init();
-    await this.db!.delete('messages', id);
+    try {
+      await this.init();
+      await this.db!.delete('messages', id);
+      console.log('[StorageService] Message deleted successfully, id:', id);
+    } catch (error) {
+      console.error('[StorageService] Failed to delete message:', error);
+      console.error('[StorageService] Message id:', id);
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   async toggleFavorite(messageId: number): Promise<void> {
-    await this.init();
-    const message = await this.getMessage(messageId);
-    if (message) {
-      await this.updateMessage(messageId, { isFavorite: !message.isFavorite });
+    try {
+      await this.init();
+      const message = await this.getMessage(messageId);
+      if (message) {
+        await this.updateMessage(messageId, { isFavorite: !message.isFavorite });
+        console.log('[StorageService] Favorite toggled successfully, id:', messageId, 'new value:', !message.isFavorite);
+      } else {
+        console.warn('[StorageService] Cannot toggle favorite - message not found, id:', messageId);
+      }
+    } catch (error) {
+      console.error('[StorageService] Failed to toggle favorite:', error);
+      console.error('[StorageService] Message id:', messageId);
+      throw error; // Re-throw to allow caller to handle
     }
   }
 
   // Bulk operations
   async addMessages(messages: Omit<Message, 'id'>[]): Promise<void> {
-    await this.init();
-    const tx = this.db!.transaction('messages', 'readwrite');
-    await Promise.all([
-      ...messages.map(msg => tx.store.add(msg as Message)),
-      tx.done,
-    ]);
+    try {
+      await this.init();
+      console.log('[StorageService] Adding bulk messages to IndexedDB, count:', messages.length);
+      const tx = this.db!.transaction('messages', 'readwrite');
+      await Promise.all([
+        ...messages.map(msg => tx.store.add(msg as Message)),
+        tx.done,
+      ]);
+      console.log('[StorageService] Bulk messages added successfully');
+    } catch (error) {
+      console.error('[StorageService] Failed to add bulk messages:', error);
+      console.error('[StorageService] Message count:', messages.length);
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   // Clear all data (for reset)
   async clearAllData(): Promise<void> {
-    await this.init();
-    await this.db!.clear('photos');
-    await this.db!.clear('messages');
+    try {
+      await this.init();
+      console.log('[StorageService] Clearing all data from IndexedDB...');
+      await this.db!.clear('photos');
+      await this.db!.clear('messages');
+      console.log('[StorageService] All data cleared successfully');
+    } catch (error) {
+      console.error('[StorageService] Failed to clear all data:', error);
+      throw error; // Re-throw to allow caller to handle
+    }
   }
 
   // Export data for backup
   async exportData(): Promise<{ photos: Photo[]; messages: Message[] }> {
-    await this.init();
-    const [photos, messages] = await Promise.all([
-      this.getAllPhotos(),
-      this.getAllMessages(),
-    ]);
-    return { photos, messages };
+    try {
+      await this.init();
+      console.log('[StorageService] Exporting all data from IndexedDB...');
+      const [photos, messages] = await Promise.all([
+        this.getAllPhotos(),
+        this.getAllMessages(),
+      ]);
+      console.log('[StorageService] Data exported successfully, photos:', photos.length, 'messages:', messages.length);
+      return { photos, messages };
+    } catch (error) {
+      console.error('[StorageService] Failed to export data:', error);
+      return { photos: [], messages: [] }; // Graceful fallback: return empty data
+    }
   }
 }
 

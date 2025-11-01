@@ -10,7 +10,18 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dev-dist
+.code
 *.local
+
+# Local environment overrides (optional)
+.env.local
+.env.test
+
+# Playwright test artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
 
 # Editor directories and files
 .vscode/*
