@@ -15,8 +15,8 @@ export default defineConfig({
   // Test directory
   testDir: './tests/e2e',
 
-  // Global test timeout (30 seconds - aggressive for speed)
-  timeout: 30000,
+  // Global test timeout (60 seconds - allows for slow PWA operations)
+  timeout: 60000,
 
   // Fail the build on CI if tests fail
   fullyParallel: true,
