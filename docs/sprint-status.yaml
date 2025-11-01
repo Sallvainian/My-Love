@@ -50,8 +50,8 @@ development_status:
   2-2-testing-component-integration: done
   2-3-add-data-testid-attributes: done
   2-4-configure-auto-start-preview-server: done
-  2-5-run-validate-tests-pass: in-progress
-  2-6-add-ci-integration-github-actions: backlog
+  2-5-run-validate-tests-pass: done
+  2-6-add-ci-integration-github-actions: done
   epic-2-retrospective: optional
 
   epic-3: backlog
