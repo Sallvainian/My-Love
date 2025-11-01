@@ -1303,7 +1303,7 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 #### Issue: Tests timeout waiting for dev server
 
 **Symptoms:**
-- CI log shows: "Timed out waiting 120000ms for dev server to start"
+- CI log shows: "Timed out waiting 180000ms for dev server to start"
 - Tests never run, workflow fails during server startup
 - Local tests pass but CI fails
 
