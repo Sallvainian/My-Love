@@ -1,0 +1,455 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3.6</storyId>
+    <title>AI Message Suggestion Review Interface (Optional Enhancement)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-6-ai-message-suggestion-review-interface-optional-enhancement.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>the app creator (Frank)</asA>
+    <iWant>to review AI-generated message suggestions and approve/reject them</iWant>
+    <soThat>I can quickly expand the library with quality-controlled content</soThat>
+    <tasks>
+### Implementation Tasks
+
+- [ ] **Task 1**: Install OpenAI Package and Configure API Key (AC: 3.6.2)
+  - [ ] Subtask 1.1: `npm install openai` (version ^4.x)
+  - [ ] Subtask 1.2: Create `.env.example` with `VITE_OPENAI_API_KEY=your_key_here`
+  - [ ] Subtask 1.3: Add `.env` to `.gitignore` if not already present
+  - [ ] Subtask 1.4: Document API key setup in README or admin docs
+  - [ ] Subtask 1.5: Test environment variable loading in development
+
+- [ ] **Task 2**: Create AI Suggestion Service (AC: 3.6.2)
+  - [ ] Subtask 2.1: Create `src/services/aiSuggestionService.ts`
+  - [ ] Subtask 2.2: Implement `AISuggestionService` class with OpenAI client initialization
+  - [ ] Subtask 2.3: Implement `generateSuggestions(request)` method with GPT-3.5-turbo API call
+  - [ ] Subtask 2.4: Implement `buildPrompt(request)` with category context and examples
+  - [ ] Subtask 2.5: Implement `parseResponse(response)` to extract messages from GPT output
+  - [ ] Subtask 2.6: Implement `checkRateLimit()` to read daily usage from LocalStorage
+  - [ ] Subtask 2.7: Implement `incrementUsage()` to update daily usage counter
+  - [ ] Subtask 2.8: Export singleton: `export const aiSuggestionService = new AISuggestionService()`
+
+- [ ] **Task 3**: Update TypeScript Interfaces (AC: 3.6.2, 3.6.3, 3.6.4)
+  - [ ] Subtask 3.1: Add `MessageSuggestion` interface
+  - [ ] Subtask 3.2: Add `GenerateSuggestionsRequest` interface
+  - [ ] Subtask 3.3: Add `AISuggestionUsage` interface
+  - [ ] Subtask 3.4: Enhance `Message` interface with `createdBy` field
+  - [ ] Subtask 3.5: Export all new interfaces
+
+- [ ] **Task 4**: Extend Zustand Store with AI Actions (AC: 3.6.2, 3.6.4, 3.6.5)
+  - [ ] Subtask 4.1: Add `aiSuggestions: MessageSuggestion[]` state
+  - [ ] Subtask 4.2: Add `aiGenerating: boolean` state
+  - [ ] Subtask 4.3: Implement `generateAISuggestions(request)` action
+  - [ ] Subtask 4.4: Implement `acceptSuggestion(id)` action
+  - [ ] Subtask 4.5: Implement `rejectSuggestion(id)` action
+  - [ ] Subtask 4.6: Implement `clearSuggestions()` action
+  - [ ] Subtask 4.7: Implement `checkAIRateLimit()` action
+  - [ ] Subtask 4.8: Add console logging for all AI actions
+
+- [ ] **Task 5**: Create AI Suggestion Panel Component (AC: 3.6.1, 3.6.3, 3.6.6)
+  - [ ] Subtask 5.1: Create `src/components/AdminPanel/AISuggestionPanel.tsx`
+  - [ ] Subtask 5.2: Implement header with "Generate Suggestions" button and quota display
+  - [ ] Subtask 5.3: Implement generation form modal
+  - [ ] Subtask 5.4: Implement suggestions list with cards
+  - [ ] Subtask 5.5: Implement Accept/Reject buttons
+  - [ ] Subtask 5.6: Implement loading state
+  - [ ] Subtask 5.7: Implement empty state
+  - [ ] Subtask 5.8: Implement "Generate More" button
+  - [ ] Subtask 5.9: Add data-testid attributes
+  - [ ] Subtask 5.10: Style consistently with existing admin panel
+
+- [ ] **Task 6**: Integrate AI Panel into Admin Panel (AC: 3.6.1)
+  - [ ] Subtask 6.1: Modify `src/components/AdminPanel/AdminPanel.tsx`
+  - [ ] Subtask 6.2: Add tab or section for "AI Suggestions"
+  - [ ] Subtask 6.3: Import and render `<AISuggestionPanel />`
+  - [ ] Subtask 6.4: Add navigation/routing logic
+  - [ ] Subtask 6.5: Ensure consistent theme
+
+- [ ] **Task 7**: Implement Rate Limiting UI (AC: 3.6.7)
+  - [ ] Subtask 7.1: Display remaining quota
+  - [ ] Subtask 7.2: Disable button when limit reached
+  - [ ] Subtask 7.3: Show tooltip on disabled button
+  - [ ] Subtask 7.4: Display warning at 4/5 usage
+  - [ ] Subtask 7.5: Display cost estimate
+  - [ ] Subtask 7.6: Test limit reset logic
+
+- [ ] **Task 8**: Handle API Errors Gracefully (AC: 3.6.2)
+  - [ ] Subtask 8.1: Catch OpenAI API errors
+  - [ ] Subtask 8.2: Display user-friendly error messages
+  - [ ] Subtask 8.3: Handle missing API key
+  - [ ] Subtask 8.4: Handle quota exceeded
+  - [ ] Subtask 8.5: Handle malformed responses
+  - [ ] Subtask 8.6: Log errors for debugging
+
+- [ ] **Task 9**: Write Comprehensive E2E Tests (AC: All)
+  - [ ] Subtask 9.1: Create `tests/e2e/ai-suggestions.spec.ts`
+  - [ ] Subtask 9.2-9.10: Test all acceptance criteria
+
+- [ ] **Task 10**: Documentation and Setup Guide (AC: 3.6.2, 3.6.7)
+  - [ ] Subtask 10.1: Update README with API key setup
+  - [ ] Subtask 10.2: Document rate limiting policy
+  - [ ] Subtask 10.3: Document cost estimates
+  - [ ] Subtask 10.4: Add troubleshooting section
+  - [ ] Subtask 10.5: Document prompt engineering
+  - [ ] Subtask 10.6: Note security concerns
+
+- [ ] **Task 11**: Validate All Acceptance Criteria
+  - [ ] Subtask 11.1-11.7: Manual test all ACs
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+**AC-3.6.1**: Admin Panel Includes "Generate Suggestions" Button
+- Button visible in AI Suggestions section
+- Disabled if daily limit reached (5 sessions)
+- Tooltip shows remaining quota
+- Opens generation form on click
+
+**AC-3.6.2**: Uses OpenAI API to Generate 10 Message Suggestions
+- Form includes category dropdown, tone selector, count input
+- API calls GPT-3.5-turbo model
+- Prompt includes category context, examples, tone instructions
+- Response parsed into MessageSuggestion objects
+- Loading indicator during API call
+- Error handling for API failures
+
+**AC-3.6.3**: Each Suggestion Displayed with "Accept" and "Reject" Buttons
+- Suggestion card displays message text, category badge, character count
+- Accept ✓ (green) and Reject ✗ (red) buttons
+- Hover states provide visual feedback
+- Keyboard navigation supported
+
+**AC-3.6.4**: Accepted Messages Added to Custom Message Library as Drafts
+- Calls customMessageService.create() with accepted suggestion
+- Saved with active: false (draft), createdBy: 'ai'
+- Optimistic UI update shows "Accepted ✓" badge
+- Success toast notification
+- Message appears in MessageList under Custom/Draft filter
+
+**AC-3.6.5**: Rejected Messages Discarded
+- Removed from pending list immediately
+- No IndexedDB write operation
+- Shows "Rejected ✗" badge and fades out
+- No recovery mechanism (intentional)
+
+**AC-3.6.6**: Can Regenerate New Batch of Suggestions
+- "Generate More" button appears after all suggestions reviewed
+- Reuses last generation parameters
+- "Change Parameters" option available
+- Increments daily usage counter
+- Shows updated quota
+
+**AC-3.6.7**: Rate Limiting and Cost Control
+- Tracks usage in LocalStorage: ai-suggestion-usage
+- Daily limit: 5 generation sessions (resets midnight UTC)
+- Button disabled when limit reached
+- Shows remaining time until reset
+- Warning at 4/5 usage
+- Displays cost estimation (~$0.01 per batch)
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- Epic 3 Technical Specification -->
+      <artifact path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="AI Suggestion Service API (Story 3.6)">
+        Defines AI Suggestion Service with generateSuggestions() API, MessageSuggestion and GenerateSuggestionsRequest interfaces, OpenAI GPT-3.5-turbo integration patterns, rate limiting strategy (5 sessions/day), and cost optimization (~$0.01 per 10 messages).
+      </artifact>
+
+      <artifact path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Security - AI Integration">
+        OpenAI API key stored in environment variables (VITE_OPENAI_API_KEY), content moderation through human-in-loop review, recommendation to use backend proxy to prevent client-side API key exposure, rate limiting for cost control.
+      </artifact>
+
+      <artifact path="docs/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Critical Workflow 3: AI Message Suggestion Review">
+        End-to-end workflow: User opens AI Suggestions section → configures parameters (category, tone, count) → generates suggestions via OpenAI API → reviews each suggestion → accepts (saves as draft) or rejects (discards) → can generate more batches within daily limit.
+      </artifact>
+
+      <!-- Architecture Documentation -->
+      <artifact path="docs/architecture.md" title="Architecture Documentation" section="Services">
+        Service layer patterns: singleton instances, async methods with Promise returns, error handling with try/catch, console logging for debugging. Follow existing customMessageService.ts patterns.
+      </artifact>
+
+      <artifact path="docs/architecture.md" title="Architecture Documentation" section="State Management">
+        Zustand store patterns: async actions for API operations, optimistic UI updates, state mutations through set() function, error handling with user-friendly messages, reusable action patterns.
+      </artifact>
+
+      <!-- Related Stories (Dependencies) -->
+      <artifact path="docs/stories/3-4-admin-interface-custom-message-management-phase-1-ui.md" title="Story 3.4: Admin Interface UI" section="Admin Panel Components">
+        Admin panel UI framework with modal patterns (Framer Motion AnimatePresence), button/form styles, data-testid attributes for E2E tests, consistent theme and spacing. Reuse these patterns for AI Suggestion Panel.
+      </artifact>
+
+      <artifact path="docs/stories/3-5-admin-interface-message-persistence-integration.md" title="Story 3.5: Message Persistence" section="Custom Message Service">
+        customMessageService provides create(), update(), delete(), getAll() methods. Custom messages saved with isCustom: true, active: boolean controls rotation participation. Messages stored in IndexedDB messages store.
+      </artifact>
+
+      <!-- PRD Requirements -->
+      <artifact path="docs/PRD.md" title="Product Requirements Document" section="FR026-FR030: Custom Message Management">
+        Functional requirements for custom message CRUD operations, category management, import/export functionality, and optional AI-powered message generation with human review process.
+      </artifact>
+    </docs>
+
+    <code>
+      <!-- Services -->
+      <artifact path="src/services/customMessageService.ts" kind="service" symbol="customMessageService" lines="1-298" reason="Provides CRUD API for custom messages - will be used by acceptSuggestion() to save AI-generated messages as drafts">
+        Singleton CustomMessageService with methods: create(input: CreateMessageInput), update(input: UpdateMessageInput), delete(id: number), getAll(), importMessages(data), exportMessages(). Uses IndexedDB for persistence. Follow this pattern for aiSuggestionService.ts.
+      </artifact>
+
+      <!-- State Management -->
+      <artifact path="src/stores/useAppStore.ts" kind="store" symbol="useAppStore" lines="25-93" reason="Zustand store structure - will be extended with AI suggestion state (aiSuggestions, aiGenerating) and actions (generateAISuggestions, acceptSuggestion, rejectSuggestion)">
+        AppState interface defines settings, messages, messageHistory, photos, moods. Store uses persist middleware for LocalStorage. Actions follow pattern: async operation → try/catch → set() state update → console logging.
+      </artifact>
+
+      <!-- Types -->
+      <artifact path="src/types/index.ts" kind="types" symbol="Message, CustomMessage, CreateMessageInput" lines="9-96" reason="Core type definitions - will be extended with MessageSuggestion, GenerateSuggestionsRequest, AISuggestionUsage interfaces">
+        Message interface: id, text, category, isCustom, active, createdAt, isFavorite, updatedAt, tags. CustomMessage similar but active field required. CreateMessageInput for new messages. MessageCategory: 'reason' | 'memory' | 'affirmation' | 'future' | 'custom'.
+      </artifact>
+
+      <!-- UI Components -->
+      <artifact path="src/components/AdminPanel/AdminPanel.tsx" kind="component" symbol="AdminPanel" reason="Main admin panel container - will be extended with AI Suggestions tab/section and AISuggestionPanel component">
+        Admin panel UI structure with tabs/sections. Uses Framer Motion for animations, lucide-react for icons. Follow existing patterns for integrating AISuggestionPanel.
+      </artifact>
+
+      <artifact path="src/components/AdminPanel/CreateMessageForm.tsx" kind="component" symbol="CreateMessageForm" reason="Form component pattern reference - reuse similar patterns for AI suggestion generation form modal">
+        Form component with category dropdown, text input, validation. Uses controlled inputs, form submission handlers, error display. Reuse these patterns for generation form modal.
+      </artifact>
+
+      <artifact path="src/components/AdminPanel/MessageList.tsx" kind="component" symbol="MessageList" reason="List display pattern reference - reuse for AI suggestion cards with Accept/Reject buttons">
+        Message list with filtering, card display, action buttons. Uses AnimatePresence for enter/exit animations. Apply similar patterns to suggestion list.
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="react" version="^19.1.1">Core React library</package>
+        <package name="react-dom" version="^19.1.1">React DOM rendering</package>
+        <package name="zustand" version="^5.0.8">State management</package>
+        <package name="framer-motion" version="^12.23.24">Animation library for modals and transitions</package>
+        <package name="lucide-react" version="^0.548.0">Icon library (Sparkles icon for AI)</package>
+        <package name="idb" version="^8.0.3">IndexedDB wrapper for message persistence</package>
+        <package name="typescript" version="~5.9.3">TypeScript compiler</package>
+        <package name="vite" version="^7.1.7">Build tool with env variable support</package>
+        <package name="@playwright/test" version="^1.56.1">E2E testing framework</package>
+      </node>
+
+      <new_dependencies>
+        <package name="openai" version="^4.x" type="production">
+          OpenAI SDK for GPT API integration. Required for Story 3.6. Install with: npm install openai
+        </package>
+      </new_dependencies>
+
+      <environment_variables>
+        <variable name="VITE_OPENAI_API_KEY">
+          OpenAI API key for GPT-3.5-turbo calls. Add to .env file (not committed to git). Create .env.example with placeholder. Document setup in README.
+        </variable>
+      </environment_variables>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+**Code Patterns and Standards:**
+- Follow existing service pattern: singleton instance exported (export const aiSuggestionService = new AISuggestionService())
+- Use async/await with try/catch for all API operations
+- Console logging format: [AISuggestions] Action: details
+- TypeScript strict mode: all interfaces must be fully typed
+- Component naming: PascalCase for React components (AISuggestionPanel.tsx)
+- File organization: services/ for API logic, components/AdminPanel/ for UI
+
+**UI/UX Requirements:**
+- Reuse existing admin panel theme and styling (Tailwind CSS classes)
+- Use Framer Motion AnimatePresence for suggestion card enter/exit animations
+- Add data-testid attributes: generate-suggestions-button, accept-{id}, reject-{id}
+- Loading states: spinner with Sparkles icon during API calls (3-10 seconds)
+- Error messages: user-friendly, non-technical (e.g., "Failed to generate suggestions. Please try again.")
+- Accessibility: keyboard navigation (tab, enter to accept, delete to reject)
+
+**Integration Requirements:**
+- Accepted suggestions must call customMessageService.create() with active: false (draft status)
+- Suggestions saved with createdBy: 'ai' metadata field (requires Message interface enhancement)
+- Rate limiting tracked in LocalStorage: ai-suggestion-usage key with { date, count } structure
+- Daily limit: 5 generation sessions, resets at midnight UTC
+- Cost estimate displayed: ~$0.01 per 10 suggestions (GPT-3.5-turbo pricing)
+
+**API Integration Constraints:**
+- Model: GPT-3.5-turbo (cost optimization vs GPT-4)
+- Max tokens: 2000 output (sufficient for 10-20 messages)
+- Temperature: 0.8 (higher for creative variety)
+- Prompt engineering: include category context, 2-3 example messages, tone instructions
+- Response parsing: extract numbered list format "1. Message\n2. Message\n..."
+- Validation: message length 50-500 characters, sanitize text before saving
+
+**Security Considerations:**
+- ⚠️ Using dangerouslyAllowBrowser: true exposes API key in client bundle
+- Document security concern: recommend backend proxy for production
+- Alternative: serverless function (Vercel/Netlify) to hide API key
+- Current approach: accept risk for MVP, add backend proxy in future enhancement
+
+**Error Handling:**
+- Network failures: "Failed to generate suggestions. Please try again."
+- Missing API key: "OpenAI API key not configured. Add VITE_OPENAI_API_KEY to .env"
+- Rate limit exceeded: "OpenAI quota exceeded. Check your billing settings."
+- Malformed responses: "Failed to parse suggestions. Try regenerating."
+- Daily limit reached: "Daily limit reached (5/5). Resets at [time]."
+
+**Testing Requirements:**
+- E2E tests must mock OpenAI API (avoid actual API calls in CI/CD)
+- Test all acceptance criteria with Playwright
+- Verify IndexedDB persistence after accept action
+- Test rate limiting (simulate date changes for reset)
+- Test error scenarios (missing key, API failure, malformed response)
+  </constraints>
+
+  <interfaces>
+**Custom Message Service API (Existing - Story 3.5):**
+```typescript
+customMessageService.create(input: CreateMessageInput): Promise<Message>
+  // Input: { text, category, active?, tags? }
+  // Output: Message with generated id, createdAt timestamp
+  // Usage: acceptSuggestion() will call this to save AI-generated messages
+```
+
+**Zustand Store Actions (To Be Added):**
+```typescript
+generateAISuggestions(request: GenerateSuggestionsRequest): Promise<void>
+  // Calls aiSuggestionService.generateSuggestions()
+  // Updates state: aiSuggestions, aiGenerating
+  // Handles rate limiting and errors
+
+acceptSuggestion(suggestionId: string): Promise<void>
+  // Finds suggestion by id in state
+  // Calls customMessageService.create() with suggestion text
+  // Updates suggestion status to 'accepted'
+  // Reloads messages to include new draft
+
+rejectSuggestion(suggestionId: string): void
+  // Updates suggestion status to 'rejected'
+  // No persistence operation (silent discard)
+
+clearSuggestions(): void
+  // Clears aiSuggestions array
+
+checkAIRateLimit(): { allowed: boolean; remaining: number; resetTime?: Date }
+  // Proxies to aiSuggestionService.checkRateLimit()
+```
+
+**AI Suggestion Service API (New - Story 3.6):**
+```typescript
+aiSuggestionService.generateSuggestions(request: GenerateSuggestionsRequest): Promise<MessageSuggestion[]>
+  // Request: { category, count, tone?, exampleMessages? }
+  // Returns: Array of MessageSuggestion objects
+  // Throws: Error with user-friendly message on failure
+
+aiSuggestionService.checkRateLimit(): { allowed: boolean; remaining: number; resetTime?: Date }
+  // Reads LocalStorage: ai-suggestion-usage
+  // Returns: Current quota status
+
+aiSuggestionService.incrementUsage(): void
+  // Increments daily usage counter in LocalStorage
+```
+
+**OpenAI API (External Dependency):**
+```typescript
+openai.chat.completions.create({
+  model: 'gpt-3.5-turbo',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant...' },
+    { role: 'user', content: prompt }
+  ],
+  max_tokens: 2000,
+  temperature: 0.8
+}): Promise<ChatCompletion>
+```
+
+**TypeScript Interfaces (New):**
+```typescript
+interface MessageSuggestion {
+  id: string;                    // Temporary UUID for UI tracking
+  text: string;                  // AI-generated message text
+  category: MessageCategory;     // Selected category
+  status: 'pending' | 'accepted' | 'rejected';
+  confidence?: number;           // Optional AI confidence score
+  createdAt: string;             // ISO timestamp
+}
+
+interface GenerateSuggestionsRequest {
+  category: MessageCategory;
+  count: number;                 // Default: 10, range: 5-20
+  tone?: 'romantic' | 'playful' | 'heartfelt';
+  exampleMessages?: string[];    // 2-3 examples for context
+}
+
+interface AISuggestionUsage {
+  date: string;                  // YYYY-MM-DD
+  count: number;                 // Sessions today
+  lastRequest?: string;          // ISO timestamp
+}
+```
+  </interfaces>
+
+  <tests>
+    <standards>
+      Epic 3 follows established testing patterns from Stories 2.1-2.6: Playwright for E2E browser tests, data-testid attributes for element selection, comprehensive test coverage for all acceptance criteria. Mock external APIs (OpenAI) to avoid costs and flakiness. Test positive paths (happy flow) and negative paths (errors, edge cases). Story 3.6 requires additional API mocking strategy for OpenAI GPT calls.
+    </standards>
+
+    <locations>
+      tests/e2e/*.spec.ts - Playwright E2E tests
+      tests/e2e/ai-suggestions.spec.ts - New test file for Story 3.6 (to be created)
+    </locations>
+
+    <ideas>
+      **AC-3.6.1 Testing (Generate Button):**
+      - Navigate to admin panel AI Suggestions section
+      - Verify "Generate Suggestions" button visible with Sparkles icon
+      - Verify button disabled when daily limit reached (5/5)
+      - Verify tooltip shows remaining quota (e.g., "3/5 generations remaining")
+      - Verify button click opens generation form modal
+
+      **AC-3.6.2 Testing (OpenAI API Integration):**
+      - Mock OpenAI API response with 10 test suggestions
+      - Fill generation form: category="reasons", tone="romantic", count=10
+      - Click "Generate" → verify loading spinner appears
+      - Wait for API response → verify 10 suggestions displayed
+      - Verify each suggestion has text, category badge, character count
+      - Test error handling: mock API failure → verify error message shown
+
+      **AC-3.6.3 Testing (Accept/Reject Buttons):**
+      - Generate suggestions (mocked API)
+      - Verify each suggestion card has Accept ✓ and Reject ✗ buttons
+      - Hover over Accept → verify green highlight
+      - Hover over Reject → verify red highlight
+      - Test keyboard navigation: tab through suggestions, enter to accept
+
+      **AC-3.6.4 Testing (Accept Flow):**
+      - Click Accept on suggestion
+      - Verify card shows "Accepted ✓" badge and fades out
+      - Open IndexedDB → verify new message entry with:
+        * isCustom: true
+        * active: false (draft status)
+        * createdBy: 'ai'
+      - Navigate to MessageList → filter by Custom + Draft
+      - Verify accepted message appears in list
+
+      **AC-3.6.5 Testing (Reject Flow):**
+      - Click Reject on suggestion
+      - Verify card shows "Rejected ✗" badge and fades out
+      - Check IndexedDB → verify NO new message entry created
+      - Verify total message count unchanged
+
+      **AC-3.6.6 Testing (Generate More):**
+      - Generate batch, accept 5, reject 5
+      - Verify "Generate More" button appears
+      - Click "Generate More" → verify new batch generated
+      - Verify new suggestions different from previous batch
+      - Check quota display → verify decremented (e.g., 4/5 remaining)
+
+      **AC-3.6.7 Testing (Rate Limiting):**
+      - Generate 5 batches in succession (mock API)
+      - After 5th batch → verify "Generate" button disabled
+      - Verify tooltip: "Daily limit reached (5/5). Resets in [time]."
+      - Simulate next UTC day → verify limit resets to 0/5
+      - Test warning at 4/5: verify warning message displayed
+    </ideas>
+  </tests>
+</story-context>

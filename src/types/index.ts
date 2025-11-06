@@ -11,8 +11,11 @@ export interface Message {
   text: string;
   category: MessageCategory;
   isCustom: boolean;
+  active?: boolean;
   createdAt: Date;
   isFavorite?: boolean;
+  updatedAt?: Date;
+  tags?: string[];
 }
 
 export interface Photo {
@@ -55,10 +58,64 @@ export interface Settings {
 }
 
 export interface MessageHistory {
-  lastShownDate: string; // ISO date string
-  lastMessageId: number;
-  favoriteIds: number[];
-  viewedIds: number[];
+  currentIndex: number;           // 0 = today, 1 = yesterday, 2 = 2 days ago
+  shownMessages: Map<string, number>; // Date (YYYY-MM-DD) → Message ID mapping
+  maxHistoryDays: number;         // Limit backward navigation (default: 30)
+  favoriteIds: number[];          // Keep for favorite tracking (legacy)
+  // Deprecated fields (kept for migration compatibility):
+  lastShownDate?: string;         // @deprecated Use shownMessages Map instead
+  lastMessageId?: number;         // @deprecated Use shownMessages Map instead
+  viewedIds?: number[];           // @deprecated Use shownMessages Map instead
+}
+
+// Custom message management types (Story 3.4)
+export interface CustomMessage {
+  id: number;
+  text: string;
+  category: MessageCategory;
+  isCustom: boolean;              // Always true for custom messages
+  active: boolean;                // Controls rotation participation (Story 3.5)
+  createdAt: string;              // ISO timestamp
+  updatedAt?: string;             // ISO timestamp
+  tags?: string[];
+}
+
+export interface CreateMessageInput {
+  text: string;
+  category: MessageCategory;
+  active?: boolean;               // Default: true (Story 3.5)
+  tags?: string[];
+}
+
+export interface UpdateMessageInput {
+  id: number;
+  text?: string;
+  category?: MessageCategory;
+  active?: boolean;               // Story 3.5
+  tags?: string[];
+}
+
+export interface MessageFilter {
+  category?: MessageCategory | 'all';
+  isCustom?: boolean;             // Story 3.5
+  active?: boolean;               // Story 3.5
+  searchTerm?: string;
+  tags?: string[];
+}
+
+// Import/Export schema (Story 3.5)
+export interface CustomMessagesExport {
+  version: '1.0';
+  exportDate: string;
+  messageCount: number;
+  messages: Array<{
+    text: string;
+    category: MessageCategory;
+    active: boolean;
+    tags?: string[];
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 export interface AppState {

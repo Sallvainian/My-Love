@@ -1,0 +1,338 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>5</storyId>
+    <title>Admin Interface - Message Persistence & Integration</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/3-5-admin-interface-message-persistence-integration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>the app creator (Frank)</asA>
+    <iWant>custom messages to persist in IndexedDB and integrate into daily rotation</iWant>
+    <soThat>my personalized messages appear alongside default messages</soThat>
+    <tasks>
+      <task id="1" ac="3.5.1, 3.5.2">
+        <name>Create Custom Message Service</name>
+        <subtasks>
+          <subtask id="1.1">Create src/services/customMessageService.ts with CustomMessageService class</subtask>
+          <subtask id="1.2">Implement create() method - save to IndexedDB with isCustom: true</subtask>
+          <subtask id="1.3">Implement update() method - update existing message with updatedAt timestamp</subtask>
+          <subtask id="1.4">Implement delete() method - remove from IndexedDB</subtask>
+          <subtask id="1.5">Implement getAll() method with MessageFilter support</subtask>
+          <subtask id="1.6">Implement getActiveCustomMessages() - filter active: true only</subtask>
+          <subtask id="1.7">Export singleton instance: export const customMessageService</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="3.5.4">
+        <name>Update TypeScript Interfaces</name>
+        <subtasks>
+          <subtask id="2.1">Add active: boolean field to CustomMessage interface</subtask>
+          <subtask id="2.2">Add active?: boolean to CreateMessageInput (default: true)</subtask>
+          <subtask id="2.3">Add active?: boolean to UpdateMessageInput</subtask>
+          <subtask id="2.4">Add active?: boolean to MessageFilter</subtask>
+          <subtask id="2.5">Define CustomMessagesExport interface for import/export</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="3.5.2, 3.5.3">
+        <name>Enhance Message Rotation Algorithm</name>
+        <subtasks>
+          <subtask id="3.1">Modify getDailyMessage() in src/utils/messageRotation.ts</subtask>
+          <subtask id="3.2">Load active custom messages: await customMessageService.getActiveCustomMessages()</subtask>
+          <subtask id="3.3">Combine with default messages: [...defaultMessages, ...customMessages]</subtask>
+          <subtask id="3.4">Maintain deterministic selection (date-based seed remains unchanged)</subtask>
+          <subtask id="3.5">Test rotation with custom messages in combined pool</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="3.5.1, 3.5.5">
+        <name>Update Zustand Store Actions</name>
+        <subtasks>
+          <subtask id="4.1">Replace createCustomMessage() LocalStorage with customMessageService.create()</subtask>
+          <subtask id="4.2">Replace updateCustomMessage() LocalStorage with customMessageService.update()</subtask>
+          <subtask id="4.3">Replace deleteCustomMessage() LocalStorage with customMessageService.delete()</subtask>
+          <subtask id="4.4">Update loadCustomMessages() to load from IndexedDB on app init</subtask>
+          <subtask id="4.5">Remove customMessages from partialize (no longer in LocalStorage)</subtask>
+          <subtask id="4.6">Update console logging to reflect IndexedDB operations</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="3.5.6">
+        <name>Implement Import/Export Feature</name>
+        <subtasks>
+          <subtask id="5.1">Implement exportMessages() in customMessageService - generate JSON</subtask>
+          <subtask id="5.2">Implement importMessages() in customMessageService - validate schema, detect duplicates</subtask>
+          <subtask id="5.3">Add exportCustomMessages() action in Zustand store - trigger browser download</subtask>
+          <subtask id="5.4">Add importCustomMessages(file) action in Zustand store - parse JSON, call service</subtask>
+          <subtask id="5.5">Add "Export Messages" button in AdminPanel header</subtask>
+          <subtask id="5.6">Add "Import Messages" button with file picker in AdminPanel header</subtask>
+          <subtask id="5.7">Display import success message with count</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="3.5.4">
+        <name>Add Active/Draft Toggle UI</name>
+        <subtasks>
+          <subtask id="6.1">Add active checkbox in EditMessageForm component</subtask>
+          <subtask id="6.2">Set default active: true in CreateMessageForm</subtask>
+          <subtask id="6.3">Add "Draft" badge in MessageRow for active: false messages</subtask>
+          <subtask id="6.4">Update MessageList filtering to support active/draft toggle</subtask>
+          <subtask id="6.5">Add data-testid attributes: 'edit-message-active-toggle', 'message-draft-badge'</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="3.5.1">
+        <name>Implement LocalStorage Migration</name>
+        <subtasks>
+          <subtask id="7.1">Create src/services/migrationService.ts</subtask>
+          <subtask id="7.2">Implement migrateCustomMessagesFromLocalStorage() function</subtask>
+          <subtask id="7.3">Check for 'my-love-custom-messages' LocalStorage key</subtask>
+          <subtask id="7.4">Parse JSON, iterate messages, call customMessageService.create()</subtask>
+          <subtask id="7.5">Remove LocalStorage key after successful migration</subtask>
+          <subtask id="7.6">Call migration function in App.tsx useEffect before initializeApp()</subtask>
+          <subtask id="7.7">Log migration results</subtask>
+        </subtasks>
+      </task>
+      <task id="8">
+        <name>Write Comprehensive E2E Tests</name>
+        <subtasks>
+          <subtask id="8.1">Create tests/e2e/custom-message-persistence.spec.ts</subtask>
+          <subtask id="8.2">Test: Create custom message → verify in IndexedDB (AC 3.5.1)</subtask>
+          <subtask id="8.3">Test: Active/draft toggle → verify rotation exclusion (AC 3.5.4)</subtask>
+          <subtask id="8.4">Test: Delete message → verify removed from IndexedDB (AC 3.5.5)</subtask>
+          <subtask id="8.5">Test: Export messages → verify JSON file schema (AC 3.5.6)</subtask>
+          <subtask id="8.6">Test: Import messages → verify restore + duplicate detection (AC 3.5.6)</subtask>
+          <subtask id="8.7">Test: Rotation integration → verify custom message eligible (AC 3.5.7)</subtask>
+          <subtask id="8.8">Test: Category filter with custom messages (AC 3.5.3)</subtask>
+          <subtask id="8.9">Test: LocalStorage migration → verify data moved (AC 3.5.1)</subtask>
+        </subtasks>
+      </task>
+      <task id="9">
+        <name>Validate All Acceptance Criteria</name>
+        <subtasks>
+          <subtask id="9.1">Manual test AC-3.5.1 - Custom message saved to IndexedDB</subtask>
+          <subtask id="9.2">Manual test AC-3.5.2 - Rotation algorithm pulls from combined pool</subtask>
+          <subtask id="9.3">Manual test AC-3.5.3 - Category filter works with custom messages</subtask>
+          <subtask id="9.4">Manual test AC-3.5.4 - Active/draft toggle controls rotation</subtask>
+          <subtask id="9.5">Manual test AC-3.5.5 - Deletion removes from IndexedDB and rotation</subtask>
+          <subtask id="9.6">Manual test AC-3.5.6 - Import/export JSON functionality</subtask>
+          <subtask id="9.7">Manual test AC-3.5.7 - End-to-end custom message in daily rotation</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="3.5.1">
+      <title>Custom Messages Saved to IndexedDB</title>
+      <given>admin panel is open and custom message form is submitted</given>
+      <when>user clicks "Save" on CreateMessageForm or EditMessageForm</when>
+      <then>the custom message SHALL be saved to IndexedDB messages object store with isCustom: true</then>
+      <validation>
+        - Open Chrome DevTools → Application → IndexedDB → my-love-db → messages
+        - Create custom message via admin panel
+        - Verify new entry with id, text, category, isCustom: true, createdAt, updatedAt timestamps
+      </validation>
+    </criterion>
+    <criterion id="3.5.2">
+      <title>Message Rotation Algorithm Pulls from Both Default and Custom</title>
+      <given>custom messages exist in IndexedDB</given>
+      <when>getDailyMessage() is called for today's date</when>
+      <then>the algorithm SHALL return a message from the combined pool of 365 default + custom messages</then>
+      <requirements>
+        - getDailyMessage() loads all messages where isCustom: true AND active: true
+        - Combined pool: [...defaultMessages, ...activeCustomMessages]
+        - Rotation algorithm remains deterministic (date-based seed)
+        - Custom messages have equal probability of selection
+      </requirements>
+      <validation>
+        - Add 5 custom messages (all marked active)
+        - Total pool size: 365 + 5 = 370 messages
+        - Call getDailyMessage() multiple times for same date → same message ID returned
+        - Verify custom messages can appear in rotation
+      </validation>
+    </criterion>
+    <criterion id="3.5.3">
+      <title>Category Filter Works with Custom Messages</title>
+      <given>admin panel MessageList is displayed</given>
+      <when>user selects a category filter (e.g., "Reasons")</when>
+      <then>the list SHALL display both default and custom messages matching that category</then>
+      <requirements>
+        - Filter applies to unified message list (default + custom)
+        - Custom messages marked with "Custom" badge
+        - Filter options: All, Reasons, Memories, Affirmations, Future Plans, Custom
+        - "Custom" filter shows only isCustom: true messages
+      </requirements>
+    </criterion>
+    <criterion id="3.5.4">
+      <title>Custom Messages Can Be Marked as Active or Draft</title>
+      <given>admin panel EditMessageForm is open</given>
+      <when>user toggles "Active" checkbox</when>
+      <then>the message's active field SHALL update and control rotation participation</then>
+      <requirements>
+        - Add active: boolean field to CustomMessage interface (default: true)
+        - EditMessageForm displays "Active" toggle checkbox
+        - Only messages with active: true participate in daily rotation
+        - Draft messages (active: false) visible in admin panel but excluded from rotation
+        - Badge indicator: "Draft" badge for inactive custom messages
+      </requirements>
+    </criterion>
+    <criterion id="3.5.5">
+      <title>Deletion Removes from IndexedDB and Rotation</title>
+      <given>custom message exists in IndexedDB</given>
+      <when>user confirms deletion in DeleteConfirmDialog</when>
+      <then>the message SHALL be removed from IndexedDB and excluded from future rotation</then>
+      <requirements>
+        - deleteCustomMessage(id) calls customMessageService.delete(id)
+        - Message removed from IndexedDB messages store
+        - In-memory Zustand customMessages array updated immediately
+        - MessageList refreshes without deleted message
+        - Rotation algorithm no longer includes deleted message in pool
+      </requirements>
+    </criterion>
+    <criterion id="3.5.6">
+      <title>Import/Export Feature to Back Up Custom Messages</title>
+      <given>admin panel is open</given>
+      <when>user clicks "Export Messages" button</when>
+      <then>a JSON file SHALL download containing all custom messages</then>
+      <requirements>
+        - Export button in AdminPanel header
+        - JSON format: version, exportDate, messageCount, messages array
+        - Import button with file picker accepts .json files only
+        - Import validates schema, detects duplicates (by text hash)
+        - Success message displays count (e.g., "Imported 25 messages (3 duplicates skipped)")
+      </requirements>
+    </criterion>
+    <criterion id="3.5.7">
+      <title>End-to-End Custom Message Rotation Test</title>
+      <given>custom message created today</given>
+      <when>rotation algorithm runs tomorrow (or simulated next day)</when>
+      <then>the custom message SHALL be eligible to appear as daily message</then>
+      <requirements>
+        - Custom message participates in rotation starting next day
+        - Message appears with same styling/UI as default messages
+        - No visual indication in DailyMessage component that message is custom
+        - Favorite/share functionality works identically for custom messages
+        - Message history tracking includes custom messages
+      </requirements>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-3.md">
+        <title>Epic 3 Technical Specification</title>
+        <section>Story 3.5: Admin Interface - Message Persistence & Integration</section>
+        <snippet>Custom Message Service provides IndexedDB CRUD operations. Service exports singleton: export const customMessageService = new CustomMessageService(). Leverages existing messages object store with isCustom and active boolean fields. Import/Export Service serializes custom messages to JSON for backup/restore capability.</snippet>
+      </doc>
+      <doc path="docs/architecture.md">
+        <title>Architecture Documentation</title>
+        <section>IndexedDB Schema</section>
+        <snippet>Database: my-love-db (version 1). Object store: messages with auto-increment primary key, indexes: by-category (string), by-date (Date). Enhanced schema adds isCustom: boolean and active: boolean fields to distinguish default vs user-created messages and control rotation participation.</snippet>
+      </doc>
+      <doc path="docs/PRD.md">
+        <title>Product Requirements Document</title>
+        <section>Custom Message Management</section>
+        <snippet>FR026: System SHALL allow admin user to review AI-generated message suggestions. FR027: System SHALL provide accept/decline interface for message curation. FR028: System SHALL enable creation of custom messages with category selection. FR029: System SHALL allow editing of existing messages in library. FR030: System SHALL integrate approved custom messages into daily rotation algorithm.</snippet>
+      </doc>
+      <doc path="docs/state-management.md">
+        <title>State Management Documentation</title>
+        <section>Messages Slice & Persistence</section>
+        <snippet>Zustand useAppStore manages messages array and messageHistory. Actions: loadMessages(), addMessage(text, category), toggleFavorite(messageId), updateCurrentMessage(). Persistence: messageHistory persisted to LocalStorage via persist middleware with partialize. Messages stored in IndexedDB. Pattern: optimistic UI updates with rollback on failure.</snippet>
+      </doc>
+      <doc path="docs/stories/3-4-admin-interface-custom-message-management-phase-1-ui.md">
+        <title>Story 3.4: Admin Interface Phase 1 UI (Completed)</title>
+        <section>UI Components and Patterns</section>
+        <snippet>AdminPanel with MessageList, CreateMessageForm, EditMessageForm, DeleteConfirmDialog components already built. Components styled with Tailwind CSS and Framer Motion animations. data-testid attributes follow 'admin-*' convention. Component co-location in src/components/AdminPanel/. Current persistence: LocalStorage (temporary) - Story 3.5 migrates to IndexedDB.</snippet>
+      </doc>
+      <doc path="docs/stories/3-3-message-history-state-management.md">
+        <title>Story 3.3: Message History State Management (Completed)</title>
+        <section>Message Rotation Algorithm</section>
+        <snippet>getDailyMessage() in src/utils/messageRotation.ts determines daily message. Algorithm: deterministic date-based seed, prioritizes favorites (2x weight), maintains message history tracking. Combined pool strategy: [...defaultMessages, ...customMessages]. Algorithm remains unchanged for Story 3.5 - only input pool expands to include custom messages.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/types/index.ts" kind="interface" symbol="Message, CustomMessage, CreateMessageInput, UpdateMessageInput, MessageFilter" lines="9-92">
+        <reason>Core TypeScript interfaces for message types. CustomMessage extends Message with isCustom: true. Story 3.5 adds active: boolean field to CustomMessage. CreateMessageInput and UpdateMessageInput need active?: boolean field added.</reason>
+      </artifact>
+      <artifact path="src/services/storage.ts" kind="service" symbol="StorageService class" lines="0-99">
+        <reason>IndexedDB wrapper service. Provides init(), addPhoto(), addMessage() patterns. Story 3.5 creates similar customMessageService following same patterns: singleton class, init() guard, try-catch error handling, console logging with [ServiceName] prefix.</reason>
+      </artifact>
+      <artifact path="src/utils/messageRotation.ts" kind="function" symbol="getDailyMessage, formatDate, hashDateString" lines="1-51">
+        <reason>Message rotation algorithm using deterministic date-based hashing. Story 3.5 enhancement: getDailyMessage() must load custom messages from IndexedDB and combine with defaultMessages before hash calculation. Algorithm itself remains unchanged.</reason>
+      </artifact>
+      <artifact path="src/stores/useAppStore.ts" kind="store" symbol="AppState interface, custom message actions" lines="0-149">
+        <reason>Zustand store state management. Contains customMessages array and actions: createCustomMessage(), updateCustomMessage(), deleteCustomMessage(), getCustomMessages(). Story 3.5 replaces LocalStorage calls with customMessageService.create/update/delete. Also adds exportCustomMessages() and importCustomMessages() actions.</reason>
+      </artifact>
+      <artifact path="src/components/AdminPanel/AdminPanel.tsx" kind="component" symbol="AdminPanel">
+        <reason>Admin interface main component. Story 3.4 built UI with LocalStorage. Story 3.5 adds Export/Import buttons in header, no other UI changes required. Component structure follows Tailwind CSS + Framer Motion patterns.</reason>
+      </artifact>
+      <artifact path="src/components/AdminPanel/EditMessageForm.tsx" kind="component" symbol="EditMessageForm">
+        <reason>Form component for editing custom messages. Story 3.5 adds active toggle checkbox. Component uses data-testid attributes following 'admin-*' convention. New attribute: 'edit-message-active-toggle'.</reason>
+      </artifact>
+      <artifact path="src/components/AdminPanel/MessageRow.tsx" kind="component" symbol="MessageRow">
+        <reason>Row component in MessageList. Story 3.5 adds "Draft" badge for active: false messages. Badge follows existing pattern: Custom badge uses 'text-purple-600 bg-purple-100'. New badge: 'text-gray-600 bg-gray-100' with data-testid='message-draft-badge'.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <dependency name="idb" version="^8.0.3" category="data">IndexedDB wrapper library for customMessageService implementation</dependency>
+        <dependency name="zustand" version="^5.0.8" category="state">State management with persist middleware for messageHistory tracking</dependency>
+        <dependency name="react" version="^19.1.1" category="ui">React framework for admin panel components</dependency>
+        <dependency name="react-dom" version="^19.1.1" category="ui">React DOM rendering</dependency>
+        <dependency name="framer-motion" version="^12.23.24" category="animation">Animations for admin panel modal transitions</dependency>
+        <dependency name="lucide-react" version="^0.548.0" category="ui">Icon library for admin panel UI elements</dependency>
+        <dependency name="typescript" version="~5.9.3" category="dev">Type-safe development with CustomMessage, CreateMessageInput, UpdateMessageInput interfaces</dependency>
+        <dependency name="tailwindcss" version="^3.4.18" category="styling">Utility-first CSS for admin panel component styling</dependency>
+        <dependency name="@playwright/test" version="^1.56.1" category="testing">E2E testing framework for Story 3.5 test suite</dependency>
+        <dependency name="vite" version="^7.1.7" category="build">Build tool with fast HMR for development</dependency>
+        <dependency name="vite-plugin-pwa" version="^1.1.0" category="pwa">PWA capabilities with service worker for offline support</dependency>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architectural">No schema migration required - leverages existing IndexedDB version 1 messages store. Add isCustom and active boolean fields without version bump.</constraint>
+    <constraint type="pattern">Follow existing StorageService patterns: singleton class export, init() guard method, try-catch with comprehensive console logging prefixed [CustomMessageService].</constraint>
+    <constraint type="testing">Use Playwright E2E tests with data-testid attributes following 'admin-*' convention. New attributes: 'edit-message-active-toggle', 'message-draft-badge', 'export-messages-button', 'import-messages-button'.</constraint>
+    <constraint type="state-management">Use Zustand optimistic UI updates with rollback on failure pattern. Example: updateCustomMessage updates state immediately, calls service, rolls back on error.</constraint>
+    <constraint type="file-organization">New service: src/services/customMessageService.ts. Optional migration service: src/services/migrationService.ts. Components remain in src/components/AdminPanel/ directory.</constraint>
+    <constraint type="performance">IndexedDB quota limit: ~50MB typical for text data supports thousands of custom messages. LocalStorage migration function runs once on app init, idempotent and safe for multiple executions.</constraint>
+    <constraint type="ui-consistency">Maintain existing admin panel styling: Tailwind CSS utility classes, Framer Motion AnimatePresence for modals. New badges follow established pattern: 'Custom' badge uses purple-600/purple-100, 'Draft' badge uses gray-600/gray-100.</constraint>
+    <constraint type="data-integrity">Rotation algorithm remains deterministic (date-based hash seed unchanged). Custom messages participate in rotation only when active: true. Deletion immediately removes from both IndexedDB and in-memory Zustand state.</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="CustomMessageService.create()" kind="method" signature="async create(input: CreateMessageInput): Promise&lt;Message&gt;" path="src/services/customMessageService.ts">
+      <description>Creates custom message in IndexedDB with isCustom: true, active: true (default), returns Message with auto-incremented ID</description>
+    </interface>
+    <interface name="CustomMessageService.update()" kind="method" signature="async update(input: UpdateMessageInput): Promise&lt;void&gt;" path="src/services/customMessageService.ts">
+      <description>Updates existing custom message, sets updatedAt timestamp, throws error if message not found</description>
+    </interface>
+    <interface name="CustomMessageService.delete()" kind="method" signature="async delete(messageId: number): Promise&lt;void&gt;" path="src/services/customMessageService.ts">
+      <description>Deletes custom message from IndexedDB by ID, used by Zustand deleteCustomMessage action</description>
+    </interface>
+    <interface name="CustomMessageService.getActiveCustomMessages()" kind="method" signature="async getActiveCustomMessages(): Promise&lt;Message[]&gt;" path="src/services/customMessageService.ts">
+      <description>Returns all custom messages where active: true for rotation algorithm integration</description>
+    </interface>
+    <interface name="getDailyMessage()" kind="function" signature="getDailyMessage(allMessages: Message[], date: Date): Message" path="src/utils/messageRotation.ts">
+      <description>Deterministic date-based message selection. Story 3.5 enhancement: allMessages input now includes [...defaultMessages, ...customMessages]. Algorithm unchanged.</description>
+    </interface>
+    <interface name="useAppStore.createCustomMessage()" kind="action" signature="(input: CreateMessageInput) =&gt; void" path="src/stores/useAppStore.ts">
+      <description>Story 3.5 update: Replace LocalStorage with customMessageService.create() call, update Zustand customMessages array</description>
+    </interface>
+    <interface name="useAppStore.exportCustomMessages()" kind="action" signature="() =&gt; void" path="src/stores/useAppStore.ts">
+      <description>Story 3.5 new action: Calls customMessageService.exportMessages(), triggers browser download of JSON file with format: my-love-custom-messages-{date}.json</description>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Playwright E2E tests in tests/e2e/ directory. Test structure: describe block per AC, test block per validation point. Use data-testid for element selection. Verify IndexedDB state via page.evaluate() for direct database access. Console logging verification: check for [CustomMessageService] prefixed logs.</standards>
+    <locations>tests/e2e/custom-message-persistence.spec.ts (new file), tests/e2e/admin-panel.spec.ts (existing, may need updates)</locations>
+    <ideas>
+      <idea ac="3.5.1">Test: Create custom message → Open DevTools Application tab via page.evaluate → Query IndexedDB my-love-db.messages → Verify entry with isCustom: true, createdAt timestamp</idea>
+      <idea ac="3.5.2">Test: Add 5 custom messages (active: true) → Mock getDailyMessage with small pool → Verify custom messages eligible in rotation → Assert pool size = defaultMessages.length + 5</idea>
+      <idea ac="3.5.3">Test: Create custom message category='reason' → Select 'Reasons' filter → Verify both default and custom reasons displayed → Custom message has 'Custom' badge visible</idea>
+      <idea ac="3.5.4">Test: Create custom message → Edit message → Toggle active checkbox to false → Verify 'Draft' badge appears → Tomorrow: verify message NOT in rotation (mock date)</idea>
+      <idea ac="3.5.5">Test: Create custom message → Delete via DeleteConfirmDialog → page.evaluate to query IndexedDB → Verify message ID removed from store → Verify MessageList no longer shows message</idea>
+      <idea ac="3.5.6">Test: Create 10 custom messages → Click Export button → Verify download triggered with filename pattern my-love-custom-messages-*.json → Parse JSON → Verify schema: version, exportDate, messageCount: 10, messages array</idea>
+      <idea ac="3.5.7">Test: Create custom message today → Mock tomorrow's date → Call updateCurrentMessage → Verify custom message eligible to appear as daily message → Check DailyMessage component displays custom message identically to defaults</idea>
+    </ideas>
+  </tests>
+</story-context>
