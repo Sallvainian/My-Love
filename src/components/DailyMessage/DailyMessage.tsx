@@ -1,18 +1,71 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Heart, Share2, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { formatRelationshipDuration, getDaysSinceStart } from '../../utils/messageRotation';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { APP_CONFIG } from '../../config/constants';
+import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
 
-export function DailyMessage() {
-  const { currentMessage, settings, messageHistory, toggleFavorite, error, initializeApp } = useAppStore();
+interface DailyMessageProps {
+  onShowWelcome?: () => void;
+}
+
+export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
+  const {
+    currentMessage,
+    settings,
+    messageHistory,
+    toggleFavorite,
+    error,
+    initializeApp,
+    navigateToPreviousMessage,
+    navigateToNextMessage,
+    canNavigateBack,
+    canNavigateForward,
+  } = useAppStore();
   const [showHearts, setShowHearts] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [direction, setDirection] = useState<'left' | 'right'>('left'); // Story 3.2: Track swipe direction
 
   // Check if current message is favorited (source of truth: messageHistory.favoriteIds)
   const isFavorited = currentMessage && messageHistory.favoriteIds.includes(currentMessage.id);
+
+  // Story 3.2: Swipe gesture handler
+  const handleDragEnd = (_event: any, info: PanInfo) => {
+    const threshold = 50; // 50px swipe threshold
+
+    if (info.offset.x < -threshold && canNavigateBack()) {
+      // Swipe left → navigate to previous message
+      setDirection('left');
+      navigateToPreviousMessage();
+    } else if (info.offset.x > threshold && canNavigateForward()) {
+      // Swipe right → navigate to next message (toward today)
+      setDirection('right');
+      navigateToNextMessage();
+    }
+  };
+
+  // Story 3.2: Keyboard navigation (Phase 4)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft' && canNavigateBack()) {
+        event.preventDefault();
+        setDirection('left');
+        navigateToPreviousMessage();
+      } else if (event.key === 'ArrowRight' && canNavigateForward()) {
+        event.preventDefault();
+        setDirection('right');
+        navigateToNextMessage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canNavigateBack, canNavigateForward, navigateToPreviousMessage, navigateToNextMessage]);
 
   // Timeout after 10 seconds if still loading
   useEffect(() => {
@@ -152,19 +205,38 @@ export function DailyMessage() {
       </motion.div>
 
       {/* Main message card */}
-      <motion.div
-        key={currentMessage.id}
-        initial={{ scale: ANIMATION_VALUES.CARD_INITIAL_SCALE, opacity: 0, rotateY: ANIMATION_VALUES.CARD_INITIAL_ROTATE_Y }}
-        animate={{ scale: 1, opacity: 1, rotateY: 0 }}
-        transition={{
-          type: 'spring',
-          stiffness: ANIMATION_VALUES.SPRING_STIFFNESS,
-          damping: ANIMATION_VALUES.SPRING_DAMPING,
-          delay: ANIMATION_TIMING.CARD_FADE_DELAY,
-        }}
-        className="relative"
-      >
-        <div className="card card-hover relative overflow-hidden" data-testid="message-card">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={currentMessage.id}
+          drag="x"
+          dragConstraints={{
+            left: -100,
+            right: canNavigateForward() ? 100 : 0,
+          }}
+          dragElastic={0.2}
+          onDragEnd={handleDragEnd}
+          initial={{
+            x: direction === 'left' ? -300 : 300,
+            opacity: 0,
+          }}
+          animate={{
+            x: 0,
+            opacity: 1,
+          }}
+          exit={{
+            x: direction === 'left' ? 300 : -300,
+            opacity: 0,
+          }}
+          transition={{
+            type: 'tween',
+            ease: 'easeOut',
+            duration: 0.3,
+          }}
+          className="relative"
+          tabIndex={0}
+          style={{ touchAction: 'pan-y' }}
+        >
+          <div className="card card-hover relative overflow-hidden" data-testid="message-card">
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50 pointer-events-none" />
 
@@ -260,8 +332,9 @@ export function DailyMessage() {
           >
             💖
           </motion.div>
-        </div>
-      </motion.div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
 
       {/* Navigation hint */}
       <motion.div
@@ -272,6 +345,9 @@ export function DailyMessage() {
       >
         Swipe left or right to see other messages
       </motion.div>
+
+      {/* Welcome message trigger button */}
+      {onShowWelcome && <WelcomeButton onClick={onShowWelcome} />}
     </div>
   );
 }
