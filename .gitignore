@@ -14,6 +14,13 @@ dev-dist
 .code
 *.local
 
+# Prevent .env files from being tracked (app uses hardcoded constants)
+# Keep .env.test.example for Playwright tests
+.env
+.env.development
+.env.production
+.env.local
+
 # Playwright test artifacts
 /test-results/
 /playwright-report/
