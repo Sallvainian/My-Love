@@ -14,9 +14,12 @@ dev-dist
 .code
 *.local
 
-# Local environment overrides (optional)
+# Prevent .env files from being tracked (app uses hardcoded constants)
+# Keep .env.test.example for Playwright tests
+.env
+.env.development
+.env.production
 .env.local
-.env.test
 
 # Playwright test artifacts
 /test-results/
