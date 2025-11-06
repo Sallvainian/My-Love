@@ -1,67 +1,89 @@
-import type { Message } from '../types';
+import type { Message, MessageHistory, Settings } from '../types';
 
 /**
- * Get the daily message ID based on the relationship start date
- * Uses deterministic rotation so the same message shows on the same day
+ * Format date as YYYY-MM-DD string (deterministic format for hashing)
  */
-export function getDailyMessageId(
-  startDate: Date,
-  today: Date,
-  totalMessages: number
-): number {
-  const daysSinceStart = Math.floor(
-    (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  return daysSinceStart % totalMessages;
+export function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
- * Get the daily message for today
+ * Hash a date string to a deterministic number
+ * Uses simple character code sum algorithm for consistency
  */
-export function getTodayMessage(
-  messages: Message[],
-  startDate: Date,
-  favoriteIds: number[] = []
-): Message | null {
-  if (messages.length === 0) return null;
+export function hashDateString(dateString: string): number {
+  let hash = 0;
+  for (let i = 0; i < dateString.length; i++) {
+    hash = (hash << 5) - hash + dateString.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
 
-  // Separate favorites and regular messages
-  const favorites = messages.filter(m => favoriteIds.includes(m.id));
-  const regular = messages.filter(m => !favoriteIds.includes(m.id));
-
-  // If we have favorites, show them more frequently (every 3 days)
-  const today = new Date();
-  const daysSinceStart = Math.floor(
-    (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  // Every 3rd day, show a favorite (if available)
-  if (favorites.length > 0 && daysSinceStart % 3 === 0) {
-    const favoriteIndex = Math.floor(daysSinceStart / 3) % favorites.length;
-    return favorites[favoriteIndex];
+/**
+ * Get the daily message for a specific date using deterministic hash algorithm
+ * Same date always returns same message (deterministic rotation)
+ *
+ * @param allMessages - Full message pool
+ * @param date - Target date (defaults to today)
+ * @returns Message for that date
+ */
+export function getDailyMessage(
+  allMessages: Message[],
+  date: Date = new Date()
+): Message {
+  if (allMessages.length === 0) {
+    throw new Error('Cannot get daily message from empty message pool');
   }
 
-  // Otherwise, rotate through regular messages
-  const messageIndex = getDailyMessageId(startDate, today, regular.length || messages.length);
-  return regular.length > 0 ? regular[messageIndex] : messages[messageIndex];
+  // Generate deterministic hash from date
+  const dateString = formatDate(date);
+  const hash = hashDateString(dateString);
+
+  // Calculate message index using modulo
+  const messageIndex = hash % allMessages.length;
+
+  // Return message at calculated index
+  return allMessages[messageIndex];
 }
 
 /**
- * Get message for a specific date (for viewing past/future messages)
+ * Get message for a specific date (alias for clarity)
  */
 export function getMessageForDate(
-  messages: Message[],
-  startDate: Date,
+  allMessages: Message[],
   targetDate: Date
-): Message | null {
-  if (messages.length === 0) return null;
-
-  const messageIndex = getDailyMessageId(startDate, targetDate, messages.length);
-  return messages[messageIndex];
+): Message {
+  return getDailyMessage(allMessages, targetDate);
 }
 
 /**
- * Check if a new day has started
+ * Get available history days based on configuration and relationship duration
+ * Returns minimum of: configured max, days since relationship start, or hard cap
+ */
+export function getAvailableHistoryDays(
+  messageHistory: MessageHistory,
+  settings: Settings
+): number {
+  const relationshipStartDate = new Date(settings.relationship.startDate);
+  const today = new Date();
+  const daysSinceStart = Math.floor(
+    (today.getTime() - relationshipStartDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  // Return minimum of: configured max, days since start, or 30 default
+  return Math.min(
+    messageHistory.maxHistoryDays || 30,
+    daysSinceStart,
+    30
+  );
+}
+
+/**
+ * Check if a new day has started (for legacy compatibility)
  */
 export function isNewDay(lastShownDate: string | null): boolean {
   if (!lastShownDate) return true;
@@ -76,34 +98,66 @@ export function isNewDay(lastShownDate: string | null): boolean {
   );
 }
 
+// Legacy functions kept for backward compatibility (deprecated in Story 3.3)
+// These will be removed in future refactoring
+
 /**
- * Get the next message (tomorrow's message)
+ * @deprecated Use getDailyMessage with date parameter instead
+ */
+export function getDailyMessageId(
+  startDate: Date,
+  today: Date,
+  totalMessages: number
+): number {
+  const daysSinceStart = Math.floor(
+    (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  return daysSinceStart % totalMessages;
+}
+
+/**
+ * @deprecated Use getDailyMessage instead
+ */
+export function getTodayMessage(
+  messages: Message[],
+  _startDate: Date,
+  _favoriteIds: number[] = []
+): Message | null {
+  if (messages.length === 0) return null;
+
+  // Story 3.3: Remove favorite rotation logic, use pure date-hash algorithm
+  const today = new Date();
+  return getDailyMessage(messages, today);
+}
+
+/**
+ * @deprecated Use getDailyMessage with tomorrow's date instead
  */
 export function getNextMessage(
   messages: Message[],
-  startDate: Date
+  _startDate: Date
 ): Message | null {
   if (messages.length === 0) return null;
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  return getMessageForDate(messages, startDate, tomorrow);
+  return getDailyMessage(messages, tomorrow);
 }
 
 /**
- * Get the previous message (yesterday's message)
+ * @deprecated Use getDailyMessage with yesterday's date instead
  */
 export function getPreviousMessage(
   messages: Message[],
-  startDate: Date
+  _startDate: Date
 ): Message | null {
   if (messages.length === 0) return null;
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  return getMessageForDate(messages, startDate, yesterday);
+  return getDailyMessage(messages, yesterday);
 }
 
 /**
