@@ -762,7 +762,9 @@ export const useAppStore = create<AppState>()(
         // Story 3.3: Serialize Map to Array for JSON storage
         messageHistory: {
           ...state.messageHistory,
-          shownMessages: Array.from(state.messageHistory.shownMessages.entries()),
+          shownMessages: state.messageHistory?.shownMessages instanceof Map
+            ? Array.from(state.messageHistory.shownMessages.entries())
+            : [],
         },
         moods: state.moods,
         // Story 3.5: Custom messages now in IndexedDB (not LocalStorage)
