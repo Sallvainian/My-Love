@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  * with PWA-specific settings for service workers, IndexedDB, and offline testing.
  *
  * Environment-aware configuration:
- * - Local: 4 workers, 0 retries (fast feedback)
+ * - Local: 12 workers, 0 retries (fast feedback)
  * - CI: 2 workers, 2 retries (handle transient failures)
  */
 

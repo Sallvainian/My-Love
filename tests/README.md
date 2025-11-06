@@ -1218,7 +1218,7 @@ GitHub Actions workflow automatically runs Playwright tests on every push and pu
 
 **Environment:**
 - **Runner:** Ubuntu 22.04 (ubuntu-latest)
-- **Node.js:** 18.x (matches local development)
+- **Node.js:** 20.x (matches local development)
 - **Browsers:** Chromium, Firefox (automatically installed with system dependencies)
 - **Workers:** 2 (CI resource constraints: 2-core CPU, 7GB memory)
 - **Retries:** Configured in `playwright.config.ts` based on `CI` environment variable
@@ -1404,9 +1404,9 @@ When CI fails but local tests pass, reproduce the exact CI environment to debug.
 # Check current Node version
 node --version
 
-# If not 18.x, install via nvm:
-nvm install 18
-nvm use 18
+# If not 20.x, install via nvm:
+nvm install 20
+nvm use 20
 ```
 
 **Step 2: Clean install dependencies (match CI)**
