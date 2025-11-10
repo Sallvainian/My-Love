@@ -20,10 +20,36 @@ export interface Message {
 
 export interface Photo {
   id: number;
+  imageBlob: Blob;           // Renamed from 'blob' for clarity
+  caption?: string;          // Optional caption (max 500 chars)
+  tags: string[];            // Array of tags
+  uploadDate: Date;          // Upload timestamp
+  originalSize: number;      // Original file size in bytes
+  compressedSize: number;    // Compressed size in bytes
+  width: number;             // Image width in pixels
+  height: number;            // Image height in pixels
+  mimeType: string;          // 'image/jpeg' | 'image/png' | 'image/webp'
+}
+
+// Photo upload types (Story 4.1)
+export interface PhotoUploadInput {
+  file: File;
+  caption?: string;
+  tags?: string;  // Comma-separated string
+}
+
+export interface CompressionOptions {
+  maxWidth: number;      // Default: 1920px
+  maxHeight: number;     // Default: 1920px
+  quality: number;       // Default: 0.8 (80%)
+}
+
+export interface CompressionResult {
   blob: Blob;
-  caption: string;
-  uploadDate: Date;
-  tags: string[];
+  width: number;
+  height: number;
+  originalSize: number;
+  compressedSize: number;
 }
 
 export interface Anniversary {

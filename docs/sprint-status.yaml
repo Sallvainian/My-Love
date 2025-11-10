@@ -63,9 +63,9 @@ development_status:
   # 3-6-ai-message-suggestion-review-interface-optional-enhancement: skipped (no OpenAI dependency)
   epic-3-retrospective: completed
 
-  epic-4: backlog
-  4-1-photo-upload-storage: backlog
-  4-2-photo-gallery-grid-view: backlog
+  epic-4: contexted
+  4-1-photo-upload-storage: done
+  4-2-photo-gallery-grid-view: in-progress
   4-3-photo-carousel-with-animated-transitions: backlog
   4-4-photo-edit-delete-functionality: backlog
   4-5-photo-gallery-navigation-integration: backlog

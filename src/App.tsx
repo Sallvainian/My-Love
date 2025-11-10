@@ -4,6 +4,9 @@ import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { BottomNavigation } from './components/Navigation/BottomNavigation';
+import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
+import { PhotoGallery } from './components/PhotoGallery/PhotoGallery';
 import { applyTheme } from './utils/themes';
 import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
@@ -40,6 +43,10 @@ function App() {
 
   const [showSplash, setShowSplash] = useState(shouldShowWelcome);
   const [showAdmin, setShowAdmin] = useState(false);
+
+  // Story 4.1/4.2: Photo gallery navigation state
+  const [currentView, setCurrentView] = useState<'home' | 'photos'>('home');
+  const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
 
   // Check URL for admin route on mount
   useEffect(() => {
@@ -136,12 +143,27 @@ function App() {
     );
   }
 
-  // Story 1.4: Always render DailyMessage (onboarding removed for single-user deployment)
-  // Settings are pre-configured via hardcoded constants
+  // Story 1.4 & 4.1/4.2: Render home or photos view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen">
-        <DailyMessage onShowWelcome={showWelcomeManually} />
+      <div className="min-h-screen pb-16">
+        {/* Conditional view rendering */}
+        {currentView === 'home' && (
+          <DailyMessage onShowWelcome={showWelcomeManually} />
+        )}
+
+        {currentView === 'photos' && (
+          <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+        )}
+
+        {/* Bottom navigation - Story 4.1 */}
+        <BottomNavigation currentView={currentView} onViewChange={setCurrentView} />
+
+        {/* Photo upload modal - Story 4.1 */}
+        <PhotoUpload
+          isOpen={isPhotoUploadOpen}
+          onClose={() => setIsPhotoUploadOpen(false)}
+        />
       </div>
     </ErrorBoundary>
   );

@@ -2,7 +2,7 @@ description = "Executes the Adv Elicit task from the BMad Method."
 prompt = """
 Execute the following BMad Method task workflow:
 
-@../My-Love/bmad/core/tasks/adv-elicit.xml
+@bmad/core/tasks/adv-elicit.xml
 
 Follow all instructions and complete the task as defined.
 """

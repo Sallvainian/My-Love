@@ -1,0 +1,334 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4.2</storyId>
+    <title>Photo Gallery Grid View</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-07</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/4-2-photo-gallery-grid-view.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>your girlfriend</asA>
+    <iWant>to see all my uploaded photos in a grid</iWant>
+    <soThat>I can browse my photo collection</soThat>
+    <tasks>
+- Task 1: Create PhotoGallery Component (AC: 4.2.1, 4.2.2, 4.2.5)
+  - Subtask 1.1: Create component file src/components/PhotoGallery/PhotoGallery.tsx
+  - Subtask 1.2: Implement responsive grid layout (2-3-4 column breakpoints)
+  - Subtask 1.3: Connect to Zustand photos state
+  - Subtask 1.4: Implement empty state (camera icon, message, upload button)
+  - Subtask 1.5: Add data-testid attributes for E2E testing
+
+- Task 2: Create PhotoGridItem Component (AC: 4.2.3, 4.2.7)
+  - Subtask 2.1: Create component file src/components/PhotoGallery/PhotoGridItem.tsx
+  - Subtask 2.2: Implement photo thumbnail display (aspect-square, object-cover)
+  - Subtask 2.3: Implement caption overlay with hover/tap reveal
+  - Subtask 2.4: Add onClick handler to call selectPhoto(id)
+  - Subtask 2.5: Add cursor-pointer and accessibility (role, aria-label)
+
+- Task 3: Extend Zustand Store with Gallery Actions (AC: 4.2.2, 4.2.6, 4.2.7)
+  - Subtask 3.1: Add loadPhotos() action - fetches from photoStorageService.getAll()
+  - Subtask 3.2: Add selectPhoto(id) action - sets selectedPhotoId state
+  - Subtask 3.3: Add isLoadingPhotos state management (set true/false during load)
+  - Subtask 3.4: Call loadPhotos() on app initialization (after photoStorageService init)
+
+- Task 4: Implement Lazy Loading Pagination (AC: 4.2.4)
+  - Subtask 4.1: Add getPage(offset, limit) method to photoStorageService if missing
+  - Subtask 4.2: Implement infinite scroll hook (useInfiniteScroll or native Intersection Observer)
+  - Subtask 4.3: Add pagination state: currentOffset, hasMore, isLoadingMore
+  - Subtask 4.4: Load next batch when user scrolls near bottom (threshold: 200px)
+  - Subtask 4.5: Display "Loading more photos..." during pagination fetch
+
+- Task 5: Add Loading Spinner Component (AC: 4.2.6)
+  - Subtask 5.1: Create LoadingSpinner component (Lucide Loader2 with animate-spin)
+  - Subtask 5.2: Display spinner when isLoadingPhotos is true
+  - Subtask 5.3: Center spinner in gallery container
+  - Subtask 5.4: Add "Loading photos..." text below spinner
+
+- Task 6: Integrate PhotoGallery into App Navigation (AC: 4.2.1)
+  - Subtask 6.1: Update App.tsx to render PhotoGallery when Photos tab is active
+  - Subtask 6.2: Add routing logic (if Photos tab clicked, show PhotoGallery, else DailyMessage)
+  - Subtask 6.3: Test navigation: Home ↔ Photos tab switching
+
+- Task 7: Create E2E Test Suite for Gallery (AC: All)
+  - Subtask 7.1: Create tests/e2e/photo-gallery.spec.ts
+  - Subtask 7.2: Test: Grid layout displays 2-3-4 columns on different viewports
+  - Subtask 7.3: Test: Empty state shown when no photos uploaded
+  - Subtask 7.4: Test: Photos sorted newest first (upload 3, verify order)
+  - Subtask 7.5: Test: Caption overlay shows on hover (desktop) and tap (mobile)
+  - Subtask 7.6: Test: Lazy loading pagination (upload 40 photos, verify 2 batches)
+  - Subtask 7.7: Test: Loading spinner displays during initial load
+  - Subtask 7.8: Test: Tap photo sets selectedPhotoId state (verify console log or state)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC-4.2.1: Responsive Grid Layout
+- Grid SHALL display: 2 columns on mobile (&lt; 640px), 3 columns on tablet (640px - 1024px), 4 columns on desktop (&gt; 1024px)
+- Tailwind responsive breakpoints: sm:grid-cols-3, lg:grid-cols-4
+- Consistent gap spacing: gap-2 (mobile), gap-4 (desktop)
+- Photos maintain square aspect ratio (aspect-square)
+- Grid fills available width (w-full)
+
+AC-4.2.2: Photos Sorted by Upload Date (Newest First)
+- Query uses by-date index: getAllFromIndex('photos', 'by-date')
+- Result array reversed: photos.reverse() (IndexedDB returns ascending)
+- Most recent upload appears at top-left of grid
+- Sort order persists across app sessions
+
+AC-4.2.3: Caption Overlay on Hover/Tap
+- Caption overlay SHALL display: Semi-transparent gradient backdrop, Caption text in white (max 2 lines with ellipsis), Smooth fade-in transition (150ms)
+- Hover state: group/hover:opacity-100 (Tailwind)
+- Gradient backdrop: bg-gradient-to-t from-black/60 to-transparent
+- Caption styling: text-white text-sm font-medium line-clamp-2
+- No overlay if caption is undefined
+
+AC-4.2.4: Lazy Loading Pagination
+- Initial load: photoStorageService.getPage(offset: 0, limit: 20)
+- Infinite scroll: Load next 20 when user scrolls near bottom (threshold: 200px)
+- Loading indicator: "Loading more photos..." displayed during fetch
+- No duplicate photos loaded in pagination
+- State management: Track current offset and hasMore flag
+
+AC-4.2.5: Empty State Message
+- Empty state SHALL display: Camera icon (Lucide camera icon), Message: "No photos yet. Upload your first memory!", Upload button: "Upload Photo" (opens PhotoUpload modal)
+- Centered layout: flex flex-col items-center justify-center
+- Muted text styling: text-gray-500 dark mode compatible
+- Upload button styled as primary CTA: bg-pink-500 text-white
+- Empty state takes full grid container height
+
+AC-4.2.6: Loading Spinner During Fetch
+- Loading spinner SHALL display: Centered spinner animation, Text: "Loading photos...", Spinner styled with theme color (pink)
+- Spinner component: Lucide Loader2 icon with animate-spin
+- Loading state managed by Zustand: isLoadingPhotos boolean
+- Spinner visible during: initial load, pagination fetch
+- Grid hidden while loading (prevent layout shift)
+
+AC-4.2.7: Tap Photo Opens Carousel View
+- Click handler: onClick={() =&gt; selectPhoto(photo.id)}
+- Zustand action: selectPhoto(id) sets selectedPhotoId state
+- For Story 4.2: Log selected photo ID (carousel UI in Story 4.3)
+- Cursor: cursor-pointer on grid items
+- Tap target: min-height 120px (thumb-friendly)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Story 4.2: Photo Gallery Grid View</section>
+        <snippet>Responsive grid layout (2-3-4 columns), lazy loading pagination (20 photos/batch), photo thumbnail display with caption overlay, empty state handling, integration with PhotoCarousel handoff (Story 4.3)</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Workflows - Photo Gallery Grid Loading</section>
+        <snippet>PhotoGallery loads photos via photoStorageService.getAll() from IndexedDB by-date index, reverses array for newest-first display, renders grid with Tailwind responsive breakpoints (sm:grid-cols-3, lg:grid-cols-4)</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/4-1-photo-upload-storage.context.xml</path>
+        <title>Story 4.1 Context</title>
+        <section>Service Layer Patterns</section>
+        <snippet>photoStorageService established with getAll() method returning photos sorted by date, IndexedDB photos store with by-date index, Photo objects with imageBlob/caption/tags fields, URL.createObjectURL() pattern for blob display</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Component Patterns</section>
+        <snippet>Component co-location pattern (src/components/[Feature]/), data-testid attributes for E2E testing, Framer Motion for animations, responsive Tailwind styling with mobile-first approach</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>IndexedDB Schema</section>
+        <snippet>Database: my-love-db v2. Photos object store with auto-increment id, by-date index on uploadDate. Query pattern: getAllFromIndex('photos', 'by-date') returns ascending order (must reverse for newest-first)</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/photoStorageService.ts</path>
+        <kind>service</kind>
+        <symbol>PhotoStorageService.getAll()</symbol>
+        <lines>134-149</lines>
+        <reason>Story 4.2 uses this method to load all photos. Returns photos from by-date index reversed for newest-first display. Includes graceful error handling returning empty array on failure.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/photoStorageService.ts</path>
+        <kind>service</kind>
+        <symbol>PhotoStorageService singleton pattern</symbol>
+        <lines>20-50</lines>
+        <reason>Reference pattern for service layer: init() guard prevents duplicate initialization, comprehensive logging, singleton instance export. Story 4.2 calls photoStorageService.getAll() directly.</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>Photo state slice</symbol>
+        <lines>46-50</lines>
+        <reason>Existing photos state from Story 4.1: photos array, isLoadingPhotos boolean, photoError string. Story 4.2 needs to add: selectedPhotoId state and selectPhoto(id) action for carousel handoff.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/Navigation/BottomNavigation.tsx</path>
+        <kind>component</kind>
+        <symbol>BottomNavigation</symbol>
+        <lines>1-50</lines>
+        <reason>Existing navigation with Photos tab (Camera icon) from Story 4.1. Story 4.2 integrates PhotoGallery to display when currentView === 'photos'. Pattern: conditional rendering in App.tsx based on view state.</reason>
+      </artifact>
+      <artifact>
+        <path>src/types/index.ts</path>
+        <kind>types</kind>
+        <symbol>Photo interface</symbol>
+        <lines>21-32</lines>
+        <reason>Photo interface with all required fields: id, imageBlob (Blob), caption (optional), tags (string[]), uploadDate, compression metadata. Story 4.2 displays these fields in grid cards.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/PhotoUpload/PhotoUpload.tsx</path>
+        <kind>component</kind>
+        <symbol>PhotoUpload modal</symbol>
+        <lines>N/A</lines>
+        <reason>Pattern for modal components: Framer Motion AnimatePresence for enter/exit, data-testid attributes, Lucide icons. Story 4.2 empty state "Upload Photo" button opens this modal (reuse from Story 4.1).</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.1.1</version>
+        <usage>PhotoGallery and PhotoGridItem components</usage>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+        <usage>Access photos state, add selectPhoto action</usage>
+      </node>
+      <node>
+        <package>idb</package>
+        <version>^8.0.3</version>
+        <usage>photoStorageService.getAll() via IndexedDB</usage>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.548.0</version>
+        <usage>Camera icon (empty state), Loader2 (loading spinner)</usage>
+      </node>
+      <node>
+        <package>framer-motion</package>
+        <version>^12.23.24</version>
+        <usage>Future Story 4.3 carousel animations (no animations in grid yet)</usage>
+      </node>
+      <node>
+        <package>tailwindcss</package>
+        <version>^3.4.18</version>
+        <usage>Responsive grid (grid-cols-2, sm:grid-cols-3, lg:grid-cols-4), gap, aspect-square</usage>
+      </node>
+      <node>
+        <package>@playwright/test</package>
+        <version>^1.56.1</version>
+        <usage>E2E testing - grid layout, lazy loading, empty state validation</usage>
+      </node>
+      <browser-api>URL.createObjectURL()</browser-api>
+      <browser-api>Intersection Observer API (for lazy loading pagination)</browser-api>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">PhotoGallery component follows co-location pattern: src/components/PhotoGallery/ directory containing PhotoGallery.tsx and PhotoGridItem.tsx components</constraint>
+    <constraint type="architecture">Extend Zustand store with selectPhoto(id) action and selectedPhotoId state for Story 4.3 carousel handoff (sets state, carousel implementation in Story 4.3)</constraint>
+    <constraint type="data">Load photos via photoStorageService.getAll() which queries by-date index and reverses array for newest-first display (IndexedDB returns ascending, must reverse)</constraint>
+    <constraint type="data">Display blob images using URL.createObjectURL(photo.imageBlob) - IMPORTANT: Clean up blob URLs in useEffect cleanup to prevent memory leaks</constraint>
+    <constraint type="performance">Lazy loading pagination: Load first 20 photos initially, load next 20 when user scrolls near bottom (threshold: 200px from bottom)</constraint>
+    <constraint type="performance">Grid render target: &lt;500ms initial load for 20 photos, 60fps scrolling with no jank</constraint>
+    <constraint type="responsive">Tailwind responsive grid: base (2 cols mobile), sm:grid-cols-3 (tablet 640px+), lg:grid-cols-4 (desktop 1024px+), gap-2 mobile, gap-4 desktop</constraint>
+    <constraint type="component">Caption overlay: Gradient backdrop (bg-gradient-to-t from-black/60), text-white, line-clamp-2 (max 2 lines with ellipsis), group/hover:opacity-100 pattern</constraint>
+    <constraint type="component">Empty state: Centered flex layout, Camera icon from Lucide, text-gray-500, "Upload Photo" button styled as primary CTA (bg-pink-500 text-white)</constraint>
+    <constraint type="component">Loading spinner: Lucide Loader2 with animate-spin, pink theme color, centered in container, "Loading photos..." text below</constraint>
+    <constraint type="component">All components must include data-testid attributes: photo-gallery-grid, photo-grid-item, photo-gallery-empty-state, photo-gallery-loading</constraint>
+    <constraint type="testing">E2E tests validate real IndexedDB queries and blob rendering (not mocked), test fixtures include multiple test photos with different sizes/captions</constraint>
+    <constraint type="integration">PhotoGallery renders when BottomNavigation currentView === 'photos' (App.tsx routing logic), replaces DailyMessage view conditionally</constraint>
+    <constraint type="navigation">Tap photo calls selectPhoto(photo.id) which updates selectedPhotoId in Zustand - actual carousel UI implemented in Story 4.3, for Story 4.2 just logs selection</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>PhotoGallery Component</name>
+      <kind>React component</kind>
+      <signature>
+interface PhotoGalleryProps {
+  // No props - accesses photos from Zustand store directly
+}
+
+function PhotoGallery(): JSX.Element {
+  const { photos, isLoadingPhotos, loadPhotos, selectPhoto } = useAppStore();
+  // Renders: Empty state | Loading spinner | Photo grid
+}
+      </signature>
+      <path>src/components/PhotoGallery/PhotoGallery.tsx (NEW)</path>
+    </interface>
+    <interface>
+      <name>PhotoGridItem Component</name>
+      <kind>React component</kind>
+      <signature>
+interface PhotoGridItemProps {
+  photo: Photo;
+  onPhotoClick: (photoId: number) =&gt; void;
+}
+
+function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps): JSX.Element {
+  // Renders: Thumbnail with aspect-square, caption overlay on hover, onClick handler
+}
+      </signature>
+      <path>src/components/PhotoGallery/PhotoGridItem.tsx (NEW)</path>
+    </interface>
+    <interface>
+      <name>Zustand Photo Actions (Enhanced)</name>
+      <kind>State management actions</kind>
+      <signature>
+// Existing from Story 4.1:
+loadPhotos: () =&gt; Promise&lt;void&gt;;  // Calls photoStorageService.getAll()
+uploadPhoto: (input: PhotoUploadInput) =&gt; Promise&lt;Photo&gt;;
+getPhotoById: (photoId: number) =&gt; Photo | null;
+
+// NEW for Story 4.2:
+selectPhoto: (photoId: number) =&gt; void;  // Sets selectedPhotoId for carousel (Story 4.3)
+
+// NEW state fields for Story 4.2:
+selectedPhotoId: number | null;  // Currently selected photo for carousel view
+      </signature>
+      <path>src/stores/useAppStore.ts (EXTEND)</path>
+    </interface>
+    <interface>
+      <name>photoStorageService.getAll()</name>
+      <kind>IndexedDB service method</kind>
+      <signature>
+async getAll(): Promise&lt;Photo[]&gt; {
+  // Query by-date index: getAllFromIndex('photos', 'by-date')
+  // Reverse array for newest-first display
+  // Return empty array on error (graceful fallback)
+}
+      </signature>
+      <path>src/services/photoStorageService.ts (EXISTING from Story 4.1)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E testing using Playwright with real IndexedDB and blob rendering. Tests validate responsive grid layout at multiple viewport sizes (375px mobile, 768px tablet, 1920px desktop). Lazy loading tests upload 40+ photos and verify pagination (20 photos per batch). Empty state and loading spinner tests verify UI states. Use data-testid selectors following pattern: [component]-[element]. Test fixtures stored in tests/fixtures/ directory. Follow existing test patterns from tests/e2e/photo-upload.spec.ts (Story 4.1) for IndexedDB validation and blob handling.</standards>
+    <locations>
+      <location>tests/e2e/photo-gallery.spec.ts (NEW)</location>
+      <location>tests/fixtures/photos/ (EXISTING from Story 4.1 - reuse test images)</location>
+      <location>tests/support/helpers/photoHelpers.ts (EXTEND - add grid-specific helpers)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-4.2.1">Test responsive grid layout: Load gallery at 375px (2 cols), 768px (3 cols), 1920px (4 cols) viewports - verify column count matches breakpoints, gap spacing correct</idea>
+      <idea ac="AC-4.2.2">Test photos sorted newest first: Upload 3 photos with different uploadDates (Day 1, Day 2, Day 3) - verify grid displays Day 3 → Day 2 → Day 1 order in top-left to bottom-right</idea>
+      <idea ac="AC-4.2.3">Test caption overlay: Desktop hover over photo with caption "Beach sunset" - verify gradient backdrop visible, caption text displays max 2 lines. Mobile tap - verify overlay appears briefly</idea>
+      <idea ac="AC-4.2.3">Test no overlay for photos without captions: Upload photo with caption=undefined - verify no overlay shown on hover/tap</idea>
+      <idea ac="AC-4.2.4">Test lazy loading pagination: Upload 40 photos - verify initial load shows 20 photos only. Scroll to bottom - verify next 20 photos load. Check IndexedDB query logs show 2 separate queries.</idea>
+      <idea ac="AC-4.2.4">Test pagination with fewer photos: Upload 15 photos - verify all display without pagination, no "Loading more..." indicator shown</idea>
+      <idea ac="AC-4.2.5">Test empty state: New user opens Photos tab - verify Camera icon, "No photos yet. Upload your first memory!" message, "Upload Photo" button displayed. Click button - verify PhotoUpload modal opens.</idea>
+      <idea ac="AC-4.2.6">Test loading spinner: Clear IndexedDB, open gallery - verify Loader2 spinner with "Loading photos..." text displays while fetching. After load completes - verify spinner disappears, grid displays.</idea>
+      <idea ac="AC-4.2.7">Test photo tap selection: Tap photo #5 in grid - verify console logs "Selected photo: 5", selectedPhotoId state updated to 5 (Story 4.3 will render carousel based on this state)</idea>
+      <idea ac="general">Test grid performance: Upload 20 photos, measure initial render time - verify &lt;500ms. Scroll grid - verify 60fps smooth scrolling with no jank (use Playwright performance traces).</idea>
+    </ideas>
+  </tests>
+</story-context>

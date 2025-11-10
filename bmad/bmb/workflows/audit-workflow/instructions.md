@@ -161,7 +161,7 @@
     <action if="condition met">Do something</action>
     ```
 
-    <action>Scan instructions.md for nested tag references using pattern: &lt;(action|ask|check|template-output|invoke-workflow|goto|step|elicit-required)&gt; within text content</action>
+    <action>Scan instructions.md for nested tag references using pattern: &lt;(action|ask|check|template-output|invoke-workflow|invoke-task|goto|step)&gt; within text content</action>
     <action>Record any instances of nested tag references with line numbers</action>
     <action>Scan instructions.md for conditional execution antipattern: self-closing check tags</action>
     <action>Detect pattern: `&lt;check&gt;.*&lt;/check&gt;` on single line (self-closing check)</action>

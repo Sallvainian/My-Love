@@ -151,8 +151,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       // The message should appear at some point in the rotation
       // For testing purposes, we verify it's in the rotation pool
       const rotationPool = await cleanApp.evaluate(() => {
-        const state = (window as any).__APP_STORE__;
-        return state?.messages || [];
+        const store = (window as any).__APP_STORE__;
+        return store?.getState().messages || [];
       });
 
       const hasCustomInPool = rotationPool.some((m: any) => m.text === testMessage);
