@@ -17,7 +17,7 @@ interface MyLoveDB extends DBSchema {
 }
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Story 4.1: Increment to match photoStorageService
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDB> | null = null;
@@ -50,18 +50,28 @@ class StorageService {
     try {
       console.log('[StorageService] Initializing IndexedDB...');
       this.db = await openDB<MyLoveDB>(DB_NAME, DB_VERSION, {
-        upgrade(db) {
-          // Create photos store
-          if (!db.objectStoreNames.contains('photos')) {
+        upgrade(db, oldVersion, newVersion) {
+          console.log(`[StorageService] Upgrading database from v${oldVersion} to v${newVersion}`);
+
+          // Migration: v1 → v2 (Story 4.1)
+          // Recreate photos store with enhanced schema
+          if (oldVersion < 2) {
+            // Delete old photos store if it exists from v1
+            if (db.objectStoreNames.contains('photos')) {
+              db.deleteObjectStore('photos');
+              console.log('[StorageService] Deleted old photos store from v1');
+            }
+
+            // Create new photos store with enhanced schema
             const photoStore = db.createObjectStore('photos', {
               keyPath: 'id',
               autoIncrement: true,
             });
-            photoStore.createIndex('by-date', 'uploadDate');
-            console.log('[StorageService] Created photos object store');
+            photoStore.createIndex('by-date', 'uploadDate', { unique: false });
+            console.log('[StorageService] Created photos store with by-date index (v2)');
           }
 
-          // Create messages store
+          // Ensure messages store exists (should have been created in v1)
           if (!db.objectStoreNames.contains('messages')) {
             const messageStore = db.createObjectStore('messages', {
               keyPath: 'id',
@@ -69,7 +79,7 @@ class StorageService {
             });
             messageStore.createIndex('by-category', 'category');
             messageStore.createIndex('by-date', 'createdAt');
-            console.log('[StorageService] Created messages object store');
+            console.log('[StorageService] Created messages store (fallback)');
           }
         },
       });
