@@ -108,7 +108,8 @@ Most workflows should be `standalone: true` to give users direct access.
 1. **Yes (Recommended)** - Users can run it directly (standalone: true)
 2. **No** - Only called by other workflows/agents (standalone: false)
 
-Most workflows choose option 1:</ask>
+Most workflows choose option 1:
+</ask>
 
 <action>Store {{standalone_setting}} as true or false based on response</action>
 
@@ -150,7 +151,8 @@ The architecture workflow is an excellent example of intent-based with prescript
 2. **Prescriptive** - Structured, consistent, controlled interactions
 3. **Mixed/Balanced** - I'll help you decide step-by-step
 
-What feels right for your workflow's purpose?</ask>
+What feels right for your workflow's purpose?
+</ask>
 
 <action>Store {{instruction_style}} preference</action>
 
@@ -185,11 +187,12 @@ Beyond style, consider **how interactive** this workflow should be:
 
 <ask>What interactivity level suits this workflow?
 
-1. **High** - Highly collaborative, user actively involved throughout
-2. **Medium** - Guided with key decision points (most common)
-3. **Low** - Autonomous with final review
+1. **High** - Highly collaborative, user actively involved throughout (Recommended)
+2. **Medium** - Guided with key decision points
+3. **Low** - Mostly autonomous with final review
 
-Select the level that matches your workflow's purpose:</ask>
+Select the level that matches your workflow's purpose:
+</ask>
 
 <action>Store {{interactivity_level}} preference</action>
 
@@ -487,6 +490,7 @@ Generate the template.md file following guide conventions:
    # Document Title
 
    **Date:** {{date}}
+
    **Author:** {{user_name}}
    ```
 
@@ -575,7 +579,9 @@ Review the created workflow:
 4. Validate YAML syntax
 5. Confirm all placeholders are replaced
 
-**Standard Config Validation:** 6. Verify workflow.yaml contains standard config block:
+**Standard Config Validation:**
+
+6. Verify workflow.yaml contains standard config block:
 
 - config_source defined
 - output_folder, user_name, communication_language pulled from config
@@ -584,7 +590,9 @@ Review the created workflow:
 7. Check instructions use config variables where appropriate
 8. Verify template includes config variables in metadata (if document workflow)
 
-**YAML/Instruction/Template Alignment:** 9. Cross-check all workflow.yaml variables against instruction usage:
+**YAML/Instruction/Template Alignment:**
+
+9. Cross-check all workflow.yaml variables against instruction usage:
 
 - Are all yaml variables referenced in instructions.md OR template.md?
 - Are there hardcoded values that should be variables?

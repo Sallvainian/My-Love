@@ -11,9 +11,13 @@ import type {
   CreateMessageInput,
   UpdateMessageInput,
   MessageFilter,
+  Photo,
+  PhotoUploadInput,
 } from '../types';
 import { storageService } from '../services/storage';
 import { customMessageService } from '../services/customMessageService';
+import { photoStorageService } from '../services/photoStorageService';
+import { imageCompressionService } from '../services/imageCompressionService';
 import defaultMessages from '../data/defaultMessages';
 import {
   getDailyMessage,
@@ -38,6 +42,15 @@ interface AppState {
   // Custom message state (Story 3.4)
   customMessages: CustomMessage[];
   customMessagesLoaded: boolean;
+
+  // Photo state (Story 4.1)
+  photos: Photo[];
+  isLoadingPhotos: boolean;
+  photoError: string | null;
+  storageWarning: string | null; // AC-4.1.9: Storage quota warning
+
+  // Gallery state (Story 4.2)
+  selectedPhotoId: number | null; // AC-4.2.7: Selected photo for carousel view
 
   // Mood tracking
   moods: MoodEntry[];
@@ -83,6 +96,16 @@ interface AppState {
 
   // Theme actions
   setTheme: (theme: ThemeName) => void;
+
+  // Photo actions (Story 4.1)
+  loadPhotos: () => Promise<void>;
+  uploadPhoto: (input: PhotoUploadInput) => Promise<Photo>;
+  getPhotoById: (photoId: number) => Photo | null;
+  getStorageUsage: () => Promise<{ used: number; quota: number; percentUsed: number }>;
+  clearStorageWarning: () => void; // AC-4.1.9: Clear storage warning
+
+  // Gallery actions (Story 4.2)
+  selectPhoto: (photoId: number) => void; // AC-4.2.7: Select photo for carousel view
 }
 
 // Initialization guards to prevent concurrent/duplicate initialization (StrictMode protection)
@@ -165,6 +188,13 @@ export const useAppStore = create<AppState>()(
       currentDayOffset: 0, // @deprecated Story 3.3: Use messageHistory.currentIndex instead
       customMessages: [],
       customMessagesLoaded: false,
+      // Story 4.1: Photo state
+      photos: [],
+      isLoadingPhotos: false,
+      photoError: null,
+      storageWarning: null, // AC-4.1.9: Storage quota warning
+      // Story 4.2: Gallery state
+      selectedPhotoId: null, // AC-4.2.7: Selected photo for carousel view
       moods: [],
       isLoading: false,
       error: null,
@@ -796,6 +826,148 @@ export const useAppStore = create<AppState>()(
             },
           });
         }
+      },
+
+      // Photo actions (Story 4.1)
+      loadPhotos: async () => {
+        try {
+          set({ isLoadingPhotos: true, photoError: null });
+          const photos = await photoStorageService.getAll();
+          set({ photos, isLoadingPhotos: false });
+          console.log(`[AppStore] Loaded ${photos.length} photos`);
+        } catch (error) {
+          console.error('[AppStore] Failed to load photos:', error);
+          set({
+            photoError: 'Failed to load photos',
+            isLoadingPhotos: false,
+            photos: [] // Fallback to empty array
+          });
+        }
+      },
+
+      uploadPhoto: async (input: PhotoUploadInput) => {
+        try {
+          set({ isLoadingPhotos: true, photoError: null });
+
+          // Validate file
+          const validation = imageCompressionService.validateImageFile(input.file);
+          if (!validation.valid) {
+            throw new Error(validation.error || 'Invalid file');
+          }
+
+          // Log warning if file is large
+          if (validation.warning) {
+            console.warn(`[AppStore] ${validation.warning}`);
+          }
+
+          // Parse tags from comma-separated string
+          const parsedTags = input.tags
+            ? input.tags
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0)
+                .filter((tag, index, arr) =>
+                  // Case-insensitive duplicate detection
+                  arr.findIndex(t => t.toLowerCase() === tag.toLowerCase()) === index
+                )
+                .slice(0, 10) // Max 10 tags
+                .map(tag => tag.slice(0, 50)) // Max 50 chars per tag
+            : [];
+
+          // Validate caption
+          const caption = input.caption?.slice(0, 500); // Max 500 chars
+
+          // Compress image
+          const compressionResult = await imageCompressionService.compressImage(input.file);
+
+          // Check storage quota before saving
+          const quotaInfo = await photoStorageService.estimateQuotaRemaining();
+
+          // Warn if 80% full (AC-4.1.9: Show UI notification)
+          if (quotaInfo.percentUsed >= 80 && quotaInfo.percentUsed < 95) {
+            const usedMB = (quotaInfo.used / 1024 / 1024).toFixed(2);
+            const quotaMB = (quotaInfo.quota / 1024 / 1024).toFixed(2);
+            const warningMessage = `Storage ${quotaInfo.percentUsed.toFixed(0)}% full (${usedMB}MB / ${quotaMB}MB). Consider deleting old photos.`;
+
+            set({ storageWarning: warningMessage });
+            console.warn(`[AppStore] ${warningMessage}`);
+          } else {
+            // Clear warning if under 80%
+            set({ storageWarning: null });
+          }
+
+          // Block if 95% full
+          if (quotaInfo.percentUsed >= 95) {
+            throw new Error('Storage full! Delete some photos to free up space.');
+          }
+
+          // Save to IndexedDB
+          const photo: Omit<Photo, 'id'> = {
+            imageBlob: compressionResult.blob,
+            caption,
+            tags: parsedTags,
+            uploadDate: new Date(),
+            originalSize: compressionResult.originalSize,
+            compressedSize: compressionResult.compressedSize,
+            width: compressionResult.width,
+            height: compressionResult.height,
+            mimeType: 'image/jpeg',
+          };
+
+          const savedPhoto = await photoStorageService.create(photo);
+
+          // Update state (optimistic UI update)
+          set(state => ({
+            photos: [savedPhoto, ...state.photos], // Add to beginning (newest first)
+            isLoadingPhotos: false,
+          }));
+
+          console.log(`[AppStore] Photo uploaded successfully, ID: ${savedPhoto.id}`);
+          return savedPhoto;
+        } catch (error) {
+          console.error('[AppStore] Failed to upload photo:', error);
+          set({
+            photoError: (error as Error).message || 'Failed to upload photo',
+            isLoadingPhotos: false
+          });
+          throw error; // Re-throw for UI error handling
+        }
+      },
+
+      getPhotoById: (photoId: number) => {
+        const { photos } = get();
+        return photos.find(p => p.id === photoId) || null;
+      },
+
+      getStorageUsage: async () => {
+        try {
+          const quotaInfo = await photoStorageService.estimateQuotaRemaining();
+          return {
+            used: quotaInfo.used,
+            quota: quotaInfo.quota,
+            percentUsed: quotaInfo.percentUsed,
+          };
+        } catch (error) {
+          console.error('[AppStore] Failed to get storage usage:', error);
+          // Return conservative defaults on error
+          return {
+            used: 0,
+            quota: 50 * 1024 * 1024, // 50MB
+            percentUsed: 0,
+          };
+        }
+      },
+
+      // AC-4.1.9: Clear storage warning
+      clearStorageWarning: () => {
+        set({ storageWarning: null });
+      },
+
+      // Gallery actions (Story 4.2)
+      // AC-4.2.7: Select photo for carousel view (Story 4.3 will render carousel)
+      selectPhoto: (photoId: number) => {
+        set({ selectedPhotoId: photoId });
+        console.log(`[AppStore] Selected photo for carousel: ${photoId}`);
       },
     }),
     {

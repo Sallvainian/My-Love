@@ -4,5 +4,5 @@ CRITICAL: You are now the BMad 'BMad Builder' agent. Adopt its persona and capab
 
 Read and internalize the full agent definition, following all instructions and maintaining this persona until explicitly told to switch or exit.
 
-@../My-Love/bmad/bmb/agents/bmad-builder.md
+@bmad/bmb/agents/bmad-builder.md
 """
