@@ -162,17 +162,21 @@ export function getPreviousMessage(
 
 /**
  * Calculate which day of the relationship it is
+ * @param startDate - Relationship start date
+ * @param targetDate - Optional target date (defaults to today)
  */
-export function getDaysSinceStart(startDate: Date): number {
-  const today = new Date();
-  return Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+export function getDaysSinceStart(startDate: Date, targetDate?: Date): number {
+  const endDate = targetDate || new Date();
+  return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /**
  * Format the relationship duration
+ * @param startDate - Relationship start date
+ * @param targetDate - Optional target date (defaults to today)
  */
-export function formatRelationshipDuration(startDate: Date): string {
-  const days = getDaysSinceStart(startDate);
+export function formatRelationshipDuration(startDate: Date, targetDate?: Date): string {
+  const days = getDaysSinceStart(startDate, targetDate);
 
   if (days < 30) {
     return `${days} ${days === 1 ? 'day' : 'days'}`;

@@ -35,14 +35,14 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const handleDragEnd = (_event: any, info: PanInfo) => {
     const threshold = 50; // 50px swipe threshold
 
-    if (info.offset.x < -threshold && canNavigateBack()) {
-      // Swipe left → navigate to previous message
+    if (info.offset.x < -threshold && canNavigateForward()) {
+      // Swipe left → navigate forward (toward today/newer messages)
       setDirection('left');
-      navigateToPreviousMessage();
-    } else if (info.offset.x > threshold && canNavigateForward()) {
-      // Swipe right → navigate to next message (toward today)
-      setDirection('right');
       navigateToNextMessage();
+    } else if (info.offset.x > threshold && canNavigateBack()) {
+      // Swipe right → navigate back (to older messages)
+      setDirection('right');
+      navigateToPreviousMessage();
     }
   };
 
@@ -125,8 +125,15 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   }
 
   const startDate = new Date(settings.relationship.startDate);
-  const daysTogether = getDaysSinceStart(startDate);
-  const durationText = formatRelationshipDuration(startDate);
+  
+  // BUG FIX: Calculate day number based on history navigation position
+  // When viewing past messages (currentIndex > 0), adjust the date calculation
+  const today = new Date();
+  const adjustedDate = new Date(today);
+  adjustedDate.setDate(today.getDate() - messageHistory.currentIndex);
+  
+  const daysTogether = getDaysSinceStart(startDate, adjustedDate);
+  const durationText = formatRelationshipDuration(startDate, adjustedDate);
 
   const handleFavorite = async () => {
     setShowHearts(true);

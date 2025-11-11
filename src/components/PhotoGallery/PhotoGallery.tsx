@@ -25,7 +25,7 @@ const SCROLL_THRESHOLD = 200; // pixels from bottom to trigger load
  * - Lazy loading pagination with Intersection Observer
  */
 export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
-  const { selectPhoto } = useAppStore();
+  const { selectPhoto, photos: storePhotos } = useAppStore();
 
   // AC-4.2.4: Pagination state
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -88,6 +88,33 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       cancelled = true;
     };
   }, []); // Run once on mount
+
+  // BUG FIX: Refresh gallery when store photos change (after upload)
+  // This fixes the issue where uploaded photos don't appear until page refresh
+  useEffect(() => {
+    // Skip if we haven't loaded once yet (initial load handles this)
+    if (!hasLoadedOnce) return;
+
+    // Check if store has more photos than local state (new upload detected)
+    if (storePhotos.length > photos.length) {
+      console.log('[PhotoGallery] New photos detected in store, refreshing gallery...');
+
+      // Refresh the gallery to show new photos
+      const refreshGallery = async () => {
+        try {
+          const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
+          setPhotos(firstPage);
+          setCurrentOffset(firstPage.length);
+          setHasMore(firstPage.length === PHOTOS_PER_PAGE);
+          console.log(`[PhotoGallery] Gallery refreshed with ${firstPage.length} photos`);
+        } catch (error) {
+          console.error('[PhotoGallery] Failed to refresh gallery:', error);
+        }
+      };
+
+      refreshGallery();
+    }
+  }, [storePhotos.length, photos.length, hasLoadedOnce]); // Watch store photo count
 
   // AC-4.2.4: Load next page of photos
   const loadMorePhotos = useCallback(async () => {
