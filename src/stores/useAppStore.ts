@@ -106,6 +106,7 @@ interface AppState {
 
   // Gallery actions (Story 4.2)
   selectPhoto: (photoId: number) => void; // AC-4.2.7: Select photo for carousel view
+  clearPhotoSelection: () => void; // AC-4.3.5: Close carousel, return to gallery (Story 4.3)
 }
 
 // Initialization guards to prevent concurrent/duplicate initialization (StrictMode protection)
@@ -968,6 +969,12 @@ export const useAppStore = create<AppState>()(
       selectPhoto: (photoId: number) => {
         set({ selectedPhotoId: photoId });
         console.log(`[AppStore] Selected photo for carousel: ${photoId}`);
+      },
+
+      // Story 4.3: AC-4.3.5 - Close carousel and return to gallery
+      clearPhotoSelection: () => {
+        set({ selectedPhotoId: null });
+        console.log('[AppStore] Cleared photo selection - carousel closed');
       },
     }),
     {

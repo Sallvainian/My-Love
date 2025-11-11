@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoGallery } from './components/PhotoGallery/PhotoGallery';
+import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
 import { applyTheme } from './utils/themes';
 import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
@@ -164,6 +165,9 @@ function App() {
           isOpen={isPhotoUploadOpen}
           onClose={() => setIsPhotoUploadOpen(false)}
         />
+
+        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected */}
+        <PhotoCarousel />
       </div>
     </ErrorBoundary>
   );

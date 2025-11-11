@@ -354,7 +354,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                           onClick={handleUpload}
                           disabled={!isFormValid}
                           className="flex items-center gap-2 px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          data-testid="photo-upload-submit"
+                          data-testid="photo-upload-submit-button"
                         >
                           <Upload className="w-5 h-5" />
                           Upload
