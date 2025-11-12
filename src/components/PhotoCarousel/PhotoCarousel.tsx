@@ -2,11 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoCarouselControls } from './PhotoCarouselControls';
+import { PhotoEditModal } from '../PhotoEditModal/PhotoEditModal';
+import { PhotoDeleteConfirmation } from '../PhotoDeleteConfirmation/PhotoDeleteConfirmation';
 
 /**
  * Photo Carousel Component
  * Story 4.3: Full-screen lightbox carousel with swipe/keyboard navigation
- * 
+ * Story 4.4: AC-4.4.1-AC-4.4.7 - Edit and delete photo functionality
+ *
  * Features:
  * - AC-4.3.1: Opens from PhotoGallery when photo is tapped (selectedPhotoId !== null)
  * - AC-4.3.2: Swipe left/right navigation with 300ms spring transitions
@@ -16,17 +19,30 @@ import { PhotoCarouselControls } from './PhotoCarouselControls';
  * - AC-4.3.6: Keyboard navigation (ArrowLeft, ArrowRight, Escape)
  * - AC-4.3.7: Framer Motion spring animations (stiffness: 300, damping: 30)
  * - AC-4.3.9: Drag constraints prevent over-scroll at boundaries
+ * - AC-4.4.1: Edit button opens PhotoEditModal
+ * - AC-4.4.4: Delete button opens PhotoDeleteConfirmation
  */
 export function PhotoCarousel() {
-  const { photos, selectedPhotoId, selectPhoto, clearPhotoSelection } = useAppStore();
-  
+  const {
+    photos,
+    selectedPhotoId,
+    selectPhoto,
+    clearPhotoSelection,
+    updatePhoto,
+    deletePhoto,
+  } = useAppStore();
+
   // Find current photo index based on selectedPhotoId
   const currentIndex = photos.findIndex(p => p.id === selectedPhotoId);
   const currentPhoto = photos[currentIndex];
-  
+
   // Navigation state
   const [direction, setDirection] = useState<'left' | 'right'>('left');
   const [imageUrl, setImageUrl] = useState<string>('');
+
+  // Story 4.4: Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   
   // AC-4.3.3 & Task 6: Blob URL management (cleanup to prevent memory leaks)
   useEffect(() => {
@@ -83,6 +99,11 @@ export function PhotoCarousel() {
   // AC-4.3.6: Keyboard navigation (ArrowLeft, ArrowRight, Escape)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't handle keyboard events when modals are open
+      if (isEditModalOpen || isDeleteConfirmOpen) {
+        return;
+      }
+
       if (event.key === 'ArrowRight') {
         event.preventDefault();
         navigateToNext();
@@ -94,14 +115,31 @@ export function PhotoCarousel() {
         clearPhotoSelection();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [navigateToNext, navigateToPrev, clearPhotoSelection]);
-  
+  }, [navigateToNext, navigateToPrev, clearPhotoSelection, isEditModalOpen, isDeleteConfirmOpen]);
+
+  // Story 4.4: Modal handlers
+  const handleOpenEditModal = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+  };
+
+  const handleOpenDeleteConfirm = () => {
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleCloseDeleteConfirm = () => {
+    setIsDeleteConfirmOpen(false);
+  };
+
   // AC-4.3.9: Dynamic drag constraints based on current position
   const dragConstraints = {
     left: currentIndex === photos.length - 1 ? 0 : -100,
@@ -128,6 +166,8 @@ export function PhotoCarousel() {
       {/* AC-4.3.8: Top controls bar */}
       <PhotoCarouselControls
         onClose={clearPhotoSelection}
+        onEdit={handleOpenEditModal}
+        onDelete={handleOpenDeleteConfirm}
         currentIndex={currentIndex}
         totalPhotos={photos.length}
       />
@@ -195,6 +235,24 @@ export function PhotoCarousel() {
           ← → Arrow keys or swipe to navigate • Esc to close • ↓ Swipe down to close
         </p>
       </div>
+
+      {/* Story 4.4: AC-4.4.1, AC-4.4.2, AC-4.4.3 - Photo Edit Modal */}
+      {isEditModalOpen && (
+        <PhotoEditModal
+          photo={currentPhoto}
+          onClose={handleCloseEditModal}
+          onSave={updatePhoto}
+        />
+      )}
+
+      {/* Story 4.4: AC-4.4.4, AC-4.4.5 - Photo Delete Confirmation */}
+      {isDeleteConfirmOpen && (
+        <PhotoDeleteConfirmation
+          photo={currentPhoto}
+          onClose={handleCloseDeleteConfirm}
+          onConfirmDelete={deletePhoto}
+        />
+      )}
     </div>
   );
 }
