@@ -39,6 +39,9 @@ interface AppState {
   // Navigation state (Story 3.2)
   currentDayOffset: number; // 0 = today, 1 = yesterday, 2 = 2 days ago, etc.
 
+  // View navigation state (Story 4.5)
+  currentView: 'home' | 'photos';
+
   // Custom message state (Story 3.4)
   customMessages: CustomMessage[];
   customMessagesLoaded: boolean;
@@ -76,6 +79,11 @@ interface AppState {
   navigateToNextMessage: () => void;
   canNavigateBack: () => boolean;
   canNavigateForward: () => boolean;
+
+  // View navigation actions (Story 4.5)
+  setView: (view: 'home' | 'photos', skipHistory?: boolean) => void;
+  navigateHome: () => void;
+  navigatePhotos: () => void;
 
   // Custom message actions (Story 3.5: Async with IndexedDB)
   loadCustomMessages: () => Promise<void>;
@@ -191,6 +199,7 @@ export const useAppStore = create<AppState>()(
       },
       currentMessage: null,
       currentDayOffset: 0, // @deprecated Story 3.3: Use messageHistory.currentIndex instead
+      currentView: 'home', // Story 4.5: View navigation ('home' | 'photos')
       customMessages: [],
       customMessagesLoaded: false,
       // Story 4.1: Photo state
@@ -1049,6 +1058,28 @@ export const useAppStore = create<AppState>()(
       clearPhotoSelection: () => {
         set({ selectedPhotoId: null });
         console.log('[AppStore] Cleared photo selection - carousel closed');
+      },
+
+      // Story 4.5: View navigation actions
+      // AC-4.5.5, AC-4.5.6: Update view and browser history
+      setView: (view: 'home' | 'photos', skipHistory = false) => {
+        set({ currentView: view });
+
+        // Update browser URL if not skipping history (prevents loops during popstate)
+        if (!skipHistory) {
+          const path = view === 'home' ? '/' : '/photos';
+          window.history.pushState({ view }, '', path);
+          console.log(`[AppStore] View changed to '${view}', URL: ${path}`);
+        }
+      },
+
+      // Convenience actions
+      navigateHome: () => {
+        get().setView('home');
+      },
+
+      navigatePhotos: () => {
+        get().setView('photos');
       },
     }),
     {

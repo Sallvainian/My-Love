@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: '/My-Love/',
+export default defineConfig(({ mode }) => ({
+  // Use base path only for production (GitHub Pages), not for development/testing
+  base: mode === 'production' ? '/My-Love/' : '/',
   plugins: [
     react(),
     VitePWA({
@@ -62,4 +63,4 @@ export default defineConfig({
       }
     })
   ],
-})
+}))

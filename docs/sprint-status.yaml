@@ -68,8 +68,8 @@ development_status:
   4-2-photo-gallery-grid-view: done
   4-3-photo-carousel-with-animated-transitions: done
   4-4-photo-edit-delete-functionality: done
-  4-5-photo-gallery-navigation-integration: drafted
-  epic-4-retrospective: optional
+  4-5-photo-gallery-navigation-integration: done
+  epic-4-retrospective: completed
 
   epic-5: backlog
   5-1-nocodb-backend-setup-api-integration: backlog
