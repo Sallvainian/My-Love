@@ -248,6 +248,16 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           )}
         </div>
       )}
+
+      {/* Floating action button (FAB) for uploading more photos */}
+      <button
+        onClick={onUploadClick}
+        className="fixed bottom-20 right-4 w-14 h-14 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-10"
+        aria-label="Upload photo"
+        data-testid="photo-gallery-upload-fab"
+      >
+        <Camera className="w-6 h-6" />
+      </button>
     </div>
   );
 }
