@@ -67,7 +67,7 @@ development_status:
   4-1-photo-upload-storage: done
   4-2-photo-gallery-grid-view: done
   4-3-photo-carousel-with-animated-transitions: done
-  4-4-photo-edit-delete-functionality: review  # READY FOR RE-REVIEW: Checkboxes updated, spinner added per review recommendations
+  4-4-photo-edit-delete-functionality: done
   4-5-photo-gallery-navigation-integration: backlog
   epic-4-retrospective: optional
 
