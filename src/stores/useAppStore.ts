@@ -104,6 +104,10 @@ interface AppState {
   getStorageUsage: () => Promise<{ used: number; quota: number; percentUsed: number }>;
   clearStorageWarning: () => void; // AC-4.1.9: Clear storage warning
 
+  // Photo edit/delete actions (Story 4.4)
+  updatePhoto: (photoId: number, updates: { caption?: string; tags: string[] }) => Promise<void>;
+  deletePhoto: (photoId: number) => Promise<void>;
+
   // Gallery actions (Story 4.2)
   selectPhoto: (photoId: number) => void; // AC-4.2.7: Select photo for carousel view
   clearPhotoSelection: () => void; // AC-4.3.5: Close carousel, return to gallery (Story 4.3)
@@ -962,6 +966,76 @@ export const useAppStore = create<AppState>()(
       // AC-4.1.9: Clear storage warning
       clearStorageWarning: () => {
         set({ storageWarning: null });
+      },
+
+      // Story 4.4: Photo edit/delete actions
+      // AC-4.4.3: Update photo caption and/or tags
+      updatePhoto: async (photoId: number, updates: { caption?: string; tags: string[] }) => {
+        try {
+          // Update in IndexedDB
+          await photoStorageService.update(photoId, updates);
+
+          // Update in state (find photo by ID and replace with updated version)
+          set(state => ({
+            photos: state.photos.map(photo =>
+              photo.id === photoId
+                ? { ...photo, ...updates }
+                : photo
+            ),
+          }));
+
+          console.log(`[AppStore] Photo ${photoId} updated successfully`);
+        } catch (error) {
+          console.error(`[AppStore] Failed to update photo ${photoId}:`, error);
+          throw error; // Re-throw for UI error handling
+        }
+      },
+
+      // Story 4.4: AC-4.4.5, AC-4.4.7 - Delete photo with navigation logic
+      deletePhoto: async (photoId: number) => {
+        try {
+          const { photos, selectedPhotoId } = get();
+
+          // Find current photo index before deletion
+          const currentIndex = photos.findIndex(p => p.id === photoId);
+          const photosCount = photos.length;
+
+          // Delete from IndexedDB
+          await photoStorageService.delete(photoId);
+
+          // Update state (filter out deleted photo)
+          set(state => ({
+            photos: state.photos.filter(photo => photo.id !== photoId),
+          }));
+
+          console.log(`[AppStore] Photo ${photoId} deleted successfully`);
+
+          // AC-4.4.7: Navigation logic after delete (only if deleted photo was selected)
+          if (selectedPhotoId === photoId) {
+            const remainingPhotosCount = photosCount - 1;
+
+            if (remainingPhotosCount === 0) {
+              // No photos left → close carousel
+              get().clearPhotoSelection();
+              console.log('[AppStore] Last photo deleted - closing carousel');
+            } else if (currentIndex < remainingPhotosCount) {
+              // Not last photo → navigate to same index (which is now next photo)
+              const updatedPhotos = photos.filter(p => p.id !== photoId);
+              const nextPhoto = updatedPhotos[currentIndex];
+              get().selectPhoto(nextPhoto.id);
+              console.log(`[AppStore] Navigated to next photo: ${nextPhoto.id}`);
+            } else {
+              // Was last photo → navigate to new last photo (previous photo)
+              const updatedPhotos = photos.filter(p => p.id !== photoId);
+              const prevPhoto = updatedPhotos[remainingPhotosCount - 1];
+              get().selectPhoto(prevPhoto.id);
+              console.log(`[AppStore] Navigated to previous photo: ${prevPhoto.id}`);
+            }
+          }
+        } catch (error) {
+          console.error(`[AppStore] Failed to delete photo ${photoId}:`, error);
+          throw error; // Re-throw for UI error handling
+        }
       },
 
       // Gallery actions (Story 4.2)

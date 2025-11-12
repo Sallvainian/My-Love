@@ -2,6 +2,8 @@ import { Edit, Trash2, X } from 'lucide-react';
 
 interface PhotoCarouselControlsProps {
   onClose: () => void;
+  onEdit: () => void;    // Story 4.4: AC-4.4.1
+  onDelete: () => void;  // Story 4.4: AC-4.4.4
   currentIndex: number;
   totalPhotos: number;
 }
@@ -9,16 +11,19 @@ interface PhotoCarouselControlsProps {
 /**
  * Photo Carousel Controls Component
  * Story 4.3: AC-4.3.8 - Top bar with Edit/Delete/Close buttons
- * 
+ * Story 4.4: AC-4.4.1, AC-4.4.4 - Enable Edit/Delete buttons
+ *
  * Features:
- * - Edit button (Pencil icon) - disabled placeholder for Story 4.4
- * - Delete button (Trash icon) - disabled placeholder for Story 4.4
+ * - Edit button (Pencil icon) - functional (Story 4.4)
+ * - Delete button (Trash icon) - functional (Story 4.4)
  * - Close button (X icon) - functional
  * - Photo counter (current/total)
  * - Semi-transparent backdrop for readability
  */
 export function PhotoCarouselControls({
   onClose,
+  onEdit,
+  onDelete,
   currentIndex,
   totalPhotos,
 }: PhotoCarouselControlsProps) {
@@ -35,30 +40,30 @@ export function PhotoCarouselControls({
         
         {/* Center/Right: Action buttons */}
         <div className="flex items-center gap-2">
-          {/* AC-4.3.8: Edit button - disabled (Story 4.4) */}
+          {/* Story 4.4: AC-4.4.1 - Edit button (functional) */}
           <button
-            disabled
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 text-gray-400
-                       opacity-50 cursor-not-allowed"
-            title="Coming in Story 4.4"
+            onClick={onEdit}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white
+                       hover:bg-blue-700 transition-colors"
+            aria-label="Edit photo caption and tags"
             data-testid="photo-carousel-edit-button"
           >
             <Edit className="w-4 h-4" />
             <span className="text-sm">Edit</span>
           </button>
-          
-          {/* AC-4.3.8: Delete button - disabled (Story 4.4) */}
+
+          {/* Story 4.4: AC-4.4.4 - Delete button (functional) */}
           <button
-            disabled
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 text-gray-400
-                       opacity-50 cursor-not-allowed"
-            title="Coming in Story 4.4"
+            onClick={onDelete}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 text-white
+                       hover:bg-gray-600 transition-colors"
+            aria-label="Delete this photo"
             data-testid="photo-carousel-delete-button"
           >
             <Trash2 className="w-4 h-4" />
             <span className="text-sm">Delete</span>
           </button>
-          
+
           {/* AC-4.3.5: Close button - functional */}
           <button
             onClick={onClose}

@@ -4,7 +4,9 @@ globs:
 alwaysApply: false
 ---
 
-<task id="bmad/core/tasks/adv-elicit.xml" name="Advanced Elicitation" standalone="true">
+<task id=".bmad/core/tasks/adv-elicit.xml" name="Advanced Elicitation" standalone="true"
+  methods="{project-root}/.bmad/core/tasks/adv-elicit-methods.csv"
+  agent-party="{project-root}/.bmad/_cfg/agent-manifest.csv">
   <llm critical="true">
     <i>MANDATORY: Execute ALL steps in the flow section IN EXACT ORDER</i>
     <i>DO NOT skip steps or change the sequence</i>
@@ -15,7 +17,7 @@ alwaysApply: false
 
   <integration description="When called from workflow">
     <desc>When called during template workflow processing:</desc>
-    <i>1. Receive the current section content that was just generated</i>
+    <i>1. Receive or review the current section content that was just generated or</i>
     <i>2. Apply elicitation methods iteratively to enhance that specific content</i>
     <i>3. Return the enhanced version back when user selects 'x' to proceed and return back</i>
     <i>4. The enhanced content replaces the original section content in the output document</i>
@@ -23,7 +25,7 @@ alwaysApply: false
 
   <flow>
     <step n="1" title="Method Registry Loading">
-      <action>Load and read {project-root}/core/tasks/adv-elicit-methods.csv</action>
+      <action>Load and read {{methods}} and {{agent-party}}</action>
 
       <csv-structure>
         <i>category: Method grouping (core, structural, risk, etc.)</i>
