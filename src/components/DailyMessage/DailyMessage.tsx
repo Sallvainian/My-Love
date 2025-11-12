@@ -160,7 +160,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto px-4 py-8" data-testid="daily-message-container">
+    <div className="relative w-full max-w-2xl mx-auto px-4 py-8" data-testid="daily-message">
       {/* Floating hearts animation */}
       <AnimatePresence>
         {showHearts && (

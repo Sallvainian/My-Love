@@ -4,6 +4,7 @@ import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { TopNavigation } from './components/TopNavigation/TopNavigation';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoGallery } from './components/PhotoGallery/PhotoGallery';
@@ -17,7 +18,7 @@ const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
 const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
 
 function App() {
-  const { settings, initializeApp, isLoading } = useAppStore();
+  const { settings, initializeApp, isLoading, currentView, setView } = useAppStore();
   const hasInitialized = useRef(false);
 
   // Helper function to check if welcome splash should be shown
@@ -44,17 +45,35 @@ function App() {
 
   const [showSplash, setShowSplash] = useState(shouldShowWelcome);
   const [showAdmin, setShowAdmin] = useState(false);
-
-  // Story 4.1/4.2: Photo gallery navigation state
-  const [currentView, setCurrentView] = useState<'home' | 'photos'>('home');
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
 
-  // Check URL for admin route on mount
+  // Story 4.5: Initial route detection and popstate listener (AC-4.5.5, AC-4.5.6)
   useEffect(() => {
+    // Check admin route
     if (window.location.pathname.includes('/admin')) {
       setShowAdmin(true);
+      return; // Don't set up navigation listeners for admin panel
     }
-  }, []);
+
+    // AC-4.5.5: Initial route detection - set view based on URL
+    const initialPath = window.location.pathname;
+    const initialView = initialPath === '/photos' ? 'photos' : 'home';
+    setView(initialView, true); // Skip history update on initial load
+
+    // AC-4.5.6: Browser back/forward button support
+    const handlePopState = () => {
+      const pathname = window.location.pathname;
+      const view = pathname === '/photos' ? 'photos' : 'home';
+      setView(view, true); // Skip history update to prevent loop
+      console.log(`[App] Popstate: navigated to ${view}`);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [setView]);
 
   useEffect(() => {
     // Initialize the app on mount (useRef ensures single init even in StrictMode)
@@ -144,11 +163,14 @@ function App() {
     );
   }
 
-  // Story 1.4 & 4.1/4.2: Render home or photos view based on navigation
+  // Story 1.4 & 4.1/4.2/4.5: Render home or photos view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen pb-16">
-        {/* Conditional view rendering */}
+      <div className="min-h-screen pt-16 pb-16">
+        {/* Story 4.5: Top navigation bar - AC-4.5.1, AC-4.5.2 */}
+        <TopNavigation />
+
+        {/* Story 4.5: AC-4.5.3 - Conditional view rendering */}
         {currentView === 'home' && (
           <DailyMessage onShowWelcome={showWelcomeManually} />
         )}
@@ -157,8 +179,8 @@ function App() {
           <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
         )}
 
-        {/* Bottom navigation - Story 4.1 */}
-        <BottomNavigation currentView={currentView} onViewChange={setCurrentView} />
+        {/* Bottom navigation - Story 4.1 (kept for mobile UX) */}
+        <BottomNavigation currentView={currentView} onViewChange={setView} />
 
         {/* Photo upload modal - Story 4.1 */}
         <PhotoUpload
