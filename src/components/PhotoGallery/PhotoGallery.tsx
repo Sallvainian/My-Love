@@ -25,7 +25,7 @@ const SCROLL_THRESHOLD = 200; // pixels from bottom to trigger load
  * - Lazy loading pagination with Intersection Observer
  */
 export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
-  const { selectPhoto, photos: storePhotos } = useAppStore();
+  const { selectPhoto, photos: storePhotos, loadPhotos } = useAppStore();
 
   // AC-4.2.4: Pagination state
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -64,6 +64,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         setHasLoadedOnce(true);
         setIsLoading(false);
 
+        // BUGFIX: Load photos into store so PhotoCarousel can access them
+        await loadPhotos();
+
         console.log(`[PhotoGallery] Loaded initial ${firstPage.length} photos, hasLoadedOnce=true, isLoading=false`);
       } catch (error) {
         console.log('[PhotoGallery] loadInitialPhotos: Error, cancelled=', cancelled);
@@ -87,7 +90,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       console.log('[PhotoGallery] Cleanup: Setting cancelled=true');
       cancelled = true;
     };
-  }, []); // Run once on mount
+  }, [loadPhotos]); // Run once on mount
 
   // BUG FIX: Refresh gallery when store photos change (after upload)
   // This fixes the issue where uploaded photos don't appear until page refresh
