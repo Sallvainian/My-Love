@@ -44,6 +44,8 @@ export default defineConfig(({ mode }) => ({
       // No navigateFallbackDenylist or exclusions needed for IndexedDB.
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
