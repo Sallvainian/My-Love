@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic 5 - UI Mockups | My-Love PWA</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: linear-gradient(135deg, #ffeef8 0%, #ffe0f0 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(255, 105, 180, 0.2);
+        }
+
+        h1 {
+            color: #ff69b4;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(255, 105, 180, 0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        nav {
+            background: #fff0f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 40px;
+            border: 2px solid #ffb6c1;
+        }
+
+        nav h2 {
+            color: #ff69b4;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        nav ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+        }
+
+        nav a {
+            color: #ff1493;
+            text-decoration: none;
+            padding: 10px;
+            display: block;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        nav a:hover {
+            background: #ffe4e9;
+            transform: translateX(5px);
+        }
+
+        .story-section {
+            margin-bottom: 60px;
+            padding: 30px;
+            background: #fffbfe;
+            border-radius: 15px;
+            border-left: 5px solid #ff69b4;
+        }
+
+        .story-section h2 {
+            color: #ff1493;
+            margin-bottom: 20px;
+            font-size: 2em;
+            border-bottom: 3px solid #ffb6c1;
+            padding-bottom: 10px;
+        }
+
+        .mockup {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .mockup h3 {
+            color: #ff69b4;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            line-height: 1.4;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .design-notes {
+            background: #fff9e6;
+            border-left: 4px solid #ffd700;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .design-notes h4 {
+            color: #ff8c00;
+            margin-bottom: 10px;
+        }
+
+        .summary {
+            background: #e6f7ff;
+            border-left: 4px solid #1890ff;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        .summary h3 {
+            color: #0066cc;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #ffb6c1;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            pre {
+                font-size: 0.7em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💕 Epic 5: UI Mockups 💕</h1>
+        <p class="subtitle">Interactive Connection Features - My-Love PWA</p>
+
+        <nav>
+            <h2>📑 Table of Contents</h2>
+            <ul>
+                <li><a href="#story-5-2">Story 5.2: Mood Tracking UI</a></li>
+                <li><a href="#story-5-3">Story 5.3: Mood History Calendar</a></li>
+                <li><a href="#story-5-4">Story 5.4: Partner Mood Visibility</a></li>
+                <li><a href="#story-5-5">Story 5.5: Poke & Kiss Interactions</a></li>
+                <li><a href="#story-5-6">Story 5.6: Anniversary Countdown Timers</a></li>
+                <li><a href="#design-rationale">Design Rationale Summary</a></li>
+            </ul>
+        </nav>
+
+        <!-- Story 5.2 -->
+        <section id="story-5-2" class="story-section">
+            <h2>Story 5.2: Mood Tracking UI</h2>
+
+            <div class="mockup">
+                <h3>Variation 1: Main Mood Tab View (Empty State)</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |  <- Top bar
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [*Mood*] [Admin]      |  |  <- Tab navigation
+|  +--------------------------------------------+  |
+|                                                  |
+|              Track Your Mood Today               |
+|                                                  |
+|         How are you feeling right now?           |
+|                                                  |
+|    +--------+ +--------+ +--------+ +--------+  |
+|    |   ♥♥   | |  😊   | |  😌   | |  🤔   |  |
+|    | Loved  | | Happy  | |Content | |Thought-|  |
+|    |        | |        | |        | |  ful   |  |
+|    +--------+ +--------+ +--------+ +--------+  |
+|                                                  |
+|                  +--------+                      |
+|                  |  🙏   |                      |
+|                  |Grateful|                      |
+|                  +--------+                      |
+|                                                  |
+|    +------------------------------------------+  |
+|    | Add a note (optional, max 200 chars)... |  |
+|    +------------------------------------------+  |
+|                                                  |
+|           [ Save Mood ]  [ Cancel ]             |
+|                                                  |
+|    📱 Ready to sync when online                 |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 2: Mood Selected with Note</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [*Mood*] [Admin]      |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|              Track Your Mood Today               |
+|                                                  |
+|         How are you feeling right now?           |
+|                                                  |
+|    +--------+ +========+ +--------+ +--------+  |
+|    |   ♥♥   | ‖  😊   ‖ |  😌   | |  🤔   |  |  <- Happy selected
+|    | Loved  | ‖ Happy  ‖ |Content | |Thought-|  |
+|    |        | ‖  ✓    ‖ |        | |  ful   |  |
+|    +--------+ +========+ +--------+ +--------+  |
+|                                                  |
+|                  +--------+                      |
+|                  |  🙏   |                      |
+|                  |Grateful|                      |
+|                  +--------+                      |
+|                                                  |
+|    +------------------------------------------+  |
+|    | Feeling great after our morning call!    |  |
+|    | Love you so much 💕                     |  |
+|    +------------------------------------------+  |
+|                                                  |
+|           [* Save Mood *]  [ Cancel ]           |
+|                                                  |
+|    ✅ Saved successfully!                        |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 3: Mobile Compact View</h3>
+                <pre>+------------------------+
+| ♥ My Love         [≡] |
++------------------------+
+| [Msg][Pht][*Md*][Adm] |
++------------------------+
+|   Today's Mood?        |
+|                        |
+| [♥♥] [😊] [😌]       |
+| Loved Happy Content    |
+|                        |
+|    [🤔]    [🙏]       |
+| Thoughtful Grateful    |
+|                        |
+| +--------------------+ |
+| | Note (optional)... | |
+| +--------------------+ |
+|                        |
+|    [ Save Mood ]       |
+|                        |
+| 🔄 Offline - will sync |
++------------------------+</pre>
+            </div>
+
+            <div class="design-notes">
+                <h4>Design Notes</h4>
+                <p><strong>Approach:</strong> Large, touch-friendly mood buttons with clear icons</p>
+                <p><strong>Strengths:</strong> Simple selection, optional notes, offline indicator</p>
+                <p><strong>Considerations:</strong> Mobile-first with clear visual hierarchy</p>
+            </div>
+        </section>
+
+        <!-- Story 5.3 -->
+        <section id="story-5-3" class="story-section">
+            <h2>Story 5.3: Mood History Calendar View</h2>
+
+            <div class="mockup">
+                <h3>Variation 1: Calendar View - Current Month</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [*Mood*] [Admin]      |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|        [<]  November 2025  [>]                  |
+|                                                  |
+|   Sun  Mon  Tue  Wed  Thu  Fri  Sat            |
+|   +--------------------------------------+      |
+|   |     |     |     |     |     | 1   | 2  |   |
+|   |     |     |     |     |     | 😊  | ♥♥ |   |
+|   +--------------------------------------+      |
+|   | 3   | 4   | 5   | 6   | 7   | 8   | 9  |   |
+|   | 😌  |     | 🙏  | 😊  | 😊  |     | ♥♥ |   |
+|   +--------------------------------------+      |
+|   | 10  | 11  |*12* | 13  | 14  | 15  | 16 |   |
+|   | 🤔  | 😌  |[😊] |     |     |     |     |   | <- Today highlighted
+|   +--------------------------------------+      |
+|   | 17  | 18  | 19  | 20  | 21  | 22  | 23 |   |
+|   |     |     |     |     |     |     |     |   |
+|   +--------------------------------------+      |
+|   | 24  | 25  | 26  | 27  | 28  | 29  | 30 |   |
+|   |     |     |     |     |     |     |     |   |
+|   +--------------------------------------+      |
+|                                                  |
+|   Legend: ♥♥ Loved | 😊 Happy | 😌 Content      |
+|          🤔 Thoughtful | 🙏 Grateful            |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 2: Date Detail View (Modal/Overlay)</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  |                                            |  |
+|  |        November 12, 2025 - Details         |  |
+|  |                                            |  |
+|  |    +------------------------------------+  |  |
+|  |    |            😊 Happy                |  |  |
+|  |    |                                    |  |  |
+|  |    | Time: 2:30 PM                     |  |  |
+|  |    |                                    |  |  |
+|  |    | Note:                             |  |  |
+|  |    | "Had an amazing lunch date         |  |  |
+|  |    | together! The new cafe was         |  |  |
+|  |    | perfect. Can't wait for our        |  |  |
+|  |    | weekend plans!"                    |  |  |
+|  |    |                                    |  |  |
+|  |    +------------------------------------+  |  |
+|  |                                            |  |
+|  |            [ Edit ]  [ Close ]             |  |
+|  |                                            |  |
+|  +--------------------------------------------+  |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 3: List View Alternative</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [*Mood*] [Admin]      |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|         November 2025 - Mood History            |
+|                                                  |
+|  [Calendar View] [*List View*]                  |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Nov 12 (Today)    😊 Happy                | |
+|  | "Had an amazing lunch date together!"      | |
+|  +--------------------------------------------+ |
+|  | Nov 11            😌 Content               | |
+|  | "Peaceful day working from home"           | |
+|  +--------------------------------------------+ |
+|  | Nov 10            🤔 Thoughtful            | |
+|  | "Planning our anniversary surprise"        | |
+|  +--------------------------------------------+ |
+|  | Nov 9             ♥♥ Loved                 | |
+|  | "Best date night ever!"                    | |
+|  +--------------------------------------------+ |
+|  | Nov 7             😊 Happy                 | |
+|  | No note                                    | |
+|  +--------------------------------------------+ |
+|                                                  |
+|              [ Load More ]                      |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="design-notes">
+                <h4>Design Notes</h4>
+                <p><strong>Approach:</strong> Traditional calendar grid with mood icons on dates</p>
+                <p><strong>Strengths:</strong> Quick visual overview, detail view on tap</p>
+                <p><strong>Considerations:</strong> Alternative list view for accessibility</p>
+            </div>
+        </section>
+
+        <!-- Story 5.4 -->
+        <section id="story-5-4" class="story-section">
+            <h2>Story 5.4: Partner Mood Visibility</h2>
+
+            <div class="mockup">
+                <h3>Variation 1: Admin View - Partner's Moods</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [Mood] [*Admin*]       |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|           Partner's Mood History                |
+|                                                  |
+|  User: Sarah (Girlfriend)    [🔄 Refresh]      |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Today, 3:45 PM                             | |
+|  | 😊 Happy                                   | |
+|  | "Excited for our dinner plans tonight!"    | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Yesterday, 8:20 AM                         | |
+|  | 😌 Content                                 | |
+|  | "Good morning! Feeling peaceful today"     | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Nov 10, 6:15 PM                            | |
+|  | ♥♥ Loved                                   | |
+|  | "You made my day with those flowers! 💐"   | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  📱 Online - Last synced 2 min ago             |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 2: Filter and Search View</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [Mood] [*Admin*]       |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|         Partner Mood Dashboard                  |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | 🔍 Search notes...              [Filter ▼] | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  Viewing: Sarah | Period: Last 7 days          |
+|                                                  |
+|  Mood Summary:                                 |
+|  ♥♥ Loved: 2 | 😊 Happy: 3 | 😌 Content: 2    |
+|                                                  |
+|  Recent Entries:                               |
+|  +--------------------------------------------+ |
+|  | Nov 12  😊  "Excited for dinner!"          | |
+|  | Nov 11  😌  "Peaceful morning"              | |
+|  | Nov 10  ♥♥  "Flowers made my day!"         | |
+|  | Nov 9   😊  "Great workout session"         | |
+|  | Nov 8   😊  "Productive day at work"        | |
+|  | Nov 7   😌  "Relaxing evening"              | |
+|  | Nov 6   ♥♥  "Our anniversary! 💕"          | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  🔄 Offline Mode - Will sync when connected    |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="design-notes">
+                <h4>Design Notes</h4>
+                <p><strong>Approach:</strong> Admin-only view with clear user indication</p>
+                <p><strong>Strengths:</strong> Chronological list, search/filter capabilities</p>
+                <p><strong>Considerations:</strong> Privacy-focused with explicit user labeling</p>
+            </div>
+        </section>
+
+        <!-- Story 5.5 -->
+        <section id="story-5-5" class="story-section">
+            <h2>Story 5.5: Poke & Kiss Interactions</h2>
+
+            <div class="mockup">
+                <h3>Variation 1: Top Navigation with Interaction Button</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love           [💋 Send Kiss]  [ ♥ ]    |  <- Kiss button added
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [Mood] [Admin]         |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|              Welcome Back!                      |
+|                                                  |
+|         Last interaction: 2 hours ago           |
+|         Sarah sent you a 💋 Kiss                |
+|                                                  |
+|    +------------------------------------------+ |
+|    |         Interaction Options              | |
+|    |                                          | |
+|    |    [ 💋 Send Kiss ]  [ 👉 Send Poke ]   | |
+|    |                                          | |
+|    +------------------------------------------+ |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 2: Notification Badge State</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love           [💋(1)]         [ ♥ ]    |  <- Badge shows 1 new
++--------------------------------------------------+
+|                                                  |
+|  ⚠️ New Kiss Received!                          |
+|  +--------------------------------------------+ |
+|  |                                            | |
+|  |        💋 Sarah sent you a kiss!           | |
+|  |              Just now                      | |
+|  |                                            | |
+|  |    [ 💋 Kiss Back ]  [ View History ]      | |
+|  |                                            | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  Recent Interactions:                           |
+|  +--------------------------------------------+ |
+|  | 10:30 AM  You → Sarah  👉 Poke             | |
+|  | 10:15 AM  Sarah → You  💋 Kiss             | |
+|  | 9:45 AM   You → Sarah  💋 Kiss              | |
+|  | Yesterday  Sarah → You  👉 Poke             | |
+|  +--------------------------------------------+ |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 3: Interaction Animation Screen</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|                                                  |
+|                    💋                            |
+|                   💋💋💋                         |  <- Animation indication
+|                  💋💋💋💋💋                       |
+|                 💋💋💋💋💋💋💋                     |
+|                    💋💋💋                         |
+|                     💋                           |
+|                                                  |
+|            Sending Kiss to Sarah...              |
+|                                                  |
+|                  ░░░░░░░░░░                     |  <- Progress bar
+|                                                  |
+|                                                  |
+|            Kiss sent successfully!               |
+|                                                  |
+|              [ Send Another ]                   |
+|              [ Back to Home ]                   |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 4: Interaction History View</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [Mood] [Admin]         |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|         Pokes & Kisses - Last 7 Days            |
+|                                                  |
+|  Stats: Sent 12 | Received 15                  |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Today                                      | |
+|  | 3:45 PM  Sarah → You  💋 Kiss              | |
+|  | 2:30 PM  You → Sarah  👉 Poke              | |
+|  | 10:15 AM Sarah → You  💋 Kiss              | |
+|  +--------------------------------------------+ |
+|  | Yesterday                                  | |
+|  | 9:00 PM  You → Sarah  💋 Kiss              | |
+|  | 7:30 PM  Sarah → You  👉 Poke              | |
+|  | 3:00 PM  You → Sarah  💋 Kiss              | |
+|  +--------------------------------------------+ |
+|  | Nov 10                                     | |
+|  | 8:00 PM  Sarah → You  💋 Kiss              | |
+|  | 6:45 PM  You → Sarah  👉 Poke              | |
+|  +--------------------------------------------+ |
+|                                                  |
+|    [ Send Kiss Now ]  [ Send Poke Now ]        |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="design-notes">
+                <h4>Design Notes</h4>
+                <p><strong>Approach:</strong> Prominent action buttons, notification badges</p>
+                <p><strong>Strengths:</strong> Quick access from top nav, visual feedback</p>
+                <p><strong>Considerations:</strong> Animation states for engagement</p>
+            </div>
+        </section>
+
+        <!-- Story 5.6 -->
+        <section id="story-5-6" class="story-section">
+            <h2>Story 5.6: Anniversary Countdown Timers</h2>
+
+            <div class="mockup">
+                <h3>Variation 1: Home View with Countdown Display</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [*Messages*] [Photos] [Mood] [Admin]       |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|    ╔════════════════════════════════════════╗  |
+|    ║     💕 Anniversary Countdown 💕        ║  |
+|    ║                                        ║  |
+|    ║         15 Days 08:24:36               ║  |
+|    ║     Until Our 2 Year Anniversary!      ║  |
+|    ╚════════════════════════════════════════╝  |
+|                                                  |
+|         Recent Messages                         |
+|  +--------------------------------------------+ |
+|  | Sarah: Can't wait for our anniversary! 💕  | |
+|  | You: Me too! Already planning surprises    | |
+|  | Sarah: You're the best! Love you          | |
+|  +--------------------------------------------+ |
+|                                                  |
+|    Other Countdowns:                           |
+|    • Valentine's Day - 94 days                 |
+|    • Sarah's Birthday - 127 days               |
+|                                                  |
+|            [ Manage Countdowns ]               |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 2: Countdown Settings/Management</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|  +--------------------------------------------+  |
+|  | [Messages] [Photos] [Mood] [*Admin*]       |  |
+|  +--------------------------------------------+  |
+|                                                  |
+|         Manage Anniversary Countdowns           |
+|                                                  |
+|  Active Countdowns:                            |
+|  +--------------------------------------------+ |
+|  | ⭐ 2 Year Anniversary                [Edit] | | <- Primary
+|  | Date: Nov 28, 2025                         | |
+|  | 15 days, 8 hours remaining                 | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Valentine's Day                      [Edit] | |
+|  | Date: Feb 14, 2026                         | |
+|  | 94 days remaining                           | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Sarah's Birthday                     [Edit] | |
+|  | Date: Mar 20, 2026                         | |
+|  | 127 days remaining                          | |
+|  +--------------------------------------------+ |
+|                                                  |
+|     [ + Add New Countdown ]                    |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 3: Add/Edit Countdown Form</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|         Add Anniversary Countdown               |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Event Name:                                | |
+|  | [First Date Anniversary              ]     | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Date:                                      | |
+|  | [12] / [25] / [2025]                       | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Time (optional):                           | |
+|  | [08] : [00] [PM]                           | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  [ ] Set as primary countdown                  |
+|  [ ] Show notification at zero                 |
+|  [ ] Auto-repeat yearly                        |
+|                                                  |
+|       [ Save Countdown ]  [ Cancel ]           |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 4: Celebration Animation (Countdown Reaches Zero)</h3>
+                <pre>+--------------------------------------------------+
+|  [<] My Love                            [ ♥ ]    |
++--------------------------------------------------+
+|                                                  |
+|              🎉 🎊 🎉 🎊 🎉                     |
+|                                                  |
+|     ╔════════════════════════════════════╗     |
+|     ║                                    ║     |
+|     ║   HAPPY 2 YEAR ANNIVERSARY!        ║     |
+|     ║                                    ║     |
+|     ║         💕 💑 💕                   ║     |
+|     ║                                    ║     |
+|     ║   Time to celebrate your love!     ║     |
+|     ║                                    ║     |
+|     ╚════════════════════════════════════╝     |
+|                                                  |
+|              🎈 🎁 💐 🎈                        |
+|                                                  |
+|     [ Send Anniversary Message ]                |
+|     [ View Anniversary Memories ]               |
+|     [ Set Next Countdown ]                      |
+|                                                  |
+|              Confetti falling...                | <- Animation note
+|              Hearts floating up...              |
+|                                                  |
++--------------------------------------------------+</pre>
+            </div>
+
+            <div class="mockup">
+                <h3>Variation 5: Mobile Responsive - Compact Countdown Widget</h3>
+                <pre>+------------------------+
+| ♥ My Love         [≡] |
++------------------------+
+|  Anniversary: 15d 8h   |
+|  ───────────────────   |
++------------------------+
+| [Msg][Pht][Mood][Adm] |
++------------------------+
+|                        |
+| 💕 Countdown Center    |
+|                        |
+| 2 Year Anniversary     |
+| ┌──────────────────┐   |
+| │ 15d : 08h : 24m  │   |
+| └──────────────────┘   |
+|                        |
+| Upcoming:              |
+| • Valentine's - 94d    |
+| • Birthday - 127d      |
+|                        |
+| [+ Add] [⚙️ Manage]    |
+|                        |
++------------------------+</pre>
+            </div>
+
+            <div class="design-notes">
+                <h4>Design Notes</h4>
+                <p><strong>Approach:</strong> Hero countdown display, management interface</p>
+                <p><strong>Strengths:</strong> Multiple countdown support, celebration state</p>
+                <p><strong>Considerations:</strong> Primary/secondary countdown hierarchy</p>
+            </div>
+        </section>
+
+        <!-- Design Rationale Summary -->
+        <section id="design-rationale" class="summary">
+            <h3>📐 Design Rationale Summary</h3>
+
+            <h4>Story 5.2: Mood Tracking UI</h4>
+            <ul>
+                <li><strong>Approach:</strong> Large, touch-friendly mood buttons with clear icons</li>
+                <li><strong>Strengths:</strong> Simple selection, optional notes, offline indicator</li>
+                <li><strong>Considerations:</strong> Mobile-first with clear visual hierarchy</li>
+            </ul>
+
+            <h4>Story 5.3: Mood History Calendar</h4>
+            <ul>
+                <li><strong>Approach:</strong> Traditional calendar grid with mood icons on dates</li>
+                <li><strong>Strengths:</strong> Quick visual overview, detail view on tap</li>
+                <li><strong>Considerations:</strong> Alternative list view for accessibility</li>
+            </ul>
+
+            <h4>Story 5.4: Partner Mood Visibility</h4>
+            <ul>
+                <li><strong>Approach:</strong> Admin-only view with clear user indication</li>
+                <li><strong>Strengths:</strong> Chronological list, search/filter capabilities</li>
+                <li><strong>Considerations:</strong> Privacy-focused with explicit user labeling</li>
+            </ul>
+
+            <h4>Story 5.5: Poke & Kiss Interactions</h4>
+            <ul>
+                <li><strong>Approach:</strong> Prominent action buttons, notification badges</li>
+                <li><strong>Strengths:</strong> Quick access from top nav, visual feedback</li>
+                <li><strong>Considerations:</strong> Animation states for engagement</li>
+            </ul>
+
+            <h4>Story 5.6: Anniversary Countdown Timers</h4>
+            <ul>
+                <li><strong>Approach:</strong> Hero countdown display, management interface</li>
+                <li><strong>Strengths:</strong> Multiple countdown support, celebration state</li>
+                <li><strong>Considerations:</strong> Primary/secondary countdown hierarchy</li>
+            </ul>
+
+            <p style="margin-top: 20px;">
+                <strong>Overall Design Philosophy:</strong> Each mockup prioritizes mobile usability while
+                maintaining the romantic pink theme and ensuring all UI elements are touch-friendly and
+                accessible. The designs emphasize clear information hierarchy and provide visual feedback
+                for all interactions.
+            </p>
+        </section>
+
+        <footer>
+            <p>💕 Generated for My-Love PWA - Epic 5: Interactive Connection Features 💕</p>
+            <p>Part of the BMAD development workflow</p>
+        </footer>
+    </div>
+</body>
+</html>

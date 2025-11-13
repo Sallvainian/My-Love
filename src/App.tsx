@@ -4,7 +4,6 @@ import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
-import { TopNavigation } from './components/TopNavigation/TopNavigation';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoGallery } from './components/PhotoGallery/PhotoGallery';
@@ -163,14 +162,11 @@ function App() {
     );
   }
 
-  // Story 1.4 & 4.1/4.2/4.5: Render home or photos view based on navigation
+  // Story 1.4 & 4.1/4.2: Render home or photos view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen pt-16 pb-16">
-        {/* Story 4.5: Top navigation bar - AC-4.5.1, AC-4.5.2 */}
-        <TopNavigation />
-
-        {/* Story 4.5: AC-4.5.3 - Conditional view rendering */}
+      <div className="min-h-screen pb-16">
+        {/* Conditional view rendering */}
         {currentView === 'home' && (
           <DailyMessage onShowWelcome={showWelcomeManually} />
         )}
@@ -179,7 +175,7 @@ function App() {
           <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
         )}
 
-        {/* Bottom navigation - Story 4.1 (kept for mobile UX) */}
+        {/* Bottom navigation */}
         <BottomNavigation currentView={currentView} onViewChange={setView} />
 
         {/* Photo upload modal - Story 4.1 */}
