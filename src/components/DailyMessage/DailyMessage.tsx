@@ -6,6 +6,7 @@ import { formatRelationshipDuration, getDaysSinceStart } from '../../utils/messa
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { APP_CONFIG } from '../../config/constants';
 import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
+import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
 
 interface DailyMessageProps {
   onShowWelcome?: () => void;
@@ -354,6 +355,18 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
       >
         Swipe left or right to see other messages
       </motion.div>
+
+      {/* Story 6.6: Anniversary Countdown Timer */}
+      {settings?.relationship.anniversaries && settings.relationship.anniversaries.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="mt-8"
+        >
+          <CountdownTimer anniversaries={settings.relationship.anniversaries} maxDisplay={3} />
+        </motion.div>
+      )}
 
       {/* Welcome message trigger button */}
       {onShowWelcome && <WelcomeButton onClick={onShowWelcome} />}

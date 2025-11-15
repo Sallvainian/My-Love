@@ -1,0 +1,395 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>0</storyId>
+    <title>Supabase Schema & RLS Foundation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/6-0-supabase-schema-rls-foundation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>to execute the Supabase database schema and Row Level Security policies</iWant>
+    <soThat>the mood tracking and interaction features have a functioning backend database</soThat>
+    <tasks>
+      <task id="1" status="pending">
+        <title>Execute Database Schema Migration (AC: #1, #2, #3)</title>
+        <subtasks>
+          <subtask>Open Supabase Dashboard → SQL Editor</subtask>
+          <subtask>Load migration script from docs/migrations/001_initial_schema.sql</subtask>
+          <subtask>Execute Users table creation SQL (Lines 15-21)</subtask>
+          <subtask>Execute Moods table creation SQL (Lines 33-47)</subtask>
+          <subtask>Execute Interactions table creation SQL (Lines 54-68)</subtask>
+          <subtask>Verify all 3 tables appear in Database → Tables view</subtask>
+          <subtask>Verify indexes created via SQL query</subtask>
+        </subtasks>
+      </task>
+      <task id="2" status="pending">
+        <title>Enable Row Level Security (AC: #4)</title>
+        <subtasks>
+          <subtask>Execute ALTER TABLE users ENABLE ROW LEVEL SECURITY</subtask>
+          <subtask>Execute ALTER TABLE moods ENABLE ROW LEVEL SECURITY</subtask>
+          <subtask>Execute ALTER TABLE interactions ENABLE ROW LEVEL SECURITY</subtask>
+          <subtask>Verify all tables show "RLS Enabled" in Dashboard</subtask>
+        </subtasks>
+      </task>
+      <task id="3" status="pending">
+        <title>Create RLS Policies for Users Table (AC: #5)</title>
+        <subtasks>
+          <subtask>Execute SELECT policy (lines 126-128)</subtask>
+          <subtask>Execute INSERT policy (lines 136-138)</subtask>
+          <subtask>Execute UPDATE policy (lines 131-133)</subtask>
+          <subtask>Verify 3 policies listed in Dashboard</subtask>
+        </subtasks>
+      </task>
+      <task id="4" status="pending">
+        <title>Create RLS Policies for Moods Table (AC: #6)</title>
+        <subtasks>
+          <subtask>Execute INSERT policy (lines 78-80)</subtask>
+          <subtask>Execute SELECT policy (lines 84-86)</subtask>
+          <subtask>Execute UPDATE policy (lines 89-91)</subtask>
+          <subtask>Execute DELETE policy (lines 94-96)</subtask>
+          <subtask>Verify 4 policies listed in Dashboard</subtask>
+        </subtasks>
+      </task>
+      <task id="5" status="pending">
+        <title>Create RLS Policies for Interactions Table (AC: #7)</title>
+        <subtasks>
+          <subtask>Execute INSERT policy (lines 105-107)</subtask>
+          <subtask>Execute SELECT policy (lines 110-112)</subtask>
+          <subtask>Execute UPDATE policy (lines 115-117)</subtask>
+          <subtask>Verify 3 policies listed in Dashboard</subtask>
+        </subtasks>
+      </task>
+      <task id="6" status="pending">
+        <title>Enable Realtime for Tables (AC: #8)</title>
+        <subtasks>
+          <subtask>Navigate to Database → Replication in Supabase Dashboard</subtask>
+          <subtask>Enable Realtime for moods table</subtask>
+          <subtask>Enable Realtime for interactions table</subtask>
+          <subtask>Verify supabase_realtime publication includes both tables</subtask>
+          <subtask>Test: INSERT mood via SQL Editor, check Realtime Inspector</subtask>
+        </subtasks>
+      </task>
+      <task id="7" status="pending">
+        <title>Schema Verification Testing (AC: #9)</title>
+        <subtasks>
+          <subtask>Test users table INSERT with valid UUID</subtask>
+          <subtask>Test moods table valid INSERT (should succeed)</subtask>
+          <subtask>Test invalid mood_type INSERT (should fail CHECK constraint)</subtask>
+          <subtask>Test note length constraint (should fail with >500 chars)</subtask>
+          <subtask>Verify indexes exist via SQL query</subtask>
+          <subtask>Clean up test data</subtask>
+        </subtasks>
+      </task>
+      <task id="8" status="pending">
+        <title>RLS Policy Testing (AC: #10)</title>
+        <subtasks>
+          <subtask>Create test user A via anonymous auth</subtask>
+          <subtask>Insert mood as User A (should succeed)</subtask>
+          <subtask>Create test user B session</subtask>
+          <subtask>Test SELECT as User B (should see User A's moods - simplified policy)</subtask>
+          <subtask>Test UPDATE as User B on User A's mood (should fail RLS)</subtask>
+          <subtask>Test DELETE as User B on User A's mood (should fail RLS)</subtask>
+          <subtask>Verify RLS policy violation error messages</subtask>
+        </subtasks>
+      </task>
+      <task id="9" status="pending">
+        <title>Documentation Update (AC: Post-implementation)</title>
+        <subtasks>
+          <subtask>Update README.md "Backend Setup" section</subtask>
+          <subtask>Document any deviations from migration script</subtask>
+          <subtask>Add troubleshooting notes if needed</subtask>
+          <subtask>Verify .env.example accuracy</subtask>
+        </subtasks>
+      </task>
+      <task id="10" status="pending">
+        <title>Create Integration Test (AC: Post-implementation)</title>
+        <subtasks>
+          <subtask>Create tests/integration/supabase-schema.test.ts</subtask>
+          <subtask>Test: Verify all 3 tables exist</subtask>
+          <subtask>Test: Verify RLS enabled on all tables</subtask>
+          <subtask>Test: Attempt unauthorized INSERT (should fail)</subtask>
+          <subtask>Test: Attempt authorized INSERT (should succeed)</subtask>
+          <subtask>Test: Verify Realtime subscription creation</subtask>
+          <subtask>Run test suite: npm run test:integration</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1" priority="critical">
+      <title>Users Table Created</title>
+      <description>Execute SQL migration to create users table in Supabase with columns: id (UUID PK), partner_name (TEXT), device_id (UUID). Table references Supabase Auth: id UUID PRIMARY KEY REFERENCES auth.users(id)</description>
+      <verification>Verify table exists via Supabase Dashboard → Database → Tables</verification>
+    </criterion>
+    <criterion id="2" priority="critical">
+      <title>Moods Table Created</title>
+      <description>Execute SQL migration to create moods table with columns: id (UUID), user_id (UUID FK), mood_type (TEXT CHECK), note (TEXT), created_at (TIMESTAMPTZ), updated_at (TIMESTAMPTZ). CHECK constraint enforces mood_type enum: 'loved', 'happy', 'content', 'thoughtful', 'grateful'. Note field has max length constraint: CHECK (char_length(note) &lt;= 500). Index created: idx_moods_user_created ON moods(user_id, created_at)</description>
+      <verification>Verify via Supabase Dashboard</verification>
+    </criterion>
+    <criterion id="3" priority="critical">
+      <title>Interactions Table Created</title>
+      <description>Execute SQL migration to create interactions table with columns: id (UUID), type (TEXT CHECK), from_user_id (UUID FK), to_user_id (UUID FK), viewed (BOOLEAN), created_at (TIMESTAMPTZ). CHECK constraint enforces type enum: 'poke', 'kiss'. Index created: idx_interactions_to_user_viewed ON interactions(to_user_id, viewed)</description>
+      <verification>Verify via Supabase Dashboard</verification>
+    </criterion>
+    <criterion id="4" priority="critical">
+      <title>Row Level Security Enabled on All Tables</title>
+      <description>Execute ALTER TABLE statements to enable RLS on users, moods, and interactions tables</description>
+      <verification>Verify RLS enabled status in Supabase Dashboard → Authentication → Policies</verification>
+    </criterion>
+    <criterion id="5" priority="critical">
+      <title>RLS Policies Created for Users Table</title>
+      <description>Create policies: "Users can read all users" (FOR SELECT USING (true)), "Users can insert own user record" (FOR INSERT WITH CHECK (auth.uid() = id)), "Users can update own user record" (FOR UPDATE USING (auth.uid() = id))</description>
+      <verification>Verify policies listed in Supabase Dashboard → Authentication → Policies → users</verification>
+    </criterion>
+    <criterion id="6" priority="critical">
+      <title>RLS Policies Created for Moods Table</title>
+      <description>Create policies: INSERT (auth.uid() = user_id), SELECT (USING (true) - simplified for 2-user MVP), UPDATE (auth.uid() = user_id), DELETE (auth.uid() = user_id)</description>
+      <verification>Verify policies in Supabase Dashboard</verification>
+      <notes>SELECT policy simplified for 2-user MVP; production would filter by partner relationship</notes>
+    </criterion>
+    <criterion id="7" priority="critical">
+      <title>RLS Policies Created for Interactions Table</title>
+      <description>Create policies: INSERT (auth.uid() = from_user_id), SELECT (auth.uid() IN (from_user_id, to_user_id)), UPDATE (auth.uid() = to_user_id for viewed status)</description>
+      <verification>Verify policies in Supabase Dashboard</verification>
+    </criterion>
+    <criterion id="8" priority="high">
+      <title>Realtime Enabled for Tables</title>
+      <description>Enable Realtime for moods and interactions tables via Supabase Dashboard → Database → Replication. Verify supabase_realtime publication includes both tables</description>
+      <verification>Test Realtime: INSERT a mood via SQL Editor, verify it appears in Realtime Inspector</verification>
+    </criterion>
+    <criterion id="9" priority="high">
+      <title>Schema Verification Tests</title>
+      <description>Test INSERT operations with valid/invalid data, verify CHECK constraints work, confirm indexes exist</description>
+      <verification>SQL tests: Valid INSERT succeeds, invalid mood_type fails, note >500 chars fails, indexes query returns results</verification>
+    </criterion>
+    <criterion id="10" priority="high">
+      <title>RLS Policy Testing</title>
+      <description>Create two test user sessions, verify INSERT succeeds for own moods, SELECT works across users (simplified policy), UPDATE/DELETE fails for other users' moods</description>
+      <verification>RLS policy violations return appropriate error messages</verification>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact>
+        <path>docs/epics.md</path>
+        <title>Epic 6: Interactive Connection Features</title>
+        <section>Epic 6 Overview</section>
+        <snippet>Build interactive features that enable real-time emotional connection: mood tracking synced via Supabase backend, poke/kiss interactions, and anniversary countdown timers.</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/migrations/001_initial_schema.sql</path>
+        <title>Initial Database Schema Migration</title>
+        <section>Complete SQL Migration Script</section>
+        <snippet>SQL script to create users, moods, and interactions tables with Row Level Security policies and Realtime configuration (169 lines, lines 1-169).</snippet>
+      </artifact>
+      <artifact>
+        <path>docs/sprint-artifacts/6-1-supabase-backend-setup-api-integration.md</path>
+        <title>Story 6.1: Supabase Backend Setup (completed)</title>
+        <section>API Integration Foundation</section>
+        <snippet>Created Supabase client, API services (moodApi, moodSyncService, interactionService), Zod validation layer, and documented migration script. Database schema NOT yet executed - this story completes that gap.</snippet>
+      </artifact>
+      <artifact>
+        <path>.env.example</path>
+        <title>Environment Configuration Template</title>
+        <section>Supabase Configuration</section>
+        <snippet>Required environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_USER_ID, VITE_PARTNER_ID</snippet>
+      </artifact>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/api/supabaseClient.ts</path>
+        <kind>API client</kind>
+        <symbol>supabase</symbol>
+        <lines>1-230</lines>
+        <reason>Singleton Supabase client with Database type definitions matching the schema to be created. Already configured for JWT auth and Realtime.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/moodApi.ts</path>
+        <kind>API service</kind>
+        <symbol>moodApi</symbol>
+        <lines>1-50+</lines>
+        <reason>Mood CRUD operations with Zod validation. Ready to use once database tables are created.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/interactionService.ts</path>
+        <kind>API service</kind>
+        <symbol>interactionService</symbol>
+        <lines>1-150+</lines>
+        <reason>Poke/kiss interaction operations. Ready to use once interactions table is created.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/moodSyncService.ts</path>
+        <kind>Real-time service</kind>
+        <symbol>moodSyncService</symbol>
+        <lines>1-200+</lines>
+        <reason>Real-time subscriptions for mood updates. Ready to use once Realtime is enabled on moods table.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/errorHandlers.ts</path>
+        <kind>Error handling</kind>
+        <symbol>handleSupabaseError</symbol>
+        <lines>1-100+</lines>
+        <reason>Comprehensive error handling for Supabase operations including network failures and RLS errors.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/validation/supabaseSchemas.ts</path>
+        <kind>Validation layer</kind>
+        <symbol>SupabaseMoodSchema, SupabaseInteractionSchema</symbol>
+        <lines>1-100+</lines>
+        <reason>Zod schemas for validating Supabase API responses before returning to application.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/supabase.test.ts</path>
+        <kind>integration test template</kind>
+        <symbol>N/A</symbol>
+        <lines>1-50+</lines>
+        <reason>Existing integration test template that can be extended to verify schema creation.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.81.1" />
+        <package name="zod" version="^3.25.76" />
+        <package name="idb" version="^8.0.3" />
+        <package name="eventsource" version="^4.0.0" />
+      </node>
+      <devDependencies>
+        <package name="@playwright/test" version="^1.56.1" />
+        <package name="vitest" version="^4.0.9" />
+        <package name="fake-indexeddb" version="^6.2.5" />
+      </devDependencies>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architectural">
+      <description>This story is DATABASE OPERATIONS ONLY via Supabase Dashboard. No new TypeScript files required. API services already exist from Story 6.1.</description>
+    </constraint>
+    <constraint type="security">
+      <description>Row Level Security (RLS) policies are MANDATORY and must be tested before marking story complete. Policies enforce auth.uid() checks at database level.</description>
+    </constraint>
+    <constraint type="design-decision">
+      <description>RLS SELECT policies simplified for 2-user MVP: moods SELECT uses USING (true) instead of partner filtering. This is acceptable because only 2 users exist in the database.</description>
+    </constraint>
+    <constraint type="testing">
+      <description>Manual testing in Supabase Dashboard is primary verification method. Integration tests are supplementary and created AFTER successful manual verification.</description>
+    </constraint>
+    <constraint type="execution-order">
+      <description>Tables must be created before RLS can be enabled. RLS must be enabled before policies can be created. Follow migration script order exactly.</description>
+    </constraint>
+    <constraint type="environment">
+      <description>Requires Supabase project already created with URL and anon key configured in .env file. Anonymous auth must be enabled in Supabase project settings.</description>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>users table schema</name>
+      <kind>Database table</kind>
+      <signature>
+CREATE TABLE users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  partner_name TEXT,
+  device_id UUID DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+)
+      </signature>
+      <path>docs/migrations/001_initial_schema.sql</path>
+    </interface>
+    <interface>
+      <name>moods table schema</name>
+      <kind>Database table</kind>
+      <signature>
+CREATE TABLE moods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  mood_type TEXT CHECK (mood_type IN ('loved', 'happy', 'content', 'thoughtful', 'grateful')),
+  note TEXT CHECK (char_length(note) &lt;= 500),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+)
+      </signature>
+      <path>docs/migrations/001_initial_schema.sql</path>
+    </interface>
+    <interface>
+      <name>interactions table schema</name>
+      <kind>Database table</kind>
+      <signature>
+CREATE TABLE interactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type TEXT CHECK (type IN ('poke', 'kiss')),
+  from_user_id UUID REFERENCES users(id),
+  to_user_id UUID REFERENCES users(id),
+  viewed BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+)
+      </signature>
+      <path>docs/migrations/001_initial_schema.sql</path>
+    </interface>
+    <interface>
+      <name>Supabase Auth - auth.uid()</name>
+      <kind>Function</kind>
+      <signature>auth.uid() → UUID</signature>
+      <path>Supabase built-in function</path>
+      <notes>Returns authenticated user's ID from JWT session. Used in all RLS policies.</notes>
+    </interface>
+    <interface>
+      <name>initializeAuth()</name>
+      <kind>Function signature</kind>
+      <signature>export const initializeAuth = async (): Promise&lt;void&gt;</signature>
+      <path>src/api/supabaseClient.ts</path>
+      <notes>Creates anonymous Supabase Auth session. Must be called before database operations.</notes>
+    </interface>
+    <interface>
+      <name>getCurrentUserId()</name>
+      <kind>Function signature</kind>
+      <signature>export const getCurrentUserId = async (): Promise&lt;string&gt;</signature>
+      <path>src/api/supabaseClient.ts</path>
+      <notes>Returns authenticated user's UUID from session. Throws if not authenticated.</notes>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing for this story is primarily manual via Supabase Dashboard SQL Editor and Realtime Inspector. Integration tests in tests/integration/supabase-schema.test.ts should be created AFTER successful manual verification to programmatically confirm: tables exist, RLS enabled, constraints enforced, indexes present. Use Vitest for unit tests and @playwright/test for E2E scenarios. All tests must achieve ≥80% coverage for touched code.
+    </standards>
+    <locations>
+      tests/integration/ - Integration tests with Supabase
+      tests/unit/api/ - Unit tests for API services
+      tests/e2e/ - End-to-end tests with Playwright
+    </locations>
+    <ideas>
+      <testIdea acceptanceCriteria="AC-1">
+        <description>Integration test: Query information_schema.tables to verify users table exists with correct columns</description>
+        <approach>Use Supabase client to query system catalog, validate column names and types</approach>
+      </testIdea>
+      <testIdea acceptanceCriteria="AC-2,AC-3">
+        <description>Integration test: Verify moods and interactions tables exist with CHECK constraints</description>
+        <approach>Attempt INSERT with invalid mood_type/interaction type, expect PostgrestError with constraint violation</approach>
+      </testIdea>
+      <testIdea acceptanceCriteria="AC-4">
+        <description>Integration test: Verify RLS enabled on all tables</description>
+        <approach>Query pg_tables system catalog where relrowsecurity = true, verify all 3 tables present</approach>
+      </testIdea>
+      <testIdea acceptanceCriteria="AC-9">
+        <description>Schema verification: Test note length constraint</description>
+        <approach>INSERT mood with 501-character note, expect CHECK constraint error with specific message</approach>
+      </testIdea>
+      <testIdea acceptanceCriteria="AC-10">
+        <description>RLS policy test: Unauthorized UPDATE attempt</description>
+        <approach>Create two auth sessions, User B attempts UPDATE on User A's mood, expect RLS error</approach>
+      </testIdea>
+      <testIdea acceptanceCriteria="AC-8">
+        <description>Realtime subscription test: Verify subscription creation succeeds</description>
+        <approach>Create Realtime subscription for moods table, verify no errors, unsubscribe cleanly</approach>
+      </testIdea>
+    </ideas>
+  </tests>
+</story-context>

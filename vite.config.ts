@@ -46,8 +46,37 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
         skipWaiting: true,
         clientsClaim: true,
+        // Prevent caching of JS/CSS - always fetch fresh app code
+        navigateFallback: null,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
+            // App shell (JS/CSS) - Network First with short cache
+            urlPattern: /\.(js|css)$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-shell',
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 5, // 5 minutes - short cache for dev
+              },
+            },
+          },
+          {
+            // Static assets (images, fonts) - Cache First
+            urlPattern: /\.(png|jpg|jpeg|svg|woff2|ico)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-assets',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+          {
+            // Google Fonts
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {

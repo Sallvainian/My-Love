@@ -1,0 +1,379 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>4</storyId>
+    <title>Mood Sync & Partner Visibility</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/6-4-mood-sync-partner-visibility.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>the app creator</asA>
+    <iWant>to see my girlfriend's mood logs synced via Supabase</iWant>
+    <soThat>I can check in on how she's feeling even when we're apart</soThat>
+    <tasks>
+      - Task 1: Implement Mood Sync Service (AC: #1, #6)
+        - Create src/api/moodSyncService.ts
+        - Implement syncPendingMoods(): Fetch moods WHERE synced === false
+        - For each mood: POST to Supabase moods table using supabaseClient.from('moods').insert()
+        - On success: Update local mood with synced: true and supabaseId from response
+        - On failure: Implement retry logic with exponential backoff (1s, 2s, 4s, max 3 retries)
+        - Add syncStatus to moodSlice Zustand store: 'idle' | 'syncing' | 'synced' | 'error'
+        - Trigger syncPendingMoods() after addMoodEntry() in MoodTracker component
+
+      - Task 2: Implement Network State Detection (AC: #6)
+        - Create src/utils/networkHelpers.ts with isOnline() utility
+        - Add online/offline event listeners in App.tsx or useAppStore init
+        - Update syncStatus on offline: set to 'offline'
+        - On 'online' event: automatically trigger syncPendingMoods()
+        - Display network status indicator in UI (online/offline dot in top nav)
+        - Test offline → log mood → go online → verify auto-sync
+
+      - Task 3: Fetch Partner Moods from Supabase (AC: #2, #4, #5)
+        - Add fetchPartnerMoods() to moodSyncService.ts
+        - Query: supabaseClient.from('moods').select('*').eq('user_id', partnerId).order('timestamp', { ascending: false })
+        - Map Supabase response to MoodEntry[] interface (convert timestamps to Date objects)
+        - Store partner moods in Zustand: add partnerMoods: MoodEntry[] to moodSlice
+        - Handle errors gracefully: display toast "Failed to fetch partner moods" on error
+        - Add lastSyncTimestamp to track when partner moods were last fetched
+
+      - Task 4: Create Partner Mood View Component (AC: #2, #4)
+        - Create src/components/PartnerMoodView/PartnerMoodView.tsx
+        - Display partner moods list: mood icon, date (formatted with date-fns), timestamp, note
+        - Use MOOD_CONFIG from MoodTracker for consistent icons/colors
+        - Add "Refresh" button in header (triggers fetchPartnerMoods())
+        - Show loading spinner during fetch (loading state)
+        - Empty state: Display "No moods logged yet" when partnerMoods.length === 0
+        - Display last sync timestamp: "Last updated: X minutes ago"
+
+      - Task 5: Integrate Partner Mood View in Navigation (AC: #2)
+        - Add "Partner Moods" tab to navigation OR Settings → Partner section
+        - Update navigationSlice to include partner mood route
+        - Wire navigation to render PartnerMoodView component
+        - Add data-testid attributes for E2E testing
+        - Test navigation flow: Home → Partner Moods → verify component renders
+
+      - Task 6: Implement Supabase Realtime Subscription (AC: #3)
+        - Create src/api/realtimeService.ts for Realtime channel management
+        - Subscribe to moods table changes: supabaseClient.channel('moods-channel').on('postgres_changes', {...})
+        - On INSERT event: Parse payload, create MoodEntry, add to partnerMoods in Zustand
+        - Display notification toast: "Your partner logged a new mood: [mood type]"
+        - Add notification badge to Partner Moods nav tab (if unviewed moods exist)
+        - Implement handleConnectionStateChange() for SUBSCRIBED, CLOSED, CHANNEL_ERROR states
+        - Log connection state changes
+
+      - Task 7: Connection Status Indicator (AC: #3)
+        - Add connection status indicator in top nav OR Partner Mood View header
+        - States: 'connected' (green dot), 'reconnecting' (yellow dot + spinner), 'disconnected' (red dot)
+        - Update UI based on Realtime connection state from Task 6
+        - On reconnect: fetch latest partner moods to catch up (fetchPartnerMoods())
+        - Display tooltip on hover: "Connected" / "Reconnecting..." / "Disconnected"
+
+      - Task 8: Retry Logic & Error Handling (AC: #1, #6)
+        - Implement exponential backoff in syncPendingMoods(): retries at 1s, 2s, 4s
+        - After 3 failed retries: mark syncStatus as 'error', display toast "Sync failed. Tap to retry."
+        - Add retry button in error toast that re-triggers syncPendingMoods()
+        - Handle Supabase API errors: 401 Unauthorized, 403 Forbidden, 500 Server Error
+        - Log detailed errors to console with context
+        - Graceful degradation: If Realtime fails, fall back to manual refresh only
+
+      - Task 9: E2E Testing for Sync & Partner View (AC: All)
+        - E2E test: Log mood → verify synced to Supabase → check local mood synced: true
+        - E2E test: Mock Supabase INSERT event → verify toast displayed, partnerMoods updated
+        - E2E test: Navigate to Partner Moods → verify list renders, shows correct data
+        - E2E test: Tap Refresh button → verify loading spinner, moods re-fetched
+        - E2E test: Offline mode → log mood → verify "Offline" message → go online → verify auto-sync
+        - E2E test: Mock Supabase error (500) → verify error toast, retry button works
+        - E2E test: Verify RLS: user can't fetch other users' moods (use mock invalid partnerId)
+
+      - Task 10: Integration with Existing MoodSlice (AC: #1)
+        - Extend moodSlice Zustand store: add partnerMoods: MoodEntry[], syncStatus, lastSyncTimestamp
+        - Add actions: syncPendingMoods(), fetchPartnerMoods(), setPartnerMoods(), updateSyncStatus()
+        - Ensure addMoodEntry() triggers syncPendingMoods() after local save
+        - Update getMoodForDate() to also work for partner moods (optional: separate selector)
+        - Test state updates: verify Zustand devtools shows correct state transitions
+
+      - Task 11: Performance Optimization (AC: #3, #4)
+        - Debounce fetchPartnerMoods() on manual refresh (prevent rapid clicks)
+        - Cache partner moods: don't re-fetch if last fetch was <60 seconds ago
+        - Limit Realtime event processing: batch updates if multiple INSERT events arrive rapidly
+        - Use React.memo on PartnerMoodView components to prevent unnecessary re-renders
+        - Verify Realtime subscription cleanup on component unmount (prevent memory leaks)
+
+      - Task 12: Documentation & Code Comments (AC: All)
+        - Add JSDoc comments to syncPendingMoods(), fetchPartnerMoods(), Realtime handlers
+        - Document environment variables: VITE_PARTNER_ID in .env.example
+        - Update architecture.md: document Realtime integration and sync strategy
+        - Add inline comments referencing AC numbers for traceability
+        - Document sync conflict resolution strategy in dev notes
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    AC1: Partner Mood Sync Service Implementation
+    - Mood entries automatically sync to Supabase after logging
+    - syncPendingMoods() function uploads all unsynced moods (where synced === false)
+    - Successfully synced moods marked with synced: true and supabaseId populated
+    - Sync respects offline state: queues moods when offline, syncs on reconnect
+    - Exponential backoff retry strategy for failed syncs (3 retries max: 1s, 2s, 4s)
+    - Sync status tracked in Zustand store: syncStatus with pending/syncing/synced/error states
+
+    AC2: Partner View Display
+    - Partner mood view accessible via Settings → Partner Moods (or dedicated tab)
+    - Displays partner's moods fetched from Supabase moods table (WHERE user_id = partnerId)
+    - Shows: mood type (icon + color), date (formatted "Monday, Nov 15, 2025"), timestamp, note
+    - Moods sorted chronologically (newest first)
+    - Empty state: "No moods logged yet" when partner hasn't logged moods
+
+    AC3: Real-time Updates via Supabase Realtime
+    - Subscribe to Supabase Realtime channel for moods table changes
+    - On INSERT event for partner's moods → update Zustand store with new mood
+    - Display notification badge/toast: "Your partner logged a new mood" with option to view
+    - Realtime connection status indicator (connected/reconnecting/disconnected)
+    - Auto-reconnect on disconnect with exponential backoff (1s, 2s, 4s, max 30s)
+
+    AC4: Manual Refresh Button
+    - "Refresh" button in partner mood view header
+    - Fetches latest partner moods from Supabase (bypasses cache)
+    - Shows loading spinner during fetch
+    - Updates UI with fetched moods
+    - Display last sync timestamp: "Last updated: 2 minutes ago"
+
+    AC5: User Filtering & Privacy
+    - Queries filter by user_id using Supabase query parameter: WHERE user_id = partnerId
+    - Row Level Security (RLS) enforces access control at database level
+    - Users can only view moods from their configured partner (via VITE_PARTNER_ID env var)
+    - No cross-user data leakage: RLS policies validated in Supabase
+
+    AC6: Offline Mode & Sync Queue
+    - When offline (navigator.onLine === false), display: "Offline - moods will sync when online"
+    - Mood sync queued in IndexedDB (synced: false flag)
+    - On network reconnect (online event), trigger syncPendingMoods() automatically
+    - Partner moods display cached data when offline (from previous successful fetch)
+    - Sync conflict resolution: Last-write-wins (Supabase timestamp used as source of truth)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document - My-Love</title>
+        <section>Mood Tracking & Sync (FR019-FR022)</section>
+        <snippet>FR019: System SHALL allow user to log daily mood (5 mood types: loved, happy, content, thoughtful, grateful). FR020: System SHALL sync mood entries to backend service for partner visibility. FR021: System SHALL display mood history in calendar view. FR022: System SHALL support optional notes with each mood entry.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-6.md</path>
+        <title>Epic Technical Specification: Interactive Connection Features</title>
+        <section>Story 6-4: Mood Sync + Partner Visibility</section>
+        <snippet>Implements real-time emotional connection features via Supabase backend. Mood logging interface with 5 mood types stored locally, Supabase integration for partner visibility with Row Level Security, mood sync service with retry logic, partner mood view display, Realtime subscriptions for live updates, manual refresh capability, offline-first with graceful degradation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Service Layer - BaseIndexedDBService Pattern</section>
+        <snippet>All services extend BaseIndexedDBService<T> generic class implementing common CRUD operations. MoodService extends BaseIndexedDBService<MoodEntry> with getMoodForDate() and getMoodsInRange() methods for calendar queries. IndexedDB operations complete successfully offline, with by-date unique index for fast range queries (<100ms).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>State Management - Zustand Store Architecture</section>
+        <snippet>Single Zustand store (useAppStore) with persistence middleware. Mood slice includes: moods: MoodEntry[], syncStatus: { lastMoodSync, pendingMoods, isOnline }, actions: addMoodEntry(), getMoodForDate(), syncMoods(). Partialize persists only critical state (settings, moods) to LocalStorage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics Breakdown</title>
+        <section>Epic 6.4: Mood Sync & Partner Visibility</section>
+        <snippet>As the app creator, I want to see my girlfriend's mood logs, so that I can check in on how she's feeling. Admin/partner view shows mood history synced from Supabase. Displays: date, mood type, note. Auto-refreshes or manual refresh button. Only shows moods from partner (user filtering). Handles sync conflicts gracefully. Offline mode: displays cached moods, syncs when back online.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/api/supabaseClient.ts</path>
+        <kind>api</kind>
+        <symbol>supabase (client singleton)</symbol>
+        <lines>all</lines>
+        <reason>Core Supabase client configuration. Exported singleton used for all API interactions including mood sync and Realtime subscriptions. Already configured with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/moodSyncService.ts</path>
+        <kind>service</kind>
+        <symbol>MoodSyncService class</symbol>
+        <lines>all</lines>
+        <reason>Existing mood sync service implementation. Contains syncPendingMoods() with validation layer and error handling. Need to extend with fetchPartnerMoods() and Realtime subscription logic for this story.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/moodApi.ts</path>
+        <kind>api</kind>
+        <symbol>MoodApi module</symbol>
+        <lines>all</lines>
+        <reason>API wrapper for mood-related Supabase operations. May contain helper functions for mood data transformation between Supabase schema and local MoodEntry interface.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/moodService.ts</path>
+        <kind>service</kind>
+        <symbol>MoodService class</symbol>
+        <lines>all</lines>
+        <reason>Local IndexedDB service for mood storage. Extends BaseIndexedDBService<MoodEntry> with getMoodForDate() and getMoodsInRange() methods. Used by sync service to fetch unsynced moods (WHERE synced === false).</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/slices/moodSlice.ts</path>
+        <kind>store</kind>
+        <symbol>moodSlice</symbol>
+        <lines>all</lines>
+        <reason>Zustand state slice for mood management. Currently includes moods: MoodEntry[], syncStatus. Need to extend with partnerMoods: MoodEntry[], lastSyncTimestamp, and actions: fetchPartnerMoods(), setPartnerMoods(), updateSyncStatus().</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/MoodTracker/MoodTracker.tsx</path>
+        <kind>component</kind>
+        <symbol>MoodTracker</symbol>
+        <lines>all</lines>
+        <reason>Main mood logging component. Contains addMoodEntry() action trigger. Need to ensure syncPendingMoods() is called after successful local save to trigger background sync.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/MoodHistory/MoodHistoryCalendar.tsx</path>
+        <kind>component</kind>
+        <symbol>MoodHistoryCalendar</symbol>
+        <lines>all</lines>
+        <reason>Calendar view for mood history. May need to extend to display partner moods with different visual style (e.g., smaller dots) if "Show partner moods" toggle is enabled.</reason>
+      </artifact>
+      <artifact>
+        <path>src/types/index.ts</path>
+        <kind>types</kind>
+        <symbol>MoodEntry interface</symbol>
+        <lines>relevant</lines>
+        <reason>Core MoodEntry interface definition. Already includes synced: boolean and supabaseId?: string fields added in Story 6.3. Verify interface matches Supabase moods table schema for proper data transformation.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <npm>
+        <package name="@supabase/supabase-js" version="^2.38.0">Supabase JavaScript Client SDK for API interactions and Realtime subscriptions</package>
+        <package name="react" version="19.1.1">UI framework for PartnerMoodView component</package>
+        <package name="zustand" version="5.0.8">State management for partnerMoods slice extension</package>
+        <package name="framer-motion" version="12.23.24">Animation library for notification toasts and loading spinners</package>
+        <package name="lucide-react" version="0.548.0">Icon library for connection status indicators and refresh button icons</package>
+        <package name="zod" version="3.25.76">Schema validation for MoodEntry before Supabase writes</package>
+        <package name="date-fns" version="latest">Date formatting for "Monday, Nov 15, 2025" display in Partner Mood View</package>
+      </npm>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Follow BaseIndexedDBService<MoodEntry> pattern from Story 5.3 (src/services/BaseIndexedDBService.ts)
+    - Use Zustand store slices pattern from Story 5.1 (feature-specific state separation)
+    - Validate MoodEntry with Zod schema before Supabase write (Story 5.5 validation layer)
+    - Maintain IndexedDB query time <100ms for mood retrieval (performance constraint)
+    - Supabase API response time <500ms for sync operations when online (performance constraint)
+    - Single persistent Realtime channel with exponential backoff reconnect (1s, 2s, 4s, max 30s)
+    - Limit sync batching to 50 pending moods per batch to avoid blocking UI
+    - Row Level Security (RLS) enforces user_id filtering at database level (security constraint)
+    - No dangerouslySetInnerHTML usage (XSS protection)
+    - All features must work offline except mood sync and partner mood fetch (NFR002)
+    - Graceful degradation: display cached partner moods when offline
+    - Auto-sync on network reconnect via 'online' event listener
+    - Use ErrorBoundary component for graceful error handling (Story 1.5 pattern)
+    - Environment variables: VITE_PARTNER_ID for partner user UUID filtering
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>MoodEntry</name>
+      <kind>TypeScript interface</kind>
+      <signature>
+        interface MoodEntry {
+          id?: number;
+          userId: string;
+          mood: MoodType;
+          note?: string;
+          date: string;
+          timestamp: Date;
+          synced: boolean;
+          supabaseId?: string;
+        }
+      </signature>
+      <path>src/types/index.ts</path>
+    </interface>
+    <interface>
+      <name>Supabase Moods Table</name>
+      <kind>PostgreSQL table</kind>
+      <signature>
+        CREATE TABLE moods (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id),
+          mood_type TEXT NOT NULL CHECK (mood_type IN ('loved', 'happy', 'content', 'thoughtful', 'grateful')),
+          note TEXT,
+          date DATE NOT NULL,
+          timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX idx_moods_user_date ON moods(user_id, date);
+        CREATE INDEX idx_moods_timestamp ON moods(timestamp DESC);
+      </signature>
+      <path>Supabase Database Schema</path>
+    </interface>
+    <interface>
+      <name>MoodSyncService.syncPendingMoods</name>
+      <kind>Service method</kind>
+      <signature>async syncPendingMoods(): Promise&lt;{ synced: number; failed: number }&gt;</signature>
+      <path>src/api/moodSyncService.ts</path>
+    </interface>
+    <interface>
+      <name>MoodSyncService.fetchPartnerMoods</name>
+      <kind>Service method (new)</kind>
+      <signature>async fetchPartnerMoods(partnerId: string): Promise&lt;MoodEntry[]&gt;</signature>
+      <path>src/api/moodSyncService.ts (to be added)</path>
+    </interface>
+    <interface>
+      <name>Supabase Realtime Channel</name>
+      <kind>WebSocket subscription</kind>
+      <signature>
+        supabaseClient.channel('moods-channel')
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'moods',
+            filter: `user_id=eq.${partnerId}`
+          }, handleNewMood)
+          .subscribe()
+      </signature>
+      <path>src/api/realtimeService.ts (to be created)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      - Unit tests: Vitest for service methods (moodSyncService, realtimeService) and utility functions
+      - Integration tests: Mock Supabase API responses, test sync logic with fake-indexeddb
+      - E2E tests: Playwright for full user journeys (log mood → sync → partner sees, offline → online sync)
+      - Component tests: React Testing Library for PartnerMoodView rendering and interactions
+      - All tests must reference AC numbers for traceability (e.g., test('AC1: syncPendingMoods uploads unsynced moods'))
+      - Use data-testid attributes for E2E test selectors (e.g., data-testid="partner-mood-list")
+      - Mock Supabase Realtime events for testing notification badge and toast display
+      - Test offline behavior: navigator.onLine = false, verify sync queues, navigator.onLine = true, verify auto-sync
+      - Validate error handling: mock 401, 403, 500 responses, verify user-friendly error messages
+    </standards>
+    <locations>
+      - tests/unit/api/moodSyncService.test.ts
+      - tests/integration/moodSync.integration.test.ts
+      - tests/e2e/mood-sync-partner-visibility.spec.ts
+      - tests/unit/components/PartnerMoodView.test.tsx
+      - tests/unit/utils/networkHelpers.test.ts
+    </locations>
+    <ideas>
+      - Unit: Test syncPendingMoods() with 0 moods, 1 mood, 50 moods (batch limit), verify correct POST calls
+      - Unit: Test exponential backoff retry logic (1s, 2s, 4s delays), verify max 3 retries
+      - Unit: Test fetchPartnerMoods() with partnerId filter, verify correct Supabase query parameters
+      - Integration: Mock Supabase INSERT success, verify local mood updated with synced: true and supabaseId
+      - Integration: Mock Supabase INSERT failure (500 error), verify syncStatus = 'error', verify retry queued
+      - E2E: Log mood offline → verify "Offline" message → go online → verify sync executes automatically
+      - E2E: Navigate to Partner Moods → verify list renders with correct data from Supabase
+      - E2E: Mock Realtime INSERT event → verify notification toast appears, verify partnerMoods updated in store
+      - E2E: Tap Refresh button → verify loading spinner → verify moods re-fetched from Supabase
+      - E2E: Verify RLS enforcement: attempt to fetch moods with invalid partnerId → verify error or empty result
+      - Component: Test PartnerMoodView empty state: partnerMoods.length === 0 → verify "No moods logged yet" displayed
+      - Component: Test connection status indicator: connected → green dot, reconnecting → yellow dot + spinner, disconnected → red dot
+    </ideas>
+  </tests>
+</story-context>

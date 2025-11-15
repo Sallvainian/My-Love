@@ -1,0 +1,361 @@
+<story-context id="story-6-6-anniversary-countdown-timers" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>6</storyId>
+    <title>Anniversary Countdown Timers</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/6-6-anniversary-countdown-timers.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>your girlfriend</asA>
+    <iWant>to see countdowns to our anniversaries</iWant>
+    <soThat>I can look forward to special dates</soThat>
+    <tasks>
+      - Task 1: Create AnniversarySchema and Integrate into Settings (AC: #1, #5)
+      - Task 2: Implement CountdownService Utility (AC: #3)
+      - Task 3: Create CountdownTimer Component (AC: #2, #4, #6, #7)
+      - Task 4: Implement Celebration Animation (AC: #4)
+      - Task 5: Add Anniversary Management UI in Settings (AC: #1)
+      - Task 6: Integrate Countdown into Home View (AC: #6)
+      - Task 7: Add Zustand Store Actions for Anniversaries (AC: #1, #5)
+      - Task 8: End-to-End Testing (AC: #1-8)
+      - Task 9: Documentation and Cleanup
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    AC1: Settings Interface for Countdown Management
+    - Settings page allows adding custom countdown: name, date
+    - Multiple countdowns supported (shows nearest one)
+    - Edit and delete countdowns in settings
+    - Form validation: name required (min 1 char), date must be valid ISO date string (YYYY-MM-DD)
+    - Date validation includes value checking (not just format): month 1-12, day valid for month, year >= current year
+
+    AC2: Countdown Display on Home View
+    - Home view displays next upcoming countdown (days, hours, minutes remaining)
+    - Countdown updates in real-time (or on page load)
+    - Displays: "X days, Y hours, Z minutes until [Anniversary Title]"
+    - When multiple countdowns exist, shows next 3 upcoming anniversaries (configurable)
+    - Past anniversaries marked as "Celebrated" with date passed
+
+    AC3: Countdown Calculation Logic
+    - CountdownService.calculateTimeRemaining() computes days/hrs/mins to date
+    - Countdown calculates from current time to target date
+    - Updates every 1 minute via setInterval (not 1-second to reduce CPU usage)
+    - Handles edge cases: leap years, month boundaries, timezone consistency
+
+    AC4: Celebration Animation Trigger
+    - When countdown reaches zero (0 days, 0 hours, 0 minutes): shouldTriggerCelebration() returns true
+    - Framer Motion fireworks/confetti animation plays
+    - DailyMessage card displays special anniversary-themed message
+    - Animation plays once (not looping)
+    - If anniversary is recurring, countdown resets to next year's date
+
+    AC5: Data Persistence
+    - Anniversaries stored in Settings (already in store via SettingsSchema)
+    - AnniversarySchema validates: id (number), label (string), date (ISO date string), description (optional string)
+    - Anniversaries persist across browser sessions via Zustand persist middleware
+    - Anniversaries survive app updates (no migration needed)
+
+    AC6: UI Integration
+    - CountdownTimer component mounts in Home view (below DailyMessage)
+    - Responsive layout: mobile and desktop viewports
+    - Uses existing Tailwind theme variables for consistency
+    - Smooth entrance animation when component first loads
+    - Multiple countdowns display as stacked cards (if >1 anniversary)
+
+    AC7: Performance Optimization
+    - Countdown timer uses 1-minute intervals (not 1-second) to reduce CPU usage and battery drain
+    - Component unmounts interval on cleanup to prevent memory leaks
+    - Celebration animation only plays when user is viewing app (not in background)
+
+    AC8: Error Handling
+    - Invalid date formats rejected with user-friendly error message
+    - Past dates allowed (for marking celebrated anniversaries)
+    - Missing required fields (name, date) prevented via form validation
+    - Graceful handling if countdown calculation fails (fallback to "Upcoming")
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-6.md</path>
+        <title>Epic 6 Technical Specification: Interactive Connection Features</title>
+        <section>Anniversary Countdown Timers (AC9, AC10)</section>
+        <snippet>CountdownTimer component displays "X days, Y hours, Z minutes until [Anniversary Title]". Countdown updates every 1 minute via setInterval. When countdown reaches 0:00:00, triggers celebration animation (Framer Motion fireworks/confetti). Celebration plays once, then countdown resets to next anniversary if recurring.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>My-Love Epic Breakdown</title>
+        <section>Epic 6: Interactive Connection Features - Story 6.6</section>
+        <snippet>Anniversary Countdown Timers - Display countdowns to relationship milestones with celebration animations on completion. FR016-FR018 coverage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Anniversary Countdown (FR016-FR018)</section>
+        <snippet>FR016: Calculate and display countdown to next anniversary (days, hours, minutes). FR017: Support multiple custom countdowns for special dates. FR018: Trigger celebration animations when countdown reaches zero.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Data Architecture - Settings Schema</section>
+        <snippet>Settings.relationship.anniversaries: Array of Anniversary objects. Anniversary: { id: number, date: string (ISO), label: string, description?: string }. Persisted via Zustand persist middleware to LocalStorage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/5-5-centralize-input-validation-layer.md</path>
+        <title>Story 5.5: Centralize Input Validation Layer</title>
+        <section>Validation Infrastructure</section>
+        <snippet>AnniversarySchema already defined in src/validation/schemas.ts with validation rules: id (number), label (string min 1 char), date (ISO format YYYY-MM-DD with value checking), description (optional). Use ValidationError for form error handling. Display field-specific errors via isValidationError() and err.fieldErrors.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/validation/schemas.ts</path>
+        <kind>validation</kind>
+        <symbol>AnniversarySchema</symbol>
+        <lines>192-199</lines>
+        <reason>Anniversary validation schema with date format and value checking - reuse for countdown management forms</reason>
+      </artifact>
+      <artifact>
+        <path>src/validation/schemas.ts</path>
+        <kind>validation</kind>
+        <symbol>SettingsSchema</symbol>
+        <lines>205-221</lines>
+        <reason>Settings schema includes relationship.anniversaries array - validates anniversary persistence structure</reason>
+      </artifact>
+      <artifact>
+        <path>src/validation/errorMessages.ts</path>
+        <kind>utility</kind>
+        <symbol>ValidationError, isValidationError, formatZodError</symbol>
+        <lines>14-197</lines>
+        <reason>Error handling utilities for form validation - use for anniversary form error display</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/slices/settingsSlice.ts</path>
+        <kind>store-slice</kind>
+        <symbol>addAnniversary, removeAnniversary</symbol>
+        <lines>236-267</lines>
+        <reason>Existing anniversary management actions in Settings slice - extend for countdown UI integration</reason>
+      </artifact>
+      <artifact>
+        <path>src/utils/dateHelpers.ts</path>
+        <kind>utility</kind>
+        <symbol>formatDateISO, getNextAnniversary, getDaysUntil, formatCountdown</symbol>
+        <lines>1-152</lines>
+        <reason>Date utilities for countdown calculations - reuse for anniversary date handling, next occurrence calculation, countdown formatting</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/DailyMessage/DailyMessage.tsx</path>
+        <kind>component</kind>
+        <symbol>DailyMessage</symbol>
+        <lines>1-365</lines>
+        <reason>Home view component where CountdownTimer will be integrated (below message card). Reference for Framer Motion animation patterns and component structure.</reason>
+      </artifact>
+      <artifact>
+        <path>src/constants/animations.ts</path>
+        <kind>constants</kind>
+        <symbol>ANIMATION_TIMING, ANIMATION_VALUES</symbol>
+        <lines>1-26</lines>
+        <reason>Animation constants for consistent timing and values - extend for celebration animation configuration</reason>
+      </artifact>
+      <artifact>
+        <path>src/types/index.ts</path>
+        <kind>types</kind>
+        <symbol>Anniversary</symbol>
+        <lines>55-60</lines>
+        <reason>Anniversary interface definition - matches AnniversarySchema structure for TypeScript type safety</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <dependency>framer-motion</dependency>
+        <version>^12.23.24</version>
+        <reason>Celebration animations (fireworks/confetti), countdown entrance animations, smooth transitions</reason>
+      </node>
+      <node>
+        <dependency>zustand</dependency>
+        <version>^5.0.8</version>
+        <reason>State management for anniversaries, countdown state, store actions (addAnniversary, removeAnniversary)</reason>
+      </node>
+      <node>
+        <dependency>zod</dependency>
+        <version>^3.25.76</version>
+        <reason>Anniversary form validation via AnniversarySchema, date value checking, field-level error messages</reason>
+      </node>
+      <node>
+        <dependency>lucide-react</dependency>
+        <version>^0.548.0</version>
+        <reason>Icons for countdown UI, anniversary management buttons (Calendar, Trash2, Edit, Plus)</reason>
+      </node>
+      <node>
+        <dependency>react</dependency>
+        <version>^19.1.1</version>
+        <reason>CountdownTimer component, useState for countdown state, useEffect for setInterval cleanup</reason>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - **MUST reuse existing patterns**: Follow DailyMessage component structure for CountdownTimer integration
+    - **MUST use AnniversarySchema**: Validation already exists in src/validation/schemas.ts - do not recreate
+    - **MUST use 1-minute intervals**: setInterval(60000ms) not 1-second to reduce CPU/battery usage
+    - **MUST cleanup intervals**: useEffect cleanup function to clear intervals on unmount (prevent memory leaks)
+    - **MUST use existing date utilities**: Leverage src/utils/dateHelpers.ts functions (getNextAnniversary, getDaysUntil, formatCountdown)
+    - **MUST follow Zustand store pattern**: Settings slice already has addAnniversary/removeAnniversary actions - extend for countdown logic
+    - **MUST use Framer Motion**: Celebration animations follow existing animation patterns in DailyMessage (floating hearts, AnimatePresence)
+    - **MUST maintain responsive design**: Mobile-first layout (320px-428px width), Tailwind theme variables for consistency
+    - **MUST handle edge cases**: Leap years, month boundaries (Feb 29 → Feb 28/Mar 1), timezone consistency, past dates allowed
+    - **MUST validate at store level**: addAnniversary action uses AnniversarySchema.parse() before state update
+    - **MUST display field-specific errors**: Use ValidationError.fieldErrors for form error messages (pattern from Story 5.5)
+    - **MUST persist via Zustand middleware**: Anniversaries auto-persist to LocalStorage via existing persist middleware in Settings slice
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CountdownService.calculateTimeRemaining</name>
+      <kind>function signature</kind>
+      <signature>function calculateTimeRemaining(targetDate: Date): { days: number; hours: number; minutes: number }</signature>
+      <path>src/utils/countdownService.ts (to be created)</path>
+      <description>Computes time difference between current time and target date. Returns object with days, hours, minutes (rounded down). Edge cases: leap years, month boundaries, timezone handling.</description>
+    </interface>
+    <interface>
+      <name>CountdownService.getNextAnniversary</name>
+      <kind>function signature</kind>
+      <signature>function getNextAnniversary(anniversaries: Anniversary[]): Anniversary | null</signature>
+      <path>src/utils/countdownService.ts (to be created)</path>
+      <description>Filters anniversaries to future dates, sorts by date ascending, returns first (nearest upcoming). Returns null if no future anniversaries.</description>
+    </interface>
+    <interface>
+      <name>CountdownService.shouldTriggerCelebration</name>
+      <kind>function signature</kind>
+      <signature>function shouldTriggerCelebration(targetDate: Date): boolean</signature>
+      <path>src/utils/countdownService.ts (to be created)</path>
+      <description>Returns true if countdown is 0 days, 0 hours, 0 minutes (within 1 minute tolerance). Triggers celebration animation.</description>
+    </interface>
+    <interface>
+      <name>SettingsSlice.addAnniversary</name>
+      <kind>Zustand action</kind>
+      <signature>addAnniversary: (anniversary: Omit&lt;Anniversary, 'id'&gt;) => void</signature>
+      <path>src/stores/slices/settingsSlice.ts</path>
+      <description>Adds new anniversary to settings.relationship.anniversaries array. Generates unique ID (Math.max + 1). Validates via AnniversarySchema. Persists to LocalStorage.</description>
+    </interface>
+    <interface>
+      <name>SettingsSlice.removeAnniversary</name>
+      <kind>Zustand action</kind>
+      <signature>removeAnniversary: (id: number) => void</signature>
+      <path>src/stores/slices/settingsSlice.ts</path>
+      <description>Removes anniversary from settings.relationship.anniversaries by id. Persists to LocalStorage.</description>
+    </interface>
+    <interface>
+      <name>CountdownTimer Component Props</name>
+      <kind>React component interface</kind>
+      <signature>interface CountdownTimerProps { anniversaries?: Anniversary[]; className?: string; }</signature>
+      <path>src/components/CountdownTimer/CountdownTimer.tsx (to be created)</path>
+      <description>Component displays next upcoming countdown. Optional anniversaries prop (defaults to store). className for responsive styling. Uses useState for countdown state, useEffect for 1-minute interval.</description>
+    </interface>
+    <interface>
+      <name>AnniversarySettings Component</name>
+      <kind>React component</kind>
+      <signature>Component displays list of anniversaries with add/edit/delete UI. Form with label, date, description fields. Validation via AnniversarySchema.</signature>
+      <path>src/components/Settings/AnniversarySettings.tsx (to be created)</path>
+      <description>Anniversary management UI in Settings page. List view with edit/delete buttons. Add form modal with validation. Field-specific error display via ValidationError.fieldErrors.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      **Unit Tests (Vitest):**
+      - CountdownService calculation tests (edge cases: leap years, month boundaries, timezone)
+      - AnniversarySchema validation tests (invalid dates, missing fields)
+      - Test fixtures: Use factory pattern for generating test anniversaries
+
+      **E2E Tests (Playwright):**
+      - Anniversary CRUD operations in settings
+      - Countdown display and updates on Home view
+      - Celebration animation trigger at zero
+      - Multiple anniversaries display correctly
+
+      **Patterns from Existing Tests:**
+      - Validation tests in tests/unit/validation/schemas.test.ts - follow for AnniversarySchema validation tests
+      - Component tests use Vitest + React Testing Library (happy-dom)
+      - E2E tests use Playwright with data-testid attributes
+    </standards>
+
+    <locations>
+      - tests/unit/countdownService.test.ts - CountdownService utility tests
+      - tests/unit/validation/schemas.test.ts - AnniversarySchema validation tests (extend existing)
+      - tests/e2e/anniversary-countdown.spec.ts - End-to-end countdown journey tests
+      - src/components/CountdownTimer/CountdownTimer.test.tsx - Component unit tests
+    </locations>
+
+    <ideas>
+      - **Unit Test: calculateTimeRemaining edge cases**
+        - Leap year anniversary (Feb 29 → Feb 28 in non-leap years)
+        - Month boundary (anniversary on 31st but target month has 30 days)
+        - Timezone consistency (user changes timezone, countdown remains correct)
+        - Past anniversaries (negative days, "Celebrated" display)
+        - Acceptance Criteria: AC3
+
+      - **Unit Test: getNextAnniversary sorting and filtering**
+        - Multiple anniversaries, returns nearest future date
+        - All past anniversaries, returns null
+        - Single anniversary, returns that anniversary
+        - Acceptance Criteria: AC3
+
+      - **Unit Test: shouldTriggerCelebration tolerance**
+        - Countdown at exactly 0:00:00 → true
+        - Countdown at 0:00:59 → true (1-minute tolerance)
+        - Countdown at 0:01:00 → false
+        - Acceptance Criteria: AC4
+
+      - **E2E Test: Add anniversary in settings → display in countdown**
+        - Navigate to Settings
+        - Add anniversary with label "First Date" and future date
+        - Navigate to Home
+        - Verify countdown displays "X days, Y hours, Z minutes until First Date"
+        - Acceptance Criteria: AC1, AC2, AC6
+
+      - **E2E Test: Countdown updates after 1 minute**
+        - Mock time or use fast-forward
+        - Verify countdown decreases by 1 minute
+        - Verify component re-renders with new time
+        - Acceptance Criteria: AC2, AC7
+
+      - **E2E Test: Celebration animation at zero**
+        - Mock countdown reaching 0:00:00
+        - Verify Framer Motion animation plays (fireworks/confetti)
+        - Verify DailyMessage shows special anniversary message
+        - Verify animation plays once, not looping
+        - Acceptance Criteria: AC4
+
+      - **E2E Test: Multiple anniversaries display**
+        - Add 3+ anniversaries with different dates
+        - Verify Home view shows next 3 upcoming as stacked cards
+        - Verify nearest anniversary highlighted
+        - Acceptance Criteria: AC2, AC6
+
+      - **E2E Test: Edit anniversary updates countdown**
+        - Edit anniversary date in settings
+        - Verify countdown recalculates and displays new time
+        - Acceptance Criteria: AC1
+
+      - **E2E Test: Delete anniversary removes countdown**
+        - Delete anniversary in settings
+        - Verify countdown disappears from Home view
+        - If multiple, verify next countdown displays
+        - Acceptance Criteria: AC1
+
+      - **E2E Test: Form validation errors**
+        - Submit empty label → verify "Anniversary label cannot be empty" error
+        - Submit invalid date format → verify "Date must be in ISO format" error
+        - Submit date with month >12 → verify "Invalid date values" error
+        - Acceptance Criteria: AC1, AC8
+    </ideas>
+  </tests>
+</story-context>

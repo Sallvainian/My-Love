@@ -869,7 +869,7 @@ So that corrupted or invalid data can't enter the system.
 
 ### Goal
 
-Build interactive features that enable real-time emotional connection: mood tracking synced via PocketBase backend, poke/kiss interactions, and anniversary countdown timers.
+Build interactive features that enable real-time emotional connection: mood tracking synced via Supabase backend, poke/kiss interactions, and anniversary countdown timers.
 
 ### Value Delivery
 
@@ -877,20 +877,22 @@ She can log daily moods that you can see, you can send spontaneous "kisses" or "
 
 ### Stories
 
-**Story 6.1: PocketBase Backend Setup & API Integration**
+**Story 6.1: Supabase Backend Setup & API Integration**
 
 As a developer,
-I want to set up PocketBase backend and create API integration layer,
+I want to set up Supabase backend and create API integration layer,
 So that I can sync mood and interaction data between devices.
 
 **Acceptance Criteria:**
 
-1. PocketBase instance deployed (free tier on PocketBase Cloud or self-hosted)
-2. Create collections: `moods` (id, date, mood_type, note, user, created), `interactions` (id, type, from_user, to_user, created, viewed)
-3. API service layer created: `pocketbase.service.ts` with methods: saveMood, getMoods, sendInteraction, getInteractions
-4. Authentication configured (API token stored securely in env vars)
-5. Error handling for network failures (graceful degradation)
-6. Rate limiting protection to stay within free tier limits
+1. Supabase project created (free tier on https://supabase.com)
+2. Create tables with Row Level Security: `moods` (id, user_id, mood_type, note, created_at, updated_at), `interactions` (id, type, from_user_id, to_user_id, viewed, created_at), `users` (id, partner_name, device_id)
+3. Enable Realtime for `moods` and `interactions` tables
+4. API service layer created: `supabase.service.ts` using `@supabase/supabase-js` with methods: saveMood, getMoods, sendInteraction, getInteractions
+5. Authentication configured (Supabase URL and anon key stored in env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+6. Row Level Security policies enforce access control at database level (users can insert own moods, view own and partner moods/interactions)
+7. Error handling for network failures (graceful degradation to local-only mode)
+8. SupabaseClient configured as singleton in `src/api/supabaseClient.ts` with JWT authentication
 
 **Prerequisites:** Epic 1 complete
 
@@ -996,11 +998,34 @@ So that I can look forward to special dates.
 
 ---
 
+**Story 6.7: User Authentication & Login Screen**
+
+As a user,
+I want to log in with my credentials,
+So that my mood logs and interactions are secure and synced to my account.
+
+**Acceptance Criteria:**
+
+1. Login screen displays on app load if user is not authenticated
+2. Login form includes email and password fields with validation
+3. "Sign In" button authenticates user via Supabase Auth
+4. Successful login stores auth session and navigates to home screen
+5. Failed login shows error message (invalid credentials, network error)
+6. Auth session persists across page reloads (localStorage/session storage)
+7. Logout functionality available in Settings tab
+8. Test user accounts work with E2E tests (testuser1@example.com, testuser2@example.com)
+9. Row Level Security policies enforce user can only access their own data
+10. Replace hardcoded VITE_USER_ID with authenticated user ID from Supabase session
+
+**Prerequisites:** Story 6.1
+
+---
+
 **Epic 6 Summary:**
 
-- **Total Stories:** 6
+- **Total Stories:** 7
 - **Estimated Effort:** Medium-High (backend integration adds complexity)
-- **Deliverable:** Mood tracking, poke/kiss interactions, anniversary countdowns
+- **Deliverable:** Mood tracking, poke/kiss interactions, anniversary countdowns, user authentication
 
 ---
 

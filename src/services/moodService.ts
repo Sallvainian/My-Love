@@ -4,7 +4,6 @@ import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { MoodEntrySchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
-import { USER_ID } from '../config/constants';
 
 const DB_NAME = 'my-love-db';
 const DB_VERSION = 3; // Story 6.2: Increment from 2 to 3 for moods store
@@ -128,16 +127,17 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
    * Story 6.2: Save with full metadata (userId, mood, note, date, timestamp, synced)
    * Story 5.5: Added runtime validation with Zod schema
    *
+   * @param userId - Authenticated user's UUID from Supabase
    * @param mood - Mood type (loved, happy, content, thoughtful, grateful)
    * @param note - Optional note (max 200 chars)
    * @returns MoodEntry with auto-generated id
    * @throws {ValidationError} if mood data is invalid
    */
-  async create(mood: MoodEntry['mood'], note?: string): Promise<MoodEntry> {
+  async create(userId: string, mood: MoodEntry['mood'], note?: string): Promise<MoodEntry> {
     try {
       const today = new Date().toISOString().split('T')[0];
       const moodEntry: Omit<MoodEntry, 'id'> = {
-        userId: USER_ID,
+        userId,
         mood,
         note: note || '',
         date: today,
