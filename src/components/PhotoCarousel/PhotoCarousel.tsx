@@ -23,17 +23,11 @@ import { PhotoDeleteConfirmation } from '../PhotoDeleteConfirmation/PhotoDeleteC
  * - AC-4.4.4: Delete button opens PhotoDeleteConfirmation
  */
 export function PhotoCarousel() {
-  const {
-    photos,
-    selectedPhotoId,
-    selectPhoto,
-    clearPhotoSelection,
-    updatePhoto,
-    deletePhoto,
-  } = useAppStore();
+  const { photos, selectedPhotoId, selectPhoto, clearPhotoSelection, updatePhoto, deletePhoto } =
+    useAppStore();
 
   // Find current photo index based on selectedPhotoId
-  const currentIndex = photos.findIndex(p => p.id === selectedPhotoId);
+  const currentIndex = photos.findIndex((p) => p.id === selectedPhotoId);
   const currentPhoto = photos[currentIndex];
 
   // Navigation state
@@ -43,7 +37,7 @@ export function PhotoCarousel() {
   // Story 4.4: Modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  
+
   // AC-4.3.3 & Task 6: Blob URL management (cleanup to prevent memory leaks)
   useEffect(() => {
     if (currentPhoto?.imageBlob) {
@@ -60,7 +54,7 @@ export function PhotoCarousel() {
       }
     }
   }, [currentPhoto]);
-  
+
   // AC-4.3.2: Navigation functions (with boundary checking)
   const navigateToNext = useCallback(() => {
     if (currentIndex < photos.length - 1) {
@@ -69,7 +63,7 @@ export function PhotoCarousel() {
       setDirection('left'); // Swipe left shows next photo
     }
   }, [currentIndex, photos, selectPhoto]);
-  
+
   const navigateToPrev = useCallback(() => {
     if (currentIndex > 0) {
       const prevPhoto = photos[currentIndex - 1];
@@ -77,11 +71,11 @@ export function PhotoCarousel() {
       setDirection('right'); // Swipe right shows previous photo
     }
   }, [currentIndex, photos, selectPhoto]);
-  
+
   // AC-4.3.2: Swipe gesture handler (50px threshold)
   const handleDragEnd = (_event: any, info: PanInfo) => {
     const swipeThreshold = 50;
-    
+
     // Swipe left (offset.x < -50) → next photo
     if (info.offset.x < -swipeThreshold) {
       navigateToNext();
@@ -95,7 +89,7 @@ export function PhotoCarousel() {
       clearPhotoSelection();
     }
   };
-  
+
   // AC-4.3.6: Keyboard navigation (ArrowLeft, ArrowRight, Escape)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -145,16 +139,16 @@ export function PhotoCarousel() {
     left: currentIndex === photos.length - 1 ? 0 : -100,
     right: currentIndex === 0 ? 0 : 100,
   };
-  
+
   // Don't render if no photo selected
   if (!currentPhoto || selectedPhotoId === null) {
     return null;
   }
-  
+
   // AC-4.3.7: Exit animation direction based on swipe
   const exitX = direction === 'left' ? -300 : 300;
   const enterX = direction === 'left' ? 300 : -300;
-  
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
@@ -171,7 +165,7 @@ export function PhotoCarousel() {
         currentIndex={currentIndex}
         totalPhotos={photos.length}
       />
-      
+
       {/* AC-4.3.7: AnimatePresence for smooth enter/exit transitions */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
@@ -201,18 +195,24 @@ export function PhotoCarousel() {
               data-testid="photo-carousel-image"
             />
           </div>
-          
+
           {/* AC-4.3.4: Caption and tags below photo */}
           {(currentPhoto.caption || currentPhoto.tags.length > 0) && (
             <div className="mt-6 text-center max-w-4xl" data-testid="photo-carousel-metadata">
               {currentPhoto.caption && (
-                <h3 className="text-white text-xl font-medium mb-3" data-testid="photo-carousel-caption">
+                <h3
+                  className="text-white text-xl font-medium mb-3"
+                  data-testid="photo-carousel-caption"
+                >
                   {currentPhoto.caption}
                 </h3>
               )}
-              
+
               {currentPhoto.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center" data-testid="photo-carousel-tags">
+                <div
+                  className="flex flex-wrap gap-2 justify-center"
+                  data-testid="photo-carousel-tags"
+                >
                   {currentPhoto.tags.map((tag, index) => (
                     <span
                       key={index}
@@ -231,18 +231,12 @@ export function PhotoCarousel() {
 
       {/* Navigation hint text */}
       <div className="fixed bottom-4 left-0 right-0 text-center text-white/60 text-sm">
-        <p>
-          ← → Arrow keys or swipe to navigate • Esc to close • ↓ Swipe down to close
-        </p>
+        <p>← → Arrow keys or swipe to navigate • Esc to close • ↓ Swipe down to close</p>
       </div>
 
       {/* Story 4.4: AC-4.4.1, AC-4.4.2, AC-4.4.3 - Photo Edit Modal */}
       {isEditModalOpen && (
-        <PhotoEditModal
-          photo={currentPhoto}
-          onClose={handleCloseEditModal}
-          onSave={updatePhoto}
-        />
+        <PhotoEditModal photo={currentPhoto} onClose={handleCloseEditModal} onSave={updatePhoto} />
       )}
 
       {/* Story 4.4: AC-4.4.4, AC-4.4.5 - Photo Delete Confirmation */}

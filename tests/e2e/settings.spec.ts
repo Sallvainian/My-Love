@@ -26,7 +26,9 @@ test.describe('Settings Persistence', () => {
 
     const settingsData = JSON.parse(storedSettings!);
     expect(settingsData.state.settings).toBeTruthy();
-    expect(settingsData.state.settings.relationship.partnerName).toBe(APP_CONFIG.defaultPartnerName);
+    expect(settingsData.state.settings.relationship.partnerName).toBe(
+      APP_CONFIG.defaultPartnerName
+    );
 
     console.log(`✓ Pre-configured partner name loaded: ${APP_CONFIG.defaultPartnerName}`);
   });
@@ -117,21 +119,24 @@ test.describe('Settings Persistence', () => {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
 
-    await cleanApp.evaluate(({ newStartDate, partnerName }) => {
-      const store = (window as any).__APP_STORE__;
-      if (store && store.getState) {
-        const { updateSettings } = store.getState();
-        updateSettings({
-          relationship: {
-            partnerName,
-            startDate: newStartDate,
-            anniversaries: [],
-          },
-        });
-        // Trigger UI update by calling updateCurrentMessage
-        store.getState().updateCurrentMessage();
-      }
-    }, { newStartDate: oneYearAgoStr, partnerName: 'Gracie' });
+    await cleanApp.evaluate(
+      ({ newStartDate, partnerName }) => {
+        const store = (window as any).__APP_STORE__;
+        if (store && store.getState) {
+          const { updateSettings } = store.getState();
+          updateSettings({
+            relationship: {
+              partnerName,
+              startDate: newStartDate,
+              anniversaries: [],
+            },
+          });
+          // Trigger UI update by calling updateCurrentMessage
+          store.getState().updateCurrentMessage();
+        }
+      },
+      { newStartDate: oneYearAgoStr, partnerName: 'Gracie' }
+    );
 
     // Wait for duration counter to update
     await cleanApp.waitForTimeout(500);
@@ -237,7 +242,9 @@ test.describe('Settings Persistence', () => {
     const storedSettings = await getLocalStorageItem(cleanApp, 'my-love-storage');
     const settingsData = JSON.parse(storedSettings!);
 
-    expect(settingsData.state.settings.relationship.partnerName).toBe(APP_CONFIG.defaultPartnerName);
+    expect(settingsData.state.settings.relationship.partnerName).toBe(
+      APP_CONFIG.defaultPartnerName
+    );
     expect(settingsData.state.settings.relationship.startDate).toBe(APP_CONFIG.defaultStartDate);
     expect(settingsData.state.isOnboarded).toBe(true); // Story 1.4: auto-onboarded with pre-configuration
 

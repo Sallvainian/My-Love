@@ -16,16 +16,12 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('home')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'home'
-              ? 'text-pink-500'
-              : 'text-gray-400 hover:text-gray-600'
+            currentView === 'home' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
           }`}
           data-testid="nav-home"
           aria-label="Home"
         >
-          <Heart
-            className={`w-6 h-6 mb-1 ${currentView === 'home' ? 'fill-current' : ''}`}
-          />
+          <Heart className={`w-6 h-6 mb-1 ${currentView === 'home' ? 'fill-current' : ''}`} />
           <span className="text-xs font-medium">Home</span>
         </button>
 
@@ -33,9 +29,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('photos')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'photos'
-              ? 'text-pink-500'
-              : 'text-gray-400 hover:text-gray-600'
+            currentView === 'photos' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
           }`}
           data-testid="nav-photos"
           aria-label="Photos"

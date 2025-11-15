@@ -186,8 +186,7 @@ Note any interaction preferences for future workflow creation.
 - New workflows needed: Note that they'll be created with intent-based + interactive defaults unless specified
   </action>
 
-<example>
-```yaml
+<example type='yaml'>
 menu:
   # Commands emerge from discussion
   - trigger: [emerging from conversation]
@@ -200,9 +199,7 @@ menu:
   workflow: "{project-root}/.bmad/SOURCE_MODULE/workflows/path/to/workflow.yaml"
   workflow-install: "{project-root}/.bmad/THIS_MODULE/workflows/vendored/path/workflow.yaml"
   description: [description]
-
-`````
-</example>
+  </example>
 
 <note>**Workflow Vendoring (Advanced):**
 When an agent needs workflows from another module, use both `workflow` (source) and `workflow-install` (destination).
@@ -244,14 +241,14 @@ This is typically used when creating specialized modules that reuse common workf
       icon: {{agent_icon}} # The perfect emoji
       module: {{target_module}}
 
-persona:
-role: |
-{{The role discovered}}
-identity: |
-{{The background that emerged}}
-communication_style: |
-{{The style they loved}}
-principles: {{The beliefs articulated}}
+    persona:
+      role: |
+      {{The role discovered}}
+      identity: |
+      {{The background that emerged}}
+      communication_style: |
+      {{The style they loved}}
+      principles: {{The beliefs articulated}}
 
 # Features explored
 
@@ -312,7 +309,7 @@ menu: {{The capabilities built}}
 
 **Folder Structure:**
 
-`````
+```text
 
 {{agent_filename}}-sidecar/
 ├── memories.md # Persistent memory
@@ -321,7 +318,7 @@ menu: {{The capabilities built}}
 │ └── README.md
 └── sessions/ # Session notes
 
-````
+```
 
 **File: memories.md**
 
@@ -339,7 +336,7 @@ menu: {{The capabilities built}}
 ## Personal Notes
 
 <!-- My observations and insights -->
-````
+```
 
 **File: instructions.md**
 

@@ -22,11 +22,13 @@ Comprehensive guide for writing, running, and debugging end-to-end tests for the
 #### System Requirements
 
 **Operating System:**
+
 - Linux (Ubuntu 20.04+, Debian 11+, or similar)
 - macOS 11+ (Big Sur or later)
 - Windows 10/11 with WSL2 (recommended) or native
 
 **Hardware:**
+
 - **CPU:** 4+ cores recommended (tests run in parallel)
 - **RAM:** 8 GB minimum, 16 GB recommended
 - **Disk Space:** 5 GB minimum (includes browsers, node_modules, build artifacts)
@@ -34,26 +36,30 @@ Comprehensive guide for writing, running, and debugging end-to-end tests for the
 #### Software Dependencies
 
 **Node.js and Package Manager:**
+
 - **Node.js:** 18.x or 20.x LTS (tested with 18.19.0 and 20.11.0)
 - **npm:** 9.x or 10.x (comes with Node.js)
 - **pnpm:** 8.x+ (optional alternative)
 - **yarn:** 4.x+ (optional alternative)
 
 **Version check:**
+
 ```bash
 node --version  # Should show v18.x.x or v20.x.x
 npm --version   # Should show 9.x.x or 10.x.x
 ```
 
 **Browser Binaries:**
+
 - Playwright will download browser binaries automatically (~1.5 GB)
 - Chromium (latest stable)
 - Firefox (latest stable)
-- WebKit (Safari engine) - *optional, requires additional system libraries*
+- WebKit (Safari engine) - _optional, requires additional system libraries_
 
 #### Project Dependencies
 
 **Core Dependencies** (from package.json):
+
 - **react:** ^19.1.1 - UI framework
 - **react-dom:** ^19.1.1 - React DOM renderer
 - **zustand:** ^5.0.8 - State management with persist middleware
@@ -61,6 +67,7 @@ npm --version   # Should show 9.x.x or 10.x.x
 - **workbox-window:** ^7.3.0 - Service worker integration
 
 **Development Dependencies:**
+
 - **@playwright/test:** ^1.56.1 - E2E testing framework
 - **vite:** ^7.1.7 - Dev server and build tool
 - **typescript:** ^5.8.3 - Type checking
@@ -70,6 +77,7 @@ npm --version   # Should show 9.x.x or 10.x.x
 **Additional System Dependencies for WebKit (Linux only):**
 
 On Ubuntu/Debian:
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
@@ -81,6 +89,7 @@ sudo apt-get install -y \
 ```
 
 On Fedora/RHEL:
+
 ```bash
 sudo dnf install -y \
   libicu \
@@ -105,6 +114,7 @@ gh --version    # Should show 2.x.x (optional)
 #### Environment Setup Summary
 
 **Quick Start (Linux/macOS):**
+
 ```bash
 # 1. Verify Node.js version
 node --version  # 18.x or 20.x
@@ -127,11 +137,13 @@ npm run test:e2e
 ```
 
 **For Windows Users:**
+
 - Install WSL2 with Ubuntu 20.04+ (recommended)
 - Follow Linux quick start steps in WSL2 terminal
 - Native Windows testing supported but WSL2 provides better compatibility
 
 **For CI/CD Environments:**
+
 - Use official Playwright Docker image: `mcr.microsoft.com/playwright:v1.56.1-jammy`
 - Pre-installed browsers and system dependencies
 - See `.github/workflows` for GitHub Actions setup example
@@ -139,11 +151,13 @@ npm run test:e2e
 ### Installation
 
 1. **Install project dependencies** (includes Playwright):
+
    ```bash
    npm install
    ```
 
 2. **Install Playwright browser binaries**:
+
    ```bash
    npx playwright install
    ```
@@ -151,6 +165,7 @@ npm run test:e2e
    This downloads Chromium, Firefox, and WebKit browser binaries (~1.5 GB total).
 
 3. **Verify installation**:
+
    ```bash
    npm run test:e2e -- --version
    ```
@@ -160,39 +175,47 @@ npm run test:e2e
 ### Test Execution Commands
 
 **Run all tests (headless mode, all browsers):**
+
 ```bash
 npm run test:e2e
 ```
 
 **Run tests in UI mode (interactive test development):**
+
 ```bash
 npm run test:e2e:ui
 ```
+
 - Visual test explorer with DOM snapshots
 - Click to run individual tests
 - Watch mode with live test updates
 - Time travel debugging through test steps
 
 **Run tests in debug mode (Playwright Inspector):**
+
 ```bash
 npm run test:e2e:debug
 ```
+
 - Pauses at first test
 - Step through test actions
 - Inspect page state at each step
 - Console REPL for live queries
 
 **Run specific test file:**
+
 ```bash
 npm run test:e2e tests/e2e/setup-validation.spec.ts
 ```
 
 **Run tests in headed mode (see browser window):**
+
 ```bash
 npx playwright test --headed
 ```
 
 **Run tests in specific browser:**
+
 ```bash
 npx playwright test --project=chromium
 npx playwright test --project=firefox
@@ -208,6 +231,7 @@ Playwright automatically manages the Vite development server lifecycle during te
 ### How It Works
 
 **Configuration** (`playwright.config.ts` lines 90-98):
+
 ```typescript
 webServer: {
   command: 'npm run dev',                      // Command to start server
@@ -218,12 +242,14 @@ webServer: {
 ```
 
 **Behavior:**
+
 1. **Before tests start:** Playwright spawns `npm run dev` process
 2. **Readiness check:** Polls URL until HTTP 200 response (typically 10-30 seconds)
 3. **Test execution:** Runs all tests against the ready server
 4. **After tests complete:** Sends SIGTERM to gracefully shut down server
 
 **Environment-Aware:**
+
 - **Local Development:** Reuses existing server if port 5173 is occupied (`reuseExistingServer: true`)
 - **CI Environment:** Always starts fresh server ignoring existing processes (`reuseExistingServer: false` when `CI=true`)
 
@@ -236,11 +262,13 @@ webServer: {
 Most common scenario - tests start server automatically from clean state.
 
 **Command:**
+
 ```bash
 npm run test:e2e
 ```
 
 **What happens:**
+
 1. Playwright checks port 5173 - finds it empty
 2. Spawns `npm run dev` process
 3. Waits for `http://localhost:5173/My-Love/` to respond (HTTP 200)
@@ -251,6 +279,7 @@ npm run test:e2e
 **Startup time:** ~10-30 seconds including PWA service worker registration
 
 **Use when:**
+
 - Running full test suite
 - CI/CD pipeline execution
 - Clean environment testing
@@ -262,6 +291,7 @@ npm run test:e2e
 When dev server is already running (e.g., in separate terminal for development), Playwright detects and reuses it.
 
 **Setup:**
+
 ```bash
 # Terminal 1: Start dev server manually
 npm run dev
@@ -271,6 +301,7 @@ npm run test:e2e
 ```
 
 **What happens:**
+
 1. Playwright checks port 5173 - finds existing server
 2. Reuses existing server (no new process spawned)
 3. Runs tests immediately (no startup delay)
@@ -280,11 +311,13 @@ npm run test:e2e
 **Startup time:** ~0 seconds (immediate test execution)
 
 **Use when:**
+
 - Local development with live server
 - Iterative test development
 - Debugging UI changes while running tests
 
 **How to identify:**
+
 - No "Starting server..." message in console
 - Tests begin immediately without 10-30 second wait
 - Dev server terminal shows no restart
@@ -296,12 +329,14 @@ npm run test:e2e
 In CI environments (`CI=true`), Playwright always starts a fresh server regardless of port availability.
 
 **Configuration:**
+
 ```bash
 export CI=true  # Set in GitHub Actions automatically
 npm run test:e2e
 ```
 
 **What happens:**
+
 1. Playwright starts fresh `npm run dev` process
 2. Ignores any existing process on port 5173
 3. Runs tests against fresh server
@@ -309,11 +344,13 @@ npm run test:e2e
 5. Clean environment for next run
 
 **Use when:**
+
 - GitHub Actions workflows
 - CI/CD pipelines
 - Reproducible test environments
 
 **Why fresh start in CI:**
+
 - Ensures consistent test environment
 - No contamination from previous runs
 - Catches port conflicts before deployment
@@ -328,16 +365,18 @@ npm run test:e2e
 Shell command to start the development server.
 
 **Requirements:**
+
 - Must match a valid script in `package.json`
 - Server must start within `timeout` period
 - Server must respond to `url` with HTTP 200
 
 **Current setup:**
+
 ```json
 // package.json
 {
   "scripts": {
-    "dev": "vite"  // Starts Vite dev server on port 5173
+    "dev": "vite" // Starts Vite dev server on port 5173
   }
 }
 ```
@@ -349,20 +388,23 @@ Shell command to start the development server.
 URL that Playwright polls to determine server readiness.
 
 **Requirements:**
+
 - Must match Vite base path configuration
 - Server must return HTTP 200 when ready
 - Must include base path from `vite.config.ts`
 
 **Current setup:**
+
 ```typescript
 // vite.config.ts
 export default defineConfig({
-  base: '/My-Love/',  // Must match webServer url path
+  base: '/My-Love/', // Must match webServer url path
   // ...
 });
 ```
 
 **Validation:**
+
 ```bash
 # After server starts, should return HTTP 200
 curl -I http://localhost:5173/My-Love/
@@ -375,16 +417,19 @@ curl -I http://localhost:5173/My-Love/
 Controls server reuse behavior based on environment.
 
 **Local Development** (`CI` not set):
+
 - Value: `true`
 - Behavior: Reuses existing server if port 5173 occupied
 - Use case: Developer has server running for UI work
 
 **CI Environment** (`CI=true`):
+
 - Value: `false`
 - Behavior: Always starts fresh server
 - Use case: Reproducible, isolated test environment
 
 **Example:**
+
 ```bash
 # Local: Reuses existing server
 npm run test:e2e
@@ -404,17 +449,20 @@ Maximum time (in milliseconds) to wait for server readiness.
 **Current setting:** 2 minutes (120,000 ms)
 
 **Why 2 minutes:**
+
 - Typical startup: 10-30 seconds (including PWA service worker)
 - Slow CI environments: 60-90 seconds
 - Generous buffer for dependency loading
 - Accommodates service worker registration delay (2-5 seconds)
 
 **When to increase:**
+
 - Very slow CI environments (resource-constrained)
 - Large dependency trees
 - Complex build steps in dev mode
 
 **When server fails to start:**
+
 - Error message: "Server did not start in 120000ms"
 - Check: `npm run dev` works independently
 - Check: Port 5173 not occupied by other process
@@ -429,12 +477,14 @@ Maximum time (in milliseconds) to wait for server readiness.
 **Symptom:** Tests timeout with "Server did not start in 120000ms"
 
 **Causes:**
+
 1. Port 5173 occupied by another process
 2. `npm run dev` fails independently
 3. Vite base path mismatch
 4. Dependencies not installed
 
 **Solutions:**
+
 ```bash
 # 1. Check if port is occupied
 lsof -ti:5173
@@ -462,6 +512,7 @@ npm install
 **Cause:** Server process didn't receive SIGTERM signal
 
 **Solution:**
+
 ```bash
 # Find and kill orphaned process
 lsof -ti:5173 | xargs kill
@@ -471,6 +522,7 @@ lsof -ti:5173 | xargs kill -9
 ```
 
 **Prevention:**
+
 - Ensure tests complete normally (no Ctrl+C during execution)
 - Use background processes properly (`&` operator)
 - Let Playwright manage server lifecycle
@@ -484,6 +536,7 @@ lsof -ti:5173 | xargs kill -9
 **Cause:** Server not responding at `url` yet
 
 **Diagnosis:**
+
 ```bash
 # Check if URL returns HTTP 200
 curl -I http://localhost:5173/My-Love/
@@ -491,6 +544,7 @@ curl -I http://localhost:5173/My-Love/
 ```
 
 **Solutions:**
+
 1. **Base path mismatch:** Ensure `vite.config.ts` base matches webServer URL
 2. **Increase timeout:** Change `timeout: 180000` (3 minutes) if CI is very slow
 3. **Service worker delay:** 120-second timeout already accommodates PWA startup
@@ -506,6 +560,7 @@ curl -I http://localhost:5173/My-Love/
 **Known limitation:** Port 5173 is hardcoded (no dynamic port fallback)
 
 **Solutions:**
+
 ```bash
 # Option 1: Kill process on port 5173
 lsof -ti:5173 | xargs kill
@@ -519,6 +574,7 @@ url: 'http://localhost:5174/My-Love/',
 ```
 
 **Why hardcoded port:**
+
 - Port 5173 is Vite's default and rarely conflicts
 - Dynamic port detection requires parsing Vite output (complex)
 - Single-developer project doesn't benefit from dynamic ports
@@ -531,6 +587,7 @@ url: 'http://localhost:5174/My-Love/',
 **Symptom:** Tests pass with manual server but fail in CI
 
 **Diagnosis:**
+
 ```bash
 # Simulate CI environment locally
 export CI=true
@@ -539,12 +596,14 @@ unset CI  # Restore after test
 ```
 
 **Common causes:**
+
 1. **Local server reuse hiding bugs:** CI starts fresh, exposes startup issues
 2. **Port conflicts in CI:** Previous job didn't clean up
 3. **Timeout too short:** Slow CI environment needs >120 seconds
 4. **Base path mismatch:** Works with manual server but not auto-start
 
 **Solutions:**
+
 1. Always test with `CI=true` before pushing
 2. Increase timeout for slow CI: `timeout: 180000`
 3. Verify `npm run dev` succeeds in clean CI environment
@@ -569,18 +628,22 @@ Before relying on webServer auto-start:
 ### Known Limitations
 
 **1. Port 5173 is hardcoded**
+
 - No dynamic port fallback if port occupied
 - Workaround: Kill process on port 5173 or change Vite port
 
 **2. Timeout applies to entire startup**
+
 - 120-second timeout includes Vite bundling + service worker registration
 - Slow CI environments may need increased timeout
 
 **3. No parallel server instances**
+
 - Cannot run multiple test suites simultaneously (port conflict)
 - Playwright handles parallelization at worker level, not server level
 
 **4. Environment variable dependency**
+
 - `reuseExistingServer` behavior depends on `CI` environment variable
 - Must be set correctly in CI/CD configuration
 
@@ -589,6 +652,7 @@ Before relying on webServer auto-start:
 ### Best Practices
 
 **✅ Do:**
+
 - Let Playwright manage server lifecycle (don't start manually for tests)
 - Use cold start for CI and full regression testing
 - Use warm start for iterative test development
@@ -596,6 +660,7 @@ Before relying on webServer auto-start:
 - Monitor test startup time (should be consistent 10-30 seconds)
 
 **❌ Don't:**
+
 - Start multiple servers on port 5173 simultaneously
 - Modify server configuration during test execution
 - Rely on server reuse in CI (use `CI=true`)
@@ -617,6 +682,7 @@ Before relying on webServer auto-start:
 PWA-specific utilities for testing service workers, IndexedDB, LocalStorage, and offline functionality.
 
 **Import:**
+
 ```typescript
 import {
   waitForServiceWorker,
@@ -635,6 +701,7 @@ import {
 Waits for the service worker to be registered and active.
 
 **Parameters:**
+
 - `page: Page` - Playwright Page instance
 - `timeout?: number` - Maximum wait time in ms (default: 30000)
 
@@ -643,6 +710,7 @@ Waits for the service worker to be registered and active.
 **Throws:** Error if service worker not registered within timeout
 
 **Example:**
+
 ```typescript
 import { test, expect } from '@playwright/test';
 import { waitForServiceWorker } from '../support/helpers/pwaHelpers';
@@ -669,12 +737,14 @@ test('should have active service worker', async ({ page }) => {
 Deletes an IndexedDB database to ensure clean test state.
 
 **Parameters:**
+
 - `page: Page` - Playwright Page instance
 - `dbName: string` - Name of the database to delete
 
 **Returns:** `Promise<void>`
 
 **Example:**
+
 ```typescript
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -694,11 +764,13 @@ test('should start with empty database', async ({ page }) => {
 Simulate offline and online network conditions.
 
 **Parameters:**
+
 - `page: Page` - Playwright Page instance
 
 **Returns:** `Promise<void>`
 
 **Example:**
+
 ```typescript
 test('should work offline after initial load', async ({ page }) => {
   // Load page and wait for service worker to cache assets
@@ -724,15 +796,18 @@ test('should work offline after initial load', async ({ page }) => {
 Read and write LocalStorage values for testing Zustand persistence.
 
 **Parameters:**
+
 - `page: Page` - Playwright Page instance
 - `key: string` - LocalStorage key
 - `value: string` - Value to store (setLocalStorageItem only)
 
 **Returns:**
+
 - `getLocalStorageItem`: `Promise<string | null>`
 - `setLocalStorageItem`: `Promise<void>`
 
 **Example:**
+
 ```typescript
 test('should persist partner name to LocalStorage', async ({ page }) => {
   await page.goto('/');
@@ -749,10 +824,14 @@ test('should persist partner name to LocalStorage', async ({ page }) => {
 test('should restore state from LocalStorage', async ({ page }) => {
   // Pre-populate LocalStorage
   await page.goto('/');
-  await setLocalStorageItem(page, 'my-love-storage', JSON.stringify({
-    state: { partnerName: 'Jordan' },
-    version: 0
-  }));
+  await setLocalStorageItem(
+    page,
+    'my-love-storage',
+    JSON.stringify({
+      state: { partnerName: 'Jordan' },
+      version: 0,
+    })
+  );
 
   // Reload page
   await page.reload();
@@ -770,11 +849,13 @@ test('should restore state from LocalStorage', async ({ page }) => {
 Clears all LocalStorage data for clean test state.
 
 **Parameters:**
+
 - `page: Page` - Playwright Page instance
 
 **Returns:** `Promise<void>`
 
 **Example:**
+
 ```typescript
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -789,6 +870,7 @@ test.beforeEach(async ({ page }) => {
 Retrieves all records from an IndexedDB object store.
 
 **Parameters:**
+
 - `page: Page` - Playwright Page instance
 - `dbName: string` - Database name
 - `storeName: string` - Object store name
@@ -796,6 +878,7 @@ Retrieves all records from an IndexedDB object store.
 **Returns:** `Promise<any[]>` - Array of all records, or empty array if DB/store doesn't exist
 
 **Example:**
+
 ```typescript
 test('should save photo to IndexedDB', async ({ page }) => {
   await page.goto('/');
@@ -829,6 +912,7 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 ### Examples
 
 **Buttons:**
+
 ```html
 <button data-testid="message-favorite-button">Favorite</button>
 <button data-testid="message-share-button">Share</button>
@@ -837,6 +921,7 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 ```
 
 **Inputs:**
+
 ```html
 <input data-testid="settings-partner-name-input" />
 <input data-testid="admin-message-text-input" />
@@ -844,6 +929,7 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 ```
 
 **Display Elements:**
+
 ```html
 <div data-testid="message-text">Daily message content</div>
 <div data-testid="message-duration-counter">Day 42 Together</div>
@@ -853,6 +939,7 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 ```
 
 **Container Elements:**
+
 ```html
 <div data-testid="message-card">...</div>
 <div data-testid="photo-item">...</div>
@@ -862,6 +949,7 @@ Use semantic, stable `data-testid` attributes for reliable test selectors that r
 ### Component-Specific Conventions
 
 **DailyMessage Component:**
+
 - `data-testid="message-duration-counter"` - Relationship duration header
 - `data-testid="message-card"` - Main message card container
 - `data-testid="message-category-badge"` - Category badge (e.g., "Why I Love You")
@@ -906,18 +994,21 @@ const heartButton = cleanApp.getByTestId('message-favorite-button');
 ```
 
 **Benefits of migration:**
+
 - **Stability:** Tests survive Tailwind class changes, theme updates, and styling refactors
 - **Clarity:** `getByTestId('message-card')` is more readable than `.locator('.card').first()`
 - **Speed:** Direct element targeting without traversing CSS class combinations
 - **Maintainability:** Adding/removing CSS classes doesn't break tests
 
 **Common replacements:**
+
 - `.card` → `getByTestId('message-card')`
 - `.font-serif.text-gray-800` → `getByTestId('message-text')`
 - `button[aria-label*="favorite"]` → `getByTestId('message-favorite-button')`
 - `locator('h2:has-text("Day")').first()` → `getByTestId('message-duration-counter').locator('h2')`
 
 **Bulk migration using sed:**
+
 ```bash
 # Replace common CSS selectors across test files
 sed -i "s/cleanApp\.locator('\.card')\.first()/cleanApp.getByTestId('message-card')/g" tests/e2e/*.spec.ts
@@ -929,6 +1020,7 @@ sed -i "s/cleanApp\.locator('button\[aria-label\*=\"favorite\"\]')\.first()/clea
 When creating new components, add data-testid attributes immediately:
 
 **Checklist:**
+
 - [ ] All interactive elements (buttons, inputs, links) have data-testid
 - [ ] Main container elements have data-testid
 - [ ] Display elements that tests will query have data-testid
@@ -936,14 +1028,13 @@ When creating new components, add data-testid attributes immediately:
 - [ ] All lowercase, hyphen-separated
 
 **Example:**
+
 ```tsx
 export const PhotoGallery: React.FC = () => {
   return (
     <div data-testid="gallery-container">
       <h2 data-testid="gallery-header">Photo Gallery</h2>
-      <button data-testid="gallery-upload-button">
-        Upload Photo
-      </button>
+      <button data-testid="gallery-upload-button">Upload Photo</button>
       <div data-testid="gallery-grid">
         {photos.map((photo) => (
           <div key={photo.id} data-testid="gallery-photo-item">
@@ -960,12 +1051,14 @@ export const PhotoGallery: React.FC = () => {
 ### Test Suite Standards
 
 **As of Story 2.3 (Epic 2):**
+
 - ✅ All 106 active E2E tests migrated to data-testid selectors
 - ✅ 100% test pass rate maintained (Chromium + Firefox)
 - ✅ Zero CSS class selectors in test suite
 - ✅ All DailyMessage component elements tagged
 
 **Coverage:**
+
 - `tests/e2e/message-display.spec.ts` - 14 tests
 - `tests/e2e/favorites.spec.ts` - 8 tests
 - `tests/e2e/settings.spec.ts` - 6 tests
@@ -979,9 +1072,14 @@ export const PhotoGallery: React.FC = () => {
 ### Test Suite Structure
 
 **Use `describe` blocks to group related tests:**
+
 ```typescript
 import { test, expect } from '@playwright/test';
-import { waitForServiceWorker, clearIndexedDB, clearLocalStorage } from '../support/helpers/pwaHelpers';
+import {
+  waitForServiceWorker,
+  clearIndexedDB,
+  clearLocalStorage,
+} from '../support/helpers/pwaHelpers';
 
 test.describe('Message Favoriting', () => {
   test.beforeEach(async ({ page }) => {
@@ -1003,7 +1101,9 @@ test.describe('Message Favoriting', () => {
 
     // Then unfavorite
     await page.click('[data-testid="message-favorite-button"]');
-    await expect(page.locator('[data-testid="message-favorite-button"]')).not.toHaveClass(/favorited/);
+    await expect(page.locator('[data-testid="message-favorite-button"]')).not.toHaveClass(
+      /favorited/
+    );
   });
 });
 ```
@@ -1013,6 +1113,7 @@ test.describe('Message Favoriting', () => {
 **Each test should be independent and idempotent:**
 
 1. **Clean state in beforeEach:**
+
    ```typescript
    test.beforeEach(async ({ page }) => {
      await clearIndexedDB(page, 'my-love-db');
@@ -1077,11 +1178,13 @@ test.describe('Photo Gallery', () => {
 ### Playwright UI Mode (Recommended)
 
 **Start UI mode:**
+
 ```bash
 npm run test:e2e:ui
 ```
 
 **Features:**
+
 - Visual test explorer
 - Click to run individual tests
 - Watch mode with live updates
@@ -1091,6 +1194,7 @@ npm run test:e2e:ui
 - Console logs
 
 **Workflow:**
+
 1. Open UI mode: `npm run test:e2e:ui`
 2. Click on a test to run it
 3. Click on test steps to see DOM state
@@ -1106,11 +1210,13 @@ npm run test:e2e:ui
 Traces are automatically captured on first retry (configured in `playwright.config.ts`).
 
 **View trace:**
+
 ```bash
 npx playwright show-trace test-results/trace.zip
 ```
 
 **Features:**
+
 - Visual timeline of test execution
 - Screenshot at each step
 - Network requests
@@ -1123,11 +1229,13 @@ npx playwright show-trace test-results/trace.zip
 ### Playwright Inspector
 
 **Start debug mode:**
+
 ```bash
 npm run test:e2e:debug
 ```
 
 **Features:**
+
 - Pauses at first test
 - Step through test actions with "Step Over" button
 - Inspect page state at any point
@@ -1135,11 +1243,12 @@ npm run test:e2e:debug
 - Copy selectors from page
 
 **Console REPL commands:**
+
 ```javascript
 // In Playwright Inspector console:
-playwright.$('button')              // Find element
-playwright.$$('button')             // Find all elements
-playwright.$eval('button', el => el.textContent)  // Evaluate JS
+playwright.$('button'); // Find element
+playwright.$$('button'); // Find all elements
+playwright.$eval('button', (el) => el.textContent); // Evaluate JS
 ```
 
 ---
@@ -1147,11 +1256,13 @@ playwright.$eval('button', el => el.textContent)  // Evaluate JS
 ### Headed Mode
 
 **Run tests with visible browser:**
+
 ```bash
 npx playwright test --headed
 ```
 
 **Use cases:**
+
 - Visual debugging
 - Seeing UI interactions
 - Verifying animations
@@ -1164,11 +1275,13 @@ npx playwright test --headed
 **Slow down test execution to see actions:**
 
 **Via .env.test:**
+
 ```bash
 SLOW_MO=500 npm run test:e2e
 ```
 
 **Via command line:**
+
 ```bash
 npx playwright test --headed --slow-mo=500
 ```
@@ -1180,6 +1293,7 @@ Adds 500ms delay between each action.
 ### Console Logs
 
 **Add debug logs in tests:**
+
 ```typescript
 test('should do something', async ({ page }) => {
   console.log('Starting test...');
@@ -1196,6 +1310,7 @@ test('should do something', async ({ page }) => {
 ```
 
 **View console logs:**
+
 ```bash
 npx playwright test --headed
 # Console logs appear in terminal
@@ -1212,11 +1327,13 @@ GitHub Actions workflow automatically runs Playwright tests on every push and pu
 **File:** `.github/workflows/playwright.yml` (created in Story 2.6)
 
 **Triggers:**
+
 - **Push to `main` branch:** Validates merged code stays healthy
 - **Pull requests:** Validates code before merge, blocks PRs if tests fail
 - **Manual dispatch:** Can manually trigger workflow from Actions tab (optional)
 
 **Environment:**
+
 - **Runner:** Ubuntu 22.04 (ubuntu-latest)
 - **Node.js:** 20.x (matches local development)
 - **Browsers:** Chromium, Firefox (automatically installed with system dependencies)
@@ -1227,6 +1344,7 @@ GitHub Actions workflow automatically runs Playwright tests on every push and pu
 **CI-Specific Configuration:**
 
 The Playwright config automatically adjusts for CI environments via the `process.env.CI` flag:
+
 - CI uses fewer workers (2 vs 12 local) due to resource constraints
 - Retries enabled in CI (2) to handle transient failures, disabled locally (0) for fast feedback
 - GitHub reporter enabled for better CI output formatting
@@ -1261,6 +1379,7 @@ The Playwright config automatically adjusts for CI environments via the `process
 When tests fail (or if configured with `if: always()`), CI uploads test artifacts for debugging.
 
 **Artifacts included:**
+
 - **`playwright-report/`** - Full HTML test report with screenshots and traces
 - **`test-results/`** - Raw test output files (if present)
 
@@ -1275,6 +1394,7 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 **Artifact retention:** 7 days (configurable in workflow file)
 
 **Viewing HTML report:**
+
 - Index page shows all test suites and pass/fail status
 - Click on failed test to see error details, screenshots, and traces
 - Use trace viewer for step-by-step debugging with DOM snapshots
@@ -1284,15 +1404,18 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 #### Issue: Workflow fails with "Playwright browser install failed"
 
 **Symptoms:**
+
 - CI log shows error during `npx playwright install --with-deps` step
 - Error message: "Failed to install browsers" or "Failed to download browsers"
 
 **Causes:**
+
 - Network timeout downloading browser binaries (~1.5GB)
 - Corrupted npm cache in CI environment
 - GitHub Actions runner out of disk space
 
 **Solutions:**
+
 1. **Re-run workflow:** Often transient network issues resolve on retry
 2. **Check GitHub Actions status:** Verify no platform-wide outages
 3. **Review disk space:** Workflow logs show disk usage; artifact retention may need adjustment
@@ -1303,17 +1426,20 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 #### Issue: Tests timeout waiting for dev server
 
 **Symptoms:**
+
 - CI log shows: "Timed out waiting 180000ms for dev server to start"
 - Tests never run, workflow fails during server startup
 - Local tests pass but CI fails
 
 **Causes:**
+
 - webServer timeout too aggressive for CI resource constraints
 - Port conflict or binding issue in CI environment
 - Missing environment variables or configuration
 - npm ci installed incompatible dependencies
 
 **Solutions:**
+
 1. **Increase timeout in `playwright.config.ts`:**
    ```typescript
    webServer: {
@@ -1329,17 +1455,20 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 #### Issue: Flaky tests in CI but pass locally
 
 **Symptoms:**
+
 - Tests pass consistently locally (12 workers, 0 retries, fast machine)
 - Tests fail intermittently in CI (2 workers, slower execution, transient issues)
 - Failures with "Timeout exceeded" or "Element not visible"
 
 **Causes:**
+
 - Timing issues due to slower CI resources (2-core CPU vs local multi-core)
 - Race conditions in test code not caught by fast local execution
 - CI-specific browser behavior (headless vs headed)
 - Network latency for external resources (if tests hit real URLs)
 
 **Solutions:**
+
 1. **Review test for timing assumptions:** Remove `waitForTimeout()`, use auto-waiting assertions
 2. **Increase retries temporarily:** Set `retries: 2` in `playwright.config.ts` for CI
 3. **Use explicit waits:** Replace fragile selectors with robust `data-testid` attributes
@@ -1354,17 +1483,20 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 #### Issue: Workflow doesn't trigger on PR
 
 **Symptoms:**
+
 - Push to PR branch, but no workflow appears in Actions tab
 - "Checks" section on PR shows nothing
 - Other repositories' workflows work fine
 
 **Causes:**
+
 - Workflow YAML syntax error (GitHub silently ignores invalid workflows)
 - Workflow file not in `main` branch yet (first PR with workflow won't trigger itself)
 - GitHub Actions disabled in repository settings
 - Branch protection rules misconfigured
 
 **Solutions:**
+
 1. **Validate YAML syntax:** Use [GitHub Actions YAML validator](https://rhysd.github.io/actionlint/)
 2. **Merge workflow to main first:** First-time workflow setup requires merge to main before triggering
 3. **Check repository settings:** Settings → Actions → General → ensure Actions enabled
@@ -1376,16 +1508,19 @@ When tests fail (or if configured with `if: always()`), CI uploads test artifact
 #### Issue: Artifacts not uploading despite failures
 
 **Symptoms:**
+
 - Tests fail, but no artifacts appear in "Artifacts" section
 - Workflow completes without uploading reports
 
 **Causes:**
+
 - `if: failure()` condition not met (workflow canceled before upload step)
 - Artifact path incorrect (playwright-report/ not generated)
 - Artifact size exceeds GitHub limits (2GB per artifact)
 - Upload step failed silently
 
 **Solutions:**
+
 1. **Check artifact upload step logs:** Expand "Upload test artifacts" step for errors
 2. **Change condition to `if: always()`:** Uploads artifacts even on success (helpful for debugging)
 3. **Verify report generation:** Check "Run Playwright tests" logs for HTML reporter output
@@ -1475,19 +1610,22 @@ npx playwright test --workers=2 --retries=2
 **Solution:** Use explicit waits, not arbitrary sleeps
 
 ❌ **Bad:**
+
 ```typescript
 await page.click('button');
-await page.waitForTimeout(2000);  // Arbitrary wait
+await page.waitForTimeout(2000); // Arbitrary wait
 expect(page.locator('.result')).toBeVisible();
 ```
 
 ✅ **Good:**
+
 ```typescript
 await page.click('button');
-await expect(page.locator('.result')).toBeVisible();  // Waits until visible
+await expect(page.locator('.result')).toBeVisible(); // Waits until visible
 ```
 
 **Auto-waiting in Playwright:**
+
 - `page.click()` waits for element to be actionable
 - `page.fill()` waits for input to be editable
 - `expect().toBeVisible()` waits until assertion passes
@@ -1501,16 +1639,19 @@ await expect(page.locator('.result')).toBeVisible();  // Waits until visible
 **Solution:** Prefer `data-testid` over CSS classes
 
 ❌ **Bad:**
+
 ```typescript
-await page.click('.btn.btn-primary.rounded-lg');  // Brittle, coupled to styling
+await page.click('.btn.btn-primary.rounded-lg'); // Brittle, coupled to styling
 ```
 
 ✅ **Good:**
+
 ```typescript
-await page.click('[data-testid="submit-button"]');  // Stable, semantic
+await page.click('[data-testid="submit-button"]'); // Stable, semantic
 ```
 
 **Selector priority:**
+
 1. `data-testid` (best)
 2. Semantic HTML (`button[type="submit"]`)
 3. Text content (`text=Submit`)
@@ -1525,19 +1666,21 @@ await page.click('[data-testid="submit-button"]');  // Stable, semantic
 **Solution:** Always use `waitForServiceWorker` helper
 
 ❌ **Bad:**
+
 ```typescript
 test('should work offline', async ({ page }) => {
   await page.goto('/');
-  await goOffline(page);  // Service worker may not be ready!
+  await goOffline(page); // Service worker may not be ready!
   // Test may fail
 });
 ```
 
 ✅ **Good:**
+
 ```typescript
 test('should work offline', async ({ page }) => {
   await page.goto('/');
-  await waitForServiceWorker(page);  // Ensure SW ready
+  await waitForServiceWorker(page); // Ensure SW ready
   await goOffline(page);
   // Test works reliably
 });
@@ -1552,10 +1695,11 @@ test('should work offline', async ({ page }) => {
 **Solution:** Clear IndexedDB before each test
 
 ✅ **Good:**
+
 ```typescript
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await clearIndexedDB(page, 'my-love-db');  // Clean state
+  await clearIndexedDB(page, 'my-love-db'); // Clean state
 });
 ```
 
@@ -1566,27 +1710,30 @@ test.beforeEach(async ({ page }) => {
 **Problem:** Test passes locally but fails in CI intermittently
 
 **Root causes:**
+
 1. Race conditions (use explicit waits)
 2. Network timing (use `waitForResponse`)
 3. Service worker caching (clear caches in beforeEach)
 4. Shared state between tests (ensure test isolation)
 
 **Investigation steps:**
+
 1. Run test 10 times locally: `npx playwright test --repeat-each=10`
 2. Check CI artifacts (screenshots, videos, traces)
 3. Increase timeout if PWA operation legitimately slow
 4. Add retry logic only as last resort
 
 **Example: Wait for network response**
+
 ```typescript
 test('should save data', async ({ page }) => {
   // Wait for API call to complete
-  const responsePromise = page.waitForResponse(response =>
-    response.url().includes('/api/save') && response.status() === 200
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes('/api/save') && response.status() === 200
   );
 
   await page.click('[data-testid="save-button"]');
-  await responsePromise;  // Ensure request completed
+  await responsePromise; // Ensure request completed
 
   // Now safe to assert result
   await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
@@ -1602,7 +1749,9 @@ test('should save data', async ({ page }) => {
 Service workers only register in production builds or when served over HTTPS. The Vite dev server runs in development mode without service worker registration by default.
 
 **Workaround options:**
+
 1. **Test against production build** (recommended for CI):
+
    ```bash
    npm run build
    npm run preview  # Serves production build on localhost
@@ -1615,6 +1764,7 @@ Service workers only register in production builds or when served over HTTPS. Th
    - Service worker will register in dev mode
 
 **Affected tests:**
+
 - "should register service worker"
 - "should simulate offline mode" (requires service worker for offline cache)
 - "should access IndexedDB store" (when testing service worker cache)
@@ -1629,63 +1779,68 @@ The E2E test suite provides comprehensive coverage of Epic 1 foundation features
 
 #### Features Covered by E2E Tests
 
-| Epic 1 Story | Test Coverage | Test Suite(s) |
-|--------------|---------------|---------------|
-| **Story 1.2:** Zustand Persist Middleware Fix | ✅ **Comprehensive** | `persistence.spec.ts` |
-| - LocalStorage hydration on app init | ✅ Tested | `should hydrate LocalStorage on app init` |
-| - State persistence after changes | ✅ Tested | `should persist LocalStorage after state changes` |
-| - Persist middleware version | ✅ Tested | `should include version in persisted state` |
-| - State migration | ✅ Tested | `should handle state migration gracefully` |
-| **Story 1.3:** IndexedDB/Service Worker Fix | ✅ **Comprehensive** | `persistence.spec.ts`, `favorites.spec.ts`, `setup-validation.spec.ts` |
-| - IndexedDB CRUD operations | ✅ Tested | `should access IndexedDB store` |
-| - Service worker registration | ✅ Tested | `should register service worker` |
-| - Offline mode favorites | ✅ Tested | `should persist favorite in offline mode` |
-| - IndexedDB quota handling | ✅ Tested | `should handle IndexedDB quota exceeded gracefully` |
-| **Story 1.4:** Pre-Configuration (Hardcoded Constants) | ✅ **Comprehensive** | `settings.spec.ts` |
-| - Partner name pre-configured | ✅ Tested | `should load pre-configured partner name on first init` |
-| - Start date pre-configured | ✅ Tested | `should load pre-configured start date on first init` |
-| - Duration calculation from constants | ✅ Tested | `should calculate relationship duration correctly` |
-| **Story 1.5:** Refactoring & Code Quality | ✅ **Implicit Coverage** | All test suites |
-| - Regression detection | ✅ Tested | All 106 passing tests validate refactored code behavior |
-| - No functional regressions | ✅ Verified | 100% pass rate across all features |
+| Epic 1 Story                                           | Test Coverage            | Test Suite(s)                                                          |
+| ------------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------- |
+| **Story 1.2:** Zustand Persist Middleware Fix          | ✅ **Comprehensive**     | `persistence.spec.ts`                                                  |
+| - LocalStorage hydration on app init                   | ✅ Tested                | `should hydrate LocalStorage on app init`                              |
+| - State persistence after changes                      | ✅ Tested                | `should persist LocalStorage after state changes`                      |
+| - Persist middleware version                           | ✅ Tested                | `should include version in persisted state`                            |
+| - State migration                                      | ✅ Tested                | `should handle state migration gracefully`                             |
+| **Story 1.3:** IndexedDB/Service Worker Fix            | ✅ **Comprehensive**     | `persistence.spec.ts`, `favorites.spec.ts`, `setup-validation.spec.ts` |
+| - IndexedDB CRUD operations                            | ✅ Tested                | `should access IndexedDB store`                                        |
+| - Service worker registration                          | ✅ Tested                | `should register service worker`                                       |
+| - Offline mode favorites                               | ✅ Tested                | `should persist favorite in offline mode`                              |
+| - IndexedDB quota handling                             | ✅ Tested                | `should handle IndexedDB quota exceeded gracefully`                    |
+| **Story 1.4:** Pre-Configuration (Hardcoded Constants) | ✅ **Comprehensive**     | `settings.spec.ts`                                                     |
+| - Partner name pre-configured                          | ✅ Tested                | `should load pre-configured partner name on first init`                |
+| - Start date pre-configured                            | ✅ Tested                | `should load pre-configured start date on first init`                  |
+| - Duration calculation from constants                  | ✅ Tested                | `should calculate relationship duration correctly`                     |
+| **Story 1.5:** Refactoring & Code Quality              | ✅ **Implicit Coverage** | All test suites                                                        |
+| - Regression detection                                 | ✅ Tested                | All 106 passing tests validate refactored code behavior                |
+| - No functional regressions                            | ✅ Verified              | 100% pass rate across all features                                     |
 
 #### Features Intentionally Not Covered by E2E Tests
 
-| Epic 1 Story | Reason Not E2E Tested | Validation Method |
-|--------------|----------------------|-------------------|
-| **Story 1.1:** Technical Debt Audit | Analysis-only story | Manual review, documentation |
-| - Codebase analysis | N/A | Audit report in `docs/technical-decisions.md` |
-| - Refactoring recommendations | N/A | Implemented in Story 1.5 |
-| **Story 1.6:** Build & Deployment Hardening | Infrastructure validation | Manual build/deploy verification |
-| - Build process | Not E2E testable | `npm run build` success verified manually |
-| - Deployment configuration | Not E2E testable | Deployment tested manually |
-| - Production optimizations | Indirect testing | Performance validated through dev testing |
+| Epic 1 Story                                | Reason Not E2E Tested     | Validation Method                             |
+| ------------------------------------------- | ------------------------- | --------------------------------------------- |
+| **Story 1.1:** Technical Debt Audit         | Analysis-only story       | Manual review, documentation                  |
+| - Codebase analysis                         | N/A                       | Audit report in `docs/technical-decisions.md` |
+| - Refactoring recommendations               | N/A                       | Implemented in Story 1.5                      |
+| **Story 1.6:** Build & Deployment Hardening | Infrastructure validation | Manual build/deploy verification              |
+| - Build process                             | Not E2E testable          | `npm run build` success verified manually     |
+| - Deployment configuration                  | Not E2E testable          | Deployment tested manually                    |
+| - Production optimizations                  | Indirect testing          | Performance validated through dev testing     |
 
 #### Edge Cases and Scenarios Not Covered
 
 The following edge cases are documented but not covered by automated E2E tests due to complexity or impracticality:
 
 **Storage Edge Cases:**
+
 - **Storage quota exhaustion:** Tests simulate quota exceeded, but not actual browser storage limits (varies by browser and OS)
 - **Corrupted LocalStorage data:** Tests don't simulate data corruption scenarios (rare in practice)
 - **IndexedDB versioning conflicts:** Multiple app versions running simultaneously not tested
 
 **Network and Performance Edge Cases:**
+
 - **Extremely slow networks (< 2G):** Tests use binary offline/online, not gradual network degradation
 - **App behavior under sustained high latency (> 5 seconds):** Tests focus on typical network conditions
 - **Race conditions in service worker registration:** Service worker timing tested but not all edge cases
 
 **Browser and System Edge Cases:**
+
 - **Browser crashes or abrupt closures:** OS-level events not testable in E2E framework
 - **System resource exhaustion (out of memory):** Tests assume sufficient system resources
 - **PWA installation flows:** Platform-dependent installation not tested (requires manual validation on iOS/Android)
 
 **User Interaction Edge Cases:**
+
 - **Rapid successive actions (button mashing):** Tests validate normal user interaction patterns
 - **Concurrent tabs modifying same data:** Single-tab assumption (LocalStorage sync between tabs not tested)
 
 **Justification for Gaps:**
 These edge cases represent <1% of real-world usage and are either:
+
 1. **Impractical to test:** Require OS-level control or complex environment simulation
 2. **Low probability:** Rare scenarios with minimal user impact
 3. **Better validated manually:** Human testing provides better coverage for UX edge cases
@@ -1696,6 +1851,7 @@ These edge cases represent <1% of real-world usage and are either:
 ### WebKit Browser Support
 
 WebKit tests require additional system libraries that may not be installed by default on all Linux distributions:
+
 - `libicudata.so.66`
 - `libicui18n.so.66`
 - `libicuuc.so.66`
@@ -1705,6 +1861,7 @@ WebKit tests require additional system libraries that may not be installed by de
 **Status:** WebKit project temporarily disabled in `playwright.config.ts` until dependencies are installed.
 
 **To enable WebKit:**
+
 1. Install missing dependencies (distribution-specific)
 2. Uncomment WebKit project in `playwright.config.ts`
 3. Run tests: `npm run test:e2e --project=webkit`

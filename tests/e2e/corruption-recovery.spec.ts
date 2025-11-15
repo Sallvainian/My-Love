@@ -92,7 +92,9 @@ test.describe('Corrupted Map Deserialization', () => {
 
     // Verify corruption was detected
     const hasCorruptionError = consoleErrors.some(
-      (err) => err.includes('Invalid shownMessages array structure') || err.includes('resetting to empty Map')
+      (err) =>
+        err.includes('Invalid shownMessages array structure') ||
+        err.includes('resetting to empty Map')
     );
     expect(hasCorruptionError).toBe(true);
 
@@ -267,13 +269,15 @@ test.describe('State Validation', () => {
     await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify validation errors were logged (pre-hydration validation in storage layer)
-    const hasValidationError = consoleErrors.some(
-      (err) => err.includes('[Storage] Pre-hydration validation failed')
+    const hasValidationError = consoleErrors.some((err) =>
+      err.includes('[Storage] Pre-hydration validation failed')
     );
     expect(hasValidationError).toBe(true);
 
     // Verify corrupted state was cleared
-    const hasCleared = consoleErrors.some((err) => err.includes('[Storage] Clearing corrupted state'));
+    const hasCleared = consoleErrors.some((err) =>
+      err.includes('[Storage] Clearing corrupted state')
+    );
     expect(hasCleared).toBe(true);
 
     console.log('✓ Invalid state detected, validated, and recovered');
@@ -349,8 +353,8 @@ test.describe('Hydration Failure Detection', () => {
     await cleanApp.waitForLoadState('networkidle');
 
     // Verify hydration failure was detected (pre-hydration validation in storage layer)
-    const hasHydrationError = consoleErrors.some(
-      (err) => err.includes('[Storage] Failed to parse localStorage data')
+    const hasHydrationError = consoleErrors.some((err) =>
+      err.includes('[Storage] Failed to parse localStorage data')
     );
     expect(hasHydrationError).toBe(true);
 
@@ -368,7 +372,9 @@ test.describe('Hydration Failure Detection', () => {
 });
 
 test.describe('Automatic Corruption Recovery', () => {
-  test('should automatically clear corrupted state and work after refresh', async ({ cleanApp }) => {
+  test('should automatically clear corrupted state and work after refresh', async ({
+    cleanApp,
+  }) => {
     // Set corrupted state
     const corruptedState = {
       state: {

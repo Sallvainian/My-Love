@@ -15,6 +15,7 @@ So that tests are maintainable and resilient to UI changes.
 Story 2.3 adds semantic `data-testid` attributes to all interactive elements following a consistent naming convention, enabling test stability and maintainability as UI components evolve. With Story 2.2 establishing 106 passing tests using temporary CSS selectors, Story 2.3 transitions to data-testid selectors that are resilient to styling changes, class name refactoring, and component structure modifications.
 
 **Core Requirements:**
+
 - **Button Elements**: Add data-testid to all buttons (favorite toggle, share, navigation, settings actions, theme switching)
 - **Message Display**: Add data-testid to message card, message text, category badge, relationship duration counter
 - **Input Fields**: Add data-testid to settings form inputs (partner name, start date)
@@ -23,6 +24,7 @@ Story 2.3 adds semantic `data-testid` attributes to all interactive elements fol
 - **Test Migration**: Update all existing test files to use `getByTestId()` selectors instead of CSS selectors
 
 **Dependencies:**
+
 - **Story 2.2 Complete**: 106 integration tests implemented using temporary CSS selectors
 - **Test Framework**: Playwright test infrastructure with multi-browser support established
 - **Component Architecture**: App.tsx → ErrorBoundary → DailyMessage component tree from Epic 1
@@ -38,23 +40,24 @@ Story 2.3 adds semantic `data-testid` attributes to all interactive elements fol
 // Action suffix: only for buttons/interactive elements
 
 // Examples:
-'message-card'                    // Main message display container
-'message-text'                    // Message content text
-'message-category-badge'          // Category badge
-'message-duration-counter'        // Relationship duration display
-'message-favorite-button'         // Favorite toggle button
-'message-share-button'            // Share button
-'settings-partner-name-input'     // Partner name input field
-'settings-start-date-input'       // Relationship start date input
-'navigation-home-link'            // Home navigation link (future)
-'navigation-favorites-link'       // Favorites navigation link (future)
-'navigation-settings-link'        // Settings navigation link (future)
-'theme-selector'                  // Theme dropdown/selector
+'message-card'; // Main message display container
+'message-text'; // Message content text
+'message-category-badge'; // Category badge
+'message-duration-counter'; // Relationship duration display
+'message-favorite-button'; // Favorite toggle button
+'message-share-button'; // Share button
+'settings-partner-name-input'; // Partner name input field
+'settings-start-date-input'; // Relationship start date input
+'navigation-home-link'; // Home navigation link (future)
+'navigation-favorites-link'; // Favorites navigation link (future)
+'navigation-settings-link'; // Settings navigation link (future)
+'theme-selector'; // Theme dropdown/selector
 ```
 
 **Test Migration Strategy:**
 
 All 106 tests from Story 2.2 will be updated to use stable `data-testid` selectors:
+
 - Replace: `page.locator('.message-card')` → `page.getByTestId('message-card')`
 - Replace: `page.locator('button.favorite')` → `page.getByTestId('message-favorite-button')`
 - Replace: `page.locator('input[name="partnerName"]')` → `page.getByTestId('settings-partner-name-input')`
@@ -62,6 +65,7 @@ All 106 tests from Story 2.2 will be updated to use stable `data-testid` selecto
 **From [PRD.md#NFR006](../../docs/PRD.md#NFR006):**
 
 **Testing Quality Goals:**
+
 - Test selectors must be resilient to styling changes and refactoring
 - data-testid attributes add negligible overhead (~200 bytes HTML)
 - No impact on production performance or bundle size
@@ -232,6 +236,7 @@ All 106 tests from Story 2.2 will be updated to use stable `data-testid` selecto
 **Primary Files to MODIFY:**
 
 **1. DailyMessage Component:**
+
 - Location: Likely `src/components/DailyMessage.tsx` or `src/components/DailyMessage.jsx`
 - Changes: Add data-testid attributes to:
   - Message card container
@@ -243,17 +248,20 @@ All 106 tests from Story 2.2 will be updated to use stable `data-testid` selecto
 - Impact: No functional changes, only attribute addition
 
 **2. Theme Selector Component:**
+
 - Location: Possibly in App.tsx or separate ThemeSelector component
 - Changes: Add `data-testid="theme-selector"` to theme switching element
 - Impact: No functional changes
 
 **3. Settings Component (if exists):**
+
 - Location: Possibly `src/components/Settings.tsx` or inline in App
 - Changes: Add data-testid to partner name input, start date input
 - Impact: No functional changes
 - Note: May not exist yet if Story 1.4 only added pre-configuration without UI
 
 **4. Test Files to MODIFY (all 5 test suites):**
+
 - `tests/e2e/message-display.spec.ts` (~200 lines, replace ~15-20 selectors)
 - `tests/e2e/favorites.spec.ts` (~180 lines, replace ~10-15 selectors)
 - `tests/e2e/settings.spec.ts` (~150 lines, replace ~5-10 selectors)
@@ -262,9 +270,11 @@ All 106 tests from Story 2.2 will be updated to use stable `data-testid` selecto
 - Total: ~40-65 selector replacements across 5 files
 
 **5. Test Documentation:**
+
 - `tests/README.md` - Add data-testid strategy section (~50-100 lines)
 
 **Files NOT Modified:**
+
 - Application logic (state management, business logic) - no changes
 - PWA helpers (tests/support/helpers/pwaHelpers.ts) - no changes needed
 - Test fixtures (tests/support/fixtures/baseFixture.ts) - no changes needed
@@ -277,7 +287,7 @@ All 106 tests from Story 2.2 will be updated to use stable `data-testid` selecto
 - **Test Suites Established**: 106 tests pass with 100% pass rate (18 skipped for valid reasons)
   - **Use in Story 2.3**: Update these 106 passing tests to use data-testid selectors
   - **Pattern**: Search for `page.locator()` calls, replace with `page.getByTestId()`
-  - **Location**: tests/e2e/*.spec.ts files
+  - **Location**: tests/e2e/\*.spec.ts files
 
 - **CSS Selector Strategy (Temporary)**: Tests currently use CSS selectors (classes, elements, attributes)
   - **Apply here**: Story 2.3 migrates to data-testid, eliminating brittleness from class name changes
@@ -312,6 +322,7 @@ Story 2.2 established 106 comprehensive integration tests using temporary CSS se
 ### Project Structure Notes
 
 **Files to MODIFY:**
+
 - `src/components/DailyMessage.tsx` (or .jsx) - Add data-testid attributes (~10 additions)
 - `src/components/ThemeSelector.tsx` (or inline in App) - Add data-testid (~1-2 additions)
 - `src/components/Settings.tsx` (if exists) - Add data-testid (~2-3 additions)
@@ -323,6 +334,7 @@ Story 2.2 established 106 comprehensive integration tests using temporary CSS se
 - `tests/README.md` - Add data-testid strategy documentation (~50-100 lines)
 
 **Directories Involved:**
+
 - `src/components/` - Component files with attribute additions
 - `tests/e2e/` - Test spec files with selector migrations
 - `tests/` - README documentation update
@@ -330,6 +342,7 @@ Story 2.2 established 106 comprehensive integration tests using temporary CSS se
 **Alignment with Architecture:**
 
 **Testing Strategy** (from tech-spec-epic-2.md):
+
 ```
 Story 2.2: CSS Selectors (Temporary) → Story 2.3: data-testid Selectors (Stable)
     ↓
@@ -349,12 +362,12 @@ No changes to: State Management, PWA Helpers, Test Fixtures
 
 **Component-to-Test Mapping:**
 
-| Component | data-testid Attributes | Test Files Affected |
-|-----------|------------------------|---------------------|
-| DailyMessage | message-card, message-text, message-category-badge, message-duration-counter, message-favorite-button, message-share-button | message-display.spec.ts, favorites.spec.ts, persistence.spec.ts |
-| ThemeSelector | theme-selector | navigation.spec.ts |
-| Settings (if exists) | settings-partner-name-input, settings-start-date-input | settings.spec.ts |
-| Navigation (future) | navigation-home-link, navigation-favorites-link, navigation-settings-link | navigation.spec.ts (partial) |
+| Component            | data-testid Attributes                                                                                                      | Test Files Affected                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| DailyMessage         | message-card, message-text, message-category-badge, message-duration-counter, message-favorite-button, message-share-button | message-display.spec.ts, favorites.spec.ts, persistence.spec.ts |
+| ThemeSelector        | theme-selector                                                                                                              | navigation.spec.ts                                              |
+| Settings (if exists) | settings-partner-name-input, settings-start-date-input                                                                      | settings.spec.ts                                                |
+| Navigation (future)  | navigation-home-link, navigation-favorites-link, navigation-settings-link                                                   | navigation.spec.ts (partial)                                    |
 
 ### Testing Notes
 
@@ -409,6 +422,7 @@ const messageText = page.getByTestId('message-text');
 2. Search for all `page.locator()` calls
 3. Replace with `page.getByTestId()` using appropriate data-testid values
 4. Example replacements:
+
    ```typescript
    // Before
    const messageCard = page.locator('.message-card');
@@ -418,6 +432,7 @@ const messageText = page.getByTestId('message-text');
    const messageCard = page.getByTestId('message-card');
    await expect(messageCard).toBeVisible();
    ```
+
 5. Run test suite: `npm run test:e2e message-display.spec.ts`
 6. Expected: All 14 tests pass in Chromium and Firefox
 7. If failures: check data-testid spelling, verify attribute actually added to component
@@ -426,6 +441,7 @@ const messageText = page.getByTestId('message-text');
 
 1. Open tests/e2e/favorites.spec.ts
 2. Replace favorite button selector:
+
    ```typescript
    // Before
    const favoriteButton = page.locator('button.favorite');
@@ -435,6 +451,7 @@ const messageText = page.getByTestId('message-text');
    // After
    const favoriteButton = page.getByTestId('message-favorite-button');
    ```
+
 3. Run test suite: `npm run test:e2e favorites.spec.ts`
 4. Expected: All active tests pass (6 active, 2 skipped as documented in Story 2.2)
 
@@ -588,9 +605,11 @@ Story 2.3 successfully migrated all 106 active E2E tests from CSS selectors to s
 ### File List
 
 **Components Modified:**
+
 - `src/components/DailyMessage/DailyMessage.tsx` - Added 6 data-testid attributes (lines 142, 167, 180, 195, 211, 226)
 
 **Test Files Migrated:**
+
 - `tests/e2e/message-display.spec.ts` - 348 lines, 14 tests, migrated all CSS selectors to getByTestId()
 - `tests/e2e/favorites.spec.ts` - 279 lines, 8 active tests, migrated all selectors
 - `tests/e2e/settings.spec.ts` - 247 lines, 6 active tests, bulk migrated with sed
@@ -598,9 +617,11 @@ Story 2.3 successfully migrated all 106 active E2E tests from CSS selectors to s
 - `tests/e2e/persistence.spec.ts` - 424 lines, 7 active tests, bulk migrated with sed
 
 **Documentation Updated:**
+
 - `tests/README.md` - Enhanced data-testid section (lines 292-449), added 160 lines of migration guidance, component-specific conventions, bulk replacement patterns, and test suite standards
 
 **Project Management:**
+
 - `docs/sprint-status.yaml` - Updated story 2.3 status: ready-for-dev → in-progress → review
 
 ## Change Log

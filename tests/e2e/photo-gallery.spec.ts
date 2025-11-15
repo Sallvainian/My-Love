@@ -49,7 +49,10 @@ async function uploadTestPhoto(page: any, photoFileName: string, caption?: strin
   await page.click('[data-testid="photo-upload-submit-button"]');
 
   // Wait for upload to complete (modal closes)
-  await page.waitForSelector('[data-testid="photo-upload-modal"]', { state: 'hidden', timeout: 10000 });
+  await page.waitForSelector('[data-testid="photo-upload-modal"]', {
+    state: 'hidden',
+    timeout: 10000,
+  });
 }
 
 test.describe('Photo Gallery Grid View', () => {

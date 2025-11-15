@@ -1,5 +1,11 @@
-import { openDB, type IDBPDatabase } from 'idb';
+import { openDB } from 'idb';
 import type { Photo } from '../types';
+import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { PhotoSchema } from '../validation/schemas';
+import { createValidationError, isZodError } from '../validation/errorMessages';
+import { ZodError } from 'zod';
+import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../config/performance';
+import { performanceMonitor } from './performanceMonitor';
 
 const DB_NAME = 'my-love-db';
 const DB_VERSION = 2; // Story 4.1: Increment from 1 to 2 for photos store enhancement
@@ -7,71 +13,94 @@ const DB_VERSION = 2; // Story 4.1: Increment from 1 to 2 for photos store enhan
 /**
  * Photo Storage Service - IndexedDB CRUD operations for photos
  * Story 4.1: AC-4.1.7 - Save photos to IndexedDB with metadata
+ * Story 5.3: Refactored to extend BaseIndexedDBService to reduce duplication
  *
- * Patterns followed from CustomMessageService:
- * - Singleton class with init() guard
- * - Comprehensive error handling and logging
- * - Graceful fallbacks for failures
+ * Extends: BaseIndexedDBService<Photo>
+ * - Inherits: init(), add(), get(), update(), delete(), clear(), getPage()
+ * - Implements: getStoreName(), _doInit()
+ * - Overrides: getAll() (uses 'by-date' index), getPage() (custom pagination)
+ * - Preserves: Service-specific methods (getStorageSize, estimateQuotaRemaining)
  *
  * DB Migration: v1 → v2
  * - Version 1: Basic photos store existed but wasn't actively used
  * - Version 2: Enhanced Photo schema with compression metadata
  */
-class PhotoStorageService {
-  private db: IDBPDatabase<any> | null = null;
-  private initPromise: Promise<void> | null = null;
+class PhotoStorageService extends BaseIndexedDBService<Photo> {
+  /**
+   * Get the object store name for photos
+   */
+  protected getStoreName(): string {
+    return 'photos';
+  }
 
   /**
    * Initialize IndexedDB connection with DB version 2
    * Story 4.1: Migrate from v1 to v2 if needed
    */
-  async init(): Promise<void> {
-    // Return existing promise if initialization already in progress
-    if (this.initPromise) {
-      console.log('[PhotoStorage] Init already in progress, waiting...');
-      return this.initPromise;
-    }
-
-    // Return immediately if already initialized
-    if (this.db) {
-      console.log('[PhotoStorage] Already initialized');
-      return Promise.resolve();
-    }
-
-    // Store promise to prevent concurrent initialization
-    this.initPromise = this._doInit();
-
+  protected async _doInit(): Promise<void> {
     try {
-      await this.initPromise;
-    } finally {
-      this.initPromise = null;
-    }
-  }
-
-  private async _doInit(): Promise<void> {
-    try {
-      console.log('[PhotoStorage] Initializing IndexedDB (version 2)...');
+      if (import.meta.env.DEV) {
+        console.log('[PhotoStorage] Initializing IndexedDB (version 2)...');
+      }
 
       this.db = await openDB<any>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, _transaction) {
-          console.log(`[PhotoStorage] Upgrading database from v${oldVersion} to v${newVersion}`);
+        async upgrade(db, oldVersion, newVersion, transaction) {
+          if (import.meta.env.DEV) {
+            console.log(`[PhotoStorage] Upgrading database from v${oldVersion} to v${newVersion}`);
+          }
 
-          // Migration: Recreate photos store if upgrading from v1
+          // Migration: v1 → v2 with data preservation
           // v1 had photos store but with old schema (blob instead of imageBlob)
           if (oldVersion < 2) {
-            // If photos store exists from v1, delete it
+            let migratedPhotos: any[] = [];
+
+            // Step 1: Preserve existing v1 photos before deleting store
             if (db.objectStoreNames.contains('photos')) {
+              const oldPhotosStore = transaction.objectStore('photos');
+              const allV1Photos = await oldPhotosStore.getAll();
+
+              if (import.meta.env.DEV) {
+                console.log(`[PhotoStorage] Found ${allV1Photos.length} photos to migrate from v1`);
+              }
+
+              // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
+              migratedPhotos = allV1Photos.map((photo: any) => ({
+                ...photo,
+                imageBlob: photo.blob, // Rename blob → imageBlob
+                // Remove old 'blob' field to avoid duplication
+                blob: undefined,
+              }));
+
+              // Step 3: Delete old v1 store
               db.deleteObjectStore('photos');
-              console.log('[PhotoStorage] Deleted old photos store from v1');
+              if (import.meta.env.DEV) {
+                console.log('[PhotoStorage] Deleted old photos store from v1');
+              }
             }
 
-            // Create new photos store with enhanced schema
+            // Step 4: Create new v2 photos store with enhanced schema
             const photosStore = db.createObjectStore('photos', {
               keyPath: 'id',
               autoIncrement: true,
             });
             photosStore.createIndex('by-date', 'uploadDate', { unique: false });
-            console.log('[PhotoStorage] Created photos store with by-date index (v2)');
+            if (import.meta.env.DEV) {
+              console.log('[PhotoStorage] Created photos store with by-date index (v2)');
+            }
+
+            // Step 5: Re-insert migrated photos into new v2 store
+            if (migratedPhotos.length > 0) {
+              for (const photo of migratedPhotos) {
+                // Remove undefined blob field before inserting
+                const { blob, ...cleanPhoto } = photo;
+                await photosStore.add(cleanPhoto);
+              }
+              if (import.meta.env.DEV) {
+                console.log(
+                  `[PhotoStorage] Successfully migrated ${migratedPhotos.length} photos to v2 schema`
+                );
+              }
+            }
           }
 
           // Ensure messages store exists (should have been created in v1)
@@ -82,170 +111,184 @@ class PhotoStorageService {
             });
             messageStore.createIndex('by-category', 'category');
             messageStore.createIndex('by-date', 'createdAt');
-            console.log('[PhotoStorage] Created messages store (fallback)');
+            if (import.meta.env.DEV) {
+              console.log('[PhotoStorage] Created messages store (fallback)');
+            }
           }
         },
       });
 
-      console.log('[PhotoStorage] IndexedDB initialized successfully (v2)');
+      if (import.meta.env.DEV) {
+        console.log('[PhotoStorage] IndexedDB initialized successfully (v2)');
+      }
     } catch (error) {
-      console.error('[PhotoStorage] Failed to initialize IndexedDB:', error);
-      console.error('[PhotoStorage] Error details:', {
-        name: (error as Error).name,
-        message: (error as Error).message,
-      });
-      throw error;
+      this.handleError('initialize', error as Error);
     }
   }
 
   /**
    * Create a new photo in IndexedDB
    * AC-4.1.7: Save with full metadata (imageBlob, caption, tags, sizes, dimensions)
+   * Story 5.5: Added runtime validation with Zod schema
+   * Uses inherited add() method from base class
    *
    * @param photo - Photo data (without id)
    * @returns Photo with auto-generated id
+   * @throws {ValidationError} if photo data is invalid
    */
   async create(photo: Omit<Photo, 'id'>): Promise<Photo> {
-    try {
-      await this.init();
+    return performanceMonitor.measureAsync('photo-create', async () => {
+      try {
+        // Validate photo data before saving to IndexedDB
+        const validated = PhotoSchema.parse(photo);
 
-      const id = await this.db!.add('photos', photo as Photo);
-      const sizeKB = (photo.compressedSize / 1024).toFixed(0);
-      console.log(`[PhotoStorage] Saved photo ID: ${id}, size: ${sizeKB}KB, dimensions: ${photo.width}x${photo.height}`);
+        const created = await super.add(validated);
 
-      return { ...photo, id: id as number } as Photo;
-    } catch (error) {
-      console.error('[PhotoStorage] Failed to save photo:', error);
-      console.error('[PhotoStorage] Photo data:', {
-        caption: photo.caption?.substring(0, 50),
-        tags: photo.tags,
-        size: photo.compressedSize,
-      });
-      throw error;
-    }
+        // Record photo size metric
+        performanceMonitor.recordMetric('photo-size-kb', validated.compressedSize / BYTES_PER_KB);
+
+        if (import.meta.env.DEV) {
+          const sizeKB = (validated.compressedSize / BYTES_PER_KB).toFixed(0);
+          console.log(
+            `[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`
+          );
+        }
+
+        return created;
+      } catch (error) {
+        // Transform Zod validation errors into user-friendly messages
+        if (isZodError(error)) {
+          throw createValidationError(error as ZodError);
+        }
+
+        console.error('[PhotoStorage] Failed to save photo:', error);
+        console.error('[PhotoStorage] Photo data:', {
+          caption: photo.caption?.substring(0, 50),
+          tags: photo.tags,
+          size: photo.compressedSize,
+        });
+        throw error;
+      }
+    });
   }
 
   /**
    * Get all photos sorted by date (newest first)
-   * Uses by-date index for efficient chronological retrieval
+   * Overrides base getAll() to use by-date index for efficient chronological retrieval
    *
    * @returns Array of photos (newest first)
    */
   async getAll(): Promise<Photo[]> {
-    try {
-      await this.init();
+    return performanceMonitor.measureAsync('photo-getAll', async () => {
+      try {
+        await this.init();
 
-      // Use by-date index for sorted retrieval
-      const photos = await this.db!.getAllFromIndex('photos', 'by-date');
-      // Reverse to get newest first
-      const sortedPhotos = photos.reverse();
+        // Use by-date index for sorted retrieval
+        const photos = await this.db!.getAllFromIndex('photos', 'by-date');
+        // Reverse to get newest first
+        const sortedPhotos = photos.reverse();
 
-      console.log(`[PhotoStorage] Retrieved ${sortedPhotos.length} photos (newest first)`);
-      return sortedPhotos;
-    } catch (error) {
-      console.error('[PhotoStorage] Failed to load photos:', error);
-      return []; // Graceful fallback: return empty array
-    }
+        if (import.meta.env.DEV) {
+          console.log(`[PhotoStorage] Retrieved ${sortedPhotos.length} photos (newest first)`);
+        }
+        return sortedPhotos;
+      } catch (error) {
+        console.error('[PhotoStorage] Failed to load photos:', error);
+        return []; // Graceful fallback: return empty array
+      }
+    });
   }
 
   /**
-   * Get paginated photos sorted by date (newest first)
+   * Get paginated photos sorted by date (newest first) using cursor
    * Story 4.2: AC-4.2.4 - Lazy loading pagination
+   * Overrides base getPage() to use by-date index with descending cursor
+   *
+   * Performance: O(offset + limit) instead of O(n) with slice approach
    *
    * @param offset - Number of photos to skip (0 = first page)
    * @param limit - Number of photos to return per page (default: 20)
-   * @returns Array of photos for the requested page
+   * @returns Array of photos for the requested page (newest first)
    */
-  async getPage(offset: number = 0, limit: number = 20): Promise<Photo[]> {
-    try {
-      await this.init();
+  async getPage(
+    offset: number = 0,
+    limit: number = PAGINATION.DEFAULT_PAGE_SIZE
+  ): Promise<Photo[]> {
+    return performanceMonitor.measureAsync('photo-getPage', async () => {
+      try {
+        await this.init();
 
-      // Get all photos sorted by date
-      const allPhotos = await this.db!.getAllFromIndex('photos', 'by-date');
-      // Reverse to get newest first
-      const sortedPhotos = allPhotos.reverse();
+        const transaction = this.db!.transaction('photos', 'readonly');
+        const index = transaction.objectStore('photos').index('by-date');
 
-      // Slice to get requested page
-      const page = sortedPhotos.slice(offset, offset + limit);
+        const results: Photo[] = [];
+        let cursor = await index.openCursor(null, 'prev'); // 'prev' = descending order
+        let skipped = 0;
+        let collected = 0;
 
-      console.log(
-        `[PhotoStorage] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${sortedPhotos.length}`
-      );
+        // Advance cursor to offset position
+        while (cursor && skipped < offset) {
+          cursor = await cursor.continue();
+          skipped++;
+        }
 
-      return page;
-    } catch (error) {
-      console.error('[PhotoStorage] Failed to load photo page:', error);
-      return []; // Graceful fallback
-    }
-  }
+        // Collect photos up to limit
+        while (cursor && collected < limit) {
+          results.push(cursor.value as Photo);
+          collected++;
+          cursor = await cursor.continue();
+        }
 
-  /**
-   * Get single photo by ID
-   *
-   * @param photoId - Photo ID to retrieve
-   * @returns Photo or null if not found
-   */
-  async getById(photoId: number): Promise<Photo | null> {
-    try {
-      await this.init();
+        if (import.meta.env.DEV) {
+          console.log(
+            `[PhotoStorage] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
+          );
+        }
 
-      const photo = await this.db!.get('photos', photoId);
-      if (photo) {
-        console.log(`[PhotoStorage] Retrieved photo ID: ${photoId}`);
-      } else {
-        console.warn(`[PhotoStorage] Photo not found: ${photoId}`);
+        return results;
+      } catch (error) {
+        console.error('[PhotoStorage] Failed to load photo page (cursor):', error);
+        return []; // Graceful fallback
       }
-
-      return photo || null;
-    } catch (error) {
-      console.error(`[PhotoStorage] Failed to get photo ${photoId}:`, error);
-      return null; // Graceful fallback
-    }
+    });
   }
 
   /**
-   * Update existing photo
-   * Story 4.4 will use this for edit functionality
+   * Update an existing photo in IndexedDB
+   * Story 5.5: Override to add runtime validation with Zod schema
+   * Overrides inherited update() method from base class
    *
-   * @param photoId - Photo ID to update
+   * @param id - Photo ID to update
    * @param updates - Partial photo data to update
+   * @throws {ValidationError} if update data is invalid
    */
-  async update(photoId: number, updates: Partial<Photo>): Promise<void> {
+  async update(id: number, updates: Partial<Photo>): Promise<void> {
     try {
-      await this.init();
+      // Validate partial update data
+      // Use partial schema to allow updating individual fields
+      const validated = PhotoSchema.partial().parse(updates);
 
-      const photo = await this.getById(photoId);
-      if (!photo) {
-        throw new Error(`Photo ${photoId} not found`);
+      await super.update(id, validated);
+      if (import.meta.env.DEV) {
+        console.log(`[PhotoStorage] Updated photo ID: ${id}`);
+      }
+    } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        throw createValidationError(error as ZodError);
       }
 
-      const updated: Photo = { ...photo, ...updates };
-      await this.db!.put('photos', updated);
-
-      console.log(`[PhotoStorage] Updated photo ID: ${photoId}`);
-    } catch (error) {
-      console.error(`[PhotoStorage] Failed to update photo ${photoId}:`, error);
+      console.error('[PhotoStorage] Failed to update photo:', error);
+      console.error('[PhotoStorage] Update data:', updates);
       throw error;
     }
   }
 
   /**
-   * Delete photo by ID
-   * Story 4.4 will use this for delete functionality
-   *
-   * @param photoId - Photo ID to delete
+   * Note: get() and delete() methods are inherited from BaseIndexedDBService
+   * - get(id: number): Promise<Photo | null> - Get photo by ID (replaces getById)
+   * - delete(id: number): Promise<void> - Delete photo by ID
    */
-  async delete(photoId: number): Promise<void> {
-    try {
-      await this.init();
-
-      await this.db!.delete('photos', photoId);
-      console.log(`[PhotoStorage] Deleted photo ID: ${photoId}`);
-    } catch (error) {
-      console.error(`[PhotoStorage] Failed to delete photo ${photoId}:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Get total storage size used by all photos
@@ -258,8 +301,10 @@ class PhotoStorageService {
       const photos = await this.getAll();
       const totalSize = photos.reduce((total, photo) => total + photo.compressedSize, 0);
 
-      const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
-      console.log(`[PhotoStorage] Total photo storage: ${sizeMB}MB (${photos.length} photos)`);
+      if (import.meta.env.DEV) {
+        const sizeMB = (totalSize / BYTES_PER_MB).toFixed(2);
+        console.log(`[PhotoStorage] Total photo storage: ${sizeMB}MB (${photos.length} photos)`);
+      }
 
       return totalSize;
     } catch (error) {
@@ -284,19 +329,23 @@ class PhotoStorageService {
       if ('storage' in navigator && 'estimate' in navigator.storage) {
         const estimate = await navigator.storage.estimate();
         const used = estimate.usage || 0;
-        const quota = estimate.quota || 50 * 1024 * 1024; // Default 50MB
+        const quota = estimate.quota || STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES;
         const remaining = quota - used;
         const percentUsed = (used / quota) * 100;
 
-        const usedMB = (used / 1024 / 1024).toFixed(2);
-        const quotaMB = (quota / 1024 / 1024).toFixed(2);
-        console.log(`[PhotoStorage] Quota: ${usedMB}MB / ${quotaMB}MB (${percentUsed.toFixed(0)}% used)`);
+        if (import.meta.env.DEV) {
+          const usedMB = (used / BYTES_PER_MB).toFixed(2);
+          const quotaMB = (quota / BYTES_PER_MB).toFixed(2);
+          console.log(
+            `[PhotoStorage] Quota: ${usedMB}MB / ${quotaMB}MB (${percentUsed.toFixed(0)}% used)`
+          );
+        }
 
         return { used, quota, remaining, percentUsed };
       } else {
         // Fallback for browsers without Storage API
         console.warn('[PhotoStorage] Storage API not available, using conservative default');
-        const defaultQuota = 50 * 1024 * 1024; // 50MB
+        const defaultQuota = STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES;
         return {
           used: 0,
           quota: defaultQuota,
@@ -306,7 +355,7 @@ class PhotoStorageService {
       }
     } catch (error) {
       console.error('[PhotoStorage] Failed to estimate quota:', error);
-      const defaultQuota = 50 * 1024 * 1024;
+      const defaultQuota = STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES;
       return {
         used: 0,
         quota: defaultQuota,

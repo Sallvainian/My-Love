@@ -40,11 +40,13 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 ### Dependencies
 
 **Requires:**
+
 - ✅ Epic 1 complete: IndexedDB operational, ErrorBoundary established
 - ✅ Epic 2 complete: Playwright E2E testing infrastructure
 - ✅ Story 3.5 complete: Service layer patterns for IndexedDB operations
 
 **Enables:**
+
 - Story 4.2: Grid view will load photos from photoStorageService
 - Story 4.3: Carousel will display photos saved in this story
 - Story 4.4: Edit/delete will use same storage service
@@ -53,22 +55,26 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 ### Integration Points
 
 **IndexedDB Photos Store:**
+
 - New `photos` object store created (DB version 1 → 2)
 - Schema: `{ id: number, imageBlob: Blob, caption?: string, tags: string[], uploadDate: Date, ... }`
 - Index: `by-date` on `uploadDate` for chronological sorting
 - Migration function runs on app init if upgrading from v1
 
 **Service Layer Integration:**
+
 - `photoStorageService.ts` - IndexedDB CRUD operations (create, getAll, getById)
 - `imageCompressionService.ts` - Canvas API compression with quality/dimension limits
 - Follows patterns from `customMessageService.ts` (Story 3.5)
 
 **Zustand Store Extension:**
+
 - New state slice: `photos: Photo[]`, `isLoadingPhotos: boolean`, `photoError: string | null`
 - New actions: `uploadPhoto()`, `loadPhotos()`, `getStorageUsage()`
 - Store calls service methods for all IndexedDB operations
 
 **Component Architecture:**
+
 - PhotoUpload modal component with file picker, preview, metadata form
 - Framer Motion modal animations (AnimatePresence for enter/exit)
 - Temporary navigation integration (full Photos tab in Story 4.5)
@@ -84,6 +90,7 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Then** photo gallery view SHALL open (placeholder for Story 4.2)
 
 **Validation:**
+
 - Photos tab visible in navigation with camera icon
 - Temporarily shows PhotoUpload modal for Story 4.1 testing
 - Full gallery grid implemented in Story 4.2
@@ -97,11 +104,13 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Then** system file picker SHALL open accepting only image files (JPEG, PNG, WebP)
 
 **Requirements:**
+
 - File input `accept="image/jpeg,image/png,image/webp"`
 - Single file selection (no multiple uploads in MVP)
 - File picker works on mobile (iOS/Android) and desktop browsers
 
 **Validation:**
+
 - Tap "Upload Photo" → file picker opens
 - File picker filters: only image files selectable
 - Non-image files (PDF, TXT, etc.) not selectable
@@ -113,20 +122,23 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Given** user selected photo from file picker
 **When** photo file is loaded
 **Then** preview screen SHALL display:
-  - Selected image preview at reasonable size
-  - Original file size (e.g., "3.2 MB")
-  - Estimated compressed size (e.g., "Will compress to ~320 KB")
-  - Caption text area (optional)
-  - Tags input field (optional)
-  - Upload button
-  - Cancel button
+
+- Selected image preview at reasonable size
+- Original file size (e.g., "3.2 MB")
+- Estimated compressed size (e.g., "Will compress to ~320 KB")
+- Caption text area (optional)
+- Tags input field (optional)
+- Upload button
+- Cancel button
 
 **Requirements:**
+
 - Preview uses `URL.createObjectURL()` for immediate display
 - Compression estimate calculated before actual compression
 - Preview maintains aspect ratio (max 400px width)
 
 **Validation:**
+
 - Select 3.2MB JPEG → preview shows image + "3.2 MB" + "~300 KB compressed"
 - Preview image displays correctly (no stretching/distortion)
 - Can cancel and return to file picker
@@ -140,6 +152,7 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Then** caption SHALL be saved with photo metadata
 
 **Requirements:**
+
 - Text area with placeholder: "Add a caption to your photo..."
 - Character counter shows remaining characters (500 max)
 - Optional field (empty caption allowed)
@@ -147,6 +160,7 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 - Multi-line input (textarea, not input field)
 
 **Validation:**
+
 - Type "Our first beach sunset together ❤️" (35 chars) → counter shows "465 remaining"
 - Type 501 characters → prevented, max 500 enforced
 - Leave caption empty → upload succeeds with `caption: undefined`
@@ -161,6 +175,7 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Then** tags SHALL be parsed and saved as array with photo
 
 **Requirements:**
+
 - Input field with placeholder: "beach, sunset, memories"
 - Tags parsed by splitting on commas and trimming whitespace
 - Max 10 tags enforced
@@ -169,8 +184,9 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 - Case-insensitive duplicate detection (e.g., "Beach" and "beach" = same tag)
 
 **Validation:**
+
 - Enter "beach, sunset, date night" → parsed as `['beach', 'sunset', 'date night']`
-- Enter "  beach  ,  sunset  " (extra spaces) → trimmed to `['beach', 'sunset']`
+- Enter " beach , sunset " (extra spaces) → trimmed to `['beach', 'sunset']`
 - Enter 11 tags → error: "Maximum 10 tags allowed"
 - Enter tag with 51 characters → error: "Tag too long (max 50 characters)"
 - Leave tags empty → upload succeeds with `tags: []`
@@ -182,18 +198,21 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Given** user taps "Upload" button
 **When** compression process runs
 **Then** photo SHALL be compressed using native Canvas API:
-  - Max width: 1920px (resize if larger, maintain aspect ratio)
-  - Max height: 1920px (resize if larger, maintain aspect ratio)
-  - JPEG quality: 80%
-  - Output format: JPEG (even if input is PNG/WebP)
+
+- Max width: 1920px (resize if larger, maintain aspect ratio)
+- Max height: 1920px (resize if larger, maintain aspect ratio)
+- JPEG quality: 80%
+- Output format: JPEG (even if input is PNG/WebP)
 
 **Requirements:**
+
 - Compression runs client-side (no server upload)
 - Loading indicator shown during compression
 - Compression logged: `[Compression] 3.2MB compressed in 1850ms`
 - Typical compression ratio: 3-5MB → 300-500KB (90% reduction)
 
 **Validation:**
+
 - Upload 4032×3024 JPEG (3.2MB) → resized to 1920×1440, ~320KB
 - Upload 800×600 JPEG (150KB) → no resize needed, ~120KB (slight quality compression only)
 - Upload PNG (1.5MB) → converted to JPEG, compressed to ~300KB
@@ -206,24 +225,27 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Given** photo compression completed successfully
 **When** save operation runs
 **Then** photo SHALL be saved to IndexedDB `photos` store with:
-  - `id`: auto-incremented number (primary key)
-  - `imageBlob`: Blob (compressed JPEG data)
-  - `caption`: string | undefined (user input)
-  - `tags`: string[] (parsed from comma-separated input)
-  - `uploadDate`: Date (current timestamp)
-  - `originalSize`: number (original file size in bytes)
-  - `compressedSize`: number (compressed blob size in bytes)
-  - `width`: number (final image width in pixels)
-  - `height`: number (final image height in pixels)
-  - `mimeType`: 'image/jpeg'
+
+- `id`: auto-incremented number (primary key)
+- `imageBlob`: Blob (compressed JPEG data)
+- `caption`: string | undefined (user input)
+- `tags`: string[] (parsed from comma-separated input)
+- `uploadDate`: Date (current timestamp)
+- `originalSize`: number (original file size in bytes)
+- `compressedSize`: number (compressed blob size in bytes)
+- `width`: number (final image width in pixels)
+- `height`: number (final image height in pixels)
+- `mimeType`: 'image/jpeg'
 
 **Requirements:**
+
 - IndexedDB database version incremented to 2
 - `photos` object store created with `by-date` index
 - Migration runs on app init for existing installations
 - Blob stored directly (not base64 encoded)
 
 **Validation:**
+
 - Open Chrome DevTools → Application → IndexedDB → my-love-db → photos
 - Verify new entry with correct metadata
 - Verify imageBlob is Blob type (not string)
@@ -238,6 +260,7 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Then** success feedback SHALL display: "Photo uploaded! ✨"
 
 **Requirements:**
+
 - Toast notification (not modal alert)
 - Fade in/out animation (Framer Motion)
 - Auto-dismiss after 3 seconds
@@ -245,6 +268,7 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 - User returns to gallery view (placeholder in Story 4.1, full grid in Story 4.2)
 
 **Validation:**
+
 - Upload completes → see "Photo uploaded! ✨" toast
 - Toast auto-dismisses after 3 seconds
 - Modal closes, returns to previous view
@@ -260,31 +284,37 @@ The story addresses PRD requirements FR012-FR015 by implementing secure, offline
 **Error Types:**
 
 **1. Unsupported File Format**
+
 - **Trigger:** User selects non-image file (PDF, TXT) or unsupported image format (BMP, GIF)
 - **Message:** "Unsupported file format. Please select a JPEG, PNG, or WebP image."
 - **Action:** Return to file picker
 
 **2. File Too Large (Warning)**
+
 - **Trigger:** Original file size > 10MB
 - **Message:** "This file is very large (12.5 MB). Compression may take longer."
 - **Action:** Allow upload but show warning, proceed with compression
 
 **3. Storage Quota Exceeded**
+
 - **Trigger:** IndexedDB quota exceeded during save (typically 50MB limit)
 - **Message:** "Storage full! Delete some photos to free up space."
 - **Action:** Rollback transaction, do not save photo, PhotoUpload modal remains open
 
 **4. Quota Warning (80% Full)**
+
 - **Trigger:** Storage usage > 80% of quota (before upload)
 - **Message:** "Storage 80% full (40MB / 50MB). Consider deleting old photos."
 - **Action:** Show warning but allow upload if space remains
 
 **5. Compression Failure**
+
 - **Trigger:** Canvas API compression fails (rare)
 - **Message:** "Failed to compress image. Try a different photo."
 - **Action:** Rollback, return to preview screen with retry option
 
 **Validation:**
+
 - Select PDF file → see "Unsupported file format" error
 - Upload 12MB photo → see "File is very large" warning, compression proceeds
 - Fill storage to 80% → see warning, can still upload
@@ -316,7 +346,7 @@ export class PhotoStorageService {
         if (oldVersion < 2) {
           const photosStore = db.createObjectStore('photos', {
             keyPath: 'id',
-            autoIncrement: true
+            autoIncrement: true,
           });
           photosStore.createIndex('by-date', 'uploadDate', { unique: false });
           console.log('[PhotoStorage] Photos store created');
@@ -450,7 +480,10 @@ export class ImageCompressionService {
       return { valid: false, error: 'Unsupported file format' };
     }
     if (file.size > 10 * 1024 * 1024) {
-      return { valid: false, error: `File is very large (${(file.size / 1024 / 1024).toFixed(1)} MB)` };
+      return {
+        valid: false,
+        error: `File is very large (${(file.size / 1024 / 1024).toFixed(1)} MB)`,
+      };
     }
     return { valid: true };
   }
@@ -477,36 +510,42 @@ export const imageCompressionService = new ImageCompressionService();
 **From Story 3.5 - Admin Interface Message Persistence:**
 
 **Service Layer Pattern:**
+
 - Reference [src/services/customMessageService.ts](../../src/services/customMessageService.ts) for IndexedDB service structure
 - Singleton pattern: `export const photoStorageService = new PhotoStorageService()`
 - Error handling: Try/catch with console logging and user-friendly errors
 - Init guard: Check if `this.db` is null before operations
 
 **IndexedDB Patterns:**
+
 - Use `idb` library: `import { openDB, IDBPDatabase } from 'idb'`
 - Auto-increment primary key: `autoIncrement: true`
 - Create indexes for common queries: `createIndex('by-date', 'uploadDate')`
 - Blob storage works well in IndexedDB (tested in Story 3.5 with custom messages)
 
 **Zustand Store Patterns:**
+
 - Actions call service methods: `await photoStorageService.create()`
 - Optimistic UI updates: Update state immediately, rollback on error
 - Error state management: Set `photoError` for UI display
 - Loading states: `isLoadingPhotos` for spinner/feedback
 
 **Component Patterns:**
+
 - Modal components use Framer Motion AnimatePresence
 - File input hidden, trigger via custom button: `<input type="file" ref={inputRef} style={{ display: 'none' }} />`
 - Toast notifications for success/error feedback
 - data-testid attributes for E2E tests: `[component]-[element]-[action]`
 
 **Testing Patterns (E2E):**
+
 - Use Playwright fixtures: Create `tests/fixtures/photos.ts` for test images
 - Test helpers: `uploadTestPhoto()`, `getPhotoCount()`, `clearPhotos()`
 - Direct IndexedDB inspection in tests (not mocked)
 - Test with real image files (150KB small JPEG, 3.2MB large JPEG, 1.5MB PNG)
 
 **Files to Reference:**
+
 - [src/services/customMessageService.ts](../../src/services/customMessageService.ts) - Service layer patterns
 - [src/stores/useAppStore.ts](../../src/stores/useAppStore.ts) - Store action patterns, error handling
 - [src/components/AdminPanel/CreateMessageForm.tsx](../../src/components/AdminPanel/CreateMessageForm.tsx) - Modal form patterns
@@ -515,19 +554,23 @@ export const imageCompressionService = new ImageCompressionService();
 ### Project Structure Notes
 
 **New Services:**
+
 - `src/services/photoStorageService.ts` - IndexedDB CRUD for photos (follows customMessageService patterns)
 - `src/services/imageCompressionService.ts` - Client-side image compression using Canvas API
 
 **New Components:**
+
 - `src/components/PhotoUpload/PhotoUpload.tsx` - Upload modal with file picker, preview, metadata form
 - `src/components/PhotoUpload/types.ts` - Component-specific types (PhotoUploadInput, etc.)
 
 **Type Definitions:**
+
 - Add Photo interface to `src/types/index.ts` (central types file)
 - Add PhotoUploadInput, CompressionOptions interfaces
 - Follow existing Message interface patterns (similar structure)
 
 **IndexedDB Schema Enhancement:**
+
 - Database version: 1 → 2
 - New `photos` object store:
   ```typescript
@@ -541,12 +584,14 @@ export const imageCompressionService = new ImageCompressionService();
   ```
 
 **Storage Strategy:**
+
 - Photos stored as Blob in IndexedDB (not base64 in LocalStorage due to size constraints)
 - Compression target: 350KB average per photo (max 1920px, 80% quality)
 - Quota management: Monitor via `navigator.storage.estimate()`
 - Typical quota: 50MB (enough for ~100-150 compressed photos)
 
 **Tech Stack (No New Dependencies):**
+
 - Native Canvas API for compression (no external library needed)
 - Existing `idb` ^8.0.3 for IndexedDB operations
 - Existing `framer-motion` ^12.23.24 for modal animations
@@ -555,19 +600,23 @@ export const imageCompressionService = new ImageCompressionService();
 ### Alignment with Unified Project Structure
 
 **Service Directory Pattern:**
+
 - Follows existing `src/services/` convention
 - Existing: `storageService.ts` (IndexedDB wrapper), `customMessageService.ts` (custom messages)
 - New: `photoStorageService.ts`, `imageCompressionService.ts`
 - Consistent naming: `[feature]Service.ts` pattern
 
 **Component Co-location:**
+
 - Create `src/components/PhotoUpload/` directory (like `AdminPanel/` from Story 3.4)
 - Co-locate component and types: `PhotoUpload.tsx`, `types.ts`
 - Consistent with established component organization
 
 **Type Definitions:**
+
 - Add Photo interfaces to `src/types/index.ts` (central types file)
 - Follow existing Message interface patterns:
+
   ```typescript
   interface Message {
     id: number;
@@ -585,6 +634,7 @@ export const imageCompressionService = new ImageCompressionService();
   ```
 
 **Error Handling:**
+
 - Extend ErrorBoundary (Story 1.5) to catch photo component errors
 - User-friendly error messages (not technical stack traces)
 - Log errors with context: `[PhotoUpload] Failed to upload: ${error.message}`
@@ -596,16 +646,19 @@ export const imageCompressionService = new ImageCompressionService();
 ### References
 
 **Technical Specifications:**
+
 - [tech-spec-epic-4.md#story-41-photo-upload--storage](../tech-spec-epic-4.md) - Detailed technical requirements, data models, API contracts
 - [epics.md#story-41-photo-upload--storage](../epics.md#story-41-photo-upload--storage) - User story and acceptance criteria
 - [PRD.md#photo-gallery](../PRD.md) - FR012-FR015 functional requirements for photo gallery
 
 **Architecture References:**
+
 - [architecture.md#indexeddb-schema](../architecture.md#indexeddb-schema) - IndexedDB photos store schema
 - [architecture.md#data-flow](../architecture.md#data-flow) - Service layer integration patterns
 - [architecture.md#component-overview](../architecture.md#component-overview) - Component patterns and best practices
 
 **Related Stories:**
+
 - [3-5-admin-interface-message-persistence-integration.md](./3-5-admin-interface-message-persistence-integration.md) - Service layer patterns (completed)
 - Story 4.2 (next): Photo Gallery Grid View - will display uploaded photos from photoStorageService
 - Story 4.3 (future): Photo Carousel - full-screen photo viewing with swipe navigation
@@ -651,6 +704,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 ### File List
 
 **Created:**
+
 - src/components/Navigation/BottomNavigation.tsx
 - src/components/PhotoUpload/PhotoUpload.tsx
 - src/services/photoStorageService.ts
@@ -660,6 +714,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - tests/fixtures/test-image.jpg
 
 **Modified:**
+
 - src/App.tsx - Added navigation and PhotoUpload modal integration
 - src/stores/useAppStore.ts - Extended with photo state and uploadPhoto action
 - src/types/index.ts - Added Photo, PhotoUploadInput, CompressionOptions interfaces
@@ -669,12 +724,15 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 ## Senior Developer Review (AI)
 
 ### Reviewer
+
 Frank
 
 ### Date
+
 2025-11-07
 
 ### Outcome
+
 **Changes Requested** - Implementation is fundamentally sound but requires corrections before approval
 
 ### Summary
@@ -718,17 +776,17 @@ None - Core functionality is solid
 
 ### Acceptance Criteria Coverage
 
-| AC # | Description | Status | Evidence |
-|------|-------------|--------|----------|
-| AC-4.1.1 | Photos Tab Opens Gallery View | ✅ IMPLEMENTED | BottomNavigation.tsx:33-43 (Photos tab with Camera icon), App.tsx:122-128 (opens PhotoUpload modal), Test: photo-upload.spec.ts:21-46 |
-| AC-4.1.2 | Upload Button Triggers File Picker | ✅ IMPLEMENTED | PhotoUpload.tsx:196-211 (file input with accept="image/jpeg,image/png,image/webp", single file, hidden with custom button trigger) |
-| AC-4.1.3 | Photo Preview Before Upload | ✅ IMPLEMENTED | PhotoUpload.tsx:219-326 (preview with URL.createObjectURL, size estimates, caption/tags inputs, upload/cancel buttons, max-h-[300px] object-contain) |
-| AC-4.1.4 | Caption Text Area | ✅ IMPLEMENTED | PhotoUpload.tsx:235-249 (textarea with 500 char max, character counter, multi-line, emoji support, optional) |
-| AC-4.1.5 | Tags Input Field | ✅ IMPLEMENTED | PhotoUpload.tsx:252-284 (comma-separated parsing, max 10 tags, 50 chars per tag, useAppStore.ts:856-867 case-insensitive duplicate detection) |
-| AC-4.1.6 | Photo Compressed Client-Side | ✅ IMPLEMENTED | imageCompressionService.ts:14-75 (Canvas API, max 1920px dimensions, 80% JPEG quality, compression logging with timing) |
-| AC-4.1.7 | Photo Saved to IndexedDB | ✅ IMPLEMENTED | photoStorageService.ts:5,56-81 (DB v2 with photos store, by-date index, auto-increment id), types/index.ts:20-33 (Photo interface with all metadata fields) |
-| AC-4.1.8 | Success Feedback After Upload | ⚠️ PARTIAL | PhotoUpload.tsx:345-364 ("Photo uploaded! ✨" with Framer Motion animations), **ISSUE**: Auto-dismiss is 2s not 3s (line 63) |
-| AC-4.1.9 | Error Handling for Upload Failures | ⚠️ PARTIAL | 4 of 5 error types fully implemented: unsupported format (imageCompressionService.ts:92-100), file too large (103-110), quota exceeded (useAppStore.ts:888-892), compression failure (imageCompressionService.ts:77-81). **ISSUE**: Quota warning at 80% only logs to console (useAppStore.ts:882-887) |
+| AC #     | Description                        | Status         | Evidence                                                                                                                                                                                                                                                                                               |
+| -------- | ---------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AC-4.1.1 | Photos Tab Opens Gallery View      | ✅ IMPLEMENTED | BottomNavigation.tsx:33-43 (Photos tab with Camera icon), App.tsx:122-128 (opens PhotoUpload modal), Test: photo-upload.spec.ts:21-46                                                                                                                                                                  |
+| AC-4.1.2 | Upload Button Triggers File Picker | ✅ IMPLEMENTED | PhotoUpload.tsx:196-211 (file input with accept="image/jpeg,image/png,image/webp", single file, hidden with custom button trigger)                                                                                                                                                                     |
+| AC-4.1.3 | Photo Preview Before Upload        | ✅ IMPLEMENTED | PhotoUpload.tsx:219-326 (preview with URL.createObjectURL, size estimates, caption/tags inputs, upload/cancel buttons, max-h-[300px] object-contain)                                                                                                                                                   |
+| AC-4.1.4 | Caption Text Area                  | ✅ IMPLEMENTED | PhotoUpload.tsx:235-249 (textarea with 500 char max, character counter, multi-line, emoji support, optional)                                                                                                                                                                                           |
+| AC-4.1.5 | Tags Input Field                   | ✅ IMPLEMENTED | PhotoUpload.tsx:252-284 (comma-separated parsing, max 10 tags, 50 chars per tag, useAppStore.ts:856-867 case-insensitive duplicate detection)                                                                                                                                                          |
+| AC-4.1.6 | Photo Compressed Client-Side       | ✅ IMPLEMENTED | imageCompressionService.ts:14-75 (Canvas API, max 1920px dimensions, 80% JPEG quality, compression logging with timing)                                                                                                                                                                                |
+| AC-4.1.7 | Photo Saved to IndexedDB           | ✅ IMPLEMENTED | photoStorageService.ts:5,56-81 (DB v2 with photos store, by-date index, auto-increment id), types/index.ts:20-33 (Photo interface with all metadata fields)                                                                                                                                            |
+| AC-4.1.8 | Success Feedback After Upload      | ⚠️ PARTIAL     | PhotoUpload.tsx:345-364 ("Photo uploaded! ✨" with Framer Motion animations), **ISSUE**: Auto-dismiss is 2s not 3s (line 63)                                                                                                                                                                           |
+| AC-4.1.9 | Error Handling for Upload Failures | ⚠️ PARTIAL     | 4 of 5 error types fully implemented: unsupported format (imageCompressionService.ts:92-100), file too large (103-110), quota exceeded (useAppStore.ts:888-892), compression failure (imageCompressionService.ts:77-81). **ISSUE**: Quota warning at 80% only logs to console (useAppStore.ts:882-887) |
 
 **Summary:** 7 ACs fully implemented, 2 ACs partially implemented with minor corrections needed
 
@@ -738,16 +796,16 @@ None - Core functionality is solid
 
 **Claimed Completed Tasks from Dev Notes:**
 
-| Task | Claimed | Verified | Evidence | Status |
-|------|---------|----------|----------|--------|
-| Created BottomNavigation component | ✅ | ✅ | src/components/Navigation/BottomNavigation.tsx exists with Photos tab implementation | VERIFIED |
-| Implemented PhotoUpload modal | ✅ | ✅ | src/components/PhotoUpload/PhotoUpload.tsx exists with complete multi-step flow | VERIFIED |
-| Created photoStorageService | ✅ | ✅ | src/services/photoStorageService.ts exists with IndexedDB CRUD operations and v2 migration | VERIFIED |
-| Created imageCompressionService | ✅ | ✅ | src/services/imageCompressionService.ts exists with Canvas API compression | VERIFIED |
-| Extended Zustand store | ✅ | ✅ | src/stores/useAppStore.ts:42-48 (photo state), 837-920 (uploadPhoto action) | VERIFIED |
-| Added Photo types | ✅ | ✅ | src/types/index.ts:20-56 (Photo, PhotoUploadInput, CompressionOptions) | VERIFIED |
-| Created E2E test suite | ✅ | ✅ | tests/e2e/photo-upload.spec.ts exists with AC tests | VERIFIED |
-| Fixed TypeScript error | ✅ | ✅ | src/services/photoStorageService.ts:56 (_transaction parameter prefixed) | VERIFIED |
+| Task                               | Claimed | Verified | Evidence                                                                                   | Status   |
+| ---------------------------------- | ------- | -------- | ------------------------------------------------------------------------------------------ | -------- |
+| Created BottomNavigation component | ✅      | ✅       | src/components/Navigation/BottomNavigation.tsx exists with Photos tab implementation       | VERIFIED |
+| Implemented PhotoUpload modal      | ✅      | ✅       | src/components/PhotoUpload/PhotoUpload.tsx exists with complete multi-step flow            | VERIFIED |
+| Created photoStorageService        | ✅      | ✅       | src/services/photoStorageService.ts exists with IndexedDB CRUD operations and v2 migration | VERIFIED |
+| Created imageCompressionService    | ✅      | ✅       | src/services/imageCompressionService.ts exists with Canvas API compression                 | VERIFIED |
+| Extended Zustand store             | ✅      | ✅       | src/stores/useAppStore.ts:42-48 (photo state), 837-920 (uploadPhoto action)                | VERIFIED |
+| Added Photo types                  | ✅      | ✅       | src/types/index.ts:20-56 (Photo, PhotoUploadInput, CompressionOptions)                     | VERIFIED |
+| Created E2E test suite             | ✅      | ✅       | tests/e2e/photo-upload.spec.ts exists with AC tests                                        | VERIFIED |
+| Fixed TypeScript error             | ✅      | ✅       | src/services/photoStorageService.ts:56 (\_transaction parameter prefixed)                  | VERIFIED |
 
 **Summary:** 8 of 8 tasks verified complete
 
@@ -756,6 +814,7 @@ None - Core functionality is solid
 **E2E Test Suite:** tests/e2e/photo-upload.spec.ts
 
 **Coverage:**
+
 - ✅ AC-4.1.1: Photos tab opens modal (lines 21-46)
 - ✅ AC-4.1.2: File selection and preview (lines 86-99)
 - ✅ Modal close functionality (lines 48-82)
@@ -767,6 +826,7 @@ None - Core functionality is solid
 - ⚠️ **Gap**: No tests for error handling scenarios (AC-4.1.9)
 
 **Test Quality:**
+
 - Uses proper test fixtures (test-image.jpg)
 - Uses data-testid attributes for selectors
 - Follows existing test patterns from Epic 2
@@ -776,29 +836,34 @@ None - Core functionality is solid
 ### Architectural Alignment
 
 **✅ Service Layer Patterns**
+
 - photoStorageService follows customMessageService patterns (singleton, init guards, error handling)
 - Comprehensive logging with context: `[PhotoStorage]`, `[Compression]`, `[AppStore]`
 - Graceful fallbacks in service methods
 
 **✅ IndexedDB Migration**
+
 - Correctly increments DB version from 1 to 2
 - Migration logic checks `oldVersion < 2` and creates photos store
 - by-date index created for chronological sorting
 - Handles existing v1 installations
 
 **✅ TypeScript Strict Typing**
+
 - Photo interface with all required fields
 - CompressionOptions and CompressionResult interfaces
 - PhotoUploadInput for form data
 - Proper use of Omit<Photo, 'id'> for create operations
 
 **✅ Component Architecture**
+
 - Framer Motion AnimatePresence for modal animations
 - Hidden file input with custom button trigger (accessibility pattern)
 - data-testid attributes throughout for E2E testing
 - Consistent with AdminPanel modal patterns from Story 3.4
 
 **✅ No New Dependencies**
+
 - Uses existing `idb` for IndexedDB
 - Native Canvas API (no external compression library)
 - Existing `framer-motion` for animations
@@ -820,6 +885,7 @@ None - Core functionality is solid
 ### Best-Practices and References
 
 **Patterns Followed:**
+
 - Service Layer: Singleton pattern with init() guards
 - Error Handling: Try/catch with console logging and user-friendly messages
 - State Management: Zustand with optimistic UI updates and rollback on error
@@ -827,6 +893,7 @@ None - Core functionality is solid
 - Type Definitions: Central types file (types/index.ts)
 
 **References Used:**
+
 - Story 3.5 customMessageService for IndexedDB patterns
 - Story 3.4 AdminPanel for modal component structure
 - Epic 2 test patterns for E2E testing
@@ -862,11 +929,13 @@ None - Core functionality is solid
 ### Issues Fixed
 
 **1. [LOW] Success Toast Auto-Dismiss Timing - AC-4.1.8**
+
 - **Issue**: Success screen auto-dismissed after 2000ms instead of required 3000ms
 - **Fix**: Updated timeout in [src/components/PhotoUpload/PhotoUpload.tsx:65](../src/components/PhotoUpload/PhotoUpload.tsx#L65) from `2000` to `3000`
 - **Impact**: Toast now displays for full 3 seconds as specified in acceptance criteria
 
 **2. [MEDIUM] Storage Quota Warning UI - AC-4.1.9**
+
 - **Issue**: 80% storage warning only logged to console, no visible UI notification
 - **Fix**: Implemented complete UI notification system
   - Added `storageWarning: string | null` state to AppState interface ([src/stores/useAppStore.ts:50](../src/stores/useAppStore.ts#L50))
@@ -888,11 +957,13 @@ $ npm run build
 ### Files Modified
 
 **src/components/PhotoUpload/PhotoUpload.tsx**
+
 - Line 15: Added `storageWarning` to store destructuring
 - Line 65: Updated timeout from 2000ms to 3000ms (AC-4.1.8)
 - Lines 173-192: Added storage warning banner display (AC-4.1.9)
 
 **src/stores/useAppStore.ts**
+
 - Line 50: Added `storageWarning: string | null` to AppState interface
 - Line 102: Added `clearStorageWarning()` action to interface
 - Line 189: Added `storageWarning: null` to initial state
@@ -905,4 +976,3 @@ $ npm run build
 **After Fixes**: 9/9 ACs fully implemented ✅
 
 Story ready for re-review to verify fixes address identified issues.
-
