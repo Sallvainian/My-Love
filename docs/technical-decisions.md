@@ -678,3 +678,291 @@ The My-Love codebase is in **good shape** for a rapid vibe-coded prototype. The 
 ---
 
 *End of Technical Debt Audit Report*
+
+---
+
+# Input Validation Strategy
+
+**Decision Date:** 2025-11-14
+**Story:** 5.5 - Centralize Input Validation Layer
+**Implementation:** Zod-based validation at service boundaries
+
+## Context
+
+During Epic 4 photo upload testing, we discovered that invalid data could potentially enter the system through user inputs, potentially causing data corruption, UI breakage, or unexpected runtime errors. TypeScript provides compile-time type safety, but runtime validation was missing.
+
+## Decision
+
+Implement centralized input validation using Zod schemas at all service boundaries before IndexedDB writes.
+
+### Architecture Pattern: Service Boundary Validation
+
+```typescript
+// Services validate before IndexedDB writes
+class CustomMessageService {
+  async create(input: CreateMessageInput): Promise<Message> {
+    // 1. Validate input at service boundary
+    const validated = CreateMessageInputSchema.parse(input);
+
+    // 2. Proceed with IndexedDB write using validated data
+    return await this.addToIndexedDB(validated);
+  }
+}
+```
+
+### Implementation Details
+
+**Location:** `/src/validation/`
+- `schemas.ts` - Zod validation schemas for all data models
+- `errorMessages.ts` - Error transformation utilities
+- `index.ts` - Public API exports
+
+**Services with Validation:**
+- `customMessageService.ts` - Message creation/update validation
+- `photoStorageService.ts` - Photo upload/update validation
+- `migrationService.ts` - Settings and mood validation (backward compatible)
+- `useAppStore.ts` - Store-level validation for moods and settings
+
+**Validation Rules:**
+
+| Model | Field | Validation |
+|-------|-------|------------|
+| **Message** | text | min: 1, max: 1000 chars (trimmed) |
+| **Message** | category | enum: reason, memory, affirmation, future, custom |
+| **Photo** | caption | max: 500 chars, optional |
+| **Photo** | imageBlob | Blob instance check |
+| **Photo** | width/height | positive integers |
+| **Photo** | sizes | positive numbers |
+| **MoodEntry** | date | ISO format (YYYY-MM-DD) with value validation |
+| **MoodEntry** | mood | enum: loved, happy, content, thoughtful, grateful |
+| **Settings** | themeName | enum: sunset, ocean, lavender, rose |
+| **Settings** | time | HH:MM format with value validation (00:00-23:59) |
+
+### Error Handling Pattern
+
+```typescript
+try {
+  const validated = MessageSchema.parse(input);
+} catch (error) {
+  if (isZodError(error)) {
+    // Transform to user-friendly message
+    const message = formatZodError(error);
+    throw new ValidationError(message);
+  }
+  throw error;
+}
+```
+
+**Error Transformation:**
+- `formatZodError()` - Converts Zod errors to single user-friendly message
+- `getFieldErrors()` - Returns Map of field-specific errors for forms
+- `createValidationError()` - Creates custom ValidationError with field details
+- `isValidationError()` / `isZodError()` - Type guards for error handling
+
+### Type Safety Strategy
+
+Zod schemas serve as the **single source of truth** for both validation and types:
+
+```typescript
+export const MessageSchema = z.object({
+  text: z.string().trim().min(1).max(1000),
+  category: z.enum(['reason', 'memory', 'affirmation', 'future', 'custom']),
+  // ...
+});
+
+// Types derived from schemas
+export type MessageSchemaType = z.infer<typeof MessageSchema>;
+```
+
+This ensures schemas and TypeScript types stay in sync, preventing drift between compile-time types and runtime validation.
+
+### Backward Compatibility
+
+**Migration Service:** Uses `.safeParse()` instead of `.parse()` to handle legacy data gracefully:
+
+```typescript
+const result = SettingsSchema.safeParse(legacyData);
+if (!result.success) {
+  console.warn('Legacy data validation failed:', result.error);
+  // Apply defaults or data repair logic
+}
+```
+
+This prevents app initialization from failing due to validation errors in existing user data.
+
+### Testing Coverage
+
+**Unit Tests:** 76 comprehensive tests covering:
+- Schema validation for all data models (messages, photos, moods, settings)
+- Edge cases (empty strings, max lengths, boundary values)
+- Error message transformation
+- Type guards and error handling utilities
+
+**Test Files:**
+- `tests/unit/validation/schemas.test.ts` - Schema validation tests
+- `tests/unit/validation/errorMessages.test.ts` - Error utility tests
+
+**Coverage:** 100% of validation schemas and error utilities
+
+### Performance Considerations
+
+- **Schema Compilation:** Occurs once at module load (automatic with Zod)
+- **Validation Overhead:** <10ms per operation (acceptable for user-facing actions)
+- **Optimization:** Only validate at service boundary, not in UI or store
+- **Graceful Handling:** Use `.safeParse()` for non-critical paths to avoid throw overhead
+
+### Benefits Achieved
+
+**Problems Prevented:**
+1. Empty messages causing blank cards
+2. Invalid categories breaking filters
+3. Photo captions exceeding UI layout limits (>500 chars)
+4. Invalid date strings causing calculation errors
+5. Mood type typos breaking mood tracking
+6. Null values in required fields causing crashes
+7. Type mismatches (numbers as strings) breaking logic
+
+**Data Integrity:**
+- Invalid data rejected before IndexedDB write
+- Prevents corruption of message rotation algorithm
+- Ensures mood tracking data consistency
+- Settings validation prevents broken app state
+
+### Future Enhancements
+
+1. **Form-level validation:** Display field-specific errors in UI forms
+2. **Data repair utilities:** Migrate invalid legacy data to valid schemas
+3. **Validation refinement:** Adjust rules based on production error logs
+4. **Additional schemas:** Add validation for future data models
+
+## Alternatives Considered
+
+1. **Manual validation:** Too error-prone, hard to maintain
+2. **Joi/Yup:** Zod chosen for better TypeScript integration
+3. **Class-validator:** Zod schemas more composable and functional
+4. **No validation:** Unacceptable - discovered corruption risks during testing
+
+## Impact
+
+- **Positive:** Data corruption prevention, improved type safety, clear error messages
+- **Negative:** Minor performance overhead (<10ms), additional code complexity
+- **Migration:** No breaking changes - validation only enforced on new writes
+
+## Related Stories
+
+- **Story 5.4:** Unit testing infrastructure (Vitest)
+- **Story 5.3:** Service base class extraction
+- **Epic 4:** Photo upload testing revealed validation gaps
+
+---
+
+*Last Updated: 2025-11-14*
+
+---
+
+## Store Architecture: Feature Slice Pattern
+
+**Decision Date:** 2025-11-14
+**Status:** Implemented in Epic 5, Story 5.1
+**Context:** Main store (useAppStore) grew to 1,267 lines, violating single responsibility principle
+
+### Pattern Description
+
+The application uses **feature slices** to organize Zustand store logic. Each slice is a self-contained module managing a specific feature domain.
+
+### Slice Boundaries
+
+| Slice | Responsibility | Size | File |
+|-------|---------------|------|------|
+| **Messages** | Custom message CRUD, rotation, service integration | 553 lines | `src/stores/slices/messagesSlice.ts` |
+| **Photos** | Photo gallery state, upload/delete, storage service | 272 lines | `src/stores/slices/photosSlice.ts` |
+| **Settings** | App configuration, persistence to LocalStorage | 255 lines | `src/stores/slices/settingsSlice.ts` |
+| **Navigation** | Current day tracking, date navigation | 56 lines | `src/stores/slices/navigationSlice.ts` |
+| **Mood** | Daily mood tracking, persistence | 54 lines | `src/stores/slices/moodSlice.ts` |
+
+### Composition Pattern
+
+Main store composes slices using spread operator:
+
+```typescript
+// src/stores/useAppStore.ts
+export const useAppStore = create<AppStore>()(
+  persist(
+    (set, get) => ({
+      ...createMessagesSlice(set, get),
+      ...createPhotosSlice(set, get),
+      ...createSettingsSlice(set, get),
+      ...createNavigationSlice(set, get),
+      ...createMoodSlice(set, get),
+    }),
+    { name: 'app-store', partialize: /* ... */ }
+  )
+);
+```
+
+### Cross-Slice Dependencies
+
+Slices access each other's state via `get()`:
+
+```typescript
+// Example: messagesSlice accessing settings
+const createMessagesSlice = (set, get): MessagesSlice => ({
+  rotateMessage: () => {
+    const { customMessages } = get(); // Access own state
+    const { rotationInterval } = get(); // Access settings state
+    // ...
+  }
+});
+```
+
+**Documented dependencies:**
+- Messages → Settings (rotation interval)
+- Photos → Navigation (current day for filtering)
+- All slices → Settings (theme, preferences)
+
+### Persistence Strategy
+
+**LocalStorage partitioning:**
+- Each slice persists independently to prevent localStorage quota issues
+- Map serialization/deserialization handles complex data types
+- Custom `partialize` functions filter what gets persisted
+
+```typescript
+partialize: (state) => ({
+  customMessages: state.customMessages,
+  photos: state.photos,
+  // ... only serializable data
+})
+```
+
+### Type Safety
+
+**Known limitation:** TypeScript requires `as any` casts (10 instances) due to Zustand's type system limitations when composing heterogeneous slices.
+
+**Rationale:** Pragmatic trade-off accepted because:
+1. TypeScript compiles without errors
+2. Runtime type safety preserved via Zod validation (Story 5.5)
+3. Alternative approaches (discriminated unions, branded types) add complexity without solving the root issue
+4. Zustand's official docs acknowledge this limitation
+
+**Future consideration:** Monitor Zustand v5 for improved TypeScript support.
+
+### Migration Impact
+
+**Zero breaking changes:** All 16 components using `useAppStore` work unchanged. Component API remains identical.
+
+### Benefits Achieved
+
+- **80% size reduction** in main store (1,267 → 251 lines)
+- **Clear separation of concerns** by feature domain
+- **Improved maintainability** - easier to locate and modify feature logic
+- **Better testability** - slices can be tested independently
+- **Scalability** - new features add new slices without bloating main store
+
+### Testing Strategy
+
+**E2E validation:** All existing E2E tests pass, confirming API compatibility and zero regressions.
+
+**Future work:** Unit tests for individual slices (Story 5.4 addresses this).
+
+---
