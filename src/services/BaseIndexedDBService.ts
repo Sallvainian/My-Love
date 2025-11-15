@@ -215,10 +215,14 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
   }
 
   /**
-   * Get paginated items using offset and limit
-   * Uses getAll() + slice for simplicity (services can override for index-based pagination)
+   * Get paginated items using cursor-based pagination for efficiency
+   * Replaces inefficient getAll().slice() with IDBCursor advancement
    *
-   * @param offset - Number of items to skip
+   * Performance improvement:
+   * - Before: O(n) - fetches ALL items, then slices (wasteful for large datasets)
+   * - After: O(offset + limit) - advances cursor to offset, reads only needed items
+   *
+   * @param offset - Number of items to skip (0 = first page)
    * @param limit - Number of items to return
    * @returns Array of items for the requested page
    */
@@ -226,18 +230,37 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
     try {
       await this.init();
 
-      const allItems = await this.getAll();
-      const page = allItems.slice(offset, offset + limit);
+      const storeName = this.getStoreName();
+      const transaction = this.db!.transaction(storeName, 'readonly');
+      const store = transaction.objectStore(storeName);
+
+      const results: T[] = [];
+      let cursor = await store.openCursor();
+      let skipped = 0;
+      let collected = 0;
+
+      // Advance cursor to offset position
+      while (cursor && skipped < offset) {
+        cursor = await cursor.continue();
+        skipped++;
+      }
+
+      // Collect items up to limit
+      while (cursor && collected < limit) {
+        results.push(cursor.value as T);
+        collected++;
+        cursor = await cursor.continue();
+      }
 
       if (import.meta.env.DEV) {
         console.log(
-          `[${this.constructor.name}] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${allItems.length}`
+          `[${this.constructor.name}] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
         );
       }
 
-      return page;
+      return results;
     } catch (error) {
-      console.error(`[${this.constructor.name}] Failed to get page:`, error);
+      console.error(`[${this.constructor.name}] Failed to get page (cursor):`, error);
       return []; // Graceful fallback
     }
   }

@@ -201,36 +201,51 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
   }
 
   /**
-   * Get paginated photos sorted by date (newest first)
+   * Get paginated photos sorted by date (newest first) using cursor
    * Story 4.2: AC-4.2.4 - Lazy loading pagination
-   * Overrides base getPage() to use by-date index for efficient pagination
+   * Overrides base getPage() to use by-date index with descending cursor
+   *
+   * Performance: O(offset + limit) instead of O(n) with slice approach
    *
    * @param offset - Number of photos to skip (0 = first page)
    * @param limit - Number of photos to return per page (default: 20)
-   * @returns Array of photos for the requested page
+   * @returns Array of photos for the requested page (newest first)
    */
   async getPage(offset: number = 0, limit: number = PAGINATION.DEFAULT_PAGE_SIZE): Promise<Photo[]> {
     return performanceMonitor.measureAsync('photo-getPage', async () => {
       try {
         await this.init();
 
-        // Get all photos sorted by date
-        const allPhotos = await this.db!.getAllFromIndex('photos', 'by-date');
-        // Reverse to get newest first
-        const sortedPhotos = allPhotos.reverse();
+        const transaction = this.db!.transaction('photos', 'readonly');
+        const index = transaction.objectStore('photos').index('by-date');
 
-        // Slice to get requested page
-        const page = sortedPhotos.slice(offset, offset + limit);
+        const results: Photo[] = [];
+        let cursor = await index.openCursor(null, 'prev'); // 'prev' = descending order
+        let skipped = 0;
+        let collected = 0;
+
+        // Advance cursor to offset position
+        while (cursor && skipped < offset) {
+          cursor = await cursor.continue();
+          skipped++;
+        }
+
+        // Collect photos up to limit
+        while (cursor && collected < limit) {
+          results.push(cursor.value as Photo);
+          collected++;
+          cursor = await cursor.continue();
+        }
 
         if (import.meta.env.DEV) {
           console.log(
-            `[PhotoStorage] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${sortedPhotos.length}`
+            `[PhotoStorage] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
           );
         }
 
-        return page;
+        return results;
       } catch (error) {
-        console.error('[PhotoStorage] Failed to load photo page:', error);
+        console.error('[PhotoStorage] Failed to load photo page (cursor):', error);
         return []; // Graceful fallback
       }
     });
