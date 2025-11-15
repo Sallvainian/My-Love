@@ -2,7 +2,7 @@
  * Navigation Slice
  *
  * Manages all navigation-related state and actions including:
- * - View switching (home/photos)
+ * - View switching (home/photos/mood/partner)
  * - Browser history integration
  *
  * Cross-slice dependencies:
@@ -14,14 +14,18 @@
 
 import type { StateCreator } from 'zustand';
 
+export type ViewType = 'home' | 'photos' | 'mood' | 'partner';
+
 export interface NavigationSlice {
   // State
-  currentView: 'home' | 'photos';
+  currentView: ViewType;
 
   // Actions
-  setView: (view: 'home' | 'photos', skipHistory?: boolean) => void;
+  setView: (view: ViewType, skipHistory?: boolean) => void;
   navigateHome: () => void;
   navigatePhotos: () => void;
+  navigateMood: () => void;
+  navigatePartner: () => void;
 }
 
 export const createNavigationSlice: StateCreator<NavigationSlice, [], [], NavigationSlice> = (
@@ -32,12 +36,18 @@ export const createNavigationSlice: StateCreator<NavigationSlice, [], [], Naviga
   currentView: 'home',
 
   // Actions
-  setView: (view: 'home' | 'photos', skipHistory = false) => {
+  setView: (view: ViewType, skipHistory = false) => {
     set({ currentView: view });
 
     // Update browser URL if not skipping history (prevents loops during popstate)
     if (!skipHistory) {
-      const path = view === 'home' ? '/' : '/photos';
+      const pathMap: Record<ViewType, string> = {
+        home: '/',
+        photos: '/photos',
+        mood: '/mood',
+        partner: '/partner',
+      };
+      const path = pathMap[view];
       window.history.pushState({ view }, '', path);
       console.log(`[AppStore] View changed to '${view}', URL: ${path}`);
     }
@@ -50,5 +60,13 @@ export const createNavigationSlice: StateCreator<NavigationSlice, [], [], Naviga
 
   navigatePhotos: () => {
     get().setView('photos');
+  },
+
+  navigateMood: () => {
+    get().setView('mood');
+  },
+
+  navigatePartner: () => {
+    get().setView('partner');
   },
 });

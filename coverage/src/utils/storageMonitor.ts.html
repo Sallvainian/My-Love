@@ -204,7 +204,10 @@
 <a name='L139'></a><a href='#L139'>139</a>
 <a name='L140'></a><a href='#L140'>140</a>
 <a name='L141'></a><a href='#L141'>141</a>
-<a name='L142'></a><a href='#L142'>142</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -292,10 +295,13 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -415,7 +421,7 @@ export function <span class="fstat-no" title="function not covered" >getStorageQ
     total,
     available,
     usagePercentage: Math.round(usagePercentage * 10) / 10, // Round to 1 decimal
-    warningLevel
+    warningLevel,
   };
 }
 &nbsp;
@@ -433,12 +439,15 @@ export function <span class="fstat-no" title="function not covered" >logStorageQ
     const <span class="cstat-no" title="statement not covered" >totalMB = (quota.total / (1024 * 1024)).toFixed(2);</span>
     const <span class="cstat-no" title="statement not covered" >availableMB = (quota.available / (1024 * 1024)).toFixed(2);</span>
 &nbsp;
-    const emoji = <span class="cstat-no" title="statement not covered" >quota.warningLevel === 'safe' ? '✅' :</span>
-                  quota.warningLevel === 'warning' ? '⚠️' : '🚨';
+    const emoji =
+<span class="cstat-no" title="statement not covered" >      quota.warningLevel === 'safe' ? '✅' : quota.warningLevel === 'warning' ? '⚠️' : '🚨';</span>
 &nbsp;
-    const style = <span class="cstat-no" title="statement not covered" >quota.warningLevel === 'safe' ? 'color: green' :</span>
-                  quota.warningLevel === 'warning' ? 'color: orange; font-weight: bold' :
-                  'color: red; font-weight: bold';
+    const style =
+<span class="cstat-no" title="statement not covered" >      quota.warningLevel === 'safe'</span>
+        ? 'color: green'
+        : quota.warningLevel === 'warning'
+          ? 'color: orange; font-weight: bold'
+          : 'color: red; font-weight: bold';
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    console.log(</span>
       `%c${emoji} LocalStorage Quota: ${quota.usagePercentage}% used (${usedMB}MB / ${totalMB}MB) - ${availableMB}MB available`,
@@ -448,18 +457,18 @@ export function <span class="fstat-no" title="function not covered" >logStorageQ
 <span class="cstat-no" title="statement not covered" >    if (quota.warningLevel === 'warning') {</span>
 <span class="cstat-no" title="statement not covered" >      console.warn(</span>
         `⚠️ LocalStorage approaching limit (${quota.usagePercentage}%). Consider optimization:\n` +
-        `  - Review persisted state partializer in store configuration\n` +
-        `  - Move large data (photos, messages) to IndexedDB\n` +
-        `  - Implement data cleanup for old/unused entries`
+          `  - Review persisted state partializer in store configuration\n` +
+          `  - Move large data (photos, messages) to IndexedDB\n` +
+          `  - Implement data cleanup for old/unused entries`
       );
 <span class="cstat-no" title="statement not covered" >    } else if (quota.warningLevel === 'critical') {</span>
 <span class="cstat-no" title="statement not covered" >      console.error(</span>
         `🚨 LocalStorage CRITICAL (${quota.usagePercentage}%)! Quota exceeded error imminent!\n` +
-        `  ACTION REQUIRED:\n` +
-        `  1. Immediately review persisted state size\n` +
-        `  2. Migrate large data to IndexedDB\n` +
-        `  3. Clear unnecessary cached data\n` +
-        `  Current usage: ${usedMB}MB of ${totalMB}MB`
+          `  ACTION REQUIRED:\n` +
+          `  1. Immediately review persisted state size\n` +
+          `  2. Migrate large data to IndexedDB\n` +
+          `  3. Clear unnecessary cached data\n` +
+          `  Current usage: ${usedMB}MB of ${totalMB}MB`
       );
     }
   }
@@ -493,7 +502,7 @@ export function <span class="fstat-no" title="function not covered" >formatBytes
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-15T04:51:44.082Z
+                at 2025-11-15T18:25:01.368Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

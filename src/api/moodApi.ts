@@ -78,8 +78,9 @@ export class MoodApi {
 
     try {
       // Insert mood into Supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from('moods').insert as any)([moodData])
+      const { data, error } = await supabase
+        .from('moods')
+        .insert(moodData)
         .select()
         .single();
 
@@ -358,11 +359,12 @@ export class MoodApi {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.from('moods').update as any)({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      const { data, error} = await supabase
+        .from('moods')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', moodId)
         .select()
         .single();

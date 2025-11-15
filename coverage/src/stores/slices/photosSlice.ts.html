@@ -329,18 +329,7 @@
 <a name='L264'></a><a href='#L264'>264</a>
 <a name='L265'></a><a href='#L265'>265</a>
 <a name='L266'></a><a href='#L266'>266</a>
-<a name='L267'></a><a href='#L267'>267</a>
-<a name='L268'></a><a href='#L268'>268</a>
-<a name='L269'></a><a href='#L269'>269</a>
-<a name='L270'></a><a href='#L270'>270</a>
-<a name='L271'></a><a href='#L271'>271</a>
-<a name='L272'></a><a href='#L272'>272</a>
-<a name='L273'></a><a href='#L273'>273</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L267'></a><a href='#L267'>267</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -432,6 +421,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -538,8 +528,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -653,12 +641,7 @@ export interface PhotosSlice {
   clearPhotoSelection: () =&gt; void;
 }
 &nbsp;
-export const createPhotosSlice: StateCreator&lt;
-  PhotosSlice,
-  [],
-  [],
-  PhotosSlice
-&gt; = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(s</span>et, get) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+export const createPhotosSlice: StateCreator&lt;PhotosSlice, [], [], PhotosSlice&gt; = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(s</span>et, get) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
   // Initial state
   photos: [],
   isLoadingPhotos: false,
@@ -678,7 +661,7 @@ export const createPhotosSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      set({</span>
         photoError: 'Failed to load photos',
         isLoadingPhotos: false,
-        photos: [] // Fallback to empty array
+        photos: [], // Fallback to empty array
       });
     }
   },
@@ -702,14 +685,15 @@ export const createPhotosSlice: StateCreator&lt;
       const parsedTags = <span class="cstat-no" title="statement not covered" >input.tags</span>
         ? input.tags
             .split(',')
-            .map(<span class="fstat-no" title="function not covered" >tag =&gt; <span class="cstat-no" title="statement not covered" >t</span>ag.trim())</span>
-            .filter(<span class="fstat-no" title="function not covered" >tag =&gt; <span class="cstat-no" title="statement not covered" >t</span>ag.length &gt; 0)</span>
-            .filter(<span class="fstat-no" title="function not covered" >(t</span>ag, index, arr) =&gt;
-              // Case-insensitive duplicate detection
-<span class="cstat-no" title="statement not covered" >              arr.findIndex(<span class="fstat-no" title="function not covered" >t =&gt; <span class="cstat-no" title="statement not covered" >t</span>.toLowerCase() === tag.toLowerCase())</span> === index</span>
+            .map(<span class="fstat-no" title="function not covered" >(t</span>ag) =&gt; <span class="cstat-no" title="statement not covered" >tag.trim())</span>
+            .filter(<span class="fstat-no" title="function not covered" >(t</span>ag) =&gt; <span class="cstat-no" title="statement not covered" >tag.length &gt; 0)</span>
+            .filter(
+<span class="fstat-no" title="function not covered" >              (t</span>ag, index, arr) =&gt;
+                // Case-insensitive duplicate detection
+<span class="cstat-no" title="statement not covered" >                arr.findIndex(<span class="fstat-no" title="function not covered" >(t</span>) =&gt; <span class="cstat-no" title="statement not covered" >t.toLowerCase() === tag.toLowerCase())</span> === index</span>
             )
             .slice(0, 10) // Max 10 tags
-            .map(<span class="fstat-no" title="function not covered" >tag =&gt; <span class="cstat-no" title="statement not covered" >t</span>ag.slice(0, 50))</span> // Max 50 chars per tag
+            .map(<span class="fstat-no" title="function not covered" >(t</span>ag) =&gt; <span class="cstat-no" title="statement not covered" >tag.slice(0, 50))</span> // Max 50 chars per tag
         : [];
 &nbsp;
       // Validate caption
@@ -755,7 +739,7 @@ export const createPhotosSlice: StateCreator&lt;
       const savedPhoto = <span class="cstat-no" title="statement not covered" >await photoStorageService.create(photo);</span>
 &nbsp;
       // Update state (optimistic UI update)
-<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >state =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
+<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >(s</span>tate) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
         photos: [savedPhoto, ...state.photos], // Add to beginning (newest first)
         isLoadingPhotos: false,
       }));
@@ -766,7 +750,7 @@ export const createPhotosSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      console.error('[AppStore] Failed to upload photo:', error);</span>
 <span class="cstat-no" title="statement not covered" >      set({</span>
         photoError: (error as Error).message || 'Failed to upload photo',
-        isLoadingPhotos: false
+        isLoadingPhotos: false,
       });
 <span class="cstat-no" title="statement not covered" >      throw error; // Re-throw for UI error handling</span>
     }
@@ -774,7 +758,7 @@ export const createPhotosSlice: StateCreator&lt;
 &nbsp;
   getPhotoById: <span class="fstat-no" title="function not covered" >(p</span>hotoId: number) =&gt; {
     const { photos } = <span class="cstat-no" title="statement not covered" >get();</span>
-<span class="cstat-no" title="statement not covered" >    return photos.find(<span class="fstat-no" title="function not covered" >p =&gt; <span class="cstat-no" title="statement not covered" >p</span>.id === photoId)</span> || null;</span>
+<span class="cstat-no" title="statement not covered" >    return photos.find(<span class="fstat-no" title="function not covered" >(p</span>) =&gt; <span class="cstat-no" title="statement not covered" >p.id === photoId)</span> || null;</span>
   },
 &nbsp;
   getStorageUsage: <span class="fstat-no" title="function not covered" >async () =&gt; {</span>
@@ -807,11 +791,9 @@ export const createPhotosSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      await photoStorageService.update(photoId, updates);</span>
 &nbsp;
       // Update in state (find photo by ID and replace with updated version)
-<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >state =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
-        photos: state.photos.map(<span class="fstat-no" title="function not covered" >photo =&gt;</span>
-<span class="cstat-no" title="statement not covered" >          photo.id === photoId</span>
-            ? { ...photo, ...updates }
-            : photo
+<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >(s</span>tate) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+        photos: state.photos.map(<span class="fstat-no" title="function not covered" >(p</span>hoto) =&gt;
+<span class="cstat-no" title="statement not covered" >          photo.id === photoId ? { ...photo, ...updates } : photo</span>
         ),
       }));
 &nbsp;
@@ -827,15 +809,15 @@ export const createPhotosSlice: StateCreator&lt;
       const { photos, selectedPhotoId } = <span class="cstat-no" title="statement not covered" >get();</span>
 &nbsp;
       // Find current photo index before deletion
-      const currentIndex = <span class="cstat-no" title="statement not covered" >photos.findIndex(<span class="fstat-no" title="function not covered" >p =&gt; <span class="cstat-no" title="statement not covered" >p</span>.id === photoId)</span>;</span>
+      const currentIndex = <span class="cstat-no" title="statement not covered" >photos.findIndex(<span class="fstat-no" title="function not covered" >(p</span>) =&gt; <span class="cstat-no" title="statement not covered" >p.id === photoId)</span>;</span>
       const photosCount = <span class="cstat-no" title="statement not covered" >photos.length;</span>
 &nbsp;
       // Delete from IndexedDB
 <span class="cstat-no" title="statement not covered" >      await photoStorageService.delete(photoId);</span>
 &nbsp;
       // Update state (filter out deleted photo)
-<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >state =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
-        photos: state.photos.filter(<span class="fstat-no" title="function not covered" >photo =&gt; <span class="cstat-no" title="statement not covered" >p</span>hoto.id !== photoId)</span>,
+<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >(s</span>tate) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+        photos: state.photos.filter(<span class="fstat-no" title="function not covered" >(p</span>hoto) =&gt; <span class="cstat-no" title="statement not covered" >photo.id !== photoId)</span>,
       }));
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      console.log(`[AppStore] Photo ${photoId} deleted successfully`);</span>
@@ -850,13 +832,13 @@ export const createPhotosSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >          console.log('[AppStore] Last photo deleted - closing carousel');</span>
 <span class="cstat-no" title="statement not covered" >        } else if (currentIndex &lt; remainingPhotosCount) {</span>
           // Not last photo → navigate to same index (which is now next photo)
-          const updatedPhotos = <span class="cstat-no" title="statement not covered" >photos.filter(<span class="fstat-no" title="function not covered" >p =&gt; <span class="cstat-no" title="statement not covered" >p</span>.id !== photoId)</span>;</span>
+          const updatedPhotos = <span class="cstat-no" title="statement not covered" >photos.filter(<span class="fstat-no" title="function not covered" >(p</span>) =&gt; <span class="cstat-no" title="statement not covered" >p.id !== photoId)</span>;</span>
           const nextPhoto = <span class="cstat-no" title="statement not covered" >updatedPhotos[currentIndex];</span>
 <span class="cstat-no" title="statement not covered" >          get().selectPhoto(nextPhoto.id);</span>
 <span class="cstat-no" title="statement not covered" >          console.log(`[AppStore] Navigated to next photo: ${nextPhoto.id}`);</span>
         } else {
           // Was last photo → navigate to new last photo (previous photo)
-          const updatedPhotos = <span class="cstat-no" title="statement not covered" >photos.filter(<span class="fstat-no" title="function not covered" >p =&gt; <span class="cstat-no" title="statement not covered" >p</span>.id !== photoId)</span>;</span>
+          const updatedPhotos = <span class="cstat-no" title="statement not covered" >photos.filter(<span class="fstat-no" title="function not covered" >(p</span>) =&gt; <span class="cstat-no" title="statement not covered" >p.id !== photoId)</span>;</span>
           const prevPhoto = <span class="cstat-no" title="statement not covered" >updatedPhotos[remainingPhotosCount - 1];</span>
 <span class="cstat-no" title="statement not covered" >          get().selectPhoto(prevPhoto.id);</span>
 <span class="cstat-no" title="statement not covered" >          console.log(`[AppStore] Navigated to previous photo: ${prevPhoto.id}`);</span>
@@ -886,7 +868,7 @@ export const createPhotosSlice: StateCreator&lt;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-15T04:51:44.082Z
+                at 2025-11-15T18:25:01.368Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

@@ -26,11 +26,11 @@
     "lint:fix": "eslint . --fix && prettier --write ."
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.81.1",
     "eventsource": "^4.0.0",
     "framer-motion": "^12.23.24",
     "idb": "^8.0.3",
     "lucide-react": "^0.548.0",
-    "pocketbase": "^0.26.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "workbox-window": "^7.3.0",
@@ -40,6 +40,8 @@
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@playwright/test": "^1.56.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^24.6.0",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",

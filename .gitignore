@@ -36,3 +36,10 @@ dev-dist
 *.njsproj
 *.sln
 *.sw?
+
+# Dot Files
+.claude
+.bmad
+.bmad-ephemeral
+.code
+

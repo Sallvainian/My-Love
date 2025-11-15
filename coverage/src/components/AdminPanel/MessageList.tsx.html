@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/19</span>
+                <span class='fraction'>0/18</span>
             </div>
         
             
@@ -220,8 +220,7 @@
 <a name='L155'></a><a href='#L155'>155</a>
 <a name='L156'></a><a href='#L156'>156</a>
 <a name='L157'></a><a href='#L157'>157</a>
-<a name='L158'></a><a href='#L158'>158</a>
-<a name='L159'></a><a href='#L159'>159</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L158'></a><a href='#L158'>158</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -268,30 +267,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -316,11 +294,31 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -399,7 +397,7 @@ export function <span class="fstat-no" title="function not covered" >MessageList
   // Combine default messages and custom messages
   // Convert Message to CustomMessage format for display
   const <span class="cstat-no" title="statement not covered" >allMessages: CustomMessage[] = useMemo(<span class="fstat-no" title="function not covered" >() =&gt; {</span></span>
-    const defaultAsCustom: CustomMessage[] = <span class="cstat-no" title="statement not covered" >messages.map(<span class="fstat-no" title="function not covered" >msg =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
+    const defaultAsCustom: CustomMessage[] = <span class="cstat-no" title="statement not covered" >messages.map(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
       id: msg.id,
       text: msg.text,
       category: msg.category,
@@ -419,15 +417,13 @@ export function <span class="fstat-no" title="function not covered" >MessageList
 &nbsp;
     // Filter by category
 <span class="cstat-no" title="statement not covered" >    if (filterCategory !== 'all') {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >msg =&gt; <span class="cstat-no" title="statement not covered" >m</span>sg.category === filterCategory)</span>;</span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.category === filterCategory)</span>;</span>
     }
 &nbsp;
     // Filter by search term
 <span class="cstat-no" title="statement not covered" >    if (searchTerm.trim()) {</span>
       const searchLower = <span class="cstat-no" title="statement not covered" >searchTerm.toLowerCase();</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >msg =&gt;</span></span>
-<span class="cstat-no" title="statement not covered" >        msg.text.toLowerCase().includes(searchLower)</span>
-      );
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.text.toLowerCase().includes(searchLower))</span>;</span>
     }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    return filtered;</span>
@@ -446,7 +442,10 @@ export function <span class="fstat-no" title="function not covered" >MessageList
         &lt;div className="flex flex-col sm:flex-row gap-4"&gt;
           {/* Category filter */}
           &lt;div className="flex-1"&gt;
-            &lt;label htmlFor="category-filter" className="block text-sm font-medium text-gray-700 mb-1"&gt;
+            &lt;label
+              htmlFor="category-filter"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            &gt;
               Filter by Category
             &lt;/label&gt;
             &lt;select
@@ -489,9 +488,7 @@ export function <span class="fstat-no" title="function not covered" >MessageList
         &lt;div className="mt-3 text-sm text-gray-600"&gt;
           Showing {filteredMessages.length} of {allMessages.length} messages
           {customMessages.length &gt; 0 &amp;&amp; (
-            &lt;span className="ml-2 text-pink-600 font-medium"&gt;
-              ({customMessages.length} custom)
-            &lt;/span&gt;
+            &lt;span className="ml-2 text-pink-600 font-medium"&gt;({customMessages.length} custom)&lt;/span&gt;
           )}
         &lt;/div&gt;
       &lt;/div&gt;
@@ -544,7 +541,7 @@ export function <span class="fstat-no" title="function not covered" >MessageList
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-15T04:51:44.082Z
+                at 2025-11-15T18:25:01.368Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
