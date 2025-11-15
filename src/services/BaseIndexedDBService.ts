@@ -1,11 +1,12 @@
-import type { IDBPDatabase } from 'idb';
+import type { IDBPDatabase, DBSchema } from 'idb';
 
 /**
  * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores
  * Story 5.3: Extract shared service logic to reduce ~80% code duplication
  *
- * Generic Type Constraint: <T extends { id?: number }>
- * - Ensures all entities have optional id field for IndexedDB auto-increment keys
+ * Generic Type Constraints:
+ * - T extends { id?: number }: Entity type with optional id field for IndexedDB auto-increment keys
+ * - DBTypes extends DBSchema: Database schema type for type-safe IndexedDB operations
  * - Services provide concrete types: Message, Photo, MoodEntry
  *
  * Abstract Methods (services must implement):
@@ -27,8 +28,8 @@ import type { IDBPDatabase } from 'idb';
  *   - Prevents silent data loss or inconsistent state
  *   - Allows callers to handle failures with proper user feedback
  */
-export abstract class BaseIndexedDBService<T extends { id?: number }> {
-  protected db: IDBPDatabase<any> | null = null;
+export abstract class BaseIndexedDBService<T extends { id?: number }, DBTypes extends DBSchema = DBSchema> {
+  protected db: IDBPDatabase<DBTypes> | null = null;
   protected initPromise: Promise<void> | null = null;
 
   /**
