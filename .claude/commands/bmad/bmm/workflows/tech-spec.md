@@ -1,5 +1,5 @@
 ---
-description: 'Technical specification workflow for Level 0 projects (single atomic changes). Creates focused tech spec for bug fixes, single endpoint additions, or small isolated changes. Tech-spec only - no PRD needed.'
+description: 'Technical specification workflow for quick-flow projects. Creates focused tech spec and generates epic + stories (1 story for simple changes, 2-5 stories for features). Tech-spec only - no PRD needed.'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

@@ -1,29 +1,155 @@
 # My-Love - Epic Breakdown
 
 **Author:** Frank
-**Date:** 2025-10-30
+**Date:** 2025-11-14 (Updated with FR traceability)
 **Project Level:** 2
-**Target Scale:** Medium feature set (16-24 stories across 4 epics)
+**Target Scale:** Medium feature set (34 stories across 6 epics)
 
 ---
 
 ## Overview
 
-This document provides the detailed epic breakdown for My-Love, expanding on the high-level epic list in the [PRD](./PRD.md).
+This document provides the complete epic and story breakdown for My-Love, transforming the strategic requirements from the [PRD](./PRD.md) into tactical, implementable stories with full functional requirement (FR) traceability.
+
+**Living Document Notice:** This document evolves through the BMad Method workflow chain:
+1. **Initial Creation** (this version): Epic structure, stories, FR traceability ✅
+2. **After UX Design**: Story acceptance criteria updated with interaction specs and mockup references
+3. **After Architecture**: Story technical notes updated with implementation decisions and patterns
+4. **During Implementation**: Stories refined as edge cases discovered
+
+**Document Structure:**
 
 Each epic includes:
-
 - Expanded goal and value proposition
-- Complete story breakdown with user stories
-- Acceptance criteria for each story
+- Complete story breakdown with user stories in BDD format
+- Detailed acceptance criteria for each story
 - Story sequencing and dependencies
+- **NEW:** Complete FR inventory and coverage matrices ensuring no requirements are missed
 
 **Epic Sequencing Principles:**
 
 - Epic 1 establishes foundational infrastructure and fixes critical issues
-- Subsequent epics build progressively, each delivering significant end-to-end value
+- Epic 2 adds comprehensive E2E testing to protect against regressions
+- Epics 3-4 build feature value (messages and photos)
+- Epic 5 addresses technical debt and optimizes performance
+- Epic 6 adds interactive connection features (mood tracking, interactions, countdowns)
 - Stories within epics are vertically sliced and sequentially ordered
 - No forward dependencies - each story builds only on previous work
+
+**Epic Summary:**
+
+| Epic | Focus | Stories | FRs Covered |
+|---|---|---|---|
+| **Epic 1** | Foundation & Core Fixes | 6 | FR001-FR005, FR010, FR031-FR033 |
+| **Epic 2** | Testing Infrastructure | 6 | All FRs (validation layer) |
+| **Epic 3** | Enhanced Message Experience | 6 | FR006-FR011, FR026-FR030 |
+| **Epic 4** | Photo Gallery & Memories | 5 | FR012-FR015 |
+| **Epic 5** | Code Quality & Performance | 5 | Technical debt & optimization |
+| **Epic 6** | Interactive Connection Features | 6 | FR016-FR025 |
+| **Total** | | **34 stories** | **33 FRs (100% coverage)** |
+
+---
+
+## Functional Requirements Inventory
+
+**Core Data Persistence:**
+- **FR001**: System SHALL persist all user data (messages, photos, mood entries, settings) across browser sessions
+- **FR002**: System SHALL correctly restore application state from persisted storage on app initialization
+- **FR003**: System SHALL handle storage quota limits gracefully with user notification
+
+**Pre-Configured Experience:**
+- **FR004**: System SHALL eliminate onboarding flow by pre-configuring relationship data via hardcoded constants
+- **FR005**: System SHALL display relationship duration automatically without user input
+
+**Message Library & Navigation:**
+- **FR006**: System SHALL maintain library of 365 unique love messages across 5 categories
+- **FR007**: System SHALL display one message per day based on date-based rotation algorithm
+- **FR008**: System SHALL support horizontal swipe gestures to navigate to previous days' messages
+- **FR009**: System SHALL prevent forward navigation to future unread messages
+- **FR010**: System SHALL allow users to favorite messages with visual indication
+- **FR011**: System SHALL enable message sharing via native share API or clipboard copy
+
+**Photo Gallery:**
+- **FR012**: System SHALL allow users to upload photos with captions and optional tags
+- **FR013**: System SHALL display photos in carousel/gallery view with smooth animated transitions
+- **FR014**: System SHALL store photos in IndexedDB with compression for optimal storage
+- **FR015**: System SHALL provide navigation interface to access photo gallery from main app
+
+**Anniversary Countdown:**
+- **FR016**: System SHALL calculate and display countdown to next anniversary
+- **FR017**: System SHALL support multiple custom countdowns for special dates
+- **FR018**: System SHALL trigger celebration animations when countdown reaches zero
+
+**Mood Tracking & Sync:**
+- **FR019**: System SHALL allow user to log daily mood (5 mood types)
+- **FR020**: System SHALL sync mood entries to backend service for partner visibility
+- **FR021**: System SHALL display mood history in calendar view
+- **FR022**: System SHALL support optional notes with each mood entry
+
+**Interactive Connection Features:**
+- **FR023**: System SHALL support "poke" and "kiss" actions that send notifications to partner
+- **FR024**: System SHALL display animated reactions when poke/kiss is received
+- **FR025**: System SHALL maintain interaction history for sentimental value
+
+**Custom Message Management:**
+- **FR026**: System SHALL allow admin user to review AI-generated message suggestions
+- **FR027**: System SHALL provide accept/decline interface for message curation
+- **FR028**: System SHALL enable creation of custom messages with category selection
+- **FR029**: System SHALL allow editing of existing messages in library
+- **FR030**: System SHALL integrate approved custom messages into daily rotation algorithm
+
+**Navigation & UI:**
+- **FR031**: System SHALL provide top navigation bar to access: Home, Photos, Mood Tracker, Settings
+- **FR032**: System SHALL maintain consistent theme across all views
+- **FR033**: System SHALL support all 4 existing themes (Sunset Bliss, Ocean Dreams, Lavender Fields, Rose Garden)
+
+**Total: 33 Functional Requirements**
+
+---
+
+## FR Coverage Map
+
+This section maps each functional requirement to the epic(s) and story(ies) that implement it, ensuring complete coverage and traceability.
+
+### Epic 1: Foundation & Core Fixes
+**Addresses:** FR001, FR002, FR003, FR004, FR005, FR031, FR032, FR033
+- Infrastructure for all features
+- Data persistence foundation (FR001-FR003)
+- Pre-configured experience (FR004-FR005)
+- Navigation and theming (FR031-FR033)
+
+### Epic 2: Testing Infrastructure & Quality Assurance
+**Addresses:** All FRs indirectly (validation layer)
+- Ensures all functional requirements are tested and working
+- Provides regression protection for Epic 1 features
+
+### Epic 3: Enhanced Message Experience
+**Addresses:** FR006, FR007, FR008, FR009, FR010, FR011, FR026, FR027, FR028, FR029, FR030
+- Message library expansion (FR006)
+- Daily rotation and navigation (FR007-FR009)
+- Favorites and sharing (FR010-FR011)
+- Custom message management (FR026-FR030)
+
+### Epic 4: Photo Gallery & Memories
+**Addresses:** FR012, FR013, FR014, FR015
+- Photo upload and storage (FR012, FR014)
+- Carousel gallery view (FR013)
+- Navigation integration (FR015)
+
+### Epic 5: Code Quality & Performance Improvements
+**Addresses:** Technical debt and optimization (no new FRs)
+- State management refactoring
+- Performance optimization (photo pagination)
+- Code maintainability (service layer, validation)
+- Test coverage expansion
+
+### Epic 6: Interactive Connection Features
+**Addresses:** FR016, FR017, FR018, FR019, FR020, FR021, FR022, FR023, FR024, FR025
+- Mood tracking and sync (FR019-FR022)
+- Poke/kiss interactions (FR023-FR025)
+- Anniversary countdowns (FR016-FR018)
+
+**Coverage Validation:** ✅ All 33 FRs mapped to epics
 
 ---
 
@@ -534,7 +660,151 @@ So that I can easily access my photo memories.
 
 ---
 
-## Epic 5: Interactive Connection Features
+## Epic 5: Code Quality & Performance Improvements
+
+### Goal
+
+Address technical debt and optimize performance by refactoring complex state management, improving code maintainability, adding comprehensive unit tests, and optimizing resource-intensive operations like photo loading.
+
+### Value Delivery
+
+By completing this epic, the codebase will be more maintainable, performant, and resilient. The 1,268-line store will be split into manageable feature slices, photo gallery will load efficiently with pagination, service code will be DRY with a base class, and critical utilities will have unit test coverage for confidence in refactoring.
+
+### Stories
+
+**Story 5.1: Split useAppStore into Feature Slices**
+
+As a developer,
+I want to split the monolithic useAppStore.ts (1,268 lines) into feature-specific slices,
+So that the state management is more maintainable and easier to reason about.
+
+**Acceptance Criteria:**
+1. Analyze current useAppStore.ts structure and identify natural feature boundaries
+2. Create feature slices: `useMessagesStore.ts`, `usePhotosStore.ts`, `useSettingsStore.ts`, `useNavigationStore.ts`, `useMoodStore.ts`
+3. Extract related state, actions, and selectors into respective slices
+4. Maintain existing API compatibility (no breaking changes to component imports)
+5. Use Zustand's slice pattern or similar composition approach
+6. Update imports across codebase to use feature slices
+7. Verify all existing functionality works (run E2E tests)
+8. Document slice architecture in technical-decisions.md
+
+**Prerequisites:** Epic 1 and Epic 2 complete (stable foundation with tests)
+
+**Technical Notes:**
+- Consider using Zustand's `combine` or manual composition
+- Keep shared state (like theme) in a core slice
+- Each slice should be independently testable
+
+---
+
+**Story 5.2: Implement Photo Pagination with Lazy Loading**
+
+As a user,
+I want the photo gallery to load efficiently without loading all photos into memory,
+So that the app remains responsive even with hundreds of photos.
+
+**Acceptance Criteria:**
+1. Update PhotoGallery component to use existing `getPage()` pagination method
+2. Implement virtual scrolling or progressive loading (load 20 photos per page)
+3. Add "Load More" button or infinite scroll behavior
+4. Photos load on-demand as user scrolls (lazy loading)
+5. Memory usage stays constant regardless of total photo count
+6. Smooth UX: loading indicators, no jarring jumps during load
+7. IndexedDB queries optimized (use cursor pagination, not loading all then slicing)
+8. Test with 100+ photos to verify performance improvement
+
+**Prerequisites:** Story 5.1 (photos state extracted to slice)
+
+**Technical Notes:**
+- Existing `getPage(page: number, pageSize: number)` method in photosService.ts
+- Consider using react-window or react-virtualized for virtual scrolling
+- Maintain current photo ordering (newest first)
+
+---
+
+**Story 5.3: Extract Base Service Class to Reduce Duplication**
+
+As a developer,
+I want to extract common service logic into a base class,
+So that messagesService, photosService, and moodService don't duplicate ~80% of their code.
+
+**Acceptance Criteria:**
+1. Analyze common patterns across messagesService.ts, photosService.ts, moodService.ts
+2. Create `BaseIndexedDBService.ts` with shared methods: `add()`, `get()`, `getAll()`, `update()`, `delete()`, `clear()`
+3. Refactor existing services to extend base class
+4. Maintain existing API contracts (no breaking changes)
+5. Add generic typing for type safety (`BaseIndexedDBService<T>`)
+6. Remove duplicated error handling and transaction logic
+7. All existing E2E tests still pass
+8. Document service architecture in technical-decisions.md
+
+**Prerequisites:** Story 5.2
+
+**Technical Notes:**
+- Each service still defines its own schema and store name
+- Base class handles DB connection, transactions, error handling
+- Consider using TypeScript generics for type-safe operations
+
+---
+
+**Story 5.4: Add Unit Tests for Utilities and Services**
+
+As a developer,
+I want unit tests for critical utilities and services,
+So that I can refactor confidently without breaking functionality.
+
+**Acceptance Criteria:**
+1. Set up Vitest for unit testing (fast, Vite-native)
+2. Add tests for utility functions: date calculations, message rotation algorithm, validation helpers
+3. Add tests for service layer: BaseIndexedDBService methods (use fake-indexeddb)
+4. Add tests for Zustand store slices: state updates, selectors, actions
+5. Achieve 80%+ code coverage for utilities and services
+6. Tests run in under 5 seconds total (fast feedback loop)
+7. Configure test scripts: `npm run test:unit`, `npm run test:unit:watch`, `npm run test:unit:coverage`
+8. Document testing approach in tests/README.md
+
+**Prerequisites:** Story 5.3 (service refactoring complete)
+
+**Technical Notes:**
+- Use `fake-indexeddb` for service tests (no real browser DB)
+- Use Vitest's built-in mocking for external dependencies
+- Don't duplicate E2E test scenarios - unit tests focus on logic/edge cases
+
+---
+
+**Story 5.5: Centralize Input Validation Layer**
+
+As a developer,
+I want a centralized validation layer for user inputs,
+So that corrupted or invalid data can't enter the system.
+
+**Acceptance Criteria:**
+1. Create `src/validation/` directory with validation schemas
+2. Define validation rules for: messages (content, category), photos (captions, tags), moods (type, notes), settings (name, date)
+3. Use Zod or similar for type-safe runtime validation
+4. Apply validation at service layer (before IndexedDB write)
+5. Return clear, user-friendly error messages on validation failure
+6. Add validation tests in Story 5.4's unit test suite
+7. Update existing forms to use centralized validators
+8. Prevent edge cases: empty strings, null values, excessively long inputs, invalid dates
+
+**Prerequisites:** Story 5.4
+
+**Technical Notes:**
+- Validation happens at service boundary (not UI layer)
+- Zod schemas double as TypeScript types
+- Existing E2E tests should help catch any regressions from stricter validation
+
+---
+
+**Epic 5 Summary:**
+- **Total Stories:** 5
+- **Estimated Effort:** Medium-High (refactoring requires care)
+- **Deliverable:** Maintainable codebase with better performance, DRY code, unit tests, and robust validation
+
+---
+
+## Epic 6: Interactive Connection Features
 
 ### Goal
 
@@ -546,7 +816,7 @@ She can log daily moods that you can see, you can send spontaneous "kisses" or "
 
 ### Stories
 
-**Story 5.1: NocoDB Backend Setup & API Integration**
+**Story 6.1: NocoDB Backend Setup & API Integration**
 
 As a developer,
 I want to set up NocoDB backend and create API integration layer,
@@ -564,7 +834,7 @@ So that I can sync mood and interaction data between devices.
 
 ---
 
-**Story 5.2: Mood Tracking UI & Local Storage**
+**Story 6.2: Mood Tracking UI & Local Storage**
 
 As your girlfriend,
 I want to log my daily mood,
@@ -579,11 +849,11 @@ So that I can track how I'm feeling and you can see it.
 6. Can only log one mood per day (edit if logging again same day)
 7. UI shows if mood synced successfully or pending (offline indicator)
 
-**Prerequisites:** Story 5.1
+**Prerequisites:** Story 6.1
 
 ---
 
-**Story 5.3: Mood History Calendar View**
+**Story 6.3: Mood History Calendar View**
 
 As your girlfriend,
 I want to see my mood history in a calendar,
@@ -597,11 +867,11 @@ So that I can reflect on patterns over time.
 5. Current date highlighted
 6. Responsive layout (mobile and desktop)
 
-**Prerequisites:** Story 5.2
+**Prerequisites:** Story 6.2
 
 ---
 
-**Story 5.4: Mood Sync & Partner Visibility**
+**Story 6.4: Mood Sync & Partner Visibility**
 
 As the app creator,
 I want to see my girlfriend's mood logs,
@@ -615,11 +885,11 @@ So that I can check in on how she's feeling.
 5. Handles sync conflicts gracefully
 6. Offline mode: displays cached moods, syncs when back online
 
-**Prerequisites:** Story 5.3
+**Prerequisites:** Story 6.3
 
 ---
 
-**Story 5.5: Poke & Kiss Interactions**
+**Story 6.5: Poke & Kiss Interactions**
 
 As your girlfriend (and you),
 I want to send spontaneous pokes or kisses,
@@ -636,11 +906,11 @@ So that we can share small moments of affection throughout the day.
 6. Interaction history viewable (last 7 days)
 7. Can send unlimited interactions (no daily limit)
 
-**Prerequisites:** Story 5.4
+**Prerequisites:** Story 6.4
 
 ---
 
-**Story 5.6: Anniversary Countdown Timers**
+**Story 6.6: Anniversary Countdown Timers**
 
 As your girlfriend,
 I want to see countdowns to our anniversaries,
@@ -655,14 +925,61 @@ So that I can look forward to special dates.
 6. Past anniversaries marked as "Celebrated" with date passed
 7. Edit and delete countdowns in settings
 
-**Prerequisites:** Story 5.2 (mood tracking sets pattern for settings/features)
+**Prerequisites:** Story 6.2 (mood tracking sets pattern for settings/features)
 
 ---
 
-**Epic 5 Summary:**
+**Epic 6 Summary:**
 - **Total Stories:** 6
 - **Estimated Effort:** Medium-High (backend integration adds complexity)
 - **Deliverable:** Mood tracking, poke/kiss interactions, anniversary countdowns
+
+---
+
+## FR Coverage Matrix
+
+This detailed matrix shows exactly which story(ies) implement each functional requirement, ensuring complete traceability from requirements to implementation.
+
+| FR | Requirement | Epic | Story | Implementation Notes |
+|---|---|---|---|---|
+| **FR001** | Persist user data across sessions | Epic 1 | Story 1.2 | Zustand persist middleware |
+| **FR002** | Restore application state on init | Epic 1 | Story 1.2 | State hydration on load |
+| **FR003** | Handle storage quota gracefully | Epic 1 | Story 1.2 | Error handling for quota exceeded |
+| **FR004** | Pre-configure relationship data | Epic 1 | Story 1.4 | Hardcoded constants in config |
+| **FR005** | Auto-display relationship duration | Epic 1 | Story 1.4 | Calculate from start date |
+| **FR006** | 365 message library | Epic 3 | Story 3.1 | Expand from 100 to 365 messages |
+| **FR007** | One message per day rotation | Epic 3 | Story 3.3 | Date-based deterministic algorithm |
+| **FR008** | Swipe to previous messages | Epic 3 | Story 3.2 | Horizontal swipe gesture support |
+| **FR009** | Prevent forward navigation | Epic 3 | Story 3.2 | Block swipe beyond today |
+| **FR010** | Favorite messages | Epic 1 | Story 1.2 | Persist favorites in state |
+| **FR011** | Share messages | Epic 3 | Story 3.2 | Native share API or clipboard |
+| **FR012** | Upload photos with captions | Epic 4 | Story 4.1 | File picker + caption input |
+| **FR013** | Carousel gallery view | Epic 4 | Story 4.3 | Full-screen lightbox with swipe |
+| **FR014** | IndexedDB photo storage | Epic 4 | Story 4.1 | Compression + IndexedDB |
+| **FR015** | Photo gallery navigation | Epic 4 | Story 4.5 | Top nav integration |
+| **FR016** | Anniversary countdown display | Epic 6 | Story 6.6 | Real-time countdown timer |
+| **FR017** | Multiple custom countdowns | Epic 6 | Story 6.6 | Settings to add/manage countdowns |
+| **FR018** | Celebration animations | Epic 6 | Story 6.6 | Trigger animation at zero |
+| **FR019** | Log daily mood | Epic 6 | Story 6.2 | 5 mood types with UI |
+| **FR020** | Sync moods to backend | Epic 6 | Story 6.1, 6.4 | NocoDB API integration |
+| **FR021** | Mood history calendar | Epic 6 | Story 6.3 | Calendar view component |
+| **FR022** | Optional mood notes | Epic 6 | Story 6.2 | Note field with mood entry |
+| **FR023** | Poke/kiss actions | Epic 6 | Story 6.5 | Send interaction via NocoDB |
+| **FR024** | Animated reactions | Epic 6 | Story 6.5 | Heart/nudge animations |
+| **FR025** | Interaction history | Epic 6 | Story 6.5 | Last 7 days viewable |
+| **FR026** | Review AI suggestions | Epic 3 | Story 3.6 | AI message generation (optional) |
+| **FR027** | Accept/decline interface | Epic 3 | Story 3.6 | Approval UI (optional) |
+| **FR028** | Create custom messages | Epic 3 | Story 3.4 | Message creation form |
+| **FR029** | Edit existing messages | Epic 3 | Story 3.5 | Edit + persist to IndexedDB |
+| **FR030** | Integrate custom messages | Epic 3 | Story 3.5 | Include in rotation algorithm |
+| **FR031** | Top navigation bar | Epic 1 | Story 1.4 | Home, Photos, Mood, Settings tabs |
+| **FR032** | Consistent theme | Epic 1 | Story 1.5 | Theme system refactoring |
+| **FR033** | Support 4 existing themes | Epic 1 | Story 1.5 | Sunset, Ocean, Lavender, Rose Garden |
+
+**Coverage Status:**
+- ✅ All 33 FRs mapped to specific stories
+- ✅ No orphaned requirements
+- ✅ Complete traceability from PRD → Epic → Story
 
 ---
 

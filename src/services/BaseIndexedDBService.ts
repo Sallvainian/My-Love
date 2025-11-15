@@ -17,6 +17,15 @@ import type { IDBPDatabase } from 'idb';
  * - add(), get(), getAll(), update(), delete(), clear(): Standard CRUD
  * - getPage(): Pagination helper for lazy loading
  * - handleError(), handleQuotaExceeded(): Centralized error handling
+ *
+ * Error Handling Strategy:
+ * - **Read operations** (get, getAll, getPage): Return null or empty array on error
+ *   - Rationale: Graceful degradation - app continues functioning with empty state
+ *   - Users see empty UI instead of crashes, can retry or reload
+ * - **Write operations** (add, update, delete, clear): Throw errors on failure
+ *   - Rationale: Data integrity - mutations must succeed or fail explicitly
+ *   - Prevents silent data loss or inconsistent state
+ *   - Allows callers to handle failures with proper user feedback
  */
 export abstract class BaseIndexedDBService<T extends { id?: number }> {
   protected db: IDBPDatabase<any> | null = null;

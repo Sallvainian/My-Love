@@ -2,7 +2,7 @@
 # Full product + architecture planning for complex brownfield additions (10-50+ stories typically)
 
 method_name: "BMad Method"
-track: "method"
+track: "bmad-method"
 field_type: "brownfield"
 description: "Complete product and system design for complex brownfield work"
 
@@ -74,6 +74,13 @@ phases:
         command: "create-architecture"
         output: "Integration architecture - solution design for THIS project"
         note: "HIGHLY RECOMMENDED: Distills massive brownfield context into focused solution design. Prevents agent confusion."
+
+      - id: "test-design"
+        recommended: true
+        agent: "tea"
+        command: "test-design"
+        output: "System-level testability review"
+        note: "Testability assessment before gate check - auto-detects system-level mode"
 
       - id: "validate-architecture"
         optional: true

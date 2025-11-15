@@ -19,16 +19,16 @@
 - Epic files: {output*folder}/\_epic*.md or {output*folder}/\_epic*/index.md
 - Architecture: {output*folder}/\_architecture*.md or {output*folder}/\_arch*.md
 - UX Design: {output*folder}/\_ux*.md or {output*folder}/\_design*.md
-- Product Brief: {output*folder}/\_brief*.md
-- Research docs: {output*folder}/\_research*.md
-- Brainstorm docs: {output*folder}/\_brainstorm*.md
+- Product Brief: {output_folder}/\*brief\*.md
+- Research docs: {output_folder}/\*research\*.md
+- Brainstorm docs: {output_folder}/\*brainstorm\*.md
 
 **Check for implementation artifacts:**
 
-- The following could be in or nested under {output_folder} OR {ephemeral_location} - CHECK BOTH LOCATIONS
-  - Story files: {output*folder}/stories/*.md or {ephemeral*location}/stories/*.md
-  - Sprint status: {output_folder}/sprint-status.yaml or {ephemeral_location}/sprint-status.yaml
-  - Existing workflow status: {output_folder}/bmm-workflow-status.yaml or {ephemeral_location}/bmm-workflow-status.yaml
+- The following could be in or nested under {output_folder} OR {sprint_artifacts} - CHECK BOTH LOCATIONS
+  - Story files: {output_folder}/stories/*.md or \*\*/stories/*story\*.md
+  - Sprint status: {output_folder}/sprint-status.yaml or {sprint_artifacts}/sprint-status.yaml
+  - Existing workflow status: {default_output_file} or {sprint_artifacts}/bmm-workflow-status.yaml
 
 **Check for codebase:**
 
@@ -660,13 +660,13 @@ For each phase in path file:
 
 - Brainstorm: {output_folder}/brainstorm\*.md
 - Research: {output_folder}/research\*.md
-- Product Brief: {output*folder}/\_brief*.md
+- Product Brief: {output_folder}/\*brief\*.md
 - PRD: {output*folder}/\_prd*.md or {output*folder}/\_prd*/index.md
 - Tech-spec: {output*folder}/\_tech-spec*.md or {output*folder}/\_spec*.md
 - Epics: {output*folder}/\_epic*.md or {output*folder}/\_epic*/index.md
 - UX Design: {output*folder}/\_ux*.md or {output*folder}/\_design*.md
 - Architecture: {output*folder}/\_architecture*.md or {output*folder}/\_arch*.md
-- Sprint Planning: {output*folder}/\_sprint*.yaml
+- Sprint Planning: {output_folder}/\*sprint\*.yaml
 
 **CRITICAL:** If file exists, replace workflow status with ONLY the file path, preserving agent comment.
 Example: `prd: docs/prd.md  # agent: pm` (NOT "completed - docs/prd.md")

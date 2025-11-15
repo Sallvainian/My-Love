@@ -16,7 +16,7 @@
 <action>Check if {output_folder}/bmm-workflow-status.yaml exists</action>
 
 <check if="status file not found">
-  <output>No workflow status file found. Decision Architecture can run standalone or as part of BMM workflow path.</output>
+  <output>No workflow status file found. Create Architecture can run standalone or as part of BMM workflow path.</output>
   <output>**Recommended:** Run `workflow-init` first for project context tracking and workflow sequencing.</output>
   <ask>Continue in standalone mode or exit to run workflow-init? (continue/exit)</ask>
   <check if="continue">
@@ -33,17 +33,9 @@
   <action>Check status of "create-architecture" workflow</action>
   <action>Get project_level from YAML metadata</action>
   <action>Find first non-completed workflow (next expected workflow)</action>
-
-  <check if="project_level < 3">
-    <output>**Note: Level {{project_level}} Project**
-
-The Detailed Architecture is typically for Level 3-4 projects, but can be used for any project that needs architectural planning.
-
-For Level {{project_level}}, we'll keep the architecture appropriately scoped.
-</output>
 </check>
 
-  <check if="create-architecture status is file path (already completed)">
+  <check if="create-architecture status is indicates already completed">
     <output>⚠️ Architecture already completed: {{create-architecture status}}</output>
     <ask>Re-running will overwrite the existing architecture. Continue? (y/n)</ask>
     <check if="n">
@@ -62,7 +54,6 @@ For Level {{project_level}}, we'll keep the architecture appropriately scoped.
   </check>
 
 <action>Set standalone_mode = false</action>
-</check>
 
 <action>Check for existing PRD and epics files using fuzzy matching</action>
 
@@ -70,32 +61,37 @@ For Level {{project_level}}, we'll keep the architecture appropriately scoped.
 <check if="PRD_not_found">
 <output>**PRD Not Found**
 
-Decision Architecture works from your Product Requirements Document (PRD).
+Creation of an Architecture works from your Product Requirements Document (PRD), along with an optional UX Design and other assets.
 
-Looking for: _PRD_, PRD.md, or prd/index.md + files in {output_folder}
+Looking for: _prd_.md, or prd/\* + files in {output_folder}
 
-Please run the PRD workflow first to define your requirements.
-
-Architect: `create-prd`
+Please talk to the PM Agent to run the Create PRD workflow first to define your requirements, or if I am mistaken and it does exist, provide the file now.
 </output>
-<action>Exit workflow - PRD required</action>
+<ask>Would you like to exit, or can you provide a PRD?
+<action if='yes to exit'>Exit workflow - PRD required</action>
+<action if='prd provided'>Proceed to Step 1</action>
+</ask>
 </check>
 
 </step>
 
-<step n="1" goal="Load and understand project context">
-  <action>Load the PRD using fuzzy matching: {prd_file}, if the PRD is mulitple files in a folder, load the index file and all files associated with the PRD</action>
-  <action>Load epics file using fuzzy matching: {epics_file}</action>
+<step n="0.5" goal="Discover and load input documents">
+<invoke-protocol name="discover_inputs" />
+<note>After discovery, these content variables are available: {prd_content}, {epics_content}, {ux_design_content}, {document_project_content}</note>
+</step>
 
-<action>Check for UX specification using fuzzy matching:
-<action>Attempt to locate: {ux_spec_file}</action>
-<check if="ux_spec_found">
-<action>Load UX spec and extract architectural implications: - Component complexity (simple forms vs rich interactions) - Animation/transition requirements - Real-time update needs (live data, collaborative features) - Platform-specific UI requirements - Accessibility standards (WCAG compliance level) - Responsive design breakpoints - Offline capability requirements - Performance expectations (load times, interaction responsiveness)
+<step n="1" goal="Load and understand project context">
+  <action>Review loaded PRD: {prd_content} (auto-loaded in Step 0.5 - handles both whole and sharded documents)</action>
+  <action>Review loaded epics: {epics_content}</action>
+
+<action>Check for UX specification:
+<check if="{ux_design_content} is not empty">
+<action>Extract architectural implications from {ux_design_content}: - Component complexity (simple forms vs rich interactions) - Animation/transition requirements - Real-time update needs (live data, collaborative features) - Platform-specific UI requirements - Accessibility standards (WCAG compliance level) - Responsive design breakpoints - Offline capability requirements - Performance expectations (load times, interaction responsiveness)
 </action>
 </check>
 </action>
 
-<action>Extract and understand from PRD: - Functional Requirements (what it must do) - Non-Functional Requirements (performance, security, compliance, etc.) - Epic structure and user stories - Acceptance criteria - Any technical constraints mentioned
+<action>Extract and understand from {prd_content}: - Functional Requirements (what it must do) - Non-Functional Requirements (performance, security, compliance, etc.) - Epic structure and user stories - Acceptance criteria - Any technical constraints mentioned
 </action>
 
 <action>Count and assess project scale: - Number of epics: {{epic_count}} - Number of stories: {{story_count}} - Complexity indicators (real-time, multi-tenant, regulated, etc.) - UX complexity level (if UX spec exists) - Novel features
@@ -363,7 +359,6 @@ Provided by Starter: {{yes_if_from_starter}}
 </action>
 
 <template-output>decision_record</template-output>
-<invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>
 </step>
 
 <step n="5" goal="Address cross-cutting concerns">
@@ -393,7 +388,6 @@ Provided by Starter: {{yes_if_from_starter}}
 </action>
 
 <template-output>project_structure</template-output>
-<invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>
 </step>
 
 <step n="7" goal="Design novel architectural patterns" optional="true">
@@ -467,7 +461,6 @@ Provided by Starter: {{yes_if_from_starter}}
   </check>
 
 <template-output>novel_pattern_designs</template-output>
-<invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>
 </step>
 
 <step n="8" goal="Define implementation patterns to prevent agent conflicts">
@@ -560,7 +553,6 @@ Enforcement: "All agents MUST follow this pattern"
 </action>
 
 <template-output>implementation_patterns</template-output>
-<invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>
 </step>
 
 <step n="9" goal="Validate architectural coherence">
@@ -614,7 +606,6 @@ Enforcement: "All agents MUST follow this pattern"
   </action>
 
 <template-output>architecture_document</template-output>
-<invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>
 </step>
 
 <step n="11" goal="Validate document completeness">
@@ -623,14 +614,15 @@ Enforcement: "All agents MUST follow this pattern"
 <action>Run validation checklist from {installed_path}/checklist.md</action>
 
 <action>Verify MANDATORY items:
-□ Decision table has Version column with specific versions
-□ Every epic is mapped to architecture components
-□ Source tree is complete, not generic
-□ No placeholder text remains
-□ All FRs from PRD have architectural support
-□ All NFRs from PRD are addressed
-□ Implementation patterns cover all potential conflicts
-□ Novel patterns are fully documented (if applicable)
+
+- [] Decision table has Version column with specific versions
+- [] Every epic is mapped to architecture components
+- [] Source tree is complete, not generic
+- [] No placeholder text remains
+- [] All FRs from PRD have architectural support
+- [] All NFRs from PRD are addressed
+- [] Implementation patterns cover all potential conflicts
+- [] Novel patterns are fully documented (if applicable)
 </action>
 
   <check if="validation_failed">

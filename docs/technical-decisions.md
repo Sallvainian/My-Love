@@ -1076,14 +1076,21 @@ useEffect(() => {
    - `getAllFromIndex()` loads all photo metadata into memory
    - Acceptable for <100 photos, optimization needed for 500+ photos
 
-2. **Future optimization path (if needed):**
+2. **Pagination error handling edge case:**
+   - `getPage()` follows "graceful degradation" pattern (returns `[]` on error)
+   - If DB corruption occurs after successful initialization, users see empty gallery instead of error
+   - Rare scenario: DB init succeeds, but subsequent queries fail
+   - Trade-off: Consistent error handling strategy vs. explicit error states for all failure modes
+   - Logged errors in console help identify this scenario during development
+
+3. **Future optimization path (if needed):**
    ```typescript
    // Cursor-based pagination (deferred)
    const cursor = await openCursor('photos', 'by-date');
    const photos = await advanceCursor(cursor, offset, limit);
    ```
 
-3. **Memory leak detection:**
+4. **Memory leak detection:**
    - Manual testing required via Chrome DevTools
    - Automated Playwright memory tests considered for future work
 

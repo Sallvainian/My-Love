@@ -9,6 +9,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:ui": "vitest --ui",
+    "test:unit:coverage": "vitest run --coverage",
     "test:smoke": "node scripts/smoke-tests.cjs",
     "test:e2e": "./scripts/test-with-cleanup.sh",
     "test:e2e:raw": "playwright test",
@@ -25,6 +29,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "workbox-window": "^7.3.0",
+    "zod": "^3.25.76",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
@@ -34,17 +39,22 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^4.0.9",
+    "@vitest/ui": "^4.0.9",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
+    "fake-indexeddb": "^6.2.5",
     "gh-pages": "^6.3.0",
     "globals": "^16.4.0",
+    "happy-dom": "^20.0.10",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
     "vite": "^7.1.7",
-    "vite-plugin-pwa": "^1.1.0"
+    "vite-plugin-pwa": "^1.1.0",
+    "vitest": "^4.0.9"
   }
 }

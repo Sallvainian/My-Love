@@ -225,19 +225,15 @@
 
 ### Critical Issues Found
 
-- [ ] Issue 1: **\*\***\_\_\_**\*\***
-- [ ] Issue 2: **\*\***\_\_\_**\*\***
-- [ ] Issue 3: **\*\***\_\_\_**\*\***
+<!-- replace with list of critical issues found, or N/A -->
 
 ### Recommended Actions Before Implementation
 
-1. ***
-2. ***
-3. ***
+<!-- replace with list of recommended actions, or N/A -->
 
 ---
 
-**Next Step**: Run the **solutioning-gate-check** workflow to validate alignment between PRD, Architecture, and Stories before beginning implementation.
+**Next Step**: Run the **solutioning-gate-check** workflow to validate alignment between PRD, UX, Architecture, and Stories before beginning implementation.
 
 ---
 
