@@ -84,6 +84,7 @@ export default {
         'slide-up': 'slideUp 0.4s ease-out',
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'heart-beat': 'heartBeat 1s ease-in-out infinite',
+        'shimmer': 'shimmer 2s infinite',
       },
       keyframes: {
         float: {
@@ -106,6 +107,10 @@ export default {
           '0%, 100%': { transform: 'scale(1)' },
           '25%': { transform: 'scale(1.1)' },
           '50%': { transform: 'scale(1)' },
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
         },
       },
     },
