@@ -1,5 +1,11 @@
 import { openDB } from 'idb';
-import type { Message, CreateMessageInput, UpdateMessageInput, MessageFilter, CustomMessagesExport } from '../types';
+import type {
+  Message,
+  CreateMessageInput,
+  UpdateMessageInput,
+  MessageFilter,
+  CustomMessagesExport,
+} from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import {
   CreateMessageInputSchema,
@@ -45,7 +51,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
       this.db = await openDB<any>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, _transaction) {
           if (import.meta.env.DEV) {
-            console.log(`[CustomMessageService] Upgrading database from v${oldVersion} to v${newVersion}`);
+            console.log(
+              `[CustomMessageService] Upgrading database from v${oldVersion} to v${newVersion}`
+            );
           }
 
           // Create messages store if it doesn't exist
@@ -165,29 +173,34 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
 
       // Filter by isCustom
       if (filter?.isCustom !== undefined) {
-        messages = messages.filter(m => m.isCustom === filter.isCustom);
+        messages = messages.filter((m) => m.isCustom === filter.isCustom);
       }
 
       // Filter by active status
       if (filter?.active !== undefined) {
-        messages = messages.filter(m => m.active === filter.active);
+        messages = messages.filter((m) => m.active === filter.active);
       }
 
       // Filter by search term
       if (filter?.searchTerm) {
         const term = filter.searchTerm.toLowerCase();
-        messages = messages.filter(m => m.text.toLowerCase().includes(term));
+        messages = messages.filter((m) => m.text.toLowerCase().includes(term));
       }
 
       // Filter by tags
       if (filter?.tags && filter.tags.length > 0) {
-        messages = messages.filter(m =>
-          m.tags && m.tags.some(tag => filter.tags!.includes(tag))
+        messages = messages.filter(
+          (m) => m.tags && m.tags.some((tag) => filter.tags!.includes(tag))
         );
       }
 
       if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Retrieved messages, count:', messages.length, 'filter:', filter);
+        console.log(
+          '[CustomMessageService] Retrieved messages, count:',
+          messages.length,
+          'filter:',
+          filter
+        );
       }
       return messages;
     } catch (error) {
@@ -223,7 +236,7 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
         version: '1.0',
         exportDate: new Date().toISOString(),
         messageCount: messages.length,
-        messages: messages.map(m => ({
+        messages: messages.map((m) => ({
           text: m.text,
           category: m.category,
           active: m.active ?? true,
@@ -254,7 +267,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
    * AC-3.5.6: Import functionality with duplicate detection
    * AC-5.5.6: Validate import data structure before processing
    */
-  async importMessages(exportData: CustomMessagesExport): Promise<{ imported: number; skipped: number }> {
+  async importMessages(
+    exportData: CustomMessagesExport
+  ): Promise<{ imported: number; skipped: number }> {
     try {
       // Validate import data structure at service boundary
       const validated = CustomMessagesExportSchema.parse(exportData);
@@ -268,7 +283,7 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
 
       // Get existing custom message texts for duplicate detection
       const existingMessages = await this.getAll({ isCustom: true });
-      const existingTexts = new Set(existingMessages.map(m => m.text.trim().toLowerCase()));
+      const existingTexts = new Set(existingMessages.map((m) => m.text.trim().toLowerCase()));
 
       for (const msg of validated.messages) {
         const normalizedText = msg.text.trim().toLowerCase();
@@ -276,7 +291,10 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
         if (existingTexts.has(normalizedText)) {
           skippedCount++;
           if (import.meta.env.DEV) {
-            console.log('[CustomMessageService] Skipping duplicate message:', msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
+            console.log(
+              '[CustomMessageService] Skipping duplicate message:',
+              msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+            );
           }
         } else {
           await this.create({
@@ -291,7 +309,12 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
       }
 
       if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Import complete - imported:', importedCount, 'skipped:', skippedCount);
+        console.log(
+          '[CustomMessageService] Import complete - imported:',
+          importedCount,
+          'skipped:',
+          skippedCount
+        );
       }
       return { imported: importedCount, skipped: skippedCount };
     } catch (error) {

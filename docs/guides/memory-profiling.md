@@ -26,12 +26,14 @@ This guide documents the methodology for profiling IndexedDB memory usage in the
 ### Storage Quotas
 
 **Browser Storage Quotas:**
+
 - **Chrome/Edge:** ~60% of available disk space (up to 80% temporary)
 - **Firefox:** ~50% of available disk space (up to 2GB)
 - **Safari:** 1GB default (can request more)
 - **Mobile browsers:** ~10-50MB (varies by device)
 
 **App Thresholds:**
+
 - **80% usage:** Warning displayed to user (yellow banner)
 - **95% usage:** Error state, photo uploads disabled (red banner)
 - **100% usage:** QuotaExceededError thrown by IndexedDB
@@ -45,14 +47,15 @@ Use the Storage API to query current quota and usage:
 ```typescript
 // Available in photoStorageService.estimateQuotaRemaining()
 const estimate = await navigator.storage.estimate();
-const used = estimate.usage || 0;      // Bytes used
-const quota = estimate.quota || 0;     // Total quota in bytes
+const used = estimate.usage || 0; // Bytes used
+const quota = estimate.quota || 0; // Total quota in bytes
 const percentUsed = (used / quota) * 100;
 ```
 
 **Location:** `src/services/photoStorageService.ts:288-330`
 
 **Output:**
+
 ```
 Quota: 25.45MB / 458.12MB (5.6% used)
 Remaining: 432.67MB
@@ -73,6 +76,7 @@ const messageSize = messageCount.length * 100; // Approximate
 **Location:** `src/services/photoStorageService.ts:265-280`
 
 **Example Output:**
+
 ```
 Photos: 24.8MB (120 photos * ~200KB average)
 Messages: 0.02MB (200 messages * 100 bytes)
@@ -86,7 +90,7 @@ Monitor photo compression ratios to validate image compression:
 
 ```typescript
 const photos = await photoStorageService.getAll();
-const compressionStats = photos.map(p => ({
+const compressionStats = photos.map((p) => ({
   id: p.id,
   originalSize: p.originalSize,
   compressedSize: p.compressedSize,
@@ -96,6 +100,7 @@ const compressionStats = photos.map(p => ({
 ```
 
 **Expected Results:**
+
 - Original size: 2-8MB (modern smartphone photos)
 - Compressed size: 100-300KB (target: <200KB)
 - Compression ratio: 90-97% reduction
@@ -106,6 +111,7 @@ const compressionStats = photos.map(p => ({
 #### Chrome DevTools
 
 **Application Tab → Storage:**
+
 1. Open DevTools (F12)
 2. Navigate to Application → Storage
 3. Expand IndexedDB → my-love-db
@@ -113,6 +119,7 @@ const compressionStats = photos.map(p => ({
 5. View individual records and sizes
 
 **Performance Tab → Memory:**
+
 1. Open Performance tab
 2. Click "Collect garbage" icon (🗑️)
 3. Take heap snapshot
@@ -122,6 +129,7 @@ const compressionStats = photos.map(p => ({
 #### Firefox DevTools
 
 **Storage Inspector:**
+
 1. Open DevTools (F12)
 2. Navigate to Storage → IndexedDB
 3. Select my-love-db
@@ -133,17 +141,20 @@ const compressionStats = photos.map(p => ({
 
 ```typescript
 // Run every 5 minutes in background
-setInterval(async () => {
-  const { percentUsed } = await photoStorageService.estimateQuotaRemaining();
+setInterval(
+  async () => {
+    const { percentUsed } = await photoStorageService.estimateQuotaRemaining();
 
-  if (percentUsed >= 95) {
-    console.error('[StorageMonitor] CRITICAL: 95% quota exceeded');
-    // Trigger error UI
-  } else if (percentUsed >= 80) {
-    console.warn('[StorageMonitor] WARNING: 80% quota threshold reached');
-    // Trigger warning UI
-  }
-}, 5 * 60 * 1000);
+    if (percentUsed >= 95) {
+      console.error('[StorageMonitor] CRITICAL: 95% quota exceeded');
+      // Trigger error UI
+    } else if (percentUsed >= 80) {
+      console.warn('[StorageMonitor] WARNING: 80% quota threshold reached');
+      // Trigger warning UI
+    }
+  },
+  5 * 60 * 1000
+);
 ```
 
 **Per-Upload Monitoring:**
@@ -162,18 +173,21 @@ console.log(`Photo upload consumed: ${(quotaAfter.used - quotaBefore.used) / 102
 ### Storage Growth Rates
 
 **Photo Storage (Primary Concern):**
+
 - Average photo size: 200KB (compressed)
 - Photos per week: ~10-20 (estimated)
 - Monthly growth: ~2-4MB
 - Annual capacity: ~2,500 photos (500MB quota)
 
 **Message Storage (Negligible):**
+
 - Average message size: 100 bytes
 - Messages per week: ~50-100 (estimated)
 - Monthly growth: ~0.02MB
 - Effectively unlimited (text-only)
 
 **Mood Storage (Negligible):**
+
 - Average entry size: 50 bytes
 - Entries per week: 7 (daily tracking)
 - Monthly growth: ~0.001MB
@@ -183,13 +197,13 @@ console.log(`Photo upload consumed: ${(quotaAfter.used - quotaBefore.used) / 102
 
 Based on typical 1GB mobile quota:
 
-| Photos | Storage Used | % of 1GB | Status |
-|--------|--------------|----------|--------|
-| 100    | 20MB         | 2%       | ✅ Safe |
-| 500    | 100MB        | 10%      | ✅ Safe |
-| 1,000  | 200MB        | 20%      | ✅ Safe |
-| 2,500  | 500MB        | 50%      | ⚠️ Monitor |
-| 4,000  | 800MB        | 80%      | ⚠️ Warning |
+| Photos | Storage Used | % of 1GB | Status      |
+| ------ | ------------ | -------- | ----------- |
+| 100    | 20MB         | 2%       | ✅ Safe     |
+| 500    | 100MB        | 10%      | ✅ Safe     |
+| 1,000  | 200MB        | 20%      | ✅ Safe     |
+| 2,500  | 500MB        | 50%      | ⚠️ Monitor  |
+| 4,000  | 800MB        | 80%      | ⚠️ Warning  |
 | 4,750  | 950MB        | 95%      | 🚨 Critical |
 
 ## Troubleshooting
@@ -197,11 +211,13 @@ Based on typical 1GB mobile quota:
 ### QuotaExceededError
 
 **Symptoms:**
+
 - IndexedDB write operations fail with `QuotaExceededError`
 - Photo uploads fail with error message
 - Browser DevTools shows quota at 100%
 
 **Resolution:**
+
 1. Check current quota usage: `photoStorageService.estimateQuotaRemaining()`
 2. Identify largest photos: Sort by `compressedSize` DESC
 3. Delete old or duplicate photos manually
@@ -211,10 +227,12 @@ Based on typical 1GB mobile quota:
 ### Inaccurate Quota Estimates
 
 **Symptoms:**
+
 - `navigator.storage.estimate()` returns 0 or undefined
 - Quota percentages don't match browser DevTools
 
 **Resolution:**
+
 - Browser doesn't support Storage API (Safari < 15.2)
 - Fallback to conservative 50MB default quota
 - Use browser DevTools for accurate measurement
@@ -223,10 +241,12 @@ Based on typical 1GB mobile quota:
 ### Storage Fragmentation
 
 **Symptoms:**
+
 - Quota usage remains high after deleting photos
 - `estimateQuotaRemaining()` doesn't reflect deletions
 
 **Resolution:**
+
 - Browser hasn't reclaimed deleted space yet
 - Trigger manual garbage collection in DevTools
 - Wait 10-15 minutes for browser cleanup
@@ -257,9 +277,9 @@ describe('getStorageSize', () => {
 // tests/e2e/storage-quota.spec.ts
 test('displays warning when 80% quota reached', async ({ page }) => {
   // Mock quota at 81%
-  await page.route('**/storage/estimate', route => {
+  await page.route('**/storage/estimate', (route) => {
     route.fulfill({
-      json: { usage: 810000000, quota: 1000000000 }
+      json: { usage: 810000000, quota: 1000000000 },
     });
   });
 

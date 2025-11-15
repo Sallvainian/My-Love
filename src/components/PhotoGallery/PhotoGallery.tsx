@@ -49,7 +49,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     setPhotos([]);
     setCurrentOffset(0);
     setHasMore(true);
-    setRetryTrigger(prev => prev + 1); // Increment to trigger useEffect
+    setRetryTrigger((prev) => prev + 1); // Increment to trigger useEffect
   }, []);
 
   // Load initial page of photos
@@ -63,7 +63,12 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       try {
         console.log('[PhotoGallery] loadInitialPhotos: Calling getPage...');
         const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
-        console.log('[PhotoGallery] loadInitialPhotos: Got response, cancelled=', cancelled, 'count=', firstPage.length);
+        console.log(
+          '[PhotoGallery] loadInitialPhotos: Got response, cancelled=',
+          cancelled,
+          'count=',
+          firstPage.length
+        );
 
         if (cancelled) {
           console.log('[PhotoGallery] loadInitialPhotos: Cancelled, skipping state updates');
@@ -81,11 +86,15 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         // BUGFIX: Load photos into store so PhotoCarousel can access them
         await loadPhotos();
 
-        console.log(`[PhotoGallery] Loaded initial ${firstPage.length} photos, hasLoadedOnce=true, isLoading=false`);
+        console.log(
+          `[PhotoGallery] Loaded initial ${firstPage.length} photos, hasLoadedOnce=true, isLoading=false`
+        );
       } catch (error) {
         console.log('[PhotoGallery] loadInitialPhotos: Error, cancelled=', cancelled);
         if (cancelled) {
-          console.log('[PhotoGallery] loadInitialPhotos: Cancelled in catch, skipping state updates');
+          console.log(
+            '[PhotoGallery] loadInitialPhotos: Cancelled in catch, skipping state updates'
+          );
           return;
         }
 
@@ -95,7 +104,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         setHasLoadedOnce(true); // Mark as loaded even on error to show empty state
         setIsLoading(false);
         setError(error instanceof Error ? error.message : 'Failed to load photos');
-        console.log('[PhotoGallery] loadInitialPhotos: Error handled, hasLoadedOnce=true, isLoading=false');
+        console.log(
+          '[PhotoGallery] loadInitialPhotos: Error handled, hasLoadedOnce=true, isLoading=false'
+        );
       }
     };
 
@@ -162,11 +173,13 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       const nextPage = await photoStorageService.getPage(currentOffset, PHOTOS_PER_PAGE);
 
       if (nextPage.length > 0) {
-        setPhotos(prev => [...prev, ...nextPage]);
-        setCurrentOffset(prev => prev + nextPage.length);
+        setPhotos((prev) => [...prev, ...nextPage]);
+        setCurrentOffset((prev) => prev + nextPage.length);
         setHasMore(nextPage.length === PHOTOS_PER_PAGE);
 
-        console.log(`[PhotoGallery] Loaded ${nextPage.length} more photos (total: ${currentOffset + nextPage.length})`);
+        console.log(
+          `[PhotoGallery] Loaded ${nextPage.length} more photos (total: ${currentOffset + nextPage.length})`
+        );
       } else {
         setHasMore(false);
         console.log('[PhotoGallery] No more photos to load');
@@ -236,9 +249,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
             Failed to load photos
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-            {error}
-          </p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">{error}</p>
           <button
             onClick={handleRetry}
             className="bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
@@ -253,7 +264,14 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
   // Story 5.2 AC-4: Skeleton loaders during initial fetch
   // Show skeleton grid if actively loading OR haven't loaded yet
-  console.log('[PhotoGallery] Render - isLoading:', isLoading, 'hasLoadedOnce:', hasLoadedOnce, 'photos.length:', photos.length);
+  console.log(
+    '[PhotoGallery] Render - isLoading:',
+    isLoading,
+    'hasLoadedOnce:',
+    hasLoadedOnce,
+    'photos.length:',
+    photos.length
+  );
 
   if ((isLoading || !hasLoadedOnce) && photos.length === 0) {
     console.log('[PhotoGallery] Render - Showing SKELETON LOADING state');
@@ -271,9 +289,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       >
         <div className="text-center max-w-md">
           <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg mb-6">
-            No photos yet. Upload your first memory!
-          </p>
+          <p className="text-gray-500 text-lg mb-6">No photos yet. Upload your first memory!</p>
           <button
             onClick={onUploadClick}
             className="bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
@@ -297,11 +313,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         data-testid="photo-gallery-grid"
       >
         {photos.map((photo) => (
-          <PhotoGridItem
-            key={photo.id}
-            photo={photo}
-            onPhotoClick={selectPhoto}
-          />
+          <PhotoGridItem key={photo.id} photo={photo} onPhotoClick={selectPhoto} />
         ))}
       </div>
 
@@ -327,9 +339,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           className="w-full py-8 flex items-center justify-center"
           data-testid="photo-gallery-end-message"
         >
-          <p className="text-gray-400 text-sm">
-            You've reached the end of your memories
-          </p>
+          <p className="text-gray-400 text-sm">You've reached the end of your memories</p>
         </div>
       )}
 

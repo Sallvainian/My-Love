@@ -33,15 +33,18 @@ However, the current implementation has critical usability issues that prevent i
 ### Functional Requirements
 
 **Core Data Persistence**
+
 - FR001: System SHALL persist all user data (messages, photos, mood entries, settings) across browser sessions
 - FR002: System SHALL correctly restore application state from persisted storage on app initialization
 - FR003: System SHALL handle storage quota limits gracefully with user notification
 
 **Pre-Configured Experience**
+
 - FR004: System SHALL eliminate onboarding flow by pre-configuring relationship data (partner name, relationship start date) via hardcoded constants in src/config/constants.ts
 - FR005: System SHALL display relationship duration automatically without user input
 
 **Message Library & Navigation**
+
 - FR006: System SHALL maintain library of 365 unique love messages across 5 categories (reasons, memories, affirmations, future plans, custom)
 - FR007: System SHALL display one message per day based on date-based rotation algorithm
 - FR008: System SHALL support horizontal swipe gestures to navigate to previous days' messages (backward navigation only)
@@ -50,28 +53,33 @@ However, the current implementation has critical usability issues that prevent i
 - FR011: System SHALL enable message sharing via native share API or clipboard copy
 
 **Photo Gallery**
+
 - FR012: System SHALL allow users to upload photos with captions and optional tags
 - FR013: System SHALL display photos in carousel/gallery view with smooth animated transitions
 - FR014: System SHALL store photos in IndexedDB with compression for optimal storage
 - FR015: System SHALL provide navigation interface to access photo gallery from main app
 
 **Anniversary Countdown**
+
 - FR016: System SHALL calculate and display countdown to next anniversary (days, hours, minutes)
 - FR017: System SHALL support multiple custom countdowns for special dates
 - FR018: System SHALL trigger celebration animations when countdown reaches zero
 
 **Mood Tracking & Sync**
+
 - FR019: System SHALL allow user to log daily mood (5 mood types: loved, happy, content, thoughtful, grateful)
 - FR020: System SHALL sync mood entries to backend service for partner visibility
 - FR021: System SHALL display mood history in calendar view
 - FR022: System SHALL support optional notes with each mood entry
 
 **Interactive Connection Features**
+
 - FR023: System SHALL support "poke" and "kiss" actions that send notifications to partner via backend service
 - FR024: System SHALL display animated reactions when poke/kiss is received
 - FR025: System SHALL maintain interaction history for sentimental value
 
 **Custom Message Management**
+
 - FR026: System SHALL allow admin user (you) to review AI-generated message suggestions
 - FR027: System SHALL provide accept/decline interface for message curation
 - FR028: System SHALL enable creation of custom messages with category selection
@@ -79,6 +87,7 @@ However, the current implementation has critical usability issues that prevent i
 - FR030: System SHALL integrate approved custom messages into daily rotation algorithm
 
 **Navigation & UI**
+
 - FR031: System SHALL provide top navigation bar to access: Home, Photos, Mood Tracker, Settings
 - FR032: System SHALL maintain consistent theme across all views
 - FR033: System SHALL support all 4 existing themes (Sunset Bliss, Ocean Dreams, Lavender Fields, Rose Garden)
@@ -126,6 +135,7 @@ However, the current implementation has critical usability issues that prevent i
 13. Closes app feeling connected and appreciated
 
 **Alternative Flows:**
+
 - If first visit of the day: sees new message (FR007)
 - If returning later: sees same message as earlier - one per day (FR007)
 - If offline: everything works except mood sync and poke/kiss features (NFR002, FR020, FR023)
@@ -156,15 +166,19 @@ However, the current implementation has critical usability issues that prevent i
 ## Epic List
 
 ### Epic 1: Foundation & Core Fixes (Est. 5-7 stories)
+
 Fix technical debt, persistence issues, and eliminate onboarding friction to create stable production-ready base.
 
 ### Epic 2: Enhanced Message Experience (Est. 4-6 stories)
+
 Expand message library to 365 messages, implement swipe navigation, and add custom message management interface.
 
 ### Epic 3: Photo Gallery & Memories (Est. 3-5 stories)
+
 Build photo upload, storage, and carousel gallery with animated transitions and navigation integration.
 
 ### Epic 4: Interactive Connection Features (Est. 4-6 stories)
+
 Implement mood tracking with NocoDB sync, poke/kiss interactions, and anniversary countdown timers.
 
 **Total Estimated Stories:** 16-24 stories across 4 epics
@@ -178,17 +192,20 @@ Implement mood tracking with NocoDB sync, poke/kiss interactions, and anniversar
 The following features are explicitly excluded from this project phase:
 
 **Multi-User & Social Features**
+
 - Multi-user functionality (app remains single-user focused on your girlfriend)
 - Social sharing features or public galleries
 - Cross-device sync (data stays local to each device)
 - User authentication system (not needed for single-user app)
 
 **Monetization & Analytics**
+
 - Any monetization features or ads
 - Analytics or telemetry tracking
 - Third-party integrations beyond NocoDB
 
 **Advanced Features (Future Consideration)**
+
 - Video uploads or playback
 - Voice messages or audio features
 - Push notifications from NocoDB backend (may add later)
@@ -197,6 +214,7 @@ The following features are explicitly excluded from this project phase:
 - Theming beyond the 4 existing themes
 
 **Platform Expansion**
+
 - Native mobile apps (PWA is sufficient)
 - Desktop-specific features
 - Smart watch or wearable integrations

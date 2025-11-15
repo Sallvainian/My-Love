@@ -72,7 +72,7 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
 
     // Get existing messages from IndexedDB to detect duplicates
     const existingMessages = await customMessageService.getAll({ isCustom: true });
-    const existingTexts = new Set(existingMessages.map(m => m.text.trim().toLowerCase()));
+    const existingTexts = new Set(existingMessages.map((m) => m.text.trim().toLowerCase()));
 
     // Migrate each message to IndexedDB
     for (const message of customMessages) {
@@ -91,7 +91,10 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
         // Check for duplicates (same text already in IndexedDB)
         const normalizedText = validated.text.trim().toLowerCase();
         if (existingTexts.has(normalizedText)) {
-          console.log('[MigrationService] Skipping duplicate message:', validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
+          console.log(
+            '[MigrationService] Skipping duplicate message:',
+            validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+          );
           result.skippedCount++;
           continue;
         }
@@ -102,7 +105,10 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
 
         existingTexts.add(normalizedText); // Prevent duplicates within same migration
         result.migratedCount++;
-        console.log('[MigrationService] Migrated message:', validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
+        console.log(
+          '[MigrationService] Migrated message:',
+          validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+        );
       } catch (error) {
         // Handle validation errors gracefully
         if (isZodError(error)) {

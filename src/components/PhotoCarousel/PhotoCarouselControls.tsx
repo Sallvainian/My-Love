@@ -2,8 +2,8 @@ import { Edit, Trash2, X } from 'lucide-react';
 
 interface PhotoCarouselControlsProps {
   onClose: () => void;
-  onEdit: () => void;    // Story 4.4: AC-4.4.1
-  onDelete: () => void;  // Story 4.4: AC-4.4.4
+  onEdit: () => void; // Story 4.4: AC-4.4.1
+  onDelete: () => void; // Story 4.4: AC-4.4.4
   currentIndex: number;
   totalPhotos: number;
 }
@@ -37,7 +37,7 @@ export function PhotoCarouselControls({
         <div className="text-white text-sm font-medium" data-testid="photo-carousel-counter">
           {currentIndex + 1} / {totalPhotos}
         </div>
-        
+
         {/* Center/Right: Action buttons */}
         <div className="flex items-center gap-2">
           {/* Story 4.4: AC-4.4.1 - Edit button (functional) */}

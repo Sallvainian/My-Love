@@ -3,5 +3,5 @@ bundle:
   name: Creative Squad
   icon: 🎨
   description: Innovation and Creative Excellence Team - Comprehensive creative development from ideation through narrative execution
-agents: "*"
-party: "./default-party.csv"
+agents: '*'
+party: './default-party.csv'

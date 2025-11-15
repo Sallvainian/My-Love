@@ -90,7 +90,7 @@ class StorageService {
         name: (error as Error).name,
         message: (error as Error).message,
       });
-      
+
       // Fallback: App will continue with default state (handled in useAppStore)
       // Possible causes: permission denied, quota exceeded, corrupted database
       throw error; // Re-throw to allow caller to handle gracefully
@@ -218,7 +218,12 @@ class StorageService {
     try {
       await this.init();
       const messages = await this.db!.getAllFromIndex('messages', 'by-category', category);
-      console.log('[StorageService] Retrieved messages by category:', category, 'count:', messages.length);
+      console.log(
+        '[StorageService] Retrieved messages by category:',
+        category,
+        'count:',
+        messages.length
+      );
       return messages;
     } catch (error) {
       console.error('[StorageService] Failed to get messages by category:', error);
@@ -262,7 +267,12 @@ class StorageService {
       const message = await this.getMessage(messageId);
       if (message) {
         await this.updateMessage(messageId, { isFavorite: !message.isFavorite });
-        console.log('[StorageService] Favorite toggled successfully, id:', messageId, 'new value:', !message.isFavorite);
+        console.log(
+          '[StorageService] Favorite toggled successfully, id:',
+          messageId,
+          'new value:',
+          !message.isFavorite
+        );
       } else {
         console.warn('[StorageService] Cannot toggle favorite - message not found, id:', messageId);
       }
@@ -279,10 +289,7 @@ class StorageService {
       await this.init();
       console.log('[StorageService] Adding bulk messages to IndexedDB, count:', messages.length);
       const tx = this.db!.transaction('messages', 'readwrite');
-      await Promise.all([
-        ...messages.map(msg => tx.store.add(msg as Message)),
-        tx.done,
-      ]);
+      await Promise.all([...messages.map((msg) => tx.store.add(msg as Message)), tx.done]);
       console.log('[StorageService] Bulk messages added successfully');
     } catch (error) {
       console.error('[StorageService] Failed to add bulk messages:', error);
@@ -310,11 +317,13 @@ class StorageService {
     try {
       await this.init();
       console.log('[StorageService] Exporting all data from IndexedDB...');
-      const [photos, messages] = await Promise.all([
-        this.getAllPhotos(),
-        this.getAllMessages(),
-      ]);
-      console.log('[StorageService] Data exported successfully, photos:', photos.length, 'messages:', messages.length);
+      const [photos, messages] = await Promise.all([this.getAllPhotos(), this.getAllMessages()]);
+      console.log(
+        '[StorageService] Data exported successfully, photos:',
+        photos.length,
+        'messages:',
+        messages.length
+      );
       return { photos, messages };
     } catch (error) {
       console.error('[StorageService] Failed to export data:', error);

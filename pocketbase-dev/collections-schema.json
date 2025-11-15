@@ -1,0 +1,169 @@
+[
+  {
+    "id": "users",
+    "name": "users",
+    "type": "auth",
+    "system": false,
+    "schema": [
+      {
+        "id": "users_name",
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "options": {
+          "min": 1,
+          "max": 100
+        }
+      },
+      {
+        "id": "users_avatar",
+        "name": "avatar",
+        "type": "file",
+        "required": false,
+        "options": {
+          "maxSelect": 1,
+          "maxSize": 5242880,
+          "mimeTypes": ["image/jpeg", "image/png", "image/webp"]
+        }
+      }
+    ],
+    "listRule": "id = @request.auth.id",
+    "viewRule": "id = @request.auth.id",
+    "createRule": "",
+    "updateRule": "id = @request.auth.id",
+    "deleteRule": "id = @request.auth.id",
+    "options": {
+      "allowEmailAuth": true,
+      "allowOAuth2Auth": false,
+      "allowUsernameAuth": false,
+      "exceptEmailDomains": [],
+      "manageRule": null,
+      "minPasswordLength": 8,
+      "onlyEmailDomains": [],
+      "requireEmail": true
+    }
+  },
+  {
+    "id": "moods",
+    "name": "moods",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "id": "moods_user",
+        "name": "user",
+        "type": "relation",
+        "required": true,
+        "options": {
+          "collectionId": "users",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": ["name"]
+        }
+      },
+      {
+        "id": "moods_type",
+        "name": "type",
+        "type": "select",
+        "required": true,
+        "options": {
+          "maxSelect": 1,
+          "values": ["happy", "sad", "excited", "calm", "anxious"]
+        }
+      },
+      {
+        "id": "moods_note",
+        "name": "note",
+        "type": "text",
+        "required": false,
+        "options": {
+          "min": null,
+          "max": 500
+        }
+      },
+      {
+        "id": "moods_date",
+        "name": "date",
+        "type": "date",
+        "required": true,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX idx_moods_user ON moods (user)",
+      "CREATE INDEX idx_moods_date ON moods (date)",
+      "CREATE UNIQUE INDEX idx_moods_user_date ON moods (user, date)"
+    ],
+    "listRule": "@request.auth.id != \"\" && (user = @request.auth.id || @collection.users.id ?= @request.auth.id)",
+    "viewRule": "@request.auth.id != \"\" && (user = @request.auth.id || @collection.users.id ?= @request.auth.id)",
+    "createRule": "@request.auth.id != \"\" && @request.data.user = @request.auth.id",
+    "updateRule": "@request.auth.id != \"\" && user = @request.auth.id",
+    "deleteRule": "@request.auth.id != \"\" && user = @request.auth.id",
+    "options": {}
+  },
+  {
+    "id": "interactions",
+    "name": "interactions",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "id": "interactions_sender",
+        "name": "sender",
+        "type": "relation",
+        "required": true,
+        "options": {
+          "collectionId": "users",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": ["name"]
+        }
+      },
+      {
+        "id": "interactions_receiver",
+        "name": "receiver",
+        "type": "relation",
+        "required": true,
+        "options": {
+          "collectionId": "users",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": ["name"]
+        }
+      },
+      {
+        "id": "interactions_type",
+        "name": "type",
+        "type": "select",
+        "required": true,
+        "options": {
+          "maxSelect": 1,
+          "values": ["poke", "kiss"]
+        }
+      },
+      {
+        "id": "interactions_viewed",
+        "name": "viewed",
+        "type": "bool",
+        "required": false,
+        "options": {}
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX idx_interactions_receiver ON interactions (receiver)",
+      "CREATE INDEX idx_interactions_viewed ON interactions (viewed)"
+    ],
+    "listRule": "@request.auth.id != \"\" && (sender = @request.auth.id || receiver = @request.auth.id)",
+    "viewRule": "@request.auth.id != \"\" && (sender = @request.auth.id || receiver = @request.auth.id)",
+    "createRule": "@request.auth.id != \"\" && @request.data.sender = @request.auth.id",
+    "updateRule": "@request.auth.id != \"\" && receiver = @request.auth.id",
+    "deleteRule": "@request.auth.id != \"\" && sender = @request.auth.id",
+    "options": {}
+  }
+]

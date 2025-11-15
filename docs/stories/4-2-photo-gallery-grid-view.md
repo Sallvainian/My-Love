@@ -40,11 +40,13 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 ### Dependencies
 
 **Requires:**
+
 - ✅ Story 4.1 complete: photoStorageService operational, Photo types defined, photos store in IndexedDB
 - ✅ Zustand photos state slice available from Story 4.1
 - ✅ BottomNavigation component with Photos tab from Story 4.1
 
 **Enables:**
+
 - Story 4.3: Carousel will open from grid item taps
 - Story 4.4: Edit/delete will be accessible from carousel
 - Future features: Photo search, filtering, albums (out of scope for MVP)
@@ -52,23 +54,27 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 ### Integration Points
 
 **Photo Loading from IndexedDB:**
+
 - Uses photoStorageService.getAll() from Story 4.1
 - Queries photos store sorted by-date index (newest first)
 - Loads in batches of 20 for pagination performance
 
 **Zustand Store Integration:**
+
 - Extends photos state with selectedPhotoId for carousel handoff
 - Action: loadPhotos() - fetches from IndexedDB and updates state
 - Action: selectPhoto(id) - sets selected photo for carousel (Story 4.3)
 - Loading state: isLoadingPhotos boolean for spinner display
 
 **Component Architecture:**
+
 - PhotoGallery component (NEW) - main grid container
 - PhotoGridItem component (NEW) - individual photo card
 - Uses existing BottomNavigation with Photos tab (Story 4.1)
 - Prepares for PhotoCarousel handoff (Story 4.3)
 
 **Responsive Grid Layout:**
+
 - Tailwind CSS grid utilities: grid-cols-2 (mobile), grid-cols-3 (tablet), grid-cols-4 (desktop)
 - Gap spacing: gap-2 (mobile), gap-4 (desktop)
 - Aspect ratio maintained: aspect-square for uniform grid
@@ -83,17 +89,20 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Given** photo gallery is open
 **When** viewing on different screen sizes
 **Then** grid SHALL display:
-  - 2 columns on mobile (< 640px width)
-  - 3 columns on tablet (640px - 1024px width)
-  - 4 columns on desktop (> 1024px width)
+
+- 2 columns on mobile (< 640px width)
+- 3 columns on tablet (640px - 1024px width)
+- 4 columns on desktop (> 1024px width)
 
 **Requirements:**
+
 - Tailwind responsive breakpoints: sm:grid-cols-3, lg:grid-cols-4
 - Consistent gap spacing: gap-2 (mobile), gap-4 (desktop)
 - Photos maintain square aspect ratio (aspect-square)
 - Grid fills available width (w-full)
 
 **Validation:**
+
 - Open gallery on iPhone (375px) → 2 columns displayed
 - Open gallery on iPad (768px) → 3 columns displayed
 - Open gallery on desktop (1920px) → 4 columns displayed
@@ -108,12 +117,14 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Then** photos SHALL be sorted by uploadDate descending (newest first)
 
 **Requirements:**
+
 - Query uses by-date index: getAllFromIndex('photos', 'by-date')
 - Result array reversed: photos.reverse() (IndexedDB returns ascending)
 - Most recent upload appears at top-left of grid
 - Sort order persists across app sessions
 
 **Validation:**
+
 - Upload 3 photos on different days (Day 1, Day 2, Day 3)
 - Open gallery → Day 3 photo appears first (top-left)
 - Verify order: [Day 3, Day 2, Day 1]
@@ -125,17 +136,20 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Given** grid displays photos with captions
 **When** user hovers over photo (desktop) OR taps photo briefly (mobile)
 **Then** caption overlay SHALL display:
-  - Semi-transparent gradient backdrop
-  - Caption text in white (max 2 lines with ellipsis)
-  - Smooth fade-in transition (150ms)
+
+- Semi-transparent gradient backdrop
+- Caption text in white (max 2 lines with ellipsis)
+- Smooth fade-in transition (150ms)
 
 **Requirements:**
+
 - Hover state: group/hover:opacity-100 (Tailwind)
 - Gradient backdrop: bg-gradient-to-t from-black/60 to-transparent
 - Caption styling: text-white text-sm font-medium line-clamp-2
 - No overlay if caption is undefined (only show for photos with captions)
 
 **Validation:**
+
 - Desktop: Hover photo with caption "Beach sunset" → caption overlays bottom
 - Mobile: Tap photo → caption appears briefly before carousel opens
 - Photo without caption → no overlay shown
@@ -150,6 +164,7 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Then** first 20 photos SHALL load, with pagination for more
 
 **Requirements:**
+
 - Initial load: photoStorageService.getPage(offset: 0, limit: 20)
 - Infinite scroll: Load next 20 when user scrolls near bottom (threshold: 200px)
 - Loading indicator: "Loading more photos..." displayed during fetch
@@ -157,6 +172,7 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 - State management: Track current offset and hasMore flag
 
 **Validation:**
+
 - Upload 40 photos → gallery shows first 20
 - Scroll to bottom → next 20 load automatically
 - Upload 15 photos → no pagination (all fit on one page)
@@ -169,17 +185,20 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Given** no photos have been uploaded yet
 **When** gallery view opens
 **Then** empty state SHALL display:
-  - Icon: Camera icon (Lucide camera icon)
-  - Message: "No photos yet. Upload your first memory!"
-  - Upload button: "Upload Photo" (opens PhotoUpload modal from Story 4.1)
+
+- Icon: Camera icon (Lucide camera icon)
+- Message: "No photos yet. Upload your first memory!"
+- Upload button: "Upload Photo" (opens PhotoUpload modal from Story 4.1)
 
 **Requirements:**
+
 - Centered layout: flex flex-col items-center justify-center
 - Muted text styling: text-gray-500 dark mode compatible
 - Upload button styled as primary CTA: bg-pink-500 text-white
 - Empty state takes full grid container height
 
 **Validation:**
+
 - New user opens gallery → sees empty state message
 - Click "Upload Photo" button → PhotoUpload modal opens (Story 4.1)
 - Upload first photo → empty state disappears, grid displays photo
@@ -191,17 +210,20 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Given** gallery is fetching photos from IndexedDB
 **When** loading state is active (isLoadingPhotos: true)
 **Then** loading spinner SHALL display:
-  - Centered spinner animation
-  - Text: "Loading photos..."
-  - Spinner styled with theme color (pink)
+
+- Centered spinner animation
+- Text: "Loading photos..."
+- Spinner styled with theme color (pink)
 
 **Requirements:**
+
 - Spinner component: Lucide Loader2 icon with animate-spin
 - Loading state managed by Zustand: isLoadingPhotos boolean
 - Spinner visible during: initial load, pagination fetch
 - Grid hidden while loading (prevent layout shift)
 
 **Validation:**
+
 - Open gallery first time → see spinner while loading
 - Upload 25 photos, scroll to bottom → spinner shows during pagination
 - Fast device: spinner visible briefly (< 500ms for 20 photos)
@@ -215,6 +237,7 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **Then** carousel/lightbox view SHALL open (Story 4.3 implementation)
 
 **Requirements:**
+
 - Click handler: onClick={() => selectPhoto(photo.id)}
 - Zustand action: selectPhoto(id) sets selectedPhotoId state
 - For Story 4.2: Log selected photo ID (carousel UI in Story 4.3)
@@ -222,6 +245,7 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 - Tap target: min-height 120px (thumb-friendly)
 
 **Validation:**
+
 - Tap photo #5 → console logs: "Selected photo: 5"
 - selectedPhotoId state updated to 5
 - Story 4.3 will render PhotoCarousel when selectedPhotoId is set
@@ -287,6 +311,7 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 **From Story 4.1 - Photo Upload & Storage (DONE):**
 
 **Service Layer Patterns:**
+
 - photoStorageService singleton established at src/services/photoStorageService.ts
 - Methods available: create(), getAll(), getById()
 - Need to add: getPage(offset, limit) for pagination support
@@ -294,6 +319,7 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 - Error handling: Try/catch with console logging and graceful fallbacks
 
 **IndexedDB Photo Loading:**
+
 - Use idb library: `await db.getAllFromIndex('photos', 'by-date')`
 - Returns photos in ascending order (oldest first) - MUST reverse array
 - Photo objects include: id, imageBlob, caption, tags, uploadDate, compressedSize
@@ -301,24 +327,28 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 - IMPORTANT: Clean up blob URLs when component unmounts to prevent memory leaks
 
 **Zustand Store Patterns:**
+
 - Photos state already exists from Story 4.1: photos: Photo[], isLoadingPhotos: boolean
 - Action pattern: async functions that update state and call service methods
 - Loading states: Set isLoadingPhotos: true before fetch, false after completion
 - Error handling: Set photoError state for UI display
 
 **Component Patterns:**
+
 - Use data-testid attributes for E2E tests: `data-testid="photo-gallery-grid"`
 - Framer Motion for animations (if needed - Story 4.3 will use heavily)
 - Responsive Tailwind: sm:, md:, lg: breakpoints for grid columns
 - Empty states: Center with flex, use Lucide icons, provide clear CTA
 
 **Files Created in Story 4.1:**
+
 - src/components/Navigation/BottomNavigation.tsx - Photos tab already exists
 - src/services/photoStorageService.ts - REUSE getAll() method
 - src/types/index.ts - Photo interface already defined
 - src/stores/useAppStore.ts - photos state slice already exists
 
 **Key Insights:**
+
 - Photos tab navigation already implemented (Story 4.1) - just needs gallery view
 - PhotoUpload modal works and tested - reuse "Upload Photo" button for empty state
 - Storage quota warnings implemented (80% threshold) - gallery should respect
@@ -327,21 +357,25 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 ### Project Structure Notes
 
 **New Components:**
+
 - src/components/PhotoGallery/PhotoGallery.tsx - Main gallery grid container
 - src/components/PhotoGallery/PhotoGridItem.tsx - Individual photo card component
 - src/components/PhotoGallery/LoadingSpinner.tsx - Reusable spinner (or inline)
 
 **Zustand Store Extensions:**
+
 - Add selectPhoto(id) action to set selectedPhotoId for carousel handoff
 - Enhance loadPhotos() to support pagination if needed
 - Add isLoadingMore state for lazy loading pagination indicator
 
 **No New Services:**
+
 - photoStorageService from Story 4.1 sufficient
 - May need to add getPage(offset, limit) method for pagination
 
 **Tech Stack (No New Dependencies):**
-- Existing Tailwind CSS for responsive grid (grid, grid-cols-*, gap)
+
+- Existing Tailwind CSS for responsive grid (grid, grid-cols-\*, gap)
 - Existing Lucide icons for empty state (Camera icon) and spinner (Loader2)
 - Existing zustand for state management
 - Existing idb for IndexedDB operations
@@ -349,21 +383,25 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 ### Alignment with Unified Project Structure
 
 **Component Co-location:**
+
 - Create src/components/PhotoGallery/ directory (follows PhotoUpload pattern)
 - Co-locate PhotoGallery and PhotoGridItem components
 - Consistent with established component organization
 
 **Responsive Design Patterns:**
+
 - Use existing Tailwind breakpoints: sm:, md:, lg:
 - Follow mobile-first approach (2 columns base, 3-4 on larger screens)
 - Existing app is mobile-optimized - maintain consistency
 
 **State Management Consistency:**
+
 - Follow Story 4.1 patterns: actions call service methods, update state
 - Loading states managed in Zustand (isLoadingPhotos, isLoadingMore)
 - Error handling with photoError state
 
 **Navigation Integration:**
+
 - Photos tab already exists in BottomNavigation (Story 4.1)
 - App.tsx needs routing logic to show PhotoGallery when Photos tab active
 - Maintain consistent navigation patterns from existing DailyMessage view
@@ -371,15 +409,18 @@ The story addresses PRD requirements FR012, FR015 by implementing the gallery vi
 ### References
 
 **Technical Specifications:**
+
 - [tech-spec-epic-4.md#story-42-photo-gallery-grid-view](../tech-spec-epic-4.md) - Detailed technical requirements for grid layout, lazy loading
 - [epics.md#story-42-photo-gallery-grid-view](../epics.md#story-42-photo-gallery-grid-view) - User story and acceptance criteria
 
 **Architecture References:**
+
 - [architecture.md#component-overview](../architecture.md#component-overview) - Component patterns and best practices
 - [architecture.md#state-management](../architecture.md#state-management) - Zustand store patterns
 - [architecture.md#data-architecture](../architecture.md#data-architecture) - IndexedDB schema and query patterns
 
 **Related Stories:**
+
 - [4-1-photo-upload-storage.md](./4-1-photo-upload-storage.md) - Service layer patterns, photo storage implementation (completed)
 - Story 4.3 (next): Photo Carousel - will open from grid item taps, receives selectedPhotoId
 - Story 4.4 (future): Photo Edit & Delete - will be accessible from carousel
@@ -408,12 +449,14 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 **Implementation Plan (2025-11-07)**
 
 Story 4.2 builds on Story 4.1's photo storage infrastructure. Analysis shows:
+
 - photoStorageService.getAll() already handles by-date sorting ✅
 - Zustand photos state exists but needs selectedPhotoId for carousel handoff
 - App.tsx navigation exists but needs PhotoGallery component integration
 - Missing: getPage() for pagination, PhotoGallery/PhotoGridItem components
 
 **Approach:**
+
 1. Create PhotoGallery component with responsive Tailwind grid (2-3-4 cols)
 2. Create PhotoGridItem component with aspect-square thumbnails + caption overlay
 3. Extend Zustand: Add selectedPhotoId state and selectPhoto(id) action
@@ -424,6 +467,7 @@ Story 4.2 builds on Story 4.1's photo storage infrastructure. Analysis shows:
 8. E2E tests covering all 7 ACs with real IndexedDB/blob validation
 
 **Key Technical Decisions:**
+
 - Use URL.createObjectURL() for blob display (cleanup in useEffect return)
 - Tailwind group/hover pattern for caption overlays (AC-4.2.3)
 - Intersection Observer threshold: 200px from bottom (AC-4.2.4)

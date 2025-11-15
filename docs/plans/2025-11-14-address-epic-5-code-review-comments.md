@@ -9,6 +9,7 @@
 **Tech Stack:** TypeScript, Zod validation, React, Zustand, Tailwind CSS, Vitest
 
 **Context:** PR #4 received 7 review comments from Copilot and Codex. Deep analysis reveals:
+
 - Validation infrastructure (schemas, tests, utilities) exists but wasn't committed to git
 - Service integration is incomplete (only 1 of 4 services integrated)
 - UI bugs in PhotoGallery retry and missing Tailwind animation
@@ -19,6 +20,7 @@
 ## Task 1: Add Missing Files to Git (P0 - Compilation Blocker)
 
 **Files:**
+
 - Add: `src/services/BaseIndexedDBService.ts` (exists, not tracked)
 - Add: `src/validation/schemas.ts` (exists, not tracked)
 - Add: `src/validation/errorMessages.ts` (exists, not tracked)
@@ -49,6 +51,7 @@ Expected: BaseIndexedDBService.ts staged
 Run: `git status`
 
 Expected: Shows new files in staging area:
+
 ```
 new file:   src/services/BaseIndexedDBService.ts
 new file:   src/validation/errorMessages.ts
@@ -78,6 +81,7 @@ Expected: Commit successful, 4 files added
 ## Task 2: Fix PhotoGallery Retry Button (P1)
 
 **Files:**
+
 - Modify: `src/components/PhotoGallery/PhotoGallery.tsx:43-107`
 
 **Addresses:** Review Comment 2 (P1: Retry button doesn't actually reload photos)
@@ -95,11 +99,13 @@ Expected: See handleRetry only resets state, doesn't trigger reload
 Open: `src/components/PhotoGallery/PhotoGallery.tsx`
 
 Find (around line 30):
+
 ```typescript
 const [currentOffset, setCurrentOffset] = useState(0);
 ```
 
 Add after:
+
 ```typescript
 const [retryTrigger, setRetryTrigger] = useState(0);
 ```
@@ -107,6 +113,7 @@ const [retryTrigger, setRetryTrigger] = useState(0);
 ### Step 3: Update handleRetry to increment retryTrigger
 
 Find (around line 43-52):
+
 ```typescript
 const handleRetry = useCallback(() => {
   setError(null);
@@ -120,6 +127,7 @@ const handleRetry = useCallback(() => {
 ```
 
 Replace with:
+
 ```typescript
 const handleRetry = useCallback(() => {
   setError(null);
@@ -128,18 +136,20 @@ const handleRetry = useCallback(() => {
   setPhotos([]);
   setCurrentOffset(0);
   setHasMore(true);
-  setRetryTrigger(prev => prev + 1); // Increment to trigger useEffect
+  setRetryTrigger((prev) => prev + 1); // Increment to trigger useEffect
 }, []);
 ```
 
 ### Step 4: Add retryTrigger to useEffect deps
 
 Find (around line 107):
+
 ```typescript
 }, [loadPhotos]); // Run once on mount
 ```
 
 Replace with:
+
 ```typescript
 }, [loadPhotos, retryTrigger]); // Re-run on mount and when retry is clicked
 ```
@@ -177,6 +187,7 @@ Expected: Commit successful
 ## Task 3: Add Shimmer Animation to Tailwind Config
 
 **Files:**
+
 - Modify: `tailwind.config.js`
 
 **Addresses:** Review Comment 6 (Missing animate-shimmer CSS class)
@@ -254,6 +265,7 @@ Expected: Commit successful
 ## Task 4: Integrate Validation into photoStorageService
 
 **Files:**
+
 - Modify: `src/services/photoStorageService.ts:1-10, 88-120`
 
 **Addresses:** Review Comment 3 (Missing validation integration), Story 5.5 AC3 & AC6
@@ -271,12 +283,14 @@ Expected: No validation, directly calls super.add()
 Open: `src/services/photoStorageService.ts`
 
 Find (around line 1-6):
+
 ```typescript
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import type { Photo } from '../types';
 ```
 
 Add after:
+
 ```typescript
 import { PhotoSchema, PhotoUploadInputSchema } from '../validation/schemas';
 import { isZodError, createValidationError } from '../validation/errorMessages';
@@ -285,6 +299,7 @@ import { isZodError, createValidationError } from '../validation/errorMessages';
 ### Step 3: Add validation to create() method
 
 Find (around line 88-104):
+
 ```typescript
 async create(photoData: Partial<Photo>): Promise<Photo> {
   console.log('[PhotoStorageService] create: Creating photo with caption', photoData.caption);
@@ -301,6 +316,7 @@ async create(photoData: Partial<Photo>): Promise<Photo> {
 ```
 
 Replace with:
+
 ```typescript
 async create(photoData: Partial<Photo>): Promise<Photo> {
   console.log('[PhotoStorageService] create: Creating photo with caption', photoData.caption);
@@ -332,6 +348,7 @@ async create(photoData: Partial<Photo>): Promise<Photo> {
 Find the update() method (if it exists).
 
 Add similar validation pattern:
+
 ```typescript
 async update(id: number, updates: Partial<Photo>): Promise<Photo> {
   try {
@@ -438,6 +455,7 @@ Expected: Commit successful
 ## Task 5: Integrate Validation into migrationService
 
 **Files:**
+
 - Modify: `src/services/migrationService.ts:1-10, validation points`
 
 **Addresses:** Review Comment 4 (Missing validation integration), Story 5.5 AC4/AC5/AC6
@@ -457,6 +475,7 @@ Open: `src/services/migrationService.ts`
 Find import section (around line 1-10).
 
 Add:
+
 ```typescript
 import { CreateMessageInputSchema, SettingsSchema } from '../validation/schemas';
 import { isZodError } from '../validation/errorMessages';
@@ -580,6 +599,7 @@ Expected: Commit successful
 ## Task 6: Integrate Validation into settingsSlice
 
 **Files:**
+
 - Modify: `src/stores/slices/settingsSlice.ts:1-30, setSettings/updateSettings methods`
 
 **Addresses:** Review Comment 5 (Missing validation integration), Story 5.5 AC5/AC6
@@ -599,6 +619,7 @@ Open: `src/stores/slices/settingsSlice.ts`
 Find import section (around line 1-10).
 
 Add:
+
 ```typescript
 import { SettingsSchema } from '../../validation/schemas';
 import { isZodError, createValidationError } from '../../validation/errorMessages';
@@ -736,6 +757,7 @@ Expected: Commit successful
 ## Task 7: Update Documentation to Reflect True Status
 
 **Files:**
+
 - Modify: `docs/technical-decisions.md:862` (remove misleading claims)
 - Modify: `docs/sprint-artifacts/5-5-centralize-input-validation-layer.md:395-450`
 
@@ -761,23 +783,27 @@ Update the "Implementation Status" section to reflect accurate completion:
 ## Implementation Status
 
 **Phase 1: Infrastructure** ✓ COMPLETE
+
 - Zod validation library installed (v3.25.76)
 - Validation schemas created for all data models
 - Error transformation utilities implemented
 - 76 comprehensive unit tests (100% schema coverage)
 
 **Phase 2: Service Integration** ✓ COMPLETE (as of 2025-11-14)
+
 - customMessageService: Full validation integration ✓
 - photoStorageService: Full validation integration ✓
 - migrationService: Full validation integration ✓
 - settingsSlice: Full validation integration ✓
 
 **Phase 3: UI Integration** ⚠️ PENDING
+
 - PhotoEditModal: Error display pending
 - Message forms: Error display pending
 - Settings forms: Error display pending
 
 **Phase 4: Data Repair** 📋 FUTURE
+
 - Legacy data repair utilities (future story)
 - Migration validation reports (future story)
 ```
@@ -792,16 +818,19 @@ Update to reflect current status:
 
 ```markdown
 **Deviations from Plan:**
+
 - UI form error display not yet implemented (to be done in future story)
 - Data repair utilities deferred to future story
 
 **Implementation Notes:**
+
 - Initial implementation (2025-11-14): Created schemas, tests, customMessageService integration
 - Code review fixes (2025-11-14): Completed photoStorageService, migrationService, settingsSlice integration
 - All service boundary validation now complete
 - UI integration remains as future work
 
 **Known Issues:**
+
 - Form components do not yet display field-specific validation errors
 - Users see generic error messages instead of guided field errors
 ```
@@ -843,6 +872,7 @@ Expected: Commit successful
 ## Task 8: Run Full Test Suite and Build
 
 **Files:**
+
 - Verify: All modified files
 - Test: Full test suite
 - Build: Production build
@@ -897,6 +927,7 @@ Create: `docs/sprint-artifacts/code-review-fixes-test-results.md`
 ## Test Summary
 
 **Unit Tests:** 180 passing
+
 - Validation schemas: 53 tests ✓
 - Error messages: 23 tests ✓
 - photoStorageService: 2 tests ✓
@@ -905,10 +936,12 @@ Create: `docs/sprint-artifacts/code-review-fixes-test-results.md`
 - Other tests: 97 tests ✓
 
 **Build:** SUCCESS
+
 - TypeScript compilation: 0 errors
 - Production build: SUCCESS
 
 **Manual Testing:**
+
 - Photo upload validation: ✓ Working
 - Settings validation: ✓ Working
 - PhotoGallery retry: ✓ Fixed
@@ -955,6 +988,7 @@ Expected: Commit successful
 ## Task 9: Push Changes and Update PR
 
 **Files:**
+
 - Push: All commits to origin
 - Update: PR #4 description
 
@@ -975,6 +1009,7 @@ Expected: See updated files in PR
 ### Step 3: Add comment to PR addressing all review feedback
 
 Run:
+
 ```bash
 gh pr comment 4 --body "## Code Review Fixes Complete
 
@@ -1033,6 +1068,7 @@ Expected: All checks passing
 **Commits:** 9
 
 **Outcome:**
+
 - All P0 and P1 code review comments addressed
 - Validation integration complete (4/4 services)
 - UI bugs fixed (retry button, shimmer animation)
@@ -1042,6 +1078,7 @@ Expected: All checks passing
 - Ready for re-review
 
 **Next Steps After Review Approval:**
+
 1. Merge PR #4 to main
 2. Consider creating follow-up story for UI error display (AC7 completion)
 3. Consider creating story for data repair utilities (legacy data migration)

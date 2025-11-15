@@ -5,6 +5,7 @@
 **Goal:** Implement 5 technical improvements to enhance code quality, performance, and maintainability: memory profiling documentation, magic number extraction, performance monitoring, memoization optimization, and code formatting setup.
 
 **Architecture:**
+
 - Documentation-driven approach for memory profiling methodology
 - Constants centralization with type safety using `as const` pattern
 - Performance monitoring using Web Performance API with IndexedDB storage
@@ -18,6 +19,7 @@
 ## Task 1: Document Memory Profiling Methodology
 
 **Files:**
+
 - Create: `docs/guides/memory-profiling.md`
 - Modify: `docs/technical-decisions.md` (add reference to memory profiling guide)
 - Test: Manual verification of documentation completeness
@@ -26,7 +28,7 @@
 
 Create `docs/guides/memory-profiling.md`:
 
-```markdown
+````markdown
 # Memory Profiling Methodology
 
 ## Overview
@@ -55,12 +57,14 @@ This guide documents the methodology for profiling IndexedDB memory usage in the
 ### Storage Quotas
 
 **Browser Storage Quotas:**
+
 - **Chrome/Edge:** ~60% of available disk space (up to 80% temporary)
 - **Firefox:** ~50% of available disk space (up to 2GB)
 - **Safari:** 1GB default (can request more)
 - **Mobile browsers:** ~10-50MB (varies by device)
 
 **App Thresholds:**
+
 - **80% usage:** Warning displayed to user (yellow banner)
 - **95% usage:** Error state, photo uploads disabled (red banner)
 - **100% usage:** QuotaExceededError thrown by IndexedDB
@@ -74,14 +78,16 @@ Use the Storage API to query current quota and usage:
 ```typescript
 // Available in photoStorageService.estimateQuotaRemaining()
 const estimate = await navigator.storage.estimate();
-const used = estimate.usage || 0;      // Bytes used
-const quota = estimate.quota || 0;     // Total quota in bytes
+const used = estimate.usage || 0; // Bytes used
+const quota = estimate.quota || 0; // Total quota in bytes
 const percentUsed = (used / quota) * 100;
 ```
+````
 
 **Location:** `src/services/photoStorageService.ts:288-330`
 
 **Output:**
+
 ```
 Quota: 25.45MB / 458.12MB (5.6% used)
 Remaining: 432.67MB
@@ -102,6 +108,7 @@ const messageSize = messageCount.length * 100; // Approximate
 **Location:** `src/services/photoStorageService.ts:265-280`
 
 **Example Output:**
+
 ```
 Photos: 24.8MB (120 photos * ~200KB average)
 Messages: 0.02MB (200 messages * 100 bytes)
@@ -115,7 +122,7 @@ Monitor photo compression ratios to validate image compression:
 
 ```typescript
 const photos = await photoStorageService.getAll();
-const compressionStats = photos.map(p => ({
+const compressionStats = photos.map((p) => ({
   id: p.id,
   originalSize: p.originalSize,
   compressedSize: p.compressedSize,
@@ -125,6 +132,7 @@ const compressionStats = photos.map(p => ({
 ```
 
 **Expected Results:**
+
 - Original size: 2-8MB (modern smartphone photos)
 - Compressed size: 100-300KB (target: <200KB)
 - Compression ratio: 90-97% reduction
@@ -135,6 +143,7 @@ const compressionStats = photos.map(p => ({
 #### Chrome DevTools
 
 **Application Tab → Storage:**
+
 1. Open DevTools (F12)
 2. Navigate to Application → Storage
 3. Expand IndexedDB → my-love-db
@@ -142,6 +151,7 @@ const compressionStats = photos.map(p => ({
 5. View individual records and sizes
 
 **Performance Tab → Memory:**
+
 1. Open Performance tab
 2. Click "Collect garbage" icon (🗑️)
 3. Take heap snapshot
@@ -151,6 +161,7 @@ const compressionStats = photos.map(p => ({
 #### Firefox DevTools
 
 **Storage Inspector:**
+
 1. Open DevTools (F12)
 2. Navigate to Storage → IndexedDB
 3. Select my-love-db
@@ -162,17 +173,20 @@ const compressionStats = photos.map(p => ({
 
 ```typescript
 // Run every 5 minutes in background
-setInterval(async () => {
-  const { percentUsed } = await photoStorageService.estimateQuotaRemaining();
+setInterval(
+  async () => {
+    const { percentUsed } = await photoStorageService.estimateQuotaRemaining();
 
-  if (percentUsed >= 95) {
-    console.error('[StorageMonitor] CRITICAL: 95% quota exceeded');
-    // Trigger error UI
-  } else if (percentUsed >= 80) {
-    console.warn('[StorageMonitor] WARNING: 80% quota threshold reached');
-    // Trigger warning UI
-  }
-}, 5 * 60 * 1000);
+    if (percentUsed >= 95) {
+      console.error('[StorageMonitor] CRITICAL: 95% quota exceeded');
+      // Trigger error UI
+    } else if (percentUsed >= 80) {
+      console.warn('[StorageMonitor] WARNING: 80% quota threshold reached');
+      // Trigger warning UI
+    }
+  },
+  5 * 60 * 1000
+);
 ```
 
 **Per-Upload Monitoring:**
@@ -191,18 +205,21 @@ console.log(`Photo upload consumed: ${(quotaAfter.used - quotaBefore.used) / 102
 ### Storage Growth Rates
 
 **Photo Storage (Primary Concern):**
+
 - Average photo size: 200KB (compressed)
 - Photos per week: ~10-20 (estimated)
 - Monthly growth: ~2-4MB
 - Annual capacity: ~2,500 photos (500MB quota)
 
 **Message Storage (Negligible):**
+
 - Average message size: 100 bytes
 - Messages per week: ~50-100 (estimated)
 - Monthly growth: ~0.02MB
 - Effectively unlimited (text-only)
 
 **Mood Storage (Negligible):**
+
 - Average entry size: 50 bytes
 - Entries per week: 7 (daily tracking)
 - Monthly growth: ~0.001MB
@@ -212,13 +229,13 @@ console.log(`Photo upload consumed: ${(quotaAfter.used - quotaBefore.used) / 102
 
 Based on typical 1GB mobile quota:
 
-| Photos | Storage Used | % of 1GB | Status |
-|--------|--------------|----------|--------|
-| 100    | 20MB         | 2%       | ✅ Safe |
-| 500    | 100MB        | 10%      | ✅ Safe |
-| 1,000  | 200MB        | 20%      | ✅ Safe |
-| 2,500  | 500MB        | 50%      | ⚠️ Monitor |
-| 4,000  | 800MB        | 80%      | ⚠️ Warning |
+| Photos | Storage Used | % of 1GB | Status      |
+| ------ | ------------ | -------- | ----------- |
+| 100    | 20MB         | 2%       | ✅ Safe     |
+| 500    | 100MB        | 10%      | ✅ Safe     |
+| 1,000  | 200MB        | 20%      | ✅ Safe     |
+| 2,500  | 500MB        | 50%      | ⚠️ Monitor  |
+| 4,000  | 800MB        | 80%      | ⚠️ Warning  |
 | 4,750  | 950MB        | 95%      | 🚨 Critical |
 
 ## Troubleshooting
@@ -226,11 +243,13 @@ Based on typical 1GB mobile quota:
 ### QuotaExceededError
 
 **Symptoms:**
+
 - IndexedDB write operations fail with `QuotaExceededError`
 - Photo uploads fail with error message
 - Browser DevTools shows quota at 100%
 
 **Resolution:**
+
 1. Check current quota usage: `photoStorageService.estimateQuotaRemaining()`
 2. Identify largest photos: Sort by `compressedSize` DESC
 3. Delete old or duplicate photos manually
@@ -240,10 +259,12 @@ Based on typical 1GB mobile quota:
 ### Inaccurate Quota Estimates
 
 **Symptoms:**
+
 - `navigator.storage.estimate()` returns 0 or undefined
 - Quota percentages don't match browser DevTools
 
 **Resolution:**
+
 - Browser doesn't support Storage API (Safari < 15.2)
 - Fallback to conservative 50MB default quota
 - Use browser DevTools for accurate measurement
@@ -252,10 +273,12 @@ Based on typical 1GB mobile quota:
 ### Storage Fragmentation
 
 **Symptoms:**
+
 - Quota usage remains high after deleting photos
 - `estimateQuotaRemaining()` doesn't reflect deletions
 
 **Resolution:**
+
 - Browser hasn't reclaimed deleted space yet
 - Trigger manual garbage collection in DevTools
 - Wait 10-15 minutes for browser cleanup
@@ -286,9 +309,9 @@ describe('getStorageSize', () => {
 // tests/e2e/storage-quota.spec.ts
 test('displays warning when 80% quota reached', async ({ page }) => {
   // Mock quota at 81%
-  await page.route('**/storage/estimate', route => {
+  await page.route('**/storage/estimate', (route) => {
     route.fulfill({
-      json: { usage: 810000000, quota: 1000000000 }
+      json: { usage: 810000000, quota: 1000000000 },
     });
   });
 
@@ -308,7 +331,8 @@ test('displays warning when 80% quota reached', async ({ page }) => {
 
 **Last Updated:** 2025-11-15
 **Maintained By:** Engineering Team
-```
+
+````
 
 **Step 2: Add reference to technical-decisions.md**
 
@@ -341,7 +365,7 @@ Add to `docs/technical-decisions.md` under "Performance & Optimization" section:
 - ⚠️ Storage API not supported in Safari < 15.2 (fallback to conservative defaults)
 
 **Status:** ✅ Implemented (Epic 4), Documentation Added (2025-11-15)
-```
+````
 
 **Step 3: Verify documentation completeness**
 
@@ -362,6 +386,7 @@ wc -w docs/guides/memory-profiling.md
 ```
 
 Expected output:
+
 ```
 ✓ Guide created
 ✓ Reference added
@@ -398,6 +423,7 @@ EOF
 ## Task 2: Extract Magic Numbers to Named Constants
 
 **Files:**
+
 - Create: `src/config/performance.ts`
 - Modify: `src/services/photoStorageService.ts:197,298,312,322`
 - Modify: `src/validation/schemas.ts:33,48,60,235`
@@ -468,6 +494,7 @@ npm run test:unit -- tests/config/performance.test.ts
 ```
 
 Expected output:
+
 ```
 FAIL tests/config/performance.test.ts
  ● Test suite failed to run
@@ -561,6 +588,7 @@ npm run test:unit -- tests/config/performance.test.ts
 ```
 
 Expected output:
+
 ```
 PASS tests/config/performance.test.ts
   Performance Constants
@@ -641,11 +669,20 @@ import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 
 // Replace .substring(0, 50) with .substring(0, LOG_TRUNCATE_LENGTH)
 // customMessageService.ts:278
-console.log('[CustomMessageService] Skipping duplicate message:', msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
+console.log(
+  '[CustomMessageService] Skipping duplicate message:',
+  msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+);
 
 // migrationService.ts:93, 104, 108, 114
-console.log('[MigrationService] Skipping duplicate message:', validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
-console.log('[MigrationService] Migrated message:', validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
+console.log(
+  '[MigrationService] Skipping duplicate message:',
+  validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+);
+console.log(
+  '[MigrationService] Migrated message:',
+  validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+);
 const errorMsg = `Invalid message data: ${message.text?.substring(0, LOG_TRUNCATE_LENGTH)} - ${(error as ZodError).errors[0]?.message}`;
 const errorMsg = `Failed to migrate message: ${message.text?.substring(0, LOG_TRUNCATE_LENGTH)}`;
 ```
@@ -690,6 +727,7 @@ EOF
 ## Task 3: Add Performance Metrics/Monitoring
 
 **Files:**
+
 - Create: `src/services/performanceMonitor.ts`
 - Create: `tests/services/performanceMonitor.test.ts`
 - Modify: `src/services/photoStorageService.ts` (integrate monitoring)
@@ -711,7 +749,7 @@ describe('PerformanceMonitor', () => {
   describe('measureAsync', () => {
     it('measures execution time of async operations', async () => {
       const operation = async () => {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         return 'result';
       };
 
@@ -727,7 +765,7 @@ describe('PerformanceMonitor', () => {
 
     it('tracks multiple executions and calculates average', async () => {
       const operation = async () => {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       };
 
       await performanceMonitor.measureAsync('multi-op', operation);
@@ -746,9 +784,9 @@ describe('PerformanceMonitor', () => {
         throw new Error('Operation failed');
       };
 
-      await expect(
-        performanceMonitor.measureAsync('error-op', operation)
-      ).rejects.toThrow('Operation failed');
+      await expect(performanceMonitor.measureAsync('error-op', operation)).rejects.toThrow(
+        'Operation failed'
+      );
 
       // Error should not be recorded in metrics
       const metrics = performanceMonitor.getMetrics('error-op');
@@ -796,7 +834,7 @@ describe('PerformanceMonitor', () => {
   describe('getReport', () => {
     it('generates human-readable performance report', async () => {
       await performanceMonitor.measureAsync('db-read', async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
       performanceMonitor.recordMetric('db-write', 25.5);
 
@@ -1111,6 +1149,7 @@ EOF
 ## Task 4: Memoize Expensive Slice Computations
 
 **Files:**
+
 - Modify: `src/services/BaseIndexedDBService.ts:225-243` (replace slice with cursor)
 - Modify: `src/services/photoStorageService.ts:197-220` (override with efficient pagination)
 - Create: `tests/services/BaseIndexedDBService.cursor.test.ts`
@@ -1383,9 +1422,9 @@ async function benchmark() {
   performanceMonitor.clear();
 
   // Test various page positions
-  await photoStorageService.getPage(0, 20);     // First page
-  await photoStorageService.getPage(100, 20);   // Middle page
-  await photoStorageService.getPage(400, 20);   // Near end
+  await photoStorageService.getPage(0, 20); // First page
+  await photoStorageService.getPage(100, 20); // Middle page
+  await photoStorageService.getPage(400, 20); // Near end
 
   console.log(performanceMonitor.getReport());
 
@@ -1402,6 +1441,7 @@ npx tsx scripts/benchmark-pagination.ts
 ```
 
 Expected output:
+
 ```
 Performance Metrics Report
 ==================================================
@@ -1456,6 +1496,7 @@ EOF
 ## Task 5: Set Up Code Formatting (Prettier)
 
 **Files:**
+
 - Create: `.prettierrc`
 - Create: `.prettierignore`
 - Modify: `package.json` (add format scripts)
@@ -1636,13 +1677,8 @@ Create `.lintstagedrc.json`:
 
 ```json
 {
-  "*.{ts,tsx,js,jsx}": [
-    "eslint --fix",
-    "prettier --write"
-  ],
-  "*.{json,md,css}": [
-    "prettier --write"
-  ]
+  "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
+  "*.{json,md,css}": ["prettier --write"]
 }
 ```
 
@@ -1739,6 +1775,7 @@ npm run test:e2e -- tests/e2e/photo-pagination.spec.ts
 ### Manual Testing Checklist
 
 **Memory Profiling:**
+
 1. Open browser DevTools → Application → IndexedDB
 2. Verify my-love-db contains photos, messages, moods stores
 3. Upload 5 photos, check storage size increases
@@ -1746,18 +1783,21 @@ npm run test:e2e -- tests/e2e/photo-pagination.spec.ts
 5. Verify quota metrics logged correctly
 
 **Performance Monitoring:**
+
 1. Open browser DevTools → Console
 2. Upload a photo, verify `[PerfMonitor]` logs appear
 3. Run: `import { performanceMonitor } from './services/performanceMonitor'; console.log(performanceMonitor.getReport())`
 4. Verify report shows photo-create, photo-getPage metrics
 
 **Cursor Pagination:**
+
 1. Upload 50 photos (or use existing test data)
 2. Open Photos page, scroll to bottom (triggers pagination)
 3. Check Console for `[PhotoStorage] Retrieved page (cursor): offset=X, limit=20`
 4. Verify photos load smoothly without fetching all items
 
 **Code Formatting:**
+
 1. Open any `.ts` file in VSCode
 2. Make a formatting change (add extra spaces)
 3. Save file (Cmd+S / Ctrl+S)
@@ -1772,6 +1812,7 @@ npm run test:e2e -- tests/e2e/photo-pagination.spec.ts
 **Commits:** 6 (one per task + optional formatting commit)
 
 **Deliverables:**
+
 1. ✅ Comprehensive memory profiling guide (`docs/guides/memory-profiling.md`)
 2. ✅ Centralized performance constants (`src/config/performance.ts`)
 3. ✅ Performance monitoring service (`src/services/performanceMonitor.ts`)
@@ -1779,11 +1820,13 @@ npm run test:e2e -- tests/e2e/photo-pagination.spec.ts
 5. ✅ Prettier configuration with VSCode integration
 
 **Test Coverage:**
+
 - New unit tests: 18 tests added
 - Existing tests: All pass (non-breaking changes)
 - E2E tests: Verified with cursor pagination
 
 **Documentation:**
+
 - Memory profiling methodology guide
 - Performance constants documented with JSDoc
 - PerformanceMonitor usage examples

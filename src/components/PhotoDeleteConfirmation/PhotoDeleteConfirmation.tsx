@@ -74,9 +74,7 @@ export function PhotoDeleteConfirmation({
 
         {/* Content */}
         <div className="px-6 py-4 space-y-4">
-          <p className="text-gray-300">
-            This action cannot be undone.
-          </p>
+          <p className="text-gray-300">This action cannot be undone.</p>
 
           {/* Show photo caption if it exists */}
           {photo.caption && (

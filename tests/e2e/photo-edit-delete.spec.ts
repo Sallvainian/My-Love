@@ -51,7 +51,10 @@ async function uploadTestPhoto(page: any, photoFileName: string, caption?: strin
   await page.click('[data-testid="photo-upload-submit-button"]');
 
   // Wait for upload to complete
-  await page.waitForSelector('[data-testid="photo-upload-modal"]', { state: 'hidden', timeout: 10000 });
+  await page.waitForSelector('[data-testid="photo-upload-modal"]', {
+    state: 'hidden',
+    timeout: 10000,
+  });
   await page.waitForTimeout(300); // Brief pause for IndexedDB write
 }
 
@@ -105,7 +108,12 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
 
   test('AC-4.4.1: Edit button opens edit modal with current photo data', async ({ page }) => {
     // Upload a test photo
-    await uploadTestPhoto(page, 'test-photo.jpg', 'Beach sunset together', 'beach, sunset, memories');
+    await uploadTestPhoto(
+      page,
+      'test-photo.jpg',
+      'Beach sunset together',
+      'beach, sunset, memories'
+    );
 
     // Open carousel
     await openCarousel(page, 0);
@@ -176,7 +184,10 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await saveButton.click();
 
     // Modal should close
-    await page.waitForSelector('[data-testid="photo-edit-modal"]', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('[data-testid="photo-edit-modal"]', {
+      state: 'hidden',
+      timeout: 5000,
+    });
 
     // Verify carousel shows updated caption
     const carouselCaption = page.locator('[data-testid="photo-carousel-caption"]');
@@ -193,7 +204,9 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
 
     // Reopen carousel to verify persistence
     await openCarousel(page, 0);
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Updated caption with new text');
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText(
+      'Updated caption with new text'
+    );
   });
 
   test('AC-4.4.3: Cancel button closes modal without saving', async ({ page }) => {
@@ -238,8 +251,12 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await expect(deleteDialog.locator('text=This action cannot be undone.')).toBeVisible();
 
     // Verify Cancel and Delete buttons
-    await expect(page.locator('[data-testid="photo-delete-confirmation-cancel-button"]')).toBeVisible();
-    await expect(page.locator('[data-testid="photo-delete-confirmation-delete-button"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="photo-delete-confirmation-cancel-button"]')
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-testid="photo-delete-confirmation-delete-button"]')
+    ).toBeVisible();
   });
 
   test('AC-4.4.5: Cancel delete closes dialog without action', async ({ page }) => {
@@ -266,7 +283,9 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await expect(page.locator('[data-testid="photo-gallery-item"]').first()).toBeVisible();
   });
 
-  test('AC-4.4.5, AC-4.4.6: Confirm delete removes photo from IndexedDB and grid', async ({ page }) => {
+  test('AC-4.4.5, AC-4.4.6: Confirm delete removes photo from IndexedDB and grid', async ({
+    page,
+  }) => {
     // Upload a test photo
     await uploadTestPhoto(page, 'test-photo.jpg', 'Test caption', 'test');
 
@@ -281,13 +300,21 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await page.click('[data-testid="photo-delete-confirmation-delete-button"]');
 
     // Dialog should close
-    await page.waitForSelector('[data-testid="photo-delete-confirmation"]', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('[data-testid="photo-delete-confirmation"]', {
+      state: 'hidden',
+      timeout: 5000,
+    });
 
     // Carousel should close (since it was the only photo)
-    await page.waitForSelector('[data-testid="photo-carousel"]', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('[data-testid="photo-carousel"]', {
+      state: 'hidden',
+      timeout: 5000,
+    });
 
     // Verify empty state is shown
-    await expect(page.locator('[data-testid="photo-gallery-empty-state"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="photo-gallery-empty-state"]')).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('AC-4.4.7: Carousel navigates to next photo after delete', async ({ page }) => {
@@ -308,7 +335,10 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await page.click('[data-testid="photo-delete-confirmation-delete-button"]');
 
     // Dialog should close
-    await page.waitForSelector('[data-testid="photo-delete-confirmation"]', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('[data-testid="photo-delete-confirmation"]', {
+      state: 'hidden',
+      timeout: 5000,
+    });
 
     // Carousel should navigate to Photo 3 (which is now at index 1 after Photo 2 is deleted)
     await expect(page.locator('[data-testid="photo-carousel"]')).toBeVisible();
@@ -316,7 +346,9 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await expect(page.locator('[data-testid="photo-carousel-counter"]')).toHaveText('2 / 2');
   });
 
-  test('AC-4.4.7: Carousel navigates to previous photo when deleting last photo', async ({ page }) => {
+  test('AC-4.4.7: Carousel navigates to previous photo when deleting last photo', async ({
+    page,
+  }) => {
     // Upload 3 test photos
     await uploadTestPhoto(page, 'test-photo.jpg', 'Photo 1', 'first');
     await uploadTestPhoto(page, 'test-photo.jpg', 'Photo 2', 'second');
@@ -354,7 +386,10 @@ test.describe('Photo Edit & Delete - Story 4.4', () => {
     await page.click('[data-testid="photo-delete-confirmation-delete-button"]');
 
     // Carousel should close
-    await page.waitForSelector('[data-testid="photo-carousel"]', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('[data-testid="photo-carousel"]', {
+      state: 'hidden',
+      timeout: 5000,
+    });
 
     // Gallery should show empty state
     await expect(page.locator('[data-testid="photo-gallery-empty-state"]')).toBeVisible();

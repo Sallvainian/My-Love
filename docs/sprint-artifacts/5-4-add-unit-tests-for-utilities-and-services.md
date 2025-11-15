@@ -77,8 +77,12 @@ so that I can refactor confidently without breaking functionality.
   - [ ] Create concrete test implementation of abstract BaseIndexedDBService:
     ```typescript
     class TestService extends BaseIndexedDBService<TestItem> {
-      protected getStoreName() { return 'test-items'; }
-      protected async _doInit() { /* minimal schema */ }
+      protected getStoreName() {
+        return 'test-items';
+      }
+      protected async _doInit() {
+        /* minimal schema */
+      }
     }
     ```
   - [ ] Test CRUD operations:
@@ -209,11 +213,13 @@ so that I can refactor confidently without breaking functionality.
 **Why Unit Tests Now (Story 5.4)?**
 
 After completing:
+
 - **Story 5.1**: Store slicing (need to test slices independently)
 - **Story 5.2**: Photo pagination (need to test pagination logic)
 - **Story 5.3**: BaseIndexedDBService (need to test generic base class)
 
 Unit tests provide:
+
 1. **Fast feedback** - 5 second test runs vs 2 minute E2E runs
 2. **Isolated testing** - Test utilities/services without DOM/UI
 3. **Edge case coverage** - Test boundaries, null cases, errors
@@ -254,19 +260,19 @@ Unit tests provide:
 
 **dateHelpers.ts Testing Priorities:**
 
-| Function | Critical Edge Cases | Coverage Target |
-|----------|---------------------|-----------------|
-| `calculateDaysTogether()` | Leap years, DST, same-day, future date | 95% |
-| `formatDate()` | Invalid dates, timezone handling | 90% |
-| `getRelationshipDuration()` | Boundary dates (0 days, 10+ years) | 90% |
+| Function                    | Critical Edge Cases                    | Coverage Target |
+| --------------------------- | -------------------------------------- | --------------- |
+| `calculateDaysTogether()`   | Leap years, DST, same-day, future date | 95%             |
+| `formatDate()`              | Invalid dates, timezone handling       | 90%             |
+| `getRelationshipDuration()` | Boundary dates (0 days, 10+ years)     | 90%             |
 
 **messageRotation.ts Testing Priorities:**
 
-| Function | Critical Edge Cases | Coverage Target |
-|----------|---------------------|-----------------|
-| `selectMessageForDate()` | Determinism, date boundaries, empty library | 95% |
-| `getMessageHistory()` | Empty history, future dates blocked | 90% |
-| `canNavigateForward()` | Today boundary, edge dates | 90% |
+| Function                 | Critical Edge Cases                         | Coverage Target |
+| ------------------------ | ------------------------------------------- | --------------- |
+| `selectMessageForDate()` | Determinism, date boundaries, empty library | 95%             |
+| `getMessageHistory()`    | Empty history, future dates blocked         | 90%             |
+| `canNavigateForward()`   | Today boundary, edge dates                  | 90%             |
 
 **Why 90%+ for utilities?**
 
@@ -276,14 +282,14 @@ Utilities are pure functions (no side effects), easiest to test. High coverage e
 
 **BaseIndexedDBService.ts Testing (Story 5.3 dependency):**
 
-| Method | Test Scenarios | Mock Complexity |
-|--------|----------------|-----------------|
-| `add()` | Success, quota exceeded, transaction error | Medium |
-| `get()` | Found, not found, invalid ID | Low |
-| `getAll()` | Empty store, many items, index usage | Low |
-| `update()` | Partial update, full update, non-existent ID | Medium |
-| `delete()` | Success, non-existent ID (no error) | Low |
-| `getPage()` | First page, middle page, beyond data | Medium |
+| Method      | Test Scenarios                               | Mock Complexity |
+| ----------- | -------------------------------------------- | --------------- |
+| `add()`     | Success, quota exceeded, transaction error   | Medium          |
+| `get()`     | Found, not found, invalid ID                 | Low             |
+| `getAll()`  | Empty store, many items, index usage         | Low             |
+| `update()`  | Partial update, full update, non-existent ID | Medium          |
+| `delete()`  | Success, non-existent ID (no error)          | Low             |
+| `getPage()` | First page, middle page, beyond data         | Medium          |
 
 **fake-indexeddb Usage:**
 
@@ -328,7 +334,7 @@ describe('messagesSlice', () => {
       await store.toggleFavorite(1);
     });
 
-    expect(store.messages.find(m => m.id === 1)?.isFavorite).toBe(true);
+    expect(store.messages.find((m) => m.id === 1)?.isFavorite).toBe(true);
   });
 });
 ```
@@ -338,9 +344,11 @@ describe('messagesSlice', () => {
 ```typescript
 vi.mock('@/services/customMessageService', () => ({
   customMessageService: {
-    getAll: vi.fn().mockResolvedValue([/* test messages */]),
+    getAll: vi.fn().mockResolvedValue([
+      /* test messages */
+    ]),
     update: vi.fn().mockResolvedValue(undefined),
-  }
+  },
 }));
 ```
 
@@ -354,13 +362,13 @@ vi.mock('@/services/customMessageService', () => ({
 
 **Vitest Mocking Patterns:**
 
-| Pattern | Use Case | Example |
-|---------|----------|---------|
-| `vi.fn()` | Mock function calls | `const mockFn = vi.fn().mockReturnValue(42)` |
-| `vi.spyOn()` | Spy on existing methods | `vi.spyOn(service, 'getAll')` |
-| `vi.mock()` | Auto-mock module | `vi.mock('@/services/customMessageService')` |
-| `vi.useFakeTimers()` | Control time/dates | `vi.setSystemTime(new Date('2024-01-01'))` |
-| `vi.clearAllMocks()` | Reset between tests | `afterEach(() => vi.clearAllMocks())` |
+| Pattern              | Use Case                | Example                                      |
+| -------------------- | ----------------------- | -------------------------------------------- |
+| `vi.fn()`            | Mock function calls     | `const mockFn = vi.fn().mockReturnValue(42)` |
+| `vi.spyOn()`         | Spy on existing methods | `vi.spyOn(service, 'getAll')`                |
+| `vi.mock()`          | Auto-mock module        | `vi.mock('@/services/customMessageService')` |
+| `vi.useFakeTimers()` | Control time/dates      | `vi.setSystemTime(new Date('2024-01-01'))`   |
+| `vi.clearAllMocks()` | Reset between tests     | `afterEach(() => vi.clearAllMocks())`        |
 
 **Custom Test Utilities (to create):**
 
@@ -393,13 +401,13 @@ export function createMockPhoto(overrides = {}) {
 
 **Target: <5 seconds for all unit tests**
 
-| Optimization | Expected Speedup | Trade-off |
-|--------------|------------------|-----------|
-| **Parallel execution** | 2-4x | None (Vitest default) |
-| **Mocking IndexedDB** | 5-10x | Doesn't catch real DB issues |
-| **Fake timers** | Instant | Must remember to restore |
-| **Shared fixtures** | 20-30% | Test isolation risk |
-| **Focused imports** | 10-15% | Code organization |
+| Optimization           | Expected Speedup | Trade-off                    |
+| ---------------------- | ---------------- | ---------------------------- |
+| **Parallel execution** | 2-4x             | None (Vitest default)        |
+| **Mocking IndexedDB**  | 5-10x            | Doesn't catch real DB issues |
+| **Fake timers**        | Instant          | Must remember to restore     |
+| **Shared fixtures**    | 20-30%           | Test isolation risk          |
+| **Focused imports**    | 10-15%           | Code organization            |
 
 **Baseline Measurement:**
 
@@ -529,9 +537,10 @@ tests/
 ```
 
 Update `vitest.config.ts`:
+
 ```typescript
 test: {
-  include: ['tests/unit/**/*.test.ts', 'src/**/*.test.ts']
+  include: ['tests/unit/**/*.test.ts', 'src/**/*.test.ts'];
 }
 ```
 
@@ -563,18 +572,19 @@ test: {
 
 **Coverage Targets (from Tech Spec):**
 
-| File/Module | Target Coverage | Rationale |
-|-------------|-----------------|-----------|
-| `dateHelpers.ts` | 90%+ | Pure functions, easy to test |
-| `messageRotation.ts` | 90%+ | Critical algorithm, deterministic |
-| `BaseIndexedDBService.ts` | 85%+ | Generic base, some abstract methods |
-| Service implementations | 80%+ | Service-specific logic only |
-| Store slices | 75%+ | Integration-heavy, E2E coverage exists |
-| **Overall** | **80%+** | Epic-level acceptance criteria |
+| File/Module               | Target Coverage | Rationale                              |
+| ------------------------- | --------------- | -------------------------------------- |
+| `dateHelpers.ts`          | 90%+            | Pure functions, easy to test           |
+| `messageRotation.ts`      | 90%+            | Critical algorithm, deterministic      |
+| `BaseIndexedDBService.ts` | 85%+            | Generic base, some abstract methods    |
+| Service implementations   | 80%+            | Service-specific logic only            |
+| Store slices              | 75%+            | Integration-heavy, E2E coverage exists |
+| **Overall**               | **80%+**        | Epic-level acceptance criteria         |
 
 ### Key Risks and Mitigation
 
 **Risk 1: Story 5.3 (BaseIndexedDBService) not complete before Story 5.4**
+
 - **Likelihood**: Medium (Story 5.3 is only drafted)
 - **Impact**: Medium (can't test base class, delays Story 5.4)
 - **Mitigation**:
@@ -583,6 +593,7 @@ test: {
   - Use TDD: write base class tests to help drive Story 5.3 implementation
 
 **Risk 2: Achieving 80% coverage takes longer than expected**
+
 - **Likelihood**: Medium
 - **Impact**: Low (can ship with lower coverage initially)
 - **Mitigation**:
@@ -591,6 +602,7 @@ test: {
   - Plan follow-up story to increase coverage if needed
 
 **Risk 3: Tests run slower than 5 second target**
+
 - **Likelihood**: Low
 - **Impact**: Low (minor DX degradation)
 - **Mitigation**:
@@ -599,6 +611,7 @@ test: {
   - Profile slow tests and optimize setup/teardown
 
 **Risk 4: fake-indexeddb doesn't match real IndexedDB behavior**
+
 - **Likelihood**: Low
 - **Impact**: Medium (tests pass but real DB fails)
 - **Mitigation**:
@@ -607,6 +620,7 @@ test: {
   - Run manual testing with real browser IndexedDB
 
 **Risk 5: Store slice tests break due to Story 5.1 refactoring**
+
 - **Likelihood**: Low (Story 5.1 maintains API compatibility)
 - **Impact**: Medium (tests need rewrite)
 - **Mitigation**:
@@ -618,15 +632,15 @@ test: {
 
 **When to Write Unit Tests vs E2E Tests:**
 
-| Scenario | Test Type | Rationale |
-|----------|-----------|-----------|
-| Date calculation logic | Unit | Pure function, many edge cases |
-| Message rotation algorithm | Unit | Complex algorithm, deterministic |
-| Service CRUD operations | Unit | Fast feedback, isolated testing |
-| Store state updates | Unit | Logic verification without UI |
-| User clicking favorite button | E2E | User flow, real DOM interaction |
-| Photo upload and display | E2E | Integration of multiple components |
-| Settings persistence | E2E | Crosses LocalStorage boundary |
+| Scenario                      | Test Type | Rationale                          |
+| ----------------------------- | --------- | ---------------------------------- |
+| Date calculation logic        | Unit      | Pure function, many edge cases     |
+| Message rotation algorithm    | Unit      | Complex algorithm, deterministic   |
+| Service CRUD operations       | Unit      | Fast feedback, isolated testing    |
+| Store state updates           | Unit      | Logic verification without UI      |
+| User clicking favorite button | E2E       | User flow, real DOM interaction    |
+| Photo upload and display      | E2E       | Integration of multiple components |
+| Settings persistence          | E2E       | Crosses LocalStorage boundary      |
 
 **Arrange-Act-Assert Pattern:**
 
@@ -668,6 +682,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 **Implementation Status: Partially Complete**
 
 **Completed:**
+
 1. ✅ Installed and configured Vitest with fake-indexeddb and @vitest/coverage-v8
 2. ✅ Updated vitest.config.ts with coverage thresholds (80%), test patterns, and path aliases
 3. ✅ Created test setup file (tests/setup.ts) with IndexedDB polyfill configuration
@@ -677,6 +692,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 7. ✅ Comprehensive tests for BaseIndexedDBService.ts - **94.73% coverage** (31 tests)
 
 **Coverage Achieved:**
+
 - **dateHelpers.ts**: 100% lines, 82.6% branches, 100% functions (Target: 90%+) ✅
 - **messageRotation.ts**: 100% lines, 94.28% branches, 100% functions (Target: 90%+) ✅
 - **BaseIndexedDBService.ts**: 94.73% lines, 100% branches, 100% functions (Target: 85%+) ✅
@@ -684,6 +700,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - **Execution time**: <1 second (267ms) - Well under 5-second target ✅
 
 **Not Completed (Out of Scope for Current Session):**
+
 - ❌ Tests for customMessageService.ts (target 80%+)
 - ❌ Tests for photoStorageService.ts (target 80%+)
 - ❌ Tests for Zustand store slices (target 75%+)
@@ -692,6 +709,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - ❌ tests/README.md documentation
 
 **Technical Challenges Encountered:**
+
 1. **Timezone Issues with Fake Timers**: Initial tests using `vi.useFakeTimers()` and UTC dates (`new Date('2024-01-15T00:00:00Z')`) failed due to timezone conversions. Solution: Used local time dates (`new Date(2024, 0, 15)`) to avoid UTC/local timezone mismatches.
 
 2. **IndexedDB Polyfill Setup**: Required global setup in tests/setup.ts to properly reset fake-indexeddb between tests using `beforeEach(() => globalThis.indexedDB = new IDBFactory())`.
@@ -699,6 +717,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 3. **Abstract Class Testing**: Created concrete `TestService` implementation to test abstract `BaseIndexedDBService` methods, which is the correct pattern for testing abstract classes.
 
 **Key Learnings:**
+
 - Vitest fake timers work differently than Jest for Date objects - prefer real dates for timezone-sensitive tests
 - fake-indexeddb requires explicit reset between tests to avoid state leakage
 - Co-locating test utilities (testHelpers.ts) significantly reduces test boilerplate
@@ -706,6 +725,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - BaseIndexedDBService abstraction significantly reduces future test writing (80% duplication removed)
 
 **Performance Notes:**
+
 - Unit tests execute in <300ms for 180 tests
 - Coverage report generation adds ~200ms
 - Well under 5-second performance target even with coverage enabled
@@ -714,6 +734,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 ### File List
 
 **Files Created:**
+
 - NEW: /home/sallvain/dev/personal/My-Love/tests/setup.ts - Global test setup with IndexedDB polyfill
 - NEW: /home/sallvain/dev/personal/My-Love/tests/unit/utils/testHelpers.ts - Shared test utilities and factory functions
 - NEW: /home/sallvain/dev/personal/My-Love/tests/unit/utils/dateHelpers.test.ts - 41 tests, 100% coverage
@@ -721,10 +742,12 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - NEW: /home/sallvain/dev/personal/My-Love/tests/unit/services/BaseIndexedDBService.test.ts - 31 tests, 94.73% coverage
 
 **Files Modified:**
+
 - MODIFIED: /home/sallvain/dev/personal/My-Love/vitest.config.ts - Added coverage thresholds, path aliases, and setup files
 - MODIFIED: /home/sallvain/dev/personal/My-Love/package.json - Added fake-indexeddb and @vitest/coverage-v8 dependencies
 
 **Files Not Created (Deferred):**
+
 - tests/unit/services/customMessageService.test.ts
 - tests/unit/services/photoStorageService.test.ts
 - tests/unit/stores/slices/messagesSlice.test.ts
@@ -735,6 +758,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 **Recommendation:**
 Continue with service and store tests in a follow-up session to reach 80% overall coverage threshold. The foundation is solid with:
+
 - Test infrastructure fully configured
 - Test utilities ready for reuse
 - Base service class tested (reduces future test duplication)
@@ -761,16 +785,16 @@ The implementation demonstrates excellent quality for the portions completed (ut
 
 ### Acceptance Criteria Validation
 
-| AC | Requirement | Status | Evidence | Severity |
-|----|-------------|--------|----------|----------|
-| AC-1 | Set up Vitest for unit testing | ✅ IMPLEMENTED | `/home/sallvain/dev/personal/My-Love/vitest.config.ts:1-36`<br>- Vitest configured with v8 coverage provider<br>- happy-dom environment<br>- Test patterns and setup files configured | None |
-| AC-2 | Add tests for utility functions | ✅ IMPLEMENTED | `/home/sallvain/dev/personal/My-Love/tests/unit/utils/dateHelpers.test.ts:1-237` (41 tests, 100% coverage)<br>`/home/sallvain/dev/personal/My-Love/tests/unit/utils/messageRotation.test.ts:1-447` (73 tests, 100% coverage) | None |
-| AC-3 | Add tests for service layer | 🟡 PARTIAL | `/home/sallvain/dev/personal/My-Love/tests/unit/services/BaseIndexedDBService.test.ts:1-404` (31 tests, 94.73% coverage)<br>**MISSING:** customMessageService.test.ts (0% coverage)<br>**MISSING:** photoStorageService.test.ts (0% coverage) | MEDIUM |
-| AC-4 | Add tests for Zustand store slices | ❌ MISSING | **NO TESTS FOUND**<br>- messagesSlice.ts: 0% coverage<br>- photosSlice.ts: 0% coverage<br>- settingsSlice.ts: 0% coverage<br>- moodSlice.ts: 0% coverage<br>- navigationSlice.ts: 0% coverage | HIGH |
-| AC-5 | Achieve 80%+ code coverage | ❌ MISSING | **ACTUAL: 12.87% overall project coverage**<br>- dateHelpers.ts: 100% ✅<br>- messageRotation.ts: 100% ✅<br>- BaseIndexedDBService.ts: 94.73% ✅<br>- customMessageService.ts: 0% ❌<br>- photoStorageService.ts: 0% ❌<br>- All store slices: 0% ❌<br>**Coverage errors in CI:**<br>- Lines: 12.87% (target: 80%)<br>- Functions: 12.8% (target: 80%)<br>- Statements: 12.95% (target: 80%)<br>- Branches: 10.06% (target: 80%) | CRITICAL |
-| AC-6 | Tests run in under 5 seconds | ✅ IMPLEMENTED | Test execution: <1 second (267ms for 180 tests)<br>Well under 5-second target | None |
-| AC-7 | Configure test scripts | ✅ IMPLEMENTED | `/home/sallvain/dev/personal/My-Love/package.json:11-14`<br>- `test:unit` ✅<br>- `test:unit:watch` ✅<br>- `test:unit:ui` ✅<br>- `test:unit:coverage` ✅ | None |
-| AC-8 | Document testing approach | ❌ MISSING | **NO tests/README.md FOUND**<br>Required documentation not created | HIGH |
+| AC   | Requirement                        | Status         | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                           | Severity |
+| ---- | ---------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| AC-1 | Set up Vitest for unit testing     | ✅ IMPLEMENTED | `/home/sallvain/dev/personal/My-Love/vitest.config.ts:1-36`<br>- Vitest configured with v8 coverage provider<br>- happy-dom environment<br>- Test patterns and setup files configured                                                                                                                                                                                                                                              | None     |
+| AC-2 | Add tests for utility functions    | ✅ IMPLEMENTED | `/home/sallvain/dev/personal/My-Love/tests/unit/utils/dateHelpers.test.ts:1-237` (41 tests, 100% coverage)<br>`/home/sallvain/dev/personal/My-Love/tests/unit/utils/messageRotation.test.ts:1-447` (73 tests, 100% coverage)                                                                                                                                                                                                       | None     |
+| AC-3 | Add tests for service layer        | 🟡 PARTIAL     | `/home/sallvain/dev/personal/My-Love/tests/unit/services/BaseIndexedDBService.test.ts:1-404` (31 tests, 94.73% coverage)<br>**MISSING:** customMessageService.test.ts (0% coverage)<br>**MISSING:** photoStorageService.test.ts (0% coverage)                                                                                                                                                                                      | MEDIUM   |
+| AC-4 | Add tests for Zustand store slices | ❌ MISSING     | **NO TESTS FOUND**<br>- messagesSlice.ts: 0% coverage<br>- photosSlice.ts: 0% coverage<br>- settingsSlice.ts: 0% coverage<br>- moodSlice.ts: 0% coverage<br>- navigationSlice.ts: 0% coverage                                                                                                                                                                                                                                      | HIGH     |
+| AC-5 | Achieve 80%+ code coverage         | ❌ MISSING     | **ACTUAL: 12.87% overall project coverage**<br>- dateHelpers.ts: 100% ✅<br>- messageRotation.ts: 100% ✅<br>- BaseIndexedDBService.ts: 94.73% ✅<br>- customMessageService.ts: 0% ❌<br>- photoStorageService.ts: 0% ❌<br>- All store slices: 0% ❌<br>**Coverage errors in CI:**<br>- Lines: 12.87% (target: 80%)<br>- Functions: 12.8% (target: 80%)<br>- Statements: 12.95% (target: 80%)<br>- Branches: 10.06% (target: 80%) | CRITICAL |
+| AC-6 | Tests run in under 5 seconds       | ✅ IMPLEMENTED | Test execution: <1 second (267ms for 180 tests)<br>Well under 5-second target                                                                                                                                                                                                                                                                                                                                                      | None     |
+| AC-7 | Configure test scripts             | ✅ IMPLEMENTED | `/home/sallvain/dev/personal/My-Love/package.json:11-14`<br>- `test:unit` ✅<br>- `test:unit:watch` ✅<br>- `test:unit:ui` ✅<br>- `test:unit:coverage` ✅                                                                                                                                                                                                                                                                         | None     |
+| AC-8 | Document testing approach          | ❌ MISSING     | **NO tests/README.md FOUND**<br>Required documentation not created                                                                                                                                                                                                                                                                                                                                                                 | HIGH     |
 
 **AC Coverage Summary:** 4 of 8 acceptance criteria fully implemented (50%)
 
@@ -779,6 +803,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 ### Task Completion Validation
 
 #### Task 1: Install and Configure Vitest ✅ COMPLETE
+
 - [x] Install Vitest dependencies → **VERIFIED**: package.json includes vitest@4.0.9, @vitest/ui@4.0.9
 - [x] Install fake-indexeddb → **VERIFIED**: package.json includes fake-indexeddb@6.2.5
 - [x] Create vitest.config.ts → **VERIFIED**: vitest.config.ts:1-36 with proper configuration
@@ -788,6 +813,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Status:** ✅ All subtasks verified complete with evidence
 
 #### Task 2: Test Utility Functions - Date Helpers ✅ COMPLETE
+
 - [x] Create dateHelpers.test.ts → **VERIFIED**: tests/unit/utils/dateHelpers.test.ts:1-237
 - [x] Test calculateDaysTogether() → **VERIFIED**: Covered by getDaysSince/getDaysUntil tests (lines 115-125)
 - [x] Test date formatting → **VERIFIED**: formatDateISO, formatDateLong, formatDateShort tests (lines 56-93)
@@ -797,6 +823,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Status:** ✅ All subtasks verified complete, exceeds coverage target
 
 #### Task 3: Test Utility Functions - Message Rotation ✅ COMPLETE
+
 - [x] Create messageRotation.test.ts → **VERIFIED**: tests/unit/utils/messageRotation.test.ts:1-447
 - [x] Test message selection algorithm → **VERIFIED**: getDailyMessage tests with determinism validation (lines 85-165)
 - [x] Test message history → **VERIFIED**: getAvailableHistoryDays tests (lines 180-247)
@@ -806,6 +833,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Status:** ✅ All subtasks verified complete, exceeds coverage target
 
 #### Task 4: Test Service Layer - BaseIndexedDBService ✅ COMPLETE
+
 - [x] Create BaseIndexedDBService.test.ts → **VERIFIED**: tests/unit/services/BaseIndexedDBService.test.ts:1-404
 - [x] Set up fake-indexeddb → **VERIFIED**: tests/setup.ts:6-31 with proper reset logic
 - [x] Create concrete test implementation → **VERIFIED**: TestService class (lines 19-36)
@@ -818,6 +846,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Status:** ✅ All subtasks verified complete, exceeds coverage target
 
 #### Task 5: Test Service Layer - Specific Services ❌ NOT STARTED
+
 - [ ] Create customMessageService.test.ts → **NOT FOUND**: File does not exist, 0% coverage
 - [ ] Create photoStorageService.test.ts → **NOT FOUND**: File does not exist, 0% coverage
 - [ ] Achieve 80%+ coverage → **FAILED**: Both services at 0% coverage
@@ -826,6 +855,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Severity:** HIGH - Critical services completely untested
 
 #### Task 6: Test Zustand Store Slices ❌ NOT STARTED
+
 - [ ] Create messagesSlice.test.ts → **NOT FOUND**: File does not exist, 0% coverage
 - [ ] Create photosSlice.test.ts → **NOT FOUND**: File does not exist, 0% coverage
 - [ ] Create settingsSlice.test.ts → **NOT FOUND**: File does not exist, 0% coverage
@@ -836,6 +866,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Severity:** HIGH - State management completely untested
 
 #### Task 7: Verify Coverage Thresholds Met ❌ FAILED
+
 - [ ] Run coverage report → **EXECUTED**: Coverage ran successfully
 - [ ] Review coverage targets → **FAILED**: Overall coverage 12.87% vs 80% target
 - [ ] Document untested code → **NOT FOUND**: No documentation of coverage gaps
@@ -844,6 +875,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Severity:** CRITICAL - Project coverage threshold enforcement will fail in CI
 
 #### Task 8: Optimize Test Performance ✅ COMPLETE
+
 - [x] Run tests and measure time → **VERIFIED**: 267ms execution time
 - [x] Target <5 seconds → **VERIFIED**: Well under target
 - [x] Optimizations if needed → **VERIFIED**: Parallel execution enabled
@@ -854,6 +886,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Severity:** LOW - Performance met, only documentation missing
 
 #### Task 9: Configure CI Coverage Enforcement ❌ NOT STARTED
+
 - [ ] Update CI workflow → **NOT FOUND**: No CI configuration changes detected
 - [ ] Add coverage badge → **NOT APPLICABLE**: Optional item
 - [ ] Test CI workflow → **NOT VERIFIED**: Cannot verify without CI changes
@@ -862,6 +895,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **Severity:** MEDIUM - CI will fail on coverage thresholds without adjustment
 
 #### Task 10: Document Testing Approach ❌ NOT STARTED
+
 - [ ] Create tests/README.md → **NOT FOUND**: File does not exist (AC-8 failure)
 - [ ] Add examples → **NOT APPLICABLE**: No documentation to contain examples
 - [ ] Document guidelines → **NOT APPLICABLE**: No documentation exists
@@ -878,6 +912,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 #### Test Infrastructure ⭐⭐⭐⭐⭐ (5/5)
 
 **Strengths:**
+
 1. **Excellent Vitest Configuration** (`vitest.config.ts`)
    - Proper path aliases configured (`@` → `./src`)
    - happy-dom environment (lightweight, fast)
@@ -902,6 +937,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 #### Test Quality - dateHelpers.test.ts ⭐⭐⭐⭐ (4/5)
 
 **Strengths:**
+
 1. **Comprehensive Coverage** (100% lines, 82.6% branches)
    - All 14 exported functions tested
    - Both positive and negative test cases
@@ -918,6 +954,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
    - Tests immutability (addDays doesn't mutate original)
 
 **Issues:**
+
 1. **Missing Edge Cases** (MINOR)
    - `getDaysUntil` line 98: Mutation of input date (`targetDate.setHours(...)`) not tested
    - `isPast` line 138: Mutation of input date not tested
@@ -936,6 +973,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 #### Test Quality - messageRotation.test.ts ⭐⭐⭐⭐⭐ (5/5)
 
 **Strengths:**
+
 1. **Outstanding Coverage** (100% lines, 94.28% branches)
    - All 10 exported functions tested (including deprecated legacy functions)
    - Determinism validation (critical for message rotation algorithm)
@@ -959,6 +997,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
    - Proper TypeScript typing throughout
 
 **Issues:**
+
 1. **Minor Uncovered Branch** (line 190 - 94.28% branch coverage)
    - Last branch in `formatRelationshipDuration` when years with no remaining months
    - **Impact:** NEGLIGIBLE - Main functionality covered, edge case only
@@ -969,6 +1008,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 #### Test Quality - BaseIndexedDBService.test.ts ⭐⭐⭐⭐⭐ (5/5)
 
 **Strengths:**
+
 1. **Exceptional Coverage** (94.73% lines, 100% branches, 100% functions)
    - All public methods tested (init, add, get, getAll, update, delete, clear, getPage)
    - All error handling paths tested
@@ -1010,6 +1050,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
    - Parallel read operations (data consistency)
 
 **Issues:**
+
 1. **Uncovered Lines** (94.73% - lines 168-169, 185-186)
    - Line 168-169: Error path in `delete()` method
    - Line 185-186: Error path in `clear()` method
@@ -1022,6 +1063,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 #### Missing Test Coverage - Critical Gaps 🔴🔴🔴
 
 **1. customMessageService.ts - 0% Coverage** (HIGH SEVERITY)
+
 - **Lines of Code:** 279 lines (estimated)
 - **Public Methods Untested:**
   - `getActiveCustomMessages()` - Filters active messages from all custom messages
@@ -1034,6 +1076,7 @@ The implementation demonstrates excellent quality for the portions completed (ut
 - **Estimated Effort:** 2-3 hours
 
 **2. photoStorageService.ts - 0% Coverage** (HIGH SEVERITY)
+
 - **Lines of Code:** 126 lines (estimated)
 - **Public Methods Untested:**
   - `getStorageSize()` - Calculates total photo storage
@@ -1047,18 +1090,21 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **3. Store Slices - 0% Coverage** (HIGH SEVERITY)
 
 **messagesSlice.ts** (483 lines, 0% coverage)
+
 - Untested state management logic
 - Untested service integration
 - Untested action creators
 - Estimated 25-30 tests needed
 
 **photosSlice.ts** (219 lines, 0% coverage)
+
 - Untested photo state management
 - Untested pagination state
 - Untested photo CRUD actions
 - Estimated 20-25 tests needed
 
 **settingsSlice.ts** (200 lines, 0% coverage)
+
 - Untested settings persistence
 - Untested theme switching
 - Untested notification preferences
@@ -1074,11 +1120,13 @@ The implementation demonstrates excellent quality for the portions completed (ut
 ### Architecture & Standards Compliance
 
 #### ✅ Test Organization
+
 - Co-located test utilities in `tests/unit/utils/testHelpers.ts` (reusable across tests)
 - Consistent file naming: `*.test.ts` convention followed
 - Proper test categorization: `tests/unit/` directory structure
 
 #### ✅ Testing Best Practices
+
 - Arrange-Act-Assert pattern used consistently
 - Descriptive test names following "it does X when Y" format
 - Proper setup/teardown with beforeEach/afterEach
@@ -1086,18 +1134,21 @@ The implementation demonstrates excellent quality for the portions completed (ut
 - Mock data created via factory functions (DRY principle)
 
 #### ✅ TypeScript Usage
+
 - Full TypeScript usage in all tests
 - Proper type imports from source code
 - Type-safe test helpers with generics
 - No `any` types except intentional use in BaseIndexedDBService private access
 
 #### ✅ Performance Optimization
+
 - Parallel test execution (Vitest default)
 - Fake IndexedDB (no real I/O)
 - Fake timers (instant time manipulation)
 - Execution time: 267ms for 180 tests (well under 5s target)
 
 #### ❌ Documentation Gap
+
 - **MISSING:** tests/README.md (AC-8, Task 10)
 - **Impact:** Future developers lack testing guidelines
 - **Required Content:**
@@ -1114,12 +1165,14 @@ The implementation demonstrates excellent quality for the portions completed (ut
 **No security issues identified in test code.**
 
 Test infrastructure properly isolated:
+
 - Tests use fake-indexeddb (no real data persistence)
 - No network calls in tests
 - No sensitive data in test fixtures
 - Proper cleanup prevents test pollution
 
 **Production Services (Untested - Risk Assessment):**
+
 - customMessageService import/export: **MEDIUM RISK** - Data validation untested
 - photoStorageService quota: **LOW RISK** - Graceful degradation expected
 - Store slices: **LOW RISK** - State management, not security-critical
@@ -1130,14 +1183,15 @@ Test infrastructure properly isolated:
 
 **Test Execution Performance:** ⭐⭐⭐⭐⭐ (5/5)
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Total execution time | <5s | 267ms | ✅ 18x better than target |
-| Tests per second | - | ~674 tests/sec | ✅ Excellent |
-| Coverage generation | - | +200ms overhead | ✅ Acceptable |
-| Watch mode responsiveness | <1s | Instant | ✅ Excellent |
+| Metric                    | Target | Actual          | Status                    |
+| ------------------------- | ------ | --------------- | ------------------------- |
+| Total execution time      | <5s    | 267ms           | ✅ 18x better than target |
+| Tests per second          | -      | ~674 tests/sec  | ✅ Excellent              |
+| Coverage generation       | -      | +200ms overhead | ✅ Acceptable             |
+| Watch mode responsiveness | <1s    | Instant         | ✅ Excellent              |
 
 **Performance Optimizations Applied:**
+
 1. Parallel test execution (Vitest default)
 2. Fake IndexedDB (eliminates async I/O delays)
 3. Fake timers (instant time manipulation)
@@ -1150,13 +1204,13 @@ Test infrastructure properly isolated:
 
 ### Severity Summary
 
-| Severity | Count | Issues |
-|----------|-------|--------|
-| 🔴 CRITICAL | 1 | Overall coverage 12.87% vs 80% target (AC-5, Task 7) |
-| 🟠 HIGH | 4 | Missing service tests (AC-3, Task 5)<br>Missing store tests (AC-4, Task 6)<br>Missing documentation (AC-8, Task 10)<br>CI not configured (Task 9) |
-| 🟡 MEDIUM | 0 | - |
-| 🟢 LOW | 2 | dateHelpers edge cases<br>Performance baseline not documented |
-| ⚪ NEGLIGIBLE | 2 | messageRotation branch (line 190)<br>BaseIndexedDBService lines (168-169, 185-186) |
+| Severity      | Count | Issues                                                                                                                                            |
+| ------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔴 CRITICAL   | 1     | Overall coverage 12.87% vs 80% target (AC-5, Task 7)                                                                                              |
+| 🟠 HIGH       | 4     | Missing service tests (AC-3, Task 5)<br>Missing store tests (AC-4, Task 6)<br>Missing documentation (AC-8, Task 10)<br>CI not configured (Task 9) |
+| 🟡 MEDIUM     | 0     | -                                                                                                                                                 |
+| 🟢 LOW        | 2     | dateHelpers edge cases<br>Performance baseline not documented                                                                                     |
+| ⚪ NEGLIGIBLE | 2     | messageRotation branch (line 190)<br>BaseIndexedDBService lines (168-169, 185-186)                                                                |
 
 ---
 
@@ -1165,6 +1219,7 @@ Test infrastructure properly isolated:
 #### Critical Findings
 
 **1. Coverage Threshold Failure (CRITICAL)**
+
 - **Issue:** Overall project coverage 12.87% vs 80% requirement
 - **Impact:** CI will fail, story cannot be marked "done"
 - **Root Cause:** Only 3 of 6 target file categories tested (utilities ✅, base service ✅, services ❌, stores ❌)
@@ -1175,6 +1230,7 @@ Test infrastructure properly isolated:
   - Alternative: Adjust vitest.config.ts coverage thresholds to utilities/services only: `include: ['src/utils/**', 'src/services/**']`
 
 **Evidence:**
+
 ```
 ERROR: Coverage for lines (12.87%) does not meet global threshold (80%)
 ERROR: Coverage for functions (12.8%) does not meet global threshold (80%)
@@ -1185,6 +1241,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 #### High Severity Findings
 
 **2. Missing Service Tests (HIGH)**
+
 - **Issue:** customMessageService.ts and photoStorageService.ts have 0% coverage
 - **Impact:** Service-specific logic (filtering, export/import, quota management) completely untested
 - **Recommendation:**
@@ -1196,6 +1253,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 - **Estimated Effort:** 4-6 hours total
 
 **3. Missing Store Tests (HIGH)**
+
 - **Issue:** All Zustand store slices have 0% coverage
 - **Impact:** State management logic untested, action creators untested, service integration untested
 - **Recommendation:**
@@ -1208,6 +1266,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 - **Estimated Effort:** 6-8 hours total
 
 **4. Missing Documentation (HIGH)**
+
 - **Issue:** tests/README.md does not exist (AC-8 failure)
 - **Impact:** Future developers lack testing guidelines, patterns, examples
 - **Recommendation:**
@@ -1222,6 +1281,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 - **Estimated Effort:** 1-2 hours
 
 **5. CI Configuration Not Updated (HIGH)**
+
 - **Issue:** No CI workflow changes detected for coverage enforcement
 - **Impact:** Coverage failures won't block merges, technical debt accumulates
 - **Recommendation:**
@@ -1235,12 +1295,14 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 #### Low Severity Findings
 
 **6. dateHelpers Input Mutation (LOW)**
+
 - **Issue:** Functions mutate input dates (`setHours()`) - not tested
 - **Impact:** Potential bugs if callers rely on immutability
 - **Recommendation:** Add immutability tests or refactor to not mutate inputs
 - **Estimated Effort:** 30 minutes
 
 **7. Performance Baseline Not Documented (LOW)**
+
 - **Issue:** Performance excellent (267ms) but not documented in tests/README.md
 - **Impact:** Future regressions harder to detect
 - **Recommendation:** Document baseline in tests/README.md: "180 tests in ~300ms"
@@ -1250,12 +1312,12 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 
 ### Detailed Test Quality Scores
 
-| Test File | Coverage | Test Count | Quality Score | Notes |
-|-----------|----------|------------|---------------|-------|
-| dateHelpers.test.ts | 100% lines, 82.6% branches | 41 | ⭐⭐⭐⭐ (4/5) | Excellent coverage, minor edge cases missing |
-| messageRotation.test.ts | 100% lines, 94.28% branches | 73 | ⭐⭐⭐⭐⭐ (5/5) | Outstanding algorithm testing, determinism validated |
-| BaseIndexedDBService.test.ts | 94.73% lines, 100% branches | 31 | ⭐⭐⭐⭐⭐ (5/5) | Perfect abstract class testing pattern |
-| testHelpers.ts | N/A | N/A | ⭐⭐⭐⭐⭐ (5/5) | Reusable, type-safe factory functions |
+| Test File                    | Coverage                    | Test Count | Quality Score    | Notes                                                |
+| ---------------------------- | --------------------------- | ---------- | ---------------- | ---------------------------------------------------- |
+| dateHelpers.test.ts          | 100% lines, 82.6% branches  | 41         | ⭐⭐⭐⭐ (4/5)   | Excellent coverage, minor edge cases missing         |
+| messageRotation.test.ts      | 100% lines, 94.28% branches | 73         | ⭐⭐⭐⭐⭐ (5/5) | Outstanding algorithm testing, determinism validated |
+| BaseIndexedDBService.test.ts | 94.73% lines, 100% branches | 31         | ⭐⭐⭐⭐⭐ (5/5) | Perfect abstract class testing pattern               |
+| testHelpers.ts               | N/A                         | N/A        | ⭐⭐⭐⭐⭐ (5/5) | Reusable, type-safe factory functions                |
 
 **Average Quality Score:** 4.75/5 (Excellent)
 
@@ -1264,16 +1326,19 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 ### Technical Debt Assessment
 
 **Test Infrastructure Debt:** ✅ NONE
+
 - Vitest configuration production-ready
 - Test setup robust and maintainable
 - Test helpers reusable and clean
 
 **Test Coverage Debt:** 🔴 HIGH
+
 - ~1,100 lines of production code untested
 - 60-80 additional tests needed
 - 8-12 hours of implementation effort
 
 **Documentation Debt:** 🟠 MEDIUM
+
 - tests/README.md missing
 - Performance baseline not documented
 - 1-2 hours to resolve
@@ -1300,6 +1365,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 ### Recommended Action Items
 
 #### Immediate (Must Complete Before "Done")
+
 1. 🔴 **Implement Service Tests** (4-6 hours)
    - customMessageService.test.ts with 80%+ coverage
    - photoStorageService.test.ts with 80%+ coverage
@@ -1319,6 +1385,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
    - Enforce coverage thresholds
 
 #### Follow-Up (Nice to Have)
+
 5. 🟡 **Add Missing Edge Cases** (1-2 hours)
    - dateHelpers immutability tests
    - formatCountdown boundary tests
@@ -1335,6 +1402,7 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 ### Evidence of Implementation
 
 #### Files Created (5 files)
+
 1. `/home/sallvain/dev/personal/My-Love/tests/setup.ts` - Global test setup ✅
 2. `/home/sallvain/dev/personal/My-Love/tests/unit/utils/testHelpers.ts` - Test utilities ✅
 3. `/home/sallvain/dev/personal/My-Love/tests/unit/utils/dateHelpers.test.ts` - 41 tests ✅
@@ -1342,10 +1410,12 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 5. `/home/sallvain/dev/personal/My-Love/tests/unit/services/BaseIndexedDBService.test.ts` - 31 tests ✅
 
 #### Files Modified (2 files)
+
 1. `/home/sallvain/dev/personal/My-Love/vitest.config.ts` - Coverage config ✅
 2. `/home/sallvain/dev/personal/My-Love/package.json` - Test scripts and dependencies ✅
 
 #### Files Not Created (Expected but Missing)
+
 1. ❌ `tests/unit/services/customMessageService.test.ts`
 2. ❌ `tests/unit/services/photoStorageService.test.ts`
 3. ❌ `tests/unit/stores/slices/messagesSlice.test.ts`
@@ -1362,12 +1432,14 @@ ERROR: Coverage for branches (10.06%) does not meet global threshold (80%)
 
 **Rationale:**
 The completed work (utilities and base service testing) demonstrates **excellent quality** with:
+
 - Proper test infrastructure and configuration
 - High-quality test patterns and helpers
 - Exceptional coverage for completed portions (100%, 100%, 94.73%)
 - Outstanding performance (<300ms for 180 tests)
 
 However, **story is incomplete**:
+
 - Only 40% of tasks completed (4/10)
 - Only 50% of acceptance criteria met (4/8)
 - Critical coverage gap: 12.87% vs 80% target
@@ -1398,6 +1470,7 @@ However, **story is incomplete**:
 **Pattern Consistency:** All tests follow consistent Arrange-Act-Assert pattern with descriptive naming. Future tests can follow these as templates.
 
 **Technical Decisions:** Smart choices throughout:
+
 - happy-dom over jsdom (performance)
 - V8 coverage over Istanbul (accuracy)
 - Real dates over fake timers for timezone-sensitive tests (pragmatic)

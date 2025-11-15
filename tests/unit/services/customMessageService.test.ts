@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { customMessageService } from '../../../src/services/customMessageService';
-import type { CreateMessageInput, UpdateMessageInput, CustomMessagesExport } from '../../../src/types';
+import type {
+  CreateMessageInput,
+  UpdateMessageInput,
+  CustomMessagesExport,
+} from '../../../src/types';
 import { createMockMessages, createMockMessage } from '../utils/testHelpers';
 
 describe('CustomMessageService', () => {
@@ -143,7 +147,9 @@ describe('CustomMessageService', () => {
       const updated = await customMessageService.get(created.id!);
       expect(updated?.text).toBe('Updated text');
       expect(updated?.updatedAt).toBeInstanceOf(Date);
-      expect(updated?.updatedAt?.getTime()).toBeGreaterThanOrEqual(updated?.createdAt.getTime() || 0);
+      expect(updated?.updatedAt?.getTime()).toBeGreaterThanOrEqual(
+        updated?.createdAt.getTime() || 0
+      );
     });
 
     it('updates category field', async () => {
@@ -222,10 +228,12 @@ describe('CustomMessageService', () => {
         category: 'reason',
       });
 
-      await expect(customMessageService.updateMessage({
-        id: created.id!,
-        text: '',
-      })).rejects.toThrow();
+      await expect(
+        customMessageService.updateMessage({
+          id: created.id!,
+          text: '',
+        })
+      ).rejects.toThrow();
     });
 
     it('rejects update with text exceeding 1000 chars (validation)', async () => {
@@ -234,10 +242,12 @@ describe('CustomMessageService', () => {
         category: 'reason',
       });
 
-      await expect(customMessageService.updateMessage({
-        id: created.id!,
-        text: 'a'.repeat(1001),
-      })).rejects.toThrow();
+      await expect(
+        customMessageService.updateMessage({
+          id: created.id!,
+          text: 'a'.repeat(1001),
+        })
+      ).rejects.toThrow();
     });
   });
 
@@ -277,35 +287,35 @@ describe('CustomMessageService', () => {
     it('filters by category', async () => {
       const messages = await customMessageService.getAll({ category: 'reason' });
       expect(messages).toHaveLength(2);
-      expect(messages.every(m => m.category === 'reason')).toBe(true);
+      expect(messages.every((m) => m.category === 'reason')).toBe(true);
     });
 
     it('filters by active status', async () => {
       const activeMessages = await customMessageService.getAll({ active: true });
       expect(activeMessages).toHaveLength(3);
-      expect(activeMessages.every(m => m.active === true)).toBe(true);
+      expect(activeMessages.every((m) => m.active === true)).toBe(true);
 
       const inactiveMessages = await customMessageService.getAll({ active: false });
       expect(inactiveMessages).toHaveLength(1);
-      expect(inactiveMessages.every(m => m.active === false)).toBe(true);
+      expect(inactiveMessages.every((m) => m.active === false)).toBe(true);
     });
 
     it('filters by isCustom', async () => {
       const customMessages = await customMessageService.getAll({ isCustom: true });
       expect(customMessages).toHaveLength(4);
-      expect(customMessages.every(m => m.isCustom === true)).toBe(true);
+      expect(customMessages.every((m) => m.isCustom === true)).toBe(true);
     });
 
     it('filters by searchTerm', async () => {
       const messages = await customMessageService.getAll({ searchTerm: 'Reason' });
       expect(messages).toHaveLength(2);
-      expect(messages.every(m => m.text.toLowerCase().includes('reason'))).toBe(true);
+      expect(messages.every((m) => m.text.toLowerCase().includes('reason'))).toBe(true);
     });
 
     it('filters by tags', async () => {
       const messages = await customMessageService.getAll({ tags: ['tag1'] });
       expect(messages).toHaveLength(2);
-      expect(messages.every(m => m.tags && m.tags.includes('tag1'))).toBe(true);
+      expect(messages.every((m) => m.tags && m.tags.includes('tag1'))).toBe(true);
     });
 
     it('combines multiple filters', async () => {
@@ -390,8 +400,8 @@ describe('CustomMessageService', () => {
       const activeMessages = await customMessageService.getActiveCustomMessages();
 
       expect(activeMessages).toHaveLength(2);
-      expect(activeMessages.every(m => m.active === true)).toBe(true);
-      expect(activeMessages.every(m => m.isCustom === true)).toBe(true);
+      expect(activeMessages.every((m) => m.active === true)).toBe(true);
+      expect(activeMessages.every((m) => m.isCustom === true)).toBe(true);
     });
 
     it('returns empty array when no active custom messages', async () => {
@@ -503,8 +513,8 @@ describe('CustomMessageService', () => {
 
       const allMessages = await customMessageService.getAll();
       expect(allMessages).toHaveLength(2);
-      expect(allMessages.find(m => m.text === 'Imported message 1')).toBeDefined();
-      expect(allMessages.find(m => m.text === 'Imported message 2')).toBeDefined();
+      expect(allMessages.find((m) => m.text === 'Imported message 1')).toBeDefined();
+      expect(allMessages.find((m) => m.text === 'Imported message 2')).toBeDefined();
     });
 
     it('skips duplicate messages (case-insensitive)', async () => {
@@ -597,7 +607,9 @@ describe('CustomMessageService', () => {
         messages: [],
       };
 
-      await expect(customMessageService.importMessages(exportData)).rejects.toThrow('expected "1.0"');
+      await expect(customMessageService.importMessages(exportData)).rejects.toThrow(
+        'expected "1.0"'
+      );
     });
 
     it('validates export data structure (validation)', async () => {

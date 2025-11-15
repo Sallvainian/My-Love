@@ -67,7 +67,9 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Create New Message</h2>
-              <p className="text-sm text-gray-500 mt-1">Add a personalized message to your library</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Add a personalized message to your library
+              </p>
             </div>
             <button
               onClick={handleCancel}
@@ -83,7 +85,10 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
           <div className="p-6 space-y-6">
             {/* Message text */}
             <div>
-              <label htmlFor="message-text" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="message-text"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Message Text *
               </label>
               <textarea
@@ -100,9 +105,11 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 <p className="text-sm text-gray-500">
                   {text.length === 0 ? 'Required' : 'Characters used'}
                 </p>
-                <p className={`text-sm font-medium ${
-                  remainingChars < 50 ? 'text-orange-600' : 'text-gray-600'
-                }`}>
+                <p
+                  className={`text-sm font-medium ${
+                    remainingChars < 50 ? 'text-orange-600' : 'text-gray-600'
+                  }`}
+                >
                   {remainingChars} remaining
                 </p>
               </div>
@@ -143,13 +150,11 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                   data-testid="create-message-active-toggle"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-700">
-                    Active in rotation
-                  </span>
+                  <span className="text-sm font-medium text-gray-700">Active in rotation</span>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {active
                       ? 'This message can appear in daily rotation'
-                      : 'Save as draft - won\'t appear in rotation until activated'}
+                      : "Save as draft - won't appear in rotation until activated"}
                   </p>
                 </div>
               </label>

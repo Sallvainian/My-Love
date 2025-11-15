@@ -27,7 +27,7 @@ class TestService extends BaseIndexedDBService<TestItem> {
         if (!db.objectStoreNames.contains('test-items')) {
           db.createObjectStore('test-items', {
             keyPath: 'id',
-            autoIncrement: true
+            autoIncrement: true,
           });
         }
       },
@@ -57,11 +57,7 @@ describe('BaseIndexedDBService', () => {
     it('only initializes once for multiple calls', async () => {
       const spy = vi.spyOn(service as any, '_doInit');
 
-      await Promise.all([
-        service.init(),
-        service.init(),
-        service.init(),
-      ]);
+      await Promise.all([service.init(), service.init(), service.init()]);
 
       // Should only be called once
       expect(spy).toHaveBeenCalledTimes(1);
@@ -143,9 +139,7 @@ describe('BaseIndexedDBService', () => {
     it('handles errors gracefully', async () => {
       // Break the db connection
       (service as any).db = null;
-      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(
-        new Error('DB init failed')
-      );
+      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(new Error('DB init failed'));
 
       const result = await service.get(1);
       expect(result).toBeNull();
@@ -161,7 +155,7 @@ describe('BaseIndexedDBService', () => {
       const items = await service.getAll();
 
       expect(items).toHaveLength(3);
-      expect(items.map(i => i.name)).toEqual(['Item 1', 'Item 2', 'Item 3']);
+      expect(items.map((i) => i.name)).toEqual(['Item 1', 'Item 2', 'Item 3']);
     });
 
     it('returns empty array when store is empty', async () => {
@@ -171,9 +165,7 @@ describe('BaseIndexedDBService', () => {
 
     it('handles errors gracefully', async () => {
       (service as any).db = null;
-      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(
-        new Error('DB init failed')
-      );
+      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(new Error('DB init failed'));
 
       const result = await service.getAll();
       expect(result).toEqual([]);
@@ -210,9 +202,7 @@ describe('BaseIndexedDBService', () => {
     });
 
     it('throws error for non-existent id', async () => {
-      await expect(
-        service.update(99999, { name: 'Updated' })
-      ).rejects.toThrow();
+      await expect(service.update(99999, { name: 'Updated' })).rejects.toThrow();
     });
   });
 
@@ -314,9 +304,7 @@ describe('BaseIndexedDBService', () => {
 
     it('handles errors gracefully', async () => {
       (service as any).db = null;
-      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(
-        new Error('DB init failed')
-      );
+      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(new Error('DB init failed'));
 
       const result = await service.getPage(0, 10);
       expect(result).toEqual([]);
@@ -335,9 +323,7 @@ describe('BaseIndexedDBService', () => {
       (service as any).initPromise = null;
 
       // Mock _doInit to throw error
-      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(
-        new Error('DB error')
-      );
+      vi.spyOn(service as any, '_doInit').mockRejectedValueOnce(new Error('DB error'));
 
       await expect(
         service.testAdd({ name: 'Test', value: 1, createdAt: new Date() })
@@ -382,7 +368,7 @@ describe('BaseIndexedDBService', () => {
 
       expect(results).toHaveLength(5);
       // All should have unique ids
-      const ids = results.map(r => r.id);
+      const ids = results.map((r) => r.id);
       expect(new Set(ids).size).toBe(5);
     });
 
@@ -393,14 +379,12 @@ describe('BaseIndexedDBService', () => {
         createdAt: new Date(),
       });
 
-      const promises = Array.from({ length: 10 }, () =>
-        service.get(item.id!)
-      );
+      const promises = Array.from({ length: 10 }, () => service.get(item.id!));
 
       const results = await Promise.all(promises);
 
       // All should return the same item
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).not.toBeNull();
         expect(result!.id).toBe(item.id);
       });

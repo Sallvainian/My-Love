@@ -73,9 +73,7 @@ describe('messageRotation', () => {
     });
 
     it('produces consistent hashes across multiple runs', () => {
-      const hashes = Array.from({ length: 100 }, () =>
-        hashDateString('2024-01-15')
-      );
+      const hashes = Array.from({ length: 100 }, () => hashDateString('2024-01-15'));
 
       // All hashes should be identical
       expect(new Set(hashes).size).toBe(1);
@@ -137,9 +135,7 @@ describe('messageRotation', () => {
         return d;
       });
 
-      const selectedMessages = dates.map((date) =>
-        getDailyMessage(largePool, date)
-      );
+      const selectedMessages = dates.map((date) => getDailyMessage(largePool, date));
 
       // Should use multiple different messages (not all the same)
       const uniqueMessageIds = new Set(selectedMessages.map((m) => m.id));
@@ -154,9 +150,7 @@ describe('messageRotation', () => {
         return d;
       });
 
-      const selectedMessages = dates.map((date) =>
-        getDailyMessage(smallPool, date)
-      );
+      const selectedMessages = dates.map((date) => getDailyMessage(smallPool, date));
 
       // All selected messages should be from the pool
       selectedMessages.forEach((msg) => {

@@ -23,11 +23,7 @@ import type {
 } from '../../types';
 import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
-import {
-  getDailyMessage,
-  formatDate,
-  getAvailableHistoryDays,
-} from '../../utils/messageRotation';
+import { getDailyMessage, formatDate, getAvailableHistoryDays } from '../../utils/messageRotation';
 
 export interface MessagesSlice {
   // State
@@ -69,10 +65,10 @@ export const createMessagesSlice: StateCreator<
   // Initial state
   messages: [],
   messageHistory: {
-    currentIndex: 0,           // Story 3.3: 0 = today, 1 = yesterday, etc.
-    shownMessages: new Map(),  // Story 3.3: Date → Message ID mapping
-    maxHistoryDays: 30,        // Story 3.3: History limit
-    favoriteIds: [],           // Keep for legacy favorite tracking
+    currentIndex: 0, // Story 3.3: 0 = today, 1 = yesterday, etc.
+    shownMessages: new Map(), // Story 3.3: Date → Message ID mapping
+    maxHistoryDays: 30, // Story 3.3: History limit
+    favoriteIds: [], // Keep for legacy favorite tracking
     // Deprecated fields (migration):
     lastShownDate: '',
     lastMessageId: 0,
@@ -147,7 +143,7 @@ export const createMessagesSlice: StateCreator<
 
     // Story 3.5: Filter out inactive custom messages from rotation pool
     // Keep default messages + only active custom messages
-    const rotationPool = messages.filter(m => !m.isCustom || m.active !== false);
+    const rotationPool = messages.filter((m) => !m.isCustom || m.active !== false);
 
     if (rotationPool.length === 0) {
       console.error('[MessageHistory] No active messages available for rotation');
@@ -192,7 +188,9 @@ export const createMessagesSlice: StateCreator<
           },
         });
         if (import.meta.env.DEV) {
-          console.log(`[MessageRotation] Reset to today (index 0) from index ${messageHistory.currentIndex}`);
+          console.log(
+            `[MessageRotation] Reset to today (index 0) from index ${messageHistory.currentIndex}`
+          );
         }
       }
     }
@@ -210,7 +208,7 @@ export const createMessagesSlice: StateCreator<
     if (!settings || messages.length === 0) return;
 
     // Story 3.5: Filter rotation pool (exclude inactive custom messages)
-    const rotationPool = messages.filter(m => !m.isCustom || m.active !== false);
+    const rotationPool = messages.filter((m) => !m.isCustom || m.active !== false);
 
     if (rotationPool.length === 0) {
       console.error('[MessageHistory] No active messages available for rotation');
@@ -282,7 +280,7 @@ export const createMessagesSlice: StateCreator<
     if (messages.length === 0) return;
 
     // Story 3.5: Filter rotation pool (exclude inactive custom messages)
-    const rotationPool = messages.filter(m => !m.isCustom || m.active !== false);
+    const rotationPool = messages.filter((m) => !m.isCustom || m.active !== false);
 
     if (rotationPool.length === 0) {
       console.error('[MessageHistory] No active messages available for rotation');
@@ -344,7 +342,7 @@ export const createMessagesSlice: StateCreator<
       const customMessagesFromDB = await customMessageService.getAll({ isCustom: true });
 
       // Convert Date objects to ISO strings for CustomMessage interface
-      const customMessages: CustomMessage[] = customMessagesFromDB.map(m => ({
+      const customMessages: CustomMessage[] = customMessagesFromDB.map((m) => ({
         id: m.id,
         text: m.text,
         category: m.category,
@@ -383,7 +381,7 @@ export const createMessagesSlice: StateCreator<
       };
 
       // Update state (optimistic UI update)
-      set(state => ({
+      set((state) => ({
         customMessages: [...state.customMessages, newCustomMessage],
       }));
 
@@ -391,7 +389,9 @@ export const createMessagesSlice: StateCreator<
       await get().loadMessages();
 
       if (import.meta.env.DEV) {
-        console.log(`[AdminPanel] Created custom message ID: ${message.id}, category: ${input.category}`);
+        console.log(
+          `[AdminPanel] Created custom message ID: ${message.id}, category: ${input.category}`
+        );
       }
     } catch (error) {
       console.error('[AdminPanel] Failed to create custom message:', error);
@@ -405,8 +405,8 @@ export const createMessagesSlice: StateCreator<
       await customMessageService.updateMessage(input);
 
       // Update state (optimistic UI update)
-      set(state => ({
-        customMessages: state.customMessages.map(msg => {
+      set((state) => ({
+        customMessages: state.customMessages.map((msg) => {
           if (msg.id === input.id) {
             return {
               ...msg,
@@ -439,8 +439,8 @@ export const createMessagesSlice: StateCreator<
       await customMessageService.delete(id);
 
       // Update state (optimistic UI update)
-      set(state => ({
-        customMessages: state.customMessages.filter(msg => msg.id !== id),
+      set((state) => ({
+        customMessages: state.customMessages.filter((msg) => msg.id !== id),
       }));
 
       // Reload messages to update rotation pool
@@ -466,26 +466,24 @@ export const createMessagesSlice: StateCreator<
 
     // Filter by category
     if (filter.category && filter.category !== 'all') {
-      filtered = filtered.filter(msg => msg.category === filter.category);
+      filtered = filtered.filter((msg) => msg.category === filter.category);
     }
 
     // Filter by active status
     if (filter.active !== undefined) {
-      filtered = filtered.filter(msg => msg.active === filter.active);
+      filtered = filtered.filter((msg) => msg.active === filter.active);
     }
 
     // Filter by search term
     if (filter.searchTerm) {
       const searchLower = filter.searchTerm.toLowerCase();
-      filtered = filtered.filter(msg =>
-        msg.text.toLowerCase().includes(searchLower)
-      );
+      filtered = filtered.filter((msg) => msg.text.toLowerCase().includes(searchLower));
     }
 
     // Filter by tags
     if (filter.tags && filter.tags.length > 0) {
-      filtered = filtered.filter(msg =>
-        msg.tags && msg.tags.some(tag => filter.tags!.includes(tag))
+      filtered = filtered.filter(
+        (msg) => msg.tags && msg.tags.some((tag) => filter.tags!.includes(tag))
       );
     }
 
@@ -515,7 +513,9 @@ export const createMessagesSlice: StateCreator<
       URL.revokeObjectURL(url);
 
       if (import.meta.env.DEV) {
-        console.log(`[AdminPanel] Exported ${exportData.messageCount} custom messages to ${filename}`);
+        console.log(
+          `[AdminPanel] Exported ${exportData.messageCount} custom messages to ${filename}`
+        );
       }
     } catch (error) {
       console.error('[AdminPanel] Failed to export custom messages:', error);

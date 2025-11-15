@@ -4,12 +4,7 @@ import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { PhotoSchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
-import {
-  PAGINATION,
-  STORAGE_QUOTAS,
-  BYTES_PER_KB,
-  BYTES_PER_MB,
-} from '../config/performance';
+import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../config/performance';
 import { performanceMonitor } from './performanceMonitor';
 
 const DB_NAME = 'my-love-db';
@@ -71,7 +66,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
               // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
               migratedPhotos = allV1Photos.map((photo: any) => ({
                 ...photo,
-                imageBlob: photo.blob,  // Rename blob → imageBlob
+                imageBlob: photo.blob, // Rename blob → imageBlob
                 // Remove old 'blob' field to avoid duplication
                 blob: undefined,
               }));
@@ -101,7 +96,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
                 await photosStore.add(cleanPhoto);
               }
               if (import.meta.env.DEV) {
-                console.log(`[PhotoStorage] Successfully migrated ${migratedPhotos.length} photos to v2 schema`);
+                console.log(
+                  `[PhotoStorage] Successfully migrated ${migratedPhotos.length} photos to v2 schema`
+                );
               }
             }
           }
@@ -152,7 +149,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
 
         if (import.meta.env.DEV) {
           const sizeKB = (validated.compressedSize / BYTES_PER_KB).toFixed(0);
-          console.log(`[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`);
+          console.log(
+            `[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`
+          );
         }
 
         return created;
@@ -211,7 +210,10 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
    * @param limit - Number of photos to return per page (default: 20)
    * @returns Array of photos for the requested page (newest first)
    */
-  async getPage(offset: number = 0, limit: number = PAGINATION.DEFAULT_PAGE_SIZE): Promise<Photo[]> {
+  async getPage(
+    offset: number = 0,
+    limit: number = PAGINATION.DEFAULT_PAGE_SIZE
+  ): Promise<Photo[]> {
     return performanceMonitor.measureAsync('photo-getPage', async () => {
       try {
         await this.init();
@@ -334,7 +336,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
         if (import.meta.env.DEV) {
           const usedMB = (used / BYTES_PER_MB).toFixed(2);
           const quotaMB = (quota / BYTES_PER_MB).toFixed(2);
-          console.log(`[PhotoStorage] Quota: ${usedMB}MB / ${quotaMB}MB (${percentUsed.toFixed(0)}% used)`);
+          console.log(
+            `[PhotoStorage] Quota: ${usedMB}MB / ${quotaMB}MB (${percentUsed.toFixed(0)}% used)`
+          );
         }
 
         return { used, quota, remaining, percentUsed };

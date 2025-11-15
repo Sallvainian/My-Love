@@ -62,7 +62,9 @@ describe('PhotoStorageService', () => {
 
   describe('get()', () => {
     it('retrieves photo by id', async () => {
-      const created = await photoStorageService.create(createMockPhoto({ caption: 'Test retrieval' }));
+      const created = await photoStorageService.create(
+        createMockPhoto({ caption: 'Test retrieval' })
+      );
       const retrieved = await photoStorageService.get(created.id!);
 
       expect(retrieved).toBeDefined();
@@ -86,7 +88,7 @@ describe('PhotoStorageService', () => {
 
       expect(allPhotos).toHaveLength(3);
       // Photos are sorted by date descending (newest first)
-      expect(allPhotos.map(p => p.caption)).toEqual(['Photo 3', 'Photo 2', 'Photo 1']);
+      expect(allPhotos.map((p) => p.caption)).toEqual(['Photo 3', 'Photo 2', 'Photo 1']);
     });
 
     it('returns empty array when no photos exist', async () => {
@@ -194,8 +196,12 @@ describe('PhotoStorageService', () => {
       const blob1 = new Blob(['a'.repeat(1000)], { type: 'image/jpeg' });
       const blob2 = new Blob(['b'.repeat(2000)], { type: 'image/jpeg' });
 
-      await photoStorageService.create(createMockPhoto({ imageBlob: blob1, compressedSize: blob1.size }));
-      await photoStorageService.create(createMockPhoto({ imageBlob: blob2, compressedSize: blob2.size }));
+      await photoStorageService.create(
+        createMockPhoto({ imageBlob: blob1, compressedSize: blob1.size })
+      );
+      await photoStorageService.create(
+        createMockPhoto({ imageBlob: blob2, compressedSize: blob2.size })
+      );
 
       const totalSize = await photoStorageService.getStorageSize();
       expect(totalSize).toBe(3000); // 1000 + 2000
@@ -246,184 +252,187 @@ describe('PhotoStorageService', () => {
     });
   });
 
-describe('PhotoStorageService Validation', () => {
-  beforeEach(async () => {
-    await photoStorageService.init();
-    await photoStorageService.clear();
-  });
-
-  describe('create() validation', () => {
-    it('should reject photo with caption exceeding 500 chars', async () => {
-      const longCaption = 'a'.repeat(501);
-      const invalidPhoto = {
-        imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
-        caption: longCaption,
-        tags: [],
-        uploadDate: new Date(),
-        originalSize: 1000,
-        compressedSize: 800,
-        width: 100,
-        height: 100,
-        mimeType: 'image/jpeg' as const,
-      };
-
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+  describe('PhotoStorageService Validation', () => {
+    beforeEach(async () => {
+      await photoStorageService.init();
+      await photoStorageService.clear();
     });
 
-    it('should reject photo with negative width', async () => {
-      const invalidPhoto = {
-        imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
-        caption: 'Valid caption',
-        tags: [],
-        uploadDate: new Date(),
-        originalSize: 1000,
-        compressedSize: 800,
-        width: -100, // Invalid: negative
-        height: 100,
-        mimeType: 'image/jpeg' as const,
-      };
+    describe('create() validation', () => {
+      it('should reject photo with caption exceeding 500 chars', async () => {
+        const longCaption = 'a'.repeat(501);
+        const invalidPhoto = {
+          imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
+          caption: longCaption,
+          tags: [],
+          uploadDate: new Date(),
+          originalSize: 1000,
+          compressedSize: 800,
+          width: 100,
+          height: 100,
+          mimeType: 'image/jpeg' as const,
+        };
 
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
-    });
-
-    it('should reject photo with invalid MIME type', async () => {
-      const invalidPhoto = {
-        imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
-        caption: 'Valid caption',
-        tags: [],
-        uploadDate: new Date(),
-        originalSize: 1000,
-        compressedSize: 800,
-        width: 100,
-        height: 100,
-        mimeType: 'image/invalid' as any, // Invalid MIME type
-      };
-
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
-    });
-  });
-
-  describe('update() validation', () => {
-    it('should reject update with caption exceeding 500 chars', async () => {
-      const longCaption = 'a'.repeat(501);
-
-      await expect(photoStorageService.update(1, { caption: longCaption })).rejects.toThrow();
-    });
-
-    it('should accept valid caption update', async () => {
-      // Create a test photo first
-      const validPhoto = {
-        imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
-        caption: 'Initial caption',
-        tags: [],
-        uploadDate: new Date(),
-        originalSize: 1000,
-        compressedSize: 800,
-        width: 100,
-        height: 100,
-        mimeType: 'image/jpeg' as const,
-      };
-
-      const created = await photoStorageService.create(validPhoto);
-
-      // Update with valid data - should not throw
-      const validUpdate = { caption: 'Valid caption under 500 chars' };
-      await expect(photoStorageService.update(created.id!, validUpdate)).resolves.not.toThrow();
-
-      // Verify update succeeded
-      const updated = await photoStorageService.get(created.id!);
-      expect(updated?.caption).toBe('Valid caption under 500 chars');
-    });
-  });
-
-  // === P2 Edge Case Tests ===
-  describe('edge cases', () => {
-    it('should allow empty caption', async () => {
-      const validPhoto = createMockPhoto({ caption: '' });
-
-      await expect(photoStorageService.create(validPhoto)).resolves.toBeDefined();
-
-      const created = await photoStorageService.create(validPhoto);
-      expect(created.caption).toBe('');
-    });
-
-    it('should reject photo with zero width', async () => {
-      const invalidPhoto = createMockPhoto({ width: 0 });
-
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
-    });
-
-    it('should reject photo with zero height', async () => {
-      const invalidPhoto = createMockPhoto({ height: 0 });
-
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
-    });
-
-    it('should reject photo with negative height', async () => {
-      const invalidPhoto = createMockPhoto({ height: -50 });
-
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
-    });
-
-    it('should reject unsupported MIME type (image/gif)', async () => {
-      const invalidPhoto = createMockPhoto({
-        imageBlob: new Blob(['test'], { type: 'image/gif' }),
-        mimeType: 'image/gif' as any,
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
       });
 
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
-    });
+      it('should reject photo with negative width', async () => {
+        const invalidPhoto = {
+          imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
+          caption: 'Valid caption',
+          tags: [],
+          uploadDate: new Date(),
+          originalSize: 1000,
+          compressedSize: 800,
+          width: -100, // Invalid: negative
+          height: 100,
+          mimeType: 'image/jpeg' as const,
+        };
 
-    it('should reject unsupported MIME type (image/bmp)', async () => {
-      const invalidPhoto = createMockPhoto({
-        imageBlob: new Blob(['test'], { type: 'image/bmp' }),
-        mimeType: 'image/bmp' as any,
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
       });
 
-      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      it('should reject photo with invalid MIME type', async () => {
+        const invalidPhoto = {
+          imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
+          caption: 'Valid caption',
+          tags: [],
+          uploadDate: new Date(),
+          originalSize: 1000,
+          compressedSize: 800,
+          width: 100,
+          height: 100,
+          mimeType: 'image/invalid' as any, // Invalid MIME type
+        };
+
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      });
     });
 
-    it('should handle very large blob sizes (quota handling)', async () => {
-      // Create a ~5MB blob to test quota handling
-      const largeBlob = new Blob([new ArrayBuffer(5 * 1024 * 1024)], { type: 'image/jpeg' });
-      const largePhoto = createMockPhoto({
-        imageBlob: largeBlob,
-        originalSize: largeBlob.size,
-        compressedSize: largeBlob.size,
+    describe('update() validation', () => {
+      it('should reject update with caption exceeding 500 chars', async () => {
+        const longCaption = 'a'.repeat(501);
+
+        await expect(photoStorageService.update(1, { caption: longCaption })).rejects.toThrow();
       });
 
-      // Should not throw error - just handle gracefully
-      const created = await photoStorageService.create(largePhoto);
-      expect(created).toBeDefined();
-      expect(created.imageBlob.size).toBe(largeBlob.size);
+      it('should accept valid caption update', async () => {
+        // Create a test photo first
+        const validPhoto = {
+          imageBlob: new Blob(['test'], { type: 'image/jpeg' }),
+          caption: 'Initial caption',
+          tags: [],
+          uploadDate: new Date(),
+          originalSize: 1000,
+          compressedSize: 800,
+          width: 100,
+          height: 100,
+          mimeType: 'image/jpeg' as const,
+        };
 
-      // Verify quota tracking is available (may be 0 in test environment)
-      const quota = await photoStorageService.estimateQuotaRemaining();
-      expect(quota.used).toBeGreaterThanOrEqual(0);
-      expect(quota.quota).toBeGreaterThan(0);
-      expect(quota.remaining).toBeGreaterThanOrEqual(0);
+        const created = await photoStorageService.create(validPhoto);
+
+        // Update with valid data - should not throw
+        const validUpdate = { caption: 'Valid caption under 500 chars' };
+        await expect(photoStorageService.update(created.id!, validUpdate)).resolves.not.toThrow();
+
+        // Verify update succeeded
+        const updated = await photoStorageService.get(created.id!);
+        expect(updated?.caption).toBe('Valid caption under 500 chars');
+      });
     });
 
-    it('should track storage usage correctly with multiple large photos', async () => {
-      const quotaBefore = await photoStorageService.estimateQuotaRemaining();
+    // === P2 Edge Case Tests ===
+    describe('edge cases', () => {
+      it('should allow empty caption', async () => {
+        const validPhoto = createMockPhoto({ caption: '' });
 
-      // Add two large photos
-      const blob1 = new Blob([new ArrayBuffer(1 * 1024 * 1024)], { type: 'image/jpeg' }); // 1MB
-      const blob2 = new Blob([new ArrayBuffer(2 * 1024 * 1024)], { type: 'image/jpeg' }); // 2MB
+        await expect(photoStorageService.create(validPhoto)).resolves.toBeDefined();
 
-      await photoStorageService.create(createMockPhoto({ imageBlob: blob1, compressedSize: blob1.size }));
-      await photoStorageService.create(createMockPhoto({ imageBlob: blob2, compressedSize: blob2.size }));
+        const created = await photoStorageService.create(validPhoto);
+        expect(created.caption).toBe('');
+      });
 
-      const quotaAfter = await photoStorageService.estimateQuotaRemaining();
+      it('should reject photo with zero width', async () => {
+        const invalidPhoto = createMockPhoto({ width: 0 });
 
-      // In test environment (fake-indexeddb), quota may not update realistically
-      // Just verify quota structure is correct
-      expect(quotaAfter.used).toBeGreaterThanOrEqual(quotaBefore.used);
-      expect(quotaAfter.remaining).toBeLessThanOrEqual(quotaBefore.remaining);
-      expect(quotaAfter.percentUsed).toBeGreaterThanOrEqual(quotaBefore.percentUsed);
-      expect(quotaAfter.quota).toBe(quotaBefore.quota); // Quota limit should not change
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      });
+
+      it('should reject photo with zero height', async () => {
+        const invalidPhoto = createMockPhoto({ height: 0 });
+
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      });
+
+      it('should reject photo with negative height', async () => {
+        const invalidPhoto = createMockPhoto({ height: -50 });
+
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      });
+
+      it('should reject unsupported MIME type (image/gif)', async () => {
+        const invalidPhoto = createMockPhoto({
+          imageBlob: new Blob(['test'], { type: 'image/gif' }),
+          mimeType: 'image/gif' as any,
+        });
+
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      });
+
+      it('should reject unsupported MIME type (image/bmp)', async () => {
+        const invalidPhoto = createMockPhoto({
+          imageBlob: new Blob(['test'], { type: 'image/bmp' }),
+          mimeType: 'image/bmp' as any,
+        });
+
+        await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
+      });
+
+      it('should handle very large blob sizes (quota handling)', async () => {
+        // Create a ~5MB blob to test quota handling
+        const largeBlob = new Blob([new ArrayBuffer(5 * 1024 * 1024)], { type: 'image/jpeg' });
+        const largePhoto = createMockPhoto({
+          imageBlob: largeBlob,
+          originalSize: largeBlob.size,
+          compressedSize: largeBlob.size,
+        });
+
+        // Should not throw error - just handle gracefully
+        const created = await photoStorageService.create(largePhoto);
+        expect(created).toBeDefined();
+        expect(created.imageBlob.size).toBe(largeBlob.size);
+
+        // Verify quota tracking is available (may be 0 in test environment)
+        const quota = await photoStorageService.estimateQuotaRemaining();
+        expect(quota.used).toBeGreaterThanOrEqual(0);
+        expect(quota.quota).toBeGreaterThan(0);
+        expect(quota.remaining).toBeGreaterThanOrEqual(0);
+      });
+
+      it('should track storage usage correctly with multiple large photos', async () => {
+        const quotaBefore = await photoStorageService.estimateQuotaRemaining();
+
+        // Add two large photos
+        const blob1 = new Blob([new ArrayBuffer(1 * 1024 * 1024)], { type: 'image/jpeg' }); // 1MB
+        const blob2 = new Blob([new ArrayBuffer(2 * 1024 * 1024)], { type: 'image/jpeg' }); // 2MB
+
+        await photoStorageService.create(
+          createMockPhoto({ imageBlob: blob1, compressedSize: blob1.size })
+        );
+        await photoStorageService.create(
+          createMockPhoto({ imageBlob: blob2, compressedSize: blob2.size })
+        );
+
+        const quotaAfter = await photoStorageService.estimateQuotaRemaining();
+
+        // In test environment (fake-indexeddb), quota may not update realistically
+        // Just verify quota structure is correct
+        expect(quotaAfter.used).toBeGreaterThanOrEqual(quotaBefore.used);
+        expect(quotaAfter.remaining).toBeLessThanOrEqual(quotaBefore.remaining);
+        expect(quotaAfter.percentUsed).toBeGreaterThanOrEqual(quotaBefore.percentUsed);
+        expect(quotaAfter.quota).toBe(quotaBefore.quota); // Quota limit should not change
+      });
     });
   });
-});
-
 }); // Close outer PhotoStorageService describe block

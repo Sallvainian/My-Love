@@ -12,17 +12,21 @@
 ## Section 1: Issue Summary
 
 ### Triggering Event
+
 During pre-implementation planning for Story 6.1 (NocoDB Backend Setup & API Integration), Frank questioned whether **Pocketbase** would be a better backend choice than the originally planned **NocoDB**.
 
 ### Discovery Context
+
 - **When:** Before Story 6.1 implementation began (proactive architecture review)
 - **Why:** Concerns about NocoDB's suitability for realtime synchronization requirements
 - **Stakeholder:** Frank (developer/product owner)
 
 ### Problem Statement
+
 The original Epic 6 plan specified NocoDB as the backend for mood tracking sync and poke/kiss interactions. However, preliminary research revealed that **NocoDB lacks native realtime update capabilities**, which are critical for the core user experience defined in FR020 ("sync mood entries for partner visibility") and FR023-FR025 (poke/kiss interactions).
 
 ### Evidence Supporting Change
+
 Multi-agent expert panel (Backend Architect, Security Engineer, DevOps Architect, Performance Engineer) conducted comprehensive analysis with the following findings:
 
 1. **Realtime Capability Gap (Critical)**
@@ -52,16 +56,17 @@ Multi-agent expert panel (Backend Architect, Security Engineer, DevOps Architect
 
 **Epic 6: Interactive Connection Features** (6 stories)
 
-| Story | Original Plan | Impact Level | Change Type |
-|-------|--------------|--------------|-------------|
-| **6.1** Backend Setup | NocoDB deployment | **HIGH** | Complete rewrite of AC + tech spec |
-| **6.2** Mood Tracking UI | NocoDB API calls | **LOW** | Minor API client changes |
-| **6.3** Mood Calendar View | Data display only | **NONE** | No changes needed |
-| **6.4** Mood Sync & Partner Visibility | NocoDB polling workaround | **MEDIUM** | **Simplification** (no polling needed) |
-| **6.5** Poke/Kiss Interactions | NocoDB sync | **MEDIUM** | **Better UX** (realtime feedback) |
-| **6.6** Anniversary Countdowns | Local-only feature | **NONE** | No changes needed |
+| Story                                  | Original Plan             | Impact Level | Change Type                            |
+| -------------------------------------- | ------------------------- | ------------ | -------------------------------------- |
+| **6.1** Backend Setup                  | NocoDB deployment         | **HIGH**     | Complete rewrite of AC + tech spec     |
+| **6.2** Mood Tracking UI               | NocoDB API calls          | **LOW**      | Minor API client changes               |
+| **6.3** Mood Calendar View             | Data display only         | **NONE**     | No changes needed                      |
+| **6.4** Mood Sync & Partner Visibility | NocoDB polling workaround | **MEDIUM**   | **Simplification** (no polling needed) |
+| **6.5** Poke/Kiss Interactions         | NocoDB sync               | **MEDIUM**   | **Better UX** (realtime feedback)      |
+| **6.6** Anniversary Countdowns         | Local-only feature        | **NONE**     | No changes needed                      |
 
 **Net Epic Impact:**
+
 - Stories requiring changes: 3 out of 6 (6.1, 6.2, 6.4, 6.5)
 - Stories becoming easier: 2 (6.4, 6.5) due to realtime eliminating polling infrastructure
 - Effort delta: +4-6 hours (Story 6.1 rewrite) - 2-3 hours (simplified 6.4/6.5) = **Net +2-3 hours**
@@ -70,14 +75,16 @@ Multi-agent expert panel (Backend Architect, Security Engineer, DevOps Architect
 
 **Story 6.1 - Backend Setup (COMPLETE REWRITE)**
 
-*Before (NocoDB):*
+_Before (NocoDB):_
+
 - Deploy NocoDB Cloud free tier or self-host
 - Create tables via spreadsheet UI
 - Generate API key
 - Implement `nocoDBService.ts` with REST calls
 - Configure rate limiting for free tier
 
-*After (Pocketbase):*
+_After (Pocketbase):_
+
 - Provision VPS (Hetzner CX11: €4/month)
 - Deploy Pocketbase binary with systemd service
 - Configure SSL via Caddy reverse proxy
@@ -85,72 +92,82 @@ Multi-agent expert panel (Backend Architect, Security Engineer, DevOps Architect
 - Implement `pocketbaseService.ts` with official SDK
 - Setup realtime subscriptions
 
-*Effort Change:* 4-6 hours → 8-12 hours (+4-6 hours)
+_Effort Change:_ 4-6 hours → 8-12 hours (+4-6 hours)
 
 **Story 6.2 - Mood Tracking UI (MINOR CHANGES)**
 
-*Changes:*
+_Changes:_
+
 - API client import: `import { nocoDBService }` → `import { pocketbaseService }`
 - Auth handling: Adapt to Pocketbase JWT tokens
 - Error handling: Update for Pocketbase error format
 
-*Effort Change:* Minimal (~30 min adjustment)
+_Effort Change:_ Minimal (~30 min adjustment)
 
 **Story 6.4 - Mood Sync (SIMPLIFICATION)**
 
-*Before (NocoDB):*
+_Before (NocoDB):_
+
 - Implement 30-60s polling infrastructure
 - Handle polling state management
 - Optimize battery usage (difficult with polling)
 - Conflict resolution for stale data
 
-*After (Pocketbase):*
+_After (Pocketbase):_
+
 - Subscribe to `moods` collection realtime updates
 - Listen for partner mood changes
 - Instant UI updates via SSE
 
-*Effort Change:* 4-6 hours → 2-3 hours (**-2-3 hours**, SIMPLER)
+_Effort Change:_ 4-6 hours → 2-3 hours (**-2-3 hours**, SIMPLER)
 
 **Story 6.5 - Poke/Kiss Interactions (UX IMPROVEMENT)**
 
-*Before (NocoDB):*
+_Before (NocoDB):_
+
 - Send interaction via API POST
 - Partner polls for new interactions
 - 30-60s delay before partner sees notification
 
-*After (Pocketbase):*
+_After (Pocketbase):_
+
 - Send interaction via API POST
 - Partner receives realtime SSE event
 - <50ms notification delivery
 
-*Effort Change:* Similar implementation time, **massively better UX**
+_Effort Change:_ Similar implementation time, **massively better UX**
 
 ### Artifact Conflicts & Required Updates
 
 **1. PRD (docs/PRD.md)**
 
-*Sections requiring updates:*
+_Sections requiring updates:_
+
 - **Functional Requirements:** FR020 update to specify Pocketbase + realtime
 - **Non-Functional Requirements:** Add NFR007 for Pocketbase backend requirement
 - **Epic List:** Update Epic 6 description to mention Pocketbase
 
-*Specific changes:*
+_Specific changes:_
+
 ```markdown
 OLD (FR020):
+
 - FR020: System SHALL sync mood entries to backend service for partner visibility
 
 NEW (FR020):
+
 - FR020: System SHALL sync mood entries to Pocketbase backend via realtime
   subscriptions for instant (<50ms) partner visibility
 
 ADD (NFR007):
+
 - NFR007: Backend SHALL use Pocketbase v0.33+ for authentication, data
   persistence, and realtime synchronization with <50ms latency for mood/interaction updates
 ```
 
 **2. Epics (docs/epics.md)**
 
-*Story 6.1 Acceptance Criteria - Complete Replacement:*
+_Story 6.1 Acceptance Criteria - Complete Replacement:_
 
 ```markdown
 OLD:
@@ -164,20 +181,21 @@ OLD:
 NEW:
 **AC-6.1.1** Pocketbase instance deployed on VPS with SSL/TLS (Hetzner CX11 or equivalent)
 **AC-6.1.2** Collections created via Admin UI:
-  - users: email, password, name (auth collection)
-  - moods: user (relation), type (select), note (text), date (date)
-  - interactions: sender (relation), receiver (relation), type (select), timestamp (datetime)
-**AC-6.1.3** API service layer created: pocketbaseService.ts using @pocketbase/sdk
-**AC-6.1.4** JWT authentication configured with secure token storage in localStorage
-**AC-6.1.5** Realtime SSE subscriptions tested: mood update propagates to partner <50ms
-**AC-6.1.6** Error handling for network failures (graceful degradation to offline-only mode)
-**AC-6.1.7** Automated daily backups configured (SQLite file + pb_data directory to S3/local)
-**AC-6.1.8** Systemd service configured for auto-restart on failure
+
+- users: email, password, name (auth collection)
+- moods: user (relation), type (select), note (text), date (date)
+- interactions: sender (relation), receiver (relation), type (select), timestamp (datetime)
+  **AC-6.1.3** API service layer created: pocketbaseService.ts using @pocketbase/sdk
+  **AC-6.1.4** JWT authentication configured with secure token storage in localStorage
+  **AC-6.1.5** Realtime SSE subscriptions tested: mood update propagates to partner <50ms
+  **AC-6.1.6** Error handling for network failures (graceful degradation to offline-only mode)
+  **AC-6.1.7** Automated daily backups configured (SQLite file + pb_data directory to S3/local)
+  **AC-6.1.8** Systemd service configured for auto-restart on failure
 ```
 
 **3. Architecture (docs/architecture.md)**
 
-*Add new section:*
+_Add new section:_
 
 ```markdown
 ## Backend Services (Epic 6+)
@@ -187,6 +205,7 @@ NEW:
 **Purpose:** Realtime mood synchronization, poke/kiss interactions, user authentication
 
 **Technology:**
+
 - Platform: Pocketbase v0.33+ (open source, MIT license)
 - Database: SQLite (embedded, file-based)
 - API: REST + realtime SSE subscriptions
@@ -194,50 +213,54 @@ NEW:
 
 **Architecture:**
 ```
+
 ┌─────────────────────────────────────────────┐
-│         My Love PWA (React 19)              │
-│  ┌──────────────────────────────────────┐   │
-│  │   pocketbaseService.ts                │   │
-│  │   - Authentication (JWT)              │   │
-│  │   - CRUD operations                   │   │
-│  │   - Realtime subscriptions            │   │
-│  └──────────────┬───────────────────────┘   │
-│                 │ HTTPS + SSE                │
+│ My Love PWA (React 19) │
+│ ┌──────────────────────────────────────┐ │
+│ │ pocketbaseService.ts │ │
+│ │ - Authentication (JWT) │ │
+│ │ - CRUD operations │ │
+│ │ - Realtime subscriptions │ │
+│ └──────────────┬───────────────────────┘ │
+│ │ HTTPS + SSE │
 └─────────────────┼───────────────────────────┘
-                  │
-                  ▼
+│
+▼
 ┌─────────────────────────────────────────────┐
-│   Pocketbase Backend (VPS - Hetzner CX11)  │
-│  ┌──────────────────────────────────────┐   │
-│  │   Caddy Reverse Proxy (SSL/TLS)     │   │
-│  └──────────────┬───────────────────────┘   │
-│  ┌──────────────▼───────────────────────┐   │
-│  │   Pocketbase Server (Port 8090)     │   │
-│  │   - REST API (/api/collections/*)   │   │
-│  │   - Admin UI (/_/)                  │   │
-│  │   - SSE (/api/realtime)             │   │
-│  └──────────────┬───────────────────────┘   │
-│  ┌──────────────▼───────────────────────┐   │
-│  │   SQLite Database (pb_data/data.db) │   │
-│  │   - users, moods, interactions      │   │
-│  └──────────────────────────────────────┘   │
+│ Pocketbase Backend (VPS - Hetzner CX11) │
+│ ┌──────────────────────────────────────┐ │
+│ │ Caddy Reverse Proxy (SSL/TLS) │ │
+│ └──────────────┬───────────────────────┘ │
+│ ┌──────────────▼───────────────────────┐ │
+│ │ Pocketbase Server (Port 8090) │ │
+│ │ - REST API (/api/collections/\*) │ │
+│ │ - Admin UI (/\_/) │ │
+│ │ - SSE (/api/realtime) │ │
+│ └──────────────┬───────────────────────┘ │
+│ ┌──────────────▼───────────────────────┐ │
+│ │ SQLite Database (pb_data/data.db) │ │
+│ │ - users, moods, interactions │ │
+│ └──────────────────────────────────────┘ │
 └─────────────────────────────────────────────┘
+
 ```
 
 **Data Flow:**
 ```
+
 User logs mood → PWA → pocketbaseService.saveMood()
-                          ↓
-                  POST /api/collections/moods/records
-                          ↓
-                  Pocketbase validates + saves to SQLite
-                          ↓
-                  Broadcasts SSE event to subscribers
-                          ↓
-                  Partner's PWA receives realtime update (<50ms)
-                          ↓
-                  Partner sees notification "She's feeling happy!"
-```
+↓
+POST /api/collections/moods/records
+↓
+Pocketbase validates + saves to SQLite
+↓
+Broadcasts SSE event to subscribers
+↓
+Partner's PWA receives realtime update (<50ms)
+↓
+Partner sees notification "She's feeling happy!"
+
+````
 
 **Collections Schema:**
 ```typescript
@@ -270,9 +293,10 @@ User logs mood → PWA → pocketbaseService.saveMood()
   timestamp: datetime,           // Auto-generated
   viewed: boolean                // Mark as read
 }
-```
+````
 
 **Deployment:**
+
 - VPS: Hetzner CX11 (€4/month, 1GB RAM, 20GB SSD, Frankfurt datacenter)
 - OS: Ubuntu 22.04 LTS
 - Reverse Proxy: Caddy (automatic Let's Encrypt SSL)
@@ -280,6 +304,7 @@ User logs mood → PWA → pocketbaseService.saveMood()
 - Backups: Daily cron job → S3-compatible storage
 
 **Security:**
+
 - HTTPS/TLS required (enforced by Caddy)
 - JWT authentication with httpOnly cookies
 - Collection-level access rules (`@request.auth.id = user`)
@@ -287,10 +312,12 @@ User logs mood → PWA → pocketbaseService.saveMood()
 - Rate limiting via Pocketbase settings
 
 **Maintenance:**
+
 - Updates: `./pocketbase update` (manual, requires changelog review for pre-1.0)
 - Backups: Automated daily via cron (SQLite file + pb_data directory)
 - Monitoring: Systemd status, disk usage, SSL expiry checks
-```
+
+````
 
 **4. Tech Spec Epic 6 (NEW FILE NEEDED)**
 
@@ -398,7 +425,7 @@ Functional Requirements - Mood Tracking & Sync:
 + FR020: System SHALL sync mood entries to **Pocketbase backend** via **realtime subscriptions** for **instant (<50ms)** partner visibility
 - FR021: System SHALL display mood history in calendar view
 - FR022: System SHALL support optional notes with each mood entry
-```
+````
 
 **Rationale:** Specify technology choice and performance requirement
 
@@ -538,7 +565,7 @@ Prerequisites: Story 6.4
 
 **Change 4.7: Add Backend Services Section**
 
-*Insert new section after "Service Layer" section (around line 260):*
+_Insert new section after "Service Layer" section (around line 260):_
 
 ```markdown
 ## Backend Services (Epic 6+)
@@ -548,6 +575,7 @@ Prerequisites: Story 6.4
 **Purpose:** Realtime mood synchronization, poke/kiss interactions, user authentication
 
 **Technology:**
+
 - Platform: Pocketbase v0.33+ (open source, MIT license)
 - Database: SQLite (embedded, file-based)
 - API: REST + realtime SSE subscriptions
@@ -564,7 +592,8 @@ Prerequisites: Story 6.4
 
 **Change 4.8: Create docs/tech-spec-epic-6.md**
 
-*New file with sections:*
+_New file with sections:_
+
 1. Overview (Epic 6 goals and Pocketbase integration strategy)
 2. Pocketbase Deployment Runbook (step-by-step VPS setup)
 3. Collection Schemas (TypeScript interfaces + Pocketbase configs)
@@ -583,7 +612,7 @@ Prerequisites: Story 6.4
 
 **Change 4.9: Add Pocketbase Environment Variables**
 
-*File: `.env.example` (create if doesn't exist)*
+_File: `.env.example` (create if doesn't exist)_
 
 ```bash
 # Pocketbase Backend Configuration (Epic 6)
@@ -619,6 +648,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ### Change Scope Classification: **MODERATE**
 
 **Criteria Met:**
+
 - ✅ Affects multiple stories (3 out of 6 in Epic 6)
 - ✅ Requires backlog reorganization (Story 6.1 AC rewrite, effort re-estimation)
 - ✅ Documentation updates needed (PRD, epics, architecture)
@@ -627,12 +657,14 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 - ❌ Does NOT affect completed epics (Epic 1-5 unaffected)
 
 **Why Moderate (not Major):**
+
 - Epic 6 not yet started (no rework of completed code)
 - Changes isolated to backend integration layer
 - Core user-facing features unchanged (mood tracking, poke/kiss UX same)
 - Timeline impact manageable (+1 week)
 
 **Why Moderate (not Minor):**
+
 - Infrastructure complexity (VPS deployment, SSL, backups)
 - Multiple document updates required
 - Learning curve for server administration
@@ -643,6 +675,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ### Handoff Recipients & Responsibilities
 
 **Primary:** Development Team (Frank)
+
 - **Responsibility:** Implement Story 6.1 using Pocketbase
 - **Deliverables:**
   1. Pocketbase VPS deployed with SSL/TLS
@@ -653,6 +686,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
   6. Tech Spec Epic 6 created
 
 **Secondary:** Product Owner / Scrum Master (Frank - dual role)
+
 - **Responsibility:** Backlog reorganization
 - **Deliverables:**
   1. Update sprint planning with revised Story 6.1 effort (11-17 hours)
@@ -661,6 +695,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
   4. Monitor for scope creep in remaining Epic 6 stories
 
 **Tertiary:** Architect (Frank - dual role)
+
 - **Responsibility:** Technical decision documentation
 - **Deliverables:**
   1. Architecture Decision Record (ADR) for NocoDB → Pocketbase switch
@@ -673,6 +708,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ### Success Criteria
 
 **Technical Success:**
+
 - [ ] Pocketbase deployed with 99.9% uptime for 7 days post-deployment
 - [ ] Realtime mood updates propagate partner-to-partner in <50ms (p95)
 - [ ] JWT authentication works without security vulnerabilities
@@ -680,6 +716,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 - [ ] All Epic 6 stories pass acceptance testing using Pocketbase backend
 
 **Documentation Success:**
+
 - [ ] PRD updated with NFR007 and FR020 revisions
 - [ ] Epics.md reflects new Story 6.1 ACs (10 criteria)
 - [ ] Architecture.md includes Backend Services section
@@ -687,12 +724,14 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 - [ ] Environment variables documented in .env.example
 
 **Process Success:**
+
 - [ ] Change decision documented in `/docs/decisions/` (ADR format)
 - [ ] Sprint status updated with revised Epic 6 timeline
 - [ ] Retrospective includes lessons learned on backend evaluation process
 - [ ] No scope creep beyond approved changes in this proposal
 
 **Business Success:**
+
 - [ ] UX improvement validated: partner receives mood updates instantly (user testing)
 - [ ] Battery drain reduced vs polling approach (measurable via Chrome DevTools)
 - [ ] Total Epic 6 cost (development time + hosting) remains within acceptable budget
@@ -703,16 +742,19 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ### Implementation Timeline
 
 **Week 1: Infrastructure Setup (Story 6.1 Part 1)**
+
 - [ ] Day 1-2: VPS provisioning, OS hardening, SSH setup (4-6 hours)
 - [ ] Day 3-4: Pocketbase deployment, SSL configuration, systemd service (2-3 hours)
 - [ ] Day 5: Collection schema design, Admin UI setup (1-2 hours)
 
 **Week 2: API Integration (Story 6.1 Part 2)**
+
 - [ ] Day 1-2: Implement pocketbaseService.ts with SDK (2-3 hours)
 - [ ] Day 3-4: Realtime subscriptions testing, auth flow validation (2-3 hours)
 - [ ] Day 5: Backup automation, monitoring setup (2 hours)
 
 **Week 3: Documentation & Handoff**
+
 - [ ] Day 1-2: Update PRD, epics, architecture docs (3-4 hours)
 - [ ] Day 3-4: Create Tech Spec Epic 6 (4-6 hours)
 - [ ] Day 5: Code review, deployment verification, ADR creation (2-3 hours)
@@ -725,27 +767,29 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ### Risk Monitoring & Escalation
 
 **Monitor These Signals:**
+
 1. **Deployment blockers** (VPS issues, SSL failures, DNS problems)
-   - *Escalate to:* DevOps community forums, Pocketbase Discord
-   - *Threshold:* Stuck for >4 hours on single issue
+   - _Escalate to:_ DevOps community forums, Pocketbase Discord
+   - _Threshold:_ Stuck for >4 hours on single issue
 
 2. **Pre-1.0 breaking changes** (Pocketbase updates cause issues)
-   - *Escalate to:* Pin to v0.33 until Epic 6 complete, defer updates
-   - *Threshold:* Any breaking change announcement in Pocketbase changelog
+   - _Escalate to:_ Pin to v0.33 until Epic 6 complete, defer updates
+   - _Threshold:_ Any breaking change announcement in Pocketbase changelog
 
 3. **Realtime performance** (SSE latency >100ms p95)
-   - *Escalate to:* Review VPS network performance, consider provider switch
-   - *Threshold:* Consistent >100ms latency over 7 days
+   - _Escalate to:_ Review VPS network performance, consider provider switch
+   - _Threshold:_ Consistent >100ms latency over 7 days
 
 4. **Security vulnerabilities** (new CVEs in Pocketbase discovered)
-   - *Escalate to:* Immediate patch or mitigation, re-evaluate backend choice
-   - *Threshold:* Any CVE with CVSS >7.0
+   - _Escalate to:_ Immediate patch or mitigation, re-evaluate backend choice
+   - _Threshold:_ Any CVE with CVSS >7.0
 
 5. **Maintenance burden** (>4 hours/month actual time spent)
-   - *Escalate to:* Consider managed Pocketbase hosting or NocoDB Cloud migration
-   - *Threshold:* 3 consecutive months >4 hours maintenance
+   - _Escalate to:_ Consider managed Pocketbase hosting or NocoDB Cloud migration
+   - _Threshold:_ 3 consecutive months >4 hours maintenance
 
 **Rollback Plan (If Critical Failure):**
+
 1. Deploy NocoDB Cloud free tier (2-4 hours)
 2. Export Pocketbase data to JSON
 3. Import to NocoDB via API
@@ -754,6 +798,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 6. Total rollback effort: 10-16 hours
 
 **Rollback Triggers:**
+
 - Pocketbase deployment failure after 20+ hours effort
 - Security breach discovered in Pocketbase infrastructure
 - VPS costs exceed $15/month (3x budget)
@@ -764,6 +809,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ### Next Actions (Immediate)
 
 **For Frank (This Week):**
+
 1. ✅ **Approve this Sprint Change Proposal** (DONE)
 2. [ ] **Create VPS account** (Hetzner recommended: https://www.hetzner.com/cloud)
 3. [ ] **Register domain or subdomain** (if not already owned) for Pocketbase deployment
@@ -772,6 +818,7 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 6. [ ] **Begin Story 6.1 implementation** following Tech Spec Epic 6 (to be created)
 
 **For Documentation (Next Week):**
+
 1. [ ] **Update PRD** with Changes 4.1, 4.2, 4.3 (30 min)
 2. [ ] **Update epics.md** with Changes 4.4, 4.5, 4.6 (1 hour)
 3. [ ] **Update architecture.md** with Change 4.7 (1 hour)
@@ -785,9 +832,11 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ## Appendix: Expert Panel Recommendations Summary
 
 ### Backend Architect (Strong Pocketbase)
+
 > "Pocketbase is purpose-built for your use case. NocoDB lacks realtime support and adds unnecessary abstraction overhead. The pre-1.0 risk is minor compared to NocoDB's functional gaps."
 
 **Key Points:**
+
 - Built-in realtime subscriptions (SSE/WebSocket)
 - Clean relational data model (no spreadsheet overhead)
 - Official TypeScript SDK with excellent DX
@@ -796,9 +845,11 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ---
 
 ### Security Engineer (Strong Pocketbase)
+
 > "NocoDB has 3 known CVEs from 2023 (XSS, SQL injection, file upload). Pocketbase has zero known vulnerabilities and built-in JWT auth. For intimate relationship data, Pocketbase is the clear choice."
 
 **Key Points:**
+
 - Clean security track record (no CVEs)
 - Built-in authentication + OAuth2
 - Collection-level access control
@@ -807,9 +858,11 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ---
 
 ### Performance Engineer (Strong Pocketbase)
+
 > "Pocketbase delivers 90% better battery efficiency via realtime SSE vs NocoDB's polling workaround. For a couple's PWA where instant mood updates matter, NocoDB's lack of realtime is disqualifying."
 
 **Key Points:**
+
 - <50ms realtime latency (SSE)
 - 20 mAh/day battery (vs 200 mAh with polling)
 - Native PWA offline-first support
@@ -818,9 +871,11 @@ VITE_POCKETBASE_ADMIN_EMAIL=admin@example.com  # For initial setup only
 ---
 
 ### DevOps Architect (Moderate NocoDB Cloud, Acknowledges Pocketbase Superiority)
+
 > "NocoDB Cloud is easier to deploy (2-4 hours vs 10-20 hours), but the realtime gap is a deal-breaker. If you accept the learning curve, Pocketbase is the better long-term choice."
 
 **Key Points:**
+
 - Easier initial deployment (NocoDB Cloud)
 - Lower maintenance burden (NocoDB Cloud: 30 min/month)
 - BUT: Realtime gap disqualifies NocoDB for this use case

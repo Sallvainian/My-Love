@@ -8,36 +8,41 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Story 4.3: Photo Carousel with Animated Transitions - E2E Test Suite
- * 
+ *
  * Tests cover all acceptance criteria (AC-4.3.1 through AC-4.3.9)
  * Builds on Story 4.2's photo gallery grid view foundation
  */
 
 // Helper: Upload a single test photo via PhotoUpload modal
-async function uploadTestPhoto(page: any, photoFileName: string, caption?: string, tags?: string[]) {
+async function uploadTestPhoto(
+  page: any,
+  photoFileName: string,
+  caption?: string,
+  tags?: string[]
+) {
   // Open Photos tab
   await page.click('[data-testid="nav-photos"]');
-  
+
   // If empty state, click \"Upload Photo\" button
   const emptyStateButton = page.locator('[data-testid="photo-gallery-empty-upload-button"]');
   const isEmptyState = await emptyStateButton.isVisible().catch(() => false);
-  
+
   if (isEmptyState) {
     await emptyStateButton.click();
   }
-  
+
   // Wait for PhotoUpload modal
   await page.waitForSelector('[data-testid="photo-upload-modal"]', { timeout: 5000 });
-  
+
   // Select file
   const filePath = path.join(__dirname, '..', 'fixtures', photoFileName);
   await page.setInputFiles('[data-testid="photo-upload-file-input"]', filePath);
-  
+
   // Add caption if provided
   if (caption) {
     await page.fill('[data-testid="photo-upload-caption-input"]', caption);
   }
-  
+
   // Add tags if provided
   if (tags && tags.length > 0) {
     for (const tag of tags) {
@@ -45,16 +50,22 @@ async function uploadTestPhoto(page: any, photoFileName: string, caption?: strin
       await page.keyboard.press('Enter');
     }
   }
-  
+
   // Submit upload
   await page.click('[data-testid="photo-upload-submit-button"]');
-  
+
   // Wait for upload to complete
-  await page.waitForSelector('[data-testid="photo-upload-modal"]', { state: 'hidden', timeout: 10000 });
+  await page.waitForSelector('[data-testid="photo-upload-modal"]', {
+    state: 'hidden',
+    timeout: 10000,
+  });
 }
 
 // Helper: Upload multiple test photos
-async function uploadMultiplePhotos(page: any, photos: Array<{ fileName: string; caption?: string; tags?: string[] }>) {
+async function uploadMultiplePhotos(
+  page: any,
+  photos: Array<{ fileName: string; caption?: string; tags?: string[] }>
+) {
   for (const photo of photos) {
     await uploadTestPhoto(page, photo.fileName, photo.caption, photo.tags);
     await page.waitForTimeout(200); // Brief pause between uploads
@@ -66,9 +77,9 @@ test.describe('Photo Carousel - Story 4.3', () => {
     // Clear all storage for clean state
     await context.clearCookies();
     await context.clearPermissions();
-    
+
     await page.goto('/');
-    
+
     // Clear IndexedDB to prevent version conflicts
     await page.evaluate(() => {
       return new Promise<void>((resolve) => {
@@ -78,25 +89,27 @@ test.describe('Photo Carousel - Story 4.3', () => {
         deleteRequest.onblocked = () => setTimeout(() => resolve(), 100);
       });
     });
-    
+
     // Clear localStorage
     await page.evaluate(() => localStorage.clear());
-    
+
     // Reload after clearing
     await page.reload();
-    
+
     // Handle welcome splash if present
     const continueButton = page.locator('button:has-text("Continue")');
     if (await continueButton.isVisible().catch(() => false)) {
       await continueButton.click();
       await page.waitForSelector('button:has-text("Continue")', { state: 'hidden', timeout: 5000 });
     }
-    
+
     // Wait for app initialization
     await page.waitForSelector('[data-testid="daily-message-container"]', { timeout: 10000 });
   });
 
-  test('AC-4.3.1: Tap grid photo opens full-screen carousel with correct photo', async ({ page }) => {
+  test('AC-4.3.1: Tap grid photo opens full-screen carousel with correct photo', async ({
+    page,
+  }) => {
     // Upload 3 test photos
     await uploadMultiplePhotos(page, [
       { fileName: 'test-image.jpg', caption: 'Photo 1', tags: ['test'] },
@@ -115,7 +128,7 @@ test.describe('Photo Carousel - Story 4.3', () => {
 
     // Verify correct photo is displayed (Photo 2)
     await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 2');
-    
+
     // Verify full-screen overlay
     await expect(carousel).toHaveCSS('position', 'fixed');
     await expect(carousel).toHaveCSS('z-index', '50');
@@ -152,7 +165,9 @@ test.describe('Photo Carousel - Story 4.3', () => {
     }
 
     // Verify navigated to Photo 4
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 4', { timeout: 1000 });
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 4', {
+      timeout: 1000,
+    });
 
     // Simulate swipe right (drag left-to-right > 50px to show previous photo)
     if (box) {
@@ -163,7 +178,9 @@ test.describe('Photo Carousel - Story 4.3', () => {
     }
 
     // Verify navigated back to Photo 3
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 3', { timeout: 1000 });
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 3', {
+      timeout: 1000,
+    });
   });
 
   test('AC-4.3.3: Photo displayed at optimal size maintaining aspect ratio', async ({ page }) => {
@@ -192,12 +209,18 @@ test.describe('Photo Carousel - Story 4.3', () => {
 
   test('AC-4.3.4: Caption and tags displayed correctly', async ({ page }) => {
     // Test 1: Photo with both caption and tags
-    await uploadTestPhoto(page, 'test-image.jpg', 'Beautiful sunset at the beach', ['sunset', 'beach', 'nature']);
+    await uploadTestPhoto(page, 'test-image.jpg', 'Beautiful sunset at the beach', [
+      'sunset',
+      'beach',
+      'nature',
+    ]);
     await page.click('[data-testid="photo-grid-item"]');
 
     // Verify caption displayed
     await expect(page.locator('[data-testid="photo-carousel-caption"]')).toBeVisible();
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Beautiful sunset at the beach');
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText(
+      'Beautiful sunset at the beach'
+    );
 
     // Verify tags displayed
     const tags = page.locator('[data-testid^="photo-carousel-tag-"]');
@@ -223,7 +246,7 @@ test.describe('Photo Carousel - Story 4.3', () => {
     // Test 1: Close with X button
     await page.click('[data-testid="photo-grid-item"]');
     await expect(page.locator('[data-testid="photo-carousel"]')).toBeVisible();
-    
+
     await page.click('[data-testid="photo-carousel-close-button"]');
     await expect(page.locator('[data-testid="photo-carousel"]')).not.toBeVisible();
 
@@ -265,18 +288,26 @@ test.describe('Photo Carousel - Story 4.3', () => {
 
     // Test ArrowRight → next photo
     await page.keyboard.press('ArrowRight');
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 4', { timeout: 500 });
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 4', {
+      timeout: 500,
+    });
 
     // Test ArrowRight again
     await page.keyboard.press('ArrowRight');
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 5', { timeout: 500 });
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 5', {
+      timeout: 500,
+    });
 
     // Test ArrowLeft → previous photo
     await page.keyboard.press('ArrowLeft');
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 4', { timeout: 500 });
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 4', {
+      timeout: 500,
+    });
 
     await page.keyboard.press('ArrowLeft');
-    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 3', { timeout: 500 });
+    await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Photo 3', {
+      timeout: 500,
+    });
 
     // Test Escape → close carousel
     await page.keyboard.press('Escape');
@@ -291,7 +322,7 @@ test.describe('Photo Carousel - Story 4.3', () => {
 
     // Open carousel (entrance animation)
     await page.click('[data-testid="photo-grid-item"]');
-    
+
     // Wait for entrance animation to complete (300ms + buffer)
     await page.waitForTimeout(400);
     await expect(page.locator('[data-testid="photo-carousel"]')).toBeVisible();
@@ -366,10 +397,10 @@ test.describe('Photo Carousel - Story 4.3', () => {
     // Verify middle photo allows navigation in both directions
     await page.keyboard.press('ArrowLeft'); // Back to middle
     await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Middle');
-    
+
     await page.keyboard.press('ArrowLeft'); // Can go back to first
     await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('First');
-    
+
     await page.keyboard.press('ArrowRight'); // Can go forward to middle
     await expect(page.locator('[data-testid="photo-carousel-caption"]')).toHaveText('Middle');
   });

@@ -17,13 +17,7 @@ import { VALIDATION_LIMITS } from '../config/performance';
  * Message category enum validation
  * Ensures only valid categories are accepted
  */
-const MessageCategorySchema = z.enum([
-  'reason',
-  'memory',
-  'affirmation',
-  'future',
-  'custom'
-]);
+const MessageCategorySchema = z.enum(['reason', 'memory', 'affirmation', 'future', 'custom']);
 
 /**
  * Full message schema for existing messages
@@ -31,7 +25,13 @@ const MessageCategorySchema = z.enum([
  */
 export const MessageSchema = z.object({
   id: z.number().int().positive().optional(),
-  text: z.string().min(1, 'Message text cannot be empty').max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH, `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`),
+  text: z
+    .string()
+    .min(1, 'Message text cannot be empty')
+    .max(
+      VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH,
+      `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`
+    ),
   category: MessageCategorySchema,
   isCustom: z.boolean(),
   active: z.boolean().default(true),
@@ -46,7 +46,14 @@ export const MessageSchema = z.object({
  * Validates user input before message creation
  */
 export const CreateMessageInputSchema = z.object({
-  text: z.string().trim().min(1, 'Message text cannot be empty').max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH, `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Message text cannot be empty')
+    .max(
+      VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH,
+      `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`
+    ),
   category: MessageCategorySchema,
   active: z.boolean().default(true),
   tags: z.array(z.string()).optional(),
@@ -58,7 +65,15 @@ export const CreateMessageInputSchema = z.object({
  */
 export const UpdateMessageInputSchema = z.object({
   id: z.number().int().positive(),
-  text: z.string().trim().min(1, 'Message text cannot be empty').max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH, `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`).optional(),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Message text cannot be empty')
+    .max(
+      VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH,
+      `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`
+    )
+    .optional(),
   category: MessageCategorySchema.optional(),
   active: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
@@ -118,23 +133,15 @@ export type PhotoUploadInputType = z.infer<typeof PhotoUploadInputSchema>;
  * Mood type enum validation
  * Ensures only valid mood types are accepted
  */
-const MoodTypeSchema = z.enum([
-  'loved',
-  'happy',
-  'content',
-  'thoughtful',
-  'grateful'
-]);
+const MoodTypeSchema = z.enum(['loved', 'happy', 'content', 'thoughtful', 'grateful']);
 
 /**
  * ISO date format validation (YYYY-MM-DD)
  * Ensures consistent date format across the app and validates actual date values
  */
-const IsoDateStringSchema = z.string()
-  .regex(
-    /^\d{4}-\d{2}-\d{2}$/,
-    'Date must be in ISO format (YYYY-MM-DD)'
-  )
+const IsoDateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
   .refine((date) => {
     // Additional validation: check if date is actually valid
     const [_year, month, day] = date.split('-').map(Number);
@@ -173,11 +180,9 @@ const ThemeNameSchema = z.enum(['sunset', 'ocean', 'lavender', 'rose']);
  * Time format validation (HH:MM)
  * Ensures consistent time format for notifications and validates hour/minute ranges
  */
-const TimeFormatSchema = z.string()
-  .regex(
-    /^\d{2}:\d{2}$/,
-    'Time must be in HH:MM format'
-  )
+const TimeFormatSchema = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format')
   .refine((time) => {
     const [hour, minute] = time.split(':').map(Number);
     return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;

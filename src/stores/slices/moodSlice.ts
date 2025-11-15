@@ -28,12 +28,7 @@ export interface MoodSlice {
   getMoodForDate: (date: string) => MoodEntry | undefined;
 }
 
-export const createMoodSlice: StateCreator<
-  MoodSlice,
-  [],
-  [],
-  MoodSlice
-> = (set, get) => ({
+export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set, get) => ({
   // Initial state
   moods: [],
 

@@ -40,8 +40,9 @@ export class ErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (this.state.hasError) {
       // P1 Fix: Detect validation errors and show user-friendly messaging
-      const isValidationError = this.state.error?.message.includes('Validation failed') ||
-                                this.state.error?.message.includes('Invalid');
+      const isValidationError =
+        this.state.error?.message.includes('Validation failed') ||
+        this.state.error?.message.includes('Invalid');
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">

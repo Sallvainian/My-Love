@@ -79,7 +79,7 @@ describe('Message Validation Schemas', () => {
     it('should accept all valid categories', () => {
       const categories = ['reason', 'memory', 'affirmation', 'future', 'custom'];
 
-      categories.forEach(category => {
+      categories.forEach((category) => {
         const message = {
           text: 'Test message',
           category,
@@ -310,7 +310,7 @@ describe('Photo Validation Schema', () => {
     it('should accept all valid MIME types', () => {
       const mimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
-      mimeTypes.forEach(mimeType => {
+      mimeTypes.forEach((mimeType) => {
         const photo = {
           ...createValidPhoto(),
           mimeType,
@@ -347,7 +347,7 @@ describe('Mood Validation Schema', () => {
     it('should accept all valid mood types', () => {
       const moods = ['loved', 'happy', 'content', 'thoughtful', 'grateful'];
 
-      moods.forEach(mood => {
+      moods.forEach((mood) => {
         const entry = {
           date: '2024-11-14',
           mood,
@@ -372,10 +372,10 @@ describe('Mood Validation Schema', () => {
         '2024-11-32', // Invalid day
         '11-14-2024', // Wrong format
         '2024/11/14', // Wrong separator
-        '2024-1-1',   // Missing leading zeros
+        '2024-1-1', // Missing leading zeros
       ];
 
-      invalidDates.forEach(date => {
+      invalidDates.forEach((date) => {
         const mood = {
           date,
           mood: 'loved' as const,
@@ -392,7 +392,7 @@ describe('Mood Validation Schema', () => {
         '2024-02-30', // Feb 30 doesn't exist even in leap years
       ];
 
-      invalidLeapYearDates.forEach(date => {
+      invalidLeapYearDates.forEach((date) => {
         const mood = {
           date,
           mood: 'loved' as const,
@@ -403,13 +403,9 @@ describe('Mood Validation Schema', () => {
     });
 
     it('should accept valid ISO date formats', () => {
-      const validDates = [
-        '2024-01-01',
-        '2024-12-31',
-        '2025-06-15',
-      ];
+      const validDates = ['2024-01-01', '2024-12-31', '2025-06-15'];
 
-      validDates.forEach(date => {
+      validDates.forEach((date) => {
         const mood = {
           date,
           mood: 'loved' as const,
@@ -486,7 +482,7 @@ describe('Settings Validation Schema', () => {
     it('should accept all valid themes', () => {
       const themes = ['sunset', 'ocean', 'lavender', 'rose'];
 
-      themes.forEach(themeName => {
+      themes.forEach((themeName) => {
         const settings = {
           ...createValidSettings(),
           themeName,
@@ -514,14 +510,14 @@ describe('Settings Validation Schema', () => {
 
     it('should reject invalid time format', () => {
       const invalidTimes = [
-        '9:00',     // Missing leading zero
-        '09:0',     // Missing trailing zero
-        '09-00',    // Wrong separator
-        '25:00',    // Invalid hour
-        '09:60',    // Invalid minute
+        '9:00', // Missing leading zero
+        '09:0', // Missing trailing zero
+        '09-00', // Wrong separator
+        '25:00', // Invalid hour
+        '09:60', // Invalid minute
       ];
 
-      invalidTimes.forEach(notificationTime => {
+      invalidTimes.forEach((notificationTime) => {
         const settings = {
           ...createValidSettings(),
           notificationTime,
@@ -532,14 +528,9 @@ describe('Settings Validation Schema', () => {
     });
 
     it('should accept valid time formats', () => {
-      const validTimes = [
-        '00:00',
-        '09:30',
-        '12:00',
-        '23:59',
-      ];
+      const validTimes = ['00:00', '09:30', '12:00', '23:59'];
 
-      validTimes.forEach(notificationTime => {
+      validTimes.forEach((notificationTime) => {
         const settings = {
           ...createValidSettings(),
           notificationTime,

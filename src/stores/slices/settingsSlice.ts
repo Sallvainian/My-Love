@@ -115,7 +115,7 @@ export const createSettingsSlice: StateCreator<
         if (state.error !== undefined) {
           set({
             error: 'Failed to load saved settings. App will reinitialize with defaults.',
-            isLoading: false
+            isLoading: false,
           } as any);
         }
 
@@ -196,7 +196,10 @@ export const createSettingsSlice: StateCreator<
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
-        console.error('[Settings] Validation failed:', createValidationError(error as ZodError).message);
+        console.error(
+          '[Settings] Validation failed:',
+          createValidationError(error as ZodError).message
+        );
         throw createValidationError(error as ZodError);
       }
       throw error;
@@ -214,7 +217,10 @@ export const createSettingsSlice: StateCreator<
       } catch (error) {
         // Transform Zod validation errors into user-friendly messages
         if (isZodError(error)) {
-          console.error('[Settings] Validation failed:', createValidationError(error as ZodError).message);
+          console.error(
+            '[Settings] Validation failed:',
+            createValidationError(error as ZodError).message
+          );
           throw createValidationError(error as ZodError);
         }
         throw error;
@@ -230,8 +236,7 @@ export const createSettingsSlice: StateCreator<
   addAnniversary: (anniversary) => {
     const { settings } = get();
     if (settings) {
-      const newId =
-        Math.max(0, ...settings.relationship.anniversaries.map((a) => a.id)) + 1;
+      const newId = Math.max(0, ...settings.relationship.anniversaries.map((a) => a.id)) + 1;
       const newAnniversary: Anniversary = { ...anniversary, id: newId };
 
       set({
@@ -254,9 +259,7 @@ export const createSettingsSlice: StateCreator<
           ...settings,
           relationship: {
             ...settings.relationship,
-            anniversaries: settings.relationship.anniversaries.filter(
-              (a) => a.id !== id
-            ),
+            anniversaries: settings.relationship.anniversaries.filter((a) => a.id !== id),
           },
         },
       });

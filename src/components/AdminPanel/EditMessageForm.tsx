@@ -26,7 +26,8 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
   const maxLength = 500;
   const remainingChars = maxLength - text.length;
   const isValid = text.trim().length > 0 && text.length <= maxLength;
-  const hasChanges = text.trim() !== message.text || category !== message.category || active !== message.active;
+  const hasChanges =
+    text.trim() !== message.text || category !== message.category || active !== message.active;
 
   const handleSave = () => {
     if (isValid && hasChanges) {
@@ -94,7 +95,10 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
           <div className="p-6 space-y-6">
             {/* Message text */}
             <div>
-              <label htmlFor="edit-message-text" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="edit-message-text"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Message Text *
               </label>
               <textarea
@@ -111,9 +115,11 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
                 <p className="text-sm text-gray-500">
                   {text.length === 0 ? 'Required' : 'Characters used'}
                 </p>
-                <p className={`text-sm font-medium ${
-                  remainingChars < 50 ? 'text-orange-600' : 'text-gray-600'
-                }`}>
+                <p
+                  className={`text-sm font-medium ${
+                    remainingChars < 50 ? 'text-orange-600' : 'text-gray-600'
+                  }`}
+                >
                   {remainingChars} remaining
                 </p>
               </div>
@@ -121,7 +127,10 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
 
             {/* Category */}
             <div>
-              <label htmlFor="edit-category" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="edit-category"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Category *
               </label>
               <select
@@ -151,13 +160,11 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
                   data-testid="edit-message-active-toggle"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-700">
-                    Active in rotation
-                  </span>
+                  <span className="text-sm font-medium text-gray-700">Active in rotation</span>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {active
                       ? 'This message can appear in daily rotation'
-                      : 'This message is a draft and won\'t appear in rotation'}
+                      : "This message is a draft and won't appear in rotation"}
                   </p>
                 </div>
               </label>

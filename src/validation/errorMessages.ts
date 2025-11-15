@@ -25,22 +25,22 @@ export class ValidationError extends Error {
  * Maps technical field paths to user-friendly field names
  */
 const FIELD_NAME_MAP: Record<string, string> = {
-  'text': 'Message',
-  'category': 'Category',
-  'tags': 'Tags',
-  'caption': 'Caption',
-  'imageBlob': 'Image',
-  'file': 'File',
-  'width': 'Width',
-  'height': 'Height',
-  'mimeType': 'File type',
-  'originalSize': 'Original size',
-  'compressedSize': 'Compressed size',
-  'date': 'Date',
-  'mood': 'Mood',
-  'note': 'Note',
-  'themeName': 'Theme',
-  'notificationTime': 'Notification time',
+  text: 'Message',
+  category: 'Category',
+  tags: 'Tags',
+  caption: 'Caption',
+  imageBlob: 'Image',
+  file: 'File',
+  width: 'Width',
+  height: 'Height',
+  mimeType: 'File type',
+  originalSize: 'Original size',
+  compressedSize: 'Compressed size',
+  date: 'Date',
+  mood: 'Mood',
+  note: 'Note',
+  themeName: 'Theme',
+  notificationTime: 'Notification time',
   'relationship.startDate': 'Relationship start date',
   'relationship.partnerName': 'Partner name',
   'relationship.anniversaries': 'Anniversaries',
@@ -124,7 +124,7 @@ export function formatZodError(error: ZodError): string {
   }
 
   // Multiple errors: format as list
-  return fieldErrors.map(err => err.message).join(', ');
+  return fieldErrors.map((err) => err.message).join(', ');
 }
 
 /**
@@ -148,7 +148,7 @@ export function formatZodError(error: ZodError): string {
 export function getFieldErrors(error: ZodError): Map<string, string> {
   const fieldErrors = new Map<string, string>();
 
-  error.errors.forEach(issue => {
+  error.errors.forEach((issue) => {
     const { field, message } = formatIssue(issue);
     // Only store first error for each field
     if (!fieldErrors.has(field)) {

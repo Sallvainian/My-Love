@@ -27,12 +27,13 @@ This document tracks technical decisions, constraints, preferences, and consider
 **Context:** Mood tracking and poke/kiss features require data sharing between two users
 **Decision:** Implement lightweight backend using NocoDB (free tier) with API integration
 **Alternatives Considered:**
+
 - Supabase/Firebase (more complex than needed)
 - Google Sheets API (rate limits and auth complexity)
 - Full custom backend (overkill for simple sync)
-**Rationale:** NocoDB provides free hosting, simple REST API, and minimal setup while maintaining privacy. Keeps 95% of app client-side, only syncs minimal interactive data.
-**Impact:** Adds backend dependency but enables key relationship features
-**Date:** 2025-10-30
+  **Rationale:** NocoDB provides free hosting, simple REST API, and minimal setup while maintaining privacy. Keeps 95% of app client-side, only syncs minimal interactive data.
+  **Impact:** Adds backend dependency but enables key relationship features
+  **Date:** 2025-10-30
 
 ### Client-Side Architecture Maintained
 
@@ -41,22 +42,24 @@ This document tracks technical decisions, constraints, preferences, and consider
 **Rationale:** Aligns with privacy goals, offline-first approach, and zero-cost hosting. Persistence bug is fixable via Zustand persist configuration, not an architectural flaw.
 **Impact:** No backend needed for photos, messages, or personal data
 **Implementation Details:**
+
 - **Storage Layer:** IndexedDB for large data (photos, message library), LocalStorage for settings and small state
 - **State Management:** Zustand with persist middleware for state hydration across sessions
 - **Service Worker:** Workbox for offline caching and PWA functionality
-**Date:** 2025-10-30
+  **Date:** 2025-10-30
 
 ### Pre-configured Relationship Data
 
 **Context:** Story 1.4 removed onboarding flow and implemented hardcoded relationship data
 **Decision:** Hardcode relationship configuration in `src/config/constants.ts` for single-user deployment
 **Configuration Values:**
+
 - Partner Name: Gracie
 - Relationship Start Date: October 18, 2025
 - User Name: Frank
-**Rationale:** App is personal project for specific relationship, no need for generic onboarding flow. Pre-configuration simplifies UX and removes setup friction. Configuration is done by editing `src/config/constants.ts` directly with hardcoded values.
-**Implementation:** Configuration constants are hardcoded in `src/config/constants.ts` and bundled directly into the application at build time.
-**Date:** 2025-10-30
+  **Rationale:** App is personal project for specific relationship, no need for generic onboarding flow. Pre-configuration simplifies UX and removes setup friction. Configuration is done by editing `src/config/constants.ts` directly with hardcoded values.
+  **Implementation:** Configuration constants are hardcoded in `src/config/constants.ts` and bundled directly into the application at build time.
+  **Date:** 2025-10-30
 
 ---
 
@@ -162,6 +165,7 @@ The rapid vibe-coding produced **surprisingly clean code** with good architectur
 2. **[src/App.tsx:20](../src/App.tsx#L20) (1 warning)**
    - Rule: `react-hooks/exhaustive-deps`
    - Issue: useEffect missing dependency 'settings'
+
    ```typescript
    useEffect(() => {
      if (settings) {
@@ -169,6 +173,7 @@ The rapid vibe-coding produced **surprisingly clean code** with good architectur
      }
    }, [settings?.themeName]); // ⚠️ Should be [settings]
    ```
+
    - **Severity:** Medium - Potential stale closure bug
    - **Action:** Story 1.5 - Fix dependency array
 
@@ -180,6 +185,7 @@ The rapid vibe-coding produced **surprisingly clean code** with good architectur
      console.log('Share cancelled');
    }
    ```
+
    - **Severity:** Low - Dead code
    - **Action:** Story 1.5 - Remove unused variable or use underscore prefix
 
@@ -198,7 +204,9 @@ The rapid vibe-coding produced **surprisingly clean code** with good architectur
 
 ```typescript
 persist(
-  (set, get) => ({ /* store definition */ }),
+  (set, get) => ({
+    /* store definition */
+  }),
   {
     name: 'my-love-storage',
     partialize: (state) => ({
@@ -208,12 +216,13 @@ persist(
       moods: state.moods,
     }),
   }
-)
+);
 ```
 
 **Analysis:**
 
 ✅ **Good:**
+
 - Proper partialize strategy: Only persists settings/metadata, not heavy data
 - Messages and photos correctly excluded (stored in IndexedDB)
 - currentMessage excluded (computed on-the-fly)
@@ -245,7 +254,7 @@ persist(storeFactory, {
       localStorage.removeItem('my-love-storage');
     }
   },
-})
+});
 ```
 
 **Severity:** **CRITICAL** - Story 1.2 dependency
@@ -258,6 +267,7 @@ persist(storeFactory, {
 **Location:** [src/stores/useAppStore.ts](../src/stores/useAppStore.ts)
 
 **Strengths:**
+
 - Clean imperative action pattern
 - Good separation between persisted and in-memory state
 - Async actions properly handle errors (mostly)
@@ -277,6 +287,7 @@ persist(storeFactory, {
 **Location:** [src/services/storage.ts](../src/services/storage.ts)
 
 ✅ **Good:**
+
 - Clean wrapper around `idb` library
 - Proper schema definition with indexes
 - Singleton pattern appropriate
@@ -309,11 +320,13 @@ async addPhoto(photo: Omit<Photo, 'id'>): Promise<number> {
    - **Hypothesis:** Race condition between SW cache and IndexedDB transactions?
 
 **Severity:**
+
 - **CRITICAL** for Epic 3 (quota management)
 - Medium for Story 1.3 (SW compatibility)
 - Nice-to-have for migrations
 
 **Recommendation:**
+
 - Story 1.3: Investigate and document SW compatibility issue
 - **Before Epic 3:** Add quota management (3-4 hours estimated)
 - Story 1.5: Add database versioning strategy
@@ -404,6 +417,7 @@ PWA plugin properly configured. No issues found.
 **Location:** [package.json:11-12](../package.json#L11-L12)
 
 **Missing:**
+
 - No smoke tests before deployment
 - No deployment environment validation
 - No rollback strategy
@@ -420,6 +434,7 @@ PWA plugin properly configured. No issues found.
 **Observed Patterns:**
 
 1. **Silent Console Errors** (most common)
+
    ```typescript
    } catch (error) {
      console.error('Error loading messages:', error);
@@ -504,17 +519,18 @@ Run `npm audit` to check for known vulnerabilities (not performed in this audit)
 
 ### 8.1 Production Dependencies ✅ ALL USED
 
-| Package | Version | Usage | Notes |
-|---------|---------|-------|-------|
-| react | 19.1.1 | Core framework | Latest |
-| react-dom | 19.1.1 | Rendering | Latest |
-| zustand | 5.0.8 | State management | Core to app |
-| idb | 8.0.3 | IndexedDB wrapper | Used in storage.ts |
-| framer-motion | 12.23.24 | Animations | Heavy (~150KB), re-evaluate after Story 1.4 |
-| lucide-react | 0.548.0 | Icons | Multiple components |
-| workbox-window | 7.3.0 | PWA | Required by vite-plugin-pwa |
+| Package        | Version  | Usage             | Notes                                       |
+| -------------- | -------- | ----------------- | ------------------------------------------- |
+| react          | 19.1.1   | Core framework    | Latest                                      |
+| react-dom      | 19.1.1   | Rendering         | Latest                                      |
+| zustand        | 5.0.8    | State management  | Core to app                                 |
+| idb            | 8.0.3    | IndexedDB wrapper | Used in storage.ts                          |
+| framer-motion  | 12.23.24 | Animations        | Heavy (~150KB), re-evaluate after Story 1.4 |
+| lucide-react   | 0.548.0  | Icons             | Multiple components                         |
+| workbox-window | 7.3.0    | PWA               | Required by vite-plugin-pwa                 |
 
 **framer-motion Note:**
+
 - Large bundle size (~150KB gzipped)
 - Used extensively in Onboarding (removed in Story 1.4) and DailyMessage
 - **Action:** Story 1.4 - Re-evaluate after Onboarding removal
@@ -622,31 +638,37 @@ All dev dependencies verified as necessary. No unused dependencies found.
 ## 10. Effort Estimates
 
 ### Story 1.2: Fix Zustand Persist Middleware Configuration
+
 - **Estimate:** 2-3 hours
 - **Complexity:** Medium
 - **Dependencies:** None
 
 ### Story 1.3: IndexedDB Service Worker Cache Fix
+
 - **Estimate:** 3-4 hours
 - **Complexity:** Medium-High (investigative)
 - **Dependencies:** Story 1.2
 
 ### Story 1.4: Remove Onboarding Flow
+
 - **Estimate:** 2-3 hours
 - **Complexity:** Low-Medium
 - **Dependencies:** None
 
 ### Story 1.5: Critical Refactoring & Code Quality
+
 - **Estimate:** 6-8 hours (can be split)
 - **Complexity:** Medium
 - **Dependencies:** Stories 1.2, 1.3, 1.4
 
 ### Story 1.6: Build, Deployment & Configuration
+
 - **Estimate:** 4-5 hours
 - **Complexity:** Medium
 - **Dependencies:** All previous stories
 
 ### Epic 3 Blocker: IndexedDB Quota Management
+
 - **Estimate:** 3-4 hours
 - **Complexity:** Medium
 - **Dependencies:** Story 1.3
@@ -677,7 +699,7 @@ The My-Love codebase is in **good shape** for a rapid vibe-coded prototype. The 
 
 ---
 
-*End of Technical Debt Audit Report*
+_End of Technical Debt Audit Report_
 
 ---
 
@@ -713,11 +735,13 @@ class CustomMessageService {
 ### Implementation Details
 
 **Location:** `/src/validation/`
+
 - `schemas.ts` - Zod validation schemas for all data models
 - `errorMessages.ts` - Error transformation utilities
 - `index.ts` - Public API exports
 
 **Services with Validation:**
+
 - `customMessageService.ts` - Message creation/update validation
 - `photoStorageService.ts` - Photo upload/update validation
 - `migrationService.ts` - Settings and mood validation (backward compatible)
@@ -725,18 +749,18 @@ class CustomMessageService {
 
 **Validation Rules:**
 
-| Model | Field | Validation |
-|-------|-------|------------|
-| **Message** | text | min: 1, max: 1000 chars (trimmed) |
-| **Message** | category | enum: reason, memory, affirmation, future, custom |
-| **Photo** | caption | max: 500 chars, optional |
-| **Photo** | imageBlob | Blob instance check |
-| **Photo** | width/height | positive integers |
-| **Photo** | sizes | positive numbers |
-| **MoodEntry** | date | ISO format (YYYY-MM-DD) with value validation |
-| **MoodEntry** | mood | enum: loved, happy, content, thoughtful, grateful |
-| **Settings** | themeName | enum: sunset, ocean, lavender, rose |
-| **Settings** | time | HH:MM format with value validation (00:00-23:59) |
+| Model         | Field        | Validation                                        |
+| ------------- | ------------ | ------------------------------------------------- |
+| **Message**   | text         | min: 1, max: 1000 chars (trimmed)                 |
+| **Message**   | category     | enum: reason, memory, affirmation, future, custom |
+| **Photo**     | caption      | max: 500 chars, optional                          |
+| **Photo**     | imageBlob    | Blob instance check                               |
+| **Photo**     | width/height | positive integers                                 |
+| **Photo**     | sizes        | positive numbers                                  |
+| **MoodEntry** | date         | ISO format (YYYY-MM-DD) with value validation     |
+| **MoodEntry** | mood         | enum: loved, happy, content, thoughtful, grateful |
+| **Settings**  | themeName    | enum: sunset, ocean, lavender, rose               |
+| **Settings**  | time         | HH:MM format with value validation (00:00-23:59)  |
 
 ### Error Handling Pattern
 
@@ -754,6 +778,7 @@ try {
 ```
 
 **Error Transformation:**
+
 - `formatZodError()` - Converts Zod errors to single user-friendly message
 - `getFieldErrors()` - Returns Map of field-specific errors for forms
 - `createValidationError()` - Creates custom ValidationError with field details
@@ -793,12 +818,14 @@ This prevents app initialization from failing due to validation errors in existi
 ### Testing Coverage
 
 **Unit Tests:** 76 comprehensive tests covering:
+
 - Schema validation for all data models (messages, photos, moods, settings)
 - Edge cases (empty strings, max lengths, boundary values)
 - Error message transformation
 - Type guards and error handling utilities
 
 **Test Files:**
+
 - `tests/unit/validation/schemas.test.ts` - Schema validation tests
 - `tests/unit/validation/errorMessages.test.ts` - Error utility tests
 
@@ -807,12 +834,14 @@ This prevents app initialization from failing due to validation errors in existi
 ### Implementation Status
 
 **Phase 1: Infrastructure** ✅ COMPLETE (2025-11-14)
+
 - Zod validation library installed (v3.25.76)
 - Validation schemas created for all data models
 - Error transformation utilities implemented
 - 76 comprehensive unit tests (100% schema coverage)
 
 **Phase 2: Service Integration** ✅ COMPLETE (2025-11-14)
+
 - `customMessageService.ts`: Full validation integration
 - `photoStorageService.ts`: Full validation integration (create + update)
 - `migrationService.ts`: Full validation integration with backward compatibility
@@ -820,10 +849,12 @@ This prevents app initialization from failing due to validation errors in existi
 - Integration tests added: 338 additional tests across 3 test files
 
 **Phase 3: UI Integration** 📋 FUTURE WORK
+
 - Form-level error display (field-specific validation messages)
 - Planned for future story (AC7 completion from Story 5.5)
 
 **Phase 4: Data Repair** 📋 FUTURE WORK
+
 - Legacy data repair utilities
 - Migration validation reports
 
@@ -839,6 +870,7 @@ This prevents app initialization from failing due to validation errors in existi
 ### Benefits Achieved
 
 **Problems Prevented:**
+
 1. Empty messages causing blank cards
 2. Invalid categories breaking filters
 3. Photo captions exceeding UI layout limits (>500 chars)
@@ -848,6 +880,7 @@ This prevents app initialization from failing due to validation errors in existi
 7. Type mismatches (numbers as strings) breaking logic
 
 **Data Integrity:**
+
 - Invalid data rejected before IndexedDB write
 - Prevents corruption of message rotation algorithm
 - Ensures mood tracking data consistency
@@ -881,7 +914,7 @@ This prevents app initialization from failing due to validation errors in existi
 
 ---
 
-*Last Updated: 2025-11-14*
+_Last Updated: 2025-11-14_
 
 ---
 
@@ -897,13 +930,13 @@ The application uses **feature slices** to organize Zustand store logic. Each sl
 
 ### Slice Boundaries
 
-| Slice | Responsibility | Size | File |
-|-------|---------------|------|------|
-| **Messages** | Custom message CRUD, rotation, service integration | 553 lines | `src/stores/slices/messagesSlice.ts` |
-| **Photos** | Photo gallery state, upload/delete, storage service | 272 lines | `src/stores/slices/photosSlice.ts` |
-| **Settings** | App configuration, persistence to LocalStorage | 255 lines | `src/stores/slices/settingsSlice.ts` |
-| **Navigation** | Current day tracking, date navigation | 56 lines | `src/stores/slices/navigationSlice.ts` |
-| **Mood** | Daily mood tracking, persistence | 54 lines | `src/stores/slices/moodSlice.ts` |
+| Slice          | Responsibility                                      | Size      | File                                   |
+| -------------- | --------------------------------------------------- | --------- | -------------------------------------- |
+| **Messages**   | Custom message CRUD, rotation, service integration  | 553 lines | `src/stores/slices/messagesSlice.ts`   |
+| **Photos**     | Photo gallery state, upload/delete, storage service | 272 lines | `src/stores/slices/photosSlice.ts`     |
+| **Settings**   | App configuration, persistence to LocalStorage      | 255 lines | `src/stores/slices/settingsSlice.ts`   |
+| **Navigation** | Current day tracking, date navigation               | 56 lines  | `src/stores/slices/navigationSlice.ts` |
+| **Mood**       | Daily mood tracking, persistence                    | 54 lines  | `src/stores/slices/moodSlice.ts`       |
 
 ### Composition Pattern
 
@@ -936,11 +969,12 @@ const createMessagesSlice = (set, get): MessagesSlice => ({
     const { customMessages } = get(); // Access own state
     const { rotationInterval } = get(); // Access settings state
     // ...
-  }
+  },
 });
 ```
 
 **Documented dependencies:**
+
 - Messages → Settings (rotation interval)
 - Photos → Navigation (current day for filtering)
 - All slices → Settings (theme, preferences)
@@ -948,6 +982,7 @@ const createMessagesSlice = (set, get): MessagesSlice => ({
 ### Persistence Strategy
 
 **LocalStorage partitioning:**
+
 - Each slice persists independently to prevent localStorage quota issues
 - Map serialization/deserialization handles complex data types
 - Custom `partialize` functions filter what gets persisted
@@ -957,7 +992,7 @@ partialize: (state) => ({
   customMessages: state.customMessages,
   photos: state.photos,
   // ... only serializable data
-})
+});
 ```
 
 ### Type Safety
@@ -965,6 +1000,7 @@ partialize: (state) => ({
 **Known limitation:** TypeScript requires `as any` casts (10 instances) due to Zustand's type system limitations when composing heterogeneous slices.
 
 **Rationale:** Pragmatic trade-off accepted because:
+
 1. TypeScript compiles without errors
 2. Runtime type safety preserved via Zod validation (Story 5.5)
 3. Alternative approaches (discriminated unions, branded types) add complexity without solving the root issue
@@ -1008,6 +1044,7 @@ partialize: (state) => ({
 - **Data source:** IndexedDB `by-date` index (photos sorted newest first)
 
 **Architecture decision:**
+
 ```typescript
 // photoStorageService.getPage() implementation
 const photos = await getAllFromIndex('photos', 'by-date');
@@ -1015,6 +1052,7 @@ return photos.slice(offset, offset + limit); // Simple slice-based pagination
 ```
 
 **Rationale:** Slice-based pagination chosen for MVP simplicity:
+
 - ✅ Simple to implement and maintain
 - ✅ Sufficient performance for <100 photos (target use case)
 - ✅ No complex cursor state management
@@ -1029,18 +1067,21 @@ return photos.slice(offset, offset + limit); // Simple slice-based pagination
 **Testing approach:** Chrome DevTools heap snapshots with production build
 
 **Profiling steps:**
+
 1. Baseline snapshot (empty app): ~10-15MB heap
 2. Load 100 photos via pagination (5 pages of 20 photos each)
 3. Heap snapshot after full load
 4. Monitor memory stability over multiple pagination cycles
 
 **Actual measurements (Chrome DevTools heap snapshots):**
+
 - **Baseline (empty homepage):** 11.3 MB total heap size
   - Date measured: 2025-11-15
   - Environment: Chrome browser, development build
   - Note: Only baseline measured; full photo load testing pending
 
 **Expected memory targets:**
+
 - **100 photos (paginated):** <50MB total heap size
 - **500 photos (paginated):** <100MB total heap size
 - **Memory stability:** No unbounded growth after initial load
@@ -1048,6 +1089,7 @@ return photos.slice(offset, offset + limit); // Simple slice-based pagination
 ### Memory Optimization Techniques
 
 **Blob URL cleanup:**
+
 ```typescript
 // PhotoGridItem.tsx - Cleanup effect
 useEffect(() => {
@@ -1058,22 +1100,26 @@ useEffect(() => {
 ```
 
 **IndexedDB storage:**
+
 - Photo files stored as blobs in IndexedDB (not in-memory)
 - Only paginated subset loaded into React state at a time
 - Old pages eligible for garbage collection when out of view
 
 **React 18 automatic batching:**
+
 - State updates batched during pagination to minimize re-renders
 - Reduces memory churn from intermediate states
 
 ### Performance Characteristics
 
 **Measured performance (expected):**
+
 - **Initial load (20 photos):** <500ms
 - **Load more (20 photos):** <300ms
 - **Intersection Observer overhead:** Negligible (<5ms per scroll event)
 
 **Memory growth pattern:**
+
 - Initial spike during first page load (+15-25MB)
 - Gradual increase with pagination (+5-8MB per 20 photos)
 - Plateau after ~100 photos (garbage collection of old blob URLs)
@@ -1092,6 +1138,7 @@ useEffect(() => {
    - Logged errors in console help identify this scenario during development
 
 3. **Future optimization path (if needed):**
+
    ```typescript
    // Cursor-based pagination (deferred)
    const cursor = await openCursor('photos', 'by-date');

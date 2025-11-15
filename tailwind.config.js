@@ -1,9 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -78,13 +75,13 @@ export default {
         cursive: ['Dancing Script', 'cursive'],
       },
       animation: {
-        'float': 'float 3s ease-in-out infinite',
+        float: 'float 3s ease-in-out infinite',
         'fade-in': 'fadeIn 0.5s ease-in',
         'scale-in': 'scaleIn 0.3s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'heart-beat': 'heartBeat 1s ease-in-out infinite',
-        'shimmer': 'shimmer 2s infinite',
+        shimmer: 'shimmer 2s infinite',
       },
       keyframes: {
         float: {
@@ -116,4 +113,4 @@ export default {
     },
   },
   plugins: [],
-}
+};

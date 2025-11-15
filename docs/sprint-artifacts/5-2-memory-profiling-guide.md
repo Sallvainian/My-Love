@@ -1,10 +1,13 @@
 # Memory Profiling Guide for Photo Pagination
+
 ## Story 5.2: Implement Photo Pagination with Lazy Loading
 
 ### Memory Testing Requirement (AC-5)
+
 Verify memory optimization with large photo collections (100+ photos).
 
 **Target:** Memory usage should stay under:
+
 - **<50MB with 100 photos**
 - **<100MB with 500 photos**
 
@@ -15,6 +18,7 @@ Verify memory optimization with large photo collections (100+ photos).
 ### 1. Setup Test Environment
 
 1. **Build the app:**
+
    ```bash
    npm run build
    npm run preview
@@ -121,12 +125,14 @@ Verify memory optimization with large photo collections (100+ photos).
 ## Interpreting Results
 
 ### Good Memory Profile
+
 ✅ Memory increases during load, then stabilizes
 ✅ Garbage collection reclaims memory from old pages
 ✅ Total heap size stays within target limits
 ✅ No continuous memory growth over time
 
 ### Bad Memory Profile (Indicates Leak)
+
 ❌ Memory grows unbounded with each pagination cycle
 ❌ Detached DOM nodes accumulate in heap snapshot
 ❌ Blob URLs not revoked (appear in heap as "Blob" objects)

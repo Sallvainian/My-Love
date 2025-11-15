@@ -24,12 +24,10 @@ export interface NavigationSlice {
   navigatePhotos: () => void;
 }
 
-export const createNavigationSlice: StateCreator<
-  NavigationSlice,
-  [],
-  [],
-  NavigationSlice
-> = (set, get) => ({
+export const createNavigationSlice: StateCreator<NavigationSlice, [], [], NavigationSlice> = (
+  set,
+  get
+) => ({
   // Initial state
   currentView: 'home',
 

@@ -104,12 +104,14 @@ So that the state management is more maintainable and easier to reason about.
 **From Story 4-5 - Photo Gallery Navigation Integration (Status: review)**
 
 **Completed Implementation:**
+
 - Full navigation system implemented with TopNavigation component
 - Zustand store extended with `currentView` state and navigation actions (setView, navigateHome, navigatePhotos)
 - Browser history integration working (pushState, popstate)
 - Photo count badge implemented and reactive
 
 **Store Pattern Insights:**
+
 - Current store location: `src/stores/useAppStore.ts` (1,267 lines - NEEDS REFACTORING)
 - Navigation state successfully added to monolithic store
 - State pattern: `currentView: 'home' | 'photos'` with union types
@@ -117,10 +119,12 @@ So that the state management is more maintainable and easier to reason about.
 - Zustand selector optimization working well (no unnecessary re-renders)
 
 **Files to Refactor:**
+
 - src/stores/useAppStore.ts (SPLIT into slices)
 - All components importing useAppStore (UPDATE imports to use slices)
 
 **Key Technical Debt:**
+
 - Store has grown to 1,267 lines across Epics 1-4 feature additions
 - Features: Messages (Epic 3), Photos (Epic 4), Settings (Epic 1), Navigation (Epic 3 & 4), Mood (not yet implemented)
 - Persist middleware partializer needs to handle all slice state
@@ -128,6 +132,7 @@ So that the state management is more maintainable and easier to reason about.
 - Initialization guards (isInitializing, isInitialized, isHydrated) must remain global
 
 **Slice Composition Pattern to Use:**
+
 - Zustand supports manual composition with spread operator
 - Pattern: `create<AppState>()(persist((set, get) => ({ ...messagesSlice(set, get), ...photosSlice(set, get), ... }), persistConfig))`
 - Each slice file exports: `export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> = (set, get) => ({ ... })`
@@ -135,6 +140,7 @@ So that the state management is more maintainable and easier to reason about.
 - Example: messagesSlice can access `get().settings` for date-based rotation
 
 **Review Findings (Story 4.5):**
+
 - Test fixture mismatch (data-testid) but functionality works
 - No architectural concerns blocking store refactoring
 - Story 5.1 should simplify future feature additions
@@ -146,9 +152,11 @@ So that the state management is more maintainable and easier to reason about.
 ### Project Structure Notes
 
 **New Directories:**
+
 - `src/stores/slices/` - Feature-specific state slices
 
 **New Slice Files:**
+
 - `src/stores/slices/messagesSlice.ts` - Messages, message history, custom messages, message navigation
 - `src/stores/slices/photosSlice.ts` - Photos, photo upload/edit/delete, gallery state, storage warnings
 - `src/stores/slices/settingsSlice.ts` - Settings, onboarding, theme, anniversaries
@@ -156,14 +164,17 @@ So that the state management is more maintainable and easier to reason about.
 - `src/stores/slices/moodSlice.ts` - Mood tracking entries
 
 **Modified Files:**
+
 - `src/stores/useAppStore.ts` - Refactored to compose slices
 - Components using useAppStore - No changes expected (API compatibility maintained)
 
 **No New Dependencies:**
+
 - Use existing Zustand StateCreator pattern
 - No additional state management libraries needed
 
 **Architecture Alignment:**
+
 - Follows Zustand best practices for large stores
 - Maintains single store pattern (no store splitting)
 - Preserves persist middleware configuration
@@ -172,6 +183,7 @@ So that the state management is more maintainable and easier to reason about.
 ### Store Refactoring Strategy
 
 **Current Structure (1,267 lines):**
+
 - Lines 1-28: Imports (services, types, utils)
 - Lines 29-122: AppState interface (all state + actions)
 - Lines 124-164: Initialization guards and validation helpers
@@ -180,6 +192,7 @@ So that the state management is more maintainable and easier to reason about.
 **Slice Breakdown:**
 
 **Messages Slice (~400 lines):**
+
 - State: messages, messageHistory, currentMessage, currentDayOffset, customMessages, customMessagesLoaded
 - Actions: loadMessages, addMessage, toggleFavorite, updateCurrentMessage
 - Navigation: navigateToPreviousMessage, navigateToNextMessage, canNavigateBack, canNavigateForward
@@ -188,6 +201,7 @@ So that the state management is more maintainable and easier to reason about.
 - Utils: messageRotation (getDailyMessage, formatDate, getAvailableHistoryDays)
 
 **Photos Slice (~350 lines):**
+
 - State: photos, isLoadingPhotos, photoError, storageWarning, selectedPhotoId
 - Actions: loadPhotos, uploadPhoto, getPhotoById, getStorageUsage, clearStorageWarning
 - Edit/Delete: updatePhoto, deletePhoto
@@ -195,6 +209,7 @@ So that the state management is more maintainable and easier to reason about.
 - Services: photoStorageService, imageCompressionService
 
 **Settings Slice (~200 lines):**
+
 - State: settings, isOnboarded
 - Actions: setSettings, updateSettings, setOnboarded
 - Theme: setTheme
@@ -202,21 +217,25 @@ So that the state management is more maintainable and easier to reason about.
 - Initialization: initializeApp (may need to stay in main store or coordinate across slices)
 
 **Navigation Slice (~50 lines):**
+
 - State: currentView
 - Actions: setView, navigateHome, navigatePhotos
 - Browser history integration (pushState)
 
 **Mood Slice (~50 lines):**
+
 - State: moods
 - Actions: addMoodEntry, getMoodForDate
 
 **Shared/Core (~200 lines):**
+
 - Loading states: isLoading, error (may need to move to individual slices)
 - Initialization: initializeApp, initialization guards (isInitializing, isInitialized, isHydrated)
 - State validation: validateHydratedState
 - Persist configuration: partializer, onRehydrateStorage
 
 **Composition Pattern:**
+
 ```typescript
 // src/stores/useAppStore.ts (after refactor)
 import { create } from 'zustand';
@@ -278,6 +297,7 @@ export const useAppStore = create<AppState>()(
 ```
 
 **Slice File Pattern:**
+
 ```typescript
 // src/stores/slices/messagesSlice.ts
 import { StateCreator } from 'zustand';
@@ -342,19 +362,23 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ### Cross-Slice Dependencies
 
 **Messages depends on Settings:**
+
 - Message rotation algorithm uses `settings.relationship.startDate` for date calculations
 - Access pattern: `get().settings` within messages actions
 
 **Photos depends on Settings:**
+
 - Storage quota warnings may check user preferences
 - Theme affects photo UI rendering (but theme is in settings slice)
 
 **All slices depend on Initialization:**
+
 - initializeApp() must coordinate across slices (load messages, photos, settings)
 - Option 1: Keep initializeApp in main store, call slice loaders
 - Option 2: Each slice has init method, main store orchestrates
 
 **Recommended Approach:**
+
 - Keep initializeApp in main store (core functionality)
 - Each slice exposes load/init methods called by main initializeApp
 - Slices access other slices via `get()` for cross-dependencies
@@ -362,16 +386,19 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ### Persistence Strategy per Slice
 
 **Persisted (LocalStorage):**
+
 - Settings Slice: `settings`, `isOnboarded`
 - Messages Slice: `messageHistory`, `customMessages`
 - Mood Slice: `moods`
 
 **Not Persisted (In-Memory):**
+
 - Messages Slice: `messages`, `currentMessage`, `currentDayOffset` (derived from messageHistory)
 - Photos Slice: `photos`, `isLoadingPhotos`, `photoError`, `storageWarning`, `selectedPhotoId`
 - Navigation Slice: `currentView` (restored from URL on mount)
 
 **Rationale:**
+
 - Messages loaded from IndexedDB + defaultMessages, not LocalStorage
 - Photos loaded from IndexedDB, not LocalStorage (too large)
 - Navigation view restored from URL (browser history), not persisted state
@@ -380,12 +407,14 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ### Testing Strategy
 
 **E2E Test Validation:**
+
 - All Epic 2 tests must pass (message display, favorites, settings)
 - All Epic 3 tests must pass (message navigation, custom messages)
 - All Epic 4 tests must pass (photo upload, gallery, carousel, navigation)
 - No test modifications should be needed (API compatibility maintained)
 
 **Manual Testing:**
+
 - Test message rotation and navigation
 - Test photo upload, edit, delete
 - Test view switching (Home ↔ Photos)
@@ -394,6 +423,7 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 - Test app reload (state hydration)
 
 **Performance Testing:**
+
 - Measure component re-render counts before/after refactoring (React DevTools Profiler)
 - Target: 30% reduction in unnecessary re-renders (better selector optimization)
 - Verify no memory leaks with Zustand DevTools
@@ -401,21 +431,25 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ### Risk Mitigation
 
 **Risk: Breaking component imports**
+
 - Mitigation: Maintain exact same export structure from useAppStore
 - Components should not need to change imports
 - Selectors remain unchanged: `useAppStore(state => state.messages)`
 
 **Risk: Persist hydration issues**
+
 - Mitigation: Test state hydration thoroughly with browser refresh
 - Validate that Map deserialization still works for messageHistory.shownMessages
 - Keep validateHydratedState helper to catch issues early
 
 **Risk: Cross-slice dependencies break**
+
 - Mitigation: Use `get()` to access other slice state
 - Document dependencies clearly in each slice file
 - Test message rotation (depends on settings) and photo storage (depends on settings)
 
 **Risk: Initialization race conditions**
+
 - Mitigation: Keep initialization guards (isInitializing, isInitialized, isHydrated) global
 - Coordinate slice initialization through main store initializeApp
 - Test with React StrictMode to catch concurrent initialization issues
@@ -423,20 +457,24 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ### Alignment with Unified Project Structure
 
 **Store Organization:**
+
 - `src/stores/useAppStore.ts` - Main store (composition + persist config)
 - `src/stores/slices/` - Feature-specific slices
 
 **Slice Naming Convention:**
+
 - Singular noun + "Slice" suffix (messagesSlice, photosSlice, settingsSlice)
 - Export: `createXSlice` function (factory pattern)
 - Interface: `XSlice` for state + actions
 
 **Code Organization:**
+
 - Each slice file is self-contained with imports for its services/utils
 - No circular dependencies (slices don't import other slices, only AppState type)
 - Main store composes slices, slices don't compose each other
 
 **Documentation Standards:**
+
 - Each slice file has header comment explaining scope and dependencies
 - Cross-slice dependencies documented at top of file
 - Persistence strategy noted in comments
@@ -444,20 +482,24 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ### References
 
 **Technical Specifications:**
+
 - [tech-spec-epic-5.md#story-51-split-useappstore-into-feature-slices](../tech-spec-epic-5.md#story-51-split-useappstore-into-feature-slices) - Detailed store slicing strategy, composition patterns, persistence
 - [epics.md#story-51-split-useappstore-into-feature-slices](../epics.md#story-51-split-useappstore-into-feature-slices) - User story and acceptance criteria
 
 **Architecture References:**
+
 - [architecture.md#state-management](../architecture.md#state-management) - Zustand store patterns, persistence strategy
 - [architecture.md#data-architecture](../architecture.md#data-architecture) - LocalStorage schema, persist partializer
 
 **Related Stories:**
+
 - [1-2-fix-zustand-persist-middleware-configuration.md](./1-2-fix-zustand-persist-middleware-configuration.md) - Persist middleware setup (Epic 1)
 - [3-3-message-history-state-management.md](./3-3-message-history-state-management.md) - Message history state structure (Epic 3)
 - [4-1-photo-upload-storage.md](./4-1-photo-upload-storage.md) - Photo state in Zustand (Epic 4)
 - [4-5-photo-gallery-navigation-integration.md](./4-5-photo-gallery-navigation-integration.md) - Navigation state addition (Epic 4)
 
 **Zustand Documentation:**
+
 - [Zustand Slices Pattern](https://docs.pmnd.rs/zustand/guides/slices-pattern) - Official guide to splitting stores
 - [Zustand TypeScript](https://docs.pmnd.rs/zustand/guides/typescript) - StateCreator type usage
 
@@ -466,14 +508,15 @@ export const createMessagesSlice: StateCreator<AppState, [], [], MessagesSlice> 
 ## Change Log
 
 **2025-11-14** - Story drafted (create-story workflow)
-  - Extracted requirements from tech-spec-epic-5.md and epics.md
-  - Analyzed previous story (4.5) learnings: Store at 1,267 lines, needs refactoring
-  - Identified current store structure: Messages (~400 lines), Photos (~350 lines), Settings (~200 lines), Navigation (~50 lines), Mood (~50 lines), Shared (~200 lines)
-  - Defined 6 acceptance criteria with detailed requirements
-  - Created 12 tasks with 53 subtasks covering analysis, slice extraction, composition, testing, documentation
-  - Documented slice composition pattern using Zustand StateCreator and spread operator
-  - Documented cross-slice dependencies and persistence strategy
-  - Story ready for implementation after Epic 4 complete
+
+- Extracted requirements from tech-spec-epic-5.md and epics.md
+- Analyzed previous story (4.5) learnings: Store at 1,267 lines, needs refactoring
+- Identified current store structure: Messages (~400 lines), Photos (~350 lines), Settings (~200 lines), Navigation (~50 lines), Mood (~50 lines), Shared (~200 lines)
+- Defined 6 acceptance criteria with detailed requirements
+- Created 12 tasks with 53 subtasks covering analysis, slice extraction, composition, testing, documentation
+- Documented slice composition pattern using Zustand StateCreator and spread operator
+- Documented cross-slice dependencies and persistence strategy
+- Story ready for implementation after Epic 4 complete
 
 ---
 
@@ -514,6 +557,7 @@ The store refactoring from a 1,267-line monolithic file into 5 feature slices (M
 #### Slice Separation (AC-1, AC-2) ✅ EXCELLENT
 
 **File Structure:**
+
 ```
 src/stores/
 ├── useAppStore.ts (251 lines) ← 80% size reduction from 1,267 lines
@@ -527,6 +571,7 @@ Total: 1,441 lines (174 lines added for interfaces/exports)
 ```
 
 **Analysis:**
+
 - ✅ Clear feature boundaries with minimal cross-slice dependencies
 - ✅ Each slice is self-contained with its own imports (services, utils, types)
 - ✅ Main store successfully reduced from 1,267 → 251 lines (80% reduction)
@@ -534,6 +579,7 @@ Total: 1,441 lines (174 lines added for interfaces/exports)
 - ✅ No circular dependencies detected
 
 **Composition Pattern:**
+
 ```typescript
 // src/stores/useAppStore.ts (lines 59-64)
 ...createMessagesSlice(set as any, get as any, api as any),
@@ -550,26 +596,31 @@ Total: 1,441 lines (174 lines added for interfaces/exports)
 #### Cross-Slice Dependencies (AC-2) ✅ WELL-DESIGNED
 
 **Messages Slice Dependencies:**
+
 ```typescript
 // messagesSlice.ts (lines 207-210)
 const { messageHistory, messages, currentMessage, settings } = get();
 if (!settings || messages.length === 0) return;
 ```
+
 - ✅ Accesses `settings.relationship.startDate` for date-based message rotation
 - ✅ Uses `get()` pattern correctly for cross-slice access
 - ✅ Properly documented in file header comments
 
 **Settings Slice Coordination:**
+
 ```typescript
 // settingsSlice.ts (lines 164-167)
 if (state.updateCurrentMessage) {
   state.updateCurrentMessage();
 }
 ```
+
 - ✅ `initializeApp` orchestrates Messages slice via optional method check
 - ✅ Initialization guards prevent concurrent/duplicate initialization (React StrictMode safe)
 
 **Photos & Navigation Slices:**
+
 - ✅ Self-contained with no cross-slice dependencies
 - ✅ Clean separation of concerns
 
@@ -584,6 +635,7 @@ if (state.updateCurrentMessage) {
 **Issue 1: Excessive `as any` Casts in Main Store**
 
 Location: `/home/sallvain/dev/personal/My-Love/src/stores/useAppStore.ts` (lines 60-64)
+
 ```typescript
 ...createMessagesSlice(set as any, get as any, api as any),
 ...createPhotosSlice(set as any, get as any, api as any),
@@ -593,12 +645,14 @@ Location: `/home/sallvain/dev/personal/My-Love/src/stores/useAppStore.ts` (lines
 ```
 
 **Impact:**
+
 - Disables TypeScript safety for slice function signatures
 - Prevents detection of slice interface mismatches
 - Bypasses Zustand's `StateCreator` type validation
 
 **Root Cause Analysis:**
 Each slice uses a different `StateCreator` type signature:
+
 - **MessagesSlice:** `StateCreator<MessagesSlice & { settings: Settings | null }, [], [], MessagesSlice>`
 - **PhotosSlice:** `StateCreator<PhotosSlice, [], [], PhotosSlice>`
 - **SettingsSlice:** `StateCreator<SettingsSlice & { messages?: Message[]; updateCurrentMessage?: () => void; ... }, [], [], SettingsSlice>`
@@ -609,6 +663,7 @@ The slices expect different state shapes (partial AppState) but are being compos
 
 **Recommendation:**
 This is a **known limitation of Zustand's TypeScript support for slice composition**. The `as any` casts are pragmatic given:
+
 1. TypeScript compiles without errors (verified with `npx tsc --noEmit`)
 2. Runtime behavior is correct (persist middleware works, tests pass)
 3. Component-level types are preserved (selectors work correctly)
@@ -620,26 +675,34 @@ This is a **known limitation of Zustand's TypeScript support for slice compositi
 **Issue 2: `as any` Casts in SettingsSlice**
 
 Location: `/home/sallvain/dev/personal/My-Love/src/stores/slices/settingsSlice.ts` (lines 99, 116, 155, 160, 170, 180)
+
 ```typescript
 set({ isLoading: true, error: null } as any);
 set({ messages: messagesWithIds } as any);
 ```
 
 **Impact:**
+
 - SettingsSlice needs to set state from other slices (`messages`, `isLoading`, `error`)
 - Type system correctly rejects this because SettingsSlice interface doesn't include these fields
 - `as any` bypasses the type check
 
 **Root Cause:**
 `initializeApp` lives in SettingsSlice but needs to coordinate across multiple slices. The current type signature only includes optional fields from AppState:
+
 ```typescript
-StateCreator<SettingsSlice & {
-  messages?: Message[];
-  updateCurrentMessage?: () => void;
-  isLoading?: boolean;
-  error?: string | null;
-  __isHydrated?: boolean;
-}, [], [], SettingsSlice>
+StateCreator<
+  SettingsSlice & {
+    messages?: Message[];
+    updateCurrentMessage?: () => void;
+    isLoading?: boolean;
+    error?: string | null;
+    __isHydrated?: boolean;
+  },
+  [],
+  [],
+  SettingsSlice
+>;
 ```
 
 **Alternative Design Considered:**
@@ -652,12 +715,14 @@ Move `initializeApp` to main store composition? **No** - this would break the en
 **Issue 3: Type Cast in Persist Middleware**
 
 Location: `/home/sallvain/dev/personal/My-Love/src/stores/useAppStore.ts` (lines 155, 250)
+
 ```typescript
 const shownMessagesArray = state.messageHistory.shownMessages as any;
 (window as any).__APP_STORE__ = useAppStore;
 ```
 
 **Analysis:**
+
 - Line 155: Deserializing JSON to Map - runtime type is unknown, `as any` is appropriate
 - Line 250: Window object extension for E2E tests - `as any` is standard practice
 
@@ -681,16 +746,18 @@ $ npx tsc --noEmit
 #### Component Import Analysis
 
 **Grep Results:** 16 component files import `useAppStore`
+
 ```typescript
 // All components use same import pattern:
 import { useAppStore } from '../../stores/useAppStore';
 
 // All selectors work unchanged:
 const { messages, currentMessage } = useAppStore();
-const selectPhoto = useAppStore(state => state.selectPhoto);
+const selectPhoto = useAppStore((state) => state.selectPhoto);
 ```
 
 **Files Using Store:**
+
 - `/home/sallvain/dev/personal/My-Love/src/components/DailyMessage/DailyMessage.tsx`
 - `/home/sallvain/dev/personal/My-Love/src/components/PhotoGallery/PhotoGallery.tsx`
 - `/home/sallvain/dev/personal/My-Love/src/components/AdminPanel/*.tsx` (5 files)
@@ -706,6 +773,7 @@ const selectPhoto = useAppStore(state => state.selectPhoto);
 #### Partializer Configuration
 
 Location: `/home/sallvain/dev/personal/My-Love/src/stores/useAppStore.ts` (lines 108-129)
+
 ```typescript
 partialize: (state) => ({
   settings: state.settings,
@@ -721,17 +789,21 @@ partialize: (state) => ({
 ```
 
 **Analysis:**
+
 - ✅ Persists: `settings`, `isOnboarded`, `messageHistory` (serialized Map), `moods`
 - ✅ Excludes: `messages` (loaded from IndexedDB), `photos` (too large), `customMessages` (IndexedDB), `currentView` (restored from URL)
 - ✅ Map serialization/deserialization working correctly (lines 114-119, 154-203)
 - ✅ Hydration validation includes all slice state (lines 20-53)
 
 **Edge Case Handling:**
+
 ```typescript
 // Line 191: messageHistory null/undefined handling
 if (state && !state.messageHistory) {
   console.warn('[Zustand Persist] messageHistory is null - creating default structure');
-  state.messageHistory = { /* default */ };
+  state.messageHistory = {
+    /* default */
+  };
 }
 ```
 
@@ -747,27 +819,32 @@ if (state && !state.messageHistory) {
 **Status:** Test run interrupted (dev server shutdown during Firefox tests)
 
 **Chromium Tests (Partial Results):**
+
 - ✅ ~400+ tests executed
 - ❌ 14 failures detected (admin panel route timeouts, custom message persistence)
 
 **Key Failures:**
 
 1. **Admin Panel Route Timeout (12 tests)**
+
    ```
    Error: getByTestId('admin-title').toBeVisible() failed
    Expected: visible
    Received: undefined
    ```
+
    - **Analysis:** Pre-existing issue unrelated to store refactoring
    - Tests expect admin panel to load within 5000ms but timing out
    - Likely infrastructure issue (dev server performance, fixture cleanup)
 
 2. **Custom Message Persistence (2 tests)**
+
    ```
    Error: expect(storedMessages.length).toBeGreaterThan(0)
    Expected: > 0
    Received: 0
    ```
+
    - Test: `should persist custom messages to LocalStorage`
    - **Analysis:** Test expectation incorrect - custom messages moved to IndexedDB in Story 3.5
    - Test fixture needs update to check IndexedDB instead of LocalStorage
@@ -778,6 +855,7 @@ if (state && !state.messageHistory) {
    Expected: 74
    Received: 73
    ```
+
    - Test: `should create message and add to list`
    - **Analysis:** Off-by-one error, possibly race condition or fixture state pollution
 
@@ -788,16 +866,19 @@ if (state && !state.messageHistory) {
 #### Test Verdict
 
 **API Compatibility:** ✅ Zero breaking changes detected in functional tests
+
 - Daily message display: PASSING
 - Photo upload/gallery: PASSING
 - Message navigation: PASSING
 - Settings persistence: PASSING
 
 **Pre-Existing Issues:** ❌ 14 test failures unrelated to store refactoring
+
 - Admin panel routing: Infrastructure/timing issues
 - Custom message tests: Fixture needs update for IndexedDB
 
 **Recommendation:**
+
 1. Mark Story 5.1 as **COMPLETE** - store refactoring objectives achieved
 2. Create follow-up tickets:
    - **Bug:** Admin panel E2E tests timing out (investigate dev server performance)
@@ -811,6 +892,7 @@ if (state && !state.messageHistory) {
 #### Slice Header Documentation
 
 **Example: messagesSlice.ts (lines 1-12)**
+
 ```typescript
 /**
  * Messages Slice
@@ -827,6 +909,7 @@ if (state && !state.messageHistory) {
 ```
 
 **Analysis:**
+
 - ✅ All slices have clear header documentation
 - ✅ Cross-slice dependencies explicitly documented
 - ✅ Persistence strategy documented
@@ -845,11 +928,13 @@ if (state && !state.messageHistory) {
 **Net Increase:** +174 lines (13.7% increase due to type exports and slice interfaces)
 
 **Bundle Impact:** ✅ NEUTRAL
+
 - All slice files imported in main store - no lazy loading benefit
 - Increased line count offset by improved tree-shaking (Rollup can eliminate unused exports per slice)
 - Gzip compression likely makes file split negligible (<1KB difference)
 
 **Developer Experience Impact:** ✅ POSITIVE
+
 - Main store file now navigable in single screen (251 lines vs 1,267 lines)
 - Feature-specific changes isolated to single slice file
 - Reduced cognitive load when debugging specific features
@@ -863,6 +948,7 @@ if (state && !state.messageHistory) {
 **Status:** ⚠️ **NOT COMPLETE**
 
 **Missing from technical-decisions.md:**
+
 1. Slice architecture rationale and pattern explanation
 2. Slice boundaries and responsibilities
 3. Composition pattern (spread operator + StateCreator)
@@ -873,7 +959,7 @@ if (state && !state.messageHistory) {
 **Recommendation:**
 Create new section in `/home/sallvain/dev/personal/My-Love/docs/technical-decisions.md`:
 
-```markdown
+````markdown
 ### Zustand Store Slice Architecture
 
 **Decision:** Split monolithic 1,267-line store into 5 feature slices
@@ -881,11 +967,13 @@ Create new section in `/home/sallvain/dev/personal/My-Love/docs/technical-decisi
 **Story:** Epic 5, Story 5.1
 
 **Rationale:**
+
 - Maintainability: 1,267-line file exceeded cognitive load threshold
 - Feature isolation: Messages, Photos, Settings, Navigation, Mood as separate concerns
 - Developer experience: Changes isolated to relevant slice, not entire store
 
 **Slice Boundaries:**
+
 - **MessagesSlice (553 lines):** Message CRUD, history, navigation, custom messages, import/export
 - **PhotosSlice (272 lines):** Photo CRUD, upload, gallery, storage quota management
 - **SettingsSlice (255 lines):** Settings, onboarding, theme, anniversaries, app initialization
@@ -894,39 +982,50 @@ Create new section in `/home/sallvain/dev/personal/My-Love/docs/technical-decisi
 
 **Composition Pattern:**
 Uses Zustand's manual slice composition with spread operator:
+
 ```typescript
-create<AppState>()(persist((set, get, api) => ({
-  ...createMessagesSlice(set, get, api),
-  ...createPhotosSlice(set, get, api),
-  ...createSettingsSlice(set, get, api),
-  ...createNavigationSlice(set, get, api),
-  ...createMoodSlice(set, get, api),
-  isLoading: false,
-  error: null,
-}), persistConfig))
+create<AppState>()(
+  persist(
+    (set, get, api) => ({
+      ...createMessagesSlice(set, get, api),
+      ...createPhotosSlice(set, get, api),
+      ...createSettingsSlice(set, get, api),
+      ...createNavigationSlice(set, get, api),
+      ...createMoodSlice(set, get, api),
+      isLoading: false,
+      error: null,
+    }),
+    persistConfig
+  )
+);
 ```
+````
 
 Each slice exports `StateCreator<AppState, [], [], SliceInterface>` for type safety.
 
 **Cross-Slice Dependencies:**
 Slices access other slice state via `get()`:
+
 ```typescript
 const { settings } = get();
 const message = getDailyMessage(messages, settings.relationship.startDate);
 ```
 
 **Persistence Strategy:**
+
 - **Persisted (LocalStorage):** settings, isOnboarded, messageHistory, moods
 - **Not Persisted:** messages (IndexedDB), photos (IndexedDB), customMessages (IndexedDB), currentView (URL)
 
 **Type Safety Limitations:**
 Zustand's TypeScript support for heterogeneous slice composition requires `as any` casts:
+
 - Main store composition (lines 60-64): Slice function signatures differ, TypeScript can't infer merged type
 - SettingsSlice cross-slice state (lines 99-180): `initializeApp` sets state from other slices
 - Trade-off: Runtime safety preserved (tests pass), compile-time safety reduced at composition boundary
 
 **Adding New State:**
 To add state to a slice:
+
 1. Update slice interface (`export interface XSlice`)
 2. Add state to slice creator initial state
 3. Add actions to slice creator
@@ -934,6 +1033,7 @@ To add state to a slice:
 5. No component changes needed (same useAppStore import)
 
 **Impact:** 80% size reduction in main store file (1,267 → 251 lines), improved maintainability, zero breaking changes.
+
 ```
 
 ---
@@ -1053,3 +1153,4 @@ To add state to a slice:
 **Review Date:** 2025-11-14
 **Review Duration:** Comprehensive analysis (store architecture, type safety, persistence, tests, documentation)
 **Recommendation:** **APPROVE** after completing AC-6 (documentation)
+```

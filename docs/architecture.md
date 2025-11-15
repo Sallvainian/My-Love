@@ -8,17 +8,17 @@
 
 ## Technology Stack
 
-| Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
-| **UI Framework** | React | 19.1.1 | Component-based UI rendering |
-| **Language** | TypeScript | 5.9.3 | Type-safe development |
-| **Build Tool** | Vite | 7.1.7 | Fast dev server and optimized builds |
-| **State Management** | Zustand | 5.0.8 | Lightweight global state with persistence |
-| **Styling** | Tailwind CSS | 3.4.18 | Utility-first CSS framework |
-| **Animations** | Framer Motion | 12.23.24 | Declarative animations and transitions |
-| **Data Layer** | IndexedDB (via idb) | 8.0.3 | Client-side structured data storage |
-| **PWA** | vite-plugin-pwa | 0.21.3 | Service worker and manifest generation |
-| **Deployment** | gh-pages | 6.3.0 | GitHub Pages deployment |
+| Layer                | Technology          | Version  | Purpose                                   |
+| -------------------- | ------------------- | -------- | ----------------------------------------- |
+| **UI Framework**     | React               | 19.1.1   | Component-based UI rendering              |
+| **Language**         | TypeScript          | 5.9.3    | Type-safe development                     |
+| **Build Tool**       | Vite                | 7.1.7    | Fast dev server and optimized builds      |
+| **State Management** | Zustand             | 5.0.8    | Lightweight global state with persistence |
+| **Styling**          | Tailwind CSS        | 3.4.18   | Utility-first CSS framework               |
+| **Animations**       | Framer Motion       | 12.23.24 | Declarative animations and transitions    |
+| **Data Layer**       | IndexedDB (via idb) | 8.0.3    | Client-side structured data storage       |
+| **PWA**              | vite-plugin-pwa     | 0.21.3   | Service worker and manifest generation    |
+| **Deployment**       | gh-pages            | 6.3.0    | GitHub Pages deployment                   |
 
 ## Architecture Patterns
 
@@ -42,11 +42,13 @@ App (Root)
 ```
 
 **Removed Components** (Story 1.5):
+
 - ~~Onboarding~~ - First-time setup wizard (removed in Story 1.4, files deleted in Story 1.5)
   - Functionality replaced by environment-based pre-configuration
   - Dead code cleanup completed
 
 **Future Components** (planned but not yet implemented):
+
 - PhotoMemory - Photo gallery with captions
 - MoodTracker - Daily mood logging interface
 - CountdownTimer - Anniversary countdown display
@@ -82,42 +84,44 @@ The application is designed to work seamlessly without network connectivity:
 ```typescript
 interface MyLoveDB {
   photos: {
-    key: number;              // Auto-increment primary key
+    key: number; // Auto-increment primary key
     value: Photo;
     indexes: {
-      'by-date': Date;        // Index by uploadDate
-    }
+      'by-date': Date; // Index by uploadDate
+    };
   };
 
   messages: {
-    key: number;              // Auto-increment primary key
+    key: number; // Auto-increment primary key
     value: Message;
     indexes: {
-      'by-category': string;  // Index by message category
-      'by-date': Date;        // Index by createdAt
-    }
+      'by-category': string; // Index by message category
+      'by-date': Date; // Index by createdAt
+    };
   };
 }
 ```
 
 **Object Stores**:
 
-| Store | Purpose | Indexes | Key Path |
-|-------|---------|---------|----------|
-| `photos` | User-uploaded photos with captions | `by-date` (uploadDate) | `id` (auto-increment) |
-| `messages` | Love messages (default + custom) | `by-category`, `by-date` | `id` (auto-increment) |
+| Store      | Purpose                            | Indexes                  | Key Path              |
+| ---------- | ---------------------------------- | ------------------------ | --------------------- |
+| `photos`   | User-uploaded photos with captions | `by-date` (uploadDate)   | `id` (auto-increment) |
+| `messages` | Love messages (default + custom)   | `by-category`, `by-date` | `id` (auto-increment) |
 
 ### LocalStorage Schema
 
 **Storage Key**: `my-love-storage`
 
 **Persisted State** (via Zustand persist middleware):
+
 - `settings` - User preferences and relationship data
 - `isOnboarded` - Onboarding completion flag
 - `messageHistory` - Message rotation tracking
 - `moods` - Daily mood entries
 
 **Non-Persisted State** (in-memory only):
+
 - `messages` - Loaded from IndexedDB on app init
 - `photos` - Loaded from IndexedDB on demand
 - `currentMessage` - Computed daily from messages
@@ -134,6 +138,7 @@ User Action → Component → Zustand Store Action → Service Layer → Indexed
 ```
 
 **Example: Toggling a favorite**
+
 1. User clicks heart icon in DailyMessage component
 2. Component calls `toggleFavorite(messageId)` action
 3. Store updates IndexedDB via `storageService.toggleFavorite()`
@@ -154,10 +159,12 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 **Type Constraint**: `<T extends { id?: number }>` ensures all entities have an optional id field for auto-increment keys
 
 **Abstract Methods** (must be implemented by services):
+
 - `getStoreName(): string` - Returns object store name ('messages', 'photos', 'moods')
 - `_doInit(): Promise<void>` - DB-specific initialization and schema upgrade logic
 
 **Shared Methods** (inherited by all services):
+
 - `init(): Promise<void>` - Initialization guard to prevent concurrent DB setup
 - `add(item: Omit<T, 'id'>): Promise<T>` - Add new item with auto-generated ID
 - `get(id: number): Promise<T | null>` - Get single item by ID
@@ -178,13 +185,16 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 **Purpose**: IndexedDB CRUD operations for love messages (default + custom)
 
 **Implementation**:
+
 - `getStoreName()` returns `'messages'`
 - `_doInit()` creates messages store with `by-category` and `by-date` indexes
 
 **Inherited Methods**:
+
 - Basic CRUD: `add()`, `get()`, `update()`, `delete()`, `getAll()`
 
 **Service-Specific Methods**:
+
 - `create(input: CreateMessageInput): Promise<Message>` - Create custom message (wraps `add()` with validation)
 - `getAll(filter?: MessageFilter): Promise<Message[]>` - Overridden to support category index and filtering
 - `getActiveCustomMessages(): Promise<Message[]>` - Get only active custom messages for rotation
@@ -202,13 +212,16 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 **Purpose**: IndexedDB CRUD operations for user-uploaded photos with metadata
 
 **Implementation**:
+
 - `getStoreName()` returns `'photos'`
 - `_doInit()` handles v1→v2 migration, creates photos store with `by-date` index
 
 **Inherited Methods**:
+
 - Basic CRUD: `add()`, `get()`, `update()`, `delete()`
 
 **Service-Specific Methods**:
+
 - `create(photo: Omit<Photo, 'id'>): Promise<Photo>` - Create photo with logging (wraps `add()`)
 - `getAll(): Promise<Photo[]>` - Overridden to use `by-date` index for efficient chronological retrieval
 - `getPage(offset, limit): Promise<Photo[]>` - Overridden for custom index-based pagination
@@ -245,6 +258,7 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 ```
 
 **Code Duplication Reduction** (Story 5.3):
+
 - Before: 621 lines total (299 + 322)
 - After: 768 lines total (239 base + 290 messages + 239 photos)
 - Base class extracts ~170 lines of shared logic now reusable across all services
@@ -252,6 +266,7 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 - Future services (MoodService) will leverage base class, amplifying efficiency gains
 
 **Benefits**:
+
 - **Consistency**: All services use same CRUD patterns
 - **Maintainability**: Bug fixes in base class apply to all services
 - **Type Safety**: Generic type parameter enforces id field constraint
@@ -263,9 +278,11 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 ### Implemented Components
 
 #### DailyMessage Component
+
 **Purpose**: Main application view displaying the daily love message
 
 **Features**:
+
 - Animated message card with category badge
 - Relationship duration counter (days together)
 - Favorite toggle with floating hearts animation
@@ -274,20 +291,24 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 - Responsive design (mobile-first)
 
 **State Dependencies**:
+
 - `currentMessage` - The message to display
 - `settings` - For relationship start date
 - `toggleFavorite` - Action to favorite/unfavorite
 
 **Animations**:
+
 - Card entrance: scale + 3D rotation
 - Hearts burst: 10 floating hearts on favorite
 - Decorative hearts: continuous subtle pulse
 - Category badge: scale pop-in
 
 #### ErrorBoundary Component (Story 1.5)
+
 **Purpose**: Graceful error handling with fallback UI
 
 **Features**:
+
 - Catches React component errors using `getDerivedStateFromError()`
 - Logs errors with context using `componentDidCatch()`
 - Displays user-friendly error screen with retry button
@@ -295,12 +316,14 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 - Resets error state on retry to allow recovery
 
 **Error UI Components**:
+
 - Broken heart emoji (💔) for visual indication
 - Clear error message: "Something went wrong"
 - Technical error details (error.message) for debugging
 - Retry button to reset error state and attempt recovery
 
 #### ~~Onboarding Component~~ (REMOVED - Story 1.5)
+
 **Status**: Files deleted in Story 1.5, no longer in codebase
 
 **Original Purpose**: First-time user setup wizard
@@ -311,14 +334,14 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 
 ### Planned Components
 
-| Component | Purpose | Features |
-|-----------|---------|----------|
-| **PhotoMemory** | Photo gallery | Upload, caption, tag photos; grid view; lightbox |
-| **MoodTracker** | Daily mood logging | 5 mood types; note field; calendar view; mood trends |
-| **CountdownTimer** | Anniversary countdown | Days/hours/minutes to next anniversary; animations |
-| **CustomNotes** | User messages | Create custom messages; category selection; preview |
-| **Settings** | App configuration | Theme switcher; notification settings; data export/import |
-| **Layout** | Shared UI | Header, footer, navigation, theme wrapper |
+| Component          | Purpose               | Features                                                  |
+| ------------------ | --------------------- | --------------------------------------------------------- |
+| **PhotoMemory**    | Photo gallery         | Upload, caption, tag photos; grid view; lightbox          |
+| **MoodTracker**    | Daily mood logging    | 5 mood types; note field; calendar view; mood trends      |
+| **CountdownTimer** | Anniversary countdown | Days/hours/minutes to next anniversary; animations        |
+| **CustomNotes**    | User messages         | Create custom messages; category selection; preview       |
+| **Settings**       | App configuration     | Theme switcher; notification settings; data export/import |
+| **Layout**         | Shared UI             | Header, footer, navigation, theme wrapper                 |
 
 ## State Management
 
@@ -327,6 +350,7 @@ The service layer encapsulates all IndexedDB operations, providing a clean abstr
 **Single Store**: `useAppStore` (no store splitting)
 
 **Store Structure**:
+
 ```typescript
 interface AppState {
   // State slices
@@ -357,6 +381,7 @@ interface AppState {
 ```
 
 **Persistence Strategy**:
+
 - **Middleware**: `persist` from `zustand/middleware`
 - **Storage**: LocalStorage (`my-love-storage` key)
 - **Partialize**: Only persists critical state (settings, isOnboarded, messageHistory, moods)
@@ -382,6 +407,7 @@ interface AppState {
 ```
 
 **Configuration**:
+
 - Source: `src/config/constants.ts` exports `APP_CONFIG` object with hardcoded values
 - Values: `defaultPartnerName`, `defaultStartDate` directly set in source code
 - How it works: Developer edits constants.ts, values are bundled at build time
@@ -398,21 +424,23 @@ interface AppState {
 
 **Caching Strategies**:
 
-| Resource Type | Strategy | Cache Name | Expiration |
-|--------------|----------|------------|------------|
-| App shell (JS, CSS, HTML) | CacheFirst | `workbox-precache-v2` | Never (versioned) |
-| Google Fonts | CacheFirst | `google-fonts-cache` | 1 year, 10 entries max |
-| Images (PNG, JPG, SVG) | CacheFirst | `workbox-precache-v2` | Never (versioned) |
-| Runtime requests | NetworkFirst | `workbox-runtime-cache` | Default |
+| Resource Type             | Strategy     | Cache Name              | Expiration             |
+| ------------------------- | ------------ | ----------------------- | ---------------------- |
+| App shell (JS, CSS, HTML) | CacheFirst   | `workbox-precache-v2`   | Never (versioned)      |
+| Google Fonts              | CacheFirst   | `google-fonts-cache`    | 1 year, 10 entries max |
+| Images (PNG, JPG, SVG)    | CacheFirst   | `workbox-precache-v2`   | Never (versioned)      |
+| Runtime requests          | NetworkFirst | `workbox-runtime-cache` | Default                |
 
 **Pre-cached Assets** (glob pattern):
+
 ```javascript
-globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}']
+globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'];
 ```
 
 ### PWA Manifest
 
 **Configuration** (defined in `vite.config.ts`):
+
 ```json
 {
   "name": "My Love - Daily Reminders",
@@ -431,6 +459,7 @@ globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}']
 ```
 
 **Capabilities**:
+
 - Installable to home screen (iOS, Android, Desktop)
 - Standalone display (no browser chrome)
 - Portrait-only orientation
@@ -446,6 +475,7 @@ npm run dev  # Start Vite dev server on port 5173
 ```
 
 **Features**:
+
 - Hot Module Replacement (HMR)
 - Fast refresh for React components
 - TypeScript compilation on save
@@ -461,6 +491,7 @@ npm run build  # TypeScript compile + Vite bundle + PWA generation
 ```
 
 **Steps**:
+
 1. **TypeScript Compilation**: `tsc -b` (type checking)
 2. **Vite Bundling**: JSX/TSX → JS, tree-shaking, minification
 3. **CSS Processing**: Tailwind → PostCSS → optimized CSS
@@ -469,6 +500,7 @@ npm run build  # TypeScript compile + Vite bundle + PWA generation
 6. **Output**: `dist/` directory ready for deployment
 
 **Output Structure**:
+
 ```
 dist/
 ├── assets/              # Hashed JS and CSS bundles
@@ -481,12 +513,14 @@ dist/
 ### Testing Strategy
 
 **Manual Testing**:
+
 - Browser DevTools for IndexedDB inspection
 - Application tab for service worker status
 - Network throttling for offline testing
 - Lighthouse for PWA score
 
 **Offline Testing**:
+
 1. Build: `npm run build`
 2. Preview: `npm run preview`
 3. Open DevTools → Application → Service Workers
@@ -502,6 +536,7 @@ dist/
 **Tool**: `gh-pages` package
 
 **Process**:
+
 1. Builds production bundle
 2. Pushes `dist/` to `gh-pages` branch
 3. GitHub Pages serves from branch root

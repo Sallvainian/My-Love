@@ -115,9 +115,7 @@ describe('settingsSlice Validation', () => {
     });
 
     it('should reject invalid theme in update', () => {
-      expect(() =>
-        store.getState().updateSettings({ themeName: 'invalid' as any })
-      ).toThrow();
+      expect(() => store.getState().updateSettings({ themeName: 'invalid' as any })).toThrow();
     });
 
     it('should reject invalid partial update that breaks validation', () => {

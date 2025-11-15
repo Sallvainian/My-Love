@@ -52,7 +52,10 @@ async function uploadTestPhoto(page: any, photoFileName: string, caption?: strin
   await page.click('[data-testid="photo-upload-submit-button"]');
 
   // Wait for upload to complete (modal closes)
-  await page.waitForSelector('[data-testid="photo-upload-modal"]', { state: 'hidden', timeout: 10000 });
+  await page.waitForSelector('[data-testid="photo-upload-modal"]', {
+    state: 'hidden',
+    timeout: 10000,
+  });
 }
 
 // Helper: Bulk upload multiple photos for pagination testing
@@ -303,7 +306,10 @@ test.describe('Photo Pagination with Lazy Loading', () => {
     await page.setInputFiles('[data-testid="photo-upload-file-input"]', filePath);
     await page.fill('[data-testid="photo-upload-caption-input"]', 'New photo');
     await page.click('[data-testid="photo-upload-submit-button"]');
-    await page.waitForSelector('[data-testid="photo-upload-modal"]', { state: 'hidden', timeout: 10000 });
+    await page.waitForSelector('[data-testid="photo-upload-modal"]', {
+      state: 'hidden',
+      timeout: 10000,
+    });
 
     // Gallery should refresh automatically (BUG FIX from Story 4.2)
     // Wait for new photo to appear

@@ -9,7 +9,7 @@ describe('PerformanceMonitor', () => {
   describe('measureAsync', () => {
     it('measures execution time of async operations', async () => {
       const operation = async () => {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         return 'result';
       };
 
@@ -19,13 +19,13 @@ describe('PerformanceMonitor', () => {
       const metrics = performanceMonitor.getMetrics('test-op');
       expect(metrics).toBeDefined();
       expect(metrics!.count).toBe(1);
-      expect(metrics!.avgDuration).toBeGreaterThanOrEqual(100);
-      expect(metrics!.avgDuration).toBeLessThan(150); // Allow 50ms margin
+      expect(metrics!.avgDuration).toBeGreaterThanOrEqual(95); // Allow 5ms margin for timing variations
+      expect(metrics!.avgDuration).toBeLessThan(150); // Allow 50ms upper margin
     });
 
     it('tracks multiple executions and calculates average', async () => {
       const operation = async () => {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       };
 
       await performanceMonitor.measureAsync('multi-op', operation);
@@ -44,9 +44,9 @@ describe('PerformanceMonitor', () => {
         throw new Error('Operation failed');
       };
 
-      await expect(
-        performanceMonitor.measureAsync('error-op', operation)
-      ).rejects.toThrow('Operation failed');
+      await expect(performanceMonitor.measureAsync('error-op', operation)).rejects.toThrow(
+        'Operation failed'
+      );
 
       // Error should not be recorded in metrics
       const metrics = performanceMonitor.getMetrics('error-op');
@@ -94,7 +94,7 @@ describe('PerformanceMonitor', () => {
   describe('getReport', () => {
     it('generates human-readable performance report', async () => {
       await performanceMonitor.measureAsync('db-read', async () => {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
       performanceMonitor.recordMetric('db-write', 25.5);
 

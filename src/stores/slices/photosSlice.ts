@@ -44,12 +44,7 @@ export interface PhotosSlice {
   clearPhotoSelection: () => void;
 }
 
-export const createPhotosSlice: StateCreator<
-  PhotosSlice,
-  [],
-  [],
-  PhotosSlice
-> = (set, get) => ({
+export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> = (set, get) => ({
   // Initial state
   photos: [],
   isLoadingPhotos: false,
@@ -69,7 +64,7 @@ export const createPhotosSlice: StateCreator<
       set({
         photoError: 'Failed to load photos',
         isLoadingPhotos: false,
-        photos: [] // Fallback to empty array
+        photos: [], // Fallback to empty array
       });
     }
   },
@@ -93,14 +88,15 @@ export const createPhotosSlice: StateCreator<
       const parsedTags = input.tags
         ? input.tags
             .split(',')
-            .map(tag => tag.trim())
-            .filter(tag => tag.length > 0)
-            .filter((tag, index, arr) =>
-              // Case-insensitive duplicate detection
-              arr.findIndex(t => t.toLowerCase() === tag.toLowerCase()) === index
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0)
+            .filter(
+              (tag, index, arr) =>
+                // Case-insensitive duplicate detection
+                arr.findIndex((t) => t.toLowerCase() === tag.toLowerCase()) === index
             )
             .slice(0, 10) // Max 10 tags
-            .map(tag => tag.slice(0, 50)) // Max 50 chars per tag
+            .map((tag) => tag.slice(0, 50)) // Max 50 chars per tag
         : [];
 
       // Validate caption
@@ -146,7 +142,7 @@ export const createPhotosSlice: StateCreator<
       const savedPhoto = await photoStorageService.create(photo);
 
       // Update state (optimistic UI update)
-      set(state => ({
+      set((state) => ({
         photos: [savedPhoto, ...state.photos], // Add to beginning (newest first)
         isLoadingPhotos: false,
       }));
@@ -157,7 +153,7 @@ export const createPhotosSlice: StateCreator<
       console.error('[AppStore] Failed to upload photo:', error);
       set({
         photoError: (error as Error).message || 'Failed to upload photo',
-        isLoadingPhotos: false
+        isLoadingPhotos: false,
       });
       throw error; // Re-throw for UI error handling
     }
@@ -165,7 +161,7 @@ export const createPhotosSlice: StateCreator<
 
   getPhotoById: (photoId: number) => {
     const { photos } = get();
-    return photos.find(p => p.id === photoId) || null;
+    return photos.find((p) => p.id === photoId) || null;
   },
 
   getStorageUsage: async () => {
@@ -198,11 +194,9 @@ export const createPhotosSlice: StateCreator<
       await photoStorageService.update(photoId, updates);
 
       // Update in state (find photo by ID and replace with updated version)
-      set(state => ({
-        photos: state.photos.map(photo =>
-          photo.id === photoId
-            ? { ...photo, ...updates }
-            : photo
+      set((state) => ({
+        photos: state.photos.map((photo) =>
+          photo.id === photoId ? { ...photo, ...updates } : photo
         ),
       }));
 
@@ -218,15 +212,15 @@ export const createPhotosSlice: StateCreator<
       const { photos, selectedPhotoId } = get();
 
       // Find current photo index before deletion
-      const currentIndex = photos.findIndex(p => p.id === photoId);
+      const currentIndex = photos.findIndex((p) => p.id === photoId);
       const photosCount = photos.length;
 
       // Delete from IndexedDB
       await photoStorageService.delete(photoId);
 
       // Update state (filter out deleted photo)
-      set(state => ({
-        photos: state.photos.filter(photo => photo.id !== photoId),
+      set((state) => ({
+        photos: state.photos.filter((photo) => photo.id !== photoId),
       }));
 
       console.log(`[AppStore] Photo ${photoId} deleted successfully`);
@@ -241,13 +235,13 @@ export const createPhotosSlice: StateCreator<
           console.log('[AppStore] Last photo deleted - closing carousel');
         } else if (currentIndex < remainingPhotosCount) {
           // Not last photo → navigate to same index (which is now next photo)
-          const updatedPhotos = photos.filter(p => p.id !== photoId);
+          const updatedPhotos = photos.filter((p) => p.id !== photoId);
           const nextPhoto = updatedPhotos[currentIndex];
           get().selectPhoto(nextPhoto.id);
           console.log(`[AppStore] Navigated to next photo: ${nextPhoto.id}`);
         } else {
           // Was last photo → navigate to new last photo (previous photo)
-          const updatedPhotos = photos.filter(p => p.id !== photoId);
+          const updatedPhotos = photos.filter((p) => p.id !== photoId);
           const prevPhoto = updatedPhotos[remainingPhotosCount - 1];
           get().selectPhoto(prevPhoto.id);
           console.log(`[AppStore] Navigated to previous photo: ${prevPhoto.id}`);

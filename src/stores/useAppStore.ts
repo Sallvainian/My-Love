@@ -7,7 +7,12 @@ import { createNavigationSlice, type NavigationSlice } from './slices/navigation
 import { createMoodSlice, type MoodSlice } from './slices/moodSlice';
 
 // Composed AppState from all slices
-export interface AppState extends MessagesSlice, PhotosSlice, SettingsSlice, NavigationSlice, MoodSlice {
+export interface AppState
+  extends MessagesSlice,
+    PhotosSlice,
+    SettingsSlice,
+    NavigationSlice,
+    MoodSlice {
   // Shared/Core state
   isLoading: boolean;
   error: string | null;
@@ -17,7 +22,10 @@ export interface AppState extends MessagesSlice, PhotosSlice, SettingsSlice, Nav
 }
 
 // State validation helper
-function validateHydratedState(state: Partial<AppState> | undefined): { isValid: boolean; errors: string[] } {
+function validateHydratedState(state: Partial<AppState> | undefined): {
+  isValid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   if (!state) {
@@ -35,19 +43,24 @@ function validateHydratedState(state: Partial<AppState> | undefined): { isValid:
   if (state.messageHistory) {
     // After deserialization, shownMessages should be a Map
     // This validation runs AFTER deserialization, so it must be a Map by now
-    if (state.messageHistory.shownMessages && !(state.messageHistory.shownMessages instanceof Map)) {
+    if (
+      state.messageHistory.shownMessages &&
+      !(state.messageHistory.shownMessages instanceof Map)
+    ) {
       errors.push('shownMessages is not a Map instance after deserialization');
     }
-    if (state.messageHistory.currentIndex !== undefined && typeof state.messageHistory.currentIndex !== 'number') {
+    if (
+      state.messageHistory.currentIndex !== undefined &&
+      typeof state.messageHistory.currentIndex !== 'number'
+    ) {
       errors.push('currentIndex is not a number');
     }
   }
 
   // Only fail validation if we have CRITICAL errors
   // Missing fields are OK - they'll use defaults
-  const hasCriticalErrors = errors.some(err =>
-    err.includes('not a Map instance') ||
-    err.includes('not a number')
+  const hasCriticalErrors = errors.some(
+    (err) => err.includes('not a Map instance') || err.includes('not a number')
   );
 
   return { isValid: !hasCriticalErrors, errors };
@@ -113,9 +126,10 @@ export const useAppStore = create<AppState>()(
         // Story 3.3: Serialize Map to Array for JSON storage
         messageHistory: {
           ...state.messageHistory,
-          shownMessages: state.messageHistory?.shownMessages instanceof Map
-            ? Array.from(state.messageHistory.shownMessages.entries())
-            : [],
+          shownMessages:
+            state.messageHistory?.shownMessages instanceof Map
+              ? Array.from(state.messageHistory.shownMessages.entries())
+              : [],
         },
         moods: state.moods,
         // Story 3.5: Custom messages now in IndexedDB (not LocalStorage)
@@ -129,10 +143,7 @@ export const useAppStore = create<AppState>()(
       }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          console.error(
-            '[Zustand Persist] Failed to rehydrate state from LocalStorage:',
-            error
-          );
+          console.error('[Zustand Persist] Failed to rehydrate state from LocalStorage:', error);
 
           // Attempt to recover: clear corrupted state
           try {
@@ -156,12 +167,14 @@ export const useAppStore = create<AppState>()(
 
             // If shownMessages is null or undefined, create empty Map
             if (!shownMessagesArray) {
-              console.warn('[Zustand Persist] shownMessages is null/undefined - creating empty Map');
+              console.warn(
+                '[Zustand Persist] shownMessages is null/undefined - creating empty Map'
+              );
               state.messageHistory.shownMessages = new Map();
             } else if (Array.isArray(shownMessagesArray)) {
               // Validate array structure before converting to Map
               const isValidArray = shownMessagesArray.every(
-                item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string'
+                (item) => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string'
               );
 
               if (isValidArray) {
@@ -171,22 +184,31 @@ export const useAppStore = create<AppState>()(
                   `${shownMessagesArray.length} entries`
                 );
               } else {
-                console.error('[Zustand Persist] Invalid shownMessages array structure - resetting to empty Map');
+                console.error(
+                  '[Zustand Persist] Invalid shownMessages array structure - resetting to empty Map'
+                );
                 state.messageHistory.shownMessages = new Map();
 
                 // Mark state as potentially corrupted
                 console.warn('[Zustand Persist] Message history was corrupted and has been reset');
               }
             } else {
-              console.error('[Zustand Persist] shownMessages is not an array - resetting to empty Map');
+              console.error(
+                '[Zustand Persist] shownMessages is not an array - resetting to empty Map'
+              );
               state.messageHistory.shownMessages = new Map();
             }
           } catch (deserializationError) {
-            console.error('[Zustand Persist] Failed to deserialize shownMessages Map:', deserializationError);
+            console.error(
+              '[Zustand Persist] Failed to deserialize shownMessages Map:',
+              deserializationError
+            );
             state.messageHistory.shownMessages = new Map();
 
             // Mark for potential full state reset
-            console.error('[Zustand Persist] CRITICAL: Map deserialization failed - state may be corrupted');
+            console.error(
+              '[Zustand Persist] CRITICAL: Map deserialization failed - state may be corrupted'
+            );
           }
         } else if (state) {
           // messageHistory is null/undefined - create default structure
@@ -204,7 +226,9 @@ export const useAppStore = create<AppState>()(
 
         // Handle null/undefined settings gracefully
         if (state && !state.settings) {
-          console.warn('[Zustand Persist] settings is null - app will use defaults from initial state');
+          console.warn(
+            '[Zustand Persist] settings is null - app will use defaults from initial state'
+          );
           // Don't create default settings here - let the store's initial state handle it
         }
 
