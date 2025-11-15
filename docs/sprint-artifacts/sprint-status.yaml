@@ -84,8 +84,8 @@ development_status:
   5-2-implement-photo-pagination-with-lazy-loading: done
   5-3-extract-base-service-class-to-reduce-duplication: done
   5-4-add-unit-tests-for-utilities-and-services: done
-  5-5-centralize-input-validation-layer: done
-  epic-5-retrospective: optional
+  5-5-centralize-input-validation-layer: review
+  epic-5-retrospective: completed
 
   # Epic 6: Interactive Connection Features (6 stories) - RENAMED FROM EPIC 5
   epic-6: backlog

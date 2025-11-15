@@ -99,7 +99,7 @@ test.describe('Photo Pagination with Lazy Loading', () => {
     }
 
     // Wait for app initialization
-    await page.waitForSelector('[data-testid="daily-message-container"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="daily-message"]', { timeout: 10000 });
   });
 
   // AC-4: Skeleton loaders during initial load

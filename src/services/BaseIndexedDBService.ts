@@ -40,13 +40,17 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
   async init(): Promise<void> {
     // Return existing promise if initialization already in progress
     if (this.initPromise) {
-      console.log(`[${this.constructor.name}] Init already in progress, waiting...`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Init already in progress, waiting...`);
+      }
       return this.initPromise;
     }
 
     // Return immediately if already initialized
     if (this.db) {
-      console.log(`[${this.constructor.name}] Already initialized`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Already initialized`);
+      }
       return Promise.resolve();
     }
 
@@ -85,7 +89,9 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
 
       const storeName = this.getStoreName();
       const id = await this.db!.add(storeName, item as T);
-      console.log(`[${this.constructor.name}] Added item to ${storeName}, id: ${id}`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Added item to ${storeName}, id: ${id}`);
+      }
 
       return { ...item, id: id as number } as T;
     } catch (error) {
@@ -106,7 +112,9 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       const item = await this.db!.get(storeName, id);
 
       if (item) {
-        console.log(`[${this.constructor.name}] Retrieved item from ${storeName}, id: ${id}`);
+        if (import.meta.env.DEV) {
+          console.log(`[${this.constructor.name}] Retrieved item from ${storeName}, id: ${id}`);
+        }
       } else {
         console.warn(`[${this.constructor.name}] Item not found in ${storeName}, id: ${id}`);
       }
@@ -129,7 +137,9 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       const storeName = this.getStoreName();
       const items = await this.db!.getAll(storeName);
 
-      console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${storeName}`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${storeName}`);
+      }
       return items;
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to get all items:`, error);
@@ -156,7 +166,9 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       const updated: T = { ...item, ...updates };
       await this.db!.put(storeName, updated);
 
-      console.log(`[${this.constructor.name}] Updated item in ${storeName}, id: ${id}`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Updated item in ${storeName}, id: ${id}`);
+      }
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to update item ${id}:`, error);
       throw error;
@@ -174,7 +186,9 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       const storeName = this.getStoreName();
       await this.db!.delete(storeName, id);
 
-      console.log(`[${this.constructor.name}] Deleted item from ${storeName}, id: ${id}`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Deleted item from ${storeName}, id: ${id}`);
+      }
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to delete item ${id}:`, error);
       throw error;
@@ -191,7 +205,9 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       const storeName = this.getStoreName();
       await this.db!.clear(storeName);
 
-      console.log(`[${this.constructor.name}] Cleared all items from ${storeName}`);
+      if (import.meta.env.DEV) {
+        console.log(`[${this.constructor.name}] Cleared all items from ${storeName}`);
+      }
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to clear store:`, error);
       throw error;
@@ -213,9 +229,11 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       const allItems = await this.getAll();
       const page = allItems.slice(offset, offset + limit);
 
-      console.log(
-        `[${this.constructor.name}] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${allItems.length}`
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          `[${this.constructor.name}] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${allItems.length}`
+        );
+      }
 
       return page;
     } catch (error) {

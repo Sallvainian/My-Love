@@ -15,6 +15,9 @@
 
 import type { StateCreator } from 'zustand';
 import type { MoodEntry } from '../../types';
+import { MoodEntrySchema } from '../../validation/schemas';
+import { createValidationError, isZodError } from '../../validation/errorMessages';
+import { ZodError } from 'zod';
 
 export interface MoodSlice {
   // State
@@ -36,16 +39,27 @@ export const createMoodSlice: StateCreator<
 
   // Actions
   addMoodEntry: (mood, note) => {
-    const today = new Date().toISOString().split('T')[0];
-    const newMood: MoodEntry = {
-      date: today,
-      mood,
-      note,
-    };
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const newMood: MoodEntry = {
+        date: today,
+        mood,
+        note,
+      };
 
-    set((state) => ({
-      moods: [...state.moods.filter((m) => m.date !== today), newMood],
-    }));
+      // Story 5.5: Validate mood entry before adding to state
+      const validated = MoodEntrySchema.parse(newMood);
+
+      set((state) => ({
+        moods: [...state.moods.filter((m) => m.date !== today), validated],
+      }));
+    } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        throw createValidationError(error as ZodError);
+      }
+      throw error;
+    }
   },
 
   getMoodForDate: (date) => {

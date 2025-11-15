@@ -10,6 +10,7 @@ import {
   BYTES_PER_KB,
   BYTES_PER_MB,
 } from '../config/performance';
+import { performanceMonitor } from './performanceMonitor';
 
 const DB_NAME = 'my-love-db';
 const DB_VERSION = 2; // Story 4.1: Increment from 1 to 2 for photos store enhancement
@@ -139,31 +140,37 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
    * @throws {ValidationError} if photo data is invalid
    */
   async create(photo: Omit<Photo, 'id'>): Promise<Photo> {
-    try {
-      // Validate photo data before saving to IndexedDB
-      const validated = PhotoSchema.parse(photo);
+    return performanceMonitor.measureAsync('photo-create', async () => {
+      try {
+        // Validate photo data before saving to IndexedDB
+        const validated = PhotoSchema.parse(photo);
 
-      const created = await super.add(validated);
-      if (import.meta.env.DEV) {
-        const sizeKB = (validated.compressedSize / BYTES_PER_KB).toFixed(0);
-        console.log(`[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`);
+        const created = await super.add(validated);
+
+        // Record photo size metric
+        performanceMonitor.recordMetric('photo-size-kb', validated.compressedSize / BYTES_PER_KB);
+
+        if (import.meta.env.DEV) {
+          const sizeKB = (validated.compressedSize / BYTES_PER_KB).toFixed(0);
+          console.log(`[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`);
+        }
+
+        return created;
+      } catch (error) {
+        // Transform Zod validation errors into user-friendly messages
+        if (isZodError(error)) {
+          throw createValidationError(error as ZodError);
+        }
+
+        console.error('[PhotoStorage] Failed to save photo:', error);
+        console.error('[PhotoStorage] Photo data:', {
+          caption: photo.caption?.substring(0, 50),
+          tags: photo.tags,
+          size: photo.compressedSize,
+        });
+        throw error;
       }
-
-      return created;
-    } catch (error) {
-      // Transform Zod validation errors into user-friendly messages
-      if (isZodError(error)) {
-        throw createValidationError(error as ZodError);
-      }
-
-      console.error('[PhotoStorage] Failed to save photo:', error);
-      console.error('[PhotoStorage] Photo data:', {
-        caption: photo.caption?.substring(0, 50),
-        tags: photo.tags,
-        size: photo.compressedSize,
-      });
-      throw error;
-    }
+    });
   }
 
   /**
@@ -173,22 +180,24 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
    * @returns Array of photos (newest first)
    */
   async getAll(): Promise<Photo[]> {
-    try {
-      await this.init();
+    return performanceMonitor.measureAsync('photo-getAll', async () => {
+      try {
+        await this.init();
 
-      // Use by-date index for sorted retrieval
-      const photos = await this.db!.getAllFromIndex('photos', 'by-date');
-      // Reverse to get newest first
-      const sortedPhotos = photos.reverse();
+        // Use by-date index for sorted retrieval
+        const photos = await this.db!.getAllFromIndex('photos', 'by-date');
+        // Reverse to get newest first
+        const sortedPhotos = photos.reverse();
 
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoStorage] Retrieved ${sortedPhotos.length} photos (newest first)`);
+        if (import.meta.env.DEV) {
+          console.log(`[PhotoStorage] Retrieved ${sortedPhotos.length} photos (newest first)`);
+        }
+        return sortedPhotos;
+      } catch (error) {
+        console.error('[PhotoStorage] Failed to load photos:', error);
+        return []; // Graceful fallback: return empty array
       }
-      return sortedPhotos;
-    } catch (error) {
-      console.error('[PhotoStorage] Failed to load photos:', error);
-      return []; // Graceful fallback: return empty array
-    }
+    });
   }
 
   /**
@@ -201,28 +210,30 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
    * @returns Array of photos for the requested page
    */
   async getPage(offset: number = 0, limit: number = PAGINATION.DEFAULT_PAGE_SIZE): Promise<Photo[]> {
-    try {
-      await this.init();
+    return performanceMonitor.measureAsync('photo-getPage', async () => {
+      try {
+        await this.init();
 
-      // Get all photos sorted by date
-      const allPhotos = await this.db!.getAllFromIndex('photos', 'by-date');
-      // Reverse to get newest first
-      const sortedPhotos = allPhotos.reverse();
+        // Get all photos sorted by date
+        const allPhotos = await this.db!.getAllFromIndex('photos', 'by-date');
+        // Reverse to get newest first
+        const sortedPhotos = allPhotos.reverse();
 
-      // Slice to get requested page
-      const page = sortedPhotos.slice(offset, offset + limit);
+        // Slice to get requested page
+        const page = sortedPhotos.slice(offset, offset + limit);
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[PhotoStorage] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${sortedPhotos.length}`
-        );
+        if (import.meta.env.DEV) {
+          console.log(
+            `[PhotoStorage] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${sortedPhotos.length}`
+          );
+        }
+
+        return page;
+      } catch (error) {
+        console.error('[PhotoStorage] Failed to load photo page:', error);
+        return []; // Graceful fallback
       }
-
-      return page;
-    } catch (error) {
-      console.error('[PhotoStorage] Failed to load photo page:', error);
-      return []; // Graceful fallback
-    }
+    });
   }
 
   /**
