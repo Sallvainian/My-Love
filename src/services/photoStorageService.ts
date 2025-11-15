@@ -1,5 +1,9 @@
-import { openDB, type IDBPDatabase } from 'idb';
+import { openDB } from 'idb';
 import type { Photo } from '../types';
+import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { PhotoSchema } from '../validation/schemas';
+import { createValidationError, isZodError } from '../validation/errorMessages';
+import { ZodError } from 'zod';
 
 const DB_NAME = 'my-love-db';
 const DB_VERSION = 2; // Story 4.1: Increment from 1 to 2 for photos store enhancement
@@ -7,48 +11,31 @@ const DB_VERSION = 2; // Story 4.1: Increment from 1 to 2 for photos store enhan
 /**
  * Photo Storage Service - IndexedDB CRUD operations for photos
  * Story 4.1: AC-4.1.7 - Save photos to IndexedDB with metadata
+ * Story 5.3: Refactored to extend BaseIndexedDBService to reduce duplication
  *
- * Patterns followed from CustomMessageService:
- * - Singleton class with init() guard
- * - Comprehensive error handling and logging
- * - Graceful fallbacks for failures
+ * Extends: BaseIndexedDBService<Photo>
+ * - Inherits: init(), add(), get(), update(), delete(), clear(), getPage()
+ * - Implements: getStoreName(), _doInit()
+ * - Overrides: getAll() (uses 'by-date' index), getPage() (custom pagination)
+ * - Preserves: Service-specific methods (getStorageSize, estimateQuotaRemaining)
  *
  * DB Migration: v1 → v2
  * - Version 1: Basic photos store existed but wasn't actively used
  * - Version 2: Enhanced Photo schema with compression metadata
  */
-class PhotoStorageService {
-  private db: IDBPDatabase<any> | null = null;
-  private initPromise: Promise<void> | null = null;
+class PhotoStorageService extends BaseIndexedDBService<Photo> {
+  /**
+   * Get the object store name for photos
+   */
+  protected getStoreName(): string {
+    return 'photos';
+  }
 
   /**
    * Initialize IndexedDB connection with DB version 2
    * Story 4.1: Migrate from v1 to v2 if needed
    */
-  async init(): Promise<void> {
-    // Return existing promise if initialization already in progress
-    if (this.initPromise) {
-      console.log('[PhotoStorage] Init already in progress, waiting...');
-      return this.initPromise;
-    }
-
-    // Return immediately if already initialized
-    if (this.db) {
-      console.log('[PhotoStorage] Already initialized');
-      return Promise.resolve();
-    }
-
-    // Store promise to prevent concurrent initialization
-    this.initPromise = this._doInit();
-
-    try {
-      await this.initPromise;
-    } finally {
-      this.initPromise = null;
-    }
-  }
-
-  private async _doInit(): Promise<void> {
+  protected async _doInit(): Promise<void> {
     try {
       console.log('[PhotoStorage] Initializing IndexedDB (version 2)...');
 
@@ -89,32 +76,36 @@ class PhotoStorageService {
 
       console.log('[PhotoStorage] IndexedDB initialized successfully (v2)');
     } catch (error) {
-      console.error('[PhotoStorage] Failed to initialize IndexedDB:', error);
-      console.error('[PhotoStorage] Error details:', {
-        name: (error as Error).name,
-        message: (error as Error).message,
-      });
-      throw error;
+      this.handleError('initialize', error as Error);
     }
   }
 
   /**
    * Create a new photo in IndexedDB
    * AC-4.1.7: Save with full metadata (imageBlob, caption, tags, sizes, dimensions)
+   * Story 5.5: Added runtime validation with Zod schema
+   * Uses inherited add() method from base class
    *
    * @param photo - Photo data (without id)
    * @returns Photo with auto-generated id
+   * @throws {ValidationError} if photo data is invalid
    */
   async create(photo: Omit<Photo, 'id'>): Promise<Photo> {
     try {
-      await this.init();
+      // Validate photo data before saving to IndexedDB
+      const validated = PhotoSchema.parse(photo);
 
-      const id = await this.db!.add('photos', photo as Photo);
-      const sizeKB = (photo.compressedSize / 1024).toFixed(0);
-      console.log(`[PhotoStorage] Saved photo ID: ${id}, size: ${sizeKB}KB, dimensions: ${photo.width}x${photo.height}`);
+      const created = await super.add(validated);
+      const sizeKB = (validated.compressedSize / 1024).toFixed(0);
+      console.log(`[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`);
 
-      return { ...photo, id: id as number } as Photo;
+      return created;
     } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        throw createValidationError(error as ZodError);
+      }
+
       console.error('[PhotoStorage] Failed to save photo:', error);
       console.error('[PhotoStorage] Photo data:', {
         caption: photo.caption?.substring(0, 50),
@@ -127,7 +118,7 @@ class PhotoStorageService {
 
   /**
    * Get all photos sorted by date (newest first)
-   * Uses by-date index for efficient chronological retrieval
+   * Overrides base getAll() to use by-date index for efficient chronological retrieval
    *
    * @returns Array of photos (newest first)
    */
@@ -151,6 +142,7 @@ class PhotoStorageService {
   /**
    * Get paginated photos sorted by date (newest first)
    * Story 4.2: AC-4.2.4 - Lazy loading pagination
+   * Overrides base getPage() to use by-date index for efficient pagination
    *
    * @param offset - Number of photos to skip (0 = first page)
    * @param limit - Number of photos to return per page (default: 20)
@@ -180,72 +172,39 @@ class PhotoStorageService {
   }
 
   /**
-   * Get single photo by ID
+   * Update an existing photo in IndexedDB
+   * Story 5.5: Override to add runtime validation with Zod schema
+   * Overrides inherited update() method from base class
    *
-   * @param photoId - Photo ID to retrieve
-   * @returns Photo or null if not found
-   */
-  async getById(photoId: number): Promise<Photo | null> {
-    try {
-      await this.init();
-
-      const photo = await this.db!.get('photos', photoId);
-      if (photo) {
-        console.log(`[PhotoStorage] Retrieved photo ID: ${photoId}`);
-      } else {
-        console.warn(`[PhotoStorage] Photo not found: ${photoId}`);
-      }
-
-      return photo || null;
-    } catch (error) {
-      console.error(`[PhotoStorage] Failed to get photo ${photoId}:`, error);
-      return null; // Graceful fallback
-    }
-  }
-
-  /**
-   * Update existing photo
-   * Story 4.4 will use this for edit functionality
-   *
-   * @param photoId - Photo ID to update
+   * @param id - Photo ID to update
    * @param updates - Partial photo data to update
+   * @throws {ValidationError} if update data is invalid
    */
-  async update(photoId: number, updates: Partial<Photo>): Promise<void> {
+  async update(id: number, updates: Partial<Photo>): Promise<void> {
     try {
-      await this.init();
+      // Validate partial update data
+      // Use partial schema to allow updating individual fields
+      const validated = PhotoSchema.partial().parse(updates);
 
-      const photo = await this.getById(photoId);
-      if (!photo) {
-        throw new Error(`Photo ${photoId} not found`);
+      await super.update(id, validated);
+      console.log(`[PhotoStorage] Updated photo ID: ${id}`);
+    } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        throw createValidationError(error as ZodError);
       }
 
-      const updated: Photo = { ...photo, ...updates };
-      await this.db!.put('photos', updated);
-
-      console.log(`[PhotoStorage] Updated photo ID: ${photoId}`);
-    } catch (error) {
-      console.error(`[PhotoStorage] Failed to update photo ${photoId}:`, error);
+      console.error('[PhotoStorage] Failed to update photo:', error);
+      console.error('[PhotoStorage] Update data:', updates);
       throw error;
     }
   }
 
   /**
-   * Delete photo by ID
-   * Story 4.4 will use this for delete functionality
-   *
-   * @param photoId - Photo ID to delete
+   * Note: get() and delete() methods are inherited from BaseIndexedDBService
+   * - get(id: number): Promise<Photo | null> - Get photo by ID (replaces getById)
+   * - delete(id: number): Promise<void> - Delete photo by ID
    */
-  async delete(photoId: number): Promise<void> {
-    try {
-      await this.init();
-
-      await this.db!.delete('photos', photoId);
-      console.log(`[PhotoStorage] Deleted photo ID: ${photoId}`);
-    } catch (error) {
-      console.error(`[PhotoStorage] Failed to delete photo ${photoId}:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Get total storage size used by all photos
