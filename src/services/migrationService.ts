@@ -1,5 +1,8 @@
 import { customMessageService } from './customMessageService';
 import type { CustomMessage } from '../types';
+import { CreateMessageInputSchema } from '../validation/schemas';
+import { isZodError } from '../validation/errorMessages';
+import { ZodError } from 'zod';
 
 /**
  * Migration Service - One-time migration from LocalStorage to IndexedDB
@@ -73,33 +76,41 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
     // Migrate each message to IndexedDB
     for (const message of customMessages) {
       try {
-        // Validate message structure
-        if (!message.text || !message.category) {
-          console.warn('[MigrationService] Skipping invalid message:', message);
-          result.skippedCount++;
-          continue;
-        }
+        // Story 5.5: Validate message structure with Zod schema
+        const messageInput = {
+          text: message.text,
+          category: message.category,
+          active: message.active ?? true, // Default to active if not specified
+          tags: message.tags || [],
+        };
+
+        // Validate with schema before migration
+        const validated = CreateMessageInputSchema.parse(messageInput);
 
         // Check for duplicates (same text already in IndexedDB)
-        const normalizedText = message.text.trim().toLowerCase();
+        const normalizedText = validated.text.trim().toLowerCase();
         if (existingTexts.has(normalizedText)) {
-          console.log('[MigrationService] Skipping duplicate message:', message.text.substring(0, 50) + '...');
+          console.log('[MigrationService] Skipping duplicate message:', validated.text.substring(0, 50) + '...');
           result.skippedCount++;
           continue;
         }
 
         // Create message in IndexedDB via customMessageService
-        await customMessageService.create({
-          text: message.text,
-          category: message.category,
-          active: message.active ?? true, // Default to active if not specified
-          tags: message.tags || [],
-        });
+        // (customMessageService.create() also validates, but we validate here to provide better error messages during migration)
+        await customMessageService.create(validated);
 
         existingTexts.add(normalizedText); // Prevent duplicates within same migration
         result.migratedCount++;
-        console.log('[MigrationService] Migrated message:', message.text.substring(0, 50) + '...');
+        console.log('[MigrationService] Migrated message:', validated.text.substring(0, 50) + '...');
       } catch (error) {
+        // Handle validation errors gracefully
+        if (isZodError(error)) {
+          const errorMsg = `Invalid message data: ${message.text?.substring(0, 50)} - ${(error as ZodError).errors[0]?.message}`;
+          console.warn('[MigrationService]', errorMsg);
+          result.skippedCount++;
+          continue;
+        }
+
         const errorMsg = `Failed to migrate message: ${message.text?.substring(0, 50)}`;
         console.error('[MigrationService]', errorMsg, error);
         result.errors.push(errorMsg);
