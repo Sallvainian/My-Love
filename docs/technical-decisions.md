@@ -1024,6 +1024,8 @@ return photos.slice(offset, offset + limit); // Simple slice-based pagination
 
 ### Memory Profiling Methodology (AC-5)
 
+**Comprehensive Guide:** See [Memory Profiling Guide](guides/memory-profiling.md) for detailed profiling methodology, browser quota management, and storage optimization techniques.
+
 **Testing approach:** Chrome DevTools heap snapshots with production build
 
 **Profiling steps:**
