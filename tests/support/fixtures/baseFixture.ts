@@ -1,9 +1,5 @@
 import { test as base, expect, Page } from '@playwright/test';
-import {
-  clearIndexedDB,
-  clearLocalStorage,
-  setLocalStorageItem,
-} from '../helpers/pwaHelpers';
+import { clearIndexedDB, clearLocalStorage, setLocalStorageItem } from '../helpers/pwaHelpers';
 
 /**
  * Test Fixtures for PWA Testing
@@ -175,11 +171,7 @@ export const test = base.extend<TestFixtures>({
     };
 
     // Write to LocalStorage (Zustand persist key is 'my-love-storage')
-    await setLocalStorageItem(
-      page,
-      'my-love-storage',
-      JSON.stringify(persistedState)
-    );
+    await setLocalStorageItem(page, 'my-love-storage', JSON.stringify(persistedState));
 
     // Reload to apply persisted state
     await page.reload();

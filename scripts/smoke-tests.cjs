@@ -94,11 +94,7 @@ function getGzippedSize(filePath) {
 function testFileExistence() {
   console.log(`\n${colors.blue}Test 1: File Existence${colors.reset}`);
 
-  const requiredFiles = [
-    'index.html',
-    'manifest.webmanifest',
-    'sw.js'
-  ];
+  const requiredFiles = ['index.html', 'manifest.webmanifest', 'sw.js'];
 
   for (const file of requiredFiles) {
     const filePath = path.join(DIST_DIR, file);
@@ -171,7 +167,7 @@ function testManifest() {
 
   // Validate required fields
   const requiredFields = ['name', 'short_name', 'icons', 'display', 'theme_color'];
-  const missingFields = requiredFields.filter(field => !manifest[field]);
+  const missingFields = requiredFields.filter((field) => !manifest[field]);
 
   if (missingFields.length > 0) {
     exitWithError(
@@ -203,7 +199,10 @@ function testServiceWorker() {
   const content = fs.readFileSync(swPath, 'utf8');
 
   // Check for Workbox or cache-related code
-  const hasWorkbox = content.includes('workbox') || content.includes('precache') || content.includes('registerRoute');
+  const hasWorkbox =
+    content.includes('workbox') ||
+    content.includes('precache') ||
+    content.includes('registerRoute');
   if (!hasWorkbox) {
     exitWithError(
       'Service Worker Validation',
@@ -216,7 +215,9 @@ function testServiceWorker() {
   // Check for precache manifest (indicates assets will be cached)
   const hasPrecache = content.includes('precache') || content.includes('self.__WB_MANIFEST');
   if (!hasPrecache) {
-    console.warn(`${colors.yellow}⚠️  Warning: Service worker may not pre-cache assets${colors.reset}`);
+    console.warn(
+      `${colors.yellow}⚠️  Warning: Service worker may not pre-cache assets${colors.reset}`
+    );
   } else {
     logTest('Service worker includes precache manifest', true);
   }
@@ -239,7 +240,7 @@ function testEnvironmentVariables() {
   }
 
   // Find all JS bundles
-  const jsFiles = fs.readdirSync(assetsDir).filter(f => f.endsWith('.js'));
+  const jsFiles = fs.readdirSync(assetsDir).filter((f) => f.endsWith('.js'));
 
   if (jsFiles.length === 0) {
     exitWithError(
@@ -271,9 +272,15 @@ function testEnvironmentVariables() {
 
   if (!foundConfig) {
     // This is a warning, not a blocker - app may work without pre-configuration
-    console.warn(`${colors.yellow}⚠️  Warning: APP_CONFIG constants not found in bundle${colors.reset}`);
-    console.warn(`${colors.yellow}   Verify that src/config/constants.ts has been configured with your relationship data${colors.reset}`);
-    console.warn(`${colors.yellow}   App will function but without pre-configured relationship data${colors.reset}`);
+    console.warn(
+      `${colors.yellow}⚠️  Warning: APP_CONFIG constants not found in bundle${colors.reset}`
+    );
+    console.warn(
+      `${colors.yellow}   Verify that src/config/constants.ts has been configured with your relationship data${colors.reset}`
+    );
+    console.warn(
+      `${colors.yellow}   App will function but without pre-configured relationship data${colors.reset}`
+    );
     logTest('Configuration constants present', false, 'Missing (non-blocking)');
   } else {
     logTest('Configuration constants present', true, configDetails);
@@ -303,7 +310,7 @@ function testBundleSize() {
   }
 
   const totalSizeKB = (totalSize / 1024).toFixed(2);
-  const withinLimit = totalSize < (MAX_BUNDLE_SIZE_KB * 1024);
+  const withinLimit = totalSize < MAX_BUNDLE_SIZE_KB * 1024;
 
   if (!withinLimit) {
     console.error(`${colors.red}Bundle size breakdown:${colors.reset}`);
@@ -335,9 +342,11 @@ function testCriticalAssets() {
   // Check for at least one icon
   const iconsDir = path.join(DIST_DIR, 'icons');
   if (fs.existsSync(iconsDir)) {
-    const iconFiles = fs.readdirSync(iconsDir).filter(f => f.endsWith('.png'));
+    const iconFiles = fs.readdirSync(iconsDir).filter((f) => f.endsWith('.png'));
     if (iconFiles.length === 0) {
-      console.warn(`${colors.yellow}⚠️  Warning: No icon files found in dist/icons/${colors.reset}`);
+      console.warn(
+        `${colors.yellow}⚠️  Warning: No icon files found in dist/icons/${colors.reset}`
+      );
     } else {
       logTest(`Found ${iconFiles.length} icon file(s)`, true);
     }
@@ -347,7 +356,7 @@ function testCriticalAssets() {
 
   // Check for JS bundles
   const assetsDir = path.join(DIST_DIR, 'assets');
-  const jsFiles = fs.readdirSync(assetsDir).filter(f => f.endsWith('.js'));
+  const jsFiles = fs.readdirSync(assetsDir).filter((f) => f.endsWith('.js'));
   if (jsFiles.length === 0) {
     exitWithError(
       'Critical Assets',
@@ -358,7 +367,7 @@ function testCriticalAssets() {
   logTest(`Found ${jsFiles.length} JavaScript bundle(s)`, true);
 
   // Check for CSS bundles
-  const cssFiles = fs.readdirSync(assetsDir).filter(f => f.endsWith('.css'));
+  const cssFiles = fs.readdirSync(assetsDir).filter((f) => f.endsWith('.css'));
   if (cssFiles.length === 0) {
     console.warn(`${colors.yellow}⚠️  Warning: No CSS bundles found${colors.reset}`);
   } else {
@@ -370,9 +379,15 @@ function testCriticalAssets() {
  * Main test runner
  */
 function main() {
-  console.log(`${colors.blue}╔═══════════════════════════════════════════════════════╗${colors.reset}`);
-  console.log(`${colors.blue}║        Pre-Deploy Smoke Tests for My-Love PWA       ║${colors.reset}`);
-  console.log(`${colors.blue}╚═══════════════════════════════════════════════════════╝${colors.reset}\n`);
+  console.log(
+    `${colors.blue}╔═══════════════════════════════════════════════════════╗${colors.reset}`
+  );
+  console.log(
+    `${colors.blue}║        Pre-Deploy Smoke Tests for My-Love PWA       ║${colors.reset}`
+  );
+  console.log(
+    `${colors.blue}╚═══════════════════════════════════════════════════════╝${colors.reset}\n`
+  );
 
   // Verify dist/ directory exists
   if (!fs.existsSync(DIST_DIR)) {
@@ -396,13 +411,18 @@ function main() {
     testCriticalAssets();
 
     // Summary
-    console.log(`\n${colors.blue}═══════════════════════════════════════════════════════${colors.reset}`);
-    console.log(`${colors.green}✅ All smoke tests passed (${testsPassed}/${totalTests})${colors.reset}`);
-    console.log(`${colors.blue}═══════════════════════════════════════════════════════${colors.reset}\n`);
+    console.log(
+      `\n${colors.blue}═══════════════════════════════════════════════════════${colors.reset}`
+    );
+    console.log(
+      `${colors.green}✅ All smoke tests passed (${testsPassed}/${totalTests})${colors.reset}`
+    );
+    console.log(
+      `${colors.blue}═══════════════════════════════════════════════════════${colors.reset}\n`
+    );
     console.log(`${colors.green}✨ Build is ready for deployment!${colors.reset}\n`);
 
     process.exit(0);
-
   } catch (error) {
     // Catch any unexpected errors
     console.error(`\n${colors.red}[Unexpected Error]:${colors.reset} ${error.message}`);

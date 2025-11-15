@@ -32,6 +32,7 @@ Story 3.6 is an **optional enhancement** that introduces AI-powered content gene
 The human-in-the-loop review process ensures quality control: AI generates suggestions, you review and curate, only approved messages enter the rotation. This hybrid approach combines AI's creative output volume with human judgment for emotional authenticity. The feature is designed to be cost-conscious with built-in rate limiting (default: 5 generation sessions per day, 10 suggestions per session) to prevent runaway API expenses.
 
 **Why Optional:** This story is marked optional because:
+
 1. Manual custom message creation (Story 3.4-3.5) fully satisfies the core requirement
 2. Requires external API dependency (OpenAI) and associated costs
 3. Adds complexity without being essential to MVP functionality
@@ -51,12 +52,14 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 ### Dependencies
 
 **Requires:**
+
 - ✅ Story 3.5 complete: Custom message service and IndexedDB persistence operational
 - ✅ Story 3.4 complete: Admin panel UI components functional
 - ✅ Epic 1 complete: Stable foundation with working IndexedDB
 - 🔑 External: OpenAI API key configured in environment variables
 
 **Enables:**
+
 - Rapid expansion of custom message library (10+ messages in minutes vs. manual writing)
 - A/B testing different message styles and tones
 - Future: Fine-tuned models on your relationship's language patterns
@@ -64,24 +67,28 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 ### Integration Points
 
 **OpenAI API Integration:**
+
 - Use `openai` npm package (^4.x) for GPT-3.5-turbo or GPT-4 API calls
 - API key stored in environment variable: `VITE_OPENAI_API_KEY`
 - Prompt engineering: category-specific templates with 2-3 example messages for context
 - Response parsing: Extract 10 message suggestions from GPT completion
 
 **Admin Panel UI Extension:**
+
 - Add "AI Suggestions" section in AdminPanel (new tab or expandable section)
 - Component: `AISuggestionPanel` with generation form and suggestion review list
 - Reuse existing modal patterns (Framer Motion AnimatePresence)
 - Reuse existing button/form styles from Story 3.4 components
 
 **Custom Message Integration:**
+
 - Accepted suggestions use existing `customMessageService.create()` from Story 3.5
 - Suggestions saved with `active: false` (draft status) by default
 - User can activate drafts after reviewing in main message list
 - Metadata: `createdBy: 'ai'` field to distinguish AI vs manually written messages
 
 **Rate Limiting Strategy:**
+
 - Track generation requests in LocalStorage: `ai-suggestion-usage` key
 - Structure: `{ date: string, count: number, lastRequest: timestamp }`
 - Daily limit: 5 generation sessions (50 suggestions max per day)
@@ -99,6 +106,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** a "Generate Suggestions" button SHALL be visible and functional
 
 **Validation:**
+
 - Button displays with icon (e.g., sparkles/magic wand icon from lucide-react)
 - Button disabled if daily limit reached (5 sessions)
 - Tooltip shows remaining quota: "3/5 generations remaining today"
@@ -113,6 +121,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** system SHALL call OpenAI API and return 10 contextually appropriate message suggestions
 
 **Requirements:**
+
 - Generation form includes:
   - Category dropdown (reasons, memories, affirmations, future-plans, custom)
   - Tone selector (romantic, playful, heartfelt) - optional
@@ -128,6 +137,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 - Error handling: API failures, rate limits, invalid responses
 
 **Validation:**
+
 - Fill form with category "reasons", tone "romantic", count 10
 - Click "Generate" → loading spinner appears
 - After 5-10 seconds → 10 suggestions displayed in list
@@ -144,6 +154,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** each suggestion SHALL have clear accept/reject action buttons
 
 **Requirements:**
+
 - Suggestion card displays:
   - Message text (with character count)
   - Category badge
@@ -154,6 +165,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 - Keyboard navigation supported (tab through suggestions, enter to accept, delete to reject)
 
 **Validation:**
+
 - Generate 10 suggestions
 - Each card displays complete message text
 - Category badge matches selected category
@@ -170,6 +182,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** the message SHALL be saved to IndexedDB as a draft custom message
 
 **Requirements:**
+
 - Accepted suggestion calls `customMessageService.create(input)`
 - Message saved with:
   - `text`: suggestion text
@@ -184,6 +197,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 - User can review/edit drafted messages in main MessageList (from Story 3.4)
 
 **Validation:**
+
 - Click "Accept" on suggestion
 - Verify card shows "Accepted ✓" badge and fades out
 - Open Chrome DevTools → IndexedDB → my-love-db → messages
@@ -203,6 +217,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** the message SHALL be discarded without saving to IndexedDB
 
 **Requirements:**
+
 - Rejected suggestion removed from pending list immediately
 - No IndexedDB write operation occurs
 - Optimistic UI update: suggestion card shows "Rejected ✗" badge and fades out
@@ -210,6 +225,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 - Rejected messages not recoverable (intentional - clean up unwanted content)
 
 **Validation:**
+
 - Click "Reject" on suggestion
 - Verify card shows "Rejected ✗" badge and fades out
 - Check IndexedDB → verify NO new message entry created
@@ -225,6 +241,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** a new batch of 10 suggestions SHALL be generated with same parameters
 
 **Requirements:**
+
 - "Generate More" button appears after all suggestions reviewed (all accepted/rejected)
 - Button reuses last generation parameters (category, tone, count)
 - Option to "Change Parameters" opens generation form to adjust settings
@@ -233,6 +250,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 - Previous batch discarded (no history of rejected suggestions)
 
 **Validation:**
+
 - Generate initial batch, accept 5, reject 5
 - Verify "Generate More" button appears
 - Click "Generate More" → new batch of 10 suggestions generated
@@ -248,6 +266,7 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 **Then** system SHALL enforce daily limit and display cost-related messaging
 
 **Requirements:**
+
 - Track usage in LocalStorage: `ai-suggestion-usage` object
 - Daily limit: 5 generation sessions (resets at midnight UTC)
 - "Generate Suggestions" button disabled when limit reached
@@ -257,12 +276,14 @@ The human-in-the-loop review process ensures quality control: AI generates sugge
 - Option to increase limit in advanced settings (default: 5, max: 20)
 
 **Cost Calculation:**
+
 - GPT-3.5-turbo pricing: ~$0.002 per 1K tokens (input + output)
 - Typical generation: ~500 tokens input (prompt) + ~1500 tokens output (10 messages)
 - Total: ~2K tokens = $0.004 per batch
 - Daily cost at 5 batches: ~$0.02
 
 **Validation:**
+
 - Generate 5 batches in succession
 - After 5th batch → "Generate Suggestions" button becomes disabled
 - Button tooltip shows: "Daily limit reached (5/5). Resets in [time]."
@@ -292,14 +313,12 @@ export class AISuggestionService {
     if (this.apiKey) {
       this.openai = new OpenAI({
         apiKey: this.apiKey,
-        dangerouslyAllowBrowser: true // Note: In production, proxy through backend
+        dangerouslyAllowBrowser: true, // Note: In production, proxy through backend
       });
     }
   }
 
-  async generateSuggestions(
-    request: GenerateSuggestionsRequest
-  ): Promise<MessageSuggestion[]> {
+  async generateSuggestions(request: GenerateSuggestionsRequest): Promise<MessageSuggestion[]> {
     if (!this.openai) {
       throw new Error('OpenAI API key not configured. Add VITE_OPENAI_API_KEY to .env');
     }
@@ -310,12 +329,15 @@ export class AISuggestionService {
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates heartfelt love messages.' },
-          { role: 'user', content: prompt }
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that generates heartfelt love messages.',
+          },
+          { role: 'user', content: prompt },
         ],
         max_tokens: 2000,
         temperature: 0.8, // Higher for more creative variety
-        n: 1
+        n: 1,
       });
 
       const response = completion.choices[0]?.message?.content || '';
@@ -332,7 +354,7 @@ export class AISuggestionService {
     const toneInstructions = {
       romantic: 'deeply romantic and passionate',
       playful: 'light-hearted, fun, and flirty',
-      heartfelt: 'sincere, warm, and emotionally genuine'
+      heartfelt: 'sincere, warm, and emotionally genuine',
     };
 
     const categoryContext = {
@@ -340,10 +362,14 @@ export class AISuggestionService {
       memories: 'cherished shared memories or special moments together',
       affirmations: 'affirmations of her worth, beauty, and importance in your life',
       'future-plans': 'exciting dreams and plans for your future together',
-      custom: 'personalized love messages that feel unique to your relationship'
+      custom: 'personalized love messages that feel unique to your relationship',
     };
 
-    const examples = exampleMessages?.slice(0, 3).map(m => `- "${m}"`).join('\n') || '';
+    const examples =
+      exampleMessages
+        ?.slice(0, 3)
+        .map((m) => `- "${m}"`)
+        .join('\n') || '';
 
     return `Generate ${count} ${toneInstructions[tone || 'romantic']} love messages for my girlfriend.
 
@@ -363,7 +389,7 @@ Requirements:
 
   private parseResponse(response: string, category: MessageCategory): MessageSuggestion[] {
     // Parse numbered list format: "1. Message text\n2. Message text\n..."
-    const lines = response.split('\n').filter(line => line.trim());
+    const lines = response.split('\n').filter((line) => line.trim());
     const suggestions: MessageSuggestion[] = [];
 
     for (const line of lines) {
@@ -377,7 +403,7 @@ Requirements:
           text,
           category,
           status: 'pending',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         });
       }
     }
@@ -886,6 +912,7 @@ export function AISuggestionPanel() {
 ### Learnings from Previous Story (Story 3.5)
 
 **Infrastructure Already Built:**
+
 - ✅ `customMessageService` provides `create()`, `update()`, `delete()`, `getAll()` methods
 - ✅ IndexedDB `messages` store ready for custom messages with `isCustom: true` field
 - ✅ Admin panel UI framework complete with modal patterns (Framer Motion)
@@ -893,6 +920,7 @@ export function AISuggestionPanel() {
 - ✅ Import/export JSON functionality for backup/restore (can export AI-generated messages)
 
 **Patterns to Follow:**
+
 - ✅ Zustand store actions for async operations with try/catch error handling
 - ✅ Optimistic UI updates: mark suggestion as "accepted"/"rejected" immediately in UI
 - ✅ Console logging: `[AISuggestions] Action: details`
@@ -900,41 +928,48 @@ export function AISuggestionPanel() {
 - ✅ Framer Motion: AnimatePresence for suggestion list enter/exit animations
 
 **Files to Modify:**
+
 - `src/components/AdminPanel/AdminPanel.tsx` - Add tab/section for AI Suggestions
 - `src/stores/useAppStore.ts` - Add AI suggestion state and actions
 - `src/types/index.ts` - Add `MessageSuggestion` and `GenerateSuggestionsRequest` interfaces
 
 **New Files to Create:**
+
 - `src/services/aiSuggestionService.ts` - OpenAI API integration
 - `src/components/AdminPanel/AISuggestionPanel.tsx` - UI for AI suggestion workflow
 
 ### Project Structure Notes
 
 **New Service Layer:**
+
 - `src/services/aiSuggestionService.ts` - OpenAI GPT integration with rate limiting
 - Follows existing `customMessageService.ts` patterns (singleton instance, async methods)
 - Uses `openai` npm package (^4.x) for API calls
 - Environment variable: `VITE_OPENAI_API_KEY` in `.env` file
 
 **Rate Limiting Strategy:**
+
 - LocalStorage key: `ai-suggestion-usage` tracks daily generation count
 - Structure: `{ date: 'YYYY-MM-DD', count: number, lastRequest: timestamp }`
 - Daily limit: 5 sessions (50 suggestions max), resets at midnight UTC
 - Cost-conscious design: default to GPT-3.5-turbo (~$0.01 per 10 messages)
 
 **Alignment with Unified Project Structure:**
+
 - Component directory: `src/components/AdminPanel/` for admin-related UI
 - Service directory: `src/services/` for data/API logic
 - TypeScript interfaces: `src/types/index.ts` for shared types
 - Environment variables: `.env` for API keys (NOT committed to git)
 
 **OpenAI API Configuration:**
+
 - Model: GPT-3.5-turbo (cost optimization vs. GPT-4)
 - Max tokens: 2000 output (sufficient for 10 messages @ ~150 tokens each)
 - Temperature: 0.8 (higher for creative variety, not deterministic)
 - Prompt engineering: Include category context, 2-3 examples, tone instructions
 
 **Security Considerations:**
+
 - ⚠️ **Important:** Using `dangerouslyAllowBrowser: true` exposes API key in client bundle
 - **Production Recommendation:** Proxy OpenAI API calls through backend endpoint
 - **Alternative:** Deploy serverless function (Vercel/Netlify) to hide API key
@@ -943,22 +978,26 @@ export function AISuggestionPanel() {
 ### References
 
 **Technical Specifications:**
+
 - [tech-spec-epic-3.md](../tech-spec-epic-3.md#story-36-ai-message-suggestion-review-interface-optional-enhancement) - Story 3.6 technical requirements
 - [epics.md](../epics.md#story-36-ai-message-suggestion-review-interface-optional-enhancement) - User story and acceptance criteria
 - [PRD.md](../PRD.md#custom-message-management) - FR026-FR030 functional requirements
 
 **Architecture References:**
+
 - [architecture.md](../architecture.md#services) - Service layer patterns for API integration
 - [architecture.md](../architecture.md#state-management) - Zustand store patterns for AI state
 - [tech-spec-epic-3.md](../tech-spec-epic-3.md#ai-suggestion-service-api-story-36) - AI service API specification
 
 **Related Stories:**
+
 - [3-4-admin-interface-custom-message-management-phase-1-ui.md](./3-4-admin-interface-custom-message-management-phase-1-ui.md) - Admin UI components
 - [3-5-admin-interface-message-persistence-integration.md](./3-5-admin-interface-message-persistence-integration.md) - Custom message service CRUD operations
 - Story 3.1: 365-message library (provides example messages for AI prompts)
 - Epic 4: Interactive features (next epic after Epic 3 complete)
 
 **External Documentation:**
+
 - [OpenAI API Documentation](https://platform.openai.com/docs/api-reference) - GPT completions API
 - [OpenAI Pricing](https://openai.com/api/pricing/) - GPT-3.5-turbo cost: $0.002/1K tokens
 - [openai npm package](https://www.npmjs.com/package/openai) - TypeScript SDK

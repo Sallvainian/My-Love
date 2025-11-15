@@ -1,5 +1,20 @@
-import { openDB, type IDBPDatabase } from 'idb';
-import type { Message, CreateMessageInput, UpdateMessageInput, MessageFilter, CustomMessagesExport } from '../types';
+import { openDB } from 'idb';
+import type {
+  Message,
+  CreateMessageInput,
+  UpdateMessageInput,
+  MessageFilter,
+  CustomMessagesExport,
+} from '../types';
+import { BaseIndexedDBService } from './BaseIndexedDBService';
+import {
+  CreateMessageInputSchema,
+  UpdateMessageInputSchema,
+  CustomMessagesExportSchema,
+  createValidationError,
+  isZodError,
+} from '../validation';
+import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 
 const DB_NAME = 'my-love-db';
 const DB_VERSION = 1;
@@ -7,82 +22,97 @@ const DB_VERSION = 1;
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages
  * Story 3.5: Migrate from LocalStorage to IndexedDB for scalability
+ * Story 5.3: Refactored to extend BaseIndexedDBService to reduce duplication
+ * Story 5.5: Added validation layer to prevent data corruption
  *
- * Patterns followed from StorageService:
- * - Singleton class with init() guard
- * - Comprehensive error handling and logging
- * - Graceful fallbacks for failures
+ * Extends: BaseIndexedDBService<Message>
+ * - Inherits: init(), add(), get(), getAll(), update(), delete(), clear(), getPage()
+ * - Implements: getStoreName(), _doInit()
+ * - Preserves: Service-specific methods (getActiveCustomMessages, exportMessages, importMessages)
  */
-class CustomMessageService {
-  private db: IDBPDatabase<any> | null = null;
-  private initPromise: Promise<void> | null = null;
-
+class CustomMessageService extends BaseIndexedDBService<Message> {
   /**
-   * Initialize IndexedDB connection
-   * Uses guard to prevent concurrent initialization
+   * Get the object store name for messages
    */
-  async init(): Promise<void> {
-    // Return existing promise if initialization already in progress
-    if (this.initPromise) {
-      console.log('[CustomMessageService] Init already in progress, waiting...');
-      return this.initPromise;
-    }
-
-    // Return immediately if already initialized
-    if (this.db) {
-      console.log('[CustomMessageService] Already initialized');
-      return Promise.resolve();
-    }
-
-    // Store promise to prevent concurrent initialization
-    this.initPromise = this._doInit();
-
-    try {
-      await this.initPromise;
-    } finally {
-      this.initPromise = null;
-    }
+  protected getStoreName(): string {
+    return 'messages';
   }
 
-  private async _doInit(): Promise<void> {
+  /**
+   * Initialize IndexedDB connection (DB v1 - messages store only)
+   * Note: photoStorageService handles v2 upgrade with photos store
+   */
+  protected async _doInit(): Promise<void> {
     try {
-      console.log('[CustomMessageService] Initializing IndexedDB connection...');
-      this.db = await openDB<any>(DB_NAME, DB_VERSION);
-      console.log('[CustomMessageService] IndexedDB connection established');
-    } catch (error) {
-      console.error('[CustomMessageService] Failed to initialize IndexedDB:', error);
-      console.error('[CustomMessageService] Error details:', {
-        name: (error as Error).name,
-        message: (error as Error).message,
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Initializing IndexedDB connection...');
+      }
+
+      this.db = await openDB<any>(DB_NAME, DB_VERSION, {
+        upgrade(db, oldVersion, newVersion, _transaction) {
+          if (import.meta.env.DEV) {
+            console.log(
+              `[CustomMessageService] Upgrading database from v${oldVersion} to v${newVersion}`
+            );
+          }
+
+          // Create messages store if it doesn't exist
+          if (!db.objectStoreNames.contains('messages')) {
+            const messageStore = db.createObjectStore('messages', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            messageStore.createIndex('by-category', 'category');
+            messageStore.createIndex('by-date', 'createdAt');
+            if (import.meta.env.DEV) {
+              console.log('[CustomMessageService] Created messages store with indexes');
+            }
+          }
+        },
       });
-      throw error;
+
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] IndexedDB connection established');
+      }
+    } catch (error) {
+      this.handleError('initialize', error as Error);
     }
   }
 
   /**
    * Create a new custom message in IndexedDB
    * AC-3.5.1: Save to IndexedDB messages store with isCustom: true
+   * AC-5.5.6: Validate input at service boundary before IndexedDB write
+   * Uses inherited add() method from base class
    */
   async create(input: CreateMessageInput): Promise<Message> {
     try {
-      await this.init();
+      // Validate input at service boundary
+      const validated = CreateMessageInputSchema.parse(input);
 
       const message: Omit<Message, 'id'> = {
-        text: input.text,
-        category: input.category,
+        text: validated.text,
+        category: validated.category,
         isCustom: true,
-        active: input.active ?? true, // Default: true
+        active: validated.active ?? true, // Default: true
         isFavorite: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        tags: input.tags || [],
+        tags: validated.tags || [],
       };
 
-      const id = await this.db!.add('messages', message);
-      console.log('[CustomMessageService] Custom message created, id:', id);
+      const created = await super.add(message);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Custom message created, id:', created.id);
+      }
 
-      return { ...message, id: id as number } as Message;
+      return created;
     } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        console.error('[CustomMessageService] Validation failed:', error.errors);
+        throw createValidationError(error);
+      }
       console.error('[CustomMessageService] Failed to create custom message:', error);
       console.error('[CustomMessageService] Input:', input);
       throw error;
@@ -92,46 +122,34 @@ class CustomMessageService {
   /**
    * Update an existing custom message
    * AC-3.5.4: Update active field to control rotation participation
+   * AC-5.5.6: Validate input at service boundary before IndexedDB write
+   * Uses inherited update() method from base class with custom updatedAt logic
    */
-  async update(input: UpdateMessageInput): Promise<void> {
+  async updateMessage(input: UpdateMessageInput): Promise<void> {
     try {
-      await this.init();
+      // Validate input at service boundary
+      const validated = UpdateMessageInputSchema.parse(input);
 
-      const message = await this.db!.get('messages', input.id);
-      if (!message) {
-        throw new Error(`Message ${input.id} not found`);
-      }
-
-      const updated: Message = {
-        ...message,
-        ...(input.text !== undefined && { text: input.text }),
-        ...(input.category !== undefined && { category: input.category }),
-        ...(input.active !== undefined && { active: input.active }),
-        ...(input.tags !== undefined && { tags: input.tags }),
+      const updates: Partial<Message> = {
+        ...(validated.text !== undefined && { text: validated.text }),
+        ...(validated.category !== undefined && { category: validated.category }),
+        ...(validated.active !== undefined && { active: validated.active }),
+        ...(validated.tags !== undefined && { tags: validated.tags }),
         updatedAt: new Date(),
       };
 
-      await this.db!.put('messages', updated);
-      console.log('[CustomMessageService] Custom message updated, id:', input.id);
+      await super.update(validated.id, updates);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Custom message updated, id:', validated.id);
+      }
     } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        console.error('[CustomMessageService] Validation failed:', error.errors);
+        throw createValidationError(error);
+      }
       console.error('[CustomMessageService] Failed to update custom message:', error);
       console.error('[CustomMessageService] Input:', input);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete a custom message from IndexedDB
-   * AC-3.5.5: Remove from IndexedDB and exclude from rotation
-   */
-  async delete(messageId: number): Promise<void> {
-    try {
-      await this.init();
-      await this.db!.delete('messages', messageId);
-      console.log('[CustomMessageService] Custom message deleted, id:', messageId);
-    } catch (error) {
-      console.error('[CustomMessageService] Failed to delete custom message:', error);
-      console.error('[CustomMessageService] Message id:', messageId);
       throw error;
     }
   }
@@ -155,28 +173,35 @@ class CustomMessageService {
 
       // Filter by isCustom
       if (filter?.isCustom !== undefined) {
-        messages = messages.filter(m => m.isCustom === filter.isCustom);
+        messages = messages.filter((m) => m.isCustom === filter.isCustom);
       }
 
       // Filter by active status
       if (filter?.active !== undefined) {
-        messages = messages.filter(m => m.active === filter.active);
+        messages = messages.filter((m) => m.active === filter.active);
       }
 
       // Filter by search term
       if (filter?.searchTerm) {
         const term = filter.searchTerm.toLowerCase();
-        messages = messages.filter(m => m.text.toLowerCase().includes(term));
+        messages = messages.filter((m) => m.text.toLowerCase().includes(term));
       }
 
       // Filter by tags
       if (filter?.tags && filter.tags.length > 0) {
-        messages = messages.filter(m =>
-          m.tags && m.tags.some(tag => filter.tags!.includes(tag))
+        messages = messages.filter(
+          (m) => m.tags && m.tags.some((tag) => filter.tags!.includes(tag))
         );
       }
 
-      console.log('[CustomMessageService] Retrieved messages, count:', messages.length, 'filter:', filter);
+      if (import.meta.env.DEV) {
+        console.log(
+          '[CustomMessageService] Retrieved messages, count:',
+          messages.length,
+          'filter:',
+          filter
+        );
+      }
       return messages;
     } catch (error) {
       console.error('[CustomMessageService] Failed to get all messages:', error);
@@ -186,24 +211,10 @@ class CustomMessageService {
   }
 
   /**
-   * Get a single message by ID
+   * Note: delete() and get() methods are inherited from BaseIndexedDBService
+   * - delete(id: number): Promise<void> - Delete message by ID
+   * - get(id: number): Promise<Message | null> - Get message by ID (replaces getById)
    */
-  async getById(messageId: number): Promise<Message | null> {
-    try {
-      await this.init();
-      const message = await this.db!.get('messages', messageId);
-      if (message) {
-        console.log('[CustomMessageService] Message retrieved, id:', messageId);
-      } else {
-        console.warn('[CustomMessageService] Message not found, id:', messageId);
-      }
-      return message || null;
-    } catch (error) {
-      console.error('[CustomMessageService] Failed to get message:', error);
-      console.error('[CustomMessageService] Message id:', messageId);
-      return null; // Graceful fallback
-    }
-  }
 
   /**
    * Get only active custom messages for rotation algorithm
@@ -225,7 +236,7 @@ class CustomMessageService {
         version: '1.0',
         exportDate: new Date().toISOString(),
         messageCount: messages.length,
-        messages: messages.map(m => ({
+        messages: messages.map((m) => ({
           text: m.text,
           category: m.category,
           active: m.active ?? true,
@@ -235,7 +246,9 @@ class CustomMessageService {
         })),
       };
 
-      console.log('[CustomMessageService] Exported messages, count:', messages.length);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Exported messages, count:', messages.length);
+      }
       return exportData;
     } catch (error) {
       console.error('[CustomMessageService] Failed to export messages:', error);
@@ -252,11 +265,17 @@ class CustomMessageService {
   /**
    * Import custom messages from JSON backup
    * AC-3.5.6: Import functionality with duplicate detection
+   * AC-5.5.6: Validate import data structure before processing
    */
-  async importMessages(exportData: CustomMessagesExport): Promise<{ imported: number; skipped: number }> {
+  async importMessages(
+    exportData: CustomMessagesExport
+  ): Promise<{ imported: number; skipped: number }> {
     try {
-      if (exportData.version !== '1.0') {
-        throw new Error(`Unsupported export version: ${exportData.version}`);
+      // Validate import data structure at service boundary
+      const validated = CustomMessagesExportSchema.parse(exportData);
+
+      if (validated.version !== '1.0') {
+        throw new Error(`Unsupported export version: ${validated.version}`);
       }
 
       let importedCount = 0;
@@ -264,14 +283,19 @@ class CustomMessageService {
 
       // Get existing custom message texts for duplicate detection
       const existingMessages = await this.getAll({ isCustom: true });
-      const existingTexts = new Set(existingMessages.map(m => m.text.trim().toLowerCase()));
+      const existingTexts = new Set(existingMessages.map((m) => m.text.trim().toLowerCase()));
 
-      for (const msg of exportData.messages) {
+      for (const msg of validated.messages) {
         const normalizedText = msg.text.trim().toLowerCase();
 
         if (existingTexts.has(normalizedText)) {
           skippedCount++;
-          console.log('[CustomMessageService] Skipping duplicate message:', msg.text.substring(0, 50) + '...');
+          if (import.meta.env.DEV) {
+            console.log(
+              '[CustomMessageService] Skipping duplicate message:',
+              msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+            );
+          }
         } else {
           await this.create({
             text: msg.text,
@@ -284,9 +308,21 @@ class CustomMessageService {
         }
       }
 
-      console.log('[CustomMessageService] Import complete - imported:', importedCount, 'skipped:', skippedCount);
+      if (import.meta.env.DEV) {
+        console.log(
+          '[CustomMessageService] Import complete - imported:',
+          importedCount,
+          'skipped:',
+          skippedCount
+        );
+      }
       return { imported: importedCount, skipped: skippedCount };
     } catch (error) {
+      // Transform Zod validation errors into user-friendly messages
+      if (isZodError(error)) {
+        console.error('[CustomMessageService] Import data validation failed:', error.errors);
+        throw createValidationError(error);
+      }
       console.error('[CustomMessageService] Failed to import messages:', error);
       console.error('[CustomMessageService] Export data:', exportData);
       throw error;

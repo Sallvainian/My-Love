@@ -27,26 +27,30 @@ A beautiful Progressive Web App (PWA) that sends daily love messages and reminde
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/YOUR_USERNAME/My-Love.git
 cd My-Love
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. **Configure the app constants** by editing `src/config/constants.ts`:
+
    ```typescript
    export const APP_CONFIG = {
-     defaultPartnerName: 'Gracie',           // Edit this with your partner's name
-     defaultStartDate: '2025-10-18',          // Edit this with the relationship start date (YYYY-MM-DD)
+     defaultPartnerName: 'Gracie', // Edit this with your partner's name
+     defaultStartDate: '2025-10-18', // Edit this with the relationship start date (YYYY-MM-DD)
      isPreConfigured: true,
    } as const;
    ```
 
 4. Start the development server:
+
 ```bash
 npm run dev
 ```
@@ -62,8 +66,8 @@ The app uses pre-configured constants for relationship data. To customize for yo
 ```typescript
 // src/config/constants.ts
 export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie',              // Change to your partner's name
-  defaultStartDate: '2025-10-18',             // Change to relationship start date (YYYY-MM-DD)
+  defaultPartnerName: 'Gracie', // Change to your partner's name
+  defaultStartDate: '2025-10-18', // Change to relationship start date (YYYY-MM-DD)
   isPreConfigured: true,
 } as const;
 ```
@@ -73,6 +77,7 @@ export const APP_CONFIG = {
 ### What Gets Pre-Configured
 
 When you set `defaultPartnerName` and `defaultStartDate` in `constants.ts`:
+
 - Partner name displays throughout the app
 - Relationship duration counter calculates automatically
 - No onboarding wizard shown (pre-configured mode is always active)
@@ -86,6 +91,7 @@ When you set `defaultPartnerName` and `defaultStartDate` in `constants.ts`:
 1. **Configure environment variables** (see Environment Configuration section above)
 
 2. Initialize git repository (if not already done):
+
 ```bash
 git init
 git add .
@@ -95,6 +101,7 @@ git commit -m "Initial commit: My Love app"
 3. Create a new repository on GitHub named `My-Love`
 
 4. Connect your local repository to GitHub:
+
 ```bash
 git remote add origin https://github.com/YOUR_USERNAME/My-Love.git
 git branch -M main
@@ -110,6 +117,7 @@ npm run deploy
 ```
 
 This will:
+
 - Build the production version with your configured constants
 - Run automated smoke tests to verify everything is correct
 - Deploy to GitHub Pages
@@ -147,6 +155,7 @@ All messages are stored in `/src/data/defaultMessages.ts`. You can:
    - `custom`: Any custom messages
 
 Example:
+
 ```typescript
 {
   text: "Your smile makes my day instantly better",
@@ -158,6 +167,7 @@ Example:
 ## 🎨 Customizing Themes
 
 Themes are defined in `/src/utils/themes.ts`. Each theme has:
+
 - Primary and secondary colors
 - Background gradients
 - Text colors
@@ -168,6 +178,7 @@ You can add new themes or modify existing ones.
 ## 📱 Installing on Mobile
 
 ### iOS (iPhone/iPad)
+
 1. Open the app in Safari
 2. Tap the Share button (square with arrow)
 3. Scroll down and tap "Add to Home Screen"
@@ -175,6 +186,7 @@ You can add new themes or modify existing ones.
 5. Tap "Add"
 
 ### Android
+
 1. Open the app in Chrome
 2. Tap the three dots menu
 3. Tap "Add to Home screen" or "Install app"
@@ -259,9 +271,11 @@ Created with care to help you express your love every single day.
 ## 🐛 Troubleshooting
 
 ### App shows "Loading your daily message..." forever
+
 **Cause**: Missing or invalid configuration in `src/config/constants.ts`
 
 **Solution**:
+
 1. Edit `src/config/constants.ts` and verify your values are set
 2. Clear browser IndexedDB:
    - Open DevTools → Application → IndexedDB
@@ -269,36 +283,44 @@ Created with care to help you express your love every single day.
 3. Refresh the page
 
 ### Console errors about configuration
+
 **Symptom**: `Configuration not set` warnings in console
 
 **Solution**:
+
 - Edit `src/config/constants.ts` with your partner name and relationship start date
 - Ensure `defaultPartnerName` and `defaultStartDate` are not empty strings
 
 ### ConstraintError: Key already exists
+
 **Cause**: IndexedDB schema mismatch or duplicate initialization
 
 **Solution**:
+
 1. Clear browser IndexedDB (DevTools → Application → IndexedDB)
 2. Delete `my-love-db` database
 3. Refresh the page
 4. If persists, clear all browser data for localhost
 
 ### Development server won't start
+
 - Make sure Node.js v18+ is installed
 - Delete `node_modules` and run `npm install` again
 
 ### Build fails
+
 - Run `npm run lint` to check for errors
 - Make sure all dependencies are installed
 - Verify `.env.production` exists before building
 
 ### PWA not installing
+
 - Must be served over HTTPS (GitHub Pages does this automatically)
 - Check browser console for errors
 - Try clearing browser cache
 
 ### Messages not updating
+
 - Check browser console for IndexedDB errors
 - Try clearing application data in browser dev tools
 - Ensure JavaScript is enabled
@@ -306,6 +328,7 @@ Created with care to help you express your love every single day.
 ## 📞 Support
 
 If you run into issues:
+
 1. Check the browser console for errors
 2. Ensure all dependencies are installed
 3. Try clearing browser data

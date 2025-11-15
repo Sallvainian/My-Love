@@ -34,7 +34,7 @@ export default defineConfig({
   // Reporter configuration
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],
-    ['github'] // GitHub Actions annotations
+    ['github'], // GitHub Actions annotations
   ],
 
   // Global test settings

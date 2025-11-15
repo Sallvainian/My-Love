@@ -15,23 +15,27 @@ So that production deployments are reliable and pre-configuration works correctl
 Story 1.6 completes Epic 1 (Foundation & Core Fixes) by hardening the build and deployment pipeline to ensure production deployments are reliable and pre-configured relationship data is correctly injected at build time.
 
 **Core Requirements:**
+
 - **Build Process Hardening**: Vite build must include configuration constants from `src/config/constants.ts` in the bundled application for runtime access
 - **Deployment Reliability**: GitHub Pages deployment must correctly serve the PWA with pre-configured data, service worker, and manifest
 - **Quality Assurance**: Automated smoke tests must validate build output before deployment to catch configuration errors early
 - **Documentation**: Deployment process must be documented for maintainability
 
 **Dependencies:**
+
 - **Story 1.4**: Pre-configuration pattern established (`APP_CONFIG` in `src/config/constants.ts`)
 - **Story 1.5**: Code quality improvements ensure clean build with zero TypeScript/ESLint errors
 
 **From [tech-spec-epic-1.md#Story-1.6](../../docs/tech-spec-epic-1.md#Story-1.6):**
 
 **Build Architecture:**
+
 - Vite build process includes configuration constants from `src/config/constants.ts`
 - Constants are hardcoded in source code (committed to repository)
 - Build validation includes smoke tests to verify dist/ output integrity before GitHub Pages push
 
 **Deployment Flow:**
+
 ```
 npm run deploy
   → predeploy hook: npm run build
@@ -42,6 +46,7 @@ npm run deploy
 ```
 
 **Critical Validations:**
+
 1. Configuration constants correctly bundled into bundle (verify constant values in dist/)
 2. Service worker generated with correct routes and caching strategies
 3. PWA manifest valid and includes all required fields
@@ -50,10 +55,12 @@ npm run deploy
 **From [PRD.md](../../docs/PRD.md):**
 
 **Functional Requirements:**
+
 - FR004: System SHALL eliminate onboarding flow by pre-configuring relationship data at build/deploy time
 - FR005: System SHALL display relationship duration automatically without user input
 
 **Non-Functional Requirements:**
+
 - NFR001: Performance - App SHALL load in under 2 seconds on 3G, maintain 60fps animations
 - NFR002: Offline Support - App SHALL function fully offline after initial load
 - NFR006: Code Quality - App SHALL maintain TypeScript strict mode, ESLint compliance
@@ -61,12 +68,14 @@ npm run deploy
 **From [architecture.md#Deployment-Architecture](../../docs/architecture.md#Deployment-Architecture):**
 
 **Current Deployment Stack:**
+
 - **Tool**: gh-pages package
 - **Base Path**: /My-Love/ (configured in vite.config.ts)
 - **HTTPS**: Enforced by GitHub Pages (required for PWA features)
 - **Service Worker**: Pre-caches all static assets for offline support
 
 **Architecture Constraints:**
+
 - Must maintain offline-first capability (service worker pre-caching)
 - Bundle size target: <200KB gzipped
 - PWA Lighthouse score must remain 100
@@ -199,7 +208,7 @@ npm run deploy
   - [x] Run npm run lint → zero ESLint warnings ✓
   - [x] Build pipeline verified with smoke tests (15/15 passed)
   - [x] Verified bundle size 112.68KB gzipped (<200KB target)
-  - [x] Verified service worker generation (dist/sw.js, dist/workbox-*.js)
+  - [x] Verified service worker generation (dist/sw.js, dist/workbox-\*.js)
   - [x] Verified PWA manifest generation (dist/manifest.webmanifest)
   - [x] Verified environment variable injection (APP_CONFIG constants in bundle)
   - [x] Verified all 15 smoke tests pass
@@ -236,28 +245,33 @@ npm run deploy
 **Primary Files:**
 
 **1. Configuration Constants (FROM STORY 1.4):**
+
 - `/src/config/constants.ts` - Already exists from Story 1.4 with hardcoded configuration
 - No changes needed - Story 1.6 verifies constants are bundled correctly at build time
 - Constants are embedded in source code and bundled by Vite at build time
 
 **2. Smoke Test Scripts (NEW):**
+
 - `/scripts/smoke-tests.js` (NEW) - Pre-deploy validation script
 - `/scripts/post-deploy-check.js` (NEW) - Optional post-deploy validation
 - Scripts should be Node.js scripts (no additional dependencies if possible)
 - Use built-in fs, path, zlib modules for file checks and size validation
 
 **3. Package.json Scripts:**
+
 - `/package.json` - Update predeploy script to include smoke tests
 - Current: "predeploy": "npm run build"
 - Target: "predeploy": "npm run build && node scripts/smoke-tests.js"
 - Or add "test:smoke" script and call from predeploy
 
 **4. Documentation (NEW):**
+
 - `/DEPLOYMENT.md` (NEW) - Dedicated deployment guide
 - Or `/README.md` - Add deployment section to existing README
 - Decision: Create DEPLOYMENT.md for comprehensive guide, add link from README
 
 **5. Build Configuration (VERIFY ONLY):**
+
 - `/vite.config.ts` - Verify existing PWA and environment variable configuration
 - No changes expected - just verify vite-plugin-pwa working correctly
 - Confirm base path set to '/My-Love/' for GitHub Pages
@@ -273,7 +287,8 @@ npm run deploy
 - No modifications to dist/ - it's generated output
 
 **Files NOT Modified:**
-- Application source code (src/**/*.tsx, src/**/*.ts) - Story 1.6 is deployment only
+
+- Application source code (src/**/\*.tsx, src/**/\*.ts) - Story 1.6 is deployment only
 - Store (src/stores/useAppStore.ts) - no state management changes
 - Components - no UI changes
 - Services - no business logic changes
@@ -330,25 +345,30 @@ Story 1.5 established the foundation for reliable builds with TypeScript strict 
 ### Project Structure Notes
 
 **Files to CREATE:**
+
 - `scripts/smoke-tests.js` - Pre-deploy validation script (~150 lines estimated)
 - `scripts/post-deploy-check.js` - Post-deploy validation script (~100 lines estimated)
 - `DEPLOYMENT.md` - Deployment guide documentation (~300 lines estimated)
 
 **Files to MODIFY:**
+
 - `package.json` - Update predeploy script to include smoke tests (1 line change)
 - Potentially `README.md` - Add link to DEPLOYMENT.md (optional)
 
 **Files to VERIFY (No Changes Expected):**
+
 - `vite.config.ts` - Confirm existing PWA configuration correct
 - `src/config/constants.ts` - Verify APP_CONFIG pattern from Story 1.4 (hardcoded configuration)
 - `dist/` output - Inspect after build for validation
 
 **Directories to CREATE:**
+
 - `scripts/` - For smoke test and validation scripts (if doesn't exist)
 
 **Alignment with Architecture:**
 
 **Build Pipeline** (from architecture.md):
+
 ```
 npm run deploy
   → predeploy hook: npm run build
@@ -361,20 +381,23 @@ npm run deploy
 ```
 
 **Environment Variables** (from architecture.md):
+
 - Source: src/config/constants.ts (committed to repository)
 - Constants: defaultPartnerName, defaultStartDate
-- Injection: Vite replaces import.meta.env.* at build time (static replacement)
+- Injection: Vite replaces import.meta.env.\* at build time (static replacement)
 - Runtime: Available as APP_CONFIG.defaultPartnerName, APP_CONFIG.defaultStartDate
 - Security: No secrets - only relationship data (non-sensitive)
 
 **Service Worker Architecture** (from architecture.md):
+
 - Plugin: vite-plugin-pwa with Workbox
 - Output: dist/sw.js auto-generated
 - Caching: CacheFirst for app shell, NetworkFirst for runtime requests
-- Pre-cached: All assets matching globPatterns: **/*.{js,css,html,png,jpg,jpeg,svg,woff2}
+- Pre-cached: All assets matching globPatterns: \*_/_.{js,css,html,png,jpg,jpeg,svg,woff2}
 - Registration: Auto-update mode (no user prompt)
 
 **Deployment Architecture** (from architecture.md):
+
 - Tool: gh-pages package (already configured)
 - Branch: gh-pages (separate from main)
 - Base Path: /My-Love/ (configured in vite.config.ts)
@@ -480,18 +503,15 @@ Story 1.6 introduces automated smoke tests but still relies on manual validation
 **Smoke Test Implementation Details:**
 
 **Test 1: File Existence Checks**
+
 ```javascript
 const fs = require('fs');
 const path = require('path');
 
 const distDir = path.join(__dirname, '../dist');
-const requiredFiles = [
-  'index.html',
-  'manifest.webmanifest',
-  'sw.js'
-];
+const requiredFiles = ['index.html', 'manifest.webmanifest', 'sw.js'];
 
-requiredFiles.forEach(file => {
+requiredFiles.forEach((file) => {
   const filePath = path.join(distDir, file);
   if (!fs.existsSync(filePath)) {
     console.error(`❌ Smoke Test Failed: ${file} not found`);
@@ -502,6 +522,7 @@ console.log('✅ All required files present');
 ```
 
 **Test 2: Manifest Validation**
+
 ```javascript
 const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'manifest.webmanifest'), 'utf8'));
 if (!manifest.name || !manifest.icons || manifest.icons.length === 0) {
@@ -512,8 +533,9 @@ console.log('✅ Manifest valid');
 ```
 
 **Test 3: Environment Variable Injection Check**
+
 ```javascript
-const jsFiles = fs.readdirSync(path.join(distDir, 'assets')).filter(f => f.endsWith('.js'));
+const jsFiles = fs.readdirSync(path.join(distDir, 'assets')).filter((f) => f.endsWith('.js'));
 const mainBundle = fs.readFileSync(path.join(distDir, 'assets', jsFiles[0]), 'utf8');
 if (!mainBundle.includes('defaultPartnerName') || !mainBundle.includes('defaultStartDate')) {
   console.warn('⚠️ Warning: APP_CONFIG constants not found in bundle (env vars may be missing)');
@@ -523,6 +545,7 @@ if (!mainBundle.includes('defaultPartnerName') || !mainBundle.includes('defaultS
 ```
 
 **Test 4: Bundle Size Check**
+
 ```javascript
 const zlib = require('zlib');
 let totalSize = 0;
@@ -582,6 +605,7 @@ claude-sonnet-4-5 (Claude Code)
 **Story Goal:** Harden build and deployment pipeline to ensure reliable production deployments with pre-configured relationship data.
 
 **Approach Taken:**
+
 1. **Build Configuration Review**: Verified existing vite.config.ts, vite-plugin-pwa, and APP_CONFIG from Story 1.4 are correctly configured
 2. **Configuration Module**: src/config/constants.ts with comprehensive inline documentation
 3. **Automated Smoke Tests**: Created scripts/smoke-tests.cjs with 15 validation checks (fail-fast, Node.js built-in modules only)
@@ -594,12 +618,14 @@ claude-sonnet-4-5 (Claude Code)
 ### Debug Log References
 
 **Build Configuration Analysis:**
+
 - vite.config.ts: Base path `/My-Love/` correct, vite-plugin-pwa configured with workbox, service worker auto-generated
 - APP_CONFIG (src/config/constants.ts): Environment variable exposure working correctly from Story 1.4
 - src/config/constants.ts: Configuration module (committed intentionally)
 - package.json: Build scripts present, smoke tests integrated into predeploy hook
 
 **Smoke Test Development:**
+
 - Initial script created as .js but package.json has "type": "module" → renamed to .cjs for CommonJS
 - All 15 tests implemented: file existence, HTML/manifest/SW validation, env injection, bundle size, critical assets
 - Tests use Node.js built-in modules only (fs, path, zlib) - no external dependencies
@@ -607,6 +633,7 @@ claude-sonnet-4-5 (Claude Code)
 - Color-coded output for better visibility in terminal
 
 **Bundle Size Optimization:**
+
 - Build output: 354.14KB raw → 112.68KB gzipped (68.2% compression)
 - CSS: 16.64KB raw → 3.55KB gzipped (78.7% compression)
 - Total bundle well under 200KB target (NFR001 compliance)
@@ -615,12 +642,14 @@ claude-sonnet-4-5 (Claude Code)
 - Asset hashing for cache busting
 
 **Configuration Bundling:**
+
 - src/config/constants.ts exists with configured values
 - Smoke tests confirmed: "Configuration constants bundled" in bundle
 - APP_CONFIG pattern working correctly
 - Graceful degradation if configuration constants not set (warning logged, app continues)
 
 **Story 1.4 Integration Verification:**
+
 - Store initialization (src/stores/useAppStore.ts:99-142) correctly checks APP_CONFIG.isPreConfigured
 - Pre-configured settings injected on first load when env vars present
 - isOnboarded set to true (skips onboarding flow)
@@ -628,6 +657,7 @@ claude-sonnet-4-5 (Claude Code)
 - No Onboarding component in App.tsx (removed in Story 1.4)
 
 **ESLint Warning Resolution:**
+
 - App.tsx:16 - React Hook useEffect missing dependency 'initializeApp'
 - Pattern is intentional for single initialization (useRef guard for StrictMode)
 - Added eslint-disable-next-line comment with explanation
@@ -636,6 +666,7 @@ claude-sonnet-4-5 (Claude Code)
 ### Completion Notes List
 
 **Key Achievements:**
+
 1. ✅ **AC-1.6.1**: Environment variable injection working - verified in bundle and smoke tests
 2. ✅ **AC-1.6.2**: Story 1.4 integration verified - pre-configuration pattern working correctly
 3. ✅ **AC-1.6.3**: Service worker generated successfully - dist/sw.js with workbox precaching
@@ -644,6 +675,7 @@ claude-sonnet-4-5 (Claude Code)
 6. ✅ **AC-1.6.6**: Comprehensive documentation - DEPLOYMENT.md with troubleshooting and security notes
 
 **Quality Metrics:**
+
 - TypeScript compilation: Zero errors ✓
 - ESLint: Zero warnings ✓
 - Smoke tests: 15/15 passing ✓
@@ -652,6 +684,7 @@ claude-sonnet-4-5 (Claude Code)
 - Service worker: Auto-generated, 11 assets pre-cached ✓
 
 **Deployment Pipeline:**
+
 ```
 npm run deploy
   → predeploy: npm run build && npm run test:smoke
@@ -663,18 +696,21 @@ npm run deploy
 ```
 
 **Security Implementation:**
+
 - .env.production in .gitignore (verified)
 - Comprehensive security documentation in DEPLOYMENT.md
 - Clear explanation: env vars are NOT secrets (embedded in public bundle)
 - Guidance for privacy-sensitive deployments
 
 **Follow-up Recommendations:**
+
 - Test actual deployment to GitHub Pages (requires live push)
 - Verify service worker registration on live site (manual DevTools check)
 - Run Lighthouse audit to confirm PWA score 100
 - Test offline functionality after first deployment
 
 **Technical Decisions:**
+
 1. **CommonJS for scripts**: Package.json has "type": "module" → scripts use .cjs extension
 2. **No external dependencies**: Smoke tests use Node.js built-in modules only (fs, path, zlib)
 3. **Comprehensive documentation**: Created dedicated DEPLOYMENT.md instead of updating README
@@ -684,20 +720,24 @@ npm run deploy
 ### File List
 
 **Files Created:**
+
 - `/scripts/smoke-tests.cjs` - Pre-deploy validation script (15 automated checks)
 - `/scripts/post-deploy-check.cjs` - Optional post-deploy validation script (informational)
 - `/DEPLOYMENT.md` - Comprehensive deployment guide (300+ lines)
 
 **Files Modified:**
+
 - `/package.json` - Updated scripts: added test:smoke, modified predeploy to include smoke tests, added postdeploy message
 - `/src/App.tsx` - Fixed ESLint warning by adding eslint-disable-next-line comment for intentional useEffect pattern
 
 **Files Verified (No Changes):**
+
 - `/vite.config.ts` - Build configuration correct, vite-plugin-pwa working as expected
 - `/src/config/constants.ts` - APP_CONFIG from Story 1.4 working correctly (hardcoded configuration)
 - `/src/stores/useAppStore.ts` - Pre-configuration logic from Story 1.4 verified working
 
 **Directories Created:**
+
 - `/scripts/` - Created for smoke test and validation scripts
 
 ---
@@ -735,6 +775,7 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 #### **LOW Severity**
 
 **Finding #1: AC-1.6.4 Wording Ambiguity - Source Maps**
+
 - **Issue**: AC-1.6.4 states "Source maps generated for debugging" but production builds intentionally exclude source maps (standard industry practice for security and bundle size)
 - **Evidence**: Dev Agent Record (line 163) states "Verified source maps not generated (production build)"
 - **Analysis**: This is CORRECT behavior - production builds should NOT include source maps. Dev builds have source maps (Vite default). The AC wording is ambiguous ("for debugging" could mean dev builds).
@@ -747,14 +788,14 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 
 **Summary:** 6 of 6 acceptance criteria fully implemented (100% coverage)
 
-| AC # | Description | Status | Evidence |
-|------|-------------|--------|----------|
+| AC #         | Description                                             | Status         | Evidence                                                                                                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **AC-1.6.1** | Build process bundles configuration constants correctly | ✅ IMPLEMENTED | • `src/config/constants.ts` defines APP_CONFIG [src/config/constants.ts]<br>• Constants bundled at build time and available at runtime<br>• Smoke tests verify constants bundled [scripts/smoke-tests.cjs]<br>• Graceful degradation documented [src/stores/useAppStore.ts:129-136] |
-| **AC-1.6.2** | GitHub Pages deployment with pre-configured data | ✅ IMPLEMENTED | • Base path configured [vite.config.ts:7]<br>• Deploy script using gh-pages [package.json:13]<br>• Pre-configuration logic [src/stores/useAppStore.ts:99-128]<br>• Onboarding removed [src/App.tsx:38-39]<br>• Post-deploy validation [scripts/post-deploy-check.cjs:107-128] |
-| **AC-1.6.3** | Service worker generation in production build | ✅ IMPLEMENTED | • VitePWA plugin configured [vite.config.ts:10-58]<br>• Service worker validation [scripts/smoke-tests.cjs:199-223]<br>• Glob patterns for assets [vite.config.ts:40]<br>• `dist/sw.js` exists [verified via ls command]<br>• Auto-update registration [vite.config.ts:11] |
-| **AC-1.6.4** | Optimized, minified bundles | ⚠️ ADVISORY | • TypeScript compilation [package.json:8]<br>• Bundle size 112.68KB gzipped [DEPLOYMENT.md:161]<br>• Asset hashing [DEPLOYMENT.md:151]<br>• Tailwind purge working [DEPLOYMENT.md:160]<br>• **Advisory**: Source maps intentionally excluded from production (standard practice) |
-| **AC-1.6.5** | Deployment script with smoke test verification | ✅ IMPLEMENTED | • Smoke test suite [scripts/smoke-tests.cjs:1-417]<br>• 15 automated checks implemented<br>• Predeploy integration [package.json:12]<br>• Fail-fast exit codes [scripts/smoke-tests.cjs:71-78]<br>• Post-deploy validation [scripts/post-deploy-check.cjs:1-333] |
-| **AC-1.6.6** | Deployment process documentation | ✅ IMPLEMENTED | • DEPLOYMENT.md guide [DEPLOYMENT.md:1-790]<br>• Environment setup [DEPLOYMENT.md:70-118]<br>• Smoke test explanations [DEPLOYMENT.md:262-281]<br>• Troubleshooting (200 lines) [DEPLOYMENT.md:358-557]<br>• Security considerations [DEPLOYMENT.md:623-691] |
+| **AC-1.6.2** | GitHub Pages deployment with pre-configured data        | ✅ IMPLEMENTED | • Base path configured [vite.config.ts:7]<br>• Deploy script using gh-pages [package.json:13]<br>• Pre-configuration logic [src/stores/useAppStore.ts:99-128]<br>• Onboarding removed [src/App.tsx:38-39]<br>• Post-deploy validation [scripts/post-deploy-check.cjs:107-128]       |
+| **AC-1.6.3** | Service worker generation in production build           | ✅ IMPLEMENTED | • VitePWA plugin configured [vite.config.ts:10-58]<br>• Service worker validation [scripts/smoke-tests.cjs:199-223]<br>• Glob patterns for assets [vite.config.ts:40]<br>• `dist/sw.js` exists [verified via ls command]<br>• Auto-update registration [vite.config.ts:11]          |
+| **AC-1.6.4** | Optimized, minified bundles                             | ⚠️ ADVISORY    | • TypeScript compilation [package.json:8]<br>• Bundle size 112.68KB gzipped [DEPLOYMENT.md:161]<br>• Asset hashing [DEPLOYMENT.md:151]<br>• Tailwind purge working [DEPLOYMENT.md:160]<br>• **Advisory**: Source maps intentionally excluded from production (standard practice)    |
+| **AC-1.6.5** | Deployment script with smoke test verification          | ✅ IMPLEMENTED | • Smoke test suite [scripts/smoke-tests.cjs:1-417]<br>• 15 automated checks implemented<br>• Predeploy integration [package.json:12]<br>• Fail-fast exit codes [scripts/smoke-tests.cjs:71-78]<br>• Post-deploy validation [scripts/post-deploy-check.cjs:1-333]                    |
+| **AC-1.6.6** | Deployment process documentation                        | ✅ IMPLEMENTED | • DEPLOYMENT.md guide [DEPLOYMENT.md:1-790]<br>• Environment setup [DEPLOYMENT.md:70-118]<br>• Smoke test explanations [DEPLOYMENT.md:262-281]<br>• Troubleshooting (200 lines) [DEPLOYMENT.md:358-557]<br>• Security considerations [DEPLOYMENT.md:623-691]                        |
 
 ---
 
@@ -762,17 +803,17 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 
 **Summary:** 9 of 9 major tasks verified complete with evidence (100% task completion)
 
-| Task | Marked As | Verified As | Evidence |
-|------|-----------|-------------|----------|
-| **Task 1:** Review and verify current build configuration | [x] COMPLETE | ✅ VERIFIED | • vite.config.ts reviewed [vite.config.ts:1-61]<br>• VitePWA configured correctly [vite.config.ts:10-58]<br>• APP_CONFIG verified [src/config/constants.ts:32-52]<br>• package.json scripts reviewed [package.json:6-14] |
-| **Task 2:** Create and validate configuration constants module | [x] COMPLETE | ✅ VERIFIED | • Configuration module created [src/config/constants.ts]<br>• Constants documented [src/config/constants.ts]<br>• Values properly typed as const [src/config/constants.ts]<br>• Integration with store initialization [useAppStore.ts]<br>• Deployment guide integration [DEPLOYMENT.md] |
-| **Task 3:** Implement pre-deploy smoke tests | [x] COMPLETE | ✅ VERIFIED | • Smoke test script created [scripts/smoke-tests.cjs:1-417]<br>• 7 test functions implemented (15 total checks)<br>• File existence [scripts/smoke-tests.cjs:94-117]<br>• Manifest validation [scripts/smoke-tests.cjs:154-194]<br>• Bundle size check [scripts/smoke-tests.cjs:286-327]<br>• Fail-fast pattern [scripts/smoke-tests.cjs:108-112] |
-| **Task 4:** Update package.json scripts with smoke test integration | [x] COMPLETE | ✅ VERIFIED | • test:smoke script added [package.json:11]<br>• predeploy updated [package.json:12]<br>• postdeploy message added [package.json:14]<br>• gh-pages deploy verified [package.json:13]<br>• Script execution order documented [DEPLOYMENT.md:206-212] |
-| **Task 5:** Implement post-deploy validation | [x] COMPLETE | ✅ VERIFIED | • Post-deploy script created [scripts/post-deploy-check.cjs:1-333]<br>• HTTP 200 check [scripts/post-deploy-check.cjs:107-128]<br>• Manifest validation [scripts/post-deploy-check.cjs:167-214]<br>• Informational only (non-blocking) [scripts/post-deploy-check.cjs:320]<br>• Deployment guide integration [DEPLOYMENT.md:283-289] |
-| **Task 6:** Optimize build output and verify bundle size | [x] COMPLETE | ✅ VERIFIED | • Bundle size 112.68KB gzipped [verified in DEPLOYMENT.md:161]<br>• 43% under 200KB target<br>• Tailwind purge verified (3.55KB CSS) [DEPLOYMENT.md:160]<br>• Tree-shaking working [Dev Agent Record:615]<br>• Asset hashing confirmed [Dev Agent Record:617]<br>• Baseline documented [DEPLOYMENT.md:157-168] |
-| **Task 7:** Test complete deployment pipeline end-to-end | [x] COMPLETE | ✅ VERIFIED | • Configuration module verified [src/config/constants.ts exists]<br>• Build succeeds with zero errors [package.json:8]<br>• Smoke tests pass (15/15) [scripts/smoke-tests.cjs implemented]<br>• Constants bundled [APP_CONFIG verified in bundle]<br>• Service worker generated [dist/sw.js verified via ls]<br>• PWA manifest generated [dist/manifest.webmanifest verified] |
-| **Task 8:** Document deployment process | [x] COMPLETE | ✅ VERIFIED | • DEPLOYMENT.md created [DEPLOYMENT.md:1-790]<br>• Prerequisites documented [DEPLOYMENT.md:19-46]<br>• Environment setup [DEPLOYMENT.md:70-118]<br>• Build process [DEPLOYMENT.md:120-192]<br>• Deployment steps [DEPLOYMENT.md:196-258]<br>• Troubleshooting (200 lines) [DEPLOYMENT.md:358-557]<br>• Rollback procedures [DEPLOYMENT.md:560-621]<br>• Security considerations [DEPLOYMENT.md:623-691] |
-| **Task 9:** Verify Story 1.4 integration | [x] COMPLETE | ✅ VERIFIED | • APP_CONFIG.isPreConfigured checked [src/config/constants.ts:51]<br>• Pre-configuration logic [src/stores/useAppStore.ts:99-128]<br>• Env vars present → inject settings [src/stores/useAppStore.ts:103-119]<br>• Env vars missing → graceful degradation [src/stores/useAppStore.ts:129-136]<br>• Existing settings preserved [src/stores/useAppStore.ts:137-142]<br>• Onboarding removed [src/App.tsx:38-39] |
+| Task                                                                | Marked As    | Verified As | Evidence                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------- | ------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Task 1:** Review and verify current build configuration           | [x] COMPLETE | ✅ VERIFIED | • vite.config.ts reviewed [vite.config.ts:1-61]<br>• VitePWA configured correctly [vite.config.ts:10-58]<br>• APP_CONFIG verified [src/config/constants.ts:32-52]<br>• package.json scripts reviewed [package.json:6-14]                                                                                                                                                                                        |
+| **Task 2:** Create and validate configuration constants module      | [x] COMPLETE | ✅ VERIFIED | • Configuration module created [src/config/constants.ts]<br>• Constants documented [src/config/constants.ts]<br>• Values properly typed as const [src/config/constants.ts]<br>• Integration with store initialization [useAppStore.ts]<br>• Deployment guide integration [DEPLOYMENT.md]                                                                                                                        |
+| **Task 3:** Implement pre-deploy smoke tests                        | [x] COMPLETE | ✅ VERIFIED | • Smoke test script created [scripts/smoke-tests.cjs:1-417]<br>• 7 test functions implemented (15 total checks)<br>• File existence [scripts/smoke-tests.cjs:94-117]<br>• Manifest validation [scripts/smoke-tests.cjs:154-194]<br>• Bundle size check [scripts/smoke-tests.cjs:286-327]<br>• Fail-fast pattern [scripts/smoke-tests.cjs:108-112]                                                               |
+| **Task 4:** Update package.json scripts with smoke test integration | [x] COMPLETE | ✅ VERIFIED | • test:smoke script added [package.json:11]<br>• predeploy updated [package.json:12]<br>• postdeploy message added [package.json:14]<br>• gh-pages deploy verified [package.json:13]<br>• Script execution order documented [DEPLOYMENT.md:206-212]                                                                                                                                                             |
+| **Task 5:** Implement post-deploy validation                        | [x] COMPLETE | ✅ VERIFIED | • Post-deploy script created [scripts/post-deploy-check.cjs:1-333]<br>• HTTP 200 check [scripts/post-deploy-check.cjs:107-128]<br>• Manifest validation [scripts/post-deploy-check.cjs:167-214]<br>• Informational only (non-blocking) [scripts/post-deploy-check.cjs:320]<br>• Deployment guide integration [DEPLOYMENT.md:283-289]                                                                            |
+| **Task 6:** Optimize build output and verify bundle size            | [x] COMPLETE | ✅ VERIFIED | • Bundle size 112.68KB gzipped [verified in DEPLOYMENT.md:161]<br>• 43% under 200KB target<br>• Tailwind purge verified (3.55KB CSS) [DEPLOYMENT.md:160]<br>• Tree-shaking working [Dev Agent Record:615]<br>• Asset hashing confirmed [Dev Agent Record:617]<br>• Baseline documented [DEPLOYMENT.md:157-168]                                                                                                  |
+| **Task 7:** Test complete deployment pipeline end-to-end            | [x] COMPLETE | ✅ VERIFIED | • Configuration module verified [src/config/constants.ts exists]<br>• Build succeeds with zero errors [package.json:8]<br>• Smoke tests pass (15/15) [scripts/smoke-tests.cjs implemented]<br>• Constants bundled [APP_CONFIG verified in bundle]<br>• Service worker generated [dist/sw.js verified via ls]<br>• PWA manifest generated [dist/manifest.webmanifest verified]                                   |
+| **Task 8:** Document deployment process                             | [x] COMPLETE | ✅ VERIFIED | • DEPLOYMENT.md created [DEPLOYMENT.md:1-790]<br>• Prerequisites documented [DEPLOYMENT.md:19-46]<br>• Environment setup [DEPLOYMENT.md:70-118]<br>• Build process [DEPLOYMENT.md:120-192]<br>• Deployment steps [DEPLOYMENT.md:196-258]<br>• Troubleshooting (200 lines) [DEPLOYMENT.md:358-557]<br>• Rollback procedures [DEPLOYMENT.md:560-621]<br>• Security considerations [DEPLOYMENT.md:623-691]         |
+| **Task 9:** Verify Story 1.4 integration                            | [x] COMPLETE | ✅ VERIFIED | • APP_CONFIG.isPreConfigured checked [src/config/constants.ts:51]<br>• Pre-configuration logic [src/stores/useAppStore.ts:99-128]<br>• Env vars present → inject settings [src/stores/useAppStore.ts:103-119]<br>• Env vars missing → graceful degradation [src/stores/useAppStore.ts:129-136]<br>• Existing settings preserved [src/stores/useAppStore.ts:137-142]<br>• Onboarding removed [src/App.tsx:38-39] |
 
 **No tasks marked complete were found to be incomplete or falsely claimed.** All implementation evidence verified with file:line references.
 
@@ -783,6 +824,7 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 **Automated Testing:**
 
 **Pre-Deploy Smoke Tests (15 checks):**
+
 - ✅ File existence validation (index.html, manifest.webmanifest, sw.js)
 - ✅ HTML structure validation (viewport meta tag, manifest link)
 - ✅ PWA manifest validation (valid JSON, required fields, icons array)
@@ -792,6 +834,7 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 - ✅ Critical assets validation (icons, JS bundles, CSS bundles)
 
 **Post-Deploy Validation (informational only):**
+
 - ✅ Live site HTTP 200 accessibility check
 - ✅ Manifest link presence in HTML
 - ✅ Manifest fetchability and JSON validity
@@ -801,11 +844,13 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 **Test Coverage Gaps:**
 
 **Medium Priority:**
+
 - **Gap**: No automated E2E tests for full deployment flow (edit constants → build → deploy → verify live site)
 - **Mitigation**: Comprehensive manual testing documented in DEPLOYMENT.md:298-355
 - **Recommendation**: Consider adding E2E test suite using Playwright in Epic 2
 
 **Low Priority:**
+
 - **Gap**: No automated validation of service worker registration on live site (requires browser automation)
 - **Mitigation**: Post-deploy script provides manual verification steps [scripts/post-deploy-check.cjs:219-234]
 - **Gap**: No automated bundle analysis/size trending over time
@@ -820,17 +865,21 @@ Implementation quality exceeds expectations with thorough documentation, fail-fa
 **Tech Spec Compliance:**
 
 ✅ **Build Architecture** (from tech-spec-epic-1.md#Story-1.6):
+
 - Vite build process with configuration constants: **Implemented** [vite.config.ts, src/config/constants.ts]
 - Configuration constants bundled from source: **Implemented** [src/config/constants.ts]
 - Smoke tests for dist/ validation: **Implemented** [scripts/smoke-tests.cjs]
 
 ✅ **Deployment Flow** (from tech-spec-epic-1.md#Story-1.6):
+
 ```
 npm run deploy → predeploy hook → build → smoke tests → gh-pages push
 ```
+
 **Verified:** [package.json:12-13]
 
 ✅ **Critical Validations** (from tech-spec-epic-1.md#Story-1.6):
+
 1. Configuration constants in bundle: **Verified** [smoke-tests.cjs:228-281]
 2. Service worker with correct routes: **Verified** [smoke-tests.cjs:199-223]
 3. PWA manifest valid: **Verified** [smoke-tests.cjs:154-194]
@@ -850,17 +899,20 @@ npm run deploy → predeploy hook → build → smoke tests → gh-pages push
 ### Security Notes
 
 ✅ **Configuration Security:**
+
 - Configuration constants in source code [src/config/constants.ts]
 - Only non-sensitive data stored (partner name, start date)
 - Comprehensive security documentation [DEPLOYMENT.md:623-691]
 - Build-time bundling explained (constants embedded in source) [DEPLOYMENT.md:673-690]
 
 ✅ **Deployment Security:**
+
 - No secrets committed to version control
 - Clear guidance on privacy considerations [DEPLOYMENT.md:647-654]
 - Security checklist in deployment guide [DEPLOYMENT.md:695-724]
 
 ✅ **Code Security:**
+
 - No hardcoded credentials or API keys
 - ESLint warning properly addressed [src/App.tsx:17-18]
 - Error messages don't expose sensitive information
@@ -874,29 +926,34 @@ npm run deploy → predeploy hook → build → smoke tests → gh-pages push
 **Industry Standards Applied:**
 
 ✅ **Build Optimization:**
+
 - Vite tree-shaking and minification
 - Tailwind CSS purge (78.7% compression on CSS)
 - Asset hashing for cache busting
 - Bundle size monitoring and enforcement
 
 ✅ **Deployment Automation:**
+
 - Fail-fast validation (smoke tests)
 - Pre-deploy quality gates
 - Automated gh-pages deployment
 - Rollback procedures documented
 
 ✅ **Documentation Standards:**
+
 - Step-by-step instructions with examples
 - Troubleshooting for common issues
 - Security considerations clearly stated
 - Version history tracked
 
 ✅ **Error Handling:**
+
 - Actionable error messages with suggestions
 - Graceful degradation (env vars missing)
 - Clear exit codes for automation
 
 **References:**
+
 - **Vite Documentation**: https://vite.dev/guide/env-and-mode.html (environment variables)
 - **vite-plugin-pwa**: https://vite-pwa-org.netlify.app/ (service worker generation)
 - **GitHub Pages**: https://docs.github.com/en/pages (deployment)
@@ -919,4 +976,3 @@ npm run deploy → predeploy hook → build → smoke tests → gh-pages push
 - Note: Post-deploy validation could be enhanced with browser automation (Playwright) for service worker verification
 
 **No blocking issues.** **No changes requested.** Story ready for production deployment.
-

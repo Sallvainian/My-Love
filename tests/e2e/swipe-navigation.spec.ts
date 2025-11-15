@@ -70,7 +70,10 @@ test.describe('Swipe Navigation', () => {
     await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
   });
 
-  test('AC-3.2.1: swipe left navigates to previous day\'s message', async ({ cleanApp, browserName }) => {
+  test("AC-3.2.1: swipe left navigates to previous day's message", async ({
+    cleanApp,
+    browserName,
+  }) => {
     // Get today's message
     const todayMessage = await cleanApp.locator('[data-testid="message-text"]').textContent();
 
@@ -92,7 +95,10 @@ test.describe('Swipe Navigation', () => {
     expect(yesterdayMessage).not.toBeNull();
   });
 
-  test('AC-3.2.2: swipe right from past message returns toward today', async ({ cleanApp, browserName }) => {
+  test('AC-3.2.2: swipe right from past message returns toward today', async ({
+    cleanApp,
+    browserName,
+  }) => {
     // Navigate back 3 days
     const animationWait = browserName === 'firefox' ? 1000 : 600;
 
@@ -146,7 +152,10 @@ test.describe('Swipe Navigation', () => {
     // Actual performance measurement includes gesture time + animation, which varies by browser
   });
 
-  test('AC-3.2.5: message history loads correctly from rotation algorithm', async ({ cleanApp, browserName }) => {
+  test('AC-3.2.5: message history loads correctly from rotation algorithm', async ({
+    cleanApp,
+    browserName,
+  }) => {
     // Navigate back 5 days (with longer timeout for Firefox)
     const timeout = browserName === 'firefox' ? 800 : 600;
     const messages: string[] = [];
@@ -185,7 +194,10 @@ test.describe('Swipe Navigation', () => {
     expect(sameMessage).toBe(message2DaysBack);
   });
 
-  test('AC-3.2.6: swipe gesture works on different input methods', async ({ cleanApp, browserName }) => {
+  test('AC-3.2.6: swipe gesture works on different input methods', async ({
+    cleanApp,
+    browserName,
+  }) => {
     // This test runs across Chromium, Firefox, and WebKit
     // Framer Motion handles touch, mouse, and trackpad automatically
 
@@ -240,7 +252,9 @@ test.describe('Swipe Navigation', () => {
     await cleanApp.keyboard.press('ArrowRight');
     await cleanApp.waitForTimeout(600);
 
-    const messageAfterAttempt = await cleanApp.locator('[data-testid="message-text"]').textContent();
+    const messageAfterAttempt = await cleanApp
+      .locator('[data-testid="message-text"]')
+      .textContent();
 
     // Message should remain unchanged
     expect(messageAfterAttempt).toBe(todayMessage);
@@ -312,7 +326,9 @@ test.describe('Swipe Navigation', () => {
 
     await cleanApp.waitForTimeout(600);
 
-    const messageAfterSmallSwipe = await cleanApp.locator('[data-testid="message-text"]').textContent();
+    const messageAfterSmallSwipe = await cleanApp
+      .locator('[data-testid="message-text"]')
+      .textContent();
 
     // Message should remain unchanged (below threshold)
     expect(messageAfterSmallSwipe).toBe(todayMessage);
@@ -343,7 +359,9 @@ test.describe('Swipe Navigation', () => {
 
     // Wait for message card to be stable
     await expect(cleanApp.getByTestId('message-card')).toBeVisible();
-    const messageBeforeFavorite = await cleanApp.locator('[data-testid="message-text"]').textContent();
+    const messageBeforeFavorite = await cleanApp
+      .locator('[data-testid="message-text"]')
+      .textContent();
 
     // Favorite the message
     const favoriteButton = cleanApp.locator('[data-testid="message-favorite-button"]');
@@ -362,7 +380,9 @@ test.describe('Swipe Navigation', () => {
 
     // Verify we're back at the same message
     await expect(cleanApp.getByTestId('message-card')).toBeVisible();
-    const messageAfterFavorite = await cleanApp.locator('[data-testid="message-text"]').textContent();
+    const messageAfterFavorite = await cleanApp
+      .locator('[data-testid="message-text"]')
+      .textContent();
 
     // Should show the same message
     expect(messageAfterFavorite).toBe(messageBeforeFavorite);

@@ -37,19 +37,22 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
 
   // Helper: Get IndexedDB messages
   const getIndexedDBMessages = async (page: Page) => {
-    return await page.evaluate(async ([dbName, dbVersion]) => {
-      const idb = await (window as any).indexedDB;
-      return new Promise((resolve) => {
-        const request = idb.open(dbName, dbVersion);
-        request.onsuccess = () => {
-          const db = request.result;
-          const tx = db.transaction('messages', 'readonly');
-          const store = tx.objectStore('messages');
-          const getAll = store.getAll();
-          getAll.onsuccess = () => resolve(getAll.result);
-        };
-      });
-    }, [DB_NAME, DB_VERSION]);
+    return await page.evaluate(
+      async ([dbName, dbVersion]) => {
+        const idb = await (window as any).indexedDB;
+        return new Promise((resolve) => {
+          const request = idb.open(dbName, dbVersion);
+          request.onsuccess = () => {
+            const db = request.result;
+            const tx = db.transaction('messages', 'readonly');
+            const store = tx.objectStore('messages');
+            const getAll = store.getAll();
+            getAll.onsuccess = () => resolve(getAll.result);
+          };
+        });
+      },
+      [DB_NAME, DB_VERSION]
+    );
   };
 
   test.beforeEach(async ({ cleanApp }) => {
@@ -67,15 +70,15 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await createTestMessage(cleanApp, testMessage, 'custom');
 
       // Verify message is in IndexedDB
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const customMessages = messages.filter(m => m.isCustom);
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const customMessages = messages.filter((m) => m.isCustom);
       expect(customMessages.length).toBeGreaterThan(0);
 
-      const hasTestMessage = customMessages.some(m => m.text === testMessage);
+      const hasTestMessage = customMessages.some((m) => m.text === testMessage);
       expect(hasTestMessage).toBe(true);
 
       // Verify message has expected structure
-      const testMsg = customMessages.find(m => m.text === testMessage);
+      const testMsg = customMessages.find((m) => m.text === testMessage);
       expect(testMsg).toBeDefined();
       expect(testMsg.category).toBe('custom');
       expect(testMsg.isCustom).toBe(true);
@@ -119,13 +122,15 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.getByTestId('admin-filter-category').selectOption('custom');
       await cleanApp.waitForTimeout(300);
 
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasPersistedMessage = messageTexts.some(text => text.includes(testMessage));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasPersistedMessage = messageTexts.some((text) => text.includes(testMessage));
       expect(hasPersistedMessage).toBe(true);
 
       // Verify in IndexedDB
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const hasInDB = messages.some(m => m.text === testMessage);
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const hasInDB = messages.some((m) => m.text === testMessage);
       expect(hasInDB).toBe(true);
     });
   });
@@ -151,8 +156,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       // The message should appear at some point in the rotation
       // For testing purposes, we verify it's in the rotation pool
       const rotationPool = await cleanApp.evaluate(() => {
-        const state = (window as any).__APP_STORE__;
-        return state?.messages || [];
+        const store = (window as any).__APP_STORE__;
+        return store?.getState().messages || [];
       });
 
       const hasCustomInPool = rotationPool.some((m: any) => m.text === testMessage);
@@ -187,8 +192,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       });
 
       // Check that draft message exists but is NOT in rotation pool
-      const allMessages = await getIndexedDBMessages(cleanApp) as any[];
-      const draftInDB = allMessages.find(m => m.text === draftMessage);
+      const allMessages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const draftInDB = allMessages.find((m) => m.text === draftMessage);
       expect(draftInDB).toBeDefined();
       expect(draftInDB.active).toBe(false);
 
@@ -211,20 +216,30 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.getByTestId('admin-filter-category').selectOption('reason');
       await cleanApp.waitForTimeout(300);
 
-      const reasonMessages = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasReasonMessage = reasonMessages.some(text => text.includes('Custom reason message'));
+      const reasonMessages = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasReasonMessage = reasonMessages.some((text) =>
+        text.includes('Custom reason message')
+      );
       expect(hasReasonMessage).toBe(true);
 
       // Filter by memory category
       await cleanApp.getByTestId('admin-filter-category').selectOption('memory');
       await cleanApp.waitForTimeout(300);
 
-      const memoryMessages = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasMemoryMessage = memoryMessages.some(text => text.includes('Custom memory message'));
+      const memoryMessages = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasMemoryMessage = memoryMessages.some((text) =>
+        text.includes('Custom memory message')
+      );
       expect(hasMemoryMessage).toBe(true);
     });
 
-    test('should show both default and custom messages in category filter', async ({ cleanApp }) => {
+    test('should show both default and custom messages in category filter', async ({
+      cleanApp,
+    }) => {
       await navigateToAdmin(cleanApp);
 
       // Create custom message in reason category
@@ -237,13 +252,15 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       const messages = await cleanApp.locator('[data-testid="admin-message-row"]').all();
 
       // Verify both custom and default messages appear
-      const types = await Promise.all(messages.map(async (row) => {
-        const typeText = await row.locator('[data-testid="message-row-type"]').textContent();
-        return typeText;
-      }));
+      const types = await Promise.all(
+        messages.map(async (row) => {
+          const typeText = await row.locator('[data-testid="message-row-type"]').textContent();
+          return typeText;
+        })
+      );
 
-      const hasCustom = types.some(t => t?.includes('Custom'));
-      const hasDefault = types.some(t => t?.includes('Default'));
+      const hasCustom = types.some((t) => t?.includes('Custom'));
+      const hasDefault = types.some((t) => t?.includes('Default'));
 
       expect(hasCustom).toBe(true);
       expect(hasDefault).toBe(true);
@@ -300,8 +317,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await expect(draftBadge).toBeVisible();
 
       // Verify in IndexedDB
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const updatedMessage = messages.find(m => m.text === testMessage);
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const updatedMessage = messages.find((m) => m.text === testMessage);
       expect(updatedMessage.active).toBe(false);
     });
 
@@ -318,8 +335,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.waitForTimeout(300);
 
       // Verify in IndexedDB
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const draftMessage = messages.find(m => m.text === 'Created as draft');
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const draftMessage = messages.find((m) => m.text === 'Created as draft');
       expect(draftMessage).toBeDefined();
       expect(draftMessage.active).toBe(false);
     });
@@ -335,8 +352,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await createTestMessage(cleanApp, testMessage, 'custom');
 
       // Verify message exists in IndexedDB
-      let messages = await getIndexedDBMessages(cleanApp) as any[];
-      let hasMessage = messages.some(m => m.text === testMessage);
+      let messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      let hasMessage = messages.some((m) => m.text === testMessage);
       expect(hasMessage).toBe(true);
 
       // Delete message
@@ -348,8 +365,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.waitForTimeout(300);
 
       // Verify message removed from IndexedDB
-      messages = await getIndexedDBMessages(cleanApp) as any[];
-      hasMessage = messages.some(m => m.text === testMessage);
+      messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      hasMessage = messages.some((m) => m.text === testMessage);
       expect(hasMessage).toBe(false);
     });
 
@@ -415,8 +432,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
                 const href = element.getAttribute('href');
                 if (href && href.startsWith('blob:')) {
                   fetch(href)
-                    .then(r => r.text())
-                    .then(text => resolve(JSON.parse(text)));
+                    .then((r) => r.text())
+                    .then((text) => resolve(JSON.parse(text)));
                 }
                 originalClick();
               };
@@ -430,15 +447,19 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.getByTestId('export-messages-button').click();
 
       // Wait for export and verify structure
-      const exportData = await exportPromise as any;
+      const exportData = (await exportPromise) as any;
       expect(exportData.version).toBe('1.0');
       expect(exportData.messageCount).toBeGreaterThan(0);
       expect(exportData.messages).toBeInstanceOf(Array);
       expect(exportData.exportDate).toBeDefined();
 
       // Verify messages in export
-      const hasExportMessage1 = exportData.messages.some((m: any) => m.text === 'Export test message 1');
-      const hasExportMessage2 = exportData.messages.some((m: any) => m.text === 'Export test message 2');
+      const hasExportMessage1 = exportData.messages.some(
+        (m: any) => m.text === 'Export test message 1'
+      );
+      const hasExportMessage2 = exportData.messages.some(
+        (m: any) => m.text === 'Export test message 2'
+      );
       expect(hasExportMessage1).toBe(true);
       expect(hasExportMessage2).toBe(true);
     });
@@ -496,16 +517,18 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.getByTestId('admin-filter-category').selectOption('custom');
       await cleanApp.waitForTimeout(300);
 
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasImported1 = messageTexts.some(text => text.includes('Imported message 1'));
-      const hasImported2 = messageTexts.some(text => text.includes('Imported message 2'));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasImported1 = messageTexts.some((text) => text.includes('Imported message 1'));
+      const hasImported2 = messageTexts.some((text) => text.includes('Imported message 2'));
       expect(hasImported1).toBe(true);
       expect(hasImported2).toBe(true);
 
       // Verify in IndexedDB
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const imported1 = messages.find(m => m.text === 'Imported message 1');
-      const imported2 = messages.find(m => m.text === 'Imported message 2');
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const imported1 = messages.find((m) => m.text === 'Imported message 1');
+      const imported2 = messages.find((m) => m.text === 'Imported message 2');
       expect(imported1).toBeDefined();
       expect(imported2).toBeDefined();
       expect(imported1.active).toBe(true);
@@ -560,33 +583,39 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.waitForTimeout(1000);
 
       // Verify only one instance of duplicate exists
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const duplicateMessages = messages.filter(m => m.text === duplicateText);
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const duplicateMessages = messages.filter((m) => m.text === duplicateText);
       expect(duplicateMessages.length).toBe(1);
 
       // Verify new message was imported
-      const hasNewMessage = messages.some(m => m.text === 'New unique message');
+      const hasNewMessage = messages.some((m) => m.text === 'New unique message');
       expect(hasNewMessage).toBe(true);
     });
   });
 
   test.describe('AC-3.5.7: LocalStorage Migration on First Run', () => {
-    test('should migrate LocalStorage data to IndexedDB on first app load', async ({ page, context }) => {
+    test('should migrate LocalStorage data to IndexedDB on first app load', async ({
+      page,
+      context,
+    }) => {
       // Create a fresh page with LocalStorage data pre-populated
       const testMessage = 'Legacy LocalStorage message';
 
       // Set LocalStorage before app loads
       await page.evaluate((msg) => {
-        localStorage.setItem('my-love-custom-messages', JSON.stringify([
-          {
-            id: 1,
-            text: msg,
-            category: 'custom',
-            isCustom: true,
-            active: true,
-            createdAt: new Date().toISOString(),
-          },
-        ]));
+        localStorage.setItem(
+          'my-love-custom-messages',
+          JSON.stringify([
+            {
+              id: 1,
+              text: msg,
+              category: 'custom',
+              isCustom: true,
+              active: true,
+              createdAt: new Date().toISOString(),
+            },
+          ])
+        );
       }, testMessage);
 
       // Now load the app (migration should run)
@@ -600,21 +629,24 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       expect(localStorageAfter).toBeNull();
 
       // Verify message is now in IndexedDB
-      const messages = await page.evaluate(async ([dbName, dbVersion]) => {
-        const idb = (window as any).indexedDB;
-        return new Promise((resolve) => {
-          const request = idb.open(dbName, dbVersion);
-          request.onsuccess = () => {
-            const db = request.result;
-            const tx = db.transaction('messages', 'readonly');
-            const store = tx.objectStore('messages');
-            const getAll = store.getAll();
-            getAll.onsuccess = () => resolve(getAll.result);
-          };
-        });
-      }, [DB_NAME, DB_VERSION]) as any[];
+      const messages = (await page.evaluate(
+        async ([dbName, dbVersion]) => {
+          const idb = (window as any).indexedDB;
+          return new Promise((resolve) => {
+            const request = idb.open(dbName, dbVersion);
+            request.onsuccess = () => {
+              const db = request.result;
+              const tx = db.transaction('messages', 'readonly');
+              const store = tx.objectStore('messages');
+              const getAll = store.getAll();
+              getAll.onsuccess = () => resolve(getAll.result);
+            };
+          });
+        },
+        [DB_NAME, DB_VERSION]
+      )) as any[];
 
-      const migratedMessage = messages.find(m => m.text === testMessage);
+      const migratedMessage = messages.find((m) => m.text === testMessage);
       expect(migratedMessage).toBeDefined();
       expect(migratedMessage.isCustom).toBe(true);
       expect(migratedMessage.category).toBe('custom');
@@ -638,31 +670,37 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       const testMessage = 'Message already in IndexedDB';
 
       // First, add message to IndexedDB directly
-      await page.evaluate(async ([msg, dbName, dbVersion]) => {
-        const { openDB } = await import('idb');
-        const db = await openDB(dbName, dbVersion);
-        await db.add('messages', {
-          text: msg,
-          category: 'custom',
-          isCustom: true,
-          active: true,
-          createdAt: new Date(),
-          isFavorite: false,
-        });
-      }, [testMessage, DB_NAME, DB_VERSION]);
-
-      // Set same message in LocalStorage
-      await page.evaluate((msg) => {
-        localStorage.setItem('my-love-custom-messages', JSON.stringify([
-          {
-            id: 1,
+      await page.evaluate(
+        async ([msg, dbName, dbVersion]) => {
+          const { openDB } = await import('idb');
+          const db = await openDB(dbName, dbVersion);
+          await db.add('messages', {
             text: msg,
             category: 'custom',
             isCustom: true,
             active: true,
-            createdAt: new Date().toISOString(),
-          },
-        ]));
+            createdAt: new Date(),
+            isFavorite: false,
+          });
+        },
+        [testMessage, DB_NAME, DB_VERSION]
+      );
+
+      // Set same message in LocalStorage
+      await page.evaluate((msg) => {
+        localStorage.setItem(
+          'my-love-custom-messages',
+          JSON.stringify([
+            {
+              id: 1,
+              text: msg,
+              category: 'custom',
+              isCustom: true,
+              active: true,
+              createdAt: new Date().toISOString(),
+            },
+          ])
+        );
       }, testMessage);
 
       // Reload to trigger migration
@@ -670,27 +708,32 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await page.waitForTimeout(2000);
 
       // Verify only one instance exists
-      const messages = await page.evaluate(async ([dbName, dbVersion]) => {
-        const idb = (window as any).indexedDB;
-        return new Promise((resolve) => {
-          const request = idb.open(dbName, dbVersion);
-          request.onsuccess = () => {
-            const db = request.result;
-            const tx = db.transaction('messages', 'readonly');
-            const store = tx.objectStore('messages');
-            const getAll = store.getAll();
-            getAll.onsuccess = () => resolve(getAll.result);
-          };
-        });
-      }, [DB_NAME, DB_VERSION]) as any[];
+      const messages = (await page.evaluate(
+        async ([dbName, dbVersion]) => {
+          const idb = (window as any).indexedDB;
+          return new Promise((resolve) => {
+            const request = idb.open(dbName, dbVersion);
+            request.onsuccess = () => {
+              const db = request.result;
+              const tx = db.transaction('messages', 'readonly');
+              const store = tx.objectStore('messages');
+              const getAll = store.getAll();
+              getAll.onsuccess = () => resolve(getAll.result);
+            };
+          });
+        },
+        [DB_NAME, DB_VERSION]
+      )) as any[];
 
-      const duplicateMessages = messages.filter(m => m.text === testMessage);
+      const duplicateMessages = messages.filter((m) => m.text === testMessage);
       expect(duplicateMessages.length).toBe(1);
     });
   });
 
   test.describe('Integration Tests', () => {
-    test('should handle full workflow: create, edit active status, rotate, delete', async ({ cleanApp }) => {
+    test('should handle full workflow: create, edit active status, rotate, delete', async ({
+      cleanApp,
+    }) => {
       await navigateToAdmin(cleanApp);
 
       const testMessage = 'Full workflow test message';
@@ -738,8 +781,8 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       await cleanApp.waitForTimeout(300);
 
       // 6. Verify completely removed
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const messageExists = messages.some(m => m.text === testMessage);
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const messageExists = messages.some((m) => m.text === testMessage);
       expect(messageExists).toBe(false);
     });
 
@@ -764,9 +807,9 @@ test.describe('Admin Interface - Message Persistence & Integration (Story 3.5)',
       // Export, clear, import, verify
       // (Implementation would require full file download/upload simulation)
       // For now, verify messages exist in correct state
-      const messages = await getIndexedDBMessages(cleanApp) as any[];
-      const activeMsg = messages.find(m => m.text === 'Active message for export');
-      const draftMsg = messages.find(m => m.text === 'Draft message for export');
+      const messages = (await getIndexedDBMessages(cleanApp)) as any[];
+      const activeMsg = messages.find((m) => m.text === 'Active message for export');
+      const draftMsg = messages.find((m) => m.text === 'Draft message for export');
 
       expect(activeMsg.active).toBe(true);
       expect(draftMsg.active).toBe(false);

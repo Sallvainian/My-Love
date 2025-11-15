@@ -30,17 +30,20 @@ The current 100-message library means messages repeat every ~3 months, significa
 **Story 2-6: Add CI Integration (GitHub Actions)** - Status: DONE (APPROVED)
 
 **Key Deliverables:**
+
 - ✅ GitHub Actions workflow for Playwright tests (.github/workflows/playwright.yml)
 - ✅ Multi-browser testing (Chromium, Firefox, WebKit) with 2 retries in CI
 - ✅ Test artifact management for failure diagnostics
 - ✅ README.md status badge and CI documentation
 
 **New Infrastructure:**
+
 - CI/CD pipeline validates all tests on push to main and pull requests
 - `if: always()` artifact upload ensures debugging resources available
 - Environment-aware configuration (CI vs local test execution)
 
 **Learnings Applied:**
+
 - Status badge displays after first successful workflow run
 - Branch protection rules can be configured post-implementation
 - E2E validation via PR recommended for workflow testing
@@ -50,6 +53,7 @@ The current 100-message library means messages repeat every ~3 months, significa
 ### Epic Context
 
 **Epic 3: Enhanced Message Experience** transforms the daily message from a static 100-message rotation into a rich, year-long emotional journey with:
+
 - 365 unique messages (Story 3.1)
 - Swipe navigation through message history (Story 3.2-3.3)
 - Custom message management (Story 3.4-3.5)
@@ -62,9 +66,11 @@ This story is the critical first step, establishing the expanded content library
 ## Acceptance Criteria
 
 ### AC-3.1.1: Generate 265 Additional Messages Across 5 Categories
+
 **GIVEN** the current 100-message library,
 **WHEN** 265 additional messages are generated or sourced,
 **THEN** the total library contains 365 messages distributed across 5 categories:
+
 - Reasons (73 messages): "Why I love you" statements
 - Memories (73 messages): Shared experiences recalled
 - Affirmations (73 messages): Supportive and confidence-building
@@ -76,9 +82,11 @@ This story is the critical first step, establishing the expanded content library
 ---
 
 ### AC-3.1.2: Messages Are High-Quality, Heartfelt, and Varied
+
 **GIVEN** all 365 messages in the library,
 **WHEN** messages are reviewed for quality,
 **THEN** they meet the following standards:
+
 - **Tone Variety:** Mix of romantic, playful, heartfelt, reflective across all categories
 - **Length Balance:** 80% short (50-150 chars), 15% medium (150-250 chars), 5% long (250-300 chars)
 - **Authenticity:** Messages feel personal and genuine, not generic AI-generated content
@@ -90,9 +98,11 @@ This story is the critical first step, establishing the expanded content library
 ---
 
 ### AC-3.1.3: Update defaultMessages.ts with All 365 Messages
+
 **GIVEN** the expanded message library,
 **WHEN** `src/data/defaultMessages.ts` is updated,
 **THEN**:
+
 - File exports a const array `defaultMessages` with 365 Message objects
 - Each object follows the Message interface: `{ id, text, category, createdAt, isFavorite }`
 - IDs are sequential 1-365
@@ -106,9 +116,11 @@ This story is the critical first step, establishing the expanded content library
 ---
 
 ### AC-3.1.4: Each Message Tagged with Appropriate Category
+
 **GIVEN** all 365 messages,
 **WHEN** category assignments are reviewed,
 **THEN**:
+
 - Every message has a valid `category` field from MessageCategory type
 - Category assignments are semantically correct:
   - "I love your laugh" → reasons
@@ -123,9 +135,11 @@ This story is the critical first step, establishing the expanded content library
 ---
 
 ### AC-3.1.5: No Duplicate Messages in Library
+
 **GIVEN** the 365-message library,
 **WHEN** checked for duplicates,
 **THEN**:
+
 - No two messages have identical `text` content (case-insensitive comparison)
 - No messages are near-duplicates (>90% similarity via fuzzy matching)
 - Message IDs are unique (1-365, no gaps or duplicates)
@@ -135,9 +149,11 @@ This story is the critical first step, establishing the expanded content library
 ---
 
 ### AC-3.1.6: Message Rotation Algorithm Handles 365-Message Library Correctly
+
 **GIVEN** the existing `getDailyMessage()` rotation algorithm in `src/utils/messageRotation.ts`,
 **WHEN** the 365-message library is loaded,
 **THEN**:
+
 - Algorithm deterministically selects one message per day based on date seed
 - Same message displayed all day regardless of app reopens
 - Messages rotate over 365-day cycle before repeating
@@ -152,12 +168,12 @@ This story is the critical first step, establishing the expanded content library
 
 ### Components and Files Modified
 
-| File | Type | Changes | Lines Changed |
-|------|------|---------|---------------|
-| `src/data/defaultMessages.ts` | Data | Add 265 messages to existing 100-message array | +1,325 (~5 lines per message) |
-| `package.json` | Config | No changes | 0 |
-| `src/utils/messageRotation.ts` | Logic | No changes (algorithm already compatible) | 0 |
-| `src/types/index.ts` | Types | No changes (Message interface unchanged) | 0 |
+| File                           | Type   | Changes                                        | Lines Changed                 |
+| ------------------------------ | ------ | ---------------------------------------------- | ----------------------------- |
+| `src/data/defaultMessages.ts`  | Data   | Add 265 messages to existing 100-message array | +1,325 (~5 lines per message) |
+| `package.json`                 | Config | No changes                                     | 0                             |
+| `src/utils/messageRotation.ts` | Logic  | No changes (algorithm already compatible)      | 0                             |
+| `src/types/index.ts`           | Types  | No changes (Message interface unchanged)       | 0                             |
 
 **Total Files Modified:** 1
 **Total New Files:** 0
@@ -166,27 +182,29 @@ This story is the critical first step, establishing the expanded content library
 ### Data Model
 
 **Message Interface** (existing, no changes):
+
 ```typescript
 interface Message {
-  id: number;              // Auto-increment primary key (1-365)
-  text: string;            // Message content (50-300 chars typical)
+  id: number; // Auto-increment primary key (1-365)
+  text: string; // Message content (50-300 chars typical)
   category: MessageCategory; // reasons | memories | affirmations | future-plans | custom
-  createdAt: Date;         // Creation timestamp
-  isFavorite: boolean;     // Favorite flag (default: false)
+  createdAt: Date; // Creation timestamp
+  isFavorite: boolean; // Favorite flag (default: false)
 }
 
 type MessageCategory = 'reasons' | 'memories' | 'affirmations' | 'future-plans' | 'custom';
 ```
 
 **defaultMessages.ts Structure**:
+
 ```typescript
 export const defaultMessages: Message[] = [
   {
     id: 1,
-    text: "Your smile lights up my entire day.",
+    text: 'Your smile lights up my entire day.',
     category: 'reasons',
     createdAt: new Date('2025-01-01'),
-    isFavorite: false
+    isFavorite: false,
   },
   // ... 364 more messages
 ];
@@ -194,28 +212,31 @@ export const defaultMessages: Message[] = [
 
 ### Message Category Distribution
 
-| Category | Count | Percentage | Examples |
-|----------|-------|------------|----------|
-| **Reasons** | 73 | 20% | "I love how you always know how to make me laugh", "Your kindness inspires me every day" |
-| **Memories** | 73 | 20% | "Remember when we got lost on that hike and found the waterfall?", "Our first kiss under the stars" |
-| **Affirmations** | 73 | 20% | "You are stronger than you know", "Your presence makes everything better" |
-| **Future Plans** | 73 | 20% | "Can't wait to wake up next to you every morning", "Someday we'll have our dream home" |
-| **Custom** | 73 | 20% | "Just thinking about you", "You're my favorite person" |
+| Category         | Count | Percentage | Examples                                                                                            |
+| ---------------- | ----- | ---------- | --------------------------------------------------------------------------------------------------- |
+| **Reasons**      | 73    | 20%        | "I love how you always know how to make me laugh", "Your kindness inspires me every day"            |
+| **Memories**     | 73    | 20%        | "Remember when we got lost on that hike and found the waterfall?", "Our first kiss under the stars" |
+| **Affirmations** | 73    | 20%        | "You are stronger than you know", "Your presence makes everything better"                           |
+| **Future Plans** | 73    | 20%        | "Can't wait to wake up next to you every morning", "Someday we'll have our dream home"              |
+| **Custom**       | 73    | 20%        | "Just thinking about you", "You're my favorite person"                                              |
 
 ### Message Quality Guidelines
 
 **Tone Distribution:**
+
 - 40% Romantic: Deep expressions of love, passion, devotion
 - 30% Playful: Light-hearted, fun, teasing messages
 - 20% Heartfelt: Emotional, vulnerable, sincere appreciation
 - 10% Reflective: Thoughtful, contemplative, gratitude-focused
 
 **Length Distribution:**
+
 - 80% Short (50-150 characters): Quick, impactful messages
 - 15% Medium (150-250 characters): More detailed expressions
 - 5% Long (250-300 characters): Rich, elaborate messages
 
 **Content Constraints:**
+
 - ✅ **Include:** Specific qualities, shared memories, future dreams, emotional support
 - ❌ **Avoid:** Generic clichés, religious references, cultural assumptions, possessive language
 - ✅ **Preferred Style:** First-person ("I love...", "You make me..."), authentic voice
@@ -321,10 +342,11 @@ Output format: JSON array of message texts only (categorization done manually).
 ### Validation Scripts
 
 **Duplicate Detection Script** (`scripts/check-duplicates.js`):
+
 ```javascript
 import { defaultMessages } from '../src/data/defaultMessages.js';
 
-const texts = defaultMessages.map(m => m.text.toLowerCase());
+const texts = defaultMessages.map((m) => m.text.toLowerCase());
 const uniqueTexts = new Set(texts);
 
 if (texts.length !== uniqueTexts.size) {
@@ -337,6 +359,7 @@ if (texts.length !== uniqueTexts.size) {
 ```
 
 **Category Distribution Validator** (`scripts/validate-categories.js`):
+
 ```javascript
 import { defaultMessages } from '../src/data/defaultMessages.js';
 
@@ -353,7 +376,7 @@ Object.entries(categories).forEach(([cat, count]) => {
 
 const targetPerCategory = 73;
 const hasBalancedDistribution = Object.values(categories).every(
-  count => Math.abs(count - targetPerCategory) <= 5 // Allow 5-message variance
+  (count) => Math.abs(count - targetPerCategory) <= 5 // Allow 5-message variance
 );
 
 if (!hasBalancedDistribution) {
@@ -462,6 +485,7 @@ test('displays same message throughout the day', async ({ page }) => {
 ### Manual Testing
 
 **Quality Review Checklist:**
+
 - [ ] Random sample of 30 messages (10%) reviewed for quality
 - [ ] All 5 categories represented with balanced distribution
 - [ ] Tone variety confirmed (romantic, playful, heartfelt, reflective)
@@ -470,6 +494,7 @@ test('displays same message throughout the day', async ({ page }) => {
 - [ ] Messages feel authentic and personal
 
 **Bundle Size Verification:**
+
 ```bash
 npm run build
 du -h dist/assets/*.js | sort -h
@@ -477,12 +502,14 @@ du -h dist/assets/*.js | sort -h
 ```
 
 **Duplicate Check:**
+
 ```bash
 node scripts/check-duplicates.js
 # Expected output: ✅ No duplicates found in 365 messages
 ```
 
 **Category Distribution:**
+
 ```bash
 node scripts/validate-categories.js
 # Expected output: Each category ~73 messages (20%)
@@ -495,23 +522,27 @@ node scripts/validate-categories.js
 This story is considered **DONE** when ALL of the following are true:
 
 ### Code Complete
+
 - [x] `src/data/defaultMessages.ts` updated with 365 total messages (100 existing + 265 new)
 - [x] All messages follow Message interface structure correctly
 - [x] TypeScript compilation succeeds with no errors
 - [x] No ESLint warnings introduced
 
 ### Quality Validated
+
 - [x] Duplicate detection script passes (no duplicates found)
 - [x] Category distribution validator passes (balanced 73 per category)
 - [x] Manual quality review of 30-message random sample completed and approved
 - [x] Bundle size increase verified ≤ 50KB gzipped (actual: ~20KB)
 
 ### Tests Passing
+
 - [x] All existing unit tests for message rotation still pass
 - [x] All existing E2E tests for message display still pass
 - [x] No test flakiness introduced (3 consecutive clean runs) - 104/124 passed consistently
 
 ### Acceptance Criteria Met
+
 - [x] AC-3.1.1: 265 additional messages generated across 5 categories ✓
 - [x] AC-3.1.2: Messages are high-quality, heartfelt, and varied ✓
 - [x] AC-3.1.3: defaultMessages.ts updated with all 365 messages ✓
@@ -520,11 +551,13 @@ This story is considered **DONE** when ALL of the following are true:
 - [x] AC-3.1.6: Message rotation algorithm handles 365-message library correctly ✓
 
 ### Documentation Updated
+
 - [x] This story file updated with implementation notes in "Implementation Log" section
 - [x] Any architectural decisions documented in technical-decisions.md (N/A - no architectural changes)
 - [x] sprint-status.yaml updated with story completion
 
 ### Peer Review
+
 - [x] Code review completed (self-review for solo project)
 - [x] All review feedback addressed (N/A - no feedback)
 
@@ -533,15 +566,18 @@ This story is considered **DONE** when ALL of the following are true:
 ## Dependencies and Prerequisites
 
 ### Upstream Dependencies
+
 - ✅ **Epic 1 Complete**: Stable foundation with working persistence (required)
 - ✅ **Story 2.6 Complete**: CI integration ensures automated test validation
 
 ### Downstream Impact
+
 - **Story 3.2**: Swipe navigation will browse through this 365-message library
 - **Story 3.3**: Message history tracking will reference these messages by ID
 - **Story 3.5**: Custom message integration will merge with this default library
 
 ### External Dependencies
+
 - None (all work is content creation and data file updates)
 
 ---
@@ -551,6 +587,7 @@ This story is considered **DONE** when ALL of the following are true:
 ### Risks
 
 **R1: Message Quality Degradation (MEDIUM)**
+
 - **Risk:** Generating 265 high-quality messages is challenging; quality may decline toward end
 - **Impact:** Later messages feel generic, reducing emotional impact
 - **Mitigation:**
@@ -560,6 +597,7 @@ This story is considered **DONE** when ALL of the following are true:
   - If needed, reduce target to 300 messages (still 10-month variety) vs. forcing 365
 
 **R2: Bundle Size Bloat (LOW)**
+
 - **Risk:** 265 additional messages may exceed 50KB gzipped budget
 - **Impact:** Slower initial app load, degraded performance
 - **Mitigation:**
@@ -568,6 +606,7 @@ This story is considered **DONE** when ALL of the following are true:
   - Worst case: reduce message count to stay within budget
 
 **R3: Category Imbalance (LOW)**
+
 - **Risk:** Message distribution may skew toward easier categories (e.g., affirmations over memories)
 - **Impact:** Repetitive message types, less variety in daily experience
 - **Mitigation:**
@@ -577,16 +616,19 @@ This story is considered **DONE** when ALL of the following are true:
 ### Assumptions
 
 **A1: 365 Messages Sufficient for Year One**
+
 - User will engage daily for one year, requiring 365 unique messages before repetition acceptable
 - **Validation:** PRD explicitly requests 365 messages (FR006)
 - **Impact if Wrong:** If user continues beyond year one, messages repeat (acceptable trade-off)
 
 **A2: Rotation Algorithm Compatible**
+
 - Existing `getDailyMessage()` algorithm handles variable-size message pools without code changes
 - **Validation:** Algorithm source code review confirms date-seed selection works with any array size
 - **Impact if Wrong:** Would require algorithm refactoring (unlikely based on code review)
 
 **A3: Content Creation Effort Manageable**
+
 - Generating/curating 265 messages can be completed in 4-8 hours
 - **Validation:** Pilot test with 50-message batch to validate effort estimate
 - **Impact if Wrong:** Story takes longer than estimated (schedule buffer available)
@@ -596,9 +638,11 @@ This story is considered **DONE** when ALL of the following are true:
 ## Implementation Log
 
 ### Session 1: 2025-11-02
+
 **Goal:** Generate 265 additional messages, integrate into defaultMessages.ts, and validate complete 365-message library
 
 **Activities:**
+
 - [x] Generated 265 new messages using AI-assisted generation with manual curation
   - 53 messages each for reason, memory, affirmation, future categories
   - 73 messages for custom category
@@ -609,6 +653,7 @@ This story is considered **DONE** when ALL of the following are true:
 - [x] Ran all validations and verified TypeScript compilation
 
 **Outcomes:**
+
 - ✅ 365 total messages: 73 per category (reason, memory, affirmation, future, custom)
 - ✅ All validation checks passed:
   - Total count: 365 messages
@@ -622,6 +667,7 @@ This story is considered **DONE** when ALL of the following are true:
 - ✅ Manual quality review: Random 30-message sample validated for tone variety, authenticity, and emotional resonance
 
 **Quality Review Results:**
+
 - **Tone Variety**: ✓ Good mix of romantic, playful, heartfelt, reflective, affirming
 - **Length Balance**: ✓ Predominantly short messages (80%+) as targeted
 - **Authenticity**: ✓ Messages feel genuine and emotionally resonant
@@ -629,6 +675,7 @@ This story is considered **DONE** when ALL of the following are true:
 - **Category Appropriateness**: ✓ Messages semantically match their categories
 
 **Test Results:**
+
 ```
 Total: 124 tests
 ✓ Passed: 104 (83.9%)
@@ -646,9 +693,11 @@ Key passing tests:
 ```
 
 **Blockers:**
+
 - None
 
 **Notes:**
+
 - Firefox timing failures are pre-existing browser-specific issues, not introduced by this story
 - Message quality is high overall; the few generic messages (#352: "You're my soulmate, my best friend, my everything", #356: "You're my happily ever after") are acceptable within a 365-message library
 - Bundle size well within budget: increase of ~20KB gzipped vs. 50KB budget
@@ -659,18 +708,21 @@ Key passing tests:
 ## References
 
 ### Source Documents
+
 - [PRD.md](../PRD.md) - Functional Requirements FR006-FR011
 - [epics.md](../epics.md#story-31-expand-message-library-to-365-messages) - Story 3.1 specification
 - [tech-spec-epic-3.md](../tech-spec-epic-3.md#story-31) - Technical design for message expansion
 - [architecture.md](../architecture.md) - Data architecture and IndexedDB schema
 
 ### Related Stories
+
 - **Story 2.6**: Add CI Integration (GitHub Actions) - Previous story, testing infrastructure
 - **Story 3.2**: Implement Horizontal Swipe Navigation - Next story, will browse this library
 - **Story 3.3**: Message History State Management - Tracks messages shown from this library
 - **Story 3.5**: Admin Interface - Custom Message Integration - Merges with this default library
 
 ### Technical Resources
+
 - `src/data/defaultMessages.ts` - Message data file to update
 - `src/utils/messageRotation.ts` - Rotation algorithm (no changes needed)
 - `src/types/index.ts` - Message interface definition
@@ -680,6 +732,7 @@ Key passing tests:
 ## Dev Agent Record
 
 ### Context Reference
+
 - **Story Context File:** [3-1-expand-message-library-to-365-messages.context.xml](3-1-expand-message-library-to-365-messages.context.xml)
   - Generated: 2025-11-02
   - Contains: User story, acceptance criteria, tasks, documentation artifacts, code artifacts, interfaces, constraints, testing standards and ideas
@@ -710,28 +763,28 @@ Story 3.1 successfully expands the message library from 100 to 365 unique messag
 
 ### Acceptance Criteria Coverage
 
-| AC# | Description | Status | Evidence |
-|-----|-------------|--------|----------|
-| AC-3.1.1 | Generate 265 Additional Messages | ✅ IMPLEMENTED | 365 total messages, 73 per category, validation script passed |
-| AC-3.1.2 | High-Quality, Heartfelt, Varied | ✅ IMPLEMENTED | 99.2% quality rate (362/365), tone variety confirmed, 2-3 generic messages noted |
-| AC-3.1.3 | Update defaultMessages.ts | ✅ IMPLEMENTED | File updated, TypeScript compiled, bundle size 119.48 KB gzipped |
-| AC-3.1.4 | Appropriate Category Tags | ✅ IMPLEMENTED | All 365 messages have valid categories, spot-check passed |
-| AC-3.1.5 | No Duplicate Messages | ✅ IMPLEMENTED | Validation script: no duplicates found, unique IDs 1-365 |
-| AC-3.1.6 | Rotation Algorithm Compatible | ✅ IMPLEMENTED | Algorithm unchanged, 104/124 tests passed, O(1) performance |
+| AC#      | Description                      | Status         | Evidence                                                                         |
+| -------- | -------------------------------- | -------------- | -------------------------------------------------------------------------------- |
+| AC-3.1.1 | Generate 265 Additional Messages | ✅ IMPLEMENTED | 365 total messages, 73 per category, validation script passed                    |
+| AC-3.1.2 | High-Quality, Heartfelt, Varied  | ✅ IMPLEMENTED | 99.2% quality rate (362/365), tone variety confirmed, 2-3 generic messages noted |
+| AC-3.1.3 | Update defaultMessages.ts        | ✅ IMPLEMENTED | File updated, TypeScript compiled, bundle size 119.48 KB gzipped                 |
+| AC-3.1.4 | Appropriate Category Tags        | ✅ IMPLEMENTED | All 365 messages have valid categories, spot-check passed                        |
+| AC-3.1.5 | No Duplicate Messages            | ✅ IMPLEMENTED | Validation script: no duplicates found, unique IDs 1-365                         |
+| AC-3.1.6 | Rotation Algorithm Compatible    | ✅ IMPLEMENTED | Algorithm unchanged, 104/124 tests passed, O(1) performance                      |
 
 **Summary:** 6 of 6 acceptance criteria fully implemented
 
 ### Task Completion Validation
 
-| Task | Marked As | Verified As | Evidence |
-|------|-----------|-------------|----------|
-| Generate 265 additional messages | [x] Complete | ✅ COMPLETE | 365 total messages in defaultMessages.ts |
-| Manually curate and review | [x] Complete | ✅ COMPLETE | Quality review documented in Implementation Log |
-| Categorize messages (73 each) | [x] Complete | ✅ COMPLETE | Validation script confirms distribution |
-| Update defaultMessages.ts | [x] Complete | ✅ COMPLETE | File updated with 365 messages |
-| Run validation scripts | [x] Complete | ✅ COMPLETE | scripts/validate-messages.cjs passed |
-| Test rotation algorithm | [x] Complete | ✅ COMPLETE | Algorithm compatible without changes |
-| Manual quality review (30 sample) | [x] Complete | ✅ COMPLETE | Review results in Implementation Log |
+| Task                              | Marked As    | Verified As | Evidence                                        |
+| --------------------------------- | ------------ | ----------- | ----------------------------------------------- |
+| Generate 265 additional messages  | [x] Complete | ✅ COMPLETE | 365 total messages in defaultMessages.ts        |
+| Manually curate and review        | [x] Complete | ✅ COMPLETE | Quality review documented in Implementation Log |
+| Categorize messages (73 each)     | [x] Complete | ✅ COMPLETE | Validation script confirms distribution         |
+| Update defaultMessages.ts         | [x] Complete | ✅ COMPLETE | File updated with 365 messages                  |
+| Run validation scripts            | [x] Complete | ✅ COMPLETE | scripts/validate-messages.cjs passed            |
+| Test rotation algorithm           | [x] Complete | ✅ COMPLETE | Algorithm compatible without changes            |
+| Manual quality review (30 sample) | [x] Complete | ✅ COMPLETE | Review results in Implementation Log            |
 
 **Summary:** 7 of 7 completed tasks verified, 0 questionable, 0 falsely marked complete
 
@@ -740,6 +793,7 @@ Story 3.1 successfully expands the message library from 100 to 365 unique messag
 **Test Results:** 104/124 passed (83.9%), 2 failed (Firefox timing - pre-existing), 18 skipped
 
 **Key Passing Tests:**
+
 - Message rotation with date-based selection
 - Category badge display
 - Favorites functionality
@@ -773,11 +827,13 @@ No security issues identified. Story involves only static message content with n
 **Code Changes Required:** None (story approved as-is)
 
 **Optional Refinements (Low Priority):**
+
 - [ ] [Low] Consider replacing generic message "You're my soulmate, my best friend, my everything." [file: defaultMessages.ts:387]
 - [ ] [Low] Consider replacing generic message "You're my happily ever after." [file: defaultMessages.ts:391]
 - [ ] [Low] Add 2-3 medium-length messages (150-250 chars) in future iterations for distribution balance
 
 **Advisory Notes:**
+
 - Note: Length distribution 78.9% short vs 80% target - within acceptable tolerance
 - Note: Firefox timing failures are pre-existing, address in future test stability work
 - Note: Consider message quality rubric for future custom message additions (Stories 3.4-3.5)
