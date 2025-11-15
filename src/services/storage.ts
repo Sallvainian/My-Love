@@ -17,7 +17,7 @@ interface MyLoveDB extends DBSchema {
 }
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 2; // Story 4.1: Increment to match photoStorageService
+const DB_VERSION = 3; // Story 6.2: Increment to match MoodService (moods store)
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDB> | null = null;
@@ -53,6 +53,17 @@ class StorageService {
         upgrade(db, oldVersion, newVersion) {
           console.log(`[StorageService] Upgrading database from v${oldVersion} to v${newVersion}`);
 
+          // Ensure messages store exists (should have been created in v1)
+          if (!db.objectStoreNames.contains('messages')) {
+            const messageStore = db.createObjectStore('messages', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            messageStore.createIndex('by-category', 'category');
+            messageStore.createIndex('by-date', 'createdAt');
+            console.log('[StorageService] Created messages store (fallback)');
+          }
+
           // Migration: v1 → v2 (Story 4.1)
           // Recreate photos store with enhanced schema
           if (oldVersion < 2) {
@@ -71,15 +82,11 @@ class StorageService {
             console.log('[StorageService] Created photos store with by-date index (v2)');
           }
 
-          // Ensure messages store exists (should have been created in v1)
-          if (!db.objectStoreNames.contains('messages')) {
-            const messageStore = db.createObjectStore('messages', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            messageStore.createIndex('by-category', 'category');
-            messageStore.createIndex('by-date', 'createdAt');
-            console.log('[StorageService] Created messages store (fallback)');
+          // Migration: v2 → v3 (Story 6.2)
+          // Moods store is handled by MoodService
+          // StorageService is aware of v3 but doesn't create moods store
+          if (oldVersion < 3 && oldVersion >= 2) {
+            console.log('[StorageService] Acknowledged v2→v3 upgrade (moods store handled by MoodService)');
           }
         },
       });

@@ -184,7 +184,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
         await this.init();
 
         // Use by-date index for sorted retrieval
-        const photos = await this.db!.getAllFromIndex('photos', 'by-date');
+        const photos = await (this.db! as any).getAllFromIndex('photos', 'by-date');
         // Reverse to get newest first
         const sortedPhotos = photos.reverse();
 
@@ -218,7 +218,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
       try {
         await this.init();
 
-        const transaction = this.db!.transaction('photos', 'readonly');
+        const transaction = (this.db! as any).transaction('photos', 'readonly');
         const index = transaction.objectStore('photos').index('by-date');
 
         const results: Photo[] = [];

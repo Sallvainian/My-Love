@@ -19,6 +19,7 @@ import {
 } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
+import type { MoodEntry } from '../types';
 
 /**
  * Supabase mood record type (using validated schema)
@@ -29,20 +30,6 @@ export type SupabaseMoodRecord = SupabaseMood;
  * Mood entry insert type (using validated schema)
  */
 export type MoodEntryInsert = MoodInsert;
-
-/**
- * Local MoodEntry interface (from IndexedDB)
- * This will be defined in types/index.ts or similar
- */
-export interface MoodEntry {
-  id?: number;
-  userId: string;
-  moodType: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful';
-  note?: string;
-  timestamp: Date;
-  synced?: boolean;
-  supabaseId?: string;
-}
 
 /**
  * Sync result summary
@@ -79,7 +66,7 @@ export class MoodSyncService {
    * ```typescript
    * const mood: MoodEntry = {
    *   userId: getCurrentUserId(),
-   *   moodType: 'happy',
+   *   mood: 'happy',
    *   note: 'Great day!',
    *   timestamp: new Date(),
    * };
@@ -104,7 +91,7 @@ export class MoodSyncService {
     // Transform local mood to Supabase insert format
     const moodInsert: MoodEntryInsert = {
       user_id: mood.userId,
-      mood_type: mood.moodType,
+      mood_type: mood.mood,
       note: mood.note || null,
       created_at: mood.timestamp.toISOString(),
     };

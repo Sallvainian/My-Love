@@ -18,7 +18,7 @@
  * - AC#5: Mark interaction as viewed after animation
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Hand, History } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
@@ -46,16 +46,31 @@ export function PokeKissInterface() {
   const [showToast, setShowToast] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Use ref to prevent duplicate subscriptions in React StrictMode
+  const subscriptionRef = useRef<(() => void) | null>(null);
+  const isSubscribingRef = useRef(false);
+
   // Subscribe to real-time interactions on mount
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    // Prevent duplicate subscriptions
+    if (isSubscribingRef.current || subscriptionRef.current) {
+      if (import.meta.env.DEV) {
+        console.log('[PokeKissInterface] Subscription already active, skipping');
+      }
+      return;
+    }
+
+    isSubscribingRef.current = true;
 
     const setupSubscription = async () => {
       try {
-        unsubscribe = await subscribeToInteractions();
+        const unsubscribe = await subscribeToInteractions();
+        subscriptionRef.current = unsubscribe;
         console.log('[PokeKissInterface] Subscribed to real-time interactions');
       } catch (error) {
         console.error('[PokeKissInterface] Failed to subscribe:', error);
+      } finally {
+        isSubscribingRef.current = false;
       }
     };
 
@@ -63,12 +78,13 @@ export function PokeKissInterface() {
 
     // Cleanup subscription on unmount
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
+      if (subscriptionRef.current) {
+        subscriptionRef.current();
+        subscriptionRef.current = null;
         console.log('[PokeKissInterface] Unsubscribed from interactions');
       }
     };
-  }, [subscribeToInteractions]);
+  }, []); // Empty deps - only subscribe once
 
   // Handle Poke button click
   const handlePoke = async () => {
