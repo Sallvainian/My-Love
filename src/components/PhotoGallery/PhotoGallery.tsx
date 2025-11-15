@@ -36,6 +36,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   const [hasMore, setHasMore] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   // Intersection Observer ref for infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -48,7 +49,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     setPhotos([]);
     setCurrentOffset(0);
     setHasMore(true);
-    // Trigger re-render, which will re-run the loadInitialPhotos effect
+    setRetryTrigger(prev => prev + 1); // Increment to trigger useEffect
   }, []);
 
   // Load initial page of photos
@@ -104,7 +105,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       console.log('[PhotoGallery] Cleanup: Setting cancelled=true');
       cancelled = true;
     };
-  }, [loadPhotos]); // Run once on mount
+  }, [loadPhotos, retryTrigger]); // Re-run on mount and when retry is clicked
 
   // BUG FIX: Refresh gallery when store photos change (after upload)
   // This fixes the issue where uploaded photos don't appear until page refresh
