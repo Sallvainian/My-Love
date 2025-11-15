@@ -16,7 +16,8 @@ const fileContent = fs.readFileSync(messagesPath, 'utf8');
 
 // Extract message objects using regex
 // Match { text: "...", category: '...', isFavorite: false }
-const messageRegex = /\{\s*text:\s*"([^"]+)"\s*,\s*category:\s*'(\w+)'\s*,\s*isFavorite:\s*(true|false)\s*\}/g;
+const messageRegex =
+  /\{\s*text:\s*"([^"]+)"\s*,\s*category:\s*'(\w+)'\s*,\s*isFavorite:\s*(true|false)\s*\}/g;
 const messages = [];
 let match;
 
@@ -24,7 +25,7 @@ while ((match = messageRegex.exec(fileContent)) !== null) {
   messages.push({
     text: match[1],
     category: match[2],
-    isFavorite: match[3] === 'true'
+    isFavorite: match[3] === 'true',
   });
 }
 
@@ -71,7 +72,9 @@ console.log();
 // 3. Valid Categories Check
 console.log('3. VALID CATEGORIES');
 const validCategories = ['reason', 'memory', 'affirmation', 'future', 'custom'];
-const invalidCategories = Object.keys(categoryCount).filter(cat => !validCategories.includes(cat));
+const invalidCategories = Object.keys(categoryCount).filter(
+  (cat) => !validCategories.includes(cat)
+);
 
 if (invalidCategories.length === 0) {
   console.log(`   ✅ PASS: All categories are valid`);
@@ -92,7 +95,7 @@ messages.forEach((msg, index) => {
     duplicates.push({
       text: msg.text,
       firstIndex: textMap.get(normalizedText),
-      duplicateIndex: index
+      duplicateIndex: index,
     });
   } else {
     textMap.set(normalizedText, index);
@@ -103,7 +106,7 @@ if (duplicates.length === 0) {
   console.log('   ✅ PASS: No duplicate messages found');
 } else {
   console.log(`   ❌ FAIL: ${duplicates.length} duplicate(s) found:`);
-  duplicates.forEach(dup => {
+  duplicates.forEach((dup) => {
     console.log(`      - "${dup.text.substring(0, 50)}..."`);
     console.log(`        First at index ${dup.firstIndex}, duplicate at ${dup.duplicateIndex}`);
   });
@@ -113,12 +116,12 @@ console.log();
 // 5. Message Length Distribution
 console.log('5. MESSAGE LENGTH DISTRIBUTION');
 const lengths = {
-  short: 0,   // 50-150 chars
-  medium: 0,  // 150-250 chars
-  long: 0     // 250+ chars
+  short: 0, // 50-150 chars
+  medium: 0, // 150-250 chars
+  long: 0, // 250+ chars
 };
 
-messages.forEach(msg => {
+messages.forEach((msg) => {
   const len = msg.text.length;
   if (len >= 50 && len <= 150) lengths.short++;
   else if (len > 150 && len <= 250) lengths.medium++;
@@ -146,10 +149,11 @@ console.log('='.repeat(60));
 console.log('SUMMARY');
 console.log('='.repeat(60));
 
-const allPassed = messages.length === 365 &&
-                 categoryPass &&
-                 invalidCategories.length === 0 &&
-                 duplicates.length === 0;
+const allPassed =
+  messages.length === 365 &&
+  categoryPass &&
+  invalidCategories.length === 0 &&
+  duplicates.length === 0;
 
 if (allPassed) {
   console.log('✅ ALL VALIDATIONS PASSED');

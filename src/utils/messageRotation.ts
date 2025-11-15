@@ -31,10 +31,7 @@ export function hashDateString(dateString: string): number {
  * @param date - Target date (defaults to today)
  * @returns Message for that date
  */
-export function getDailyMessage(
-  allMessages: Message[],
-  date: Date = new Date()
-): Message {
+export function getDailyMessage(allMessages: Message[], date: Date = new Date()): Message {
   if (allMessages.length === 0) {
     throw new Error('Cannot get daily message from empty message pool');
   }
@@ -53,10 +50,7 @@ export function getDailyMessage(
 /**
  * Get message for a specific date (alias for clarity)
  */
-export function getMessageForDate(
-  allMessages: Message[],
-  targetDate: Date
-): Message {
+export function getMessageForDate(allMessages: Message[], targetDate: Date): Message {
   return getDailyMessage(allMessages, targetDate);
 }
 
@@ -75,11 +69,7 @@ export function getAvailableHistoryDays(
   );
 
   // Return minimum of: configured max, days since start, or 30 default
-  return Math.min(
-    messageHistory.maxHistoryDays || 30,
-    daysSinceStart,
-    30
-  );
+  return Math.min(messageHistory.maxHistoryDays || 30, daysSinceStart, 30);
 }
 
 /**
@@ -104,11 +94,7 @@ export function isNewDay(lastShownDate: string | null): boolean {
 /**
  * @deprecated Use getDailyMessage with date parameter instead
  */
-export function getDailyMessageId(
-  startDate: Date,
-  today: Date,
-  totalMessages: number
-): number {
+export function getDailyMessageId(startDate: Date, today: Date, totalMessages: number): number {
   const daysSinceStart = Math.floor(
     (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
   );
@@ -133,10 +119,7 @@ export function getTodayMessage(
 /**
  * @deprecated Use getDailyMessage with tomorrow's date instead
  */
-export function getNextMessage(
-  messages: Message[],
-  _startDate: Date
-): Message | null {
+export function getNextMessage(messages: Message[], _startDate: Date): Message | null {
   if (messages.length === 0) return null;
 
   const tomorrow = new Date();
@@ -148,10 +131,7 @@ export function getNextMessage(
 /**
  * @deprecated Use getDailyMessage with yesterday's date instead
  */
-export function getPreviousMessage(
-  messages: Message[],
-  _startDate: Date
-): Message | null {
+export function getPreviousMessage(messages: Message[], _startDate: Date): Message | null {
   if (messages.length === 0) return null;
 
   const yesterday = new Date();
@@ -162,17 +142,21 @@ export function getPreviousMessage(
 
 /**
  * Calculate which day of the relationship it is
+ * @param startDate - Relationship start date
+ * @param targetDate - Optional target date (defaults to today)
  */
-export function getDaysSinceStart(startDate: Date): number {
-  const today = new Date();
-  return Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+export function getDaysSinceStart(startDate: Date, targetDate?: Date): number {
+  const endDate = targetDate || new Date();
+  return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /**
  * Format the relationship duration
+ * @param startDate - Relationship start date
+ * @param targetDate - Optional target date (defaults to today)
  */
-export function formatRelationshipDuration(startDate: Date): string {
-  const days = getDaysSinceStart(startDate);
+export function formatRelationshipDuration(startDate: Date, targetDate?: Date): string {
+  const days = getDaysSinceStart(startDate, targetDate);
 
   if (days < 30) {
     return `${days} ${days === 1 ? 'day' : 'days'}`;

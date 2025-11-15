@@ -30,11 +30,7 @@ import { Page } from '@playwright/test';
  * );
  * ```
  */
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  fallback: T
-): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((resolve) =>
@@ -61,10 +57,7 @@ async function withTimeout<T>(
  * });
  * ```
  */
-export async function waitForServiceWorker(
-  page: Page,
-  timeout: number = 30000
-): Promise<void> {
+export async function waitForServiceWorker(page: Page, timeout: number = 30000): Promise<void> {
   const startTime = Date.now();
 
   await page.waitForFunction(
@@ -113,7 +106,9 @@ export async function clearIndexedDB(page: Page, dbName: string): Promise<void> 
           // Set up a fallback timeout for when no event fires (e.g., non-existent DB in Firefox)
           const diagnosticTimeout = setTimeout(() => {
             if (!eventFired) {
-              console.warn(`⚠️  No deleteDatabase event fired after 4s for '${name}' - assuming success for non-existent DB`);
+              console.warn(
+                `⚠️  No deleteDatabase event fired after 4s for '${name}' - assuming success for non-existent DB`
+              );
               eventFired = true;
               resolve(); // Resolve promise - database likely doesn't exist
             }
@@ -148,8 +143,13 @@ export async function clearIndexedDB(page: Page, dbName: string): Promise<void> 
   } catch (error: any) {
     // Firefox can close page context before evaluate completes for non-existent DBs
     // Treat "Test ended" and similar errors as success (no DB to delete)
-    if (error.message && (error.message.includes('Test ended') || error.message.includes('Target closed'))) {
-      console.warn(`⚠️  Page context closed during deleteDatabase('${dbName}') - assuming non-existent DB`);
+    if (
+      error.message &&
+      (error.message.includes('Test ended') || error.message.includes('Target closed'))
+    ) {
+      console.warn(
+        `⚠️  Page context closed during deleteDatabase('${dbName}') - assuming non-existent DB`
+      );
       return; // Successfully handled - no database existed
     }
     // Re-throw unexpected errors
@@ -229,10 +229,7 @@ export async function goOnline(page: Page): Promise<void> {
  * expect(theme).toBe('dark');
  * ```
  */
-export async function getLocalStorageItem(
-  page: Page,
-  key: string
-): Promise<string | null> {
+export async function getLocalStorageItem(page: Page, key: string): Promise<string | null> {
   return await page.evaluate((k) => {
     return localStorage.getItem(k);
   }, key);
@@ -252,11 +249,7 @@ export async function getLocalStorageItem(
  * expect(retrieved).toBe('test-value');
  * ```
  */
-export async function setLocalStorageItem(
-  page: Page,
-  key: string,
-  value: string
-): Promise<void> {
+export async function setLocalStorageItem(page: Page, key: string, value: string): Promise<void> {
   await page.evaluate(
     ({ k, v }) => {
       localStorage.setItem(k, v);
@@ -349,7 +342,9 @@ export async function getIndexedDBStore(
               const getAllRequest = objectStore.getAll();
 
               getAllRequest.onsuccess = () => {
-                console.log(`✓ Successfully read ${getAllRequest.result.length} records from '${db}'.'${store}'`);
+                console.log(
+                  `✓ Successfully read ${getAllRequest.result.length} records from '${db}'.'${store}'`
+                );
                 database.close();
                 resolve(getAllRequest.result);
               };

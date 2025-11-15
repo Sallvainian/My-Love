@@ -92,19 +92,19 @@
 
   /* Gradient backgrounds */
   .bg-sunset {
-    background: linear-gradient(135deg, #FFE5EC 0%, #FFF4E6 50%, #FFD5C8 100%);
+    background: linear-gradient(135deg, #ffe5ec 0%, #fff4e6 50%, #ffd5c8 100%);
   }
 
   .bg-ocean {
-    background: linear-gradient(135deg, #E0F7FA 0%, #B2EBF2 50%, #80DEEA 100%);
+    background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 50%, #80deea 100%);
   }
 
   .bg-lavender {
-    background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 50%, #CE93D8 100%);
+    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 50%, #ce93d8 100%);
   }
 
   .bg-rose {
-    background: linear-gradient(135deg, #FCE4EC 0%, #F8BBD0 50%, #F48FB1 100%);
+    background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%);
   }
 
   /* Safe area support for mobile */
@@ -119,7 +119,8 @@
 
 /* Custom keyframe animations */
 @keyframes heartBeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   25% {
@@ -131,7 +132,8 @@
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px) translateX(0px);
     opacity: 0;
   }

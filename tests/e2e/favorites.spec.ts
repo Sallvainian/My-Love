@@ -129,14 +129,18 @@ test.describe('Favorites Functionality', () => {
     const heartIcon = heartButton.locator('svg');
 
     // Get initial state
-    const initiallyFilled = await heartIcon.evaluate((el) => el.classList.contains('fill-pink-500'));
+    const initiallyFilled = await heartIcon.evaluate((el) =>
+      el.classList.contains('fill-pink-500')
+    );
 
     // Click to toggle
     await heartButton.click();
     await cleanApp.waitForTimeout(500);
 
     // State should have changed
-    const afterClickFilled = await heartIcon.evaluate((el) => el.classList.contains('fill-pink-500'));
+    const afterClickFilled = await heartIcon.evaluate((el) =>
+      el.classList.contains('fill-pink-500')
+    );
     expect(afterClickFilled).toBe(!initiallyFilled);
 
     console.log('✓ Favorite state updates immediately on click');
@@ -188,7 +192,9 @@ test.describe('Favorites Functionality', () => {
       console.log(`✓ Message ${currentMessageId} is favorited and shows filled heart`);
     } else {
       // If current message is NOT in favorited IDs, that's OK - just verify favoriteIds are set
-      console.log(`✓ Fixture loaded with favoriteIds [1,2,3,4,5] (current message: ${currentMessageId})`);
+      console.log(
+        `✓ Fixture loaded with favoriteIds [1,2,3,4,5] (current message: ${currentMessageId})`
+      );
     }
   });
 
