@@ -26,6 +26,7 @@
     "lint:fix": "eslint . --fix && prettier --write ."
   },
   "dependencies": {
+    "eventsource": "^4.0.0",
     "framer-motion": "^12.23.24",
     "idb": "^8.0.3",
     "lucide-react": "^0.548.0",

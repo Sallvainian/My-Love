@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Photo } from '../../types';
+import { isValidationError } from '../../validation/errorMessages';
 
 interface PhotoEditModalProps {
   photo: Photo;
@@ -131,7 +132,25 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       onClose();
     } catch (err) {
       console.error('[PhotoEditModal] Failed to save photo:', err);
-      setError('Failed to save changes. Please try again.');
+
+      // Handle validation errors with field-specific messages
+      if (isValidationError(err)) {
+        const fieldErrors = err.fieldErrors;
+
+        // Set field-specific errors
+        if (fieldErrors.has('caption')) {
+          setCaptionError(fieldErrors.get('caption') || null);
+        }
+        if (fieldErrors.has('tags')) {
+          setTagsError(fieldErrors.get('tags') || null);
+        }
+
+        // Set general error message
+        setError(err.message);
+      } else {
+        setError('Failed to save changes. Please try again.');
+      }
+
       setIsSaving(false);
     }
   };

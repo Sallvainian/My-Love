@@ -3,8 +3,8 @@
  * Run after creating test users in Admin UI
  *
  * Test accounts:
- * - frank@test.local / Test1234!
- * - gracie@test.local / Test1234!
+ * - frank.cottone97@gmail.com / fc199712
+ * - gkperrone@gmail.com / ilovefrank123
  *
  * Usage: npx tsx pocketbase-dev/test-setup.ts
  */
@@ -14,6 +14,10 @@ import PocketBase from 'pocketbase';
 const pb = new PocketBase('http://127.0.0.1:8090');
 
 async function testSetup() {
+  // Polyfill EventSource for Node.js (required for realtime subscriptions)
+  const { EventSource } = await import('eventsource');
+  (global as any).EventSource = EventSource;
+
   console.log('🧪 Testing Pocketbase Setup...\n');
 
   try {
@@ -23,8 +27,8 @@ async function testSetup() {
     // Test 2: Authentication (Frank)
     console.log('\n📝 Test 2: Authenticating as Frank...');
     const frankAuth = await pb.collection('users').authWithPassword(
-      'frank@test.local',
-      'Test1234!'
+      'frank.cottone97@gmail.com',
+      'fc199712'
     );
     console.log(`✓ Frank authenticated: ${frankAuth.record.name} (${frankAuth.record.id})`);
 
@@ -33,19 +37,57 @@ async function testSetup() {
     // Test 3: Authentication (Gracie)
     console.log('\n📝 Test 3: Authenticating as Gracie...');
     const gracieAuth = await pb.collection('users').authWithPassword(
-      'gracie@test.local',
-      'Test1234!'
+      'gkperrone@gmail.com',
+      'ilovefrank123'
     );
     console.log(`✓ Gracie authenticated: ${gracieAuth.record.name} (${gracieAuth.record.id})`);
 
     const gracieId = gracieAuth.record.id;
 
+    // Cleanup: Delete any existing test data from previous runs
+    console.log('\n🧹 Cleaning up any existing test data...');
+    const today = new Date().toISOString().split('T')[0];
+
+    // Delete ALL existing moods
+    const existingMoods = await pb.collection('moods').getFullList();
+    for (const mood of existingMoods) {
+      try {
+        // Auth as the mood owner to have delete permission
+        pb.authStore.clear();
+        await pb.collection('users').authWithPassword(
+          mood.user === frankId ? 'frank.cottone97@gmail.com' : 'gkperrone@gmail.com',
+          mood.user === frankId ? 'fc199712' : 'ilovefrank123'
+        );
+        await pb.collection('moods').delete(mood.id);
+      } catch (e) {
+        // Ignore if already deleted or no permission
+      }
+    }
+
+    // Delete existing interactions between Frank and Gracie
+    const existingInteractions = await pb.collection('interactions').getFullList({
+      filter: `(sender = "${frankId}" && receiver = "${gracieId}") || (sender = "${gracieId}" && receiver = "${frankId}")`
+    });
+    for (const interaction of existingInteractions) {
+      try {
+        // Auth as sender to have delete permission
+        pb.authStore.clear();
+        await pb.collection('users').authWithPassword(
+          interaction.sender === frankId ? 'frank.cottone97@gmail.com' : 'gkperrone@gmail.com',
+          interaction.sender === frankId ? 'fc199712' : 'ilovefrank123'
+        );
+        await pb.collection('interactions').delete(interaction.id);
+      } catch (e) {
+        // Ignore if already deleted or no permission
+      }
+    }
+    console.log(`✓ Cleaned up ${existingMoods.length} mood(s) and ${existingInteractions.length} interaction(s)`);
+
     // Test 4: Create Mood (as Frank)
     console.log('\n📝 Test 4: Creating mood entry as Frank...');
     pb.authStore.clear();
-    await pb.collection('users').authWithPassword('frank@test.local', 'Test1234!');
+    await pb.collection('users').authWithPassword('frank.cottone97@gmail.com', 'fc199712');
 
-    const today = new Date().toISOString().split('T')[0];
     const mood = await pb.collection('moods').create({
       user: frankId,
       type: 'happy',
@@ -75,7 +117,7 @@ async function testSetup() {
     // Test 7: Read Unviewed Interactions (as Gracie)
     console.log('\n📝 Test 7: Checking Gracie\'s unviewed interactions...');
     pb.authStore.clear();
-    await pb.collection('users').authWithPassword('gracie@test.local', 'Test1234!');
+    await pb.collection('users').authWithPassword('gkperrone@gmail.com', 'ilovefrank123');
 
     const unviewed = await pb.collection('interactions').getFullList({
       filter: `receiver = "${gracieId}" && viewed = false`,
@@ -90,6 +132,11 @@ async function testSetup() {
 
     // Test 9: Realtime Subscription (SSE)
     console.log('\n📝 Test 9: Testing realtime subscriptions...');
+
+    // Re-auth as Frank (Tests 7-8 switched to Gracie)
+    pb.authStore.clear();
+    await pb.collection('users').authWithPassword('frank.cottone97@gmail.com', 'fc199712');
+
     console.log('⏳ Subscribing to moods collection (will test for 3 seconds)...');
 
     let receivedEvent = false;
@@ -98,7 +145,7 @@ async function testSetup() {
       receivedEvent = true;
     });
 
-    // Create a mood to trigger realtime event
+    // Update mood to trigger realtime event (must be Frank to update his mood)
     setTimeout(async () => {
       await pb.collection('moods').update(mood.id, {
         note: 'Updated via realtime test!'

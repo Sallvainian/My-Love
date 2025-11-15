@@ -869,7 +869,7 @@ So that corrupted or invalid data can't enter the system.
 
 ### Goal
 
-Build interactive features that enable real-time emotional connection: mood tracking synced via NocoDB backend, poke/kiss interactions, and anniversary countdown timers.
+Build interactive features that enable real-time emotional connection: mood tracking synced via PocketBase backend, poke/kiss interactions, and anniversary countdown timers.
 
 ### Value Delivery
 
@@ -877,17 +877,17 @@ She can log daily moods that you can see, you can send spontaneous "kisses" or "
 
 ### Stories
 
-**Story 6.1: NocoDB Backend Setup & API Integration**
+**Story 6.1: PocketBase Backend Setup & API Integration**
 
 As a developer,
-I want to set up NocoDB backend and create API integration layer,
+I want to set up PocketBase backend and create API integration layer,
 So that I can sync mood and interaction data between devices.
 
 **Acceptance Criteria:**
 
-1. NocoDB instance deployed (free tier on NocoDB Cloud or self-hosted)
-2. Create tables: `moods` (id, date, mood_type, note, user, createdAt), `interactions` (id, type, from_user, to_user, createdAt, viewed)
-3. API service layer created: `nocodb.service.ts` with methods: saveMood, getMoods, sendInteraction, getInteractions
+1. PocketBase instance deployed (free tier on PocketBase Cloud or self-hosted)
+2. Create collections: `moods` (id, date, mood_type, note, user, created), `interactions` (id, type, from_user, to_user, created, viewed)
+3. API service layer created: `pocketbase.service.ts` with methods: saveMood, getMoods, sendInteraction, getInteractions
 4. Authentication configured (API token stored securely in env vars)
 5. Error handling for network failures (graceful degradation)
 6. Rate limiting protection to stay within free tier limits

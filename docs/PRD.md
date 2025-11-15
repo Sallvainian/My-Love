@@ -128,7 +128,7 @@ However, the current implementation has critical usability issues that prevent i
 7. Tries to swipe right beyond today - blocked with subtle indicator (FR009)
 8. Navigates to Mood Tracker tab (FR031)
 9. Logs mood as "Loved" with note "Made my morning ❤️" (FR019, FR022)
-   - Mood syncs to NocoDB backend (FR020)
+   - Mood syncs to PocketBase backend (FR020)
 10. Sees notification badge - you sent her a "kiss" (FR023)
 11. Taps to see kiss animation play (FR024)
 12. Sends you a "kiss" back (FR023)
@@ -179,7 +179,7 @@ Build photo upload, storage, and carousel gallery with animated transitions and 
 
 ### Epic 4: Interactive Connection Features (Est. 4-6 stories)
 
-Implement mood tracking with NocoDB sync, poke/kiss interactions, and anniversary countdown timers.
+Implement mood tracking with PocketBase sync, poke/kiss interactions, and anniversary countdown timers.
 
 **Total Estimated Stories:** 16-24 stories across 4 epics
 
@@ -202,13 +202,13 @@ The following features are explicitly excluded from this project phase:
 
 - Any monetization features or ads
 - Analytics or telemetry tracking
-- Third-party integrations beyond NocoDB
+- Third-party integrations beyond PocketBase
 
 **Advanced Features (Future Consideration)**
 
 - Video uploads or playback
 - Voice messages or audio features
-- Push notifications from NocoDB backend (may add later)
+- Push notifications from PocketBase backend (may add later)
 - Calendar integration for anniversaries
 - Data export/import functionality
 - Theming beyond the 4 existing themes

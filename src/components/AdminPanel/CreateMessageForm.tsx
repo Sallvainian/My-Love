@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MessageCategory } from '../../types';
+import { isValidationError } from '../../validation/errorMessages';
 
 interface CreateMessageFormProps {
   isOpen: boolean;
@@ -15,17 +16,48 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
   const [category, setCategory] = useState<MessageCategory>('custom');
   const [active, setActive] = useState(true); // Story 3.5: Default to active
 
+  // Error state
+  const [error, setError] = useState<string | null>(null);
+  const [textError, setTextError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
   const maxLength = 500;
   const remainingChars = maxLength - text.length;
   const isValid = text.trim().length > 0 && text.length <= maxLength;
 
-  const handleSave = () => {
-    if (isValid) {
-      createCustomMessage({ text: text.trim(), category, active });
+  const handleSave = async () => {
+    if (!isValid) return;
+
+    try {
+      setError(null);
+      setTextError(null);
+      setCategoryError(null);
+
+      await createCustomMessage({ text: text.trim(), category, active });
       setText('');
       setCategory('custom');
       setActive(true);
       onClose();
+    } catch (err) {
+      console.error('[CreateMessageForm] Failed to create message:', err);
+
+      // Handle validation errors with field-specific messages
+      if (isValidationError(err)) {
+        const fieldErrors = err.fieldErrors;
+
+        // Set field-specific errors
+        if (fieldErrors.has('text')) {
+          setTextError(fieldErrors.get('text') || null);
+        }
+        if (fieldErrors.has('category')) {
+          setCategoryError(fieldErrors.get('category') || null);
+        }
+
+        // Set general error message
+        setError(err.message);
+      } else {
+        setError('Failed to create message. Please try again.');
+      }
     }
   };
 
@@ -98,13 +130,19 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 placeholder="Enter your message here..."
                 maxLength={maxLength}
                 rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none ${
+                  textError ? 'border-red-500' : 'border-gray-300'
+                }`}
                 data-testid="admin-create-form-text"
               />
               <div className="flex items-center justify-between mt-2">
-                <p className="text-sm text-gray-500">
-                  {text.length === 0 ? 'Required' : 'Characters used'}
-                </p>
+                {textError ? (
+                  <p className="text-sm text-red-600">{textError}</p>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    {text.length === 0 ? 'Required' : 'Characters used'}
+                  </p>
+                )}
                 <p
                   className={`text-sm font-medium ${
                     remainingChars < 50 ? 'text-orange-600' : 'text-gray-600'
@@ -124,7 +162,9 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 id="category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MessageCategory)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+                  categoryError ? 'border-red-500' : 'border-gray-300'
+                }`}
                 data-testid="admin-create-form-category"
               >
                 <option value="reason">💖 Reasons</option>
@@ -133,9 +173,13 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 <option value="future">🌈 Future Plans</option>
                 <option value="custom">💕 Custom</option>
               </select>
-              <p className="text-sm text-gray-500 mt-2">
-                Choose a category that best describes your message
-              </p>
+              {categoryError ? (
+                <p className="text-sm text-red-600 mt-2">{categoryError}</p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">
+                  Choose a category that best describes your message
+                </p>
+              )}
             </div>
 
             {/* Active toggle (Story 3.5 AC-3.5.4) */}
@@ -159,6 +203,16 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 </div>
               </label>
             </div>
+
+            {/* General Error Message */}
+            {error && (
+              <div
+                className="px-4 py-3 bg-red-50 border border-red-300 rounded-lg text-red-700"
+                data-testid="admin-create-form-error"
+              >
+                {error}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

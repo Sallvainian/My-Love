@@ -25,15 +25,16 @@ This document tracks technical decisions, constraints, preferences, and consider
 ### Backend Architecture for Mood Sync & Interactive Features
 
 **Context:** Mood tracking and poke/kiss features require data sharing between two users
-**Decision:** Implement lightweight backend using NocoDB (free tier) with API integration
+**Decision:** Implement lightweight backend using PocketBase (free tier) with API integration
 **Alternatives Considered:**
 
 - Supabase/Firebase (more complex than needed)
 - Google Sheets API (rate limits and auth complexity)
 - Full custom backend (overkill for simple sync)
-  **Rationale:** NocoDB provides free hosting, simple REST API, and minimal setup while maintaining privacy. Keeps 95% of app client-side, only syncs minimal interactive data.
+- NocoDB (initially considered, switched to PocketBase for better TypeScript support and real-time features)
+  **Rationale:** PocketBase provides free hosting, simple REST API, built-in real-time subscriptions, and excellent TypeScript SDK. Keeps 95% of app client-side, only syncs minimal interactive data.
   **Impact:** Adds backend dependency but enables key relationship features
-  **Date:** 2025-10-30
+  **Date:** 2025-10-30 (updated 2025-11-15 from NocoDB to PocketBase)
 
 ### Client-Side Architecture Maintained
 
