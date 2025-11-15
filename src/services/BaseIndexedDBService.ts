@@ -1,0 +1,239 @@
+import type { IDBPDatabase } from 'idb';
+
+/**
+ * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores
+ * Story 5.3: Extract shared service logic to reduce ~80% code duplication
+ *
+ * Generic Type Constraint: <T extends { id?: number }>
+ * - Ensures all entities have optional id field for IndexedDB auto-increment keys
+ * - Services provide concrete types: Message, Photo, MoodEntry
+ *
+ * Abstract Methods (services must implement):
+ * - getStoreName(): Returns object store name ('messages', 'photos', 'moods')
+ * - _doInit(): DB-specific initialization and schema upgrade logic
+ *
+ * Shared Methods (inherited by all services):
+ * - init(): Initialization guard to prevent concurrent DB setup
+ * - add(), get(), getAll(), update(), delete(), clear(): Standard CRUD
+ * - getPage(): Pagination helper for lazy loading
+ * - handleError(), handleQuotaExceeded(): Centralized error handling
+ */
+export abstract class BaseIndexedDBService<T extends { id?: number }> {
+  protected db: IDBPDatabase<any> | null = null;
+  protected initPromise: Promise<void> | null = null;
+
+  /**
+   * Initialize IndexedDB connection
+   * Uses guard to prevent concurrent initialization
+   *
+   * Pattern: Single shared implementation across all services
+   */
+  async init(): Promise<void> {
+    // Return existing promise if initialization already in progress
+    if (this.initPromise) {
+      console.log(`[${this.constructor.name}] Init already in progress, waiting...`);
+      return this.initPromise;
+    }
+
+    // Return immediately if already initialized
+    if (this.db) {
+      console.log(`[${this.constructor.name}] Already initialized`);
+      return Promise.resolve();
+    }
+
+    // Store promise to prevent concurrent initialization
+    this.initPromise = this._doInit();
+
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  /**
+   * Abstract method: Service-specific DB initialization
+   * Each service implements its own schema creation and migration logic
+   */
+  protected abstract _doInit(): Promise<void>;
+
+  /**
+   * Abstract method: Get the object store name
+   * Each service returns its store name: 'messages', 'photos', 'moods'
+   */
+  protected abstract getStoreName(): string;
+
+  /**
+   * Add a new item to the store
+   * @param item - Item data (without id)
+   * @returns Item with auto-generated id
+   */
+  async add(item: Omit<T, 'id'>): Promise<T> {
+    try {
+      await this.init();
+
+      const storeName = this.getStoreName();
+      const id = await this.db!.add(storeName, item as T);
+      console.log(`[${this.constructor.name}] Added item to ${storeName}, id: ${id}`);
+
+      return { ...item, id: id as number } as T;
+    } catch (error) {
+      this.handleError('add', error as Error);
+    }
+  }
+
+  /**
+   * Get a single item by ID
+   * @param id - Item ID
+   * @returns Item or null if not found
+   */
+  async get(id: number): Promise<T | null> {
+    try {
+      await this.init();
+
+      const storeName = this.getStoreName();
+      const item = await this.db!.get(storeName, id);
+
+      if (item) {
+        console.log(`[${this.constructor.name}] Retrieved item from ${storeName}, id: ${id}`);
+      } else {
+        console.warn(`[${this.constructor.name}] Item not found in ${storeName}, id: ${id}`);
+      }
+
+      return item || null;
+    } catch (error) {
+      console.error(`[${this.constructor.name}] Failed to get item ${id}:`, error);
+      return null; // Graceful fallback
+    }
+  }
+
+  /**
+   * Get all items from the store
+   * @returns Array of all items
+   */
+  async getAll(): Promise<T[]> {
+    try {
+      await this.init();
+
+      const storeName = this.getStoreName();
+      const items = await this.db!.getAll(storeName);
+
+      console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${storeName}`);
+      return items;
+    } catch (error) {
+      console.error(`[${this.constructor.name}] Failed to get all items:`, error);
+      return []; // Graceful fallback: return empty array
+    }
+  }
+
+  /**
+   * Update an existing item
+   * @param id - Item ID to update
+   * @param updates - Partial item data to merge
+   */
+  async update(id: number, updates: Partial<T>): Promise<void> {
+    try {
+      await this.init();
+
+      const storeName = this.getStoreName();
+      const item = await this.db!.get(storeName, id);
+
+      if (!item) {
+        throw new Error(`Item ${id} not found in ${storeName}`);
+      }
+
+      const updated: T = { ...item, ...updates };
+      await this.db!.put(storeName, updated);
+
+      console.log(`[${this.constructor.name}] Updated item in ${storeName}, id: ${id}`);
+    } catch (error) {
+      console.error(`[${this.constructor.name}] Failed to update item ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete an item by ID
+   * @param id - Item ID to delete
+   */
+  async delete(id: number): Promise<void> {
+    try {
+      await this.init();
+
+      const storeName = this.getStoreName();
+      await this.db!.delete(storeName, id);
+
+      console.log(`[${this.constructor.name}] Deleted item from ${storeName}, id: ${id}`);
+    } catch (error) {
+      console.error(`[${this.constructor.name}] Failed to delete item ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all items from the store
+   */
+  async clear(): Promise<void> {
+    try {
+      await this.init();
+
+      const storeName = this.getStoreName();
+      await this.db!.clear(storeName);
+
+      console.log(`[${this.constructor.name}] Cleared all items from ${storeName}`);
+    } catch (error) {
+      console.error(`[${this.constructor.name}] Failed to clear store:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get paginated items using offset and limit
+   * Uses getAll() + slice for simplicity (services can override for index-based pagination)
+   *
+   * @param offset - Number of items to skip
+   * @param limit - Number of items to return
+   * @returns Array of items for the requested page
+   */
+  async getPage(offset: number, limit: number): Promise<T[]> {
+    try {
+      await this.init();
+
+      const allItems = await this.getAll();
+      const page = allItems.slice(offset, offset + limit);
+
+      console.log(
+        `[${this.constructor.name}] Retrieved page: offset=${offset}, limit=${limit}, returned=${page.length}, total=${allItems.length}`
+      );
+
+      return page;
+    } catch (error) {
+      console.error(`[${this.constructor.name}] Failed to get page:`, error);
+      return []; // Graceful fallback
+    }
+  }
+
+  /**
+   * Centralized error handling with logging
+   * @param operation - Name of the operation that failed
+   * @param error - Error object
+   */
+  protected handleError(operation: string, error: Error): never {
+    console.error(`[${this.constructor.name}] Failed to ${operation}:`, error);
+    console.error(`[${this.constructor.name}] Error details:`, {
+      name: error.name,
+      message: error.message,
+    });
+    throw error;
+  }
+
+  /**
+   * Handle IndexedDB quota exceeded errors
+   * Story 4.1: AC-4.1.9 - Quota warnings at 80%, error at 95%
+   */
+  protected handleQuotaExceeded(): never {
+    const error = new Error('IndexedDB storage quota exceeded');
+    console.error(`[${this.constructor.name}] Storage quota exceeded`);
+    throw error;
+  }
+}
