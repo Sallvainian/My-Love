@@ -8,92 +8,10 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../types/database.types';
 
-/**
- * Database schema type definition
- * Generated from Supabase schema (to be replaced with generated types)
- */
-export interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: {
-          id: string;
-          partner_name: string | null;
-          device_id: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id: string;
-          partner_name?: string | null;
-          device_id?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          partner_name?: string | null;
-          device_id?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-      };
-      moods: {
-        Row: {
-          id: string;
-          user_id: string;
-          mood_type: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful';
-          note: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          mood_type: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful';
-          note?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          mood_type?: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful';
-          note?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-      };
-      interactions: {
-        Row: {
-          id: string;
-          type: 'poke' | 'kiss';
-          from_user_id: string;
-          to_user_id: string;
-          viewed: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          type: 'poke' | 'kiss';
-          from_user_id: string;
-          to_user_id: string;
-          viewed?: boolean;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          type?: 'poke' | 'kiss';
-          from_user_id?: string;
-          to_user_id?: string;
-          viewed?: boolean;
-          created_at?: string;
-        };
-      };
-    };
-  };
-}
+// Re-export Database type for convenience
+export type { Database } from '../types/database.types';
 
 /**
  * Supabase configuration from environment variables

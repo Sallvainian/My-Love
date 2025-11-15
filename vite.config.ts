@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true,
+        enabled: false, // Disable in dev to prevent stale code caching
         type: 'module',
       },
       includeAssets: ['icons/*.png', 'fonts/*.woff2'],
@@ -46,20 +46,25 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
         skipWaiting: true,
         clientsClaim: true,
-        // Prevent caching of JS/CSS - always fetch fresh app code
-        navigateFallback: null,
         cleanupOutdatedCaches: true,
+        // Don't cache navigation requests - always fetch fresh HTML
+        navigateFallback: null,
+        // Don't pre-cache JS/CSS to prevent stale code issues
+        globIgnores: ['**/*.js', '**/*.css'],
         runtimeCaching: [
           {
-            // App shell (JS/CSS) - Network First with short cache
+            // App shell (JS/CSS) - Always fetch from network
             urlPattern: /\.(js|css)$/,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'app-shell',
-              networkTimeoutSeconds: 3,
+              cacheName: 'app-shell-v1', // Versioned cache name
+              networkTimeoutSeconds: 2,
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5, // 5 minutes - short cache for dev
+                maxEntries: 30,
+                maxAgeSeconds: 60, // 1 minute cache - aggressive invalidation
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },

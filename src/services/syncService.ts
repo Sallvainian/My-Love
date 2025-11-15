@@ -12,7 +12,6 @@ import { moodService } from './moodService';
 import { moodApi } from '../api/moodApi';
 import type { MoodEntry } from '../types';
 import type { MoodInsert } from '../api/validation/supabaseSchemas';
-import { USER_ID } from '../config/constants';
 
 /**
  * Sync result for a single mood entry

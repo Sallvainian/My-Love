@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Smile, Meh, MessageCircle, Sparkles, RefreshCw, Calendar, Bell, Wifi, WifiOff } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import type { MoodType, MoodEntry } from '../../types';
+import type { MoodEntry } from '../../types';
 import { PARTNER_NAME } from '../../config/constants';
 import { moodSyncService } from '../../api/moodSyncService';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {

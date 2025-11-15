@@ -1,4 +1,4 @@
-import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
+import { openDB, type DBSchema } from 'idb';
 import type { MoodEntry, Message, Photo } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { MoodEntrySchema } from '../validation/schemas';
