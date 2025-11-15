@@ -3,6 +3,7 @@ import type { CustomMessage } from '../types';
 import { CreateMessageInputSchema } from '../validation/schemas';
 import { isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
+import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 
 /**
  * Migration Service - One-time migration from LocalStorage to IndexedDB
@@ -90,7 +91,7 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
         // Check for duplicates (same text already in IndexedDB)
         const normalizedText = validated.text.trim().toLowerCase();
         if (existingTexts.has(normalizedText)) {
-          console.log('[MigrationService] Skipping duplicate message:', validated.text.substring(0, 50) + '...');
+          console.log('[MigrationService] Skipping duplicate message:', validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
           result.skippedCount++;
           continue;
         }
@@ -101,17 +102,17 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
 
         existingTexts.add(normalizedText); // Prevent duplicates within same migration
         result.migratedCount++;
-        console.log('[MigrationService] Migrated message:', validated.text.substring(0, 50) + '...');
+        console.log('[MigrationService] Migrated message:', validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
       } catch (error) {
         // Handle validation errors gracefully
         if (isZodError(error)) {
-          const errorMsg = `Invalid message data: ${message.text?.substring(0, 50)} - ${(error as ZodError).errors[0]?.message}`;
+          const errorMsg = `Invalid message data: ${message.text?.substring(0, LOG_TRUNCATE_LENGTH)} - ${(error as ZodError).errors[0]?.message}`;
           console.warn('[MigrationService]', errorMsg);
           result.skippedCount++;
           continue;
         }
 
-        const errorMsg = `Failed to migrate message: ${message.text?.substring(0, 50)}`;
+        const errorMsg = `Failed to migrate message: ${message.text?.substring(0, LOG_TRUNCATE_LENGTH)}`;
         console.error('[MigrationService]', errorMsg, error);
         result.errors.push(errorMsg);
       }

@@ -8,6 +8,7 @@ import {
   createValidationError,
   isZodError,
 } from '../validation';
+import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 
 const DB_NAME = 'my-love-db';
 const DB_VERSION = 1;
@@ -37,11 +38,15 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
    */
   protected async _doInit(): Promise<void> {
     try {
-      console.log('[CustomMessageService] Initializing IndexedDB connection...');
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Initializing IndexedDB connection...');
+      }
 
       this.db = await openDB<any>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, _transaction) {
-          console.log(`[CustomMessageService] Upgrading database from v${oldVersion} to v${newVersion}`);
+          if (import.meta.env.DEV) {
+            console.log(`[CustomMessageService] Upgrading database from v${oldVersion} to v${newVersion}`);
+          }
 
           // Create messages store if it doesn't exist
           if (!db.objectStoreNames.contains('messages')) {
@@ -51,12 +56,16 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
             });
             messageStore.createIndex('by-category', 'category');
             messageStore.createIndex('by-date', 'createdAt');
-            console.log('[CustomMessageService] Created messages store with indexes');
+            if (import.meta.env.DEV) {
+              console.log('[CustomMessageService] Created messages store with indexes');
+            }
           }
         },
       });
 
-      console.log('[CustomMessageService] IndexedDB connection established');
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] IndexedDB connection established');
+      }
     } catch (error) {
       this.handleError('initialize', error as Error);
     }
@@ -85,7 +94,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
       };
 
       const created = await super.add(message);
-      console.log('[CustomMessageService] Custom message created, id:', created.id);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Custom message created, id:', created.id);
+      }
 
       return created;
     } catch (error) {
@@ -120,7 +131,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
       };
 
       await super.update(validated.id, updates);
-      console.log('[CustomMessageService] Custom message updated, id:', validated.id);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Custom message updated, id:', validated.id);
+      }
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
@@ -173,7 +186,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
         );
       }
 
-      console.log('[CustomMessageService] Retrieved messages, count:', messages.length, 'filter:', filter);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Retrieved messages, count:', messages.length, 'filter:', filter);
+      }
       return messages;
     } catch (error) {
       console.error('[CustomMessageService] Failed to get all messages:', error);
@@ -218,7 +233,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
         })),
       };
 
-      console.log('[CustomMessageService] Exported messages, count:', messages.length);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Exported messages, count:', messages.length);
+      }
       return exportData;
     } catch (error) {
       console.error('[CustomMessageService] Failed to export messages:', error);
@@ -258,7 +275,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
 
         if (existingTexts.has(normalizedText)) {
           skippedCount++;
-          console.log('[CustomMessageService] Skipping duplicate message:', msg.text.substring(0, 50) + '...');
+          if (import.meta.env.DEV) {
+            console.log('[CustomMessageService] Skipping duplicate message:', msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...');
+          }
         } else {
           await this.create({
             text: msg.text,
@@ -271,7 +290,9 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
         }
       }
 
-      console.log('[CustomMessageService] Import complete - imported:', importedCount, 'skipped:', skippedCount);
+      if (import.meta.env.DEV) {
+        console.log('[CustomMessageService] Import complete - imported:', importedCount, 'skipped:', skippedCount);
+      }
       return { imported: importedCount, skipped: skippedCount };
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages

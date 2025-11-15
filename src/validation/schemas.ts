@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { VALIDATION_LIMITS } from '../config/performance';
 
 /**
  * Validation schemas for My Love app data models
@@ -30,7 +31,7 @@ const MessageCategorySchema = z.enum([
  */
 export const MessageSchema = z.object({
   id: z.number().int().positive().optional(),
-  text: z.string().min(1, 'Message text cannot be empty').max(1000, 'Message text cannot exceed 1000 characters'),
+  text: z.string().min(1, 'Message text cannot be empty').max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH, `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`),
   category: MessageCategorySchema,
   isCustom: z.boolean(),
   active: z.boolean().default(true),
@@ -45,7 +46,7 @@ export const MessageSchema = z.object({
  * Validates user input before message creation
  */
 export const CreateMessageInputSchema = z.object({
-  text: z.string().trim().min(1, 'Message text cannot be empty').max(1000, 'Message text cannot exceed 1000 characters'),
+  text: z.string().trim().min(1, 'Message text cannot be empty').max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH, `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`),
   category: MessageCategorySchema,
   active: z.boolean().default(true),
   tags: z.array(z.string()).optional(),
@@ -57,7 +58,7 @@ export const CreateMessageInputSchema = z.object({
  */
 export const UpdateMessageInputSchema = z.object({
   id: z.number().int().positive(),
-  text: z.string().trim().min(1, 'Message text cannot be empty').max(1000, 'Message text cannot exceed 1000 characters').optional(),
+  text: z.string().trim().min(1, 'Message text cannot be empty').max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH, `Message text cannot exceed ${VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH} characters`).optional(),
   category: MessageCategorySchema.optional(),
   active: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
@@ -85,7 +86,7 @@ const PhotoMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp']);
 export const PhotoSchema = z.object({
   id: z.number().int().positive().optional(),
   imageBlob: z.instanceof(Blob, { message: 'Image must be a valid Blob' }),
-  caption: z.string().max(500, 'Caption cannot exceed 500 characters').optional().or(z.literal('')),
+  caption: z.string().max(500, 'Caption cannot exceed 500 characters').optional(),
   tags: z.array(z.string()).default([]),
   uploadDate: z.date(),
   originalSize: z.number().positive('Original size must be a positive number'),
@@ -101,7 +102,7 @@ export const PhotoSchema = z.object({
  */
 export const PhotoUploadInputSchema = z.object({
   file: z.instanceof(File, { message: 'Must provide a valid file' }),
-  caption: z.string().max(500, 'Caption cannot exceed 500 characters').optional().or(z.literal('')),
+  caption: z.string().max(500, 'Caption cannot exceed 500 characters').optional(),
   tags: z.string().optional(), // Comma-separated string, will be parsed to array
 });
 
@@ -232,7 +233,7 @@ export const CustomMessagesExportSchema = z.object({
   messageCount: z.number().int().nonnegative(),
   messages: z.array(
     z.object({
-      text: z.string().min(1).max(1000),
+      text: z.string().min(1).max(VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH),
       category: MessageCategorySchema,
       active: z.boolean(),
       tags: z.array(z.string()).optional(),
