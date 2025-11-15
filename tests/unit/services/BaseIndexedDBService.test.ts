@@ -33,6 +33,12 @@ class TestService extends BaseIndexedDBService<TestItem> {
       },
     });
   }
+
+  // P2 FIX: Public wrapper for testing protected add() method
+  // In production, services expose create() which validates before calling add()
+  async testAdd(item: Omit<TestItem, 'id'>): Promise<TestItem> {
+    return super.add(item);
+  }
 }
 
 describe('BaseIndexedDBService', () => {
@@ -79,7 +85,7 @@ describe('BaseIndexedDBService', () => {
         createdAt: new Date(),
       };
 
-      const added = await service.add(newItem);
+      const added = await service.testAdd(newItem);
 
       expect(added.id).toBeDefined();
       expect(added.name).toBe(newItem.name);
@@ -87,12 +93,12 @@ describe('BaseIndexedDBService', () => {
     });
 
     it('auto-increments ids for multiple items', async () => {
-      const item1 = await service.add({
+      const item1 = await service.testAdd({
         name: 'Item 1',
         value: 1,
         createdAt: new Date(),
       });
-      const item2 = await service.add({
+      const item2 = await service.testAdd({
         name: 'Item 2',
         value: 2,
         createdAt: new Date(),
@@ -104,7 +110,7 @@ describe('BaseIndexedDBService', () => {
     it('initializes service before adding', async () => {
       const spy = vi.spyOn(service, 'init');
 
-      await service.add({
+      await service.testAdd({
         name: 'Test',
         value: 1,
         createdAt: new Date(),
@@ -116,7 +122,7 @@ describe('BaseIndexedDBService', () => {
 
   describe('get', () => {
     it('retrieves item by id', async () => {
-      const added = await service.add({
+      const added = await service.testAdd({
         name: 'Test Item',
         value: 42,
         createdAt: new Date(),
@@ -148,9 +154,9 @@ describe('BaseIndexedDBService', () => {
 
   describe('getAll', () => {
     it('returns all items from store', async () => {
-      await service.add({ name: 'Item 1', value: 1, createdAt: new Date() });
-      await service.add({ name: 'Item 2', value: 2, createdAt: new Date() });
-      await service.add({ name: 'Item 3', value: 3, createdAt: new Date() });
+      await service.testAdd({ name: 'Item 1', value: 1, createdAt: new Date() });
+      await service.testAdd({ name: 'Item 2', value: 2, createdAt: new Date() });
+      await service.testAdd({ name: 'Item 3', value: 3, createdAt: new Date() });
 
       const items = await service.getAll();
 
@@ -176,7 +182,7 @@ describe('BaseIndexedDBService', () => {
 
   describe('update', () => {
     it('updates existing item', async () => {
-      const added = await service.add({
+      const added = await service.testAdd({
         name: 'Original',
         value: 1,
         createdAt: new Date(),
@@ -190,7 +196,7 @@ describe('BaseIndexedDBService', () => {
     });
 
     it('merges partial updates with existing data', async () => {
-      const added = await service.add({
+      const added = await service.testAdd({
         name: 'Original',
         value: 1,
         createdAt: new Date('2024-01-01'),
@@ -212,7 +218,7 @@ describe('BaseIndexedDBService', () => {
 
   describe('delete', () => {
     it('deletes item by id', async () => {
-      const added = await service.add({
+      const added = await service.testAdd({
         name: 'To Delete',
         value: 1,
         createdAt: new Date(),
@@ -230,7 +236,7 @@ describe('BaseIndexedDBService', () => {
     });
 
     it('removes item from getAll results', async () => {
-      const item1 = await service.add({ name: 'Item 1', value: 1, createdAt: new Date() });
+      const item1 = await service.testAdd({ name: 'Item 1', value: 1, createdAt: new Date() });
       const item2 = await service.add({ name: 'Item 2', value: 2, createdAt: new Date() });
 
       await service.delete(item1.id!);
@@ -243,9 +249,9 @@ describe('BaseIndexedDBService', () => {
 
   describe('clear', () => {
     it('removes all items from store', async () => {
-      await service.add({ name: 'Item 1', value: 1, createdAt: new Date() });
-      await service.add({ name: 'Item 2', value: 2, createdAt: new Date() });
-      await service.add({ name: 'Item 3', value: 3, createdAt: new Date() });
+      await service.testAdd({ name: 'Item 1', value: 1, createdAt: new Date() });
+      await service.testAdd({ name: 'Item 2', value: 2, createdAt: new Date() });
+      await service.testAdd({ name: 'Item 3', value: 3, createdAt: new Date() });
 
       await service.clear();
 
@@ -262,7 +268,7 @@ describe('BaseIndexedDBService', () => {
     beforeEach(async () => {
       // Add 10 test items
       for (let i = 1; i <= 10; i++) {
-        await service.add({
+        await service.testAdd({
           name: `Item ${i}`,
           value: i,
           createdAt: new Date(),
@@ -334,7 +340,7 @@ describe('BaseIndexedDBService', () => {
       );
 
       await expect(
-        service.add({ name: 'Test', value: 1, createdAt: new Date() })
+        service.testAdd({ name: 'Test', value: 1, createdAt: new Date() })
       ).rejects.toThrow();
 
       consoleSpy.mockRestore();
@@ -365,7 +371,7 @@ describe('BaseIndexedDBService', () => {
   describe('concurrent operations', () => {
     it('handles concurrent add operations', async () => {
       const promises = Array.from({ length: 5 }, (_, i) =>
-        service.add({
+        service.testAdd({
           name: `Concurrent Item ${i}`,
           value: i,
           createdAt: new Date(),

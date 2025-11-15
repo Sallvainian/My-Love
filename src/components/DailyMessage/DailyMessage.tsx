@@ -35,14 +35,14 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const handleDragEnd = (_event: any, info: PanInfo) => {
     const threshold = 50; // 50px swipe threshold
 
-    if (info.offset.x < -threshold && canNavigateForward()) {
-      // Swipe left → navigate forward (toward today/newer messages)
-      setDirection('left');
-      navigateToNextMessage();
-    } else if (info.offset.x > threshold && canNavigateBack()) {
-      // Swipe right → navigate back (to older messages)
-      setDirection('right');
+    if (info.offset.x < -threshold && canNavigateBack()) {
+      // Swipe left → card exits left, new card comes from right
+      setDirection('right');  // 'right' = new card comes from right
       navigateToPreviousMessage();
+    } else if (info.offset.x > threshold && canNavigateForward()) {
+      // Swipe right → card exits right, new card comes from left
+      setDirection('left');  // 'left' = new card comes from left
+      navigateToNextMessage();
     }
   };
 
@@ -51,11 +51,11 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowLeft' && canNavigateBack()) {
         event.preventDefault();
-        setDirection('left');
+        setDirection('right');  // Arrow left should animate from right
         navigateToPreviousMessage();
       } else if (event.key === 'ArrowRight' && canNavigateForward()) {
         event.preventDefault();
-        setDirection('right');
+        setDirection('left');  // Arrow right should animate from left
         navigateToNextMessage();
       }
     };
@@ -223,7 +223,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           dragElastic={0.2}
           onDragEnd={handleDragEnd}
           initial={{
-            x: direction === 'left' ? -300 : 300,
+            x: direction === 'left' ? -300 : 300,  // direction indicates where new card comes FROM
             opacity: 0,
           }}
           animate={{
@@ -231,7 +231,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
             opacity: 1,
           }}
           exit={{
-            x: direction === 'left' ? 300 : -300,
+            x: direction === 'left' ? 300 : -300,  // exit in opposite direction
             opacity: 0,
           }}
           transition={{

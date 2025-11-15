@@ -109,6 +109,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
   // BUG FIX: Refresh gallery when store photos change (after upload)
   // This fixes the issue where uploaded photos don't appear until page refresh
+  // P1 FIX: Added cleanup to prevent memory leak on unmount
   useEffect(() => {
     // Skip if we haven't loaded once yet (initial load handles this)
     if (!hasLoadedOnce) return;
@@ -117,20 +118,38 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     if (storePhotos.length > photos.length) {
       console.log('[PhotoGallery] New photos detected in store, refreshing gallery...');
 
+      let cancelled = false;
+
       // Refresh the gallery to show new photos
       const refreshGallery = async () => {
         try {
           const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
+
+          if (cancelled) {
+            console.log('[PhotoGallery] Refresh cancelled, skipping state updates');
+            return;
+          }
+
           setPhotos(firstPage);
           setCurrentOffset(firstPage.length);
           setHasMore(firstPage.length === PHOTOS_PER_PAGE);
           console.log(`[PhotoGallery] Gallery refreshed with ${firstPage.length} photos`);
         } catch (error) {
+          if (cancelled) {
+            console.log('[PhotoGallery] Refresh cancelled in catch, skipping state updates');
+            return;
+          }
+
           console.error('[PhotoGallery] Failed to refresh gallery:', error);
         }
       };
 
       refreshGallery();
+
+      return () => {
+        cancelled = true;
+        console.log('[PhotoGallery] Refresh cleanup: Setting cancelled=true');
+      };
     }
   }, [storePhotos.length, photos.length, hasLoadedOnce]); // Watch store photo count
 

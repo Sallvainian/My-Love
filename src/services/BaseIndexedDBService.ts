@@ -74,10 +74,12 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
 
   /**
    * Add a new item to the store
+   * P2 FIX: Made protected to enforce validation through create() method
+   * Services should expose create() which validates before calling add()
    * @param item - Item data (without id)
    * @returns Item with auto-generated id
    */
-  async add(item: Omit<T, 'id'>): Promise<T> {
+  protected async add(item: Omit<T, 'id'>): Promise<T> {
     try {
       await this.init();
 

@@ -1032,6 +1032,12 @@ return photos.slice(offset, offset + limit); // Simple slice-based pagination
 3. Heap snapshot after full load
 4. Monitor memory stability over multiple pagination cycles
 
+**Actual measurements (Chrome DevTools heap snapshots):**
+- **Baseline (empty homepage):** 11.3 MB total heap size
+  - Date measured: 2025-11-15
+  - Environment: Chrome browser, development build
+  - Note: Only baseline measured; full photo load testing pending
+
 **Expected memory targets:**
 - **100 photos (paginated):** <50MB total heap size
 - **500 photos (paginated):** <100MB total heap size
