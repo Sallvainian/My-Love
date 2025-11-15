@@ -81,7 +81,7 @@ development_status:
   # Epic 5: Code Quality & Performance (5 stories) - IN REVIEW 🔍
   epic-5: contexted
   5-1-split-useappstore-into-feature-slices: done
-  5-2-implement-photo-pagination-with-lazy-loading: review
+  5-2-implement-photo-pagination-with-lazy-loading: done
   5-3-extract-base-service-class-to-reduce-duplication: done
   5-4-add-unit-tests-for-utilities-and-services: review
   5-5-centralize-input-validation-layer: in-progress
