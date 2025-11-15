@@ -292,7 +292,9 @@ test.describe('Theme Selector UI (Future Story)', () => {
 
 test.describe('Story 4.5: Photo Gallery Navigation Integration', () => {
   // AC-4.5.1: Top Navigation Bar with Home and Photos tabs
-  test('AC-4.5.1: should display top navigation with Home and Photos tabs', async ({ cleanApp }) => {
+  test('AC-4.5.1: should display top navigation with Home and Photos tabs', async ({
+    cleanApp,
+  }) => {
     await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
     // Verify top navigation bar visible

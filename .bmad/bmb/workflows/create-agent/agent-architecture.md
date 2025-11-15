@@ -7,10 +7,6 @@ _LLM-Optimized Technical Documentation for Agent Building_
 ### Minimal Valid Agent
 
 ```xml
-<!-- Powered by BMAD-CORE™ -->
-
-# Agent Name
-
 <agent id="path/to/agent.md" name="Name" title="Title" icon="🤖">
   <persona>
     <role>My primary function</role>

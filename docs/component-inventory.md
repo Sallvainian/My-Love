@@ -32,9 +32,9 @@ This document catalogs all UI components in the My Love PWA, including implement
 
 ```typescript
 const {
-  currentMessage,    // The message to display
-  settings,          // For relationship start date
-  toggleFavorite     // Action to favorite/unfavorite
+  currentMessage, // The message to display
+  settings, // For relationship start date
+  toggleFavorite, // Action to favorite/unfavorite
 } = useAppStore();
 ```
 
@@ -72,13 +72,13 @@ function App() {
 
 #### Animations
 
-| Element | Animation | Trigger |
-|---------|-----------|---------|
-| Card | Scale 0.9→1.0, rotateY -10°→0° | On mount |
-| Category Badge | Scale 0→1 spring | On mount (delayed) |
-| Message Text | Opacity 0→1 fade | On mount (delayed) |
-| Floating Hearts | Y-axis rise with fade | On favorite click |
-| Decorative Hearts | Continuous scale + rotate | Infinite loop |
+| Element           | Animation                      | Trigger            |
+| ----------------- | ------------------------------ | ------------------ |
+| Card              | Scale 0.9→1.0, rotateY -10°→0° | On mount           |
+| Category Badge    | Scale 0→1 spring               | On mount (delayed) |
+| Message Text      | Opacity 0→1 fade               | On mount (delayed) |
+| Floating Hearts   | Y-axis rise with fade          | On favorite click  |
+| Decorative Hearts | Continuous scale + rotate      | Infinite loop      |
 
 #### Accessibility
 
@@ -114,8 +114,8 @@ function App() {
 
 ```typescript
 const {
-  setSettings,    // Set initial settings
-  setOnboarded    // Mark onboarding complete
+  setSettings, // Set initial settings
+  setOnboarded, // Mark onboarding complete
 } = useAppStore();
 
 // Local component state
@@ -154,12 +154,12 @@ None (uses global store)
 
 #### Validation Rules
 
-| Step | Requirements |
-|------|--------------|
-| 0 (Welcome) | None (always can proceed) |
-| 1 (Details) | `partnerName.trim() !== ''` AND `startDate !== ''` |
-| 2 (Notifications) | None (optional feature) |
-| 3 (Ready) | None (completion step) |
+| Step              | Requirements                                       |
+| ----------------- | -------------------------------------------------- |
+| 0 (Welcome)       | None (always can proceed)                          |
+| 1 (Details)       | `partnerName.trim() !== ''` AND `startDate !== ''` |
+| 2 (Notifications) | None (optional feature)                            |
+| 3 (Ready)         | None (completion step)                             |
 
 #### Settings Generated
 
@@ -175,31 +175,31 @@ const settings: Settings = {
         id: 1,
         date: startDate,
         label: 'First Day Together',
-        description: 'The day our story began'
-      }
-    ]
+        description: 'The day our story began',
+      },
+    ],
   },
   customization: {
     accentColor: '#FF6B9D',
-    fontFamily: 'Playfair Display'
+    fontFamily: 'Playfair Display',
   },
   notifications: {
     enabled: notificationsEnabled,
-    time: notificationTime
-  }
+    time: notificationTime,
+  },
 };
 ```
 
 #### Animations
 
-| Element | Animation | Trigger |
-|---------|-----------|---------|
-| Container | Scale 0.9→1.0, opacity 0→1 | On mount |
-| Progress Bars | Width 0→100%, gradient fill | Step advance |
-| Step Content | Slide in/out (x-axis) | Step change |
-| Heart Emoji | Scale 1→1.2→1 pulse | Infinite (Step 0) |
-| Sparkles Emoji | Scale + rotate cycle | Infinite (Step 3) |
-| Toggle Switch | X-axis movement | Toggle change |
+| Element        | Animation                   | Trigger           |
+| -------------- | --------------------------- | ----------------- |
+| Container      | Scale 0.9→1.0, opacity 0→1  | On mount          |
+| Progress Bars  | Width 0→100%, gradient fill | Step advance      |
+| Step Content   | Slide in/out (x-axis)       | Step change       |
+| Heart Emoji    | Scale 1→1.2→1 pulse         | Infinite (Step 0) |
+| Sparkles Emoji | Scale + rotate cycle        | Infinite (Step 3) |
+| Toggle Switch  | X-axis movement             | Toggle change     |
 
 #### Accessibility
 
@@ -237,10 +237,10 @@ These components are referenced in the codebase but not yet implemented. Directo
 
 ```typescript
 const {
-  photos,          // Array of Photo objects
-  addPhoto,        // Upload new photo (future action)
-  updatePhoto,     // Edit caption/tags (future action)
-  deletePhoto      // Remove photo (future action)
+  photos, // Array of Photo objects
+  addPhoto, // Upload new photo (future action)
+  updatePhoto, // Edit caption/tags (future action)
+  deletePhoto, // Remove photo (future action)
 } = useAppStore();
 ```
 
@@ -301,9 +301,9 @@ PhotoMemory
 
 ```typescript
 const {
-  moods,              // Array of MoodEntry objects
-  addMoodEntry,       // Add/update mood for today
-  getMoodForDate      // Retrieve mood for specific date
+  moods, // Array of MoodEntry objects
+  addMoodEntry, // Add/update mood for today
+  getMoodForDate, // Retrieve mood for specific date
 } = useAppStore();
 ```
 
@@ -326,23 +326,24 @@ MoodTracker
 
 #### Mood Types with Icons
 
-| Mood Type | Icon | Color |
-|-----------|------|-------|
-| loved | ❤️ | Red (#FF1744) |
-| happy | 😊 | Yellow (#FFD600) |
-| content | 😌 | Green (#00C853) |
-| thoughtful | 🤔 | Blue (#2979FF) |
-| grateful | 🙏 | Purple (#AA00FF) |
+| Mood Type  | Icon | Color            |
+| ---------- | ---- | ---------------- |
+| loved      | ❤️   | Red (#FF1744)    |
+| happy      | 😊   | Yellow (#FFD600) |
+| content    | 😌   | Green (#00C853)  |
+| thoughtful | 🤔   | Blue (#2979FF)   |
+| grateful   | 🙏   | Purple (#AA00FF) |
 
 #### Data Storage
 
 Moods are stored in Zustand store and persisted to LocalStorage:
+
 ```typescript
 moods: [
   { date: '2024-10-28', mood: 'happy', note: 'Great day!' },
   { date: '2024-10-29', mood: 'loved', note: 'Received flowers' },
-  { date: '2024-10-30', mood: 'grateful' }
-]
+  { date: '2024-10-30', mood: 'grateful' },
+];
 ```
 
 #### Technical Considerations
@@ -376,7 +377,7 @@ moods: [
 
 ```typescript
 const {
-  settings  // Access relationship.anniversaries
+  settings, // Access relationship.anniversaries
 } = useAppStore();
 ```
 
@@ -414,9 +415,10 @@ function getTimeUntil(targetDate: string): {
 
   // If date has passed this year, use next year
   const thisYear = new Date(now.getFullYear(), target.getMonth(), target.getDate());
-  const nextOccurrence = thisYear < now
-    ? new Date(now.getFullYear() + 1, target.getMonth(), target.getDate())
-    : thisYear;
+  const nextOccurrence =
+    thisYear < now
+      ? new Date(now.getFullYear() + 1, target.getMonth(), target.getDate())
+      : thisYear;
 
   const diff = nextOccurrence.getTime() - now.getTime();
 
@@ -424,7 +426,7 @@ function getTimeUntil(targetDate: string): {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
     hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
     minutes: Math.floor((diff / 1000 / 60) % 60),
-    seconds: Math.floor((diff / 1000) % 60)
+    seconds: Math.floor((diff / 1000) % 60),
   };
 }
 ```
@@ -461,10 +463,10 @@ function getTimeUntil(targetDate: string): {
 
 ```typescript
 const {
-  messages,      // All messages (filter for isCustom: true)
-  addMessage,    // Create new custom message
+  messages, // All messages (filter for isCustom: true)
+  addMessage, // Create new custom message
   updateMessage, // Edit existing message (future action)
-  deleteMessage  // Remove custom message (future action)
+  deleteMessage, // Remove custom message (future action)
 } = useAppStore();
 ```
 
@@ -499,7 +501,7 @@ const categories: { value: MessageCategory; label: string }[] = [
   { value: 'memory', label: '✨ Memory' },
   { value: 'affirmation', label: '🌟 Affirmation' },
   { value: 'future', label: '🌈 Our Future' },
-  { value: 'custom', label: '💕 Custom' }
+  { value: 'custom', label: '💕 Custom' },
 ];
 ```
 
@@ -540,11 +542,11 @@ const categories: { value: MessageCategory; label: string }[] = [
 
 ```typescript
 const {
-  settings,             // Current settings
-  updateSettings,       // Update settings
-  setTheme,            // Change theme
-  addAnniversary,      // Add anniversary
-  removeAnniversary    // Delete anniversary
+  settings, // Current settings
+  updateSettings, // Update settings
+  setTheme, // Change theme
+  addAnniversary, // Add anniversary
+  removeAnniversary, // Delete anniversary
 } = useAppStore();
 ```
 
@@ -584,6 +586,7 @@ Settings
 #### Theme Preview
 
 Each theme card shows:
+
 - Theme name
 - Color swatch preview
 - Sample gradient background
@@ -623,16 +626,19 @@ Each theme card shows:
 #### Planned Components
 
 ##### Header
+
 - App title/logo
 - Navigation menu toggle (mobile)
 - Theme indicator
 
 ##### Footer
+
 - Copyright notice
 - Quick links
 - Version number
 
 ##### Navigation
+
 - Bottom navigation bar (mobile)
 - Sidebar navigation (desktop)
 - Active route indicator
@@ -656,7 +662,7 @@ const navItems: NavItem[] = [
   { route: 'memories', label: 'Photos', icon: 'Camera' },
   { route: 'moods', label: 'Moods', icon: 'Heart' },
   { route: 'countdown', label: 'Countdown', icon: 'Calendar' },
-  { route: 'settings', label: 'Settings', icon: 'Settings' }
+  { route: 'settings', label: 'Settings', icon: 'Settings' },
 ];
 ```
 

@@ -101,15 +101,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
   const parsedTags = tags
     ? tags
         .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0)
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
     : [];
 
   const tagErrors = [];
   if (parsedTags.length > 10) {
     tagErrors.push('Maximum 10 tags allowed');
   }
-  const tooLongTags = parsedTags.filter(tag => tag.length > 50);
+  const tooLongTags = parsedTags.filter((tag) => tag.length > 50);
   if (tooLongTags.length > 0) {
     tagErrors.push(`Tag too long (max 50 characters): "${tooLongTags[0].substring(0, 20)}..."`);
   }
@@ -225,7 +225,9 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                   <>
                     {/* Photo Preview */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Preview
+                      </label>
                       <div className="relative w-full bg-gray-100 rounded-lg overflow-hidden">
                         <img
                           src={previewUrl}
@@ -235,14 +237,21 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         />
                       </div>
                       <div className="flex items-center justify-between mt-2 text-sm text-gray-500">
-                        <span>Original size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
-                        <span>Will compress to ~{(selectedFile.size * 0.1 / 1024).toFixed(0)} KB</span>
+                        <span>
+                          Original size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                        <span>
+                          Will compress to ~{((selectedFile.size * 0.1) / 1024).toFixed(0)} KB
+                        </span>
                       </div>
                     </div>
 
                     {/* Caption */}
                     <div>
-                      <label htmlFor="photo-caption" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label
+                        htmlFor="photo-caption"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
                         Caption (optional)
                       </label>
                       <textarea
@@ -257,7 +266,9 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                       />
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-gray-500">Supports emoji and multiple lines</p>
-                        <p className={`text-sm ${remainingCaptionChars < 50 ? 'text-orange-500' : 'text-gray-500'}`}>
+                        <p
+                          className={`text-sm ${remainingCaptionChars < 50 ? 'text-orange-500' : 'text-gray-500'}`}
+                        >
                           {remainingCaptionChars} characters remaining
                         </p>
                       </div>
@@ -265,7 +276,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
 
                     {/* Tags */}
                     <div>
-                      <label htmlFor="photo-tags" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label
+                        htmlFor="photo-tags"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
                         Tags (optional)
                       </label>
                       <input
@@ -278,14 +292,18 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         data-testid="photo-upload-tags-input"
                       />
                       <div className="mt-2 space-y-1">
-                        <p className="text-sm text-gray-500">Comma-separated, max 10 tags, 50 characters each</p>
+                        <p className="text-sm text-gray-500">
+                          Comma-separated, max 10 tags, 50 characters each
+                        </p>
                         {parsedTags.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {parsedTags.slice(0, 10).map((tag, index) => (
                               <span
                                 key={index}
                                 className={`px-2 py-1 text-xs rounded-full ${
-                                  tag.length > 50 ? 'bg-red-100 text-red-700' : 'bg-pink-100 text-pink-700'
+                                  tag.length > 50
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-pink-100 text-pink-700'
                                 }`}
                                 data-testid={`photo-upload-tag-${index}`}
                               >
@@ -302,7 +320,11 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         {tagErrors.length > 0 && (
                           <div className="space-y-1">
                             {tagErrors.map((err, index) => (
-                              <p key={index} className="text-sm text-red-600" data-testid="photo-upload-tag-error">
+                              <p
+                                key={index}
+                                className="text-sm text-red-600"
+                                data-testid="photo-upload-tag-error"
+                              >
                                 {err}
                               </p>
                             ))}
@@ -368,7 +390,9 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                 {step === 'uploading' && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Loader className="w-12 h-12 text-pink-500 animate-spin mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Compressing & Saving...</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Compressing & Saving...
+                    </h3>
                     <p className="text-sm text-gray-500">This may take a moment</p>
                   </div>
                 )}

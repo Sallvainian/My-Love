@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Photo } from '../../types';
+import { isValidationError } from '../../validation/errorMessages';
 
 interface PhotoEditModalProps {
   photo: Photo;
@@ -64,17 +65,19 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
 
     const tags = tagsInput
       .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
 
     if (tags.length > 10) {
       setTagsError(`Too many tags (${tags.length}/10 max)`);
       return;
     }
 
-    const longTags = tags.filter(tag => tag.length > 50);
+    const longTags = tags.filter((tag) => tag.length > 50);
     if (longTags.length > 0) {
-      setTagsError(`Some tags are too long (max 50 characters): ${longTags[0].substring(0, 20)}...`);
+      setTagsError(
+        `Some tags are too long (max 50 characters): ${longTags[0].substring(0, 20)}...`
+      );
       return;
     }
 
@@ -85,8 +88,8 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   const hasChanges = () => {
     const currentTags = tagsInput
       .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
     const originalTags = photo.tags;
 
     const captionChanged = caption !== (photo.caption || '');
@@ -111,14 +114,15 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       // Parse tags
       const parsedTags = tagsInput
         .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0)
-        .filter((tag, index, arr) =>
-          // Case-insensitive duplicate detection
-          arr.findIndex(t => t.toLowerCase() === tag.toLowerCase()) === index
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
+        .filter(
+          (tag, index, arr) =>
+            // Case-insensitive duplicate detection
+            arr.findIndex((t) => t.toLowerCase() === tag.toLowerCase()) === index
         )
         .slice(0, 10) // Max 10 tags
-        .map(tag => tag.slice(0, 50)); // Max 50 chars per tag
+        .map((tag) => tag.slice(0, 50)); // Max 50 chars per tag
 
       await onSave(photo.id, {
         caption: caption || undefined,
@@ -128,7 +132,25 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       onClose();
     } catch (err) {
       console.error('[PhotoEditModal] Failed to save photo:', err);
-      setError('Failed to save changes. Please try again.');
+
+      // Handle validation errors with field-specific messages
+      if (isValidationError(err)) {
+        const fieldErrors = err.fieldErrors;
+
+        // Set field-specific errors
+        if (fieldErrors.has('caption')) {
+          setCaptionError(fieldErrors.get('caption') || null);
+        }
+        if (fieldErrors.has('tags')) {
+          setTagsError(fieldErrors.get('tags') || null);
+        }
+
+        // Set general error message
+        setError(err.message);
+      } else {
+        setError('Failed to save changes. Please try again.');
+      }
+
       setIsSaving(false);
     }
   };

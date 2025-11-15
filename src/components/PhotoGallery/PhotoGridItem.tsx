@@ -70,9 +70,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
                      p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
           data-testid="photo-grid-item-caption-overlay"
         >
-          <p className="text-white text-sm font-medium line-clamp-2">
-            {photo.caption}
-          </p>
+          <p className="text-white text-sm font-medium line-clamp-2">{photo.caption}</p>
         </div>
       )}
     </div>

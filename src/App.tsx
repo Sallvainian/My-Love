@@ -167,9 +167,7 @@ function App() {
     <ErrorBoundary>
       <div className="min-h-screen pb-16">
         {/* Conditional view rendering */}
-        {currentView === 'home' && (
-          <DailyMessage onShowWelcome={showWelcomeManually} />
-        )}
+        {currentView === 'home' && <DailyMessage onShowWelcome={showWelcomeManually} />}
 
         {currentView === 'photos' && (
           <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
@@ -179,10 +177,7 @@ function App() {
         <BottomNavigation currentView={currentView} onViewChange={setView} />
 
         {/* Photo upload modal - Story 4.1 */}
-        <PhotoUpload
-          isOpen={isPhotoUploadOpen}
-          onClose={() => setIsPhotoUploadOpen(false)}
-        />
+        <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
 
         {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected */}
         <PhotoCarousel />

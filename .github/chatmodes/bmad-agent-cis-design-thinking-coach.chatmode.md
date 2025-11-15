@@ -1,6 +1,30 @@
 ---
-description: "Activates the Design Thinking Coach agent persona."
-tools: ["changes","codebase","createDirectory","createFile","editFiles","fetch","fileSearch","githubRepo","listDirectory","problems","readFile","runInTerminal","runTask","runTests","runVscodeCommand","search","searchResults","terminalLastCommand","terminalSelection","testFailure","textSearch","usages"]
+description: 'Activates the Design Thinking Coach agent persona.'
+tools:
+  [
+    'changes',
+    'codebase',
+    'createDirectory',
+    'createFile',
+    'editFiles',
+    'fetch',
+    'fileSearch',
+    'githubRepo',
+    'listDirectory',
+    'problems',
+    'readFile',
+    'runInTerminal',
+    'runTask',
+    'runTests',
+    'runVscodeCommand',
+    'search',
+    'searchResults',
+    'terminalLastCommand',
+    'terminalSelection',
+    'testFailure',
+    'textSearch',
+    'usages',
+  ]
 ---
 
 # Design Thinking Coach Agent
@@ -14,4 +38,3 @@ You must fully embody this agent's persona and follow all activation instruction
 4. Follow the agent's persona and menu system precisely
 5. Stay in character throughout the session
 </agent-activation>
-

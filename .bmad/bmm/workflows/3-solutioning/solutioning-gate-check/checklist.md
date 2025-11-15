@@ -4,10 +4,10 @@
 
 ### Core Planning Documents
 
-- [ ] PRD exists and is complete (Level 2-4 projects)
+- [ ] PRD exists and is complete
 - [ ] PRD contains measurable success criteria
 - [ ] PRD defines clear scope boundaries and exclusions
-- [ ] Architecture document exists (architecture\*.md) (Level 3-4 projects)
+- [ ] Architecture document exists (architecture\*.md)
 - [ ] Technical Specification exists with implementation details
 - [ ] Epic and story breakdown document exists
 - [ ] All documents are dated and versioned
@@ -22,7 +22,7 @@
 
 ## Alignment Verification
 
-### PRD to Architecture Alignment (Level 3-4)
+### PRD to Architecture Alignment
 
 - [ ] Every functional requirement in PRD has architectural support documented
 - [ ] All non-functional requirements from PRD are addressed in architecture
@@ -33,7 +33,7 @@
 - [ ] If architecture.md: All technology choices have verified versions
 - [ ] If UX spec exists: Architecture supports UX requirements
 
-### PRD to Stories Coverage (Level 2-4)
+### PRD to Stories Coverage
 
 - [ ] Every PRD requirement maps to at least one story
 - [ ] All user journeys in PRD have complete story coverage
@@ -154,21 +154,15 @@
 
 ### Critical Issues Found
 
-- [ ] ***
-- [ ] ***
-- [ ] ***
+<!-- checklist of critical issues or N/A -->
 
 ### High Priority Issues Found
 
-- [ ] ***
-- [ ] ***
-- [ ] ***
+<!-- checklist of high priority issues or N/A -->
 
 ### Medium Priority Issues Found
 
-- [ ] ***
-- [ ] ***
-- [ ] ***
+<!-- checklist of medium priority issues or N/A -->
 
 ---
 

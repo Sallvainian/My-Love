@@ -195,7 +195,10 @@ import { APIRequestContext } from '@playwright/test';
 import { User, createUser } from '../../test-utils/factories/user-factory';
 import { Product, createProduct } from '../../test-utils/factories/product-factory';
 
-export async function seedUser(request: APIRequestContext, overrides: Partial<User> = {}): Promise<User> {
+export async function seedUser(
+  request: APIRequestContext,
+  overrides: Partial<User> = {}
+): Promise<User> {
   const user = createUser(overrides);
 
   const response = await request.post('/api/users', {
@@ -209,7 +212,10 @@ export async function seedUser(request: APIRequestContext, overrides: Partial<Us
   return user;
 }
 
-export async function seedProduct(request: APIRequestContext, overrides: Partial<Product> = {}): Promise<Product> {
+export async function seedProduct(
+  request: APIRequestContext,
+  overrides: Partial<Product> = {}
+): Promise<Product> {
   const product = createProduct(overrides);
 
   const response = await request.post('/api/products', {
@@ -366,11 +372,14 @@ export const createUser = (overrides: Partial<User> = {}): User => ({
 });
 
 // Compose specialized factories
-export const createAdminUser = (overrides: Partial<User> = {}): User => createUser({ role: 'admin', ...overrides });
+export const createAdminUser = (overrides: Partial<User> = {}): User =>
+  createUser({ role: 'admin', ...overrides });
 
-export const createModeratorUser = (overrides: Partial<User> = {}): User => createUser({ role: 'moderator', ...overrides });
+export const createModeratorUser = (overrides: Partial<User> = {}): User =>
+  createUser({ role: 'moderator', ...overrides });
 
-export const createInactiveUser = (overrides: Partial<User> = {}): User => createUser({ isActive: false, ...overrides });
+export const createInactiveUser = (overrides: Partial<User> = {}): User =>
+  createUser({ isActive: false, ...overrides });
 
 // Account-level factories with feature flags
 type Account = {
@@ -477,7 +486,7 @@ When working with feature flags, layer them into factories:
 ```typescript
 export const createUserWithFlags = (
   overrides: Partial<User> = {},
-  flags: Record<string, boolean> = {},
+  flags: Record<string, boolean> = {}
 ): User & { flags: Record<string, boolean> } => ({
   ...createUser(overrides),
   flags: {
@@ -493,7 +502,7 @@ const user = createUserWithFlags(
   {
     'new-dashboard': true,
     'beta-features': true,
-  },
+  }
 );
 ```
 

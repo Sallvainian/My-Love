@@ -15,6 +15,7 @@ So that I can verify core functionality works as expected.
 Story 2.2 builds upon the Playwright testing framework established in Story 2.1 by implementing comprehensive integration tests for all Epic 1 features. With the test infrastructure in place (PWA helpers, multi-browser support, test scripts), Story 2.2 focuses on writing test suites that validate the core application functionality: message display and rotation, favorites persistence, settings management, navigation, and data persistence across browser sessions.
 
 **Core Requirements:**
+
 - **Message Display Tests**: Validate daily message rotation algorithm, message card animations, category badges, relationship duration counter accuracy
 - **Favorites Tests**: Test favorite toggle functionality, persistence across browser refresh, offline mode persistence, heart animation playback
 - **Settings Tests**: Verify pre-configured relationship data loads correctly, test editing partner name and start date with persistence validation
@@ -22,6 +23,7 @@ Story 2.2 builds upon the Playwright testing framework established in Story 2.1 
 - **Persistence Tests**: Validate LocalStorage hydration on app init, IndexedDB operations in offline mode, state persistence across 24-hour gap, quota handling
 
 **Dependencies:**
+
 - **Story 2.1 Complete**: Playwright framework scaffolded with PWA helpers, test scripts, and multi-browser configuration
 - **Epic 1 Features**: All Epic 1 stories (1.1-1.6) completed, providing stable features to test against
 - **PWA Helpers Available**: waitForServiceWorker, clearIndexedDB, goOffline, goOnline, getLocalStorageItem, setLocalStorageItem, clearLocalStorage, getIndexedDBStore
@@ -41,6 +43,7 @@ Story 2.2 aims for 100% coverage of Epic 1 critical user paths through 37 test c
 **From [PRD.md#Epic-2](../../docs/PRD.md#Epic-2):**
 
 **Testing Quality Goals:**
+
 - NFR006: Code Quality - Tests must validate TypeScript strict mode compliance, ESLint standards
 - Test framework must validate offline-first architecture (NFR002)
 - Test execution time target: < 5 minutes locally, < 10 minutes CI (NFR001)
@@ -49,6 +52,7 @@ Story 2.2 aims for 100% coverage of Epic 1 critical user paths through 37 test c
 **From [architecture.md#Testing-Strategy](../../docs/architecture.md):**
 
 **Component Architecture to Test:**
+
 - App.tsx → ErrorBoundary → DailyMessage component tree
 - Zustand state management with persist middleware (LocalStorage persistence)
 - IndexedDB operations via idb 8.0.3 (photos, messages storage)
@@ -355,11 +359,13 @@ Story 2.2 aims for 100% coverage of Epic 1 critical user paths through 37 test c
 **Primary Files to CREATE:**
 
 **1. Test Fixtures (NEW):**
+
 - `/tests/support/fixtures/baseFixture.ts` (NEW) - Reusable test setup configurations
 - Fixtures: cleanApp (fresh state), appWithMessages (default messages), appWithFavorites (pre-favorited messages)
 - Purpose: Reduce test setup boilerplate, ensure consistent initial state
 
 **2. Test Suites (NEW):**
+
 - `/tests/e2e/message-display.spec.ts` (NEW) - 10 tests for message display and rotation (200+ lines)
 - `/tests/e2e/favorites.spec.ts` (NEW) - 8 tests for favorites functionality (180+ lines)
 - `/tests/e2e/settings.spec.ts` (NEW) - 6 tests for settings persistence (150+ lines)
@@ -368,12 +374,14 @@ Story 2.2 aims for 100% coverage of Epic 1 critical user paths through 37 test c
 - Total: ~850 lines of test code across 5 files
 
 **3. Page Objects (OPTIONAL):**
+
 - `/tests/support/pages/DailyMessagePage.ts` (OPTIONAL) - Page Object Model pattern
 - Methods: favoriteMessage(), getMessageText(), getDurationCounter(), switchTheme()
 - Purpose: Encapsulate page interactions, improve test maintainability
 
 **Files NOT Modified:**
-- Application source code (src/**/*.tsx, src/**/*.ts) - Story 2.2 is test writing only
+
+- Application source code (src/**/\*.tsx, src/**/\*.ts) - Story 2.2 is test writing only
 - Story 2.3 will add data-testid attributes to components
 - Playwright configuration (playwright.config.ts) - no changes needed
 - PWA helpers (tests/support/helpers/pwaHelpers.ts) - already implemented in Story 2.1
@@ -420,6 +428,7 @@ Story 2.1 established Playwright testing framework with PWA-specific helpers, mu
 ### Project Structure Notes
 
 **Files to CREATE:**
+
 - `tests/support/fixtures/baseFixture.ts` - Test fixtures (~80 lines)
 - `tests/e2e/message-display.spec.ts` - Message display tests (~200 lines)
 - `tests/e2e/favorites.spec.ts` - Favorites tests (~180 lines)
@@ -429,6 +438,7 @@ Story 2.1 established Playwright testing framework with PWA-specific helpers, mu
 - `tests/support/pages/DailyMessagePage.ts` (OPTIONAL) - Page Object (~100 lines)
 
 **Directories to USE:**
+
 - `tests/e2e/` - Test spec files (will contain 6 new test files)
 - `tests/support/fixtures/` - Test fixtures (will contain baseFixture.ts)
 - `tests/support/helpers/` - PWA helpers (already contains pwaHelpers.ts from Story 2.1)
@@ -437,6 +447,7 @@ Story 2.1 established Playwright testing framework with PWA-specific helpers, mu
 **Alignment with Architecture:**
 
 **Testing Strategy** (from tech-spec-epic-2.md):
+
 ```
 Test Suites (Story 2.2) → Test Fixtures → PWA Helpers → Application Under Test
     ↓
@@ -449,17 +460,17 @@ Data Layer: IndexedDB (photos, messages) → Service Worker (offline)
 
 **Test Coverage Mapping:**
 
-| Epic 1 Feature | Test Suite | Coverage |
-|----------------|-----------|----------|
-| Message display (Story 1.1) | message-display.spec.ts | 10 tests |
-| Message rotation algorithm | message-display.spec.ts | Date-based validation |
-| Favorites functionality (Story 1.2) | favorites.spec.ts | 8 tests |
-| Settings persistence (Story 1.4) | settings.spec.ts | 6 tests |
-| Pre-configuration (Story 1.4) | settings.spec.ts | Constant loading validation |
-| Theme switching (Story 1.5) | navigation.spec.ts | 5 tests (4 themes) |
-| Error boundaries (Story 1.5) | (Future story) | Not in scope for Story 2.2 |
-| LocalStorage persistence (Story 1.2) | persistence.spec.ts | 4 tests |
-| IndexedDB operations (Story 1.3) | persistence.spec.ts | 4 tests |
+| Epic 1 Feature                       | Test Suite              | Coverage                    |
+| ------------------------------------ | ----------------------- | --------------------------- |
+| Message display (Story 1.1)          | message-display.spec.ts | 10 tests                    |
+| Message rotation algorithm           | message-display.spec.ts | Date-based validation       |
+| Favorites functionality (Story 1.2)  | favorites.spec.ts       | 8 tests                     |
+| Settings persistence (Story 1.4)     | settings.spec.ts        | 6 tests                     |
+| Pre-configuration (Story 1.4)        | settings.spec.ts        | Constant loading validation |
+| Theme switching (Story 1.5)          | navigation.spec.ts      | 5 tests (4 themes)          |
+| Error boundaries (Story 1.5)         | (Future story)          | Not in scope for Story 2.2  |
+| LocalStorage persistence (Story 1.2) | persistence.spec.ts     | 4 tests                     |
+| IndexedDB operations (Story 1.3)     | persistence.spec.ts     | 4 tests                     |
 
 **Test Execution Flow:**
 
@@ -487,7 +498,11 @@ Story 2.2 focuses on writing comprehensive E2E integration tests using the frame
 
 ```typescript
 import { test, expect } from '@playwright/test';
-import { clearIndexedDB, clearLocalStorage, waitForServiceWorker } from '../support/helpers/pwaHelpers';
+import {
+  clearIndexedDB,
+  clearLocalStorage,
+  waitForServiceWorker,
+} from '../support/helpers/pwaHelpers';
 
 test.describe('Feature Name', () => {
   test.beforeEach(async ({ page }) => {
@@ -706,7 +721,7 @@ test.describe('Feature Name', () => {
 **Reviewer:** Frank (Code Review Agent)  
 **Review Date:** 2025-10-30  
 **Test Execution:** 106 passed, 18 skipped, 0 failed (1.7 minutes)  
-**Review Outcome:** ✅ **APPROVED**  
+**Review Outcome:** ✅ **APPROVED**
 
 ### Summary
 
@@ -715,6 +730,7 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 ### Key Achievements
 
 ✅ **6/7 Acceptance Criteria Fully Implemented**
+
 - AC-2.2.1: Message display test suite (14 tests)
 - AC-2.2.2: Favorites functionality tests (8 tests, 2 skipped with valid reasons)
 - AC-2.2.3: Settings persistence tests (6 tests, 2 skipped for Epic 3)
@@ -724,12 +740,14 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 - AC-2.2.7: All tests validate UI state AND data persistence
 
 ✅ **Tasks 1-9 Complete**
+
 - Tasks 1-6: Test suites and fixtures implemented and validated
 - Task 7: ✅ 10x flakiness validation completed (100% pass rate)
 - Task 8: ✅ Test coverage verification completed (100% Epic 1 coverage)
 - Task 9: ✅ Performance validated (1.7 min << 5 min target)
 
 ✅ **Code Quality**
+
 - Test isolation via fixtures (cleanApp, appWithMessages, appWithFavorites)
 - PWA helpers properly utilized (clearIndexedDB, clearLocalStorage, etc.)
 - Explicit waits using Playwright auto-waiting (no arbitrary sleep())
@@ -738,6 +756,7 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 ### Critical Finding Resolved During Review
 
 **🔧 Flaky Test Fixed**
+
 - **Issue:** `clearIndexedDB` helper had race condition in Firefox when deleting non-existent databases
 - **Impact:** 1/106 test failed intermittently (99.06% pass rate, not 100%)
 - **Root Cause:** Diagnostic timeout warned but didn't resolve Promise
@@ -748,16 +767,16 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 
 **100% Epic 1 Feature Coverage Confirmed**
 
-| Epic 1 Story | Feature | Test Suite | Tests | Status |
-|--------------|---------|-----------|-------|--------|
-| Story 1.1 | Message display | message-display.spec.ts | 14 | ✅ Complete |
-| Story 1.2 | Zustand persist | persistence.spec.ts | 8 | ✅ Complete |
-| Story 1.2 | Favorites | favorites.spec.ts | 6 active, 2 skipped | ✅ Core complete |
-| Story 1.3 | IndexedDB | persistence.spec.ts | 6 active, 2 skipped | ✅ Core complete |
-| Story 1.4 | Pre-configuration | settings.spec.ts | 4 | ✅ Complete |
-| Story 1.5 | Theme switching | navigation.spec.ts | 4 active, 3 skipped | ✅ Core complete |
-| Story 1.5 | Error boundaries | *(Not tested)* | 0 | Future story |
-| Story 1.6 | Build/deploy | *(Implicit)* | All tests | ✅ Validated |
+| Epic 1 Story | Feature           | Test Suite              | Tests               | Status           |
+| ------------ | ----------------- | ----------------------- | ------------------- | ---------------- |
+| Story 1.1    | Message display   | message-display.spec.ts | 14                  | ✅ Complete      |
+| Story 1.2    | Zustand persist   | persistence.spec.ts     | 8                   | ✅ Complete      |
+| Story 1.2    | Favorites         | favorites.spec.ts       | 6 active, 2 skipped | ✅ Core complete |
+| Story 1.3    | IndexedDB         | persistence.spec.ts     | 6 active, 2 skipped | ✅ Core complete |
+| Story 1.4    | Pre-configuration | settings.spec.ts        | 4                   | ✅ Complete      |
+| Story 1.5    | Theme switching   | navigation.spec.ts      | 4 active, 3 skipped | ✅ Core complete |
+| Story 1.5    | Error boundaries  | _(Not tested)_          | 0                   | Future story     |
+| Story 1.6    | Build/deploy      | _(Implicit)_            | All tests           | ✅ Validated     |
 
 **Total:** 45 tests covering Epic 1 features + 9 infrastructure tests (Story 2.1) = 54 active tests
 
@@ -801,6 +820,7 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 ### Performance Optimization Discovered
 
 **17x Speed Improvement for Validation:**
+
 - **Original approach:** Sequential execution (5 minutes for 10 runs)
 - **Optimized approach:** Parallel execution (1 minute for 10 runs)
 - **Implementation:** Run all 10 test suites simultaneously using background jobs
@@ -817,22 +837,25 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 ✅ **Data Layer:** Tests use PWA helpers to validate IndexedDB operations  
 ✅ **PWA Architecture:** Leverages helpers from Story 2.1 for service worker/offline testing  
 ✅ **Pre-Configuration:** Tests validate hardcoded constants load correctly (AC-2.2.3)  
-✅ **No Source Modifications:** Confirmed - Story 2.2 is test-only, no src/ files modified  
+✅ **No Source Modifications:** Confirmed - Story 2.2 is test-only, no src/ files modified
 
 ### Best Practices Adherence
 
 **Playwright Best Practices:**
+
 - ✅ Test isolation via fixtures (clearIndexedDB, clearLocalStorage in beforeEach)
 - ✅ Explicit waits using Playwright auto-waiting (`expect().toBeVisible()`)
 - ✅ Multi-browser testing (Chromium, Firefox configured)
 - ✅ HTML reports with screenshots on failure
 
 **React Testing Best Practices:**
+
 - ✅ Tests exercise full component tree (integration testing, not unit)
 - ✅ Tests validate user-facing behavior, not implementation details
 - ✅ State persistence validated via storage APIs
 
 **PWA Testing Best Practices:**
+
 - ✅ Service worker helpers abstract browser API complexity
 - ✅ IndexedDB operations tested via helper functions
 - ✅ Offline mode tests documented with production build requirement
@@ -840,22 +863,26 @@ Story 2.2 successfully implements comprehensive integration tests for all Epic 1
 ### Recommendations
 
 **Immediate (Story 2.3):**
+
 1. Add data-testid attributes to components per naming convention
 2. Migrate tests from CSS selectors to data-testid selectors
 3. Update test documentation with data-testid migration notes
 
 **Short-term (Story 2.4):**
+
 1. Enable skipped service worker tests when auto-start preview server configured
 2. Run full suite against production build to validate offline mode
 3. Document service worker test results
 
 **Future (Epic 3+):**
+
 1. Add ErrorBoundary component testing (error simulation story)
 2. Enable Settings UI tests when Settings page implemented
 3. Enable Favorites list tests when Favorites view implemented
 4. Enable navigation state tests when React Router integrated
 
 **Performance:**
+
 1. Consider adding parallel validation script to package.json
 2. Monitor test execution time as test count grows
 3. Increase workers to 8 for faster local execution (Ryzen 9 12-core CPU)
@@ -874,4 +901,3 @@ All acceptance criteria met. Test implementation is solid, maintainable, and per
 **Validation Method:** Code inspection + 10x parallel test execution  
 **Test Fix Applied:** tests/support/helpers/pwaHelpers.ts:112-119 (clearIndexedDB fallback timeout)  
 **Coverage Documentation:** See /tmp/coverage-verification.md for detailed checklist
-

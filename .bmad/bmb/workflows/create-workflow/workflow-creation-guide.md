@@ -61,13 +61,13 @@ That's it! To execute, tell the BMAD agent: `workflow path/to/my-workflow/`
 
 ### Tasks vs Workflows
 
-| Aspect         | Task               | Workflow                      |
-| -------------- | ------------------ | ----------------------------- |
-| **Purpose**    | Single operation   | Multi-step process            |
-| **Format**     | XML                | Folder with YAML config       |
-| **Location**   | `/src/core/tasks/` | `/.bmad/*/workflows/` |
-| **User Input** | Minimal            | Extensive                     |
-| **Output**     | Variable           | Usually documents             |
+| Aspect         | Task               | Workflow                |
+| -------------- | ------------------ | ----------------------- |
+| **Purpose**    | Single operation   | Multi-step process      |
+| **Format**     | XML                | Folder with YAML config |
+| **Location**   | `/src/core/tasks/` | `/.bmad/*/workflows/`   |
+| **User Input** | Minimal            | Extensive               |
+| **Output**     | Variable           | Usually documents       |
 
 ### Workflow Types
 
@@ -855,7 +855,6 @@ _Generated on {{date}}_
 **Output:**
 
 - `<template-output>` - Save checkpoint
-- `<invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>` - Trigger AI enhancement
 - `<critical>` - Important info
 - `<example>` - Show example
 
@@ -904,7 +903,6 @@ _Generated on {{date}}_
   <step n="2" goal="Define requirements">
     Create functional and non-functional requirements.
     <template-output>requirements</template-output>
-    <invoke-task halt="true">{project-root}/.bmad/core/tasks/adv-elicit.xml</invoke-task>
   </step>
 
   <step n="3" goal="Validate">

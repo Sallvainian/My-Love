@@ -1,5 +1,5 @@
 ---
-description: 'Transform PRD requirements into bite-sized stories organized in epics for 200k context dev agents'
+description: 'Transform PRD requirements into bite-sized stories organized into deliverable functional epics. This workflow takes a Product Requirements Document (PRD) and breaks it down into epics and user stories that can be easily assigned to development teams. It ensures that all functional requirements are captured in a structured format, making it easier for teams to understand and implement the necessary features.'
 ---
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:

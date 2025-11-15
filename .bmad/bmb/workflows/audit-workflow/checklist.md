@@ -125,10 +125,9 @@ _List any cleanup recommendations:_
 
 ## Audit Summary
 
-**Total Checks:** 72
-**Passed:** **\_** / 72
-**Failed:** **\_** / 72
-**Pass Rate:** **\_**%
+**Total Checks:**
+**Passed:** {total}
+**Failed:** {total}
 
 **Recommendation:**
 
