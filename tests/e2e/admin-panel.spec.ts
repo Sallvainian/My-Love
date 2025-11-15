@@ -59,7 +59,9 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       await navigateToAdmin(cleanApp);
 
       // Verify message count display shows 365 messages
-      const countText = await cleanApp.locator('text=/Showing \\d+ of \\d+ messages/').textContent();
+      const countText = await cleanApp
+        .locator('text=/Showing \\d+ of \\d+ messages/')
+        .textContent();
       expect(countText).toContain('of 365 messages');
 
       // Verify table is present
@@ -82,8 +84,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       expect(filteredCount).toBeLessThan(initialCount);
 
       // Verify all visible messages are "Reasons" category
-      const categoryLabels = await cleanApp.locator('[data-testid="message-row-category"]').allTextContents();
-      categoryLabels.forEach(label => {
+      const categoryLabels = await cleanApp
+        .locator('[data-testid="message-row-category"]')
+        .allTextContents();
+      categoryLabels.forEach((label) => {
         expect(label).toContain('Reasons');
       });
     });
@@ -100,8 +104,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       expect(searchResults).toBeGreaterThan(0);
 
       // Verify search term appears in visible messages
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasSearchTerm = messageTexts.some(text => text.toLowerCase().includes('love'));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasSearchTerm = messageTexts.some((text) => text.toLowerCase().includes('love'));
       expect(hasSearchTerm).toBe(true);
     });
 
@@ -288,8 +294,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       expect(newCount).toBe(initialCount + 1);
 
       // Verify message text is present
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasNewMessage = messageTexts.some(text => text.includes(testMessage));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasNewMessage = messageTexts.some((text) => text.includes(testMessage));
       expect(hasNewMessage).toBe(true);
     });
 
@@ -351,8 +359,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
 
       // Verify updated message appears in list
       await cleanApp.waitForTimeout(300);
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasUpdatedMessage = messageTexts.some(text => text.includes(updatedMessage));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasUpdatedMessage = messageTexts.some((text) => text.includes(updatedMessage));
       expect(hasUpdatedMessage).toBe(true);
     });
 
@@ -376,8 +386,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       await expect(cleanApp.getByTestId('admin-edit-form')).not.toBeVisible();
 
       // Verify original message unchanged
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasOriginalMessage = messageTexts.some(text => text.includes(originalMessage));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasOriginalMessage = messageTexts.some((text) => text.includes(originalMessage));
       expect(hasOriginalMessage).toBe(true);
     });
   });
@@ -431,7 +443,9 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
 
       expect(storedMessages.length).toBeGreaterThan(0);
 
-      const hasTestMessage = storedMessages.some((msg: { text: string }) => msg.text === testMessage);
+      const hasTestMessage = storedMessages.some(
+        (msg: { text: string }) => msg.text === testMessage
+      );
       expect(hasTestMessage).toBe(true);
     });
 
@@ -454,8 +468,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       await cleanApp.getByTestId('admin-filter-category').selectOption('custom');
       await cleanApp.waitForTimeout(300);
 
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasPersistedMessage = messageTexts.some(text => text.includes(testMessage));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasPersistedMessage = messageTexts.some((text) => text.includes(testMessage));
       expect(hasPersistedMessage).toBe(true);
     });
 
@@ -546,7 +562,9 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       expect(count).toBe(2);
     });
 
-    test('should maintain message list state when switching between admin and main app', async ({ cleanApp }) => {
+    test('should maintain message list state when switching between admin and main app', async ({
+      cleanApp,
+    }) => {
       await navigateToAdmin(cleanApp);
 
       const testMessage = 'Message to maintain state';
@@ -564,8 +582,10 @@ test.describe('Admin Interface - Custom Message Management (Story 3.4)', () => {
       // Verify message still exists
       await cleanApp.getByTestId('admin-filter-category').selectOption('custom');
       await cleanApp.waitForTimeout(300);
-      const messageTexts = await cleanApp.locator('[data-testid="message-row-text"]').allTextContents();
-      const hasMessage = messageTexts.some(text => text.includes(testMessage));
+      const messageTexts = await cleanApp
+        .locator('[data-testid="message-row-text"]')
+        .allTextContents();
+      const hasMessage = messageTexts.some((text) => text.includes(testMessage));
       expect(hasMessage).toBe(true);
     });
   });

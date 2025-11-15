@@ -290,33 +290,210 @@ test.describe('Theme Selector UI (Future Story)', () => {
   });
 });
 
-test.describe('Navigation State (Future Story)', () => {
-  // Note: Multi-page navigation will be added in Epic 3
-  // Currently app is single-view (DailyMessage only)
-
-  test.skip('should persist navigation state across refresh', async ({ cleanApp }) => {
-    // This test will be enabled when multi-page navigation is added
-    // Expected flow:
-    // 1. Navigate to Favorites view
-    // 2. Refresh page
-    // 3. Verify still on Favorites view (navigation state persisted)
-
+test.describe('Story 4.5: Photo Gallery Navigation Integration', () => {
+  // AC-4.5.1: Top Navigation Bar with Home and Photos tabs
+  test('AC-4.5.1: should display top navigation with Home and Photos tabs', async ({
+    cleanApp,
+  }) => {
     await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
 
-    // Navigate to favorites
-    // const favoritesButton = cleanApp.locator('button[aria-label="Favorites"]');
-    // await favoritesButton.click();
+    // Verify top navigation bar visible
+    const topNav = cleanApp.getByTestId('top-navigation');
+    await expect(topNav).toBeVisible();
 
-    // Verify on favorites view
-    // await expect(cleanApp.locator('h1:has-text("Favorites")')).toBeVisible();
+    // Verify Home tab
+    const homeTab = cleanApp.getByTestId('nav-home-tab');
+    await expect(homeTab).toBeVisible();
+    await expect(homeTab).toHaveAttribute('aria-label', 'Navigate to Home');
 
-    // Refresh
-    // await cleanApp.reload();
-    // await cleanApp.waitForLoadState('networkidle');
+    // Verify Photos tab
+    const photosTab = cleanApp.getByTestId('nav-photos-tab');
+    await expect(photosTab).toBeVisible();
+    await expect(photosTab).toHaveAttribute('aria-label', /Navigate to Photos/);
 
-    // Verify still on favorites view
-    // await expect(cleanApp.locator('h1:has-text("Favorites")')).toBeVisible();
+    console.log('✓ AC-4.5.1: Top navigation bar with tabs displayed');
+  });
 
-    console.log('✓ Navigation state persists across refresh');
+  // AC-4.5.2: Active tab highlighting
+  test('AC-4.5.2: should highlight active tab correctly', async ({ cleanApp }) => {
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    const homeTab = cleanApp.getByTestId('nav-home-tab');
+    const photosTab = cleanApp.getByTestId('nav-photos-tab');
+
+    // Home should be active initially
+    await expect(homeTab).toHaveAttribute('aria-current', 'page');
+    await expect(homeTab).toHaveClass(/text-blue-600/);
+
+    // Navigate to Photos
+    await photosTab.click();
+    await cleanApp.waitForURL('/photos');
+
+    // Photos should be active now
+    await expect(photosTab).toHaveAttribute('aria-current', 'page');
+    await expect(photosTab).toHaveClass(/text-blue-600/);
+    await expect(homeTab).toHaveClass(/text-gray-500/);
+
+    console.log('✓ AC-4.5.2: Active tab highlighting works correctly');
+  });
+
+  // AC-4.5.3: Smooth transitions between views
+  test('AC-4.5.3: should transition smoothly between Home and Photos', async ({ cleanApp }) => {
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    // Navigate to Photos
+    await cleanApp.getByTestId('nav-photos-tab').click();
+    await expect(cleanApp).toHaveURL('/photos');
+
+    // Verify PhotoGallery visible (empty state since no photos uploaded)
+    const photoGallery = cleanApp.getByTestId('photo-gallery-empty-state');
+    await expect(photoGallery).toBeVisible();
+
+    // Navigate back to Home
+    await cleanApp.getByTestId('nav-home-tab').click();
+    await expect(cleanApp).toHaveURL('/');
+
+    // Verify DailyMessage visible
+    const dailyMessage = cleanApp.getByTestId('daily-message');
+    await expect(dailyMessage).toBeVisible();
+
+    console.log('✓ AC-4.5.3: Smooth view transitions without reload');
+  });
+
+  // AC-4.5.4: Photo count badge (optional)
+  test('AC-4.5.4: should display photo count badge if photos exist', async ({ cleanApp }) => {
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    const badge = cleanApp.getByTestId('photo-count-badge');
+    const badgeVisible = await badge.isVisible().catch(() => false);
+
+    if (badgeVisible) {
+      const badgeText = await badge.textContent();
+      expect(badgeText).toMatch(/^\d+\+?$/); // Number or "99+"
+      console.log(`✓ AC-4.5.4: Photo count badge displays: ${badgeText}`);
+    } else {
+      console.log('✓ AC-4.5.4: No photos, badge hidden (correct)');
+    }
+  });
+
+  // AC-4.5.5: Deep linking support
+  test('AC-4.5.5: should support deep linking to /photos', async ({ cleanApp }) => {
+    // Navigate directly to /photos URL
+    await cleanApp.goto('/photos');
+    await cleanApp.waitForLoadState('networkidle');
+
+    // Wait for PhotoGallery to finish loading (it shows loading state first, then empty state)
+    await cleanApp.waitForTimeout(2000); // Give time for async loading to complete
+
+    // Verify PhotoGallery loads (empty state since no photos)
+    const photoGallery = cleanApp.getByTestId('photo-gallery-empty-state');
+    await expect(photoGallery).toBeVisible({ timeout: 10000 });
+
+    // Verify Photos tab active
+    const photosTab = cleanApp.getByTestId('nav-photos-tab');
+    await expect(photosTab).toHaveAttribute('aria-current', 'page');
+
+    console.log('✓ AC-4.5.5: Deep linking to /photos works');
+  });
+
+  test('AC-4.5.5: should support deep linking to / (home)', async ({ cleanApp }) => {
+    // cleanApp fixture already handles splash screen, so we can directly verify DailyMessage
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    // Verify Home tab active
+    const homeTab = cleanApp.getByTestId('nav-home-tab');
+    await expect(homeTab).toHaveAttribute('aria-current', 'page');
+
+    console.log('✓ AC-4.5.5: Deep linking to / works');
+  });
+
+  // AC-4.5.6: Browser back/forward buttons
+  test('AC-4.5.6: should support browser back button', async ({ cleanApp }) => {
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    // Navigate to Photos
+    await cleanApp.getByTestId('nav-photos-tab').click();
+    await expect(cleanApp).toHaveURL('/photos');
+
+    // Verify Photos view loaded (empty state) - wait longer for async loading
+    await expect(cleanApp.getByTestId('photo-gallery-empty-state')).toBeVisible({ timeout: 10000 });
+
+    // Click browser back
+    await cleanApp.goBack();
+    await cleanApp.waitForTimeout(500); // Wait for navigation
+    await expect(cleanApp).toHaveURL('/');
+
+    // Verify Home tab active and DailyMessage visible
+    const homeTab = cleanApp.getByTestId('nav-home-tab');
+    await expect(homeTab).toHaveAttribute('aria-current', 'page');
+    await expect(cleanApp.getByTestId('daily-message')).toBeVisible({ timeout: 10000 });
+
+    console.log('✓ AC-4.5.6: Browser back button works');
+  });
+
+  test('AC-4.5.6: should support browser forward button', async ({ cleanApp }) => {
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    // Navigate to Photos
+    await cleanApp.getByTestId('nav-photos-tab').click();
+    await expect(cleanApp).toHaveURL('/photos');
+
+    // Verify Photos view loaded (empty state)
+    await expect(cleanApp.getByTestId('photo-gallery-empty-state')).toBeVisible({ timeout: 10000 });
+
+    // Go back
+    await cleanApp.goBack();
+    await cleanApp.waitForTimeout(500);
+    await expect(cleanApp).toHaveURL('/');
+
+    // Go forward
+    await cleanApp.goForward();
+    await cleanApp.waitForTimeout(500);
+    await expect(cleanApp).toHaveURL('/photos');
+
+    // Verify Photos tab active and photo gallery visible
+    const photosTab = cleanApp.getByTestId('nav-photos-tab');
+    await expect(photosTab).toHaveAttribute('aria-current', 'page');
+    await expect(cleanApp.getByTestId('photo-gallery-empty-state')).toBeVisible({ timeout: 10000 });
+
+    console.log('✓ AC-4.5.6: Browser forward button works');
+  });
+
+  test('AC-4.5.6: should handle multiple back navigations', async ({ cleanApp }) => {
+    await expect(cleanApp.getByTestId('message-card')).toBeVisible({ timeout: 10000 });
+
+    // Navigate: Home → Photos → Home → Photos
+    await cleanApp.getByTestId('nav-photos-tab').click();
+    await cleanApp.waitForTimeout(500);
+    await expect(cleanApp).toHaveURL('/photos');
+    await expect(cleanApp.getByTestId('photo-gallery-empty-state')).toBeVisible({ timeout: 10000 });
+
+    await cleanApp.getByTestId('nav-home-tab').click();
+    await cleanApp.waitForTimeout(500);
+    await expect(cleanApp).toHaveURL('/');
+    await expect(cleanApp.getByTestId('daily-message')).toBeVisible({ timeout: 10000 });
+
+    await cleanApp.getByTestId('nav-photos-tab').click();
+    await cleanApp.waitForTimeout(500);
+    await expect(cleanApp).toHaveURL('/photos');
+    await expect(cleanApp.getByTestId('photo-gallery-empty-state')).toBeVisible({ timeout: 10000 });
+
+    // Back through history
+    await cleanApp.goBack(); // Photos → Home
+    await cleanApp.waitForTimeout(500); // Wait for state transition
+    await expect(cleanApp).toHaveURL('/');
+    await expect(cleanApp.getByTestId('daily-message')).toBeVisible({ timeout: 10000 });
+
+    await cleanApp.goBack(); // Home → Photos (previous)
+    await cleanApp.waitForTimeout(500); // Wait for state transition
+    await expect(cleanApp).toHaveURL('/photos');
+    await expect(cleanApp.getByTestId('photo-gallery-empty-state')).toBeVisible({ timeout: 10000 });
+
+    await cleanApp.goBack(); // Photos → Home (initial)
+    await cleanApp.waitForTimeout(500); // Wait for state transition
+    await expect(cleanApp).toHaveURL('/');
+    await expect(cleanApp.getByTestId('daily-message')).toBeVisible({ timeout: 10000 });
+
+    console.log('✓ AC-4.5.6: Multiple back navigations work correctly');
   });
 });

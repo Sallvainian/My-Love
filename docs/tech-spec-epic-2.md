@@ -16,6 +16,7 @@ This epic addresses the critical need for regression prevention as the applicati
 ## Objectives and Scope
 
 **In Scope:**
+
 - Scaffold Playwright testing framework with TypeScript configuration (Story 2.1)
 - Create PWA-specific test helpers: waitForServiceWorker, clearIndexedDB, goOffline, goOnline (Story 2.1)
 - Configure multi-browser testing (Chromium, Firefox, WebKit) with parallel execution (Story 2.1)
@@ -28,6 +29,7 @@ This epic addresses the critical need for regression prevention as the applicati
 - Document testing guidelines, patterns, and troubleshooting in tests/README.md (Story 2.1, 2.6)
 
 **Out of Scope:**
+
 - Unit testing individual React components (focus is E2E integration testing)
 - Performance testing or load testing (defer to future optimization epic)
 - Accessibility testing automation (manual WCAG validation sufficient for Epic 2)
@@ -52,6 +54,7 @@ Epic 2 integrates seamlessly with the existing architecture established in Epic 
 **Testing Framework Addition:** Playwright (new dependency) operates at browser automation layer, interacting with deployed app via Chrome DevTools Protocol. Does not require changes to application code beyond adding data-testid attributes for stable element selection.
 
 **Constraints:**
+
 - Tests must work with offline-first PWA architecture (service worker registration, cache-first strategies)
 - Multi-browser support requires testing IndexedDB/LocalStorage compatibility across Chromium, Firefox, WebKit
 - GitHub Actions free tier limits: 2000 minutes/month for private repos (estimated 10 mins per CI run)
@@ -61,21 +64,22 @@ Epic 2 integrates seamlessly with the existing architecture established in Epic 
 
 ### Services and Modules
 
-| Module/Service | Responsibilities | Input | Output | Owner/Story |
-|----------------|------------------|-------|--------|-------------|
-| **Playwright Test Runner** | Execute E2E tests across browsers | Test files (*.spec.ts) | Test results, screenshots | Story 2.1 |
-| **PWA Test Helpers** | Service worker, IndexedDB, offline testing utilities | Browser context | Promise<void> or state info | Story 2.1 |
-| **Test Fixtures** | Reusable test setup (authenticated state, clean DB) | Test context | Configured page/context | Story 2.1 |
-| **DailyMessage Test Suite** | Validate message display, rotation, animations | Epic 1 features | Pass/fail assertions | Story 2.2 |
-| **Favorites Test Suite** | Validate favorite toggle, persistence, UI updates | Favorite functionality | Pass/fail assertions | Story 2.2 |
-| **Settings Test Suite** | Validate settings persistence, pre-configuration | Settings features | Pass/fail assertions | Story 2.2 |
-| **Navigation Test Suite** | Validate routing (future), theme switching | Navigation features | Pass/fail assertions | Story 2.2 |
-| **Persistence Test Suite** | Validate LocalStorage/IndexedDB across sessions | State persistence | Pass/fail assertions | Story 2.2 |
-| **Auto-Start Dev Server** | Launch Vite dev server before tests | playwright.config.ts | Running server on dynamic port | Story 2.4 |
-| **GitHub Actions Workflow** | CI/CD test execution on PR/push | .github/workflows/playwright.yml | Test results, artifacts | Story 2.6 |
-| **HTML Test Reporter** | Generate visual test reports with screenshots | Test run results | HTML report + artifacts | Story 2.6 |
+| Module/Service              | Responsibilities                                     | Input                            | Output                         | Owner/Story |
+| --------------------------- | ---------------------------------------------------- | -------------------------------- | ------------------------------ | ----------- |
+| **Playwright Test Runner**  | Execute E2E tests across browsers                    | Test files (\*.spec.ts)          | Test results, screenshots      | Story 2.1   |
+| **PWA Test Helpers**        | Service worker, IndexedDB, offline testing utilities | Browser context                  | Promise<void> or state info    | Story 2.1   |
+| **Test Fixtures**           | Reusable test setup (authenticated state, clean DB)  | Test context                     | Configured page/context        | Story 2.1   |
+| **DailyMessage Test Suite** | Validate message display, rotation, animations       | Epic 1 features                  | Pass/fail assertions           | Story 2.2   |
+| **Favorites Test Suite**    | Validate favorite toggle, persistence, UI updates    | Favorite functionality           | Pass/fail assertions           | Story 2.2   |
+| **Settings Test Suite**     | Validate settings persistence, pre-configuration     | Settings features                | Pass/fail assertions           | Story 2.2   |
+| **Navigation Test Suite**   | Validate routing (future), theme switching           | Navigation features              | Pass/fail assertions           | Story 2.2   |
+| **Persistence Test Suite**  | Validate LocalStorage/IndexedDB across sessions      | State persistence                | Pass/fail assertions           | Story 2.2   |
+| **Auto-Start Dev Server**   | Launch Vite dev server before tests                  | playwright.config.ts             | Running server on dynamic port | Story 2.4   |
+| **GitHub Actions Workflow** | CI/CD test execution on PR/push                      | .github/workflows/playwright.yml | Test results, artifacts        | Story 2.6   |
+| **HTML Test Reporter**      | Generate visual test reports with screenshots        | Test run results                 | HTML report + artifacts        | Story 2.6   |
 
 **Key Module Interactions:**
+
 - Playwright Test Runner → PWA Test Helpers → Browser APIs (Service Worker, IndexedDB)
 - Test Suites → Test Fixtures → PWA Helpers → Application Under Test
 - Auto-Start Dev Server → Vite → Playwright (wait for server readiness)
@@ -90,22 +94,22 @@ Epic 2 integrates seamlessly with the existing architecture established in Epic 
 ```typescript
 // playwright.config.ts
 interface PlaywrightConfig {
-  testDir: string;              // './tests/e2e'
-  timeout: number;              // 30000ms per test
-  retries: number;              // 2 retries on CI, 0 locally
-  workers: number;              // Parallel test execution (4 locally, 2 CI)
-  reporter: Reporter[];         // ['html', 'github'] reporters
+  testDir: string; // './tests/e2e'
+  timeout: number; // 30000ms per test
+  retries: number; // 2 retries on CI, 0 locally
+  workers: number; // Parallel test execution (4 locally, 2 CI)
+  reporter: Reporter[]; // ['html', 'github'] reporters
   use: {
-    baseURL: string;            // 'http://localhost:5173/My-Love/'
-    trace: 'on-first-retry';    // Trace collection strategy
+    baseURL: string; // 'http://localhost:5173/My-Love/'
+    trace: 'on-first-retry'; // Trace collection strategy
     screenshot: 'only-on-failure';
     video: 'retain-on-failure';
   };
-  projects: BrowserProject[];   // Chromium, Firefox, WebKit configs
+  projects: BrowserProject[]; // Chromium, Firefox, WebKit configs
   webServer: {
     command: 'npm run dev';
     url: 'http://localhost:5173/My-Love/';
-    timeout: 120000;            // 2 min server start timeout
+    timeout: 120000; // 2 min server start timeout
     reuseExistingServer: boolean; // !process.env.CI
   };
 }
@@ -132,10 +136,10 @@ export interface PWATestHelpers {
 ```typescript
 // tests/support/fixtures/baseFixture.ts
 export interface TestFixtures {
-  cleanApp: Page;               // Fresh app state (cleared storage)
-  appWithMessages: Page;        // App with default 100 messages loaded
-  appWithFavorites: Page;       // App with 5 pre-favorited messages
-  appWithCustomTheme: Page;     // App with Ocean Dreams theme set
+  cleanApp: Page; // Fresh app state (cleared storage)
+  appWithMessages: Page; // App with default 100 messages loaded
+  appWithFavorites: Page; // App with 5 pre-favorited messages
+  appWithCustomTheme: Page; // App with Ocean Dreams theme set
 }
 ```
 
@@ -144,17 +148,17 @@ export interface TestFixtures {
 ```typescript
 // Naming pattern: [component]-[element]-[action?]
 // Examples:
-'message-card'                  // Main message display
-'message-favorite-button'       // Favorite toggle button
-'message-share-button'          // Share button
-'message-text'                  // Message content text
-'message-category-badge'        // Category badge
-'settings-partner-name-input'   // Partner name input field
-'settings-start-date-input'     // Relationship start date input
-'settings-theme-select'         // Theme dropdown
-'navigation-home-link'          // Home navigation link
-'navigation-favorites-link'     // Favorites navigation link
-'navigation-settings-link'      // Settings navigation link
+'message-card'; // Main message display
+'message-favorite-button'; // Favorite toggle button
+'message-share-button'; // Share button
+'message-text'; // Message content text
+'message-category-badge'; // Category badge
+'settings-partner-name-input'; // Partner name input field
+'settings-start-date-input'; // Relationship start date input
+'settings-theme-select'; // Theme dropdown
+'navigation-home-link'; // Home navigation link
+'navigation-favorites-link'; // Favorites navigation link
+'navigation-settings-link'; // Settings navigation link
 ```
 
 ### APIs and Interfaces
@@ -164,36 +168,40 @@ export interface TestFixtures {
 **Browser APIs Under Test:**
 
 **1. Service Worker API**
+
 ```typescript
 // Validated by PWA helpers in tests
-navigator.serviceWorker.register('/sw.js')
-navigator.serviceWorker.ready
-navigator.serviceWorker.controller
+navigator.serviceWorker.register('/sw.js');
+navigator.serviceWorker.ready;
+navigator.serviceWorker.controller;
 // Test coverage: SW registration, cache population, offline mode
 ```
 
 **2. IndexedDB API**
+
 ```typescript
 // Validated by persistence tests
-indexedDB.open('my-love-db', 1)
-transaction.objectStore('messages').add(message)
-transaction.objectStore('photos').get(id)
+indexedDB.open('my-love-db', 1);
+transaction.objectStore('messages').add(message);
+transaction.objectStore('photos').get(id);
 // Test coverage: CRUD operations, offline transactions, quota handling
 ```
 
 **3. LocalStorage API**
+
 ```typescript
 // Validated by state persistence tests
-localStorage.setItem('my-love-storage', JSON.stringify(state))
-localStorage.getItem('my-love-storage')
+localStorage.setItem('my-love-storage', JSON.stringify(state));
+localStorage.getItem('my-love-storage');
 // Test coverage: Zustand persist hydration, quota exceeded scenarios
 ```
 
 **4. Web Share API**
+
 ```typescript
 // Validated by message sharing tests
-navigator.share({ title, text, url })
-navigator.clipboard.writeText(text) // Fallback
+navigator.share({ title, text, url });
+navigator.clipboard.writeText(text); // Fallback
 // Test coverage: Share functionality, clipboard fallback
 ```
 
@@ -211,7 +219,7 @@ test.describe('Message Display', () => {
     await waitForServiceWorker(page);
   });
 
-  test('should display today\'s message', async ({ page }) => {
+  test("should display today's message", async ({ page }) => {
     const messageCard = page.getByTestId('message-card');
     await expect(messageCard).toBeVisible();
     const messageText = page.getByTestId('message-text');
@@ -428,31 +436,37 @@ Push fix to PR → CI retries → Tests pass
 **Test Infrastructure Security Considerations:**
 
 **Playwright Browser Context Isolation:**
+
 - Each test runs in isolated browser context (clean cookies, storage, cache)
 - Prevents cross-test data leakage
 - No shared state between test executions
 
 **GitHub Actions CI Security:**
+
 - Tests run in ephemeral containers (destroyed after each workflow run)
 - No persistent storage of sensitive data
 - GitHub Actions secrets used for deployment (not exposed to test logs)
 
 **Test Data Security:**
+
 - No real user data in tests (all test data is synthetic/hardcoded)
 - Pre-configured relationship data (Story 1.4) safely committed to repo (non-sensitive: partner name, date)
 - No API keys or secrets required (client-side PWA with no backend)
 
 **data-testid Attributes Security:**
+
 - Attributes are HTML data attributes (standard, no security risk)
 - Not used for application logic (testing only)
 - Do not expose sensitive information (e.g., "message-favorite-button" not "message-12345")
 
 **Dependency Security:**
+
 - Playwright maintained by Microsoft (trusted source)
 - Regular updates via Dependabot (GitHub security scanning)
 - No test dependencies with known CVEs at Epic 2 start
 
 **CI Workflow Security Best Practices:**
+
 - Workflow permissions set to minimal required (contents: read, pull-requests: write)
 - No external secrets or credentials needed for testing
 - Artifacts (test reports) uploaded to GitHub (not public CDN)
@@ -476,15 +490,15 @@ Push fix to PR → CI retries → Tests pass
 
 **Test Infrastructure Failure Scenarios:**
 
-| Failure | Impact | Mitigation | Story |
-|---------|--------|------------|-------|
-| Playwright browser install fails | CI tests cannot run | Cache browsers in CI, retry logic | 2.6 |
-| Dev server fails to start | Tests timeout waiting for server | Increase webServer timeout to 120s, check port conflicts | 2.4 |
-| Service worker registration fails | PWA tests fail | waitForServiceWorker helper with timeout, fallback to skip SW-dependent tests | 2.1 |
-| IndexedDB quota exceeded | Persistence tests fail | clearIndexedDB before each test in fixtures | 2.1, 2.2 |
-| Test selector breaks (component refactor) | Tests fail to find elements | data-testid attributes (Story 2.3) resist refactoring, update tests if intentional UI change | 2.3 |
-| GitHub Actions runner out of disk space | CI fails mid-workflow | Clean up artifacts, reduce video retention (retain-on-failure only) | 2.6 |
-| Network timeout in CI | Tests fail intermittently | Increase Playwright timeout config, retry: 2 in CI | 2.6 |
+| Failure                                   | Impact                           | Mitigation                                                                                   | Story    |
+| ----------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- | -------- |
+| Playwright browser install fails          | CI tests cannot run              | Cache browsers in CI, retry logic                                                            | 2.6      |
+| Dev server fails to start                 | Tests timeout waiting for server | Increase webServer timeout to 120s, check port conflicts                                     | 2.4      |
+| Service worker registration fails         | PWA tests fail                   | waitForServiceWorker helper with timeout, fallback to skip SW-dependent tests                | 2.1      |
+| IndexedDB quota exceeded                  | Persistence tests fail           | clearIndexedDB before each test in fixtures                                                  | 2.1, 2.2 |
+| Test selector breaks (component refactor) | Tests fail to find elements      | data-testid attributes (Story 2.3) resist refactoring, update tests if intentional UI change | 2.3      |
+| GitHub Actions runner out of disk space   | CI fails mid-workflow            | Clean up artifacts, reduce video retention (retain-on-failure only)                          | 2.6      |
+| Network timeout in CI                     | Tests fail intermittently        | Increase Playwright timeout config, retry: 2 in CI                                           | 2.6      |
 
 **Reliability Patterns Implemented:**
 
@@ -498,6 +512,7 @@ Push fix to PR → CI retries → Tests pass
 **Test Execution Observability:**
 
 **Local Development:**
+
 - **Console Output:** Real-time test progress (test name, pass/fail status)
 - **HTML Report:** playwright-report/index.html generated after each run
   - Visual test results with timeline
@@ -510,6 +525,7 @@ Push fix to PR → CI retries → Tests pass
   - Step-by-step execution with DOM inspection
 
 **CI (GitHub Actions):**
+
 - **Workflow Logs:** Real-time console output in GitHub Actions UI
   - Test execution progress
   - Error messages and stack traces
@@ -524,14 +540,14 @@ Push fix to PR → CI retries → Tests pass
 
 **Test Metrics Tracked:**
 
-| Metric | Location | Purpose | Story |
-|--------|----------|---------|-------|
-| Test pass/fail count | Playwright reporter | Overall test health | 2.1 |
-| Execution time per suite | HTML report | Identify slow tests | 2.5 |
-| Execution time per browser | HTML report | Browser-specific performance issues | 2.5 |
-| Flaky test rate | Manual analysis (10 runs) | Reliability validation | 2.5 |
-| CI workflow duration | GitHub Actions logs | Ensure < 10 min target | 2.6 |
-| Test coverage by feature | Manual tracking (checklist) | Ensure 100% Epic 1 coverage | 2.5 |
+| Metric                     | Location                    | Purpose                             | Story |
+| -------------------------- | --------------------------- | ----------------------------------- | ----- |
+| Test pass/fail count       | Playwright reporter         | Overall test health                 | 2.1   |
+| Execution time per suite   | HTML report                 | Identify slow tests                 | 2.5   |
+| Execution time per browser | HTML report                 | Browser-specific performance issues | 2.5   |
+| Flaky test rate            | Manual analysis (10 runs)   | Reliability validation              | 2.5   |
+| CI workflow duration       | GitHub Actions logs         | Ensure < 10 min target              | 2.6   |
+| Test coverage by feature   | Manual tracking (checklist) | Ensure 100% Epic 1 coverage         | 2.5   |
 
 **Debugging Tools:**
 
@@ -556,21 +572,23 @@ Push fix to PR → CI retries → Tests pass
 
 ### New Dependencies Added (Epic 2)
 
-| Package | Version | Type | Purpose | Story |
-|---------|---------|------|---------|-------|
-| **@playwright/test** | ^1.48.0 | devDependency | E2E testing framework with browser automation | 2.1 |
-| **@types/node** | Already present (^24.6.0) | devDependency | TypeScript types for Node.js (required by Playwright config) | 2.1 |
+| Package              | Version                   | Type          | Purpose                                                      | Story |
+| -------------------- | ------------------------- | ------------- | ------------------------------------------------------------ | ----- |
+| **@playwright/test** | ^1.48.0                   | devDependency | E2E testing framework with browser automation                | 2.1   |
+| **@types/node**      | Already present (^24.6.0) | devDependency | TypeScript types for Node.js (required by Playwright config) | 2.1   |
 
 **No production dependencies added** - Epic 2 is testing infrastructure only.
 
 ### Existing Dependencies (Unchanged)
 
 **Production Dependencies** (from Epic 1, no changes):
+
 - react (^19.1.1), react-dom (^19.1.1)
 - zustand (^5.0.8), idb (^8.0.3), workbox-window (^7.3.0)
 - framer-motion (^12.23.24), lucide-react (^0.548.0)
 
 **Development Dependencies** (from Epic 1, validated compatibility):
+
 - TypeScript (5.9.3) - compatible with Playwright TypeScript test files
 - Vite (^7.1.7) - auto-started by Playwright webServer config
 - ESLint (^9.36.0) - no linting changes needed for test files
@@ -579,30 +597,35 @@ Push fix to PR → CI retries → Tests pass
 ### Integration Points
 
 **Playwright ↔ Vite Dev Server:**
+
 - Playwright `webServer` config auto-starts `npm run dev`
 - Waits for `http://localhost:5173/My-Love/` readiness (120s timeout)
 - Option `reuseExistingServer: !process.env.CI` allows manual dev server
 - Integration validates in Story 2.4
 
 **Playwright ↔ Application Code:**
+
 - Tests interact via browser automation (Chrome DevTools Protocol)
 - No direct code imports from application
 - Application adds `data-testid` attributes for stable element selection (Story 2.3)
 - Tests exercise full application stack: React components → Zustand store → IndexedDB/LocalStorage
 
 **Playwright ↔ Browser APIs:**
+
 - Service Worker API: waitForServiceWorker helper validates registration
 - IndexedDB API: tests validate CRUD operations, offline persistence
 - LocalStorage API: tests validate Zustand persist hydration
 - Web Share API: tests validate share functionality or clipboard fallback
 
 **Playwright ↔ GitHub Actions:**
+
 - `.github/workflows/playwright.yml` defines CI workflow
 - Workflow steps: checkout → setup Node → install deps → install Playwright browsers → run tests
 - Artifacts uploaded: HTML report, screenshots, videos, traces
 - Workflow status (pass/fail) blocks PR merge if configured
 
 **Playwright ↔ Test Helpers/Fixtures:**
+
 - Custom PWA helpers (`tests/support/helpers/pwaHelpers.ts`) provide reusable test utilities
 - Test fixtures (`tests/support/fixtures/*.ts`) provide pre-configured test scenarios
 - Page Object Model (optional pattern): encapsulate page interactions for maintainability
@@ -626,15 +649,17 @@ projects: [
     name: 'webkit',
     use: { ...devices['Desktop Safari'] },
   },
-]
+];
 ```
 
 **Browser Engine Coverage:**
+
 - **Chromium**: Chrome, Edge, Opera (Blink engine)
 - **Firefox**: Firefox (Gecko engine)
 - **WebKit**: Safari, iOS Safari (WebKit engine)
 
 **Mobile Viewport Testing (Emulation):**
+
 ```typescript
 // Optional: Add mobile device emulation in Story 2.1
 {
@@ -650,11 +675,13 @@ projects: [
 ### Version Constraints
 
 **Playwright Requirements:**
+
 - Node.js: >= 18.0 (matches application requirement)
 - npm: >= 9.0.0
 - OS: Linux (CI), macOS/Windows (local development supported)
 
 **Browser Versions:**
+
 - Playwright bundles specific browser versions (updated with @playwright/test package)
 - Current versions (as of v1.48.0):
   - Chromium 130.x
@@ -662,6 +689,7 @@ projects: [
   - WebKit 18.x (Safari 18 equivalent)
 
 **GitHub Actions Environment:**
+
 - Runner: ubuntu-latest (Ubuntu 22.04)
 - Node.js: 18.x (configured via actions/setup-node@v4)
 - Disk space: ~14 GB available (Playwright browsers ~1.5 GB total)
@@ -671,6 +699,7 @@ projects: [
 ### No External Services
 
 Epic 2 maintains the no-backend architecture:
+
 - No external APIs or services required for testing
 - No test data hosted externally (all synthetic data in test files)
 - No cloud-based test execution services (e.g., BrowserStack, Sauce Labs)
@@ -747,53 +776,54 @@ These acceptance criteria are extracted from [epics.md](./epics.md) Epic 2 and s
 
 This table maps acceptance criteria to technical specifications, impacted components, and test approaches.
 
-| AC ID | Spec Section | Component/Module | Test Approach |
-|-------|-------------|------------------|---------------|
-| **AC-2.1.1** | Dependencies | package.json, playwright.config.ts | Verify Playwright installed, config file exists |
-| **AC-2.1.2** | Services | tests/ directory structure | Verify directory structure created |
-| **AC-2.1.3** | APIs | tests/support/helpers/pwaHelpers.ts | Unit test each helper function |
-| **AC-2.1.4** | Dependencies | playwright.config.ts projects | Verify 3 browser projects configured |
-| **AC-2.1.5** | Services | package.json scripts | Run each script, verify execution |
-| **AC-2.1.6** | Data Models | .env.test.example | Verify file exists with documented variables |
-| **AC-2.1.7** | Observability | tests/README.md | Review documentation completeness |
-| **AC-2.2.1** | Services | tests/e2e/message-display.spec.ts | Execute test suite, verify 10+ test cases |
-| **AC-2.2.2** | Services | tests/e2e/favorites.spec.ts | Execute test suite, verify 8+ test cases |
-| **AC-2.2.3** | Services | tests/e2e/settings.spec.ts | Execute test suite, verify 6+ test cases |
-| **AC-2.2.4** | Workflows | tests/e2e/relationship-duration.spec.ts | Execute duration calculation tests |
-| **AC-2.2.5** | Services | tests/e2e/navigation.spec.ts | Execute navigation tests |
-| **AC-2.2.6** | NFR Reliability | All test suites | Run tests 10 times, verify < 1% flakiness |
-| **AC-2.2.7** | Workflows | All persistence tests | Verify LocalStorage/IndexedDB validation |
-| **AC-2.3.1** | Data Models | Button components | Code review: verify data-testid on buttons |
-| **AC-2.3.2** | Data Models | Message display components | Code review: verify data-testid on message areas |
-| **AC-2.3.3** | Data Models | Input field components | Code review: verify data-testid on inputs |
-| **AC-2.3.4** | Data Models | Navigation components | Code review: verify data-testid on nav elements |
-| **AC-2.3.5** | Data Models | All components | Code review: verify naming convention followed |
-| **AC-2.3.6** | Services | All test files | Code review: verify getByTestId() usage |
-| **AC-2.3.7** | Observability | tests/README.md | Review data-testid documentation |
-| **AC-2.4.1** | APIs | playwright.config.ts webServer | Verify webServer config present |
-| **AC-2.4.2** | Workflows | playwright.config.ts webServer.url | Test dynamic port detection |
-| **AC-2.4.3** | Workflows | Test execution flow | Manual test: run tests with server down |
-| **AC-2.4.4** | Workflows | Server lifecycle | Manual test: verify server stops after tests |
-| **AC-2.4.5** | Dependencies | CI and local environments | Test in both environments |
-| **AC-2.4.6** | NFR Performance | webServer.timeout | Verify 120s timeout configured |
-| **AC-2.4.7** | Workflows | npm run test:e2e | Manual test: single command runs all tests |
-| **AC-2.5.1** | Services | Test coverage checklist | Manual review: all Epic 1 features tested |
-| **AC-2.5.2** | Observability | Test coverage report | Generate report, verify 100% critical paths |
-| **AC-2.5.3** | NFR Reliability | Playwright reporter | Verify all browsers show passing tests |
-| **AC-2.5.4** | NFR Performance | Test execution logs | Measure local execution time |
-| **AC-2.5.5** | NFR Reliability | Manual analysis | Run tests 10 times, measure pass rate |
-| **AC-2.5.6** | Observability | playwright-report/index.html | Verify HTML report generated |
-| **AC-2.5.7** | Observability | tests/README.md | Document edge cases not covered |
-| **AC-2.6.1** | Dependencies | .github/workflows/playwright.yml | Verify workflow file exists |
-| **AC-2.6.2** | APIs | Workflow triggers | Test PR creation triggers workflow |
-| **AC-2.6.3** | Dependencies | Workflow jobs.test.runs-on | Verify ubuntu-latest specified |
-| **AC-2.6.4** | Observability | Workflow artifacts | Trigger failure, verify artifacts uploaded |
-| **AC-2.6.5** | NFR Reliability | Workflow status | Trigger test failure, verify PR blocked |
-| **AC-2.6.6** | Observability | README.md | Verify status badge added |
-| **AC-2.6.7** | NFR Performance | GitHub Actions logs | Measure CI execution time |
-| **AC-2.6.8** | Observability | tests/README.md | Review CI documentation |
+| AC ID        | Spec Section    | Component/Module                        | Test Approach                                    |
+| ------------ | --------------- | --------------------------------------- | ------------------------------------------------ |
+| **AC-2.1.1** | Dependencies    | package.json, playwright.config.ts      | Verify Playwright installed, config file exists  |
+| **AC-2.1.2** | Services        | tests/ directory structure              | Verify directory structure created               |
+| **AC-2.1.3** | APIs            | tests/support/helpers/pwaHelpers.ts     | Unit test each helper function                   |
+| **AC-2.1.4** | Dependencies    | playwright.config.ts projects           | Verify 3 browser projects configured             |
+| **AC-2.1.5** | Services        | package.json scripts                    | Run each script, verify execution                |
+| **AC-2.1.6** | Data Models     | .env.test.example                       | Verify file exists with documented variables     |
+| **AC-2.1.7** | Observability   | tests/README.md                         | Review documentation completeness                |
+| **AC-2.2.1** | Services        | tests/e2e/message-display.spec.ts       | Execute test suite, verify 10+ test cases        |
+| **AC-2.2.2** | Services        | tests/e2e/favorites.spec.ts             | Execute test suite, verify 8+ test cases         |
+| **AC-2.2.3** | Services        | tests/e2e/settings.spec.ts              | Execute test suite, verify 6+ test cases         |
+| **AC-2.2.4** | Workflows       | tests/e2e/relationship-duration.spec.ts | Execute duration calculation tests               |
+| **AC-2.2.5** | Services        | tests/e2e/navigation.spec.ts            | Execute navigation tests                         |
+| **AC-2.2.6** | NFR Reliability | All test suites                         | Run tests 10 times, verify < 1% flakiness        |
+| **AC-2.2.7** | Workflows       | All persistence tests                   | Verify LocalStorage/IndexedDB validation         |
+| **AC-2.3.1** | Data Models     | Button components                       | Code review: verify data-testid on buttons       |
+| **AC-2.3.2** | Data Models     | Message display components              | Code review: verify data-testid on message areas |
+| **AC-2.3.3** | Data Models     | Input field components                  | Code review: verify data-testid on inputs        |
+| **AC-2.3.4** | Data Models     | Navigation components                   | Code review: verify data-testid on nav elements  |
+| **AC-2.3.5** | Data Models     | All components                          | Code review: verify naming convention followed   |
+| **AC-2.3.6** | Services        | All test files                          | Code review: verify getByTestId() usage          |
+| **AC-2.3.7** | Observability   | tests/README.md                         | Review data-testid documentation                 |
+| **AC-2.4.1** | APIs            | playwright.config.ts webServer          | Verify webServer config present                  |
+| **AC-2.4.2** | Workflows       | playwright.config.ts webServer.url      | Test dynamic port detection                      |
+| **AC-2.4.3** | Workflows       | Test execution flow                     | Manual test: run tests with server down          |
+| **AC-2.4.4** | Workflows       | Server lifecycle                        | Manual test: verify server stops after tests     |
+| **AC-2.4.5** | Dependencies    | CI and local environments               | Test in both environments                        |
+| **AC-2.4.6** | NFR Performance | webServer.timeout                       | Verify 120s timeout configured                   |
+| **AC-2.4.7** | Workflows       | npm run test:e2e                        | Manual test: single command runs all tests       |
+| **AC-2.5.1** | Services        | Test coverage checklist                 | Manual review: all Epic 1 features tested        |
+| **AC-2.5.2** | Observability   | Test coverage report                    | Generate report, verify 100% critical paths      |
+| **AC-2.5.3** | NFR Reliability | Playwright reporter                     | Verify all browsers show passing tests           |
+| **AC-2.5.4** | NFR Performance | Test execution logs                     | Measure local execution time                     |
+| **AC-2.5.5** | NFR Reliability | Manual analysis                         | Run tests 10 times, measure pass rate            |
+| **AC-2.5.6** | Observability   | playwright-report/index.html            | Verify HTML report generated                     |
+| **AC-2.5.7** | Observability   | tests/README.md                         | Document edge cases not covered                  |
+| **AC-2.6.1** | Dependencies    | .github/workflows/playwright.yml        | Verify workflow file exists                      |
+| **AC-2.6.2** | APIs            | Workflow triggers                       | Test PR creation triggers workflow               |
+| **AC-2.6.3** | Dependencies    | Workflow jobs.test.runs-on              | Verify ubuntu-latest specified                   |
+| **AC-2.6.4** | Observability   | Workflow artifacts                      | Trigger failure, verify artifacts uploaded       |
+| **AC-2.6.5** | NFR Reliability | Workflow status                         | Trigger test failure, verify PR blocked          |
+| **AC-2.6.6** | Observability   | README.md                               | Verify status badge added                        |
+| **AC-2.6.7** | NFR Performance | GitHub Actions logs                     | Measure CI execution time                        |
+| **AC-2.6.8** | Observability   | tests/README.md                         | Review CI documentation                          |
 
 **Coverage Summary:**
+
 - **Services/Modules**: 15 ACs
 - **Data Models**: 7 ACs
 - **APIs/Interfaces**: 4 ACs
@@ -808,36 +838,42 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Risks
 
 **R1: Test Flakiness from PWA Timing Issues (HIGH)**
+
 - **Risk:** Service worker registration and IndexedDB operations are async, causing timing-dependent test failures
 - **Impact:** Tests fail intermittently, reducing confidence in CI and wasting developer time debugging
 - **Mitigation:** Use explicit Playwright auto-waiting (expect().toBeVisible()), create robust waitForServiceWorker helper with timeout, clear state before each test
 - **Owner:** Story 2.1 (helpers), Story 2.5 (flakiness validation)
 
 **R2: CI Resource Constraints Causing Timeouts (MEDIUM)**
+
 - **Risk:** GitHub Actions free tier has limited CPU/memory, causing tests to timeout (especially browser installs or parallel execution)
 - **Impact:** CI fails not due to test failures but resource exhaustion, blocking PRs incorrectly
 - **Mitigation:** Configure retries: 2 in CI, reduce workers to 2 (vs 4 locally), cache Playwright browsers between runs
 - **Owner:** Story 2.6
 
 **R3: Browser Compatibility Issues (MEDIUM)**
+
 - **Risk:** Tests pass in Chromium but fail in Firefox/WebKit due to IndexedDB or Service Worker API differences
 - **Impact:** Application has cross-browser bugs not caught until production
 - **Mitigation:** Test all 3 browsers in parallel from Story 2.1 onward, investigate and fix browser-specific issues immediately
 - **Owner:** Story 2.1, 2.5
 
 **R4: data-testid Attribute Maintenance Overhead (LOW)**
+
 - **Risk:** Developers forget to add data-testid to new components, causing test failures when trying to select elements
 - **Impact:** Tests break when new features added, requiring reactive test updates
 - **Mitigation:** Document data-testid convention in tests/README.md, code review checklist includes data-testid verification
 - **Owner:** Story 2.3
 
 **R5: Test Scope Creep (MEDIUM)**
+
 - **Risk:** Story 2.2 attempts to test Epics 3-5 features not yet implemented, wasting time on premature testing
 - **Impact:** Epic 2 timeline extends, effort diverted from Epic 1 feature coverage
 - **Mitigation:** Strict scope: 100% Epic 1 feature coverage only, explicitly defer photo gallery/mood tracking/countdown tests to their respective epics
 - **Owner:** Story 2.2, 2.5
 
 **R6: CI Workflow Configuration Errors (LOW)**
+
 - **Risk:** GitHub Actions workflow syntax errors or missing permissions block test execution
 - **Impact:** CI doesn't run, false confidence in code quality
 - **Mitigation:** Test workflow locally with `act` tool (GitHub Actions simulator), validate workflow on feature branch before merging
@@ -846,26 +882,31 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Assumptions
 
 **A1: Epic 1 is Complete and Stable**
+
 - **Assumption:** Epic 1 features (persistence, pre-configuration, error boundaries) are fully implemented and passing before Epic 2 starts
 - **Validation:** Story 1.6 marked complete in sprint-status.yaml
 - **Impact if wrong:** Tests may fail due to incomplete features, not test issues
 
 **A2: Playwright is Sufficient for PWA Testing**
+
 - **Assumption:** Playwright can test all PWA features (service worker, IndexedDB, offline mode) without additional tools
 - **Validation:** Playwright documentation confirms PWA support, including service worker control
 - **Impact if wrong:** May need additional tools like Puppeteer or Selenium (low probability)
 
 **A3: Single Command Test Execution is Acceptable**
+
 - **Assumption:** Developers will run `npm run test:e2e` before pushing, no pre-commit hooks required
 - **Validation:** Manual testing workflow is current practice
 - **Impact if wrong:** May need to add git pre-push hooks in future if developers skip testing
 
 **A4: GitHub Actions Free Tier is Sufficient**
+
 - **Assumption:** 2000 minutes/month free tier covers ~200 CI runs (10 min each) for project development pace
 - **Validation:** Current PR frequency ~5 per week = 20 per month (200 mins used)
 - **Impact if wrong:** May need paid GitHub Actions or self-hosted runners
 
 **A5: HTML Test Reports are Sufficient for Debugging**
+
 - **Assumption:** Developers can debug test failures using HTML reports with screenshots/videos, no live debugging needed
 - **Validation:** Playwright reports are comprehensive (DOM snapshots, traces, videos)
 - **Impact if wrong:** May need to run tests locally more often (acceptable fallback)
@@ -873,30 +914,35 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Open Questions
 
 **Q1: Should We Test Mobile Viewports in Epic 2?** (Priority: MEDIUM)
+
 - **Question:** AC-2.1.4 configures Chromium, Firefox, WebKit (desktop). Should we add mobile device emulation (Pixel 5, iPhone 12)?
 - **Impact:** Adds 2 more browser projects, increases test time from 5 min to 7-8 min locally, 10 min to 15 min in CI
 - **Recommendation:** Defer mobile viewport testing to Epic 3 when implementing swipe navigation (requires mobile gestures)
 - **Decision needed by:** Story 2.1 planning
 
 **Q2: What Level of Test Documentation is Sufficient?** (Priority: LOW)
+
 - **Question:** AC-2.1.7 and AC-2.6.8 require tests/README.md, but scope unclear (guidelines only? API docs? examples?)
 - **Impact:** Insufficient docs → future developers struggle to write tests; excessive docs → maintenance burden
 - **Recommendation:** Include: setup instructions, PWA helper API docs, data-testid convention, debugging guide, example test
 - **Decision needed by:** Story 2.1 completion
 
 **Q3: Should Tests Use Page Object Model Pattern?** (Priority: MEDIUM)
+
 - **Question:** Tests can directly interact with page elements or abstract interactions into Page Objects (e.g., DailyMessagePage.favoriteMessage())
 - **Impact:** Page Objects improve maintainability but add abstraction layer, more files to maintain
 - **Recommendation:** Use Page Object Model for DailyMessage (most interactions), skip for simple pages (Settings)
 - **Decision needed by:** Story 2.2 planning
 
 **Q4: How to Handle Test Data for Message Rotation?** (Priority: HIGH)
+
 - **Question:** Message rotation is date-based. How do tests ensure deterministic message selection for assertions?
 - **Impact:** Tests may fail on different dates if relying on "today's message"
 - **Recommendation:** Mock date in test fixtures (e.g., set Date.now to fixed timestamp), or seed known messages in IndexedDB before tests
 - **Decision needed by:** Story 2.2 implementation
 
 **Q5: Should CI Run on Every Push or Only PRs?** (Priority: LOW)
+
 - **Question:** AC-2.6.2 says "push to main and all pull requests". Should feature branch pushes also trigger CI?
 - **Impact:** More CI runs (higher cost), faster feedback on feature branches
 - **Recommendation:** Run on: push to main, all PRs, and pushes to PR branches (default GitHub Actions behavior)
@@ -907,12 +953,14 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Test Approach Philosophy
 
 **E2E Integration Testing Focus:**
+
 - Epic 2 establishes end-to-end testing that exercises the full application stack: UI → React components → Zustand store → IndexedDB/LocalStorage
 - No unit testing of individual functions or components (defer to future if needed)
 - Tests validate user-facing behavior, not implementation details
 - Goal: Catch regressions in critical user paths before deployment
 
 **PWA-Specific Testing:**
+
 - Tests must validate offline-first architecture: service worker registration, cache-first strategies, IndexedDB persistence
 - Custom PWA helpers abstract browser API interactions (waitForServiceWorker, goOffline, clearIndexedDB)
 - Test scenarios include: fresh install, offline mode, state persistence across browser sessions
@@ -921,39 +969,40 @@ This table maps acceptance criteria to technical specifications, impacted compon
 
 **100% Coverage of Epic 1 Features (37 test cases estimated):**
 
-| Feature | Test Suite | Test Count | Story |
-|---------|-----------|------------|-------|
-| **Message Display** | message-display.spec.ts | 10 | 2.2 |
-| - Daily message rotation (correct message for date) | | 2 | |
-| - Message card animations (entrance, hearts burst) | | 2 | |
-| - Category badge display | | 1 | |
-| - Relationship duration counter accuracy | | 2 | |
-| - Message text rendering | | 3 | |
-| **Favorites** | favorites.spec.ts | 8 | 2.2 |
-| - Toggle favorite on/off | | 2 | |
-| - Favorite persists across browser refresh | | 2 | |
-| - Favorite persists in offline mode | | 1 | |
-| - Heart animation plays on favorite | | 1 | |
-| - Favorites list displays correctly | | 2 | |
-| **Settings** | settings.spec.ts | 6 | 2.2 |
-| - Pre-configured relationship data loaded | | 2 | |
-| - Edit partner name, verify persistence | | 2 | |
-| - Edit start date, verify duration updates | | 2 | |
-| **Navigation** | navigation.spec.ts | 5 | 2.2 |
-| - Theme switching (all 4 themes) | | 4 | |
-| - Navigation between views (future: Home, Favorites, Settings) | | 1 | |
-| **Persistence** | persistence.spec.ts | 8 | 2.2 |
-| - LocalStorage hydration on app init | | 2 | |
-| - IndexedDB operations in offline mode | | 2 | |
-| - State persists across 24-hour gap | | 2 | |
-| - Handle LocalStorage quota exceeded | | 1 | |
-| - Handle IndexedDB quota exceeded | | 1 | |
+| Feature                                                        | Test Suite              | Test Count | Story |
+| -------------------------------------------------------------- | ----------------------- | ---------- | ----- |
+| **Message Display**                                            | message-display.spec.ts | 10         | 2.2   |
+| - Daily message rotation (correct message for date)            |                         | 2          |       |
+| - Message card animations (entrance, hearts burst)             |                         | 2          |       |
+| - Category badge display                                       |                         | 1          |       |
+| - Relationship duration counter accuracy                       |                         | 2          |       |
+| - Message text rendering                                       |                         | 3          |       |
+| **Favorites**                                                  | favorites.spec.ts       | 8          | 2.2   |
+| - Toggle favorite on/off                                       |                         | 2          |       |
+| - Favorite persists across browser refresh                     |                         | 2          |       |
+| - Favorite persists in offline mode                            |                         | 1          |       |
+| - Heart animation plays on favorite                            |                         | 1          |       |
+| - Favorites list displays correctly                            |                         | 2          |       |
+| **Settings**                                                   | settings.spec.ts        | 6          | 2.2   |
+| - Pre-configured relationship data loaded                      |                         | 2          |       |
+| - Edit partner name, verify persistence                        |                         | 2          |       |
+| - Edit start date, verify duration updates                     |                         | 2          |       |
+| **Navigation**                                                 | navigation.spec.ts      | 5          | 2.2   |
+| - Theme switching (all 4 themes)                               |                         | 4          |       |
+| - Navigation between views (future: Home, Favorites, Settings) |                         | 1          |       |
+| **Persistence**                                                | persistence.spec.ts     | 8          | 2.2   |
+| - LocalStorage hydration on app init                           |                         | 2          |       |
+| - IndexedDB operations in offline mode                         |                         | 2          |       |
+| - State persists across 24-hour gap                            |                         | 2          |       |
+| - Handle LocalStorage quota exceeded                           |                         | 1          |       |
+| - Handle IndexedDB quota exceeded                              |                         | 1          |       |
 
 **Total:** 37 test cases × 3 browsers (Chromium, Firefox, WebKit) = 111 test executions
 
 ### Test Execution Strategy
 
 **Local Development:**
+
 - Command: `npm run test:e2e` (runs all tests, all browsers)
 - Command: `npm run test:e2e:ui` (Playwright UI mode for interactive debugging)
 - Command: `npm run test:e2e:debug` (headless with inspector)
@@ -961,6 +1010,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 - Target execution time: < 5 minutes
 
 **CI (GitHub Actions):**
+
 - Trigger: Push to main, all pull requests
 - Parallel execution: 2 workers (constrained by CI resources)
 - Retries: 2 (handle transient CI issues)
@@ -971,6 +1021,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Test Development Workflow
 
 **Adding New Test (Story 2.2):**
+
 1. Identify Epic 1 feature to test (e.g., message favorites)
 2. Create test file: `tests/e2e/favorites.spec.ts`
 3. Import PWA helpers: `import { waitForServiceWorker, clearIndexedDB } from '../support/helpers/pwaHelpers'`
@@ -983,6 +1034,7 @@ This table maps acceptance criteria to technical specifications, impacted compon
 10. Commit test, push to PR, verify CI passes
 
 **Adding data-testid to Component (Story 2.3):**
+
 1. Open component file (e.g., `src/components/DailyMessage.tsx`)
 2. Identify interactive elements (buttons, inputs, navigation)
 3. Add attribute: `<button data-testid="message-favorite-button" onClick={toggleFavorite}>`
@@ -994,16 +1046,19 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Test Maintenance Strategy
 
 **Regression Testing:**
+
 - All 37 tests must pass before merging any PR (enforced by CI)
 - If Epic 1 feature changes (e.g., message rotation algorithm updated), tests must be updated
 - Monthly test review: identify slow tests (> 15s), flaky tests (< 99% pass rate), obsolete tests
 
 **Test Refactoring:**
+
 - Extract reusable test logic into Page Objects or helper functions
 - Consolidate similar test cases (e.g., test all 4 themes in single parameterized test)
 - Update data-testid selectors if component structure changes
 
 **Test Documentation:**
+
 - tests/README.md updated when new patterns emerge
 - Inline comments explain complex test logic or workarounds
 - GitHub PR descriptions include test coverage summary
@@ -1011,35 +1066,41 @@ This table maps acceptance criteria to technical specifications, impacted compon
 ### Definition of Done (Testing Perspective)
 
 **Story 2.1 Complete When:**
+
 - @playwright/test installed, playwright.config.ts configured
 - 4 PWA helpers implemented and unit tested
 - 3 test scripts added to package.json
 - tests/README.md documents setup and patterns
 
 **Story 2.2 Complete When:**
+
 - All 37 test cases written across 5 test suites
 - All tests pass in Chromium, Firefox, WebKit
 - No flaky tests (10 consecutive runs, 100% pass rate)
 - Test coverage checklist shows 100% Epic 1 features
 
 **Story 2.3 Complete When:**
+
 - data-testid added to all interactive elements
 - Naming convention followed consistently
 - All tests updated to use getByTestId()
 - CSS class selectors removed from tests
 
 **Story 2.4 Complete When:**
+
 - playwright.config.ts webServer configured
 - Dev server auto-starts before tests
 - Single command `npm run test:e2e` runs end-to-end
 
 **Story 2.5 Complete When:**
+
 - All 37 tests pass (100% pass rate)
 - Test execution time < 5 min locally
 - HTML report generated with screenshots
 - No known flaky tests
 
 **Story 2.6 Complete When:**
+
 - .github/workflows/playwright.yml created
 - CI runs on push to main and all PRs
 - Test artifacts uploaded on failure

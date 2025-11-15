@@ -47,13 +47,16 @@ My-Love/
 ## Critical Directories Explained
 
 ### `/src/components/` - UI Components
+
 **Purpose**: React components for the user interface
 
 **Current Components**:
+
 - **DailyMessage/**: Primary message display with animations, favorites, sharing
 - **Onboarding/**: Multi-step onboarding wizard for first-time setup
 
 **Placeholder Folders** (for future features):
+
 - CountdownTimer/ - Anniversary countdown tracking
 - CustomNotes/ - User-created custom notes
 - Layout/ - Shared layout components
@@ -62,9 +65,11 @@ My-Love/
 - Settings/ - App settings and preferences
 
 ### `/src/stores/` - State Management
+
 **Purpose**: Centralized application state using Zustand
 
 **Key Store**:
+
 - `useAppStore.ts`: Single source of truth for app state
   - Settings persistence
   - Message history tracking
@@ -73,9 +78,11 @@ My-Love/
   - IndexedDB initialization
 
 ### `/src/services/` - Data Layer
+
 **Purpose**: Business logic and data persistence abstractions
 
 **Services**:
+
 - `storage.ts`: IndexedDB operations
   - Photo CRUD operations
   - Message CRUD operations
@@ -83,42 +90,51 @@ My-Love/
   - Export/import functionality
 
 ### `/src/types/` - Type Definitions
+
 **Purpose**: TypeScript interfaces and types
 
 **Core Types**:
+
 - Message, Photo, Anniversary, MoodEntry
 - Settings, MessageHistory, AppState
 - ThemeName, MessageCategory, MoodType
 - Theme configuration interface
 
 ### `/src/utils/` - Utility Functions
+
 **Purpose**: Reusable helper functions
 
 **Utilities**:
+
 - `messageRotation.ts`: Deterministic daily message selection with favorites prioritization
 - `themes.ts`: Theme management with CSS variable injection
 - `dateHelpers.ts`: Date formatting and calculations
 
 ### `/src/data/` - Static Data
+
 **Purpose**: Pre-populated content
 
 **Data Files**:
+
 - `defaultMessages.ts`: 100 curated love messages across 5 categories
 
 ## Entry Points
 
 ### Application Entry: `src/main.tsx`
+
 - React 19 StrictMode wrapper
 - Root component mounting
 - Global CSS injection
 
 ### Root Component: `src/App.tsx`
+
 - App initialization on mount
 - Theme application
 - Conditional routing (Onboarding vs DailyMessage)
 - Loading state handling
 
 ### Build Configuration: `vite.config.ts`
+
 - React plugin configuration
 - PWA manifest and service worker setup
 - Workbox caching strategies
@@ -127,21 +143,25 @@ My-Love/
 ## Integration Points
 
 ### IndexedDB Integration
+
 - **Stores**: `photos`, `messages`
 - **Indexes**: by-date, by-category
 - **Accessed via**: `services/storage.ts`
 
 ### LocalStorage Integration
+
 - **Purpose**: Settings and small data persistence
 - **Managed by**: Zustand persist middleware
 - **Storage key**: `my-love-storage`
 
 ### Service Worker Integration
+
 - **Provider**: Vite PWA plugin + Workbox
 - **Strategy**: CacheFirst for fonts, NetworkFirst for app shell
 - **Auto-update**: Enabled for seamless updates
 
 ### Browser APIs
+
 - **Notification API**: Daily reminder notifications (onboarding setup)
 - **Share API**: Native sharing with clipboard fallback
 - **Web App Manifest**: Installable PWA configuration
@@ -149,16 +169,19 @@ My-Love/
 ## Build & Deployment Structure
 
 ### Development
+
 - Entry: `npm run dev`
 - Server: Vite dev server on port 5173
 - HMR: Fast refresh for React components
 
 ### Production Build
+
 - Command: `npm run build`
 - Output: `dist/` directory
 - Process: TypeScript compilation → Vite bundling → PWA generation
 
 ### Deployment
+
 - Target: GitHub Pages
 - Command: `npm run deploy`
 - Tool: gh-pages package
@@ -167,6 +190,7 @@ My-Love/
 ## Code Organization Patterns
 
 ### Component Structure
+
 ```typescript
 // Standard component pattern
 import { motion } from 'framer-motion';
@@ -184,6 +208,7 @@ export function ComponentName() {
 ```
 
 ### Store Pattern
+
 ```typescript
 // Zustand store with persist
 export const useAppStore = create<AppState>()(
@@ -198,12 +223,17 @@ export const useAppStore = create<AppState>()(
 ```
 
 ### Service Pattern
+
 ```typescript
 // Singleton service class
 class StorageService {
   private db: IDBPDatabase | null = null;
-  async init() { /* ... */ }
-  async method() { /* ... */ }
+  async init() {
+    /* ... */
+  }
+  async method() {
+    /* ... */
+  }
 }
 export const storageService = new StorageService();
 ```

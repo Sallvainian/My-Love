@@ -13,7 +13,8 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ onExit }: AdminPanelProps) {
-  const { loadCustomMessages, customMessagesLoaded, exportCustomMessages, importCustomMessages } = useAppStore();
+  const { loadCustomMessages, customMessagesLoaded, exportCustomMessages, importCustomMessages } =
+    useAppStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingMessage, setEditingMessage] = useState<CustomMessage | null>(null);
   const [deletingMessage, setDeletingMessage] = useState<CustomMessage | null>(null);
@@ -56,7 +57,9 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
 
     try {
       const result = await importCustomMessages(file);
-      alert(`Import complete!\nImported: ${result.imported} messages\nSkipped duplicates: ${result.skipped}`);
+      alert(
+        `Import complete!\nImported: ${result.imported} messages\nSkipped duplicates: ${result.skipped}`
+      );
     } catch (error) {
       console.error('[AdminPanel] Import failed:', error);
       alert('Failed to import messages. Please check the file format and try again.');
@@ -149,20 +152,14 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <MessageList
-          onEdit={setEditingMessage}
-          onDelete={setDeletingMessage}
-        />
+        <MessageList onEdit={setEditingMessage} onDelete={setDeletingMessage} />
       </div>
 
       {/* Modals */}
       <AnimatePresence>
         {/* Create message modal */}
         {isCreateOpen && (
-          <CreateMessageForm
-            isOpen={isCreateOpen}
-            onClose={() => setIsCreateOpen(false)}
-          />
+          <CreateMessageForm isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
         )}
 
         {/* Edit message modal */}

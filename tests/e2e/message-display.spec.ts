@@ -16,7 +16,7 @@ import { getDaysSinceStart, formatRelationshipDuration } from '../../src/utils/m
  */
 
 test.describe('Message Display', () => {
-  test('should display today\'s message correctly', async ({ cleanApp }) => {
+  test("should display today's message correctly", async ({ cleanApp }) => {
     // Wait for message card to be visible
     const messageCard = cleanApp.getByTestId('message-card');
     await expect(messageCard).toBeVisible({ timeout: 10000 });
@@ -28,7 +28,7 @@ test.describe('Message Display', () => {
     expect(text).toBeTruthy();
     expect(text!.length).toBeGreaterThan(10);
 
-    console.log('✓ Today\'s message displayed correctly');
+    console.log("✓ Today's message displayed correctly");
   });
 
   test('should rotate message based on date', async ({ cleanApp }) => {
@@ -83,7 +83,9 @@ test.describe('Message Display', () => {
 
     // Messages should be different (unless by chance they're the same in rotation)
     // Note: There's a small chance they could be the same, but with 100 messages it's unlikely
-    console.log(`Today's message length: ${todayMessage!.length}, Tomorrow's message length: ${tomorrowMessage!.length}`);
+    console.log(
+      `Today's message length: ${todayMessage!.length}, Tomorrow's message length: ${tomorrowMessage!.length}`
+    );
     console.log('✓ Message rotation based on date verified (date mocking functional)');
   });
 
@@ -106,7 +108,7 @@ test.describe('Message Display', () => {
       '✨ Beautiful Memory',
       '🌟 Daily Affirmation',
       '🌈 Our Future',
-      '💕 Special Message'
+      '💕 Special Message',
     ];
 
     expect(validCategories).toContain(badgeText);
@@ -205,7 +207,9 @@ test.describe('Message Display', () => {
     if (hasOverflow) {
       const scrollHeight = await messageText.evaluate((el) => el.scrollHeight);
       const clientHeight = await messageText.evaluate((el) => el.clientHeight);
-      console.log(`⚠️ Text may be overflowing: scrollHeight=${scrollHeight}, clientHeight=${clientHeight}`);
+      console.log(
+        `⚠️ Text may be overflowing: scrollHeight=${scrollHeight}, clientHeight=${clientHeight}`
+      );
     }
 
     console.log(`✓ Message text renders without overflow (${text!.length} characters)`);
@@ -246,8 +250,10 @@ test.describe('Message Display', () => {
 
     // One of these should be visible
     await Promise.race([
-      expect(loadingIndicator).toBeVisible({ timeout: 1000 }).catch(() => {}),
-      expect(messageCard).toBeVisible({ timeout: 1000 })
+      expect(loadingIndicator)
+        .toBeVisible({ timeout: 1000 })
+        .catch(() => {}),
+      expect(messageCard).toBeVisible({ timeout: 1000 }),
     ]);
 
     // Eventually message should be visible
@@ -333,13 +339,13 @@ test.describe('Message Duration Calculation Edge Cases', () => {
     // Should match one of the expected formats:
     // "X day(s)", "X month(s)", or "X year(s) and Y month(s)"
     const validFormats = [
-      /^\d+ days?$/,           // "5 days" or "1 day"
-      /^\d+ months?$/,         // "2 months" or "1 month"
-      /^\d+ years?$/,          // "2 years" or "1 year"
-      /^\d+ years? and \d+ months?$/ // "1 year and 3 months"
+      /^\d+ days?$/, // "5 days" or "1 day"
+      /^\d+ months?$/, // "2 months" or "1 month"
+      /^\d+ years?$/, // "2 years" or "1 year"
+      /^\d+ years? and \d+ months?$/, // "1 year and 3 months"
     ];
 
-    const isValidFormat = validFormats.some(regex => regex.test(text!));
+    const isValidFormat = validFormats.some((regex) => regex.test(text!));
     expect(isValidFormat).toBe(true);
 
     console.log('✓ Duration text format is valid:', text);

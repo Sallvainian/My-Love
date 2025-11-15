@@ -17,7 +17,7 @@ interface MyLoveDB extends DBSchema {
 }
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Story 4.1: Increment to match photoStorageService
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDB> | null = null;
@@ -50,18 +50,28 @@ class StorageService {
     try {
       console.log('[StorageService] Initializing IndexedDB...');
       this.db = await openDB<MyLoveDB>(DB_NAME, DB_VERSION, {
-        upgrade(db) {
-          // Create photos store
-          if (!db.objectStoreNames.contains('photos')) {
+        upgrade(db, oldVersion, newVersion) {
+          console.log(`[StorageService] Upgrading database from v${oldVersion} to v${newVersion}`);
+
+          // Migration: v1 → v2 (Story 4.1)
+          // Recreate photos store with enhanced schema
+          if (oldVersion < 2) {
+            // Delete old photos store if it exists from v1
+            if (db.objectStoreNames.contains('photos')) {
+              db.deleteObjectStore('photos');
+              console.log('[StorageService] Deleted old photos store from v1');
+            }
+
+            // Create new photos store with enhanced schema
             const photoStore = db.createObjectStore('photos', {
               keyPath: 'id',
               autoIncrement: true,
             });
-            photoStore.createIndex('by-date', 'uploadDate');
-            console.log('[StorageService] Created photos object store');
+            photoStore.createIndex('by-date', 'uploadDate', { unique: false });
+            console.log('[StorageService] Created photos store with by-date index (v2)');
           }
 
-          // Create messages store
+          // Ensure messages store exists (should have been created in v1)
           if (!db.objectStoreNames.contains('messages')) {
             const messageStore = db.createObjectStore('messages', {
               keyPath: 'id',
@@ -69,7 +79,7 @@ class StorageService {
             });
             messageStore.createIndex('by-category', 'category');
             messageStore.createIndex('by-date', 'createdAt');
-            console.log('[StorageService] Created messages object store');
+            console.log('[StorageService] Created messages store (fallback)');
           }
         },
       });
@@ -80,7 +90,7 @@ class StorageService {
         name: (error as Error).name,
         message: (error as Error).message,
       });
-      
+
       // Fallback: App will continue with default state (handled in useAppStore)
       // Possible causes: permission denied, quota exceeded, corrupted database
       throw error; // Re-throw to allow caller to handle gracefully
@@ -208,7 +218,12 @@ class StorageService {
     try {
       await this.init();
       const messages = await this.db!.getAllFromIndex('messages', 'by-category', category);
-      console.log('[StorageService] Retrieved messages by category:', category, 'count:', messages.length);
+      console.log(
+        '[StorageService] Retrieved messages by category:',
+        category,
+        'count:',
+        messages.length
+      );
       return messages;
     } catch (error) {
       console.error('[StorageService] Failed to get messages by category:', error);
@@ -252,7 +267,12 @@ class StorageService {
       const message = await this.getMessage(messageId);
       if (message) {
         await this.updateMessage(messageId, { isFavorite: !message.isFavorite });
-        console.log('[StorageService] Favorite toggled successfully, id:', messageId, 'new value:', !message.isFavorite);
+        console.log(
+          '[StorageService] Favorite toggled successfully, id:',
+          messageId,
+          'new value:',
+          !message.isFavorite
+        );
       } else {
         console.warn('[StorageService] Cannot toggle favorite - message not found, id:', messageId);
       }
@@ -269,10 +289,7 @@ class StorageService {
       await this.init();
       console.log('[StorageService] Adding bulk messages to IndexedDB, count:', messages.length);
       const tx = this.db!.transaction('messages', 'readwrite');
-      await Promise.all([
-        ...messages.map(msg => tx.store.add(msg as Message)),
-        tx.done,
-      ]);
+      await Promise.all([...messages.map((msg) => tx.store.add(msg as Message)), tx.done]);
       console.log('[StorageService] Bulk messages added successfully');
     } catch (error) {
       console.error('[StorageService] Failed to add bulk messages:', error);
@@ -300,11 +317,13 @@ class StorageService {
     try {
       await this.init();
       console.log('[StorageService] Exporting all data from IndexedDB...');
-      const [photos, messages] = await Promise.all([
-        this.getAllPhotos(),
-        this.getAllMessages(),
-      ]);
-      console.log('[StorageService] Data exported successfully, photos:', photos.length, 'messages:', messages.length);
+      const [photos, messages] = await Promise.all([this.getAllPhotos(), this.getAllMessages()]);
+      console.log(
+        '[StorageService] Data exported successfully, photos:',
+        photos.length,
+        'messages:',
+        messages.length
+      );
       return { photos, messages };
     } catch (error) {
       console.error('[StorageService] Failed to export data:', error);

@@ -39,6 +39,7 @@ This guide covers the complete deployment process for the My-Love Progressive We
    - Folder: `/ (root)`
 
 2. **Verify base path** in `vite.config.ts`:
+
    ```typescript
    base: '/My-Love/',  // Must match your repository name
    ```
@@ -75,17 +76,19 @@ The app uses pre-configured constants for relationship data. Edit `src/config/co
 ```typescript
 // src/config/constants.ts
 export const APP_CONFIG = {
-  defaultPartnerName: 'YourPartnerName',     // Partner's name (displayed throughout the app)
-  defaultStartDate: '2024-01-15',             // Relationship start date (YYYY-MM-DD format)
+  defaultPartnerName: 'YourPartnerName', // Partner's name (displayed throughout the app)
+  defaultStartDate: '2024-01-15', // Relationship start date (YYYY-MM-DD format)
   isPreConfigured: true,
 } as const;
 ```
 
 **Format Requirements:**
+
 - `defaultPartnerName`: Any string (first name or nickname recommended)
 - `defaultStartDate`: ISO 8601 date (YYYY-MM-DD), must be a valid past date
 
 **Examples:**
+
 ```typescript
 // Option 1
 defaultPartnerName: 'Sarah',
@@ -111,6 +114,7 @@ npm run build
 ```
 
 **What happens:**
+
 1. **TypeScript compilation** (`tsc -b`): Type-checks all source code
 2. **Vite bundling**: Bundles React app with optimizations
 3. **Environment variable injection**: Replaces `import.meta.env.VITE_*` with literal values
@@ -119,6 +123,7 @@ npm run build
 6. **Output**: Compiled app in `dist/` directory
 
 **Build output structure:**
+
 ```
 dist/
 ├── index.html              # Entry point
@@ -135,6 +140,7 @@ dist/
 ```
 
 **Expected build output:**
+
 ```
 ✓ 2080 modules transformed.
 dist/index.html                   0.62 kB │ gzip:   0.35 kB
@@ -150,6 +156,7 @@ files generated
 ```
 
 **Build must succeed with:**
+
 - ✅ Zero TypeScript errors
 - ✅ Total bundle size <200KB gzipped (target: NFR001)
 - ✅ Service worker generated successfully
@@ -166,6 +173,7 @@ npm run preview
 Open: http://localhost:4173/My-Love/
 
 **Verify:**
+
 - Partner name displays correctly
 - Relationship duration calculates from start date
 - No onboarding flow shown
@@ -185,6 +193,7 @@ npm run deploy
 ```
 
 **What happens:**
+
 1. **Predeploy hook** runs automatically:
    - `npm run build` → Builds production bundle
    - `npm run test:smoke` → Runs smoke tests
@@ -194,6 +203,7 @@ npm run deploy
 5. **Postdeploy message** → Suggests running post-deploy validation
 
 **Expected output:**
+
 ```
 > npm run deploy
 
@@ -217,6 +227,7 @@ Published
 ```
 
 **Deployment timing:**
+
 - Build: ~2 seconds
 - Smoke tests: ~1 second
 - gh-pages push: ~5-10 seconds
@@ -258,6 +269,7 @@ Smoke tests run automatically during `npm run deploy`. They validate:
 **Smoke tests are fail-fast**: Deployment is blocked if any test fails.
 
 To run smoke tests independently:
+
 ```bash
 npm run test:smoke
 ```
@@ -271,6 +283,7 @@ node scripts/post-deploy-check.cjs https://yourusername.github.io/My-Love/
 ```
 
 **Automated checks:**
+
 - HTTP 200 response from live URL
 - Manifest link present in HTML
 - Manifest is accessible and valid JSON
@@ -278,9 +291,11 @@ node scripts/post-deploy-check.cjs https://yourusername.github.io/My-Love/
 **Manual verification steps:**
 
 #### 1. Open Live Site
+
 Navigate to: `https://yourusername.github.io/My-Love/`
 
 **Verify:**
+
 - ✅ Site loads without errors
 - ✅ Partner name displays correctly
 - ✅ Relationship duration calculates from start date
@@ -293,10 +308,12 @@ Navigate to: `https://yourusername.github.io/My-Love/`
 Open DevTools (F12) → **Application** tab → **Service Workers**
 
 **Verify:**
+
 - ✅ Status: "activated and is running" (green indicator)
 - ✅ No errors in registration
 
 **Check Cache Storage:**
+
 - Application tab → **Cache Storage**
 - Expand `workbox-precache-v2-https://...`
 - Verify all app shell files are pre-cached (JS, CSS, HTML, icons)
@@ -304,11 +321,13 @@ Open DevTools (F12) → **Application** tab → **Service Workers**
 #### 3. Test Offline Functionality
 
 **Steps:**
+
 1. DevTools → **Network** tab
 2. Check "Offline" checkbox
 3. Refresh page (Cmd+R or Ctrl+R)
 
 **Verify:**
+
 - ✅ App loads from service worker cache
 - ✅ All features work offline
 - ✅ No network errors
@@ -319,6 +338,7 @@ Open DevTools (F12) → **Application** tab → **Service Workers**
 DevTools → **Lighthouse** tab → **Generate report**
 
 **Target scores:**
+
 - 🎯 **Performance**: >90
 - 🎯 **Accessibility**: >90
 - 🎯 **Best Practices**: >90
@@ -346,6 +366,7 @@ Manual regression testing:
 **Symptom:** `npm run build` fails with TypeScript errors
 
 **Solution:**
+
 ```bash
 # Run type check to see detailed errors
 npx tsc -b
@@ -356,6 +377,7 @@ npm run build
 ```
 
 **Common causes:**
+
 - Type mismatches in React components
 - Missing type definitions
 - Strict mode violations
@@ -365,6 +387,7 @@ npm run build
 **Symptom:** Vite bundling fails after TypeScript succeeds
 
 **Solution:**
+
 - Check for import errors or missing files
 - Verify all dependencies are installed: `npm install`
 - Clear Vite cache: `rm -rf node_modules/.vite`
@@ -376,6 +399,7 @@ npm run build
 **Error:** `❌ Required file not found: [filename]`
 
 **Solution:**
+
 - Verify build completed successfully
 - Check `dist/` directory exists
 - Rebuild: `npm run build`
@@ -387,6 +411,7 @@ npm run build
 **Cause:** `src/config/constants.ts` values were not properly set during build
 
 **Solution:**
+
 ```bash
 # 1. Edit src/config/constants.ts
 nano src/config/constants.ts
@@ -407,7 +432,9 @@ npm run build
 **Error:** `❌ Bundle size exceeds 200KB limit`
 
 **Solution:**
+
 1. Analyze bundle composition:
+
    ```bash
    npm run build -- --sourcemap
    # Inspect generated source maps in dist/assets/
@@ -432,6 +459,7 @@ npm run build
 **Error:** `fatal: could not read Username`
 
 **Solution:**
+
 ```bash
 # Configure Git credentials
 git config user.name "Your Name"
@@ -446,6 +474,7 @@ npm run deploy
 **Symptom:** Deployment succeeds but site shows old version
 
 **Solution:**
+
 1. **Wait 1-2 minutes** for GitHub Pages to propagate changes
 2. **Hard refresh** browser: Cmd+Shift+R (Mac) or Ctrl+Shift+F5 (Windows)
 3. **Clear browser cache** or test in incognito mode
@@ -463,12 +492,14 @@ npm run deploy
 **Symptom:** App loads but partner name is empty or "Unknown"
 
 **Checklist:**
+
 1. ✅ `src/config/constants.ts` exists in project root
 2. ✅ `defaultPartnerName` is set to a non-empty string
 3. ✅ Rebuilt after editing `constants.ts`: `npm run build`
 4. ✅ Check browser console for APP_CONFIG warnings
 
 **Debug steps:**
+
 ```bash
 # Verify constants were set correctly
 cat src/config/constants.ts | grep defaultPartnerName
@@ -482,11 +513,13 @@ cat src/config/constants.ts | grep defaultPartnerName
 **Symptom:** Duration counter displays "NaN days" or incorrect value
 
 **Causes:**
+
 - Invalid date format (must be YYYY-MM-DD)
 - Invalid date (e.g., 2024-02-30)
 - Future date (causes negative duration)
 
 **Solution:**
+
 ```bash
 # Verify date format in src/config/constants.ts
 cat src/config/constants.ts | grep defaultStartDate
@@ -503,20 +536,23 @@ npm run build && npm run deploy
 **Symptom:** DevTools shows service worker status "Redundant" or no service worker
 
 **Checklist:**
+
 1. ✅ HTTPS is enabled (GitHub Pages enforces this automatically)
 2. ✅ `sw.js` exists in deployed site root
 3. ✅ No console errors in browser DevTools
 4. ✅ Hard refresh page to update service worker
 
 **Debug steps:**
+
 ```javascript
 // In browser console, check registration manually
-navigator.serviceWorker.getRegistrations().then(regs => {
+navigator.serviceWorker.getRegistrations().then((regs) => {
   console.log('Registered service workers:', regs);
 });
 ```
 
 **Force service worker update:**
+
 1. DevTools → Application → Service Workers
 2. Check "Update on reload"
 3. Hard refresh page (Cmd+Shift+R)
@@ -526,6 +562,7 @@ navigator.serviceWorker.getRegistrations().then(regs => {
 **Symptom:** App doesn't load when offline
 
 **Solution:**
+
 1. **First load must be online** (service worker needs to cache assets)
 2. **Verify service worker is activated** (see Service Worker troubleshooting)
 3. **Check cache storage**:
@@ -607,23 +644,27 @@ git checkout main
 ### What Gets Committed
 
 **✅ Safe to commit:**
+
 - `src/config/constants.ts` (your relationship data)
 - `vite.config.ts` (build configuration)
 - All source code
 
 **❌ Never commit:**
+
 - `dist/` directory (build output, regenerated on each build)
 - `node_modules/` (dependencies, installed via npm)
 
 ### Relationship Data Storage
 
 **Your relationship data is stored in source code:**
+
 - `defaultPartnerName` and `defaultStartDate` values are in `src/config/constants.ts`
 - This file IS committed to version control (it's part of your app)
 - Anyone with repository access can see these values
 - The app is designed for single-user deployment by you for your partner
 
 **Privacy considerations:**
+
 - Relationship data (partner name, start date) is personal but not sensitive
 - Single-user PWA deployment assumes you control access to the URL
 - The data is publicly visible in the deployed app (browser DevTools)
@@ -642,6 +683,7 @@ The constants are directly embedded in your source code:
 4. **Deployment**: Bundle is deployed with values permanently embedded
 
 **How it works:**
+
 ```typescript
 // Your source: src/config/constants.ts
 export const APP_CONFIG = {

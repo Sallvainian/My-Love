@@ -10,7 +10,12 @@ interface DeleteConfirmDialogProps {
   onCancel: () => void;
 }
 
-export function DeleteConfirmDialog({ message, isOpen, onConfirm, onCancel }: DeleteConfirmDialogProps) {
+export function DeleteConfirmDialog({
+  message,
+  isOpen,
+  onConfirm,
+  onCancel,
+}: DeleteConfirmDialogProps) {
   const { deleteCustomMessage } = useAppStore();
 
   const handleDelete = () => {
@@ -52,16 +57,15 @@ export function DeleteConfirmDialog({ message, isOpen, onConfirm, onCancel }: De
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Message?</h2>
             <p className="text-sm text-gray-500">
-              This action cannot be undone. The message will be permanently removed from your library.
+              This action cannot be undone. The message will be permanently removed from your
+              library.
             </p>
           </div>
 
           {/* Message preview */}
           <div className="px-6 pb-6">
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-700 line-clamp-3">
-                {message.text}
-              </p>
+              <p className="text-sm text-gray-700 line-clamp-3">{message.text}</p>
               <div className="mt-2 pt-2 border-t border-gray-300 flex items-center justify-between text-xs text-gray-500">
                 <span>Category: {message.category}</span>
                 <span>ID: {message.id}</span>

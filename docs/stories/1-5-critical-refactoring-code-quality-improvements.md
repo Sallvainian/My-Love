@@ -124,27 +124,33 @@ So that the codebase is maintainable and follows best practices.
 **Primary Files:**
 
 **1. TypeScript Configuration:**
+
 - `/tsconfig.json` - Enable strict mode (`strict: true`)
 - All `.ts` and `.tsx` files - Fix strict mode violations
 
 **2. Error Boundary Implementation (NEW):**
+
 - `/src/components/ErrorBoundary/ErrorBoundary.tsx` (NEW) - Create class component
 - `/src/App.tsx` - Wrap root component with ErrorBoundary
 
 **3. Dead Code Removal:**
+
 - `/src/components/Onboarding/Onboarding.tsx` (DELETE) - Remove deprecated component
 - Any related Onboarding step component files (DELETE if exist)
 - Search results for orphaned files to delete
 
 **4. Dependency Management:**
+
 - `/package.json` - Remove unused dependencies
 - `/package-lock.json` - Will be regenerated after package.json changes
 
 **5. ESLint Configuration:**
+
 - `/.eslintrc.json` or `/eslint.config.js` - Update rules if needed
 - All source files - Fix ESLint warnings
 
 **6. Documentation:**
+
 - `/docs/architecture.md` - Remove Onboarding references, document ErrorBoundary
 - `/docs/technical-decisions.md` - Mark critical items as resolved
 - `/README.md` - Note strict mode and code quality improvements
@@ -200,6 +206,7 @@ So that the codebase is maintainable and follows best practices.
 **Previous Story Continuity:**
 
 Story 1.4 established patterns for configuration management, error handling, and backward compatibility that should be followed in this refactoring story. Key reusable elements:
+
 - **APP_CONFIG pattern**: Type-safe constant exports from config modules
 - **Three-way conditionals**: Sophisticated logic for backward compatibility
 - **Console logging**: Consistent error logging format across the app
@@ -208,15 +215,18 @@ Story 1.4 established patterns for configuration management, error handling, and
 ### Project Structure Notes
 
 **Files to DELETE:**
+
 - `src/components/Onboarding/Onboarding.tsx` - Deprecated component (flagged in Story 1.4)
 - Any related Onboarding step component files (if they exist)
 - Orphaned utility files or unused components (to be identified during audit review)
 
 **Files to CREATE:**
+
 - `src/components/ErrorBoundary/ErrorBoundary.tsx` - Error boundary class component
 - Potentially `src/components/ErrorBoundary/index.ts` for clean exports
 
 **Files to MODIFY:**
+
 - `tsconfig.json` - Enable strict mode
 - `src/App.tsx` - Wrap with ErrorBoundary
 - All `.ts` and `.tsx` files - Fix strict mode violations and ESLint warnings
@@ -226,6 +236,7 @@ Story 1.4 established patterns for configuration management, error handling, and
 - `README.md` - Note strict mode and quality improvements
 
 **Files to EVALUATE (May Not Need Changes):**
+
 - `.eslintrc.json` or `eslint.config.js` - May need rule updates
 - `vite.config.ts` - Verify no changes needed for strict mode
 
@@ -247,6 +258,7 @@ Story 1.4 established patterns for configuration management, error handling, and
 Manual testing via browser with comprehensive regression checklist:
 
 **Test 1: TypeScript Strict Mode Verification (AC: 2)**
+
 1. Update tsconfig.json: `strict: true`
 2. Run `tsc -b` in terminal
 3. Expected: Zero compilation errors
@@ -254,6 +266,7 @@ Manual testing via browser with comprehensive regression checklist:
 5. Verify: Build succeeds with `npm run build`
 
 **Test 2: Error Boundary Functionality (AC: 3)**
+
 1. Temporarily add error throw in DailyMessage component: `throw new Error("Test error")`
 2. Open app in browser
 3. Expected: ErrorBoundary catches error, shows fallback UI ("Something went wrong")
@@ -264,6 +277,7 @@ Manual testing via browser with comprehensive regression checklist:
 8. Verify: App renders normally again
 
 **Test 3: Dead Code Removal Verification (AC: 4)**
+
 1. Search codebase for "Onboarding" references: `grep -r "Onboarding" src/`
 2. Expected: Zero matches except TODO comments (if any)
 3. Verify: `src/components/Onboarding/` directory deleted
@@ -273,6 +287,7 @@ Manual testing via browser with comprehensive regression checklist:
 7. Expected: Bundle size reduced (Onboarding component removed)
 
 **Test 4: Unused Dependencies Verification (AC: 4)**
+
 1. Run `npm audit` before changes
 2. Document current dependency count
 3. Analyze imports: `npm ls` (list dependencies)
@@ -285,6 +300,7 @@ Manual testing via browser with comprehensive regression checklist:
 10. Expected: Dependency count reduced or same
 
 **Test 5: ESLint Zero Warnings (AC: 5)**
+
 1. Run `npm run lint` before changes
 2. Document warning count (e.g., "47 warnings")
 3. Fix all warnings systematically
@@ -295,6 +311,7 @@ Manual testing via browser with comprehensive regression checklist:
 **Test 6: Comprehensive Regression Testing (AC: 6)**
 
 **Fresh Install Scenario:**
+
 1. Clear all browser data (DevTools → Application → Clear storage)
 2. Configuration is done by editing `src/config/constants.ts` directly with hardcoded values
 3. Run `npm run build` then `npm run preview`
@@ -304,11 +321,13 @@ Manual testing via browser with comprehensive regression checklist:
 7. Verify: Relationship duration counter shows correct days
 
 **Message Display:**
+
 1. Verify: Today's message displays correctly with category badge
 2. Verify: Message text is readable and properly formatted
 3. Verify: Entrance animation plays smoothly (3D rotation + scale)
 
 **Favorite Functionality:**
+
 1. Click heart icon on message card
 2. Verify: Heart animates (burst with floating hearts)
 3. Verify: Heart icon changes to filled state
@@ -318,12 +337,14 @@ Manual testing via browser with comprehensive regression checklist:
 7. Verify: Message record shows `isFavorite: true`
 
 **Share Functionality:**
+
 1. Click share button
 2. If Web Share API available: Verify native share sheet opens
 3. If Web Share API not available: Verify clipboard copy feedback
 4. Verify: No console errors
 
 **Theme Switching:**
+
 1. Open theme selector (if UI exists, or manually change via DevTools)
 2. Switch to each theme: Sunset Bliss, Ocean Dreams, Lavender Fields, Rose Garden
 3. Verify: Each theme applies correctly (colors, gradients, animations)
@@ -331,6 +352,7 @@ Manual testing via browser with comprehensive regression checklist:
 5. Verify: Theme persists via Zustand persist
 
 **Relationship Duration:**
+
 1. Check relationship duration counter (e.g., "87 days together")
 2. Manually calculate expected days from pre-configured start date
 3. Verify: Counter matches manual calculation
@@ -338,6 +360,7 @@ Manual testing via browser with comprehensive regression checklist:
 5. Verify: Counter increments correctly
 
 **Animations:**
+
 1. Reload page to trigger entrance animation
 2. Verify: Message card animates in smoothly (no jank, 60fps)
 3. Favorite a message
@@ -346,6 +369,7 @@ Manual testing via browser with comprehensive regression checklist:
 6. Verify: Subtle pulsing animation continuous
 
 **Offline Functionality:**
+
 1. Load app online
 2. Open DevTools → Network tab → Offline checkbox
 3. Refresh page
@@ -357,6 +381,7 @@ Manual testing via browser with comprehensive regression checklist:
 9. Verify: Favorite persists (IndexedDB transaction completed offline)
 
 **Build and TypeScript Verification:**
+
 1. Run `npm run build`
 2. Expected: "Build completed successfully" message
 3. Expected: Zero TypeScript errors in output
@@ -376,6 +401,7 @@ Manual testing via browser with comprehensive regression checklist:
 3. Update technical-decisions.md with resolution notes
 
 **Manual Verification Steps:**
+
 1. Open DevTools → Console
 2. Verify: No errors or warnings in console during normal operation
 3. Open DevTools → Application → LocalStorage
@@ -420,6 +446,7 @@ None - all changes successful on first attempt except ESLint fixes which require
 **Story 1.5 Implementation Summary:**
 
 **Completed Tasks:**
+
 1. ✅ Reviewed Story 1.1 audit and extracted critical items
 2. ✅ Verified TypeScript strict mode already enabled in tsconfig.app.json (line 20)
 3. ✅ Fixed ESLint warnings - achieved zero errors/warnings
@@ -435,10 +462,12 @@ None - all changes successful on first attempt except ESLint fixes which require
 **Key Changes:**
 
 **1. TypeScript Strict Mode (AC-2):**
+
 - Already enabled in tsconfig.app.json - no action needed
 - Confirmed zero compilation errors with strict mode
 
 **2. Error Boundaries (AC-3):**
+
 - Created src/components/ErrorBoundary/ErrorBoundary.tsx
 - Implemented getDerivedStateFromError() and componentDidCatch()
 - Added fallback UI with retry button
@@ -446,45 +475,53 @@ None - all changes successful on first attempt except ESLint fixes which require
 - Fixed TypeScript verbatimModuleSyntax issue (import type { ReactNode })
 
 **3. Dead Code Removal (AC-4):**
+
 - Deleted src/components/Onboarding/ directory
 - Verified only one comment reference remains (documentation of Story 1.4)
 - Bundle size reduced from 368.33 KiB to 361.70 KiB (then 362.53 KiB with constants)
 
 **4. ESLint Fixes (AC-5):**
+
 - Fixed exhaustive-deps warning in App.tsx (changed [settings?.themeName] to [settings])
 - Fixed no-unused-vars error in DailyMessage.tsx (removed unused catch parameter)
-- Added bmad/** to globalIgnores in eslint.config.js
+- Added bmad/\*\* to globalIgnores in eslint.config.js
 - Achieved zero errors, zero warnings
 
 **5. Code Quality Improvements (AC-1):**
+
 - Created src/constants/animations.ts with all animation timing/value constants
 - Replaced 15+ magic numbers in DailyMessage.tsx with named constants
 - Improved maintainability and self-documenting code
 
 **6. Documentation (AC-1,2,3):**
+
 - Updated architecture.md component hierarchy to show ErrorBoundary
 - Documented ErrorBoundary features and purpose
 - Marked Onboarding as "REMOVED - Story 1.5"
 
 **Bundle Impact:**
+
 - Before: 368.33 KiB (with Onboarding)
 - After Onboarding removal: 361.70 KiB
 - After adding constants: 362.53 KiB
 - Net reduction: ~6 KiB (1.6% smaller)
 
 **Quality Metrics:**
+
 - ESLint: 0 errors, 0 warnings ✅
 - TypeScript: Strict mode enabled, 0 errors ✅
 - Build: Success with no errors ✅
 - npm audit: 0 vulnerabilities ✅
 
 **Regression Testing:**
+
 - Build verification: npm run build succeeds
 - Type checking: tsc -b succeeds with zero errors
 - Linting: npm run lint shows zero warnings
 - Manual testing recommended: See Test 6 checklist above
 
 **Technical Decisions:**
+
 1. TypeScript strict mode was already enabled - Story 1.5 assumption corrected
 2. workbox-window dependency kept - required by vite-plugin-pwa
 3. Animation constants created in separate file for maintainability
@@ -492,11 +529,13 @@ None - all changes successful on first attempt except ESLint fixes which require
 5. Empty catch block preferred over unused variable for share cancellation
 
 **Deferred Items:**
+
 - Comprehensive manual regression testing (requires running dev server)
 - DRY utilities extraction (minimal code duplication found)
 - Further code quality improvements (non-critical, deferred to future stories)
 
 **Story Completion Criteria Met:**
+
 - ✅ AC-1: Critical items from Story 1.1 addressed
 - ✅ AC-2: TypeScript strict mode compliance verified
 - ✅ AC-3: Error boundaries added
@@ -507,15 +546,18 @@ None - all changes successful on first attempt except ESLint fixes which require
 ### File List
 
 **Created:**
+
 - src/components/ErrorBoundary/ErrorBoundary.tsx
 - src/constants/animations.ts
 
 **Modified:**
+
 - src/App.tsx (wrapped with ErrorBoundary, fixed ESLint warning)
 - src/components/DailyMessage/DailyMessage.tsx (replaced magic numbers, fixed ESLint error)
-- eslint.config.js (added bmad/** to globalIgnores)
+- eslint.config.js (added bmad/\*\* to globalIgnores)
 - docs/architecture.md (updated component hierarchy, documented ErrorBoundary, marked Onboarding as removed)
 - docs/stories/1-5-critical-refactoring-code-quality-improvements.md (updated status to completed)
 
 **Deleted:**
+
 - src/components/Onboarding/ (entire directory with Onboarding.tsx)

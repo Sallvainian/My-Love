@@ -53,8 +53,8 @@ function fetchUrl(targetUrl) {
       path: parsedUrl.pathname + parsedUrl.search,
       method: 'GET',
       headers: {
-        'User-Agent': 'PostDeployCheck/1.0'
-      }
+        'User-Agent': 'PostDeployCheck/1.0',
+      },
     };
 
     const req = protocol.request(options, (res) => {
@@ -68,7 +68,7 @@ function fetchUrl(targetUrl) {
         resolve({
           statusCode: res.statusCode,
           body,
-          headers: res.headers
+          headers: res.headers,
         });
       });
     });
@@ -115,7 +115,11 @@ async function testSiteAccessibility(siteUrl) {
       logTest('Site is accessible', true, `HTTP ${response.statusCode}`);
       return { success: true, body: response.body };
     } else if (response.statusCode >= 300 && response.statusCode < 400) {
-      logTest('Site returned redirect', false, `HTTP ${response.statusCode} (check redirect target)`);
+      logTest(
+        'Site returned redirect',
+        false,
+        `HTTP ${response.statusCode} (check redirect target)`
+      );
       return { success: false, body: null };
     } else {
       logTest('Site returned error', false, `HTTP ${response.statusCode}`);
@@ -194,9 +198,12 @@ async function testManifest(manifestUrl) {
 
     // Check required fields
     const requiredFields = ['name', 'short_name', 'icons', 'display'];
-    const presentFields = requiredFields.filter(field => manifest[field]);
+    const presentFields = requiredFields.filter((field) => manifest[field]);
 
-    logTest(`Manifest has ${presentFields.length}/${requiredFields.length} required fields`, presentFields.length === requiredFields.length);
+    logTest(
+      `Manifest has ${presentFields.length}/${requiredFields.length} required fields`,
+      presentFields.length === requiredFields.length
+    );
 
     // Check theme color
     if (manifest.theme_color) {
@@ -207,7 +214,6 @@ async function testManifest(manifestUrl) {
     if (Array.isArray(manifest.icons) && manifest.icons.length > 0) {
       logTest(`Manifest includes ${manifest.icons.length} icon(s)`, true);
     }
-
   } catch (error) {
     logTest('Manifest validation failed', false, error.message);
   }
@@ -219,7 +225,9 @@ async function testManifest(manifestUrl) {
 function testServiceWorker() {
   console.log(`\n${colors.blue}Test 4: Service Worker Registration${colors.reset}`);
 
-  console.log(`${colors.yellow}⚠️  Service worker registration requires manual verification${colors.reset}`);
+  console.log(
+    `${colors.yellow}⚠️  Service worker registration requires manual verification${colors.reset}`
+  );
   console.log(`\n${colors.cyan}Manual verification steps:${colors.reset}`);
   console.log(`1. Open the live site in Chrome or Edge`);
   console.log(`2. Open DevTools (F12) → Application tab`);
@@ -249,7 +257,9 @@ function testPreConfiguredData(html) {
   // and rendered dynamically via React, so it won't be in initial HTML response.
   // This check looks for the APP_CONFIG or related strings in bundled JS.
 
-  console.log(`${colors.yellow}ℹ️  Pre-configured data is loaded dynamically via JavaScript${colors.reset}`);
+  console.log(
+    `${colors.yellow}ℹ️  Pre-configured data is loaded dynamically via JavaScript${colors.reset}`
+  );
   console.log(`\n${colors.cyan}Manual verification:${colors.reset}`);
   console.log(`1. Open the live site in a browser`);
   console.log(`2. Verify partner name displays in the app UI`);
@@ -262,9 +272,13 @@ function testPreConfiguredData(html) {
  * Display post-deploy verification summary
  */
 function displaySummary() {
-  console.log(`\n${colors.blue}═══════════════════════════════════════════════════════${colors.reset}`);
+  console.log(
+    `\n${colors.blue}═══════════════════════════════════════════════════════${colors.reset}`
+  );
   console.log(`${colors.blue}Post-Deploy Verification Summary${colors.reset}`);
-  console.log(`${colors.blue}═══════════════════════════════════════════════════════${colors.reset}\n`);
+  console.log(
+    `${colors.blue}═══════════════════════════════════════════════════════${colors.reset}\n`
+  );
 
   console.log(`${colors.green}✅ Automated checks completed${colors.reset}`);
   console.log(`${colors.yellow}⚠️  Manual verification recommended (see above)${colors.reset}\n`);
@@ -283,16 +297,26 @@ function displaySummary() {
  * Main validation runner
  */
 async function main() {
-  console.log(`${colors.blue}╔═══════════════════════════════════════════════════════╗${colors.reset}`);
-  console.log(`${colors.blue}║     Post-Deploy Validation for My-Love PWA          ║${colors.reset}`);
-  console.log(`${colors.blue}╚═══════════════════════════════════════════════════════╝${colors.reset}\n`);
+  console.log(
+    `${colors.blue}╔═══════════════════════════════════════════════════════╗${colors.reset}`
+  );
+  console.log(
+    `${colors.blue}║     Post-Deploy Validation for My-Love PWA          ║${colors.reset}`
+  );
+  console.log(
+    `${colors.blue}╚═══════════════════════════════════════════════════════╝${colors.reset}\n`
+  );
 
   // Get URL from command line or use default
   let siteUrl = process.argv[2];
 
   if (!siteUrl) {
-    console.log(`${colors.yellow}ℹ️  No URL provided. Please provide your GitHub Pages URL:${colors.reset}`);
-    console.log(`${colors.cyan}   node scripts/post-deploy-check.js https://yourusername.github.io/My-Love/${colors.reset}\n`);
+    console.log(
+      `${colors.yellow}ℹ️  No URL provided. Please provide your GitHub Pages URL:${colors.reset}`
+    );
+    console.log(
+      `${colors.cyan}   node scripts/post-deploy-check.js https://yourusername.github.io/My-Love/${colors.reset}\n`
+    );
     process.exit(0);
   }
 
@@ -302,7 +326,9 @@ async function main() {
   }
 
   console.log(`${colors.cyan}Target URL: ${siteUrl}${colors.reset}`);
-  console.log(`${colors.yellow}Note: This script is informational only and does not block deployment${colors.reset}\n`);
+  console.log(
+    `${colors.yellow}Note: This script is informational only and does not block deployment${colors.reset}\n`
+  );
 
   try {
     // Run tests
@@ -319,11 +345,12 @@ async function main() {
 
     // Always exit successfully (informational only)
     process.exit(0);
-
   } catch (error) {
     console.error(`\n${colors.red}[Unexpected Error]:${colors.reset} ${error.message}`);
     console.error(error.stack);
-    console.log(`\n${colors.yellow}Note: Post-deploy check encountered an error but does not block deployment${colors.reset}\n`);
+    console.log(
+      `\n${colors.yellow}Note: Post-deploy check encountered an error but does not block deployment${colors.reset}\n`
+    );
     process.exit(0); // Exit successfully even on error (informational only)
   }
 }

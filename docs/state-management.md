@@ -5,6 +5,7 @@
 **My Love** uses [Zustand](https://zustand.docs.pmnd.rs/) for state management with the persist middleware for LocalStorage integration. The application has a single, centralized store that manages all global state.
 
 **Key Features**:
+
 - Single source of truth (`useAppStore`)
 - Automatic LocalStorage persistence
 - Simple, non-boilerplate API
@@ -33,13 +34,14 @@ export const useAppStore = create<AppState>()(
       name: 'my-love-storage',
       partialize: (state) => ({
         // Only persist critical state
-      })
+      }),
     }
   )
 );
 ```
 
 **Middleware Stack**:
+
 1. `persist` - Syncs state with LocalStorage
 2. Type inference via `create<AppState>()`
 
@@ -89,6 +91,7 @@ interface AppState {
 **Purpose**: User preferences and relationship configuration
 
 **State**:
+
 ```typescript
 settings: Settings | null;
 ```
@@ -98,12 +101,15 @@ settings: Settings | null;
 **Actions**:
 
 #### setSettings
+
 ```typescript
 setSettings: (settings: Settings) => void
 ```
+
 **Purpose**: Set complete settings object (used during onboarding)
 
 **Example**:
+
 ```typescript
 const { setSettings } = useAppStore();
 
@@ -121,12 +127,15 @@ setSettings({
 ```
 
 #### updateSettings
+
 ```typescript
 updateSettings: (updates: Partial<Settings>) => void
 ```
+
 **Purpose**: Partial update of settings (merge with existing)
 
 **Example**:
+
 ```typescript
 const { updateSettings } = useAppStore();
 
@@ -135,13 +144,14 @@ updateSettings({ themeName: 'ocean' });
 ```
 
 **Implementation**:
+
 ```typescript
 updateSettings: (updates) => {
   const { settings } = get();
   if (settings) {
     set({ settings: { ...settings, ...updates } });
   }
-}
+};
 ```
 
 ---
@@ -151,6 +161,7 @@ updateSettings: (updates) => {
 **Purpose**: Track onboarding completion status
 
 **State**:
+
 ```typescript
 isOnboarded: boolean;
 ```
@@ -160,12 +171,15 @@ isOnboarded: boolean;
 **Actions**:
 
 #### setOnboarded
+
 ```typescript
 setOnboarded: (onboarded: boolean) => void
 ```
+
 **Purpose**: Mark onboarding as complete
 
 **Example**:
+
 ```typescript
 const { setOnboarded } = useAppStore();
 
@@ -182,6 +196,7 @@ setOnboarded(true);
 **Purpose**: Manage love messages and daily rotation
 
 **State**:
+
 ```typescript
 messages: Message[];
 messageHistory: MessageHistory;
@@ -189,6 +204,7 @@ currentMessage: Message | null;
 ```
 
 **Initial Values**:
+
 - `messages`: `[]` (loaded from IndexedDB)
 - `messageHistory`: `{ lastShownDate: '', lastMessageId: 0, favoriteIds: [], viewedIds: [] }`
 - `currentMessage`: `null` (computed on init)
@@ -196,12 +212,15 @@ currentMessage: Message | null;
 **Actions**:
 
 #### loadMessages
+
 ```typescript
-loadMessages: () => Promise<void>
+loadMessages: () => Promise<void>;
 ```
+
 **Purpose**: Load all messages from IndexedDB
 
 **Example**:
+
 ```typescript
 const { loadMessages } = useAppStore();
 
@@ -209,6 +228,7 @@ await loadMessages();
 ```
 
 **Implementation**:
+
 ```typescript
 loadMessages: async () => {
   try {
@@ -217,26 +237,27 @@ loadMessages: async () => {
   } catch (error) {
     console.error('Error loading messages:', error);
   }
-}
+};
 ```
 
 #### addMessage
+
 ```typescript
-addMessage: (text: string, category: MessageCategory) => Promise<void>
+addMessage: (text: string, category: MessageCategory) => Promise<void>;
 ```
+
 **Purpose**: Add a new custom message
 
 **Example**:
+
 ```typescript
 const { addMessage } = useAppStore();
 
-await addMessage(
-  "You make every day brighter just by being you.",
-  'affirmation'
-);
+await addMessage('You make every day brighter just by being you.', 'affirmation');
 ```
 
 **Implementation**:
+
 ```typescript
 addMessage: async (text, category) => {
   try {
@@ -257,16 +278,19 @@ addMessage: async (text, category) => {
   } catch (error) {
     console.error('Error adding message:', error);
   }
-}
+};
 ```
 
 #### toggleFavorite
+
 ```typescript
-toggleFavorite: (messageId: number) => Promise<void>
+toggleFavorite: (messageId: number) => Promise<void>;
 ```
+
 **Purpose**: Toggle favorite status of a message
 
 **Example**:
+
 ```typescript
 const { toggleFavorite } = useAppStore();
 
@@ -275,6 +299,7 @@ await toggleFavorite(42);
 ```
 
 **Implementation**:
+
 ```typescript
 toggleFavorite: async (messageId) => {
   try {
@@ -296,22 +321,26 @@ toggleFavorite: async (messageId) => {
   } catch (error) {
     console.error('Error toggling favorite:', error);
   }
-}
+};
 ```
 
 **Side Effects**:
+
 1. Updates IndexedDB
 2. Updates in-memory messages array
 3. Updates favoriteIds in messageHistory
 4. Refreshes currentMessage if it's the favorited one
 
 #### updateCurrentMessage
+
 ```typescript
 updateCurrentMessage: () => void
 ```
+
 **Purpose**: Determine and set the current daily message
 
 **Algorithm**:
+
 1. Check if it's a new day (compare `lastShownDate` with today)
 2. If new day:
    - Use `getTodayMessage()` algorithm (see `/src/utils/messageRotation.ts`)
@@ -322,6 +351,7 @@ updateCurrentMessage: () => void
    - Show the same message as `lastMessageId`
 
 **Example**:
+
 ```typescript
 const { updateCurrentMessage } = useAppStore();
 
@@ -330,6 +360,7 @@ updateCurrentMessage();
 ```
 
 **Implementation**:
+
 ```typescript
 updateCurrentMessage: () => {
   const { messages, messageHistory, settings } = get();
@@ -338,11 +369,7 @@ updateCurrentMessage: () => {
 
   if (isNewDay(messageHistory.lastShownDate)) {
     const startDate = new Date(settings.relationship.startDate);
-    const todayMessage = getTodayMessage(
-      messages,
-      startDate,
-      messageHistory.favoriteIds
-    );
+    const todayMessage = getTodayMessage(messages, startDate, messageHistory.favoriteIds);
 
     if (todayMessage) {
       set({
@@ -361,7 +388,7 @@ updateCurrentMessage: () => {
       set({ currentMessage: lastMessage });
     }
   }
-}
+};
 ```
 
 ---
@@ -371,6 +398,7 @@ updateCurrentMessage: () => {
 **Purpose**: Daily mood tracking
 
 **State**:
+
 ```typescript
 moods: MoodEntry[];
 ```
@@ -380,12 +408,15 @@ moods: MoodEntry[];
 **Actions**:
 
 #### addMoodEntry
+
 ```typescript
 addMoodEntry: (mood: MoodType, note?: string) => void
 ```
+
 **Purpose**: Add or update today's mood entry
 
 **Example**:
+
 ```typescript
 const { addMoodEntry } = useAppStore();
 
@@ -393,6 +424,7 @@ addMoodEntry('grateful', 'Had an amazing day together!');
 ```
 
 **Implementation**:
+
 ```typescript
 addMoodEntry: (mood, note) => {
   const today = new Date().toISOString().split('T')[0];
@@ -405,18 +437,21 @@ addMoodEntry: (mood, note) => {
   set((state) => ({
     moods: [...state.moods.filter((m) => m.date !== today), newMood],
   }));
-}
+};
 ```
 
 **Behavior**: Replaces existing mood for today (only one mood per day)
 
 #### getMoodForDate
+
 ```typescript
-getMoodForDate: (date: string) => MoodEntry | undefined
+getMoodForDate: (date: string) => MoodEntry | undefined;
 ```
+
 **Purpose**: Retrieve mood entry for a specific date
 
 **Example**:
+
 ```typescript
 const { getMoodForDate } = useAppStore();
 
@@ -427,10 +462,11 @@ if (todayMood) {
 ```
 
 **Implementation**:
+
 ```typescript
 getMoodForDate: (date) => {
   return get().moods.find((m) => m.date === date);
-}
+};
 ```
 
 ---
@@ -444,29 +480,32 @@ getMoodForDate: (date) => {
 **Actions**:
 
 #### addAnniversary
+
 ```typescript
 addAnniversary: (anniversary: Omit<Anniversary, 'id'>) => void
 ```
+
 **Purpose**: Add a new anniversary to the list
 
 **Example**:
+
 ```typescript
 const { addAnniversary } = useAppStore();
 
 addAnniversary({
   date: '2023-06-20',
   label: 'First "I Love You"',
-  description: 'Under the stars at the beach'
+  description: 'Under the stars at the beach',
 });
 ```
 
 **Implementation**:
+
 ```typescript
 addAnniversary: (anniversary) => {
   const { settings } = get();
   if (settings) {
-    const newId =
-      Math.max(0, ...settings.relationship.anniversaries.map((a) => a.id)) + 1;
+    const newId = Math.max(0, ...settings.relationship.anniversaries.map((a) => a.id)) + 1;
     const newAnniversary: Anniversary = { ...anniversary, id: newId };
 
     set({
@@ -479,18 +518,21 @@ addAnniversary: (anniversary) => {
       },
     });
   }
-}
+};
 ```
 
 **ID Generation**: Max existing ID + 1
 
 #### removeAnniversary
+
 ```typescript
 removeAnniversary: (id: number) => void
 ```
+
 **Purpose**: Delete an anniversary by ID
 
 **Example**:
+
 ```typescript
 const { removeAnniversary } = useAppStore();
 
@@ -498,6 +540,7 @@ removeAnniversary(3);
 ```
 
 **Implementation**:
+
 ```typescript
 removeAnniversary: (id) => {
   const { settings } = get();
@@ -507,14 +550,12 @@ removeAnniversary: (id) => {
         ...settings,
         relationship: {
           ...settings.relationship,
-          anniversaries: settings.relationship.anniversaries.filter(
-            (a) => a.id !== id
-          ),
+          anniversaries: settings.relationship.anniversaries.filter((a) => a.id !== id),
         },
       },
     });
   }
-}
+};
 ```
 
 ---
@@ -528,12 +569,15 @@ removeAnniversary: (id) => {
 **Actions**:
 
 #### setTheme
+
 ```typescript
 setTheme: (theme: ThemeName) => void
 ```
+
 **Purpose**: Change the active theme
 
 **Example**:
+
 ```typescript
 const { setTheme } = useAppStore();
 
@@ -541,6 +585,7 @@ setTheme('ocean');
 ```
 
 **Implementation**:
+
 ```typescript
 setTheme: (theme) => {
   const { settings } = get();
@@ -552,7 +597,7 @@ setTheme: (theme) => {
       },
     });
   }
-}
+};
 ```
 
 **Side Effects**: Theme change is detected in `App.tsx` and applies CSS variables
@@ -564,12 +609,14 @@ setTheme: (theme) => {
 **Purpose**: Loading and error states
 
 **State**:
+
 ```typescript
 isLoading: boolean;
 error: string | null;
 ```
 
 **Initial Values**:
+
 - `isLoading`: `false`
 - `error`: `null`
 
@@ -584,14 +631,17 @@ error: string | null;
 **Actions**:
 
 #### initializeApp
+
 ```typescript
-initializeApp: () => Promise<void>
+initializeApp: () => Promise<void>;
 ```
+
 **Purpose**: Initialize IndexedDB and load initial data
 
 **Called**: Once on app mount in `App.tsx` useEffect
 
 **Example**:
+
 ```typescript
 const { initializeApp } = useAppStore();
 
@@ -601,6 +651,7 @@ useEffect(() => {
 ```
 
 **Implementation**:
+
 ```typescript
 initializeApp: async () => {
   set({ isLoading: true, error: null });
@@ -635,10 +686,11 @@ initializeApp: async () => {
     console.error('Error initializing app:', error);
     set({ error: 'Failed to initialize app', isLoading: false });
   }
-}
+};
 ```
 
 **Steps**:
+
 1. Set loading state
 2. Initialize IndexedDB connection
 3. Load messages (or populate defaults)
@@ -652,9 +704,12 @@ initializeApp: async () => {
 ### Persist Middleware
 
 **Configuration**:
+
 ```typescript
 persist(
-  (set, get) => ({ /* store */ }),
+  (set, get) => ({
+    /* store */
+  }),
   {
     name: 'my-love-storage',
     version: 1, // State schema version for future migrations
@@ -676,27 +731,29 @@ persist(
       }
     },
   }
-)
+);
 ```
 
 **Options**:
 
-| Option | Value | Purpose |
-|--------|-------|---------|
-| `name` | `'my-love-storage'` | LocalStorage key |
-| `version` | `1` | State schema version for migrations |
-| `partialize` | Function | Select which state to persist |
-| `onRehydrateStorage` | Callback | Error handling and recovery |
+| Option               | Value               | Purpose                             |
+| -------------------- | ------------------- | ----------------------------------- |
+| `name`               | `'my-love-storage'` | LocalStorage key                    |
+| `version`            | `1`                 | State schema version for migrations |
+| `partialize`         | Function            | Select which state to persist       |
+| `onRehydrateStorage` | Callback            | Error handling and recovery         |
 
 ### Persisted vs. Non-Persisted State
 
 **Persisted to LocalStorage**:
+
 - `settings` - User preferences
 - `isOnboarded` - Onboarding status
 - `messageHistory` - Message rotation tracking
 - `moods` - Daily mood entries
 
 **Not Persisted** (loaded on init):
+
 - `messages` - Stored in IndexedDB
 - `photos` - Stored in IndexedDB
 - `currentMessage` - Computed from messages
@@ -704,6 +761,7 @@ persist(
 - `error` - Runtime UI state
 
 **Rationale**:
+
 - Large data (messages, photos) → IndexedDB
 - Small config data → LocalStorage
 - Computed state → Re-calculated on load
@@ -716,6 +774,7 @@ persist(
 ### 1. Component Usage
 
 **Basic Hook**:
+
 ```typescript
 import { useAppStore } from '../stores/useAppStore';
 
@@ -751,6 +810,7 @@ const toggleFavorite = useAppStore((state) => state.toggleFavorite);
 ### 3. Accessing Store Outside Components
 
 **Method 1**: Direct store access
+
 ```typescript
 import { useAppStore } from '../stores/useAppStore';
 
@@ -759,6 +819,7 @@ const messages = useAppStore.getState().messages;
 ```
 
 **Method 2**: Subscribe to changes
+
 ```typescript
 import { useAppStore } from '../stores/useAppStore';
 
@@ -808,7 +869,7 @@ toggleFavorite: async (messageId) => {
     }));
     console.error('Failed to toggle favorite:', error);
   }
-}
+};
 ```
 
 ---
@@ -825,7 +886,7 @@ set({ isLoading: true });
 
 ```typescript
 set((state) => ({
-  messages: [...state.messages, newMessage]
+  messages: [...state.messages, newMessage],
 }));
 ```
 
@@ -837,9 +898,9 @@ set((state) => ({
     ...state.settings,
     relationship: {
       ...state.settings.relationship,
-      partnerName: 'New Name'
-    }
-  }
+      partnerName: 'New Name',
+    },
+  },
 }));
 ```
 
@@ -849,7 +910,7 @@ set((state) => ({
 set({
   isLoading: false,
   error: null,
-  messages: loadedMessages
+  messages: loadedMessages,
 });
 ```
 
@@ -867,6 +928,7 @@ if (settings) {
 ## State Access Methods
 
 ### get()
+
 **Purpose**: Access current state within actions
 
 ```typescript
@@ -875,6 +937,7 @@ console.log(currentState.messages.length);
 ```
 
 ### set()
+
 **Purpose**: Update state
 
 ```typescript
@@ -883,6 +946,7 @@ set((state) => ({ count: state.count + 1 }));
 ```
 
 ### useAppStore.getState()
+
 **Purpose**: Access state outside React components
 
 ```typescript
@@ -890,6 +954,7 @@ const currentMessages = useAppStore.getState().messages;
 ```
 
 ### useAppStore.subscribe()
+
 **Purpose**: Subscribe to state changes outside React
 
 ```typescript
@@ -922,10 +987,7 @@ const { currentMessage } = useAppStore();
 import { useMemo } from 'react';
 
 const messages = useAppStore((state) => state.messages);
-const favoriteMessages = useMemo(
-  () => messages.filter(m => m.isFavorite),
-  [messages]
-);
+const favoriteMessages = useMemo(() => messages.filter((m) => m.isFavorite), [messages]);
 ```
 
 ### 3. Batch Updates
@@ -957,18 +1019,22 @@ const { settings, isOnboarded } = useAppStore(
 ### Zustand DevTools
 
 **Installation** (optional):
+
 ```bash
 npm install --save-dev @redux-devtools/extension
 ```
 
 **Integration**:
+
 ```typescript
 import { devtools } from 'zustand/middleware';
 
 export const useAppStore = create<AppState>()(
   devtools(
     persist(
-      (set, get) => ({ /* store */ }),
+      (set, get) => ({
+        /* store */
+      }),
       { name: 'my-love-storage' }
     ),
     { name: 'MyLoveStore' }
@@ -979,6 +1045,7 @@ export const useAppStore = create<AppState>()(
 ### Console Logging
 
 **Log all state changes**:
+
 ```typescript
 useAppStore.subscribe((state) => {
   console.log('State updated:', state);
@@ -986,6 +1053,7 @@ useAppStore.subscribe((state) => {
 ```
 
 **Log specific slice changes**:
+
 ```typescript
 useAppStore.subscribe((state, prevState) => {
   if (state.currentMessage !== prevState.currentMessage) {
@@ -1011,7 +1079,7 @@ test('toggleFavorite updates message', async () => {
     await result.current.toggleFavorite(42);
   });
 
-  const message = result.current.messages.find(m => m.id === 42);
+  const message = result.current.messages.find((m) => m.id === 42);
   expect(message?.isFavorite).toBe(true);
 });
 ```
@@ -1036,6 +1104,7 @@ beforeEach(() => {
 ### Adding New State
 
 1. **Update interface**:
+
    ```typescript
    interface AppState {
      // ... existing
@@ -1044,31 +1113,33 @@ beforeEach(() => {
    ```
 
 2. **Add initial value**:
+
    ```typescript
    persist(
      (set, get) => ({
        // ... existing
        newFeature: [],
-     }),
+     })
      // ...
-   )
+   );
    ```
 
 3. **Add to partialize** (if should persist):
+
    ```typescript
    partialize: (state) => ({
      // ... existing
      newFeature: state.newFeature,
-   })
+   });
    ```
 
 4. **Add actions**:
    ```typescript
    addNewFeature: (data: NewFeatureData) => {
      set((state) => ({
-       newFeature: [...state.newFeature, data]
+       newFeature: [...state.newFeature, data],
      }));
-   }
+   };
    ```
 
 ---
@@ -1078,10 +1149,12 @@ beforeEach(() => {
 ### Problem: State Not Persisting Across Sessions
 
 **Symptoms:**
+
 - Settings, favorites, or mood entries disappear after browser refresh
 - App behaves as if it's the first time opening
 
 **Diagnosis:**
+
 1. Open Chrome DevTools → Application tab → Local Storage
 2. Look for `my-love-storage` key
 3. Check if value is a valid JSON object
@@ -1089,10 +1162,12 @@ beforeEach(() => {
 **Common Causes & Solutions:**
 
 **1. LocalStorage Disabled (Private Browsing)**
+
 - Private browsing mode blocks LocalStorage writes
 - **Solution**: Use app in normal browser mode, or expect state to reset each session
 
 **2. LocalStorage Quota Exceeded**
+
 - Browser storage limit reached (typically 5-10MB)
 - **Symptoms**: Console shows `[Zustand Persist] Failed to rehydrate state`
 - **Solution**:
@@ -1101,12 +1176,14 @@ beforeEach(() => {
   - Reload app (will reinitialize with defaults)
 
 **3. Corrupted State Data**
+
 - Invalid JSON in LocalStorage causes rehydration failure
 - **Symptoms**: Console shows rehydration error, then "Corrupted state cleared"
 - **Solution**: Automatic - corrupted state is cleared and app reinitializes
 - **Manual Fix**: Delete `my-love-storage` key in DevTools and reload
 
 **4. Browser Extensions Blocking Storage**
+
 - Some privacy extensions block LocalStorage
 - **Solution**: Whitelist the app domain or disable extension temporarily
 
@@ -1115,12 +1192,14 @@ beforeEach(() => {
 **Check Partialize Configuration:**
 
 Only these fields are persisted:
+
 - ✅ `settings` - User preferences, theme, relationship data
 - ✅ `isOnboarded` - Onboarding completion status
 - ✅ `messageHistory` - Message rotation tracking
 - ✅ `moods` - Daily mood entries
 
 These are **NOT** persisted (by design):
+
 - ❌ `messages` - Stored in IndexedDB (separate storage layer)
 - ❌ `photos` - Stored in IndexedDB
 - ❌ `currentMessage` - Computed on app init from messages + messageHistory
@@ -1135,34 +1214,40 @@ If a field you expect to persist is in the "NOT persisted" list, that's intentio
 The persist middleware uses `version: 1` to track state schema changes.
 
 **If you see this error after an update:**
+
 ```
 [Zustand Persist] Failed to rehydrate state: <error>
 [Zustand Persist] Corrupted state cleared.
 ```
 
 **What happened:**
+
 - State schema changed in a new version
 - Old persisted data is incompatible
 - Middleware automatically cleared incompatible state
 
 **Recovery:**
+
 - App will reinitialize with defaults
 - You'll need to re-enter settings (partner name, relationship start date)
 - Message history and moods will reset
 
 **Future-Proofing:**
+
 - Future updates may include migration logic to preserve data across schema changes
 - Currently, schema changes require manual re-entry of settings
 
 ### Debugging Tools
 
 **Check Persisted State:**
+
 ```javascript
 // In browser console
-JSON.parse(localStorage.getItem('my-love-storage'))
+JSON.parse(localStorage.getItem('my-love-storage'));
 ```
 
 **Manually Clear State:**
+
 ```javascript
 // In browser console
 localStorage.removeItem('my-love-storage');
@@ -1170,11 +1255,13 @@ location.reload();
 ```
 
 **Check Rehydration Status:**
+
 - Look for console logs:
   - ✅ `[Zustand Persist] State successfully rehydrated`
   - ❌ `[Zustand Persist] Failed to rehydrate state`
 
 **Inspect State in DevTools:**
+
 - Install React DevTools extension
 - Select Components tab → useAppStore hook
 - View current state values
@@ -1200,6 +1287,7 @@ location.reload();
 **My Love** uses IndexedDB for large data storage (messages, photos) and a service worker (via vite-plugin-pwa with Workbox) for offline-first PWA capabilities. This section documents how these systems interact and the error handling patterns applied.
 
 **Key Insight**: IndexedDB operations are **browser API calls** (not HTTP requests), so service workers do **NOT** intercept them. This means:
+
 - No special service worker configuration is needed to "exclude" IndexedDB
 - IndexedDB transactions complete independently of service worker cache state
 - The service worker only intercepts `fetch` events (network requests for HTML, JS, CSS, images, etc.)
@@ -1209,6 +1297,7 @@ location.reload();
 **File**: `/vite.config.ts`
 
 **Workbox Configuration**:
+
 ```typescript
 workbox: {
   // IndexedDB operations are browser API calls (not HTTP requests),
@@ -1235,10 +1324,12 @@ workbox: {
 ```
 
 **What gets cached:**
+
 - Static app shell assets (JS, CSS, HTML, images) via `globPatterns`
 - Google Fonts (external API) via `runtimeCaching`
 
 **What does NOT get cached:**
+
 - IndexedDB operations (not HTTP requests)
 - `storageService` method calls (pure JavaScript API calls)
 
@@ -1251,6 +1342,7 @@ workbox: {
 All IndexedDB operations now include comprehensive error handling following the Story 1.2 pattern:
 
 **Pattern**:
+
 1. **Try-catch blocks** wrap all async IndexedDB operations
 2. **Comprehensive console logging** for debugging (all logs prefixed with `[StorageService]`)
 3. **Fallback behavior**:
@@ -1259,6 +1351,7 @@ All IndexedDB operations now include comprehensive error handling following the 
 4. **Edge cases handled**: Permission denied, quota exceeded, corrupted database, blocked transactions
 
 **Example - Read Operation (Graceful Fallback)**:
+
 ```typescript
 async getAllMessages(): Promise<Message[]> {
   try {
@@ -1274,6 +1367,7 @@ async getAllMessages(): Promise<Message[]> {
 ```
 
 **Example - Write Operation (Throw for Integrity)**:
+
 ```typescript
 async addMessage(message: Omit<Message, 'id'>): Promise<number> {
   try {
@@ -1316,10 +1410,11 @@ initializeApp: async () => {
     set({ error: 'Failed to initialize app', isLoading: false });
     // App continues with default state - graceful degradation
   }
-}
+};
 ```
 
 **Error Recovery Strategy**:
+
 1. If IndexedDB initialization fails → App shows error state but doesn't crash
 2. If message loading fails → Returns empty array, app populates defaults
 3. If write operations fail → Error logged, user sees failure (data integrity preserved)
@@ -1329,6 +1424,7 @@ initializeApp: async () => {
 Since no automated test infrastructure exists yet (per Story 1.1 audit), manual browser-based testing is required.
 
 **Prerequisites**:
+
 - Chrome or Edge browser (DevTools has best IndexedDB inspection tools)
 - Built and running app (`npm run dev` or `npm run build && npm run preview`)
 
@@ -1339,6 +1435,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Goal**: Verify favorites persist when offline and survive app restart
 
 **Steps**:
+
 1. Open app in browser
 2. Open DevTools (F12) → **Network** tab
 3. Enable **Offline** mode (checkbox or dropdown)
@@ -1352,12 +1449,14 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 11. **Verify**: All changes persist in IndexedDB
 
 **Expected Console Logs**:
+
 ```
 [StorageService] Favorite toggled successfully, id: 42, new value: true
 [StorageService] Message updated successfully, id: 42
 ```
 
 **Expected Behavior**:
+
 - ✅ Favorite toggles work offline
 - ✅ Changes visible in IndexedDB immediately
 - ✅ Favorites persist after hard refresh
@@ -1370,6 +1469,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Goal**: Verify photos persist offline and remain accessible
 
 **Steps**:
+
 1. Enable **Offline** mode in DevTools
 2. Navigate to Photos tab (if implemented) or use photo upload feature
 3. Add a photo
@@ -1382,12 +1482,14 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 10. **Verify**: Photo still accessible
 
 **Expected Console Logs**:
+
 ```
 [StorageService] Adding photo to IndexedDB
 [StorageService] Photo added successfully, id: 1
 ```
 
 **Expected Behavior**:
+
 - ✅ Photo upload works offline
 - ✅ Photo stored in IndexedDB
 - ✅ Photo persists after network changes
@@ -1400,6 +1502,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Goal**: Verify service worker doesn't block IndexedDB operations
 
 **Steps**:
+
 1. Ensure service worker is active: DevTools → **Application** → **Service Workers**
 2. **Verify**: Service worker status shows "activated and running"
 3. Perform IndexedDB operations (favorite message, add message)
@@ -1411,11 +1514,13 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 9. **Compare behavior**: Should be identical with or without service worker
 
 **Expected Console Logs**:
+
 ```
 [StorageService] Favorite toggled successfully, id: 5, new value: true
 ```
 
 **Expected Behavior**:
+
 - ✅ No "failed to execute transaction" errors
 - ✅ IndexedDB operations NOT in Network tab
 - ✅ Same behavior with SW enabled/disabled
@@ -1428,6 +1533,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Goal**: Verify app initializes with default messages when offline
 
 **Steps**:
+
 1. Clear all site data: DevTools → **Application** → **Clear storage** → "Clear site data"
 2. Enable **Offline** mode
 3. Hard refresh (Cmd+Shift+R)
@@ -1439,6 +1545,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 9. **Verify**: Daily message appears
 
 **Expected Console Logs**:
+
 ```
 [StorageService] Initializing IndexedDB...
 [StorageService] Created messages object store
@@ -1448,6 +1555,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 ```
 
 **Expected Behavior**:
+
 - ✅ App initializes offline successfully
 - ✅ Default messages populate IndexedDB
 - ✅ No network errors prevent initialization
@@ -1460,6 +1568,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Goal**: Verify IndexedDB data intact after service worker updates
 
 **Steps**:
+
 1. With app loaded, favorite some messages
 2. Make a code change (e.g., add comment to `vite.config.ts`)
 3. Rebuild app (`npm run build`)
@@ -1472,6 +1581,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 10. **Verify**: No data loss
 
 **Expected Behavior**:
+
 - ✅ Service worker updates successfully
 - ✅ IndexedDB data intact
 - ✅ Favorites preserved
@@ -1484,6 +1594,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Goal**: Verify no data loss during rapid online/offline changes
 
 **Steps**:
+
 1. Start online, perform operations (favorite, add message)
 2. Toggle to **Offline** in DevTools
 3. Perform more operations
@@ -1495,6 +1606,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 9. Verify all changes persisted
 
 **Expected Behavior**:
+
 - ✅ No data loss during network changes
 - ✅ All operations complete successfully
 - ✅ No race conditions or transaction failures
@@ -1518,6 +1630,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 | Settings changes | ✅ | Persisted |
 
 **Steps**:
+
 1. Enable **Offline** mode
 2. Test each feature in the matrix
 3. Verify console logs show successful operations
@@ -1525,6 +1638,7 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 5. Verify no errors or warnings
 
 **Expected Behavior**:
+
 - ✅ All features functional offline
 - ✅ Data persists correctly
 - ✅ No feature regressions
@@ -1536,21 +1650,25 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Common Problems**:
 
 **1. "Failed to execute 'transaction' on 'IDBDatabase'"**
+
 - **Cause**: Attempting transaction on closed or version-changing database
 - **Check Console**: Look for `[StorageService]` error logs
 - **Solution**: Automatic retry via `this.init()` in each method
 
 **2. "QuotaExceededError"**
+
 - **Cause**: Browser storage quota exceeded (typically 10-50% of available disk space)
 - **Check**: DevTools → Application → Storage → Check quota usage
 - **Solution**: Delete large photos, clear unused messages, or increase browser quota
 
 **3. "UnknownError" or "AbortError"**
+
 - **Cause**: Database corruption, permission issues, or browser bug
 - **Check Console**: Detailed error logs from StorageService
 - **Solution**: Clear site data and reinitialize
 
 **4. Operations Silently Failing**
+
 - **Symptom**: No errors, but changes don't persist
 - **Check**: DevTools → Application → IndexedDB → Verify data written
 - **Possible Cause**: Private browsing mode (IndexedDB may be disabled)
@@ -1559,17 +1677,20 @@ Since no automated test infrastructure exists yet (per Story 1.1 audit), manual 
 **Debugging Tools**:
 
 **Inspect IndexedDB**:
+
 ```javascript
 // In browser console
-indexedDB.databases().then(dbs => console.log(dbs));
+indexedDB.databases().then((dbs) => console.log(dbs));
 ```
 
 **Check StorageService Logs**:
+
 - All operations log to console with `[StorageService]` prefix
 - Look for error logs with operation context
 - Example: `[StorageService] Failed to add message:` followed by error details
 
 **Manual Database Reset**:
+
 ```javascript
 // In browser console
 indexedDB.deleteDatabase('my-love-db');
@@ -1577,6 +1698,7 @@ location.reload(); // Will reinitialize with defaults
 ```
 
 **Verify Service Worker Not Caching**:
+
 - Open DevTools → Network tab
 - Perform IndexedDB operations
 - Verify NO network requests appear (IndexedDB is local API calls)
@@ -1586,18 +1708,21 @@ location.reload(); // Will reinitialize with defaults
 ### Technical Details
 
 **IndexedDB Schema**:
+
 - Database: `my-love-db` (version 1)
 - Object Stores:
   - `photos`: Auto-increment key, index on `uploadDate`
   - `messages`: Auto-increment key, indexes on `category` and `createdAt`
 
 **Service Worker Lifecycle**:
+
 1. App loads → Service worker registers
 2. Service worker installs → Precaches static assets
 3. Service worker activates → Intercepts fetch events
 4. IndexedDB operations happen independently (not intercepted)
 
 **Data Flow**:
+
 ```
 User Action → Component → Store Action → storageService → IndexedDB
                                       ↓
@@ -1605,6 +1730,7 @@ User Action → Component → Store Action → storageService → IndexedDB
 ```
 
 **Error Handling Flow**:
+
 ```
 IndexedDB Operation Attempt
   ├─ Success → Log success → Return data

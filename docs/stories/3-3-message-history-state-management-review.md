@@ -1,4 +1,5 @@
 # Code Review Report - Story 3.3
+
 ## Message History State Management
 
 **Review Date:** 2025-11-04
@@ -20,6 +21,7 @@
 Story 3.3 implementation has **significant defects** that prevent approval. While the core state management architecture is correctly implemented, multiple **acceptance criteria are failing** due to bugs in swipe navigation and history persistence. The implementation requires fixes before merging.
 
 **Key Findings:**
+
 - ✅ State structure correctly implemented
 - ✅ Deterministic rotation algorithm working
 - ❌ Swipe gesture navigation broken in Firefox
@@ -35,12 +37,14 @@ Story 3.3 implementation has **significant defects** that prevent approval. Whil
 **Status:** ✅ Implemented correctly
 
 **Evidence:**
+
 - State structure matches specification: `currentIndex`, `shownMessages`, `maxHistoryDays`
 - Initial values correct: `currentIndex=0`, `maxHistoryDays=30`, `shownMessages=new Map()`
 - Zustand store integration clean and follows existing patterns
 - Test coverage: [message-history.spec.ts:10-29](../tests/e2e/message-history.spec.ts#L10-L29)
 
 **Code Reference:**
+
 ```typescript
 // src/stores/useAppStore.ts:101-110
 messageHistory: {
@@ -64,6 +68,7 @@ messageHistory: {
 **Status:** ❌ **CRITICAL FAILURE**
 
 **Evidence:**
+
 - Persist middleware serialization correct: Map → Array
 - Deserialization logic correct: Array → Map
 - **BUG:** New browser context cannot load persisted state
@@ -72,6 +77,7 @@ messageHistory: {
 **Test Result:** ❌ FAILED (both Chromium and Firefox)
 
 **Failure Details:**
+
 ```
 TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
 Call log:
@@ -82,6 +88,7 @@ Test location: tests/e2e/message-history.spec.ts:59
 
 **Root Cause Analysis:**
 The test creates a new browser context after navigating:
+
 ```typescript
 await cleanApp.context().close();
 const newContext = await browser.newContext();
@@ -90,6 +97,7 @@ await newPage.goto('/');
 ```
 
 This simulates a fresh browser session, which should reload persisted state from LocalStorage. The timeout suggests:
+
 1. App initialization is hanging
 2. LocalStorage is not being read correctly in new context
 3. `initializeApp()` never completes or errors silently
@@ -97,6 +105,7 @@ This simulates a fresh browser session, which should reload persisted state from
 **Impact:** HIGH - Users lose history after browser restart
 
 **Required Fix:**
+
 1. Debug why app fails to load in new browser context
 2. Verify LocalStorage is accessible across contexts
 3. Add error handling for hydration failures
@@ -109,11 +118,13 @@ This simulates a fresh browser session, which should reload persisted state from
 **Status:** ✅ Implemented correctly
 
 **Evidence:**
+
 - Hash algorithm deterministic: same date → same hash → same message
 - Multiple reloads show identical message ID
 - Test validates 5 consecutive reloads with same result
 
 **Algorithm Review:**
+
 ```typescript
 // src/utils/messageRotation.ts:17-24
 export function hashDateString(dateString: string): number {
@@ -127,6 +138,7 @@ export function hashDateString(dateString: string): number {
 ```
 
 **Algorithm Quality:** ✅ GOOD
+
 - Simple, deterministic character-code summation
 - Bitwise operations for consistency
 - Absolute value ensures positive index
@@ -141,18 +153,20 @@ export function hashDateString(dateString: string): number {
 **Status:** ✅ Implemented correctly
 
 **Evidence:**
+
 - `canNavigateForward()` correctly returns `false` when `currentIndex === 0`
 - Keyboard navigation (ArrowRight) properly blocked at today
 - State remains unchanged after attempted forward navigation
 
 **Code Reference:**
+
 ```typescript
 // src/stores/useAppStore.ts:408-412
 canNavigateForward: () => {
   const { messageHistory } = get();
   // Can navigate forward if not at today (currentIndex > 0)
   return messageHistory.currentIndex > 0;
-}
+};
 ```
 
 **Test Result:** ✅ PASSED (both Chromium and Firefox)
@@ -164,6 +178,7 @@ canNavigateForward: () => {
 **Status:** ✅ Implemented correctly
 
 **Evidence:**
+
 - Initial state correct: `currentIndex=0`, `shownMessages` empty or has 1 entry
 - First-time user starts at today with no historical entries
 - History builds incrementally as user navigates backward
@@ -177,6 +192,7 @@ canNavigateForward: () => {
 **Status:** ❌ **MAJOR FAILURE**
 
 **Evidence:**
+
 - Logic exists to fill skipped days during navigation
 - **BUG:** History map only has 3 entries instead of expected 4+
 - Cache population incomplete when navigating through gaps
@@ -184,6 +200,7 @@ canNavigateForward: () => {
 **Test Result:** ❌ FAILED (both Chromium and Firefox)
 
 **Failure Details:**
+
 ```
 Error: expect(received).toBeGreaterThanOrEqual(expected)
 Expected: >= 4
@@ -194,12 +211,14 @@ Test: AC-3.3.6 line 231
 
 **Expected Behavior:**
 When navigating from today through 3 skipped days:
+
 1. Navigate to Day -1 → calculate & cache
 2. Navigate to Day -2 → calculate & cache
 3. Navigate to Day -3 → load cached ID 38
 4. **Result:** shownMessages should have 4+ entries (today + 3 days back)
 
 **Actual Behavior:**
+
 - Only 3 entries in shownMessages after navigation
 - One intermediate day not being cached
 - Suggests `navigateToPreviousMessage()` not always updating cache
@@ -207,6 +226,7 @@ When navigating from today through 3 skipped days:
 **Impact:** MEDIUM - Message history incomplete, potential inconsistency
 
 **Required Fix:**
+
 1. Verify `navigateToPreviousMessage()` always updates cache
 2. Debug which day is missing from the map
 3. Add logging to track cache updates
@@ -222,6 +242,7 @@ When navigating from today through 3 skipped days:
 **Firefox:** ❌ FAILED
 
 **Failure Details (Firefox):**
+
 ```
 Error: expect(received).toBe(expected)
 Expected: 1
@@ -231,6 +252,7 @@ Test location: tests/e2e/message-history.spec.ts:254
 ```
 
 **Issue:** Swipe gesture not triggering navigation in Firefox
+
 - Mouse drag simulation not recognized
 - `currentIndex` remains 0 after swipe left attempt
 - Suggests Firefox event handling differs from Chromium
@@ -246,6 +268,7 @@ Test location: tests/e2e/message-history.spec.ts:254
 **Test Result:** ❌ FAILED (both Chromium and Firefox)
 
 **Failure Details:**
+
 ```
 Error: expect(received).toBe(expected)
 Expected: 0
@@ -255,11 +278,13 @@ Test location: tests/e2e/message-history.spec.ts:294
 ```
 
 **Expected Behavior:**
+
 1. Start at today (index 0)
 2. Navigate to yesterday (index 1) via ArrowLeft
 3. Swipe right → should return to today (index 0)
 
 **Actual Behavior:**
+
 - After swipe right, `currentIndex = 2` (2 days ago!)
 - Navigation moving in WRONG direction
 - Swipe right should decrement index, but it's incrementing
@@ -267,6 +292,7 @@ Test location: tests/e2e/message-history.spec.ts:294
 **Root Cause:** Logic error in swipe direction handling
 
 **Code Reference:**
+
 ```typescript
 // src/components/DailyMessage/DailyMessage.tsx:34-46
 const handleDragEnd = (_event: any, info: PanInfo) => {
@@ -285,6 +311,7 @@ const handleDragEnd = (_event: any, info: PanInfo) => {
 ```
 
 **SUSPECTED BUG:** The test setup or the actual gesture simulation might be triggering the wrong branch. Need to verify:
+
 1. Is `info.offset.x` correct during test?
 2. Is gesture simulation matching expected Framer Motion API?
 3. Is there a race condition with state updates?
@@ -298,6 +325,7 @@ const handleDragEnd = (_event: any, info: PanInfo) => {
 ### Architecture Alignment ✅ GOOD
 
 **Strengths:**
+
 - ✅ Follows existing Zustand store patterns
 - ✅ Persist middleware integration clean
 - ✅ No architectural changes required
@@ -305,6 +333,7 @@ const handleDragEnd = (_event: any, info: PanInfo) => {
 - ✅ Type safety throughout
 
 **Code Organization:**
+
 ```
 src/
 ├── utils/messageRotation.ts      ✅ Clean, well-documented
@@ -318,6 +347,7 @@ src/
 ### Code Patterns ✅ GOOD
 
 **Positive Observations:**
+
 1. **State Immutability:** Correctly uses `new Map()` for cache updates
 2. **Error Handling:** Appropriate console warnings for edge cases
 3. **Dev Logging:** Proper use of `import.meta.env.DEV` for debug logs
@@ -325,6 +355,7 @@ src/
 5. **Type Safety:** Full TypeScript coverage with proper interfaces
 
 **Example (Good Pattern):**
+
 ```typescript
 // Immutable Map update pattern
 const updatedShownMessages = new Map(messageHistory.shownMessages);
@@ -343,6 +374,7 @@ set({
 ### Documentation Quality ✅ EXCELLENT
 
 **Story File:** Comprehensive with:
+
 - ✅ Clear acceptance criteria
 - ✅ Detailed implementation plan
 - ✅ Code examples for each phase
@@ -350,6 +382,7 @@ set({
 - ✅ Integration notes
 
 **Code Comments:**
+
 - ✅ Inline comments explain complex logic
 - ✅ JSDoc comments on public functions
 - ✅ Clear variable naming
@@ -359,18 +392,21 @@ set({
 ## Critical Issues Summary
 
 ### 🚨 Issue #1: Session Persistence Failure (CRITICAL)
+
 **Severity:** CRITICAL
 **AC Impact:** AC-3.3.2
 **Description:** App fails to load in new browser context, causing timeout
 **Required Action:** Debug initialization flow, add error handling
 
 ### 🚨 Issue #2: Swipe Right Navigation Broken (CRITICAL)
+
 **Severity:** CRITICAL
 **AC Impact:** Navigation Integration
 **Description:** Swipe right moves in wrong direction (index 2 instead of 0)
 **Required Action:** Debug gesture handling, verify Framer Motion integration
 
 ### 🚨 Issue #3: Firefox Swipe Left Broken (CRITICAL)
+
 **Severity:** CRITICAL
 **AC Impact:** Navigation Integration
 **Description:** Swipe left gesture not recognized in Firefox
@@ -381,12 +417,14 @@ set({
 ## Major Issues Summary
 
 ### ⚠️ Issue #4: Skipped Days Incomplete Cache (MAJOR)
+
 **Severity:** MAJOR
 **AC Impact:** AC-3.3.6
 **Description:** Only 3 of 4 expected cache entries after navigation
 **Required Action:** Debug cache update logic, add validation
 
 ### ⚠️ Issue #5: Test Reliability (MAJOR)
+
 **Severity:** MAJOR
 **AC Impact:** Overall Quality
 **Description:** 38.9% test failure rate, some flaky timeout issues
@@ -397,6 +435,7 @@ set({
 ## Minor Issues Summary
 
 ### ℹ️ Issue #6: Inconsistent Timeout Values (MINOR)
+
 **Severity:** MINOR
 **Description:** Test timeouts vary (500ms, 5000ms, 10000ms)
 **Required Action:** Standardize wait durations
@@ -406,16 +445,19 @@ set({
 ## Test Coverage Analysis
 
 **E2E Tests Created:** ✅ COMPLETE
+
 - Test file: `tests/e2e/message-history.spec.ts` (336 lines)
 - Coverage: All 6 acceptance criteria + 4 navigation scenarios
 - Browsers: Chromium, Firefox (WebKit not tested)
 
 **Test Quality:** ⚠️ NEEDS IMPROVEMENT
+
 - Tests correctly target acceptance criteria
 - **Issue:** High failure rate indicates logic bugs, not test bugs
 - **Issue:** Browser context test needs debugging
 
 **Test Results Summary:**
+
 ```
 Total Tests:    18 (9 per browser)
 Passed:         11 (61.1%)
@@ -480,12 +522,14 @@ Constraints: ✅ Both browsers
 **Status:** ❌ **CHANGES REQUESTED**
 
 **Rationale:**
+
 - 3 CRITICAL bugs preventing story completion
 - 38.9% test failure rate unacceptable for merge
 - Core functionality (swipe navigation) broken
 - Session persistence failing
 
 **Next Steps:**
+
 1. Developer to fix critical issues #1-3
 2. Address skipped days cache bug
 3. Re-run full test suite
@@ -500,21 +544,25 @@ Constraints: ✅ Both browsers
 Despite the critical bugs, the implementation shows strong fundamentals:
 
 ✅ **Excellent Architecture**
+
 - Clean state management patterns
 - Proper use of Zustand persist middleware
 - Type-safe throughout
 
 ✅ **Good Code Quality**
+
 - Well-documented functions
 - Appropriate error handling
 - Immutable state updates
 
 ✅ **Comprehensive Testing**
+
 - Full AC coverage in E2E tests
 - Integration tests for Story 3.2 dependency
 - Cross-browser testing included
 
 ✅ **Strong Documentation**
+
 - Detailed story file with examples
 - Clear acceptance criteria
 - Good inline comments

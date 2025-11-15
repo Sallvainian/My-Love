@@ -10,19 +10,24 @@ interface MessageRowProps {
 
 export function MessageRow({ message, onEdit, onDelete }: MessageRowProps) {
   // Truncate message text to 100 characters
-  const truncatedText = message.text.length > 100
-    ? message.text.substring(0, 100) + '...'
-    : message.text;
+  const truncatedText =
+    message.text.length > 100 ? message.text.substring(0, 100) + '...' : message.text;
 
   // Category display name
   const getCategoryLabel = (category: string) => {
     switch (category) {
-      case 'reason': return '💖 Reasons';
-      case 'memory': return '✨ Memories';
-      case 'affirmation': return '🌟 Affirmations';
-      case 'future': return '🌈 Future Plans';
-      case 'custom': return '💕 Custom';
-      default: return category;
+      case 'reason':
+        return '💖 Reasons';
+      case 'memory':
+        return '✨ Memories';
+      case 'affirmation':
+        return '🌟 Affirmations';
+      case 'future':
+        return '🌈 Future Plans';
+      case 'custom':
+        return '💕 Custom';
+      default:
+        return category;
     }
   };
 

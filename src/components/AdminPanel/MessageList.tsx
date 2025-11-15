@@ -18,7 +18,7 @@ export function MessageList({ onEdit, onDelete }: MessageListProps) {
   // Combine default messages and custom messages
   // Convert Message to CustomMessage format for display
   const allMessages: CustomMessage[] = useMemo(() => {
-    const defaultAsCustom: CustomMessage[] = messages.map(msg => ({
+    const defaultAsCustom: CustomMessage[] = messages.map((msg) => ({
       id: msg.id,
       text: msg.text,
       category: msg.category,
@@ -38,15 +38,13 @@ export function MessageList({ onEdit, onDelete }: MessageListProps) {
 
     // Filter by category
     if (filterCategory !== 'all') {
-      filtered = filtered.filter(msg => msg.category === filterCategory);
+      filtered = filtered.filter((msg) => msg.category === filterCategory);
     }
 
     // Filter by search term
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(msg =>
-        msg.text.toLowerCase().includes(searchLower)
-      );
+      filtered = filtered.filter((msg) => msg.text.toLowerCase().includes(searchLower));
     }
 
     return filtered;
@@ -65,7 +63,10 @@ export function MessageList({ onEdit, onDelete }: MessageListProps) {
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Category filter */}
           <div className="flex-1">
-            <label htmlFor="category-filter" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="category-filter"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Filter by Category
             </label>
             <select
@@ -108,9 +109,7 @@ export function MessageList({ onEdit, onDelete }: MessageListProps) {
         <div className="mt-3 text-sm text-gray-600">
           Showing {filteredMessages.length} of {allMessages.length} messages
           {customMessages.length > 0 && (
-            <span className="ml-2 text-pink-600 font-medium">
-              ({customMessages.length} custom)
-            </span>
+            <span className="ml-2 text-pink-600 font-medium">({customMessages.length} custom)</span>
           )}
         </div>
       </div>

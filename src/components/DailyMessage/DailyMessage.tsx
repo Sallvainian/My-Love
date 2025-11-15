@@ -36,12 +36,12 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     const threshold = 50; // 50px swipe threshold
 
     if (info.offset.x < -threshold && canNavigateBack()) {
-      // Swipe left → navigate to previous message
-      setDirection('left');
+      // Swipe left → card exits left, new card comes from right
+      setDirection('right'); // 'right' = new card comes from right
       navigateToPreviousMessage();
     } else if (info.offset.x > threshold && canNavigateForward()) {
-      // Swipe right → navigate to next message (toward today)
-      setDirection('right');
+      // Swipe right → card exits right, new card comes from left
+      setDirection('left'); // 'left' = new card comes from left
       navigateToNextMessage();
     }
   };
@@ -51,11 +51,11 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowLeft' && canNavigateBack()) {
         event.preventDefault();
-        setDirection('left');
+        setDirection('right'); // Arrow left should animate from right
         navigateToPreviousMessage();
       } else if (event.key === 'ArrowRight' && canNavigateForward()) {
         event.preventDefault();
-        setDirection('right');
+        setDirection('left'); // Arrow right should animate from left
         navigateToNextMessage();
       }
     };
@@ -109,7 +109,8 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           </button>
 
           <div className="text-xs text-gray-400 text-center max-w-sm">
-            If the problem persists, try clearing your browser data or check the browser console for more details.
+            If the problem persists, try clearing your browser data or check the browser console for
+            more details.
           </div>
         </div>
       );
@@ -125,8 +126,15 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   }
 
   const startDate = new Date(settings.relationship.startDate);
-  const daysTogether = getDaysSinceStart(startDate);
-  const durationText = formatRelationshipDuration(startDate);
+
+  // BUG FIX: Calculate day number based on history navigation position
+  // When viewing past messages (currentIndex > 0), adjust the date calculation
+  const today = new Date();
+  const adjustedDate = new Date(today);
+  adjustedDate.setDate(today.getDate() - messageHistory.currentIndex);
+
+  const daysTogether = getDaysSinceStart(startDate, adjustedDate);
+  const durationText = formatRelationshipDuration(startDate, adjustedDate);
 
   const handleFavorite = async () => {
     setShowHearts(true);
@@ -153,7 +161,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto px-4 py-8">
+    <div className="relative w-full max-w-2xl mx-auto px-4 py-8" data-testid="daily-message">
       {/* Floating hearts animation */}
       <AnimatePresence>
         {showHearts && (
@@ -196,9 +204,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
       >
         <div className="flex items-center justify-center gap-2 mb-2">
           <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
-          <h2 className="text-lg font-semibold text-gray-700">
-            Day {daysTogether} Together
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-700">Day {daysTogether} Together</h2>
           <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
         </div>
         <p className="text-sm text-gray-500">{durationText}</p>
@@ -216,7 +222,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           dragElastic={0.2}
           onDragEnd={handleDragEnd}
           initial={{
-            x: direction === 'left' ? -300 : 300,
+            x: direction === 'left' ? -300 : 300, // direction indicates where new card comes FROM
             opacity: 0,
           }}
           animate={{
@@ -224,7 +230,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
             opacity: 1,
           }}
           exit={{
-            x: direction === 'left' ? 300 : -300,
+            x: direction === 'left' ? 300 : -300, // exit in opposite direction
             opacity: 0,
           }}
           transition={{
@@ -237,101 +243,104 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           style={{ touchAction: 'pan-y' }}
         >
           <div className="card card-hover relative overflow-hidden" data-testid="message-card">
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50 pointer-events-none" />
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50 pointer-events-none" />
 
-          {/* Content */}
-          <div className="relative z-10">
-            {/* Category badge */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: ANIMATION_TIMING.BADGE_FADE_DELAY, type: 'spring' }}
-              className="inline-block mb-4"
-            >
-              <span className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-medium rounded-full shadow-lg" data-testid="message-category-badge">
-                {currentMessage.category === 'reason' && '💖 Why I Love You'}
-                {currentMessage.category === 'memory' && '✨ Beautiful Memory'}
-                {currentMessage.category === 'affirmation' && '🌟 Daily Affirmation'}
-                {currentMessage.category === 'future' && '🌈 Our Future'}
-                {currentMessage.category === 'custom' && '💕 Special Message'}
-              </span>
-            </motion.div>
-
-            {/* Message text */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: ANIMATION_TIMING.TEXT_FADE_DELAY, duration: 0.8 }}
-              className="text-2xl md:text-3xl font-serif text-gray-800 leading-relaxed mb-8"
-              data-testid="message-text"
-            >
-              {currentMessage.text}
-            </motion.p>
-
-            {/* Action buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: ANIMATION_TIMING.BUTTON_FADE_DELAY }}
-              className="flex items-center justify-between"
-            >
-              <button
-                onClick={handleFavorite}
-                className="btn-icon group"
-                aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-                data-testid="message-favorite-button"
+            {/* Content */}
+            <div className="relative z-10">
+              {/* Category badge */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: ANIMATION_TIMING.BADGE_FADE_DELAY, type: 'spring' }}
+                className="inline-block mb-4"
               >
-                <Heart
-                  className={`w-6 h-6 transition-all duration-300 ${
-                    isFavorited
-                      ? 'fill-pink-500 text-pink-500 animate-heart'
-                      : 'text-pink-400 group-hover:text-pink-500 group-hover:scale-110'
-                  }`}
-                />
-              </button>
+                <span
+                  className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-medium rounded-full shadow-lg"
+                  data-testid="message-category-badge"
+                >
+                  {currentMessage.category === 'reason' && '💖 Why I Love You'}
+                  {currentMessage.category === 'memory' && '✨ Beautiful Memory'}
+                  {currentMessage.category === 'affirmation' && '🌟 Daily Affirmation'}
+                  {currentMessage.category === 'future' && '🌈 Our Future'}
+                  {currentMessage.category === 'custom' && '💕 Special Message'}
+                </span>
+              </motion.div>
 
-              <button
-                onClick={handleShare}
-                className="btn-icon group"
-                aria-label="Share message"
-                data-testid="message-share-button"
+              {/* Message text */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: ANIMATION_TIMING.TEXT_FADE_DELAY, duration: 0.8 }}
+                className="text-2xl md:text-3xl font-serif text-gray-800 leading-relaxed mb-8"
+                data-testid="message-text"
               >
-                <Share2 className="w-6 h-6 text-pink-400 group-hover:text-pink-500 transition-colors" />
-              </button>
-            </motion.div>
-          </div>
+                {currentMessage.text}
+              </motion.p>
 
-          {/* Decorative elements */}
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              rotate: [0, 5, 0],
-            }}
-            transition={{
-              duration: ANIMATION_VALUES.DECORATIVE_EMOJI_FLOAT_DURATION,
-              repeat: Infinity,
-              repeatType: 'reverse',
-            }}
-            className="absolute -top-4 -right-4 text-6xl opacity-20 pointer-events-none"
-          >
-            💕
-          </motion.div>
-          <motion.div
-            animate={{
-              scale: [1, 1.1, 1],
-              rotate: [0, -5, 0],
-            }}
-            transition={{
-              duration: ANIMATION_VALUES.DECORATIVE_EMOJI_FLOAT_DURATION_ALT,
-              repeat: Infinity,
-              repeatType: 'reverse',
-              delay: 1,
-            }}
-            className="absolute -bottom-4 -left-4 text-5xl opacity-20 pointer-events-none"
-          >
-            💖
-          </motion.div>
+              {/* Action buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: ANIMATION_TIMING.BUTTON_FADE_DELAY }}
+                className="flex items-center justify-between"
+              >
+                <button
+                  onClick={handleFavorite}
+                  className="btn-icon group"
+                  aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                  data-testid="message-favorite-button"
+                >
+                  <Heart
+                    className={`w-6 h-6 transition-all duration-300 ${
+                      isFavorited
+                        ? 'fill-pink-500 text-pink-500 animate-heart'
+                        : 'text-pink-400 group-hover:text-pink-500 group-hover:scale-110'
+                    }`}
+                  />
+                </button>
+
+                <button
+                  onClick={handleShare}
+                  className="btn-icon group"
+                  aria-label="Share message"
+                  data-testid="message-share-button"
+                >
+                  <Share2 className="w-6 h-6 text-pink-400 group-hover:text-pink-500 transition-colors" />
+                </button>
+              </motion.div>
+            </div>
+
+            {/* Decorative elements */}
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                rotate: [0, 5, 0],
+              }}
+              transition={{
+                duration: ANIMATION_VALUES.DECORATIVE_EMOJI_FLOAT_DURATION,
+                repeat: Infinity,
+                repeatType: 'reverse',
+              }}
+              className="absolute -top-4 -right-4 text-6xl opacity-20 pointer-events-none"
+            >
+              💕
+            </motion.div>
+            <motion.div
+              animate={{
+                scale: [1, 1.1, 1],
+                rotate: [0, -5, 0],
+              }}
+              transition={{
+                duration: ANIMATION_VALUES.DECORATIVE_EMOJI_FLOAT_DURATION_ALT,
+                repeat: Infinity,
+                repeatType: 'reverse',
+                delay: 1,
+              }}
+              className="absolute -bottom-4 -left-4 text-5xl opacity-20 pointer-events-none"
+            >
+              💖
+            </motion.div>
           </div>
         </motion.div>
       </AnimatePresence>
