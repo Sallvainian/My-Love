@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PhotoStorageService } from '../../../src/services/photoStorageService';
+import { photoStorageService } from '../../../src/services/photoStorageService';
 import type { Photo } from '../../../src/types';
 
 describe('PhotoStorageService Validation', () => {
-  let service: PhotoStorageService;
-
   beforeEach(() => {
-    service = PhotoStorageService.getInstance();
+    // Service is a singleton instance, no setup needed
   });
 
   describe('create() validation', () => {
@@ -24,7 +22,7 @@ describe('PhotoStorageService Validation', () => {
         mimeType: 'image/jpeg' as const,
       };
 
-      await expect(service.create(invalidPhoto)).rejects.toThrow();
+      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
     });
 
     it('should reject photo with negative width', async () => {
@@ -40,7 +38,7 @@ describe('PhotoStorageService Validation', () => {
         mimeType: 'image/jpeg' as const,
       };
 
-      await expect(service.create(invalidPhoto)).rejects.toThrow();
+      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
     });
 
     it('should reject photo with invalid MIME type', async () => {
@@ -56,7 +54,7 @@ describe('PhotoStorageService Validation', () => {
         mimeType: 'image/invalid' as any, // Invalid MIME type
       };
 
-      await expect(service.create(invalidPhoto)).rejects.toThrow();
+      await expect(photoStorageService.create(invalidPhoto)).rejects.toThrow();
     });
   });
 
@@ -64,7 +62,7 @@ describe('PhotoStorageService Validation', () => {
     it('should reject update with caption exceeding 500 chars', async () => {
       const longCaption = 'a'.repeat(501);
 
-      await expect(service.update(1, { caption: longCaption })).rejects.toThrow();
+      await expect(photoStorageService.update(1, { caption: longCaption })).rejects.toThrow();
     });
 
     it('should accept valid caption update', async () => {
@@ -75,7 +73,7 @@ describe('PhotoStorageService Validation', () => {
       // Note: This will fail in test environment without IndexedDB mock
       // but validates that the validation layer accepts valid data
       try {
-        await service.update(1, validUpdate);
+        await photoStorageService.update(1, validUpdate);
       } catch (error) {
         // Expected to fail due to missing IndexedDB, not validation
         // Validation errors would have a specific format
