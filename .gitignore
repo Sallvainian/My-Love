@@ -58,3 +58,8 @@ docs/source-tree-analysis.md
 docs/sprint-change-proposal-2025-11-15.md
 docs/technical-decisions.md
 
+
+# IDE and AI tool configs
+.cursor/
+.gemini/
+.opencode/

@@ -16,14 +16,21 @@ function getUniqueTestDate(): string {
 /**
  * Create mood entry with unique date to avoid by-date constraint violations
  * Directly inserts into IndexedDB with specified date instead of using today
+ * Supports both single mood (backward compat) and multiple moods array
  */
-async function createMoodWithUniqueDate(mood: MoodType, note?: string): Promise<MoodEntry> {
+async function createMoodWithUniqueDate(
+  moods: MoodType | MoodType[],
+  note?: string
+): Promise<MoodEntry> {
   const uniqueDate = getUniqueTestDate();
+  const moodsArray = Array.isArray(moods) ? moods : [moods];
+  const primaryMood = moodsArray[0];
 
   // Create mood entry with unique date
   const moodEntry: Omit<MoodEntry, 'id'> = {
     userId: 'test-user-id',
-    mood,
+    mood: primaryMood,
+    moods: moodsArray,
     note: note || '',
     date: uniqueDate,
     timestamp: new Date(),
@@ -53,11 +60,12 @@ describe('MoodService', () => {
   // === CRUD Operations ===
   describe('create()', () => {
     it('creates a new mood entry with valid data', async () => {
-      const created = await moodService.create('test-user-id', 'happy', 'Feeling great today!');
+      const created = await moodService.create('test-user-id', ['happy'], 'Feeling great today!');
 
       expect(created).toBeDefined();
       expect(created.id).toBeGreaterThan(0);
       expect(created.mood).toBe('happy');
+      expect(created.moods).toEqual(['happy']);
       expect(created.note).toBe('Feeling great today!');
       expect(created.synced).toBe(false);
       expect(created.supabaseId).toBeUndefined();
@@ -65,11 +73,21 @@ describe('MoodService', () => {
     });
 
     it('creates mood entry without note', async () => {
-      const created = await moodService.create('test-user-id', 'loved');
+      const created = await moodService.create('test-user-id', ['loved']);
 
       expect(created).toBeDefined();
       expect(created.mood).toBe('loved');
+      expect(created.moods).toEqual(['loved']);
       expect(created.note).toBe('');
+    });
+
+    it('creates mood entry with multiple moods', async () => {
+      const created = await moodService.create('test-user-id', ['happy', 'grateful'], 'Great day!');
+
+      expect(created).toBeDefined();
+      expect(created.mood).toBe('happy'); // Primary mood is first
+      expect(created.moods).toEqual(['happy', 'grateful']);
+      expect(created.note).toBe('Great day!');
     });
 
     it('auto-increments id for multiple mood entries', async () => {
@@ -80,16 +98,16 @@ describe('MoodService', () => {
     });
 
     it('validates mood type enum', async () => {
-      await expect(moodService.create('test-user-id', 'invalid' as MoodType)).rejects.toThrow();
+      await expect(moodService.create('test-user-id', ['invalid' as MoodType])).rejects.toThrow();
     });
 
     it('validates note max length (200 chars)', async () => {
       const longNote = 'a'.repeat(201);
-      await expect(moodService.create('test-user-id', 'happy', longNote)).rejects.toThrow();
+      await expect(moodService.create('test-user-id', ['happy'], longNote)).rejects.toThrow();
     });
 
     it('sets date to today in ISO format', async () => {
-      const created = await moodService.create('test-user-id', 'grateful');
+      const created = await moodService.create('test-user-id', ['grateful']);
       const today = new Date().toISOString().split('T')[0];
 
       expect(created.date).toBe(today);
@@ -98,42 +116,44 @@ describe('MoodService', () => {
 
   describe('updateMood()', () => {
     it('updates an existing mood entry', async () => {
-      const created = await moodService.create('test-user-id', 'happy', 'Initial note');
-      const updated = await moodService.updateMood(created.id!, 'content', 'Updated note');
+      const created = await moodService.create('test-user-id', ['happy'], 'Initial note');
+      const updated = await moodService.updateMood(created.id!, ['content'], 'Updated note');
 
       expect(updated.id).toBe(created.id);
       expect(updated.mood).toBe('content');
+      expect(updated.moods).toEqual(['content']);
       expect(updated.note).toBe('Updated note');
       expect(updated.synced).toBe(false); // Should reset synced flag
     });
 
     it('updates mood without changing note', async () => {
-      const created = await moodService.create('test-user-id', 'happy', 'Original note');
-      const updated = await moodService.updateMood(created.id!, 'grateful');
+      const created = await moodService.create('test-user-id', ['happy'], 'Original note');
+      const updated = await moodService.updateMood(created.id!, ['grateful']);
 
       expect(updated.mood).toBe('grateful');
+      expect(updated.moods).toEqual(['grateful']);
       expect(updated.note).toBe('');
     });
 
     it('throws error for non-existent id', async () => {
-      await expect(moodService.updateMood(99999, 'happy')).rejects.toThrow();
+      await expect(moodService.updateMood(99999, ['happy'])).rejects.toThrow();
     });
 
     it('validates updated mood type', async () => {
-      const created = await moodService.create('test-user-id', 'happy');
-      await expect(moodService.updateMood(created.id!, 'invalid' as MoodType)).rejects.toThrow();
+      const created = await moodService.create('test-user-id', ['happy']);
+      await expect(moodService.updateMood(created.id!, ['invalid' as MoodType])).rejects.toThrow();
     });
 
     it('validates updated note max length', async () => {
-      const created = await moodService.create('test-user-id', 'happy');
+      const created = await moodService.create('test-user-id', ['happy']);
       const longNote = 'a'.repeat(201);
-      await expect(moodService.updateMood(created.id!, 'content', longNote)).rejects.toThrow();
+      await expect(moodService.updateMood(created.id!, ['content'], longNote)).rejects.toThrow();
     });
   });
 
   describe('get()', () => {
     it('retrieves mood entry by id', async () => {
-      const created = await moodService.create('test-user-id', 'thoughtful', 'Deep thoughts');
+      const created = await moodService.create('test-user-id', ['thoughtful'], 'Deep thoughts');
       const retrieved = await moodService.get(created.id!);
 
       expect(retrieved).toBeDefined();
@@ -170,7 +190,7 @@ describe('MoodService', () => {
 
   describe('delete()', () => {
     it('deletes a mood entry by id', async () => {
-      const created = await moodService.create('test-user-id', 'happy');
+      const created = await moodService.create('test-user-id', ['happy']);
       await moodService.delete(created.id!);
 
       const retrieved = await moodService.get(created.id!);
@@ -193,13 +213,14 @@ describe('MoodService', () => {
   // === Date-Based Queries ===
   describe('getMoodForDate()', () => {
     it('retrieves mood for specific date', async () => {
-      const created = await moodService.create('test-user-id', 'happy', 'Today is great!');
+      const created = await moodService.create('test-user-id', ['happy'], 'Today is great!');
       const today = new Date();
       const retrieved = await moodService.getMoodForDate(today);
 
       expect(retrieved).toBeDefined();
       expect(retrieved?.id).toBe(created.id);
       expect(retrieved?.mood).toBe('happy');
+      expect(retrieved?.moods).toEqual(['happy']);
     });
 
     it('returns null when no mood exists for date', async () => {
@@ -212,7 +233,7 @@ describe('MoodService', () => {
 
     it('uses by-date index for fast lookup', async () => {
       // Create mood for today
-      await moodService.create('test-user-id', 'happy');
+      await moodService.create('test-user-id', ['happy']);
 
       const today = new Date();
       const start = performance.now();
@@ -279,7 +300,7 @@ describe('MoodService', () => {
     });
 
     it('returns empty array when all moods synced', async () => {
-      const mood = await moodService.create('test-user-id', 'happy');
+      const mood = await moodService.create('test-user-id', ['happy']);
       await moodService.markAsSynced(mood.id!, 'supabase-id-1');
 
       const unsynced = await moodService.getUnsyncedMoods();
@@ -289,7 +310,7 @@ describe('MoodService', () => {
 
   describe('markAsSynced()', () => {
     it('marks mood entry as synced', async () => {
-      const created = await moodService.create('test-user-id', 'happy');
+      const created = await moodService.create('test-user-id', ['happy']);
       await moodService.markAsSynced(created.id!, 'supabase-123');
 
       const retrieved = await moodService.get(created.id!);
@@ -306,12 +327,12 @@ describe('MoodService', () => {
   // === Edge Cases ===
   describe('Edge Cases', () => {
     it('handles empty note correctly', async () => {
-      const created = await moodService.create('test-user-id', 'happy', '');
+      const created = await moodService.create('test-user-id', ['happy'], '');
       expect(created.note).toBe('');
     });
 
     it('trims whitespace from notes', async () => {
-      const created = await moodService.create('test-user-id', 'happy', '  test note  ');
+      const created = await moodService.create('test-user-id', ['happy'], '  test note  ');
       // Note: MoodEntrySchema doesn't trim, so this tests actual behavior
       expect(created.note).toBe('  test note  ');
     });
@@ -327,11 +348,25 @@ describe('MoodService', () => {
 
     it('stores timestamp correctly', async () => {
       const before = new Date();
-      const created = await moodService.create('test-user-id', 'happy');
+      const created = await moodService.create('test-user-id', ['happy']);
       const after = new Date();
 
       expect(created.timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(created.timestamp.getTime()).toBeLessThanOrEqual(after.getTime());
+    });
+
+    it('handles multiple negative moods', async () => {
+      const created = await moodService.create('test-user-id', ['sad', 'anxious', 'tired']);
+
+      expect(created.mood).toBe('sad'); // Primary mood
+      expect(created.moods).toEqual(['sad', 'anxious', 'tired']);
+    });
+
+    it('handles mixed positive and negative moods', async () => {
+      const created = await moodService.create('test-user-id', ['grateful', 'anxious']);
+
+      expect(created.mood).toBe('grateful');
+      expect(created.moods).toEqual(['grateful', 'anxious']);
     });
   });
 });

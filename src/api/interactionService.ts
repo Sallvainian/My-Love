@@ -8,8 +8,9 @@
  * @module api/interactionService
  */
 
-import { supabase, getCurrentUserId } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import type { Database } from './supabaseClient';
+import { authService } from './authService';
 import {
   isOnline,
   handleSupabaseError,
@@ -121,7 +122,10 @@ export class InteractionService {
     }
 
     try {
-      const currentUserId = await getCurrentUserId();
+      const currentUserId = await authService.getCurrentUserId();
+      if (!currentUserId) {
+        throw new Error('Cannot send interaction: User not authenticated');
+      }
 
       // Create interaction insert payload
       const interactionInsert: InteractionInsert = {
@@ -182,7 +186,10 @@ export class InteractionService {
   async subscribeInteractions(
     callback: (interaction: SupabaseInteractionRecord) => void
   ): Promise<() => void> {
-    const currentUserId = await getCurrentUserId();
+    const currentUserId = await authService.getCurrentUserId();
+    if (!currentUserId) {
+      throw new Error('Cannot subscribe to interactions: User not authenticated');
+    }
 
     // Create Realtime channel for incoming interactions
     this.realtimeChannel = supabase
@@ -232,7 +239,10 @@ export class InteractionService {
    */
   async getInteractionHistory(limit: number = 50, offset: number = 0): Promise<Interaction[]> {
     try {
-      const currentUserId = await getCurrentUserId();
+      const currentUserId = await authService.getCurrentUserId();
+      if (!currentUserId) {
+        throw new Error('Cannot get interaction history: User not authenticated');
+      }
 
       // Query interactions where current user is sender or recipient
       const { data, error } = await supabase
@@ -283,7 +293,10 @@ export class InteractionService {
    */
   async getUnviewedInteractions(): Promise<Interaction[]> {
     try {
-      const currentUserId = await getCurrentUserId();
+      const currentUserId = await authService.getCurrentUserId();
+      if (!currentUserId) {
+        throw new Error('Cannot get unviewed interactions: User not authenticated');
+      }
 
       const { data, error } = await supabase
         .from('interactions')

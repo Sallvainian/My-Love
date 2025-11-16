@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Hand, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { getCurrentUserId } from '../../api/supabaseClient';
+import { authService } from '../../api/authService';
 import type { Interaction } from '../../types';
 
 interface InteractionHistoryProps {
@@ -35,7 +35,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
   // Load current user ID
   useEffect(() => {
     const loadUserId = async () => {
-      const userId = await getCurrentUserId();
+      const userId = await authService.getCurrentUserId();
       setCurrentUserId(userId);
     };
     loadUserId();
