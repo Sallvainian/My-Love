@@ -1,106 +1,21 @@
 {
-  "generated_at": "2025-11-16T11:12:41.028516",
+  "generated_at": "2025-11-16T11:16:48.426817",
   "summary": {
     "total_files": 177,
-    "delete_candidates": 7,
-    "update_required": 17,
-    "current": 51,
-    "review_needed": 102,
+    "delete_candidates": 0,
+    "update_required": 8,
+    "current": 79,
+    "review_needed": 90,
     "potential_duplicates": 6
   },
   "categories": {
-    "DELETE_CANDIDATE": [
-      {
-        "path": "docs/stories/3-3-message-history-state-management-review.md",
-        "reason": "Matches deletion pattern",
-        "days_old": 1,
-        "word_count": 2057
-      },
-      {
-        "path": "docs/.archive/API_SERVICES_ARCHITECTURE.md",
-        "reason": "In archive directory",
-        "days_old": 0,
-        "word_count": 4389
-      },
-      {
-        "path": "docs/.archive/component-inventory.md",
-        "reason": "In archive directory",
-        "days_old": 0,
-        "word_count": 1462
-      },
-      {
-        "path": "docs/.archive/data-models.md",
-        "reason": "In archive directory",
-        "days_old": 0,
-        "word_count": 2027
-      },
-      {
-        "path": "docs/.archive/project-overview.md",
-        "reason": "In archive directory",
-        "days_old": 0,
-        "word_count": 2286
-      },
-      {
-        "path": "docs/.archive/source-tree-analysis.md",
-        "reason": "In archive directory",
-        "days_old": 0,
-        "word_count": 1993
-      },
-      {
-        "path": "docs/.archive/state-management.md",
-        "reason": "In archive directory",
-        "days_old": 0,
-        "word_count": 2779
-      }
-    ],
+    "DELETE_CANDIDATE": [],
     "UPDATE_REQUIRED": [
-      {
-        "path": "docs/sprint-artifacts/tech-spec-epic-2.md",
-        "reason": "Contains outdated markers",
-        "days_old": 1,
-        "word_count": 6958
-      },
-      {
-        "path": "docs/sprint-artifacts/tech-spec-epic-4.md",
-        "reason": "Contains outdated markers",
-        "days_old": 1,
-        "word_count": 6820
-      },
-      {
-        "path": "docs/stories/1-5-critical-refactoring-code-quality-improvements.md",
-        "reason": "Contains outdated markers",
-        "days_old": 1,
-        "word_count": 3340
-      },
-      {
-        "path": "docs/stories/3-5-admin-interface-message-persistence-integration.md",
-        "reason": "Contains outdated markers",
-        "days_old": 1,
-        "word_count": 5348
-      },
-      {
-        "path": "docs/stories/4-4-photo-edit-delete-functionality.md",
-        "reason": "Contains outdated markers",
-        "days_old": 1,
-        "word_count": 6868
-      },
-      {
-        "path": "docs/stories/5-4-add-unit-tests-for-utilities-and-services.md",
-        "reason": "Contains outdated markers",
-        "days_old": 1,
-        "word_count": 8072
-      },
       {
         "path": "claudedocs/ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE.md",
         "reason": "Contains outdated markers",
         "days_old": 0,
         "word_count": 7699
-      },
-      {
-        "path": "docs/.archive/claude.md",
-        "reason": "Contains outdated markers",
-        "days_old": 0,
-        "word_count": 148
       },
       {
         "path": "docs/epics.md",
@@ -133,18 +48,6 @@
         "word_count": 1836
       },
       {
-        "path": "docs/stories/6-5-implementation-summary.md",
-        "reason": "Contains outdated markers",
-        "days_old": 0,
-        "word_count": 1491
-      },
-      {
-        "path": "docs/stories/6-7-user-authentication-login.md",
-        "reason": "Contains outdated markers",
-        "days_old": 0,
-        "word_count": 2865
-      },
-      {
         "path": "docs/technical-decisions.md",
         "reason": "Contains outdated markers",
         "days_old": 0,
@@ -175,6 +78,48 @@
         "reason": "Recently maintained",
         "days_old": 0,
         "word_count": 3371
+      },
+      {
+        "path": "docs/.archive/API_SERVICES_ARCHITECTURE.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 4389
+      },
+      {
+        "path": "docs/.archive/claude.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 148
+      },
+      {
+        "path": "docs/.archive/component-inventory.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 1462
+      },
+      {
+        "path": "docs/.archive/data-models.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 2027
+      },
+      {
+        "path": "docs/.archive/project-overview.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 2286
+      },
+      {
+        "path": "docs/.archive/source-tree-analysis.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 1993
+      },
+      {
+        "path": "docs/.archive/state-management.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 2779
       },
       {
         "path": "docs/bug-tracker.md",
@@ -285,10 +230,22 @@
         "word_count": 6181
       },
       {
+        "path": "docs/sprint-artifacts/tech-spec-epic-2.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 6958
+      },
+      {
         "path": "docs/sprint-artifacts/tech-spec-epic-3.md",
         "reason": "Recently maintained",
         "days_old": 1,
         "word_count": 8023
+      },
+      {
+        "path": "docs/sprint-artifacts/tech-spec-epic-4.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 6820
       },
       {
         "path": "docs/sprint-artifacts/tech-spec-epic-5.md",
@@ -331,6 +288,12 @@
         "reason": "Recently maintained",
         "days_old": 1,
         "word_count": 3946
+      },
+      {
+        "path": "docs/stories/1-5-critical-refactoring-code-quality-improvements.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 3340
       },
       {
         "path": "docs/stories/1-6-build-deployment-configuration-hardening.md",
@@ -393,10 +356,22 @@
         "word_count": 5192
       },
       {
+        "path": "docs/stories/3-3-message-history-state-management-review.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 2057
+      },
+      {
         "path": "docs/stories/3-4-admin-interface-custom-message-management-phase-1-ui.md",
         "reason": "Recently maintained",
         "days_old": 1,
         "word_count": 4537
+      },
+      {
+        "path": "docs/stories/3-5-admin-interface-message-persistence-integration.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 5348
       },
       {
         "path": "docs/stories/3-6-ai-message-suggestion-review-interface-optional-enhancement.md",
@@ -423,10 +398,106 @@
         "word_count": 6833
       },
       {
+        "path": "docs/stories/4-4-photo-edit-delete-functionality.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 6868
+      },
+      {
         "path": "docs/stories/4-5-photo-gallery-navigation-integration.md",
         "reason": "Recently maintained",
         "days_old": 1,
         "word_count": 5447
+      },
+      {
+        "path": "docs/stories/5-1-split-useappstore-into-feature-slices.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 5320
+      },
+      {
+        "path": "docs/stories/5-2-implement-photo-pagination-with-lazy-loading.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 7512
+      },
+      {
+        "path": "docs/stories/5-2-memory-profiling-guide.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 848
+      },
+      {
+        "path": "docs/stories/5-3-extract-base-service-class-to-reduce-duplication.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 5134
+      },
+      {
+        "path": "docs/stories/5-4-add-unit-tests-for-utilities-and-services.md",
+        "reason": "Recently maintained",
+        "days_old": 1,
+        "word_count": 8072
+      },
+      {
+        "path": "docs/stories/5-5-centralize-input-validation-layer.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 5047
+      },
+      {
+        "path": "docs/stories/6-0-supabase-schema-rls-foundation.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 5104
+      },
+      {
+        "path": "docs/stories/6-1-supabase-backend-setup-api-integration.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 4896
+      },
+      {
+        "path": "docs/stories/6-2-mood-tracking-ui-local-storage.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 6545
+      },
+      {
+        "path": "docs/stories/6-3-mood-history-calendar-view.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 3753
+      },
+      {
+        "path": "docs/stories/6-4-mood-sync-partner-visibility.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 3021
+      },
+      {
+        "path": "docs/stories/6-5-implementation-summary.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 1491
+      },
+      {
+        "path": "docs/stories/6-5-poke-kiss-interactions.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 5290
+      },
+      {
+        "path": "docs/stories/6-6-anniversary-countdown-timers.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 5277
+      },
+      {
+        "path": "docs/stories/6-7-user-authentication-login.md",
+        "reason": "Recently maintained",
+        "days_old": 0,
+        "word_count": 2865
       },
       {
         "path": "docs/stories/7-1-offline-mode-testing-suite.md",
@@ -939,78 +1010,6 @@
         "reason": "Needs manual inspection",
         "days_old": 0,
         "word_count": 227
-      },
-      {
-        "path": "docs/stories/5-1-split-useappstore-into-feature-slices.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 5320
-      },
-      {
-        "path": "docs/stories/5-2-implement-photo-pagination-with-lazy-loading.md",
-        "reason": "Needs manual inspection",
-        "days_old": 1,
-        "word_count": 7512
-      },
-      {
-        "path": "docs/stories/5-2-memory-profiling-guide.md",
-        "reason": "Needs manual inspection",
-        "days_old": 1,
-        "word_count": 848
-      },
-      {
-        "path": "docs/stories/5-3-extract-base-service-class-to-reduce-duplication.md",
-        "reason": "Needs manual inspection",
-        "days_old": 1,
-        "word_count": 5134
-      },
-      {
-        "path": "docs/stories/5-5-centralize-input-validation-layer.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 5047
-      },
-      {
-        "path": "docs/stories/6-0-supabase-schema-rls-foundation.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 5104
-      },
-      {
-        "path": "docs/stories/6-1-supabase-backend-setup-api-integration.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 4896
-      },
-      {
-        "path": "docs/stories/6-2-mood-tracking-ui-local-storage.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 6545
-      },
-      {
-        "path": "docs/stories/6-3-mood-history-calendar-view.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 3753
-      },
-      {
-        "path": "docs/stories/6-4-mood-sync-partner-visibility.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 3021
-      },
-      {
-        "path": "docs/stories/6-5-poke-kiss-interactions.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 5290
-      },
-      {
-        "path": "docs/stories/6-6-anniversary-countdown-timers.md",
-        "reason": "Needs manual inspection",
-        "days_old": 0,
-        "word_count": 5277
       },
       {
         "path": "DOCUMENTATION_GUIDE.md",

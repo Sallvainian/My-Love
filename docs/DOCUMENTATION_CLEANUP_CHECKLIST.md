@@ -1,84 +1,28 @@
 # Documentation Cleanup Checklist
 
-Generated: 2025-11-16 11:12
+Generated: 2025-11-16 11:16
 
 ## Summary
 
 - Total files: 177
-- Delete candidates: 7
-- Need updates: 17
-- Manual review: 102
-- Current/OK: 51
+- Delete candidates: 0
+- Need updates: 8
+- Manual review: 90
+- Current/OK: 79
 
 ---
 
-## DELETE CANDIDATES (7 files)
+## DELETE CANDIDATES (0 files)
 
 Files safe to delete. Review before deletion.
 
-- [ ] `docs/stories/3-3-message-history-state-management-review.md`
-  - Reason: Matches deletion pattern
-  - Age: 1 days, Words: 2057
-
-- [ ] `docs/.archive/API_SERVICES_ARCHITECTURE.md`
-  - Reason: In archive directory
-  - Age: 0 days, Words: 4389
-
-- [ ] `docs/.archive/component-inventory.md`
-  - Reason: In archive directory
-  - Age: 0 days, Words: 1462
-
-- [ ] `docs/.archive/data-models.md`
-  - Reason: In archive directory
-  - Age: 0 days, Words: 2027
-
-- [ ] `docs/.archive/project-overview.md`
-  - Reason: In archive directory
-  - Age: 0 days, Words: 2286
-
-- [ ] `docs/.archive/source-tree-analysis.md`
-  - Reason: In archive directory
-  - Age: 0 days, Words: 1993
-
-- [ ] `docs/.archive/state-management.md`
-  - Reason: In archive directory
-  - Age: 0 days, Words: 2779
-
-## UPDATE REQUIRED (17 files)
+## UPDATE REQUIRED (8 files)
 
 Important documents that are outdated and need refresh.
-
-- [ ] `docs/sprint-artifacts/tech-spec-epic-2.md`
-  - Reason: Contains outdated markers
-  - Age: 1 days, Words: 6958
-
-- [ ] `docs/sprint-artifacts/tech-spec-epic-4.md`
-  - Reason: Contains outdated markers
-  - Age: 1 days, Words: 6820
-
-- [ ] `docs/stories/1-5-critical-refactoring-code-quality-improvements.md`
-  - Reason: Contains outdated markers
-  - Age: 1 days, Words: 3340
-
-- [ ] `docs/stories/3-5-admin-interface-message-persistence-integration.md`
-  - Reason: Contains outdated markers
-  - Age: 1 days, Words: 5348
-
-- [ ] `docs/stories/4-4-photo-edit-delete-functionality.md`
-  - Reason: Contains outdated markers
-  - Age: 1 days, Words: 6868
-
-- [ ] `docs/stories/5-4-add-unit-tests-for-utilities-and-services.md`
-  - Reason: Contains outdated markers
-  - Age: 1 days, Words: 8072
 
 - [ ] `claudedocs/ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE.md`
   - Reason: Contains outdated markers
   - Age: 0 days, Words: 7699
-
-- [ ] `docs/.archive/claude.md`
-  - Reason: Contains outdated markers
-  - Age: 0 days, Words: 148
 
 - [ ] `docs/epics.md`
   - Reason: Contains outdated markers
@@ -100,14 +44,6 @@ Important documents that are outdated and need refresh.
   - Reason: Contains outdated markers
   - Age: 0 days, Words: 1836
 
-- [ ] `docs/stories/6-5-implementation-summary.md`
-  - Reason: Contains outdated markers
-  - Age: 0 days, Words: 1491
-
-- [ ] `docs/stories/6-7-user-authentication-login.md`
-  - Reason: Contains outdated markers
-  - Age: 0 days, Words: 2865
-
 - [ ] `docs/technical-decisions.md`
   - Reason: Contains outdated markers
   - Age: 0 days, Words: 6178
@@ -116,7 +52,7 @@ Important documents that are outdated and need refresh.
   - Reason: Contains outdated markers
   - Age: 0 days, Words: 2237
 
-## MANUAL REVIEW NEEDED (102 files)
+## MANUAL REVIEW NEEDED (90 files)
 
 Files that need human judgment to categorize.
 
@@ -436,54 +372,6 @@ Files that need human judgment to categorize.
   - Reason: Needs manual inspection
   - Age: 0 days, Words: 227
 
-- [ ] `docs/stories/5-1-split-useappstore-into-feature-slices.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 5320
-
-- [ ] `docs/stories/5-2-implement-photo-pagination-with-lazy-loading.md`
-  - Reason: Needs manual inspection
-  - Age: 1 days, Words: 7512
-
-- [ ] `docs/stories/5-2-memory-profiling-guide.md`
-  - Reason: Needs manual inspection
-  - Age: 1 days, Words: 848
-
-- [ ] `docs/stories/5-3-extract-base-service-class-to-reduce-duplication.md`
-  - Reason: Needs manual inspection
-  - Age: 1 days, Words: 5134
-
-- [ ] `docs/stories/5-5-centralize-input-validation-layer.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 5047
-
-- [ ] `docs/stories/6-0-supabase-schema-rls-foundation.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 5104
-
-- [ ] `docs/stories/6-1-supabase-backend-setup-api-integration.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 4896
-
-- [ ] `docs/stories/6-2-mood-tracking-ui-local-storage.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 6545
-
-- [ ] `docs/stories/6-3-mood-history-calendar-view.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 3753
-
-- [ ] `docs/stories/6-4-mood-sync-partner-visibility.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 3021
-
-- [ ] `docs/stories/6-5-poke-kiss-interactions.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 5290
-
-- [ ] `docs/stories/6-6-anniversary-countdown-timers.md`
-  - Reason: Needs manual inspection
-  - Age: 0 days, Words: 5277
-
 - [ ] `DOCUMENTATION_GUIDE.md`
   - Reason: Needs manual inspection
   - Age: 0 days, Words: 1218
@@ -576,18 +464,18 @@ Files with similar names that may be duplicates.
 - [ ] `test-results/offline-cache-strategy-Cac-f3b0e-erve-theme-settings-offline-chromium/error-context.md`
 - [ ] `test-results/offline-cache-strategy-Cac-fcbf7-static-asset-caching-status-chromium/error-context.md`
 
-## CURRENT FILES (51 files)
+## CURRENT FILES (79 files)
 
 These files are current and need no action.
 
 - `claudedocs/deployment-summary-2025-11-15.md`
 - `DEPLOYMENT.md`
 - `docs/architecture.md`
-- `docs/bug-tracker.md`
-- `docs/development-guide.md`
-- `docs/guides/memory-profiling.md`
-- `docs/implementation-readiness-report-2025-11-15.md`
-- `docs/index.md`
-- `docs/overnight-dev.md`
-- `docs/plans/2025-11-14-address-epic-5-code-review-comments.md`
-- ... and 41 more files
+- `docs/.archive/API_SERVICES_ARCHITECTURE.md`
+- `docs/.archive/claude.md`
+- `docs/.archive/component-inventory.md`
+- `docs/.archive/data-models.md`
+- `docs/.archive/project-overview.md`
+- `docs/.archive/source-tree-analysis.md`
+- `docs/.archive/state-management.md`
+- ... and 69 more files
