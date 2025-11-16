@@ -1,54 +1,92 @@
--- Migration 003: Add user search function
--- Purpose: Enable users to search for other users without requiring admin API access
+-- Migration 003: Add user search with RLS
+-- Purpose: Enable users to search for other users using Row Level Security
 --
--- This function runs with SECURITY DEFINER to access auth.users data,
--- but only exposes limited, safe information (id, email, display_name)
+-- Approach: Add email and display_name to users table, sync from auth.users,
+-- and use RLS policies instead of SECURITY DEFINER functions
 
--- Create a function to search users by email or display name
-CREATE OR REPLACE FUNCTION search_users(search_query TEXT, result_limit INTEGER DEFAULT 10)
-RETURNS TABLE (
-  id UUID,
-  email TEXT,
-  display_name TEXT
-)
+-- Step 1: Add columns to users table for searchable user data
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS email TEXT,
+  ADD COLUMN IF NOT EXISTS display_name TEXT;
+
+-- Step 2: Create index for search performance
+CREATE INDEX IF NOT EXISTS idx_users_email_search ON users (LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_users_display_name_search ON users (LOWER(display_name));
+
+-- Step 3: Create function to sync user data from auth.users
+-- This runs when a user signs up or updates their profile
+CREATE OR REPLACE FUNCTION sync_user_profile()
+RETURNS TRIGGER
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, auth
 LANGUAGE plpgsql
 AS $$
-DECLARE
-  current_user_id UUID;
 BEGIN
-  -- Get the current authenticated user's ID
-  current_user_id := auth.uid();
+  -- Insert or update users table with auth data
+  INSERT INTO public.users (id, email, display_name, created_at, updated_at)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email, 'Unknown'),
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = EXCLUDED.display_name,
+    updated_at = NOW();
 
-  IF current_user_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
-
-  -- Search auth.users table (requires SECURITY DEFINER to access)
-  RETURN QUERY
-  SELECT
-    au.id,
-    au.email::TEXT,
-    COALESCE(au.raw_user_meta_data->>'display_name', au.email::TEXT, 'Unknown')::TEXT as display_name
-  FROM auth.users au
-  WHERE
-    -- Exclude current user
-    au.id != current_user_id
-    AND
-    -- Match email or display name (case-insensitive)
-    (
-      LOWER(au.email) LIKE '%' || LOWER(search_query) || '%'
-      OR
-      LOWER(COALESCE(au.raw_user_meta_data->>'display_name', '')) LIKE '%' || LOWER(search_query) || '%'
-    )
-  LIMIT result_limit;
+  RETURN NEW;
 END;
 $$;
 
--- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION search_users(TEXT, INTEGER) TO authenticated;
+-- Step 4: Create trigger to auto-sync on user creation/update
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT OR UPDATE ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION sync_user_profile();
 
--- Add comment explaining the function
-COMMENT ON FUNCTION search_users(TEXT, INTEGER) IS
-'Searches for users by email or display name. Only returns basic public information. Requires authentication.';
+-- Step 5: Backfill existing users (sync current auth.users to users table)
+-- This is safe to run multiple times (ON CONFLICT DO UPDATE)
+INSERT INTO users (id, email, display_name, created_at, updated_at)
+SELECT
+  id,
+  email,
+  COALESCE(raw_user_meta_data->>'display_name', email, 'Unknown'),
+  created_at,
+  NOW()
+FROM auth.users
+ON CONFLICT (id) DO UPDATE SET
+  email = EXCLUDED.email,
+  display_name = EXCLUDED.display_name,
+  updated_at = NOW();
+
+-- Step 6: Enable RLS on users table if not already enabled
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- Step 7: Create RLS policy - authenticated users can search other users
+-- Users can read basic info (id, email, display_name) for all users
+DROP POLICY IF EXISTS "Users can search other users" ON users;
+CREATE POLICY "Users can search other users"
+  ON users
+  FOR SELECT
+  TO authenticated
+  USING (true);  -- Allow reading all users (but only columns granted by RLS)
+
+-- Step 8: Create RLS policy - users can update their own record
+DROP POLICY IF EXISTS "Users can update own record" ON users;
+CREATE POLICY "Users can update own record"
+  ON users
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+-- Step 9: Grant SELECT on necessary columns for authenticated users
+-- RLS policies control row access, but we also need column-level permissions
+GRANT SELECT (id, email, display_name, partner_id, created_at) ON users TO authenticated;
+
+-- Add helpful comment
+COMMENT ON COLUMN users.email IS 'User email, synced from auth.users for search';
+COMMENT ON COLUMN users.display_name IS 'User display name, synced from auth.users for search';

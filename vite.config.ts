@@ -7,6 +7,22 @@ import { visualizer } from 'rollup-plugin-visualizer';
 export default defineConfig(({ mode }) => ({
   // Use base path only for production (GitHub Pages), not for development/testing
   base: mode === 'production' ? '/My-Love/' : '/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core
+          'vendor-react': ['react', 'react-dom'],
+          // Supabase (heavy, used mostly in settings/admin)
+          'vendor-supabase': ['@supabase/supabase-js'],
+          // State management + storage
+          'vendor-state': ['zustand', 'idb', 'zod'],
+          // Animations (optional, can be lazy loaded)
+          'vendor-animation': ['framer-motion'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

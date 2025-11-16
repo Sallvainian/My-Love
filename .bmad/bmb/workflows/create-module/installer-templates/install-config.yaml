@@ -1,14 +1,14 @@
 # {{MODULE_NAME}} Module Configuration
 # This file defines installation questions and module configuration values
 
-code: '{{MODULE_CODE}}'
-name: '{{MODULE_NAME}}'
-default_selected: '{{DEFAULT_SELECTED}}' # true if this should be selected by default
+code: "{{MODULE_CODE}}"
+name: "{{MODULE_NAME}}"
+default_selected: "{{DEFAULT_SELECTED}}" # true if this should be selected by default
 
 # Welcome message shown during installation
 prompt:
-  - '{{WELCOME_MESSAGE_LINE_1}}'
-  - '{{WELCOME_MESSAGE_LINE_2}}'
+  - "{{WELCOME_MESSAGE_LINE_1}}"
+  - "{{WELCOME_MESSAGE_LINE_2}}"
 # Core config values are automatically inherited:
 ## user_name
 ## communication_language

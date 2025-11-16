@@ -227,18 +227,25 @@ export function PartnerMoodView() {
     });
   }, []);
 
-  // Handle user search
-  const handleSearch = useCallback(
-    (query: string) => {
-      setSearchQuery(query);
-      if (query.trim().length >= 2) {
-        searchUsers(query);
-      } else {
+  // Debounced search - prevents spamming API on every keystroke
+  useEffect(() => {
+    // Debounce search by 300ms
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        searchUsers(searchQuery);
+      } else if (searchQuery.trim().length === 0) {
         clearSearch();
       }
-    },
-    [searchUsers, clearSearch]
-  );
+    }, 300);
+
+    // Cleanup timeout on unmount or searchQuery change
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, searchUsers, clearSearch]);
+
+  // Handle search input change
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   // Handle sending partner request
   const handleSendRequest = useCallback(

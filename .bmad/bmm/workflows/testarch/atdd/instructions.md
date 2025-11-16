@@ -268,9 +268,7 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
        await page.click('[data-testid="login-button"]');
 
        // THEN: Error message is displayed
-       await expect(page.locator('[data-testid="error-message"]')).toHaveText(
-         'Invalid email or password'
-       );
+       await expect(page.locator('[data-testid="error-message"]')).toHaveText('Invalid email or password');
      });
    });
    ```
@@ -293,7 +291,7 @@ Generates failing acceptance tests BEFORE implementation following TDD's red-gre
        route.fulfill({
          status: 200,
          body: JSON.stringify({ id: 1, name: 'Test User' }),
-       })
+       }),
      );
 
      // NOW navigate
