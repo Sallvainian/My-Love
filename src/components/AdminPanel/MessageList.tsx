@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { useAppStore } from '../../stores/useAppStore';
 import { Search } from 'lucide-react';
 import { MessageRow } from './MessageRow';

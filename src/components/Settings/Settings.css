@@ -1,0 +1,255 @@
+/**
+ * Settings Component Styles
+ *
+ * Clean, organized settings interface with logout functionality
+ */
+
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  min-height: 100vh;
+}
+
+.settings-header {
+  margin-bottom: 2rem;
+}
+
+.settings-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.settings-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+
+.error-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settings-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 1rem 1.5rem;
+  margin: 0;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.section-content {
+  padding: 1.5rem;
+}
+
+/* Account Section */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.user-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #6b7280;
+}
+
+.user-email {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+}
+
+.user-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.logout-button {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logout-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(239, 68, 68, 0.2);
+}
+
+.logout-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.logout-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.logout-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spinner-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner-track {
+  opacity: 0.25;
+}
+
+.spinner-head {
+  opacity: 0.75;
+}
+
+/* App Information */
+.app-info {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.app-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.app-version {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+}
+
+.app-description {
+  font-size: 0.938rem;
+  color: #374151;
+  margin: 0;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .settings-container {
+    padding: 1rem 0.75rem;
+  }
+
+  .settings-title {
+    font-size: 1.75rem;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .section-content {
+    padding: 1rem;
+  }
+
+  .user-info {
+    padding: 0.875rem;
+  }
+}
+
+/* Dark mode support (optional enhancement) */
+@media (prefers-color-scheme: dark) {
+  .settings-container {
+    background: #111827;
+  }
+
+  .settings-title {
+    color: #f9fafb;
+  }
+
+  .settings-section {
+    background: #1f2937;
+  }
+
+  .section-title {
+    color: #d1d5db;
+    background: #111827;
+    border-bottom-color: #374151;
+  }
+
+  .user-info {
+    background: #111827;
+  }
+
+  .user-email {
+    color: #f9fafb;
+  }
+
+  .user-label,
+  .app-version,
+  .app-description {
+    color: #9ca3af;
+  }
+
+  .app-name {
+    color: #f9fafb;
+  }
+}

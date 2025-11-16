@@ -1,17 +1,35 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
-  // Use base path only for production (GitHub Pages), not for development/testing
-  base: mode === 'production' ? '/My-Love/' : '/',
+export default defineConfig(() => ({
+  // Vercel deploys to root domain, no subpath needed
+  base: '/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core
+          'vendor-react': ['react', 'react-dom'],
+          // Supabase (heavy, used mostly in settings/admin)
+          'vendor-supabase': ['@supabase/supabase-js'],
+          // State management + storage
+          'vendor-state': ['zustand', 'idb', 'zod'],
+          // Animations (optional, can be lazy loaded)
+          'vendor-animation': ['framer-motion'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto', // Explicitly inject SW registration
       devOptions: {
-        enabled: true,
+        enabled: false, // Disable in dev to prevent stale code caching
         type: 'module',
       },
       includeAssets: ['icons/*.png', 'fonts/*.woff2'],
@@ -43,15 +61,38 @@ export default defineConfig(({ mode }) => ({
       // so service worker caching strategies do NOT intercept them.
       // No navigateFallbackDenylist or exclusions needed for IndexedDB.
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
+        // Only cache static assets, not app code
+        globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
         skipWaiting: true,
         clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        navigateFallback: null,
+        // Don't cache any JS/CSS/HTML - always fetch fresh to prevent stale code
+        globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
         runtimeCaching: [
           {
+            // JS/CSS/HTML - Always fetch from network (no caching)
+            urlPattern: /\.(js|css|html)$/,
+            handler: 'NetworkOnly',
+          },
+          {
+            // Static assets (images, fonts) - Cache First
+            urlPattern: /\.(png|jpg|jpeg|svg|woff2|ico)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-assets-v2',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+          {
+            // Google Fonts
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: 'google-fonts-v2',
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
@@ -63,6 +104,11 @@ export default defineConfig(({ mode }) => ({
           },
         ],
       },
+    }),
+    visualizer({
+      filename: 'dist/stats.html',
+      gzipSize: true,
+      brotliSize: true,
     }),
   ],
 }));

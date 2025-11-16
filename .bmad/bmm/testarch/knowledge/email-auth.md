@@ -60,7 +60,7 @@ async function getMagicLinkFromEmail(email: string): Promise<string> {
     },
     {
       timeout: 30000, // 30 seconds
-    }
+    },
   );
 
   // Mailosaur extracts links automatically - no parsing needed!
@@ -365,7 +365,7 @@ test.describe('Email Auth Negative Flows', () => {
       JSON.stringify({
         email: 'test@example.com',
         exp: Date.now() - 24 * 60 * 60 * 1000, // 24 hours ago
-      })
+      }),
     ).toString('base64');
 
     const expiredLink = `http://localhost:3000/auth/verify?token=${expiredToken}`;
@@ -485,9 +485,7 @@ test.describe('Email Auth Negative Flows', () => {
 
       if (errorVisible) {
         console.log(`Rate limit hit after ${i + 1} requests`);
-        await expect(page.getByTestId('rate-limit-error')).toContainText(
-          /too many.*requests|rate.*limit/i
-        );
+        await expect(page.getByTestId('rate-limit-error')).toContainText(/too many.*requests|rate.*limit/i);
         return;
       }
     }

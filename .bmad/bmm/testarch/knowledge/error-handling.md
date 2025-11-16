@@ -50,7 +50,7 @@ test.describe('API Error Handling', () => {
           error: 'Internal server error',
           code: 'INTERNAL_ERROR',
         }),
-      })
+      }),
     );
 
     // Act: Navigate to page that fetches users
@@ -228,13 +228,13 @@ test.describe('Network Retry Logic', () => {
         event: 'api_retry',
         attempt: 1,
         endpoint: '/api/products',
-      })
+      }),
     );
     expect(telemetryEvents).toContainEqual(
       expect.objectContaining({
         event: 'api_retry',
         attempt: 2,
-      })
+      }),
     );
   });
 
@@ -258,9 +258,7 @@ test.describe('Network Retry Logic', () => {
 
     // Assert: Error UI displayed after exhausting retries
     await expect(page.getByTestId('error-message')).toBeVisible();
-    await expect(page.getByTestId('error-message')).toContainText(
-      /unable.*load|failed.*after.*retries/i
-    );
+    await expect(page.getByTestId('error-message')).toContainText(/unable.*load|failed.*after.*retries/i);
 
     // Assert: Data not displayed
     await expect(page.getByTestId('product-list')).not.toBeVisible();
@@ -384,7 +382,7 @@ test.describe('Error Telemetry', () => {
       route.fulfill({
         status: 500,
         body: JSON.stringify({ error: 'Payment processor unavailable' }),
-      })
+      }),
     );
 
     // Act: Trigger error
@@ -405,7 +403,7 @@ test.describe('Error Telemetry', () => {
           statusCode: 500,
           userId: expect.any(String),
         }),
-      })
+      }),
     );
 
     // Assert: Sensitive data NOT logged
@@ -437,9 +435,7 @@ test.describe('Error Telemetry', () => {
     });
 
     // Mock failing API
-    await page.route('**/api/users', (route) =>
-      route.fulfill({ status: 403, body: { error: 'Forbidden' } })
-    );
+    await page.route('**/api/users', (route) => route.fulfill({ status: 403, body: { error: 'Forbidden' } }));
 
     // Act
     await page.goto('/users');
@@ -461,7 +457,7 @@ test.describe('Error Telemetry', () => {
       expect.objectContaining({
         category: 'navigation',
         message: '/users',
-      })
+      }),
     );
   });
 });
@@ -605,14 +601,14 @@ test.describe('Service Unavailability', () => {
             { id: 2, name: 'Cached Product 2' },
           ],
           timestamp: Date.now(),
-        })
+        }),
       );
     });
 
     // Mock API unavailable
     await page.route(
       '**/api/products',
-      (route) => route.abort('connectionrefused') // Simulate server down
+      (route) => route.abort('connectionrefused'), // Simulate server down
     );
 
     // Act
@@ -632,9 +628,7 @@ test.describe('Service Unavailability', () => {
 
   test('should show fallback UI when analytics service fails', async ({ page }) => {
     // Mock analytics service down (non-critical)
-    await page.route('**/analytics/track', (route) =>
-      route.fulfill({ status: 503, body: 'Service unavailable' })
-    );
+    await page.route('**/analytics/track', (route) => route.fulfill({ status: 503, body: 'Service unavailable' }));
 
     // Act: Navigate normally
     await page.goto('/dashboard');

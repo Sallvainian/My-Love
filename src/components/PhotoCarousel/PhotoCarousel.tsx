@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
+import { m as motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoCarouselControls } from './PhotoCarouselControls';
 import { PhotoEditModal } from '../PhotoEditModal/PhotoEditModal';

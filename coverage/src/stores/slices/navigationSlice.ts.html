@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/9</span>
+                <span class='fraction'>0/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/5</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>0/10</span>
             </div>
         
             
@@ -119,11 +119,10 @@
 <a name='L54'></a><a href='#L54'>54</a>
 <a name='L55'></a><a href='#L55'>55</a>
 <a name='L56'></a><a href='#L56'>56</a>
-<a name='L57'></a><a href='#L57'>57</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -153,6 +152,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -165,6 +167,10 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -179,7 +185,7 @@
  * Navigation Slice
  *
  * Manages all navigation-related state and actions including:
- * - View switching (home/photos)
+ * - View switching (home/photos/mood)
  * - Browser history integration
  *
  * Cross-slice dependencies:
@@ -193,30 +199,29 @@ import type { StateCreator } from 'zustand';
 &nbsp;
 export interface NavigationSlice {
   // State
-  currentView: 'home' | 'photos';
+  currentView: 'home' | 'photos' | 'mood';
 &nbsp;
   // Actions
-  setView: (view: 'home' | 'photos', skipHistory?: boolean) =&gt; void;
+  setView: (view: 'home' | 'photos' | 'mood', skipHistory?: boolean) =&gt; void;
   navigateHome: () =&gt; void;
   navigatePhotos: () =&gt; void;
+  navigateMood: () =&gt; void;
 }
 &nbsp;
-export const createNavigationSlice: StateCreator&lt;
-  NavigationSlice,
-  [],
-  [],
-  NavigationSlice
-&gt; = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(s</span>et, get) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+export const createNavigationSlice: StateCreator&lt;NavigationSlice, [], [], NavigationSlice&gt; = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(</span></span>
+  set,
+  get
+) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
   // Initial state
   currentView: 'home',
 &nbsp;
   // Actions
-  setView: <span class="fstat-no" title="function not covered" >(v</span>iew: 'home' | 'photos', skipHistory = <span class="branch-0 cbranch-no" title="branch not covered" >false) =&gt; {</span>
+  setView: <span class="fstat-no" title="function not covered" >(v</span>iew: 'home' | 'photos' | 'mood', skipHistory = <span class="branch-0 cbranch-no" title="branch not covered" >false) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    set({ currentView: view });</span>
 &nbsp;
     // Update browser URL if not skipping history (prevents loops during popstate)
 <span class="cstat-no" title="statement not covered" >    if (!skipHistory) {</span>
-      const path = <span class="cstat-no" title="statement not covered" >view === 'home' ? '/' : '/photos';</span>
+      const path = <span class="cstat-no" title="statement not covered" >view === 'home' ? '/' : view === 'photos' ? '/photos' : '/mood';</span>
 <span class="cstat-no" title="statement not covered" >      window.history.pushState({ view }, '', path);</span>
 <span class="cstat-no" title="statement not covered" >      console.log(`[AppStore] View changed to '${view}', URL: ${path}`);</span>
     }
@@ -230,6 +235,10 @@ export const createNavigationSlice: StateCreator&lt;
   navigatePhotos: <span class="fstat-no" title="function not covered" >() =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    get().setView('photos');</span>
   },
+&nbsp;
+  navigateMood: <span class="fstat-no" title="function not covered" >() =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    get().setView('mood');</span>
+  },
 });
 &nbsp;</pre></td></tr></table></pre>
 
@@ -238,7 +247,7 @@ export const createNavigationSlice: StateCreator&lt;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-15T04:51:44.082Z
+                at 2025-11-15T18:25:01.368Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
