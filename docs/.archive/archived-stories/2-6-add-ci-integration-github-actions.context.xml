@@ -1,0 +1,288 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>6</storyId>
+    <title>Add CI Integration (GitHub Actions)</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-31</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-6-add-ci-integration-github-actions.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>tests to run automatically on every push and pull request</iWant>
+    <soThat>regressions are caught before merging code</soThat>
+    <tasks>
+      <task id="1" acs="1,2">Create GitHub Actions workflow file
+        <subtask>Create directory: .github/workflows/ if not exists</subtask>
+        <subtask>Create file: .github/workflows/playwright.yml</subtask>
+        <subtask>Define workflow name: "Playwright Tests"</subtask>
+        <subtask>Configure triggers: on: [push, pull_request] with branch filters (main branch for push)</subtask>
+        <subtask>Set permissions: contents: read (minimal required for checkout)</subtask>
+      </task>
+      <task id="2" acs="3">Configure workflow job and environment
+        <subtask>Define job: test (or playwright-tests)</subtask>
+        <subtask>Set runner: runs-on: ubuntu-latest</subtask>
+        <subtask>Checkout code: uses: actions/checkout@v4</subtask>
+        <subtask>Setup Node.js: uses: actions/setup-node@v4 with node-version: '18'</subtask>
+        <subtask>Install dependencies: run: npm ci (clean install from package-lock.json)</subtask>
+        <subtask>Install Playwright browsers: run: npx playwright install --with-deps</subtask>
+      </task>
+      <task id="3" acs="3,7">Execute tests in CI environment
+        <subtask>Run test command: run: npm run test:e2e</subtask>
+        <subtask>Verify webServer auto-start works in CI (Story 2.4 integration)</subtask>
+        <subtask>Verify all configured browsers run (Chromium, Firefox per Story 2.5 config)</subtask>
+        <subtask>Measure execution time: review GitHub Actions logs for total duration</subtask>
+        <subtask>Confirm execution time &lt; 10 minutes (AC-2.6.7 requirement)</subtask>
+      </task>
+      <task id="4" acs="4">Configure artifact upload for debugging
+        <subtask>Add artifact upload step: uses: actions/upload-artifact@v4</subtask>
+        <subtask>Condition: if: failure() or if: always() (always recommended for debugging passing runs too)</subtask>
+        <subtask>Artifact name: playwright-report or include timestamp/run-number for uniqueness</subtask>
+        <subtask>Artifact path: playwright-report/ (HTML report directory)</subtask>
+        <subtask>Include test results: test-results/ if present (screenshots, traces, videos)</subtask>
+        <subtask>Test artifact upload: trigger intentional test failure, verify artifact uploaded</subtask>
+      </task>
+      <task id="5" acs="5">Verify PR merge blocking behavior
+        <subtask>Create test PR with intentional failing test</subtask>
+        <subtask>Verify workflow runs and fails (red X status)</subtask>
+        <subtask>Check PR status: should show "Some checks failed" if branch protection enabled</subtask>
+        <subtask>Optional: Configure branch protection rules on main branch to enforce workflow pass before merge</subtask>
+        <subtask>Document: If branch protection not enabled, note workflow status is advisory only</subtask>
+        <subtask>Revert failing test, verify workflow passes (green checkmark)</subtask>
+      </task>
+      <task id="6" acs="6">Add test status badge to README.md
+        <subtask>Locate README.md in project root</subtask>
+        <subtask>Add badge at top (below title or in "Status" section)</subtask>
+        <subtask>Replace {owner} and {repo} with actual GitHub repository details</subtask>
+        <subtask>Verify badge displays correctly (may need workflow to run once first)</subtask>
+        <subtask>Test: Click badge, verify navigates to workflow runs page</subtask>
+        <subtask>Commit README.md changes</subtask>
+      </task>
+      <task id="7" acs="8">Document CI setup and troubleshooting
+        <subtask>Open tests/README.md for editing</subtask>
+        <subtask>Add new section: "## Continuous Integration (CI)"</subtask>
+        <subtask>Document workflow overview: triggers, environment, browsers, execution</subtask>
+        <subtask>Document how to view test results: Actions tab, workflow selection, logs, artifacts</subtask>
+        <subtask>Document how to download artifacts on failure: Artifacts section, ZIP extraction, index.html viewing</subtask>
+        <subtask>Add troubleshooting section: browser install failures, server timeouts, flaky tests, workflow triggers</subtask>
+        <subtask>Document how to reproduce CI failures locally: Node 18, npm ci, playwright install, test execution</subtask>
+        <subtask>Save tests/README.md updates</subtask>
+      </task>
+      <task id="8" acs="all">Final validation and documentation
+        <subtask>Create pull request to test workflow end-to-end</subtask>
+        <subtask>Verify workflow triggers on PR creation</subtask>
+        <subtask>Verify all tests pass in CI</subtask>
+        <subtask>Verify artifacts upload (if any failures during testing)</subtask>
+        <subtask>Verify execution time &lt; 10 minutes (check GitHub Actions logs)</subtask>
+        <subtask>Verify status badge displays correctly in README.md</subtask>
+        <subtask>Review all acceptance criteria checklist</subtask>
+        <subtask>Merge PR if all ACs validated</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-2.6.1">Create .github/workflows/playwright.yml workflow file
+      - Workflow file exists at correct path in repository
+      - YAML syntax valid (GitHub Actions recognizes workflow)
+      - Workflow name: "Playwright Tests" or similar descriptive name
+      - Proper indentation and structure following GitHub Actions schema
+    </criterion>
+    <criterion id="AC-2.6.2">Workflow triggers on push to main and all pull requests
+      - Trigger configuration: on: [push, pull_request] or explicit branch filters
+      - Pushes to main branch trigger workflow execution
+      - Opening/updating pull requests trigger workflow execution
+      - Feature branch pushes to open PRs trigger workflow (GitHub default behavior)
+      - Manual workflow dispatch enabled for ad-hoc testing (optional)
+    </criterion>
+    <criterion id="AC-2.6.3">Workflow runs tests on Ubuntu (latest) with all browsers
+      - Runner: runs-on: ubuntu-latest (Ubuntu 22.04 as of 2025)
+      - Playwright browsers installed: Chromium, Firefox (matches local config)
+      - System dependencies installed: playwright install --with-deps flag
+      - Tests execute successfully in CI environment without browser-specific failures
+    </criterion>
+    <criterion id="AC-2.6.4">Workflow uploads test artifacts (reports, screenshots) on failure
+      - Uses actions/upload-artifact@v4 action
+      - Artifact uploaded on workflow failure: if: failure() or if: always()
+      - Artifact includes: playwright-report/ directory (HTML report)
+      - Artifact includes: test-results/ directory if present (screenshots, traces)
+      - Artifact retention: 7-30 days (default GitHub Actions retention)
+      - Artifact downloadable from GitHub Actions workflow run page
+    </criterion>
+    <criterion id="AC-2.6.5">Workflow fails if any tests fail (blocking PR merge)
+      - npm run test:e2e exits with non-zero status on test failure
+      - Workflow job marked as failed (red X) if tests fail
+      - Pull request merge blocked when workflow fails (if branch protection enabled)
+      - GitHub UI shows test failure status on PR page
+    </criterion>
+    <criterion id="AC-2.6.6">Add status badge to README.md showing test status
+      - Badge added to top section of README.md
+      - Badge URL: https://github.com/{owner}/{repo}/actions/workflows/playwright.yml/badge.svg
+      - Badge displays: "passing" (green) or "failing" (red) based on workflow status
+      - Clicking badge navigates to workflow runs page
+      - Badge updates automatically on workflow status change
+    </criterion>
+    <criterion id="AC-2.6.7">Test execution time in CI under 10 minutes
+      - Measure total workflow duration from start to completion
+      - Target: &lt; 10 minutes (600 seconds)
+      - Actual: Estimated ~5 minutes (3 min setup + 1 min tests + 1 min overhead)
+      - Review GitHub Actions logs to confirm timing
+      - Identify slow steps if &gt; 10 minutes (optimize or document)
+    </criterion>
+    <criterion id="AC-2.6.8">Document CI setup and troubleshooting in tests/README.md
+      - Add "Continuous Integration (CI)" section to tests/README.md
+      - Document workflow triggers: push to main, pull requests
+      - Document environment: Ubuntu, Node 18, Playwright browsers
+      - Document artifact locations: how to download HTML reports on failure
+      - Troubleshooting guide: common CI failures (browser install, server timeout, flaky tests)
+      - Document how to run tests locally to reproduce CI failures
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>My-Love Product Requirements Document</title>
+        <section>NFR006: Code Quality</section>
+        <snippet>App SHALL maintain TypeScript strict mode, ESLint compliance, and &lt;10% code duplication. CI integration enforces these standards by running automated quality checks on every commit, preventing low-quality code from merging.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic 2 Stories</title>
+        <section>Story 2.6: Add CI Integration (GitHub Actions)</section>
+        <snippet>As a developer, I want tests to run automatically on every push and pull request, so that regressions are caught before merging code. Prerequisites: Story 2.4. Acceptance criteria include workflow file creation, trigger configuration, multi-browser execution, artifact upload, PR blocking, status badge, performance targets, and documentation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Story 2.6: CI Integration Architecture</section>
+        <snippet>GitHub Actions workflow integrates test suite with CI/CD pipeline. Workflow structure defined at lines 226-243. CI-specific configuration: 2 workers (vs 12 local), 2 retries (vs 0 local), Chromium+Firefox browsers, artifact upload on failure. Performance target: &lt;10 minutes total execution (3 min setup + 1 min tests + overhead). CI environment: ubuntu-latest, Node 18, 2-core CPU, 7GB memory.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Critical Workflow 2: CI Test Execution</section>
+        <snippet>Git push triggers GitHub Actions workflow → checkout code → setup Node.js 18 → install dependencies (npm ci) → install Playwright browsers (--with-deps) → execute tests across browsers. On failure: upload artifacts (HTML report, screenshots, traces), set workflow status to FAILURE (blocks PR merge). On success: green checkmark on PR.</snippet>
+      </doc>
+      <doc>
+        <path>tests/README.md</path>
+        <title>My-Love Testing Documentation</title>
+        <section>CI Integration (placeholder)</section>
+        <snippet>Existing comprehensive testing documentation covers infrastructure setup, PWA test helpers, data-testid convention, debugging guide. Story 2.6 will add "Continuous Integration (CI)" section with workflow triggers, environment details, artifact access, and troubleshooting guide.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>configuration</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-114</lines>
+        <reason>Existing Playwright configuration with environment-aware settings (CI vs local). CI already configured with 2 workers, retries disabled (needs update to 2), GitHub reporter enabled. webServer auto-start configured (Story 2.4). Chromium-only currently (needs Firefox re-enabled for CI).</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>configuration</kind>
+        <symbol>scripts.test:e2e</symbol>
+        <lines>13</lines>
+        <reason>Test execution script that CI will invoke. Uses wrapper script test-with-cleanup.sh for process cleanup.</reason>
+      </artifact>
+      <artifact>
+        <path>README.md</path>
+        <kind>documentation</kind>
+        <symbol>N/A</symbol>
+        <lines>1-29</lines>
+        <reason>Project README where GitHub Actions status badge will be added (AC-2.6.6). Badge should be placed near top, likely in features section or new "Build Status" section.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/README.md</path>
+        <kind>documentation</kind>
+        <symbol>Table of Contents</symbol>
+        <lines>1-14</lines>
+        <reason>Comprehensive testing documentation. Already has "CI Integration" placeholder in table of contents (line 12). Story 2.6 will populate this section with workflow triggers, environment details, artifact access, and troubleshooting guide (AC-2.6.8).</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/</path>
+        <kind>test-suite</kind>
+        <symbol>6 test suites</symbol>
+        <lines>N/A</lines>
+        <reason>Complete test suite from Story 2.5: message-display, favorites, settings, navigation, persistence, setup-validation. 53 tests total with 100% Epic 1 coverage. CI will execute this suite automatically.</reason>
+      </artifact>
+      <artifact>
+        <path>scripts/test-with-cleanup.sh</path>
+        <kind>script</kind>
+        <symbol>N/A</symbol>
+        <lines>N/A</lines>
+        <reason>Test wrapper script that handles process cleanup. Already invoked by npm run test:e2e, so CI will use this automatically via package.json script.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="Node.js">
+        <package name="@playwright/test" version="^1.56.1" type="devDependency">Browser automation testing framework</package>
+        <package name="node" version="18.x" type="runtime">Node.js runtime (matches local and CI environment)</package>
+      </ecosystem>
+      <ecosystem name="GitHub Actions">
+        <package name="actions/checkout" version="v4">Checkout repository code in workflow</package>
+        <package name="actions/setup-node" version="v4">Setup Node.js environment with specified version</package>
+        <package name="actions/upload-artifact" version="v4">Upload test artifacts (reports, screenshots) on failure</package>
+      </ecosystem>
+      <ecosystem name="Testing">
+        <package name="vite" version="^7.1.7" type="devDependency">Dev server for test execution (auto-started by webServer config)</package>
+        <package name="typescript" version="~5.9.3" type="devDependency">TypeScript compiler (strict mode validation)</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>No changes to test code or application code - Story 2.6 is CI configuration only</constraint>
+    <constraint>CI execution must complete in &lt;10 minutes total (3 min setup + 1 min tests + overhead)</constraint>
+    <constraint>Workflow must run on ubuntu-latest (Ubuntu 22.04) with Node 18 to match local environment</constraint>
+    <constraint>Must test across Chromium and Firefox browsers (WebKit disabled per Story 2.5 optimization)</constraint>
+    <constraint>Artifacts uploaded on failure only to optimize GitHub Actions storage quota usage</constraint>
+    <constraint>PR merge blocking requires branch protection rules to be configured (optional but recommended)</constraint>
+    <constraint>Follow GitHub Actions YAML schema and best practices for workflow configuration</constraint>
+    <constraint>Preserve existing playwright.config.ts environment-aware settings (CI flag detection)</constraint>
+    <constraint>Status badge URL must match actual repository owner and name (replace placeholders)</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>GitHub Actions Workflow Schema</name>
+      <kind>YAML configuration</kind>
+      <signature>name, on, jobs.{job-id}.runs-on, jobs.{job-id}.steps[].uses, jobs.{job-id}.steps[].run</signature>
+      <path>.github/workflows/playwright.yml</path>
+    </interface>
+    <interface>
+      <name>npm scripts</name>
+      <kind>package.json script</kind>
+      <signature>npm run test:e2e</signature>
+      <path>package.json:13</path>
+    </interface>
+    <interface>
+      <name>Playwright webServer auto-start</name>
+      <kind>configuration option</kind>
+      <signature>webServer: { command, url, reuseExistingServer, timeout, retries }</signature>
+      <path>playwright.config.ts:106-112</path>
+    </interface>
+    <interface>
+      <name>GitHub Actions artifact upload</name>
+      <kind>workflow action</kind>
+      <signature>uses: actions/upload-artifact@v4, with: { name, path }, if: failure()</signature>
+      <path>.github/workflows/playwright.yml (to be created)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Playwright E2E testing framework with TypeScript. Multi-browser testing (Chromium, Firefox). Environment-aware configuration (CI: 2 workers, 2 retries; Local: 12 workers, 0 retries). Auto-start dev server via webServer config. HTML reporter with screenshots on failure. GitHub Actions reporter for CI integration. Test suites cover 100% Epic 1 features with data-testid selectors for stability.</standards>
+    <locations>tests/e2e/*.spec.ts (6 test suites: message-display, favorites, settings, navigation, persistence, setup-validation). Test helpers: tests/e2e/helpers/pwa-helpers.ts. Configuration: playwright.config.ts. Documentation: tests/README.md.</locations>
+    <ideas>
+      <idea ac="AC-2.6.1,AC-2.6.2">Test workflow file creation and trigger configuration by creating test PR, verifying workflow appears in GitHub Actions tab, and confirming execution on push to main</idea>
+      <idea ac="AC-2.6.3">Verify multi-browser execution by checking GitHub Actions logs for both Chromium and Firefox test runs with successful browser installation</idea>
+      <idea ac="AC-2.6.4">Test artifact upload by intentionally failing a test, confirming artifact appears in workflow run page, downloading and verifying HTML report contains failure details</idea>
+      <idea ac="AC-2.6.5">Validate PR blocking by creating PR with failing test, verifying red X status, confirming merge button disabled (if branch protection enabled), then fixing test and verifying green checkmark</idea>
+      <idea ac="AC-2.6.6">Test status badge by verifying badge appears in README.md, displays correct status (passing/failing), and clicking badge navigates to workflow runs page</idea>
+      <idea ac="AC-2.6.7">Measure CI execution time by reviewing GitHub Actions logs for total workflow duration, verifying &lt;10 minute target, and identifying any slow steps for optimization</idea>
+      <idea ac="AC-2.6.8">Validate CI documentation by following tests/README.md instructions to view results, download artifacts, troubleshoot common issues, and reproduce CI failures locally</idea>
+    </ideas>
+  </tests>
+</story-context>

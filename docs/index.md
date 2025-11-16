@@ -239,9 +239,10 @@ Located in [./plans/](./plans/):
    - **Modifying Components** → [Component Inventory](./component-inventory/index.md) + [State Management](./state-management/index.md)
    - **Adding Features** → [Source Tree Analysis](./source-tree-analysis/index.md) + [Data Models](./data-models/index.md)
    - **Database Changes** → [Data Models - Supabase](./data-models/database-schema-supabase.md)
-   - **State Changes** → [State Management - Slices](./state-management/feature-slices-deep-dive.md)
+   - **State Changes** → [State Management - Slices](./state-management/feature-slices-deep-dive.md) or [Zustand Architecture](./ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE/index.md)
    - **API Integration** → [Source Tree - API Layer](./source-tree-analysis/api-layer-architecture.md)
    - **Validation** → [Data Models - Zod](./data-models/validation-schemas-zod.md)
+   - **Zustand Slice Details** → [Zustand Architecture](./ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE/index.md) (21 sharded files)
 
 3. **Key Facts**:
    - 20 components, 7 slices, 59 actions
@@ -296,6 +297,7 @@ Files that have been sharded or superseded are stored in [./.archive/](./.archiv
 
 - [Project Overview](./project-overview/index.md) | [Source Tree](./source-tree-analysis/index.md) | [Components](./component-inventory/index.md)
 - [Data Models](./data-models/index.md) | [State Management](./state-management/index.md) | [API Services](./api-services-architecture/index.md)
+- [Zustand Architecture](./ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE/index.md) - Detailed slice specifications and patterns
 
 **Core Docs**:
 [Architecture](./architecture.md) | [PRD](./PRD.md) | [Technical Decisions](./technical-decisions.md)
