@@ -15,6 +15,8 @@ export type Database = {
       users: {
         Row: {
           id: string;
+          email: string | null;
+          display_name: string | null;
           partner_id: string | null;
           partner_name: string | null;
           device_id: string | null;
@@ -23,6 +25,8 @@ export type Database = {
         };
         Insert: {
           id: string;
+          email?: string | null;
+          display_name?: string | null;
           partner_id?: string | null;
           partner_name?: string | null;
           device_id?: string | null;
@@ -31,6 +35,8 @@ export type Database = {
         };
         Update: {
           id?: string;
+          email?: string | null;
+          display_name?: string | null;
           partner_id?: string | null;
           partner_name?: string | null;
           device_id?: string | null;

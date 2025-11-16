@@ -68,11 +68,10 @@ class PartnerService {
         return null;
       }
 
-      // Get partner's user info from auth.users via admin API
-      // Note: We need to query the users table and get auth data separately
+      // Get partner's user info from users table (RLS-protected)
       const { data: partnerRecord, error: partnerError } = await supabase
         .from('users')
-        .select('id')
+        .select('id, email, display_name')
         .eq('id', userRecord.partner_id)
         .single();
 
@@ -81,17 +80,10 @@ class PartnerService {
         return null;
       }
 
-      // Get partner's auth user data
-      const { data } = await supabase.auth.admin.getUserById(partnerRecord.id);
-
-      if (!data?.user) {
-        return null;
-      }
-
       return {
-        id: data.user.id,
-        email: data.user.email || '',
-        displayName: data.user.user_metadata?.display_name || 'Partner',
+        id: partnerRecord.id,
+        email: partnerRecord.email || '',
+        displayName: partnerRecord.display_name || partnerRecord.email || 'Partner',
         connectedAt: userRecord.updated_at,
       };
     } catch (error) {
@@ -102,6 +94,7 @@ class PartnerService {
 
   /**
    * Search for users by display name or email
+   * Uses RLS-protected users table instead of auth admin API
    *
    * @param query - Search query (matches display name or email)
    * @param limit - Maximum number of results (default: 10)
@@ -118,40 +111,31 @@ class PartnerService {
         throw new Error('Not authenticated');
       }
 
-      // Get all users from auth.users
-      const { data, error } = await supabase.auth.admin.listUsers();
-
-      if (error) {
-        console.error('[PartnerService] Error listing users:', error);
-        return [];
-      }
-
-      if (!data?.users) {
-        return [];
-      }
-
       const searchLower = query.toLowerCase().trim();
 
-      // Filter and map users
-      const results = data.users
-        .filter((user) => {
-          // Exclude current user
-          if (user.id === currentUser.user.id) {
-            return false;
-          }
+      // Query users table directly (RLS policy allows authenticated users to search)
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email, display_name')
+        .neq('id', currentUser.user.id) // Exclude current user
+        .or(`email.ilike.%${searchLower}%,display_name.ilike.%${searchLower}%`)
+        .limit(limit);
 
-          // Match email or display name
-          const email = user.email?.toLowerCase() || '';
-          const displayName = user.user_metadata?.display_name?.toLowerCase() || '';
+      if (error) {
+        console.error('[PartnerService] Error searching users:', error);
+        return [];
+      }
 
-          return email.includes(searchLower) || displayName.includes(searchLower);
-        })
-        .slice(0, limit)
-        .map((user) => ({
-          id: user.id,
-          email: user.email || '',
-          displayName: user.user_metadata?.display_name || user.email || 'Unknown',
-        }));
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Map to UserSearchResult
+      const results: UserSearchResult[] = data.map((user) => ({
+        id: user.id,
+        email: user.email || '',
+        displayName: user.display_name || user.email || 'Unknown',
+      }));
 
       return results;
     } catch (error) {
@@ -250,21 +234,23 @@ class PartnerService {
         return { sent: [], received: [] };
       }
 
-      // Get user info for all involved users
-      const userIds = new Set<string>();
-      data.forEach((request) => {
-        userIds.add(request.from_user_id);
-        userIds.add(request.to_user_id);
-      });
+      // Get user info for all involved users from users table (RLS-protected)
+      const userIds = Array.from(
+        new Set<string>(data.flatMap((req) => [req.from_user_id, req.to_user_id]))
+      );
 
-      // Fetch auth user data for all involved users
-      const { data: authData } = await supabase.auth.admin.listUsers();
+      // Fetch user data from users table (no admin API needed)
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, email, display_name')
+        .in('id', userIds);
+
       const userMap = new Map(
-        authData?.users?.map((user) => [
+        usersData?.map((user) => [
           user.id,
           {
             email: user.email,
-            displayName: user.user_metadata?.display_name || user.email || 'Unknown',
+            displayName: user.display_name || user.email || 'Unknown',
           },
         ]) || []
       );
