@@ -30,14 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Supabase CLI
-        run: npm install -g supabase
-
       - name: Generate TypeScript types from Supabase
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase gen types typescript \
+          npx supabase gen types typescript \
             --project-id vdltoyxpujbsaidctzjb \
             > src/types/database.types.ts
 
