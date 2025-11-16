@@ -210,9 +210,7 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       }));
 
       if (import.meta.env.DEV) {
-        console.log(
-          `[MoodSlice] Sync complete: ${result.synced} synced, ${result.failed} failed`
-        );
+        console.log(`[MoodSlice] Sync complete: ${result.synced} synced, ${result.failed} failed`);
       }
 
       return { synced: result.synced, failed: result.failed };
@@ -264,7 +262,9 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       }
 
       if (import.meta.env.DEV) {
-        console.log(`[MoodSlice] Fetching partner moods (partnerId: ${partnerId}, limit: ${limit})`);
+        console.log(
+          `[MoodSlice] Fetching partner moods (partnerId: ${partnerId}, limit: ${limit})`
+        );
       }
 
       // Fetch partner moods from Supabase

@@ -190,7 +190,9 @@ export function MoodHistoryCalendar() {
     if (!isLoading && calendarDays.length > 0) {
       const renderTime = performance.now() - renderStartTimeRef.current;
       if (import.meta.env.DEV && renderStartTimeRef.current > 0) {
-        console.log(`[MoodHistoryCalendar] Render time: ${renderTime.toFixed(2)}ms (target: <200ms)`);
+        console.log(
+          `[MoodHistoryCalendar] Render time: ${renderTime.toFixed(2)}ms (target: <200ms)`
+        );
       }
     }
   }, [isLoading]);
@@ -245,7 +247,21 @@ export function MoodHistoryCalendar() {
             key={day}
             className="text-center text-sm font-medium text-gray-500 py-2"
             role="columnheader"
-            aria-label={day === 'Sun' ? 'Sunday' : day === 'Mon' ? 'Monday' : day === 'Tue' ? 'Tuesday' : day === 'Wed' ? 'Wednesday' : day === 'Thu' ? 'Thursday' : day === 'Fri' ? 'Friday' : 'Saturday'}
+            aria-label={
+              day === 'Sun'
+                ? 'Sunday'
+                : day === 'Mon'
+                  ? 'Monday'
+                  : day === 'Tue'
+                    ? 'Tuesday'
+                    : day === 'Wed'
+                      ? 'Wednesday'
+                      : day === 'Thu'
+                        ? 'Thursday'
+                        : day === 'Fri'
+                          ? 'Friday'
+                          : 'Saturday'
+            }
           >
             {day}
           </div>
@@ -256,10 +272,7 @@ export function MoodHistoryCalendar() {
       {isLoading ? (
         <div className="grid grid-cols-7 gap-2" data-testid="calendar-loading">
           {Array.from({ length: 35 }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-square rounded-lg bg-gray-100 animate-pulse"
-            />
+            <div key={i} className="aspect-square rounded-lg bg-gray-100 animate-pulse" />
           ))}
         </div>
       ) : (

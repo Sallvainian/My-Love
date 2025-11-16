@@ -76,7 +76,10 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
  * @throws Error if no authenticated session exists
  */
 export const getCurrentUserId = async (): Promise<string> => {
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
   if (error) {
     console.error('[Supabase Auth] Failed to get user:', error);

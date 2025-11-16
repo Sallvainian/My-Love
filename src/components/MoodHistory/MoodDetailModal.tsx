@@ -161,10 +161,7 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
 
               {/* Mood icon and type - AC-4: Icon with color */}
               <div className="flex items-center gap-4 mb-6">
-                <div
-                  className={`p-4 rounded-full ${moodConfig.bgColor}`}
-                  aria-hidden="true"
-                >
+                <div className={`p-4 rounded-full ${moodConfig.bgColor}`} aria-hidden="true">
                   <Icon className={`w-8 h-8 ${moodConfig.color}`} />
                 </div>
                 <div>
@@ -195,7 +192,9 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
               {mood.note && (
                 <div className="border-t border-gray-200 pt-4">
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Note:</h3>
-                  <p className="text-gray-600 whitespace-pre-wrap" data-testid="modal-note">{mood.note}</p>
+                  <p className="text-gray-600 whitespace-pre-wrap" data-testid="modal-note">
+                    {mood.note}
+                  </p>
                 </div>
               )}
 

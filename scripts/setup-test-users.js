@@ -9,8 +9,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://vdltoyxpujbsaidctzjb.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHRveXhwdWpic2FpZGN0empiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxODg1ODUsImV4cCI6MjA3ODc2NDU4NX0.zPeI2Syr_eC4yZi_MLftclZYaNvx9Q88Xz2VVMKKu_w';
-const SUPABASE_SERVICE_KEY = 'REDACTED_SERVICE_KEY';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHRveXhwdWpic2FpZGN0empiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxODg1ODUsImV4cCI6MjA3ODc2NDU4NX0.zPeI2Syr_eC4yZi_MLftclZYaNvx9Q88Xz2VVMKKu_w';
+const SUPABASE_SERVICE_KEY =
+  'REDACTED_SERVICE_KEY';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -31,7 +33,7 @@ async function createTestUser(email, password) {
       console.log(`⚠️  User already exists: ${email}`);
       // Get user by email
       const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === email);
+      const existingUser = existingUsers?.users?.find((u) => u.email === email);
       if (existingUser) {
         console.log(`✅ Using existing user: ${email}`);
         return existingUser.id;
@@ -86,21 +88,12 @@ async function main() {
       // Use existing user and create one more
       userId = existingUsers[0].id;
       console.log('\n📝 Creating additional test user...');
-      partnerId = await createTestUser(
-        'testuser2@example.com',
-        'TestPassword123!'
-      );
+      partnerId = await createTestUser('testuser2@example.com', 'TestPassword123!');
     } else {
       // Create both users
       console.log('\n📝 Creating test users...');
-      userId = await createTestUser(
-        'testuser1@example.com',
-        'TestPassword123!'
-      );
-      partnerId = await createTestUser(
-        'testuser2@example.com',
-        'TestPassword123!'
-      );
+      userId = await createTestUser('testuser1@example.com', 'TestPassword123!');
+      partnerId = await createTestUser('testuser2@example.com', 'TestPassword123!');
     }
 
     console.log('\n✅ Test users ready!\n');

@@ -72,7 +72,8 @@
 }
 
 @keyframes shake {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(0);
   }
   25% {
@@ -123,11 +124,11 @@
   opacity: 0.6;
 }
 
-.form-input[aria-invalid="true"] {
+.form-input[aria-invalid='true'] {
   border-color: #ef4444;
 }
 
-.form-input[aria-invalid="true"]:focus {
+.form-input[aria-invalid='true']:focus {
   border-color: #dc2626;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }

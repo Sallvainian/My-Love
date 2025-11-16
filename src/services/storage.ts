@@ -86,7 +86,9 @@ class StorageService {
           // Moods store is handled by MoodService
           // StorageService is aware of v3 but doesn't create moods store
           if (oldVersion < 3 && oldVersion >= 2) {
-            console.log('[StorageService] Acknowledged v2→v3 upgrade (moods store handled by MoodService)');
+            console.log(
+              '[StorageService] Acknowledged v2→v3 upgrade (moods store handled by MoodService)'
+            );
           }
         },
       });

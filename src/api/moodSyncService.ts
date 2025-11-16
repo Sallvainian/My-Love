@@ -13,10 +13,7 @@
 import { supabase, getPartnerId } from './supabaseClient';
 import { moodApi } from './moodApi';
 import type { SupabaseMood, MoodInsert } from './validation/supabaseSchemas';
-import {
-  isOnline,
-  handleNetworkError,
-} from './errorHandlers';
+import { isOnline, handleNetworkError } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import type { MoodEntry } from '../types';
@@ -82,10 +79,7 @@ export class MoodSyncService {
   async syncMood(mood: MoodEntry): Promise<SupabaseMoodRecord> {
     // Check network status
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodSyncService.syncMood'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodSyncService.syncMood');
     }
 
     // Transform local mood to Supabase insert format
@@ -153,9 +147,7 @@ export class MoodSyncService {
       }
 
       if (import.meta.env.DEV) {
-        console.log(
-          `[MoodSyncService] Starting sync for ${unsyncedMoods.length} pending moods`
-        );
+        console.log(`[MoodSyncService] Starting sync for ${unsyncedMoods.length} pending moods`);
       }
 
       // Sync each mood with retry logic
@@ -351,10 +343,7 @@ export class MoodSyncService {
    * console.log('Partner last 10 moods:', moods);
    * ```
    */
-  async fetchMoods(
-    userId: string,
-    limit: number = 50
-  ): Promise<SupabaseMoodRecord[]> {
+  async fetchMoods(userId: string, limit: number = 50): Promise<SupabaseMoodRecord[]> {
     // Use validated moodApi.fetchByUser() for query with automatic validation
     return await moodApi.fetchByUser(userId, limit);
   }

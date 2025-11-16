@@ -206,9 +206,9 @@ describe('MoodApi', () => {
       const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
       (supabase.from as any).mockReturnValue({ select: mockSelect });
 
-      await expect(
-        moodApi.fetchByUser('550e8400-e29b-41d4-a716-446655440001')
-      ).rejects.toThrow(ApiValidationError);
+      await expect(moodApi.fetchByUser('550e8400-e29b-41d4-a716-446655440001')).rejects.toThrow(
+        ApiValidationError
+      );
     });
   });
 
@@ -316,9 +316,7 @@ describe('MoodApi', () => {
       const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
       (supabase.from as any).mockReturnValue({ delete: mockDelete });
 
-      await expect(
-        moodApi.delete('550e8400-e29b-41d4-a716-446655440000')
-      ).resolves.not.toThrow();
+      await expect(moodApi.delete('550e8400-e29b-41d4-a716-446655440000')).resolves.not.toThrow();
     });
 
     it('should handle delete errors', async () => {
@@ -329,9 +327,7 @@ describe('MoodApi', () => {
       const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
       (supabase.from as any).mockReturnValue({ delete: mockDelete });
 
-      await expect(
-        moodApi.delete('550e8400-e29b-41d4-a716-446655440000')
-      ).rejects.toThrow();
+      await expect(moodApi.delete('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow();
     });
   });
 
@@ -347,18 +343,12 @@ describe('MoodApi', () => {
       };
 
       await expect(moodApi.create(mockMoodInsert)).rejects.toThrow();
-      await expect(
-        moodApi.fetchByUser('550e8400-e29b-41d4-a716-446655440001')
-      ).rejects.toThrow();
-      await expect(
-        moodApi.fetchById('550e8400-e29b-41d4-a716-446655440000')
-      ).rejects.toThrow();
+      await expect(moodApi.fetchByUser('550e8400-e29b-41d4-a716-446655440001')).rejects.toThrow();
+      await expect(moodApi.fetchById('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow();
       await expect(
         moodApi.update('550e8400-e29b-41d4-a716-446655440000', { note: 'test' })
       ).rejects.toThrow();
-      await expect(
-        moodApi.delete('550e8400-e29b-41d4-a716-446655440000')
-      ).rejects.toThrow();
+      await expect(moodApi.delete('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow();
     });
   });
 });

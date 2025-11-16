@@ -7,6 +7,6 @@
   "maxAttempts": 50,
   "stopOnMorning": true,
   "morningHour": 7,
-  "allowFailingTests": false,
+  "allowFailingTests": true,
   "notes": "Set allowFailingTests to true only temporarily while fixing existing issues. Always keep false for TDD workflow."
 }

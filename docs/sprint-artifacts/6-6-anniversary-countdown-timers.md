@@ -413,10 +413,7 @@ addAnniversary: (anniversary: Omit<Anniversary, 'id'>) => {
       ...state.settings,
       relationship: {
         ...state.settings.relationship,
-        anniversaries: [
-          ...state.settings.relationship.anniversaries,
-          { ...validated, id },
-        ],
+        anniversaries: [...state.settings.relationship.anniversaries, { ...validated, id }],
       },
     },
   }));
@@ -428,9 +425,7 @@ removeAnniversary: (id: number) => {
       ...state.settings,
       relationship: {
         ...state.settings.relationship,
-        anniversaries: state.settings.relationship.anniversaries.filter(
-          (a) => a.id !== id
-        ),
+        anniversaries: state.settings.relationship.anniversaries.filter((a) => a.id !== id),
       },
     },
   }));
@@ -573,6 +568,7 @@ None - Implementation completed without blockers
 Story 6.6 (Anniversary Countdown Timers) is **production-ready** with high code quality and comprehensive test coverage. All 8 acceptance criteria are met, critical performance requirements are satisfied, and edge cases are properly handled. The implementation demonstrates strong adherence to existing patterns, proper memory management, and excellent test coverage (31 unit tests, 8 E2E scenarios).
 
 **Key Strengths**:
+
 - ✅ Correct 1-minute interval implementation (60000ms)
 - ✅ Proper interval cleanup prevents memory leaks
 - ✅ Edge cases thoroughly tested (leap years, month boundaries)
@@ -588,6 +584,7 @@ Story 6.6 (Anniversary Countdown Timers) is **production-ready** with high code 
 ### Performance Analysis ⚡
 
 #### ✅ CRITICAL: Interval Management
+
 **Status**: EXCELLENT
 
 ```typescript
@@ -601,6 +598,7 @@ return () => {
 ```
 
 **Analysis**:
+
 - ✅ Uses 60000ms intervals as required (NOT 1000ms)
 - ✅ Cleanup function clears interval on component unmount
 - ✅ No memory leak risk - interval properly managed
@@ -657,6 +655,7 @@ if (nextDate.getMonth() !== month - 1) {
 ```
 
 **Test Coverage**: Line 92-99 in `countdownService.test.ts`
+
 - ✅ Feb 29 → Feb 28 in non-leap year
 - ✅ Apr 31 → Apr 30 (invalid date handling)
 - ✅ All edge cases pass unit tests
@@ -664,6 +663,7 @@ if (nextDate.getMonth() !== month - 1) {
 #### ✅ EXCELLENT: Month Boundary Handling
 
 **Test**: Lines 61-67 in `countdownService.test.ts`
+
 ```typescript
 it('handles month boundaries correctly', () => {
   vi.setSystemTime(new Date('2024-01-31T12:00:00'));
@@ -707,7 +707,7 @@ const IsoDateStringSchema = z
     // Layer 2: Value checking
     const [_year, month, day] = date.split('-').map(Number);
     if (month < 1 || month > 12) return false; // ✅ Month range check
-    if (day < 1 || day > 31) return false;     // ✅ Day range check
+    if (day < 1 || day > 31) return false; // ✅ Day range check
 
     const dateObj = new Date(date);
     return dateObj.toISOString().startsWith(date); // ✅ Actual date validity
@@ -715,6 +715,7 @@ const IsoDateStringSchema = z
 ```
 
 **Form Validation**: `AnniversarySettings.tsx:269-298`
+
 - ✅ Label min 1 char (line 273)
 - ✅ Date format YYYY-MM-DD (line 279)
 - ✅ Month 1-12 validation (line 284)
@@ -762,6 +763,7 @@ function CelebrationAnimation() {
 ```
 
 **Performance Metrics**:
+
 - ✅ Only 10 sparkles rendered (not excessive)
 - ✅ 2-second animation duration (not CPU-intensive)
 - ✅ Staggered delays (0.1s steps) prevent jank
@@ -800,6 +802,7 @@ addAnniversary: (anniversary) => {
 ```
 
 **Analysis**:
+
 - ✅ ID generation using `Math.max() + 1` (safe for single-user app)
 - ✅ Immutable updates (spread operators)
 - ✅ Zustand persist middleware auto-persists to LocalStorage
@@ -814,9 +817,10 @@ addAnniversary: (anniversary) => {
 #### ✅ EXCELLENT: Responsive Design
 
 **Mobile-First Breakpoints**:
+
 ```typescript
-className="p-4 sm:p-6" // Padding adapts
-className="text-2xl sm:text-3xl" // Text scales
+className = 'p-4 sm:p-6'; // Padding adapts
+className = 'text-2xl sm:text-3xl'; // Text scales
 ```
 
 **E2E Test Coverage**: Line 242-290 verifies mobile viewport (375x667)
@@ -853,6 +857,7 @@ className="text-2xl sm:text-3xl" // Text scales
 #### ✅ EXCELLENT: Unit Tests (31 tests, 100% pass)
 
 **Coverage Breakdown**:
+
 - `calculateTimeRemaining`: 5 tests (future, past, same-day, leap year, month boundary)
 - `getNextAnniversaryDate`: 4 tests (current year, next year, leap year, invalid dates)
 - `getNextAnniversary`: 4 tests (nearest, empty, all past, single)
@@ -863,6 +868,7 @@ className="text-2xl sm:text-3xl" // Text scales
 - Edge cases: 3 tests (timezone, year boundaries, far future)
 
 **Critical Tests Verified**:
+
 - ✅ Leap year: Feb 29 → Feb 28 in non-leap year
 - ✅ Month boundary: Apr 31 → Apr 30
 - ✅ Celebration tolerance: 1-minute window
@@ -871,6 +877,7 @@ className="text-2xl sm:text-3xl" // Text scales
 #### ✅ GOOD: E2E Tests (8 scenarios)
 
 **Scenarios**:
+
 1. Add anniversary → verify countdown display
 2. Countdown shows days/hours/minutes
 3. Multiple anniversaries → show next 3
@@ -886,16 +893,16 @@ className="text-2xl sm:text-3xl" // Text scales
 
 ### Acceptance Criteria Compliance ✅
 
-| AC # | Requirement | Status | Evidence |
-|------|-------------|--------|----------|
-| AC1 | Settings Interface | ✅ PASS | `AnniversarySettings.tsx` implements full CRUD with validation |
-| AC2 | Countdown Display | ✅ PASS | Shows days/hours/minutes, updates real-time, displays next 3 |
-| AC3 | Calculation Logic | ✅ PASS | 1-minute intervals, edge case handling (leap years, month boundaries) |
-| AC4 | Celebration Animation | ✅ PASS | Framer Motion sparkles at zero, 3-second duration, resets correctly |
-| AC5 | Data Persistence | ✅ PASS | Zustand persist middleware, AnniversarySchema validation |
-| AC6 | UI Integration | ✅ PASS | CountdownTimer in Home view (line 367), responsive design |
-| AC7 | Performance | ✅ PASS | 60000ms intervals, cleanup on unmount, celebration when viewing |
-| AC8 | Error Handling | ✅ PASS | Form validation, date validation, graceful fallbacks |
+| AC # | Requirement           | Status  | Evidence                                                              |
+| ---- | --------------------- | ------- | --------------------------------------------------------------------- |
+| AC1  | Settings Interface    | ✅ PASS | `AnniversarySettings.tsx` implements full CRUD with validation        |
+| AC2  | Countdown Display     | ✅ PASS | Shows days/hours/minutes, updates real-time, displays next 3          |
+| AC3  | Calculation Logic     | ✅ PASS | 1-minute intervals, edge case handling (leap years, month boundaries) |
+| AC4  | Celebration Animation | ✅ PASS | Framer Motion sparkles at zero, 3-second duration, resets correctly   |
+| AC5  | Data Persistence      | ✅ PASS | Zustand persist middleware, AnniversarySchema validation              |
+| AC6  | UI Integration        | ✅ PASS | CountdownTimer in Home view (line 367), responsive design             |
+| AC7  | Performance           | ✅ PASS | 60000ms intervals, cleanup on unmount, celebration when viewing       |
+| AC8  | Error Handling        | ✅ PASS | Form validation, date validation, graceful fallbacks                  |
 
 **Overall Compliance**: 8/8 (100%)
 
@@ -946,6 +953,7 @@ className="text-2xl sm:text-3xl" // Text scales
 **Battery Impact**: 98% reduction vs 1-second intervals (excellent)
 
 **Lighthouse Scores** (with countdown active):
+
 - Performance: 95+ (no degradation)
 - Accessibility: 100 (no issues)
 - Best Practices: 100 (no issues)
@@ -955,14 +963,17 @@ className="text-2xl sm:text-3xl" // Text scales
 ### Recommendations
 
 #### Immediate (Before Merge)
+
 None - code is production-ready
 
 #### Short-Term (Next Sprint)
+
 1. **Add `useCallback` for `updateCountdowns`** to fix dependency warning
 2. **Add `data-testid` attributes** for E2E test stability
 3. **Settings Page Integration**: Complete Settings UI to enable form validation E2E test
 
 #### Long-Term (Future Enhancements)
+
 1. **Celebration Animation Variety**: Support multiple animation styles (confetti, fireworks, hearts)
 2. **Recurring Anniversary Logic**: Implement automatic reset to next year for recurring anniversaries
 3. **Countdown Notifications**: Integrate with notification system for anniversary reminders
@@ -974,6 +985,7 @@ None - code is production-ready
 **Status**: ✅ **APPROVED FOR PRODUCTION**
 
 **Rationale**:
+
 - All acceptance criteria met (8/8)
 - Critical performance requirements satisfied (60000ms intervals, cleanup)
 - Edge cases thoroughly tested (leap years, month boundaries, timezones)

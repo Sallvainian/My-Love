@@ -292,9 +292,7 @@ export const getAuthStatus = async (): Promise<AuthStatus> => {
  * unsubscribe();
  * ```
  */
-export const onAuthStateChange = (
-  callback: (session: Session | null) => void
-): (() => void) => {
+export const onAuthStateChange = (callback: (session: Session | null) => void): (() => void) => {
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((_event, session) => {

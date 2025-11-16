@@ -64,7 +64,9 @@ test.describe('Mood History Calendar', () => {
     expect(cellCount).toBeLessThanOrEqual(42);
 
     // Verify day numbers are sequential (1-31)
-    const firstDayWithNumber = cleanApp.locator('[data-testid^="calendar-day-"]:has-text("1")').first();
+    const firstDayWithNumber = cleanApp
+      .locator('[data-testid^="calendar-day-"]:has-text("1")')
+      .first();
     await expect(firstDayWithNumber).toBeVisible();
 
     console.log(`✓ Calendar displays ${cellCount} day cells`);
@@ -191,7 +193,9 @@ test.describe('Mood History Calendar', () => {
     await expect(cleanApp.getByTestId('mood-calendar')).toBeVisible();
 
     // Click on today's cell (which has a mood)
-    const todayCell = cleanApp.locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`).first();
+    const todayCell = cleanApp
+      .locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`)
+      .first();
     await todayCell.click();
 
     // Verify modal opens
@@ -220,7 +224,9 @@ test.describe('Mood History Calendar', () => {
     await cleanApp.getByTestId('mood-tab-history').click();
 
     // Open modal
-    const todayCell = cleanApp.locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`).first();
+    const todayCell = cleanApp
+      .locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`)
+      .first();
     await todayCell.click();
     await expect(cleanApp.getByTestId('mood-detail-modal')).toBeVisible();
 
@@ -246,7 +252,9 @@ test.describe('Mood History Calendar', () => {
     await cleanApp.getByTestId('mood-tab-history').click();
 
     // Open modal
-    const todayCell = cleanApp.locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`).first();
+    const todayCell = cleanApp
+      .locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`)
+      .first();
     await todayCell.click();
     await expect(cleanApp.getByTestId('mood-detail-modal')).toBeVisible();
 
@@ -272,7 +280,9 @@ test.describe('Mood History Calendar', () => {
     await cleanApp.getByTestId('mood-tab-history').click();
 
     // Open modal
-    const todayCell = cleanApp.locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`).first();
+    const todayCell = cleanApp
+      .locator(`[data-testid*="calendar-day-"][data-has-mood="true"]`)
+      .first();
     await todayCell.click();
     await expect(cleanApp.getByTestId('mood-detail-modal')).toBeVisible();
 
@@ -407,7 +417,9 @@ test.describe('Mood History Calendar', () => {
     const dayNumber = today.getDate();
 
     // Find today's cell - it should have a distinct styling
-    const todayCell = cleanApp.locator(`[data-testid*="calendar-day-"]:has-text("${dayNumber}")`).first();
+    const todayCell = cleanApp
+      .locator(`[data-testid*="calendar-day-"]:has-text("${dayNumber}")`)
+      .first();
 
     // Verify today's cell has current date styling (ring or background)
     const cellClasses = await todayCell.getAttribute('class');

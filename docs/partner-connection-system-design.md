@@ -11,6 +11,7 @@
 Currently, there is **no way for users to set their partner relationship** in the app. The database schema has a `partner_name` TEXT field but no foreign key relationship, and the RLS policies use `USING (true)` which allows viewing all data from any user.
 
 **Consequences**:
+
 - Users can't connect with their partners after OAuth signup
 - The app shows moods from ALL users, not just the partner
 - No privacy enforcement at the database level
@@ -53,6 +54,7 @@ FOR SELECT USING (
 ```
 
 **Similar update for interactions:**
+
 ```sql
 -- Interactions already use auth.uid() IN (from_user_id, to_user_id)
 -- This is correct and doesn't need changes
@@ -69,6 +71,7 @@ FOR SELECT USING (
    - After display name set, show "Connect with Partner" screen
 
 2. **Partner Connection Screen**
+
    ```
    ┌─────────────────────────────────────┐
    │  💑 Connect with Your Partner       │
@@ -104,6 +107,7 @@ FOR SELECT USING (
    - App redirects to main home screen
 
 #### Alternative Flow: Invite Code
+
 - Each user gets a unique 9-character invite code (e.g., "ABC-123-XYZ")
 - Partner enters the code instead of email
 - Automatically connects without approval step
@@ -114,6 +118,7 @@ FOR SELECT USING (
 ### Phase 3: Settings & Management
 
 **Settings Screen Additions:**
+
 ```
 ┌─────────────────────────────────────┐
 │  ⚙️ Settings                         │
@@ -141,6 +146,7 @@ FOR SELECT USING (
 ```
 
 **If No Partner Connected:**
+
 ```
 │  💑 Partner                          │
 │     Status: Not Connected           │
@@ -228,9 +234,7 @@ class PartnerService {
     if (error || !userRecord?.partner_id) return null;
 
     // Get partner's auth data
-    const { data: partnerAuth } = await supabase.auth.admin.getUserById(
-      userRecord.partner_id
-    );
+    const { data: partnerAuth } = await supabase.auth.admin.getUserById(userRecord.partner_id);
 
     if (!partnerAuth?.user) return null;
 
@@ -251,7 +255,7 @@ class PartnerService {
 
     // Find partner by email
     const { data: partnerAuth } = await supabase.auth.admin.listUsers();
-    const partner = partnerAuth?.users?.find(u => u.email === partnerEmail);
+    const partner = partnerAuth?.users?.find((u) => u.email === partnerEmail);
 
     if (!partner) {
       throw new Error('No user found with that email address');
@@ -427,6 +431,7 @@ FOR UPDATE USING (auth.uid() = to_user_id);
 ## Migration Path
 
 ### From Current State:
+
 1. ✅ Remove `VITE_USER_ID` and `VITE_PARTNER_ID` from .env (completed)
 2. ✅ Update README to reflect OAuth authentication (completed)
 3. ⏳ Execute database migration 002 (add `partner_id` column)
@@ -437,6 +442,7 @@ FOR UPDATE USING (auth.uid() = to_user_id);
 8. ⏳ Update app initialization to check partner status
 
 ### Testing Strategy:
+
 - **Unit Tests**: Test `partnerService` methods
 - **Integration Tests**: Test database functions and RLS policies
 - **E2E Tests**: Test full partner connection flow with Playwright
@@ -447,18 +453,21 @@ FOR UPDATE USING (auth.uid() = to_user_id);
 ## User Flow Example
 
 **Alice's Journey:**
+
 1. Signs up with Google OAuth → Sets display name "Alice"
 2. Sees "Connect with Partner" screen
 3. Enters Bob's email: bob@example.com
 4. Sees "Request sent! Waiting for Bob to accept..."
 
 **Bob's Journey:**
+
 1. Already has account, signed in
 2. Receives notification: "Alice wants to connect!"
 3. Clicks "Accept" → Sees "Connected with Alice! 💕"
 4. Can now see Alice's moods and send pokes/kisses
 
 **Both Users:**
+
 - Home screen shows partner's latest mood
 - Mood history shows both users' moods
 - Settings → Partner shows connection status
@@ -479,6 +488,7 @@ FOR UPDATE USING (auth.uid() = to_user_id);
 ## Next Steps
 
 After review and approval:
+
 1. Create database migration file
 2. Execute migration via Supabase MCP
 3. Implement `partnerService.ts`

@@ -70,19 +70,12 @@ export class MoodApi {
   async create(moodData: MoodInsert): Promise<SupabaseMood> {
     // Check network status
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodApi.create'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.create');
     }
 
     try {
       // Insert mood into Supabase
-      const { data, error } = await supabase
-        .from('moods')
-        .insert(moodData)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('moods').insert(moodData).select().single();
 
       if (error) {
         throw error;
@@ -99,10 +92,7 @@ export class MoodApi {
       } catch (validationError) {
         if (validationError instanceof ZodError) {
           console.error('[MoodApi] Validation error on create:', validationError.errors);
-          throw new ApiValidationError(
-            'Invalid mood data received from server',
-            validationError
-          );
+          throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
       }
@@ -139,10 +129,7 @@ export class MoodApi {
    */
   async fetchByUser(userId: string, limit: number = 50): Promise<SupabaseMood[]> {
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodApi.fetchByUser'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.fetchByUser');
     }
 
     try {
@@ -164,10 +151,7 @@ export class MoodApi {
       } catch (validationError) {
         if (validationError instanceof ZodError) {
           console.error('[MoodApi] Validation error on fetchByUser:', validationError.errors);
-          throw new ApiValidationError(
-            'Invalid mood data received from server',
-            validationError
-          );
+          throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
       }
@@ -212,10 +196,7 @@ export class MoodApi {
     endDate: string
   ): Promise<SupabaseMood[]> {
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodApi.fetchByDateRange'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.fetchByDateRange');
     }
 
     try {
@@ -238,10 +219,7 @@ export class MoodApi {
       } catch (validationError) {
         if (validationError instanceof ZodError) {
           console.error('[MoodApi] Validation error on fetchByDateRange:', validationError.errors);
-          throw new ApiValidationError(
-            'Invalid mood data received from server',
-            validationError
-          );
+          throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
       }
@@ -279,18 +257,11 @@ export class MoodApi {
    */
   async fetchById(moodId: string): Promise<SupabaseMood | null> {
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodApi.fetchById'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.fetchById');
     }
 
     try {
-      const { data, error } = await supabase
-        .from('moods')
-        .select('*')
-        .eq('id', moodId)
-        .single();
+      const { data, error } = await supabase.from('moods').select('*').eq('id', moodId).single();
 
       if (error) {
         // PGRST116 = no rows found (expected for null returns)
@@ -311,10 +282,7 @@ export class MoodApi {
       } catch (validationError) {
         if (validationError instanceof ZodError) {
           console.error('[MoodApi] Validation error on fetchById:', validationError.errors);
-          throw new ApiValidationError(
-            'Invalid mood data received from server',
-            validationError
-          );
+          throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
       }
@@ -352,14 +320,11 @@ export class MoodApi {
    */
   async update(moodId: string, updates: Partial<MoodInsert>): Promise<SupabaseMood> {
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodApi.update'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.update');
     }
 
     try {
-      const { data, error} = await supabase
+      const { data, error } = await supabase
         .from('moods')
         .update({
           ...updates,
@@ -384,10 +349,7 @@ export class MoodApi {
       } catch (validationError) {
         if (validationError instanceof ZodError) {
           console.error('[MoodApi] Validation error on update:', validationError.errors);
-          throw new ApiValidationError(
-            'Invalid mood data received from server',
-            validationError
-          );
+          throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
       }
@@ -421,17 +383,11 @@ export class MoodApi {
    */
   async delete(moodId: string): Promise<void> {
     if (!isOnline()) {
-      throw handleNetworkError(
-        new Error('Device is offline'),
-        'MoodApi.delete'
-      );
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.delete');
     }
 
     try {
-      const { error } = await supabase
-        .from('moods')
-        .delete()
-        .eq('id', moodId);
+      const { error } = await supabase.from('moods').delete().eq('id', moodId);
 
       if (error) {
         throw error;

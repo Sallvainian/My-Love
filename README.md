@@ -218,6 +218,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-from-dashboard
 **Status**: ✅ **Schema execution complete** (as of 2025-11-15)
 
 The database schema has been created with:
+
 - ✅ 3 tables: `users`, `moods`, `interactions`
 - ✅ Row Level Security (RLS) enabled on all tables
 - ✅ 10 RLS policies enforcing access control
@@ -225,6 +226,7 @@ The database schema has been created with:
 - ✅ Realtime enabled for `moods` and `interactions` tables
 
 You can verify this in your Supabase dashboard:
+
 - **Database** → **Tables**: Should show `users`, `moods`, `interactions`
 - **Authentication** → **Policies**: Should show RLS policies for all tables
 - **Database** → **Replication**: `moods` and `interactions` should be in `supabase_realtime` publication
@@ -236,6 +238,7 @@ You can verify this in your Supabase dashboard:
 The app uses email/password authentication. Create accounts for you and your partner:
 
 **Option 1: Using Supabase Dashboard** (Recommended)
+
 1. Go to **Authentication** → **Users** in Supabase dashboard
 2. Click **Add User** → **Create New User**
 3. Create two users:
@@ -245,6 +248,7 @@ The app uses email/password authentication. Create accounts for you and your par
 5. Share the login credentials with your partner
 
 **Option 2: Using the App** (If sign-up is enabled in Supabase)
+
 1. Start the app and click "Sign Up" on login screen
 2. Enter your email and password
 3. Have your partner do the same
@@ -272,6 +276,7 @@ npm run dev
 ```
 
 You should see:
+
 - ✅ `[Supabase] Client initialized`
 - ✅ No errors about missing environment variables
 

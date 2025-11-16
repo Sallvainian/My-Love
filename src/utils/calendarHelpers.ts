@@ -126,7 +126,10 @@ export function formatDateKey(date: Date): string {
  * getMonthBoundaries(2025, 10)
  * // { startOfMonth: Date(2025-11-01 00:00:00), endOfMonth: Date(2025-11-30 23:59:59) }
  */
-export function getMonthBoundaries(year: number, month: number): {
+export function getMonthBoundaries(
+  year: number,
+  month: number
+): {
   startOfMonth: Date;
   endOfMonth: Date;
 } {
@@ -227,10 +230,7 @@ export function navigateToPreviousMonth(
  * navigateToNextMonth(2025, 11) // { year: 2026, month: 0 } (Dec → Jan next year)
  * navigateToNextMonth(2025, 5) // { year: 2025, month: 6 } (Jun → Jul)
  */
-export function navigateToNextMonth(
-  year: number,
-  month: number
-): { year: number; month: number } {
+export function navigateToNextMonth(year: number, month: number): { year: number; month: number } {
   if (month === 11) {
     return { year: year + 1, month: 0 }; // December → January of next year
   }

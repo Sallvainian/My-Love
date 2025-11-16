@@ -39,10 +39,7 @@ export interface PartnerSlice {
   hasPartner: () => boolean;
 }
 
-export const createPartnerSlice: StateCreator<PartnerSlice, [], [], PartnerSlice> = (
-  set,
-  get
-) => ({
+export const createPartnerSlice: StateCreator<PartnerSlice, [], [], PartnerSlice> = (set, get) => ({
   // Initial state
   partner: null,
   isLoadingPartner: false,

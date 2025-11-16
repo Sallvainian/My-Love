@@ -151,20 +151,14 @@ function CountdownCard({ countdown, isCelebrating, isPrimary }: CountdownCardPro
       transition={{ duration: 0.2 }}
     >
       {/* Celebration Animation */}
-      <AnimatePresence>
-        {isCelebrating && <CelebrationAnimation />}
-      </AnimatePresence>
+      <AnimatePresence>{isCelebrating && <CelebrationAnimation />}</AnimatePresence>
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <div
           className={`
           p-2 rounded-lg
-          ${
-            shouldCelebrate
-              ? 'bg-pink-100 dark:bg-pink-900'
-              : 'bg-purple-100 dark:bg-purple-900'
-          }
+          ${shouldCelebrate ? 'bg-pink-100 dark:bg-pink-900' : 'bg-purple-100 dark:bg-purple-900'}
         `}
         >
           {shouldCelebrate ? (
@@ -179,9 +173,7 @@ function CountdownCard({ countdown, isCelebrating, isPrimary }: CountdownCardPro
             {anniversary.label}
           </h3>
           {anniversary.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {anniversary.description}
-            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{anniversary.description}</p>
           )}
         </div>
       </div>

@@ -69,8 +69,7 @@ export const handleSupabaseError = (
     PGRST301: 'Invalid request parameters',
   };
 
-  const userMessage =
-    errorMessages[error.code] || `Database error: ${error.message}`;
+  const userMessage = errorMessages[error.code] || `Database error: ${error.message}`;
 
   return new SupabaseServiceError(
     `${contextPrefix}${userMessage}`,
@@ -88,13 +87,9 @@ export const handleSupabaseError = (
  * @param context - Optional context string for debugging
  * @returns SupabaseServiceError with network error flag
  */
-export const handleNetworkError = (
-  error: unknown,
-  context?: string
-): SupabaseServiceError => {
+export const handleNetworkError = (error: unknown, context?: string): SupabaseServiceError => {
   const contextPrefix = context ? `[${context}] ` : '';
-  const message =
-    error instanceof Error ? error.message : 'Unknown network error';
+  const message = error instanceof Error ? error.message : 'Unknown network error';
 
   return new SupabaseServiceError(
     `${contextPrefix}Network error: ${message}. Your changes will be synced when you're back online.`,
@@ -127,9 +122,7 @@ export const isPostgrestError = (error: unknown): error is PostgrestError => {
  * @param error - Error object to check
  * @returns true if error is SupabaseServiceError
  */
-export const isSupabaseServiceError = (
-  error: unknown
-): error is SupabaseServiceError => {
+export const isSupabaseServiceError = (error: unknown): error is SupabaseServiceError => {
   return error instanceof SupabaseServiceError;
 };
 
@@ -200,8 +193,7 @@ export const retryWithBackoff = async <T>(
     try {
       return await operation();
     } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error('Unknown error');
+      lastError = error instanceof Error ? error : new Error('Unknown error');
 
       // Don't retry on last attempt
       if (attempt === config.maxAttempts) {
@@ -209,9 +201,7 @@ export const retryWithBackoff = async <T>(
       }
 
       // Log retry attempt
-      console.warn(
-        `[Supabase] Retry attempt ${attempt}/${config.maxAttempts} after ${delay}ms`
-      );
+      console.warn(`[Supabase] Retry attempt ${attempt}/${config.maxAttempts} after ${delay}ms`);
 
       // Wait before retry
       await new Promise((resolve) => setTimeout(resolve, delay));

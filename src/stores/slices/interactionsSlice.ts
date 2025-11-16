@@ -56,12 +56,10 @@ function toLocalInteraction(record: SupabaseInteractionRecord): Interaction {
   };
 }
 
-export const createInteractionsSlice: StateCreator<
-  InteractionsSlice,
-  [],
-  [],
-  InteractionsSlice
-> = (set, get) => ({
+export const createInteractionsSlice: StateCreator<InteractionsSlice, [], [], InteractionsSlice> = (
+  set,
+  get
+) => ({
   // Initial state
   interactions: [],
   unviewedCount: 0,
@@ -165,9 +163,9 @@ export const createInteractionsSlice: StateCreator<
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    return get().interactions.filter(
-      (interaction) => interaction.createdAt >= cutoffDate
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return get()
+      .interactions.filter((interaction) => interaction.createdAt >= cutoffDate)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   },
 
   loadInteractionHistory: async (limit = 100) => {

@@ -48,7 +48,7 @@ async function createAuthenticatedClient(): Promise<{ client: SupabaseClient; us
   await client.from('users').insert({
     id: userId,
     partner_name: `Test User ${userId.substring(0, 8)}`,
-    device_id: crypto.randomUUID()
+    device_id: crypto.randomUUID(),
   });
 
   return { client, userId };
@@ -62,7 +62,10 @@ async function cleanupTestData(client: SupabaseClient, userId: string) {
   await client.from('moods').delete().eq('user_id', userId);
 
   // Delete interactions
-  await client.from('interactions').delete().or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`);
+  await client
+    .from('interactions')
+    .delete()
+    .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`);
 
   // Delete user record
   await client.from('users').delete().eq('id', userId);
@@ -91,7 +94,9 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
     userBClient = userB.client;
     userBId = userB.userId;
 
-    console.log(`Test users created: User A (${userAId.substring(0, 8)}), User B (${userBId.substring(0, 8)})`);
+    console.log(
+      `Test users created: User A (${userAId.substring(0, 8)}), User B (${userBId.substring(0, 8)})`
+    );
   });
 
   // Cleanup: Delete test data and sign out after all tests
@@ -108,7 +113,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
         .insert({
           user_id: userAId,
           mood_type: 'loved',
-          note: 'Test mood from User A'
+          note: 'Test mood from User A',
         })
         .select()
         .single();
@@ -126,7 +131,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
         .insert({
           user_id: userAId, // Attempting to insert for User A
           mood_type: 'happy',
-          note: 'Attempting to insert for User A'
+          note: 'Attempting to insert for User A',
         })
         .select();
 
@@ -136,14 +141,14 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(data).toBeNull();
     });
 
-    test('AC-10.3: User B can SELECT User A\'s moods (should succeed per simplified policy)', async () => {
+    test("AC-10.3: User B can SELECT User A's moods (should succeed per simplified policy)", async () => {
       // First, User A creates a mood
       const { data: moodA } = await userAClient
         .from('moods')
         .insert({
           user_id: userAId,
           mood_type: 'content',
-          note: 'Visible to partner'
+          note: 'Visible to partner',
         })
         .select()
         .single();
@@ -162,19 +167,19 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(moodsFromB?.length).toBeGreaterThan(0);
 
       // Verify User B can see User A's mood
-      const visibleMood = moodsFromB?.find(m => m.id === moodA?.id);
+      const visibleMood = moodsFromB?.find((m) => m.id === moodA?.id);
       expect(visibleMood).toBeDefined();
       expect(visibleMood?.mood_type).toBe('content');
     });
 
-    test('AC-10.4: User B cannot UPDATE User A\'s mood (should fail with RLS error)', async () => {
+    test("AC-10.4: User B cannot UPDATE User A's mood (should fail with RLS error)", async () => {
       // User A creates a mood
       const { data: moodA } = await userAClient
         .from('moods')
         .insert({
           user_id: userAId,
           mood_type: 'thoughtful',
-          note: 'Original note'
+          note: 'Original note',
         })
         .select()
         .single();
@@ -203,14 +208,14 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(unchanged?.note).toBe('Original note');
     });
 
-    test('AC-10.5: User B cannot DELETE User A\'s mood (should fail with RLS error)', async () => {
+    test("AC-10.5: User B cannot DELETE User A's mood (should fail with RLS error)", async () => {
       // User A creates a mood
       const { data: moodA } = await userAClient
         .from('moods')
         .insert({
           user_id: userAId,
           mood_type: 'grateful',
-          note: 'Should not be deletable by User B'
+          note: 'Should not be deletable by User B',
         })
         .select()
         .single();
@@ -218,11 +223,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(moodA).toBeDefined();
 
       // User B attempts to delete User A's mood
-      const { data, error } = await userBClient
-        .from('moods')
-        .delete()
-        .eq('id', moodA?.id)
-        .select();
+      const { data, error } = await userBClient.from('moods').delete().eq('id', moodA?.id).select();
 
       // Expect RLS policy to block this operation
       expect(error).not.toBeNull();
@@ -247,7 +248,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
         .insert({
           user_id: userAId,
           mood_type: 'happy',
-          note: 'Original note'
+          note: 'Original note',
         })
         .select()
         .single();
@@ -274,7 +275,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
         .insert({
           user_id: userAId,
           mood_type: 'content',
-          note: 'To be deleted'
+          note: 'To be deleted',
         })
         .select()
         .single();
@@ -282,10 +283,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(moodA).toBeDefined();
 
       // User A deletes own mood
-      const { error } = await userAClient
-        .from('moods')
-        .delete()
-        .eq('id', moodA?.id);
+      const { error } = await userAClient.from('moods').delete().eq('id', moodA?.id);
 
       expect(error).toBeNull();
 
@@ -308,7 +306,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
           type: 'poke',
           from_user_id: userAId,
           to_user_id: userBId,
-          viewed: false
+          viewed: false,
         })
         .select()
         .single();
@@ -327,7 +325,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
           type: 'kiss',
           from_user_id: userAId, // Impersonating User A
           to_user_id: userBId,
-          viewed: false
+          viewed: false,
         })
         .select();
 
@@ -345,7 +343,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
           type: 'kiss',
           from_user_id: userAId,
           to_user_id: userBId,
-          viewed: false
+          viewed: false,
         })
         .select()
         .single();
@@ -363,7 +361,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(data?.length).toBeGreaterThan(0);
 
       // Verify User B can see the interaction
-      const received = data?.find(i => i.id === interaction?.id);
+      const received = data?.find((i) => i.id === interaction?.id);
       expect(received).toBeDefined();
       expect(received?.type).toBe('kiss');
     });
@@ -376,7 +374,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
           type: 'poke',
           from_user_id: userBId,
           to_user_id: userAId,
-          viewed: false
+          viewed: false,
         })
         .select()
         .single();
@@ -394,7 +392,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
       expect(data?.length).toBeGreaterThan(0);
 
       // Verify User B can see their sent interaction
-      const sent = data?.find(i => i.id === interaction?.id);
+      const sent = data?.find((i) => i.id === interaction?.id);
       expect(sent).toBeDefined();
       expect(sent?.type).toBe('poke');
     });
@@ -407,7 +405,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
           type: 'kiss',
           from_user_id: userAId,
           to_user_id: userBId,
-          viewed: false
+          viewed: false,
         })
         .select()
         .single();
@@ -436,7 +434,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
           type: 'poke',
           from_user_id: userAId,
           to_user_id: userBId,
-          viewed: false
+          viewed: false,
         })
         .select()
         .single();
@@ -459,21 +457,19 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
 
   test.describe('Users Table RLS Policies', () => {
     test('AC-10.14: User A can SELECT all users (should succeed)', async () => {
-      const { data, error } = await userAClient
-        .from('users')
-        .select('*');
+      const { data, error } = await userAClient.from('users').select('*');
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
       expect(data?.length).toBeGreaterThanOrEqual(2); // At least User A and User B
 
       // Verify both users are visible
-      const userIds = data?.map(u => u.id) || [];
+      const userIds = data?.map((u) => u.id) || [];
       expect(userIds).toContain(userAId);
       expect(userIds).toContain(userBId);
     });
 
-    test('AC-10.15: User B cannot UPDATE User A\'s profile (should fail)', async () => {
+    test("AC-10.15: User B cannot UPDATE User A's profile (should fail)", async () => {
       // User B attempts to update User A's partner_name
       const { data, error } = await userBClient
         .from('users')

@@ -150,11 +150,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
                         animate={{ opacity: 1, y: 0 }}
                         className={`
                           flex items-center gap-4 p-4 rounded-xl border-2 transition-all
-                          ${
-                            sent
-                              ? 'bg-pink-50 border-pink-200'
-                              : 'bg-purple-50 border-purple-200'
-                          }
+                          ${sent ? 'bg-pink-50 border-pink-200' : 'bg-purple-50 border-purple-200'}
                         `}
                         data-testid={`interaction-${interaction.id}`}
                       >

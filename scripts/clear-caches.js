@@ -88,13 +88,15 @@
   // Print results
   console.log('\n📋 CLEANUP REPORT:\n');
   console.log('Success:');
-  cleared.forEach(msg => console.log(msg));
+  cleared.forEach((msg) => console.log(msg));
 
   if (errors.length > 0) {
     console.log('\nErrors:');
-    errors.forEach(msg => console.error(msg));
+    errors.forEach((msg) => console.error(msg));
   }
 
   console.log('\n🎉 Cache cleanup complete!');
-  console.log('⚠️  IMPORTANT: Hard reload the page (Ctrl+Shift+R or Cmd+Shift+R) to ensure all changes take effect.');
+  console.log(
+    '⚠️  IMPORTANT: Hard reload the page (Ctrl+Shift+R or Cmd+Shift+R) to ensure all changes take effect.'
+  );
 })();

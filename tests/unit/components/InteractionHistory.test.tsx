@@ -147,7 +147,9 @@ describe('InteractionHistory', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No interactions yet')).toBeInTheDocument();
-        expect(screen.getByText('Send your first poke or kiss to get started!')).toBeInTheDocument();
+        expect(
+          screen.getByText('Send your first poke or kiss to get started!')
+        ).toBeInTheDocument();
       });
     });
 

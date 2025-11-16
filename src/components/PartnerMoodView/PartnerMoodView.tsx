@@ -1,6 +1,22 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Smile, Meh, MessageCircle, Sparkles, RefreshCw, Calendar, Bell, Wifi, WifiOff, Search, UserPlus, Check, X, Users } from 'lucide-react';
+import {
+  Heart,
+  Smile,
+  Meh,
+  MessageCircle,
+  Sparkles,
+  RefreshCw,
+  Calendar,
+  Bell,
+  Wifi,
+  WifiOff,
+  Search,
+  UserPlus,
+  Check,
+  X,
+  Users,
+} from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { PARTNER_NAME } from '../../config/constants';
@@ -283,9 +299,7 @@ export function PartnerMoodView() {
                   {PARTNER_NAME} just logged a mood: {notification.mood}
                 </p>
                 {notification.note && (
-                  <p className="text-sm text-pink-100 mt-1 line-clamp-2">
-                    {notification.note}
-                  </p>
+                  <p className="text-sm text-pink-100 mt-1 line-clamp-2">{notification.note}</p>
                 )}
               </div>
             </div>
@@ -315,7 +329,10 @@ export function PartnerMoodView() {
 
             {/* Search Box */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <label htmlFor="partner-search" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="partner-search"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Search by email or display name
               </label>
               <div className="relative">
@@ -406,7 +423,9 @@ export function PartnerMoodView() {
                     >
                       <div>
                         <p className="font-medium text-gray-900">
-                          {request.from_user_display_name || request.from_user_email || 'Unknown User'}
+                          {request.from_user_display_name ||
+                            request.from_user_email ||
+                            'Unknown User'}
                         </p>
                         <p className="text-sm text-gray-500">
                           Sent {new Date(request.created_at).toLocaleDateString()}
@@ -497,9 +516,7 @@ export function PartnerMoodView() {
                 }`}
                 data-testid="partner-mood-refresh-button"
               >
-                <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
-                />
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
@@ -541,14 +558,10 @@ export function PartnerMoodView() {
                 data-testid="partner-mood-empty-state"
               >
                 <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                  No moods yet
-                </h3>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">No moods yet</h3>
                 <p className="text-gray-500 mb-6">
                   {partner.displayName} hasn't logged any moods yet.
-                  {syncStatus.isOnline && (
-                    <> Try refreshing to check for updates.</>
-                  )}
+                  {syncStatus.isOnline && <> Try refreshing to check for updates.</>}
                 </p>
               </motion.div>
             )}
@@ -608,9 +621,7 @@ const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps
           <div className="flex items-center justify-between mb-2">
             <div>
               <span className="font-semibold text-gray-900">{config.label}</span>
-              <span className="text-sm text-gray-500 ml-2">
-                {formatDate(date)}
-              </span>
+              <span className="text-sm text-gray-500 ml-2">{formatDate(date)}</span>
             </div>
             <span className="text-xs text-gray-400">
               {new Date(timestamp).toLocaleTimeString('en-US', {
@@ -621,9 +632,7 @@ const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps
           </div>
 
           {/* Note (if exists) */}
-          {note && (
-            <p className="text-gray-700 text-sm leading-relaxed">{note}</p>
-          )}
+          {note && <p className="text-gray-700 text-sm leading-relaxed">{note}</p>}
         </div>
       </div>
     </motion.div>

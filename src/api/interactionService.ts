@@ -22,14 +22,12 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 /**
  * Supabase interaction record type (from database schema)
  */
-export type SupabaseInteractionRecord =
-  Database['public']['Tables']['interactions']['Row'];
+export type SupabaseInteractionRecord = Database['public']['Tables']['interactions']['Row'];
 
 /**
  * Interaction insert type (for creating new interactions)
  */
-export type InteractionInsert =
-  Database['public']['Tables']['interactions']['Insert'];
+export type InteractionInsert = Database['public']['Tables']['interactions']['Insert'];
 
 /**
  * Interaction type enum
@@ -198,10 +196,7 @@ export class InteractionService {
           filter: `to_user_id=eq.${currentUserId}`,
         },
         (payload) => {
-          console.log(
-            '[InteractionService] Received interaction:',
-            payload.new
-          );
+          console.log('[InteractionService] Received interaction:', payload.new);
           callback(payload.new as SupabaseInteractionRecord);
         }
       )
@@ -235,10 +230,7 @@ export class InteractionService {
    * console.log('Last 20 interactions:', interactions);
    * ```
    */
-  async getInteractionHistory(
-    limit: number = 50,
-    offset: number = 0
-  ): Promise<Interaction[]> {
+  async getInteractionHistory(limit: number = 50, offset: number = 0): Promise<Interaction[]> {
     try {
       const currentUserId = await getCurrentUserId();
 
@@ -269,16 +261,10 @@ export class InteractionService {
       logSupabaseError('InteractionService.getInteractionHistory', error);
 
       if (isPostgrestError(error)) {
-        throw handleSupabaseError(
-          error,
-          'InteractionService.getInteractionHistory'
-        );
+        throw handleSupabaseError(error, 'InteractionService.getInteractionHistory');
       }
 
-      throw handleNetworkError(
-        error,
-        'InteractionService.getInteractionHistory'
-      );
+      throw handleNetworkError(error, 'InteractionService.getInteractionHistory');
     }
   }
 
@@ -324,16 +310,10 @@ export class InteractionService {
       logSupabaseError('InteractionService.getUnviewedInteractions', error);
 
       if (isPostgrestError(error)) {
-        throw handleSupabaseError(
-          error,
-          'InteractionService.getUnviewedInteractions'
-        );
+        throw handleSupabaseError(error, 'InteractionService.getUnviewedInteractions');
       }
 
-      throw handleNetworkError(
-        error,
-        'InteractionService.getUnviewedInteractions'
-      );
+      throw handleNetworkError(error, 'InteractionService.getUnviewedInteractions');
     }
   }
 

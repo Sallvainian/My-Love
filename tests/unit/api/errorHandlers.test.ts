@@ -211,13 +211,7 @@ describe('logSupabaseError', () => {
   });
 
   it('should log SupabaseServiceError with network flag', () => {
-    const error = new SupabaseServiceError(
-      'Network error',
-      'NETWORK_ERROR',
-      '',
-      '',
-      true
-    );
+    const error = new SupabaseServiceError('Network error', 'NETWORK_ERROR', '', '', true);
 
     logSupabaseError('TestContext', error);
 
@@ -236,19 +230,13 @@ describe('logSupabaseError', () => {
 
     logSupabaseError('TestContext', error);
 
-    expect(console.error).toHaveBeenCalledWith(
-      '[Supabase] TestContext:',
-      'Generic error'
-    );
+    expect(console.error).toHaveBeenCalledWith('[Supabase] TestContext:', 'Generic error');
   });
 
   it('should log unknown error types', () => {
     logSupabaseError('TestContext', 'string error');
 
-    expect(console.error).toHaveBeenCalledWith(
-      '[Supabase] TestContext:',
-      'string error'
-    );
+    expect(console.error).toHaveBeenCalledWith('[Supabase] TestContext:', 'string error');
   });
 });
 
@@ -347,11 +335,7 @@ describe('createOfflineMessage', () => {
   });
 
   it('should handle different operation descriptions', () => {
-    const operations = [
-      'Sending poke',
-      'Fetching moods',
-      'Uploading photo',
-    ];
+    const operations = ['Sending poke', 'Fetching moods', 'Uploading photo'];
 
     operations.forEach((op) => {
       const message = createOfflineMessage(op);
@@ -379,12 +363,7 @@ describe('SupabaseServiceError class', () => {
   });
 
   it('should default isNetworkError to false', () => {
-    const error = new SupabaseServiceError(
-      'Test',
-      'CODE',
-      undefined,
-      undefined
-    );
+    const error = new SupabaseServiceError('Test', 'CODE', undefined, undefined);
 
     expect(error.isNetworkError).toBe(false);
   });

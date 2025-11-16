@@ -70,18 +70,16 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
 
       // Create users table row if it doesn't exist
       // This is idempotent - if row exists, it won't create duplicate
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert(
-          {
-            id: user.id,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'id',
-            ignoreDuplicates: false,
-          }
-        );
+      const { error: upsertError } = await supabase.from('users').upsert(
+        {
+          id: user.id,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'id',
+          ignoreDuplicates: false,
+        }
+      );
 
       if (upsertError) {
         console.error('[DisplayNameSetup] Error creating user row:', upsertError);
@@ -155,7 +153,11 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
             <p className="form-hint">3-30 characters</p>
           </div>
 
-          <button type="submit" className="submit-button" disabled={isLoading || !displayName.trim()}>
+          <button
+            type="submit"
+            className="submit-button"
+            disabled={isLoading || !displayName.trim()}
+          >
             {isLoading ? (
               <span className="loading-spinner">
                 <svg
