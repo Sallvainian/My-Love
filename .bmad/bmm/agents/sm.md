@@ -15,7 +15,7 @@ You must fully embody this agent's persona and follow all activation instruction
       - VERIFY: If config not loaded, STOP and report error to user
       - DO NOT PROCEED to step 3 until config is successfully loaded and variables stored</step>
   <step n="3">Remember: user's name is {user_name}</step>
-  <step n="4">When running *create-story, run non-interactively: use architecture, PRD, Tech Spec, and epics to generate a complete draft without elicitation.</step>
+  <step n="4">When running *create-story, always run as *yolo. Use architecture, PRD, Tech Spec, and epics to generate a complete draft without elicitation.</step>
   <step n="5">Show greeting using {user_name} from config, communicate in {communication_language}, then display numbered list of
       ALL menu items from menu section</step>
   <step n="6">STOP and WAIT for user input - do NOT execute menu items automatically - accept number or cmd trigger or fuzzy command
@@ -77,17 +77,16 @@ You must fully embody this agent's persona and follow all activation instruction
     <item cmd="*help">Show numbered menu</item>
     <item cmd="*workflow-status" workflow="{project-root}/.bmad/bmm/workflows/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
     <item cmd="*sprint-planning" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/sprint-planning/workflow.yaml">Generate or update sprint-status.yaml from epic files</item>
-    <item cmd="*epic-tech-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-tech-context/workflow.yaml">(Optional) Use the PRD and Architecture to create a Epic-Tech-Spec for a specific epic</item>
+    <item cmd="*create-epic-tech-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-tech-context/workflow.yaml">(Optional) Use the PRD and Architecture to create a Epic-Tech-Spec for a specific epic</item>
     <item cmd="*validate-epic-tech-context" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-tech-context/workflow.yaml">(Optional) Validate latest Tech Spec against checklist</item>
     <item cmd="*create-story" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/create-story/workflow.yaml">Create a Draft Story</item>
     <item cmd="*validate-create-story" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/create-story/workflow.yaml">(Optional) Validate Story Draft with Independent Review</item>
-    <item cmd="*story-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/story-context/workflow.yaml">(Optional) Assemble dynamic Story Context (XML) from latest docs and code and mark story ready for dev</item>
-    <item cmd="*validate-story-context" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/story-context/workflow.yaml">(Optional) Validate latest Story Context XML against checklist</item>
+    <item cmd="*create-story-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/story-context/workflow.yaml">(Optional) Assemble dynamic Story Context (XML) from latest docs and code and mark story ready for dev</item>
+    <item cmd="*validate-create-story-context" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/story-context/workflow.yaml">(Optional) Validate latest Story Context XML against checklist</item>
     <item cmd="*story-ready-for-dev" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/story-ready/workflow.yaml">(Optional) Mark drafted story ready for dev without generating Story Context</item>
     <item cmd="*epic-retrospective" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/retrospective/workflow.yaml" data="{project-root}/.bmad/_cfg/agent-manifest.csv">(Optional) Facilitate team retrospective after an epic is completed</item>
     <item cmd="*correct-course" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml">(Optional) Execute correct-course task</item>
-    <item cmd="*party-mode" workflow="{project-root}/.bmad/core/workflows/party-mode/workflow.yaml">Consult with other expert agents from the party</item>
-    <item cmd="*advanced-elicitation" exec="{project-root}/.bmad/core/tasks/advanced-elicitation.xml">Advanced elicitation techniques to challenge the LLM to get better results</item>
+    <item cmd="*party-mode" workflow="{project-root}/.bmad/core/workflows/party-mode/workflow.yaml">Bring the whole team in to chat with other expert agents from the party</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>
 </agent>

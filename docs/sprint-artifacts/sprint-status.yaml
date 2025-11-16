@@ -102,4 +102,4 @@ development_status:
 
   # Epic 7: NFR Testing & Technical Debt (from test retrospective)
   epic-7: contexted
-  7-1-offline-mode-testing-suite: review
+  7-1-offline-mode-testing-suite: done # Post-fix review: APPROVED - Firefox test fixed 2025-11-16
