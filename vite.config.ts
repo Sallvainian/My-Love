@@ -43,37 +43,21 @@ export default defineConfig(({ mode }) => ({
       // so service worker caching strategies do NOT intercept them.
       // No navigateFallbackDenylist or exclusions needed for IndexedDB.
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
+        // Only cache static assets, not app code
+        globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        // Don't cache navigation requests - always fetch fresh HTML
         navigateFallback: null,
-        // Don't pre-cache JS/CSS to prevent stale code issues
-        globIgnores: ['**/*.js', '**/*.css'],
+        // Don't cache any JS/CSS/HTML - always fetch fresh to prevent stale code
+        globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
         runtimeCaching: [
-          {
-            // App shell (JS/CSS) - Always fetch from network
-            urlPattern: /\.(js|css)$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'app-shell-v1', // Versioned cache name
-              networkTimeoutSeconds: 2,
-              expiration: {
-                maxEntries: 30,
-                maxAgeSeconds: 60, // 1 minute cache - aggressive invalidation
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
           {
             // Static assets (images, fonts) - Cache First
             urlPattern: /\.(png|jpg|jpeg|svg|woff2|ico)$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'static-assets',
+              cacheName: 'static-assets-v2',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
@@ -85,7 +69,7 @@ export default defineConfig(({ mode }) => ({
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: 'google-fonts-v2',
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
