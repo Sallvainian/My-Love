@@ -258,7 +258,7 @@ export class InteractionService {
       return (
         (data as unknown as SupabaseInteractionRecord[])?.map((record) => ({
           id: record.id,
-          type: record.type,
+          type: record.type as InteractionType,
           fromUserId: record.from_user_id,
           toUserId: record.to_user_id,
           viewed: record.viewed ?? false,
@@ -313,7 +313,7 @@ export class InteractionService {
       return (
         (data as unknown as SupabaseInteractionRecord[])?.map((record) => ({
           id: record.id,
-          type: record.type,
+          type: record.type as InteractionType,
           fromUserId: record.from_user_id,
           toUserId: record.to_user_id,
           viewed: record.viewed ?? false,

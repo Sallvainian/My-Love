@@ -1,0 +1,19 @@
+# Build outputs
+dist/
+dev-dist/
+build/
+
+# Generated files
+*.config.js
+*.config.ts
+vite.config.*
+playwright.config.*
+
+# Dependencies
+node_modules/
+
+# BMAD installer templates (not production code)
+.bmad/bmb/workflows/*/installer-templates/
+
+# Generated types
+src/types/database.types.ts
