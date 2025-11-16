@@ -4,44 +4,34 @@ import './index.css';
 import App from './App.tsx';
 
 // PWA auto-update: Register service worker with aggressive update strategy
-import { registerSW } from 'virtual:pwa-register';
-
-// Cleanup stale service workers from other ports/builds
-// This prevents conflicts between dev (5173) and production (4173) service workers
-if ('serviceWorker' in navigator) {
+// Only register in production to prevent stale code issues in development
+if (import.meta.env.PROD) {
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    const updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        // Auto-reload when new service worker is available
+        // This ensures users always get the latest code
+        console.log('[SW] New version available, reloading...');
+        updateSW(true); // true = reload after update
+      },
+      onOfflineReady() {
+        console.log('[SW] App ready to work offline');
+      },
+      onRegisterError(error) {
+        console.error('[SW] Registration error:', error);
+      },
+    });
+  });
+} else if ('serviceWorker' in navigator) {
+  // In development: Unregister ALL service workers to prevent stale code
   navigator.serviceWorker.getRegistrations().then((registrations) => {
-    const currentOrigin = window.location.origin;
     registrations.forEach((registration) => {
-      // Unregister service workers from different origins/ports
-      if (registration.scope && !registration.scope.startsWith(currentOrigin)) {
-        if (import.meta.env.DEV) {
-          console.log('[SW] Unregistering stale service worker:', registration.scope);
-        }
-        registration.unregister();
-      }
+      console.log('[Dev] Unregistering service worker:', registration.scope);
+      registration.unregister();
     });
   });
 }
-
-const updateSW = registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    // Auto-reload when new service worker is available
-    // This ensures users always get the latest code
-    if (import.meta.env.DEV) {
-      console.log('[SW] New version available, reloading...');
-    }
-    updateSW(true); // true = reload after update
-  },
-  onOfflineReady() {
-    if (import.meta.env.DEV) {
-      console.log('[SW] App ready to work offline');
-    }
-  },
-  onRegisterError(error) {
-    console.error('[SW] Registration error:', error);
-  },
-});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

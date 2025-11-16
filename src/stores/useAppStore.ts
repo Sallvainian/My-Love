@@ -6,6 +6,7 @@ import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice'
 import { createNavigationSlice, type NavigationSlice } from './slices/navigationSlice';
 import { createMoodSlice, type MoodSlice } from './slices/moodSlice';
 import { createInteractionsSlice, type InteractionsSlice } from './slices/interactionsSlice';
+import { createPartnerSlice, type PartnerSlice } from './slices/partnerSlice';
 
 // Composed AppState from all slices
 export interface AppState
@@ -14,7 +15,8 @@ export interface AppState
     SettingsSlice,
     NavigationSlice,
     MoodSlice,
-    InteractionsSlice {
+    InteractionsSlice,
+    PartnerSlice {
   // Shared/Core state
   isLoading: boolean;
   error: string | null;
@@ -43,13 +45,15 @@ function validateHydratedState(state: Partial<AppState> | undefined): {
 
   // Validate messageHistory structure (only if it exists - it's hydrated separately)
   if (state.messageHistory) {
-    // After deserialization, shownMessages should be a Map
-    // This validation runs AFTER deserialization, so it must be a Map by now
+    // BEFORE deserialization: shownMessages should be an array (serialized form)
+    // AFTER deserialization: shownMessages should be a Map (via onRehydrateStorage)
+    // This validation runs BEFORE deserialization, so it should be an array or undefined
     if (
-      state.messageHistory.shownMessages &&
+      state.messageHistory.shownMessages !== undefined &&
+      !Array.isArray(state.messageHistory.shownMessages) &&
       !(state.messageHistory.shownMessages instanceof Map)
     ) {
-      errors.push('shownMessages is not a Map instance after deserialization');
+      errors.push('shownMessages is not an array or Map instance');
     }
     if (
       state.messageHistory.currentIndex !== undefined &&
@@ -62,7 +66,7 @@ function validateHydratedState(state: Partial<AppState> | undefined): {
   // Only fail validation if we have CRITICAL errors
   // Missing fields are OK - they'll use defaults
   const hasCriticalErrors = errors.some(
-    (err) => err.includes('not a Map instance') || err.includes('not a number')
+    (err) => err.includes('not an array or Map instance') || err.includes('not a number')
   );
 
   return { isValid: !hasCriticalErrors, errors };
@@ -78,6 +82,7 @@ export const useAppStore = create<AppState>()(
       ...createNavigationSlice(set as any, get as any, api as any),
       ...createMoodSlice(set as any, get as any, api as any),
       ...createInteractionsSlice(set as any, get as any, api as any),
+      ...createPartnerSlice(set as any, get as any, api as any),
 
       // Shared/Core state (minimal - initialization, loading, error)
       isLoading: false,
