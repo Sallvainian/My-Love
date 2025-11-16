@@ -133,7 +133,18 @@ export type PhotoUploadInputType = z.infer<typeof PhotoUploadInputSchema>;
  * Mood type enum validation
  * Ensures only valid mood types are accepted
  */
-const MoodTypeSchema = z.enum(['loved', 'happy', 'content', 'thoughtful', 'grateful']);
+const MoodTypeSchema = z.enum([
+  'loved',
+  'happy',
+  'content',
+  'thoughtful',
+  'grateful',
+  'sad',
+  'anxious',
+  'frustrated',
+  'lonely',
+  'tired',
+]);
 
 /**
  * ISO date format validation (YYYY-MM-DD)
@@ -156,10 +167,12 @@ const IsoDateStringSchema = z
 /**
  * Mood entry schema
  * Validates mood tracking data
+ * Supports both single mood (backward compat) and multiple moods array
  */
 export const MoodEntrySchema = z.object({
   date: IsoDateStringSchema,
   mood: MoodTypeSchema,
+  moods: z.array(MoodTypeSchema).min(1, 'At least one mood must be selected').optional(),
   note: z.string().max(200, 'Note cannot exceed 200 characters').optional().or(z.literal('')),
 });
 

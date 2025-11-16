@@ -185,14 +185,7 @@ type HttpHelperParams = {
   token?: string;
 };
 
-export async function makeHttpRequest({
-  baseUrl,
-  endpoint,
-  method,
-  body,
-  headers = {},
-  token,
-}: HttpHelperParams): Promise<unknown> {
+export async function makeHttpRequest({ baseUrl, endpoint, method, body, headers = {}, token }: HttpHelperParams): Promise<unknown> {
   const url = `${baseUrl}${endpoint}`;
   const requestHeaders = {
     'Content-Type': 'application/json',

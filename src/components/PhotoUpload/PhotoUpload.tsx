@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Camera, Loader } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { PhotoUploadInput } from '../../types';

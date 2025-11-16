@@ -87,12 +87,19 @@ development_status:
   5-5-centralize-input-validation-layer: done
   epic-5-retrospective: completed
 
-  # Epic 6: Interactive Connection Features (6 stories) - RENAMED FROM EPIC 5
-  epic-6: backlog
-  6-1-pocketbase-backend-setup-api-integration: backlog
-  6-2-mood-tracking-ui-local-storage: backlog
-  6-3-mood-history-calendar-view: backlog
-  6-4-mood-sync-partner-visibility: backlog
-  6-5-poke-kiss-interactions: backlog
-  6-6-anniversary-countdown-timers: backlog
-  epic-6-retrospective: optional
+  # Epic 6: Interactive Connection Features (8 stories) - RENAMED FROM EPIC 5
+  # RETROSPECTIVE NOTE: Only 6/8 stories were implemented. 6-2 and 6-4 deferred to Epic 7.
+  epic-6: contexted
+  6-0-supabase-schema-rls-foundation: done
+  6-1-supabase-backend-setup-api-integration: done
+  6-2-mood-tracking-ui-local-storage: done # Post-Review Fix validated 2025-11-15
+  6-3-mood-history-calendar-view: done
+  6-4-mood-sync-partner-visibility: ready-for-dev # NOT IMPLEMENTED - deferred to Epic 7
+  6-5-poke-kiss-interactions: done
+  6-6-anniversary-countdown-timers: done
+  6-7-user-authentication-login: done
+  epic-6-retrospective: completed # See epic-6-retro-2025-11-15.md
+
+  # Epic 7: NFR Testing & Technical Debt (from test retrospective)
+  epic-7: contexted
+  7-1-offline-mode-testing-suite: review

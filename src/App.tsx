@@ -1,24 +1,61 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './stores/useAppStore';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
-import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
-import { PhotoGallery } from './components/PhotoGallery/PhotoGallery';
 import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
+import { PokeKissInterface } from './components/PokeKissInterface';
+import { LoginScreen } from './components/LoginScreen';
+import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { applyTheme } from './utils/themes';
 import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
+import { authService } from './api/authService';
+import type { Session } from '@supabase/supabase-js';
+
+// Lazy load route components for code splitting
+const PhotoGallery = lazy(() =>
+  import('./components/PhotoGallery/PhotoGallery').then((m) => ({ default: m.PhotoGallery }))
+);
+const MoodTracker = lazy(() =>
+  import('./components/MoodTracker/MoodTracker').then((m) => ({ default: m.MoodTracker }))
+);
+const PartnerMoodView = lazy(() =>
+  import('./components/PartnerMoodView/PartnerMoodView').then((m) => ({
+    default: m.PartnerMoodView,
+  }))
+);
+const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
+
+// Loading spinner component for Suspense fallback
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+  </div>
+);
 
 // Timer configuration
 const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
 const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
 
 function App() {
-  const { settings, initializeApp, isLoading, currentView, setView } = useAppStore();
+  const {
+    settings,
+    initializeApp,
+    isLoading,
+    currentView,
+    setView,
+    syncPendingMoods,
+    updateSyncStatus,
+  } = useAppStore();
   const hasInitialized = useRef(false);
+
+  // Story 6.7: Authentication state
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [needsDisplayName, setNeedsDisplayName] = useState(false);
 
   // Helper function to check if welcome splash should be shown
   const shouldShowWelcome = (): boolean => {
@@ -56,13 +93,27 @@ function App() {
 
     // AC-4.5.5: Initial route detection - set view based on URL
     const initialPath = window.location.pathname;
-    const initialView = initialPath === '/photos' ? 'photos' : 'home';
+    const initialView =
+      initialPath === '/photos'
+        ? 'photos'
+        : initialPath === '/mood'
+          ? 'mood'
+          : initialPath === '/partner'
+            ? 'partner'
+            : 'home';
     setView(initialView, true); // Skip history update on initial load
 
     // AC-4.5.6: Browser back/forward button support
     const handlePopState = () => {
       const pathname = window.location.pathname;
-      const view = pathname === '/photos' ? 'photos' : 'home';
+      const view =
+        pathname === '/photos'
+          ? 'photos'
+          : pathname === '/mood'
+            ? 'mood'
+            : pathname === '/partner'
+              ? 'partner'
+              : 'home';
       setView(view, true); // Skip history update to prevent loop
       console.log(`[App] Popstate: navigated to ${view}`);
     };
@@ -74,9 +125,70 @@ function App() {
     };
   }, [setView]);
 
+  // Story 6.7: Check authentication status on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkAuth = async () => {
+      try {
+        const currentSession = await authService.getSession();
+        if (isMounted) {
+          setSession(currentSession);
+          setAuthLoading(false);
+
+          if (import.meta.env.DEV) {
+            console.log(
+              '[App] Auth check:',
+              currentSession ? 'authenticated' : 'not authenticated'
+            );
+          }
+        }
+      } catch (error) {
+        console.error('[App] Auth check failed:', error);
+        if (isMounted) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const unsubscribe = authService.onAuthStateChange((newSession) => {
+      if (isMounted) {
+        setSession(newSession);
+
+        // Check if user needs to set display name (for new OAuth signups)
+        if (newSession?.user) {
+          const hasDisplayName = newSession.user.user_metadata?.display_name;
+          setNeedsDisplayName(!hasDisplayName);
+
+          if (import.meta.env.DEV) {
+            console.log('[App] Auth state changed:', {
+              authenticated: true,
+              hasDisplayName,
+              needsSetup: !hasDisplayName,
+            });
+          }
+        } else {
+          setNeedsDisplayName(false);
+          if (import.meta.env.DEV) {
+            console.log('[App] Auth state changed: signed out');
+          }
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     // Initialize the app on mount (useRef ensures single init even in StrictMode)
-    if (!hasInitialized.current) {
+    // Only initialize if user is authenticated
+    if (!hasInitialized.current && session) {
       hasInitialized.current = true;
 
       // Story 3.5: Migrate custom messages from LocalStorage to IndexedDB before app initialization
@@ -105,7 +217,7 @@ function App() {
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array intentional - only runs once on mount
+  }, [session]); // Initialize when session is established
 
   // Apply theme when settings change
   useEffect(() => {
@@ -114,12 +226,101 @@ function App() {
     }
   }, [settings]);
 
-  if (isLoading) {
+  // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
+  useEffect(() => {
+    const handleOnline = () => {
+      if (import.meta.env.DEV) {
+        console.log('[App] Network: ONLINE - triggering sync');
+      }
+
+      // Update sync status to reflect online state
+      updateSyncStatus();
+
+      // Trigger background sync when coming back online
+      syncPendingMoods().catch((error) => {
+        console.error('[App] Auto-sync on reconnect failed:', error);
+      });
+    };
+
+    const handleOffline = () => {
+      if (import.meta.env.DEV) {
+        console.log('[App] Network: OFFLINE');
+      }
+
+      // Update sync status to reflect offline state
+      updateSyncStatus();
+    };
+
+    // Add event listeners
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial sync status update
+    updateSyncStatus();
+
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [syncPendingMoods, updateSyncStatus]);
+
+  // Story 6.7: Show loading screen while checking authentication
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4 animate-pulse">💕</div>
           <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Story 6.7: Show login screen if not authenticated
+  if (!session) {
+    return (
+      <ErrorBoundary>
+        <LoginScreen
+          onLoginSuccess={() => {
+            // Session will be updated by auth state listener
+            if (import.meta.env.DEV) {
+              console.log('[App] Login successful');
+            }
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  // Show display name setup modal if user needs to set display name
+  // This appears AFTER successful OAuth signup, not before
+  if (needsDisplayName) {
+    return (
+      <ErrorBoundary>
+        <DisplayNameSetup
+          isOpen={needsDisplayName}
+          onComplete={() => {
+            setNeedsDisplayName(false);
+            // Refresh session to get updated user_metadata
+            authService.getSession().then((refreshedSession) => {
+              if (refreshedSession) {
+                setSession(refreshedSession);
+              }
+            });
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  // Show app loading screen while initializing data
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-pulse">💕</div>
+          <p className="text-gray-600">Loading your data...</p>
         </div>
       </div>
     );
@@ -157,21 +358,34 @@ function App() {
   if (showAdmin) {
     return (
       <ErrorBoundary>
-        <AdminPanel onExit={handleAdminExit} />
+        <Suspense fallback={<LoadingSpinner />}>
+          <AdminPanel onExit={handleAdminExit} />
+        </Suspense>
       </ErrorBoundary>
     );
   }
 
-  // Story 1.4 & 4.1/4.2: Render home or photos view based on navigation
+  // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
     <ErrorBoundary>
       <div className="min-h-screen pb-16">
+        {/* Story 6.5: Poke/Kiss Interaction Interface - Fixed top-right position (AC#1) */}
+        <div className="fixed top-4 right-4 z-50">
+          <PokeKissInterface />
+        </div>
+
         {/* Conditional view rendering */}
         {currentView === 'home' && <DailyMessage onShowWelcome={showWelcomeManually} />}
 
-        {currentView === 'photos' && (
-          <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
-        )}
+        <Suspense fallback={<LoadingSpinner />}>
+          {currentView === 'photos' && (
+            <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+          )}
+
+          {currentView === 'mood' && <MoodTracker />}
+
+          {currentView === 'partner' && <PartnerMoodView />}
+        </Suspense>
 
         {/* Bottom navigation */}
         <BottomNavigation currentView={currentView} onViewChange={setView} />

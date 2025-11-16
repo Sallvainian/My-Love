@@ -25,8 +25,8 @@ export interface StorageQuotaInfo {
 export function getLocalStorageUsage(): number {
   let totalBytes = 0;
 
-  for (let key in localStorage) {
-    if (localStorage.hasOwnProperty(key)) {
+  for (const key in localStorage) {
+    if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
       const value = localStorage.getItem(key);
       if (value !== null) {
         // Each character in JavaScript is 2 bytes (UTF-16)

@@ -1,8 +1,9 @@
-import { Heart, Camera } from 'lucide-react';
+import { Heart, Camera, Smile, Users } from 'lucide-react';
+import type { ViewType } from '../../stores/slices/navigationSlice';
 
 interface BottomNavigationProps {
-  currentView: 'home' | 'photos';
-  onViewChange: (view: 'home' | 'photos') => void;
+  currentView: ViewType;
+  onViewChange: (view: ViewType) => void;
 }
 
 export function BottomNavigation({ currentView, onViewChange }: BottomNavigationProps) {
@@ -23,6 +24,32 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         >
           <Heart className={`w-6 h-6 mb-1 ${currentView === 'home' ? 'fill-current' : ''}`} />
           <span className="text-xs font-medium">Home</span>
+        </button>
+
+        {/* Mood Tab */}
+        <button
+          onClick={() => onViewChange('mood')}
+          className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+            currentView === 'mood' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+          }`}
+          data-testid="nav-mood"
+          aria-label="Mood"
+        >
+          <Smile className={`w-6 h-6 mb-1 ${currentView === 'mood' ? 'fill-current' : ''}`} />
+          <span className="text-xs font-medium">Mood</span>
+        </button>
+
+        {/* Partner Tab - Story 6.4: Task 5 */}
+        <button
+          onClick={() => onViewChange('partner')}
+          className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+            currentView === 'partner' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+          }`}
+          data-testid="nav-partner"
+          aria-label="Partner"
+        >
+          <Users className={`w-6 h-6 mb-1 ${currentView === 'partner' ? 'fill-current' : ''}`} />
+          <span className="text-xs font-medium">Partner</span>
         </button>
 
         {/* Photos Tab */}

@@ -227,7 +227,7 @@ export const createMessagesSlice: StateCreator<
     currentDate.setDate(today.getDate() - messageHistory.currentIndex);
     const currentDateString = formatDate(currentDate);
 
-    let updatedShownMessages = new Map(messageHistory.shownMessages);
+    const updatedShownMessages = new Map(messageHistory.shownMessages);
     if (!updatedShownMessages.has(currentDateString) && currentMessage) {
       updatedShownMessages.set(currentDateString, currentMessage.id);
       if (import.meta.env.DEV) {

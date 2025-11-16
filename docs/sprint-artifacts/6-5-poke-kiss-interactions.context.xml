@@ -1,0 +1,239 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>5</storyId>
+    <title>Poke &amp; Kiss Interactions</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/6-5-poke-kiss-interactions.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>your girlfriend (and you)</asA>
+    <iWant>to send spontaneous pokes or kisses</iWant>
+    <soThat>we can share small moments of affection throughout the day</soThat>
+    <tasks>
+      - Task 1: Create PokeKissInterface Component (AC: #1, #4)
+      - Task 2: Create InteractionService for Supabase API (AC: #2, #3, #5) ✅ ALREADY IMPLEMENTED
+      - Task 3: Extend Zustand Store with Interactions Slice (AC: #2, #3, #5, #6)
+      - Task 4: Implement Realtime Interaction Notifications (AC: #3, #4)
+      - Task 5: Create Interaction Animations with Framer Motion (AC: #4)
+      - Task 6: Build Interaction History View (AC: #6)
+      - Task 7: Implement Send Interaction Flow with Feedback (AC: #2, #7)
+      - Task 8: Add Validation and Error Handling (AC: Cross-cutting)
+      - Task 9: Write Tests for Interaction Features (AC: All)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Interaction button in top nav: "Send Kiss" or "Send Poke" (icon or text)
+    2. Tapping sends interaction to Supabase backend
+    3. Recipient receives notification badge on icon
+    4. Tapping notification badge shows interaction with animation (Kiss: hearts, Poke: nudge)
+    5. Interaction marked as "viewed" after animation plays
+    6. Interaction history viewable (last 7 days)
+    7. Can send unlimited interactions (no daily limit)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- PRD: Functional Requirements for Poke/Kiss -->
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="Interactive Connection Features">
+        FR023: System SHALL support "poke" and "kiss" actions that send notifications to partner via backend service.
+        FR024: System SHALL display animated reactions when poke/kiss is received.
+        FR025: System SHALL maintain interaction history for sentimental value.
+      </doc>
+
+      <!-- Epic 6 Tech Spec: Comprehensive technical details -->
+      <doc path="docs/sprint-artifacts/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Data Models and Contracts">
+        Interaction Event data model: { id, type: 'poke'|'kiss', fromUserId, toUserId, timestamp, viewed, supabaseId }.
+        Supabase interactions table with Row Level Security policies.
+        Realtime channel subscription for live push-style notifications.
+        InteractionService API: sendPoke(), sendKiss(), subscribeInteractions(), markViewed().
+        Zustand store extension with interactions array and actions.
+        Framer Motion for animation playback (60fps target).
+      </doc>
+
+      <!-- Architecture: Component patterns and service layer -->
+      <doc path="docs/architecture.md" title="Architecture Documentation" section="Architecture Patterns">
+        Component-based SPA pattern with React 19 + TypeScript.
+        Zustand state management with persistence middleware.
+        Framer Motion for declarative animations.
+        Offline-first with graceful degradation (poke/kiss requires online connectivity).
+        ErrorBoundary for component error handling.
+      </doc>
+
+      <!-- Architecture: Service Layer with BaseIndexedDBService pattern -->
+      <doc path="docs/architecture.md" title="Architecture Documentation" section="Service Layer">
+        Service layer encapsulates all data operations. All services extend BaseIndexedDBService<T> generic class.
+        SupabaseClient singleton pattern for API calls.
+        Error handling utilities in src/api/errorHandlers.ts.
+      </doc>
+    </docs>
+
+    <code>
+      <!-- InteractionService: FULLY IMPLEMENTED -->
+      <artifact path="src/api/interactionService.ts" kind="service" symbol="InteractionService" lines="1-381" reason="✅ FULLY IMPLEMENTED - Complete Supabase interaction service with sendPoke(), sendKiss(), subscribeInteractions(), getInteractionHistory(), getUnviewedInteractions(), markAsViewed() methods. Ready to use for UI integration."/>
+
+      <!-- SupabaseClient: Singleton with database schema -->
+      <artifact path="src/api/supabaseClient.ts" kind="service" symbol="supabase, Database" lines="1-230" reason="Supabase client singleton with typed Database schema including interactions table. Provides initializeAuth(), getCurrentUserId(), getPartnerId() helpers."/>
+
+      <!-- Error Handlers: Comprehensive error handling -->
+      <artifact path="src/api/errorHandlers.ts" kind="utility" symbol="SupabaseServiceError, handleSupabaseError, handleNetworkError, retryWithBackoff" lines="1-236" reason="Error handling utilities for Supabase API failures, network issues, and retry logic with exponential backoff. Use for graceful degradation."/>
+
+      <!-- Type Definitions: InteractionType (legacy PocketBase) -->
+      <artifact path="src/types/index.ts" kind="types" symbol="InteractionType, PocketbaseInteraction" lines="74-103" reason="Legacy PocketBase types exist (lines 74-103). Need to add Supabase Interaction types to align with src/api/interactionService.ts."/>
+
+      <!-- Zustand Store Slices: Existing patterns to follow -->
+      <artifact path="src/stores/slices/moodSlice.ts" kind="store" symbol="MoodSlice" reason="Reference pattern for creating interactions slice. Similar structure for moods (already integrated with Supabase)."/>
+      <artifact path="src/stores/slices/navigationSlice.ts" kind="store" symbol="NavigationSlice" reason="Reference pattern for integrating PokeKissInterface into navigation."/>
+    </code>
+
+    <dependencies>
+      <node>
+        <!-- Core Dependencies (Already Installed) -->
+        "@supabase/supabase-js": "^2.81.1",
+        "framer-motion": "^12.23.24",
+        "lucide-react": "^0.548.0",
+        "zustand": "^5.0.8",
+        "zod": "^3.25.76",
+        "react": "^19.1.1",
+        "react-dom": "^19.1.1"
+      </node>
+      <node dev="true">
+        <!-- Testing Dependencies -->
+        "@playwright/test": "^1.56.1",
+        "@vitest/coverage-v8": "^4.0.9",
+        "vitest": "^4.0.9",
+        "happy-dom": "^20.0.10",
+        "fake-indexeddb": "^6.2.5"
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <!-- Performance Constraints -->
+    - Animations must maintain 60fps (NFR001)
+    - Realtime connection reconnection with exponential backoff (1s, 2s, 4s, max 30s)
+    - Interaction history pagination: 20 interactions per page to avoid large memory footprint
+
+    <!-- Security Constraints -->
+    - Row Level Security enforces auth.uid() = from_user_id for INSERT
+    - RLS policy allows viewing interactions where auth.uid() IN (from_user_id, to_user_id)
+    - Validate UUID format for partnerId to prevent injection
+    - Zod schema validation before API submission
+
+    <!-- Pattern Consistency -->
+    - Follow existing service pattern: InteractionService uses SupabaseClient singleton (✅ DONE)
+    - Zustand actions pattern: async actions call service, update local state, handle errors
+    - Component structure: Separate concerns (UI, logic, animations)
+    - TypeScript strict mode: No 'any' types, explicit return types
+
+    <!-- Tech Spec Alignment -->
+    - Follow Supabase PostgREST API patterns (POST /rest/v1/interactions)
+    - Use SupabaseClient singleton from src/api/supabaseClient.ts
+    - Realtime channel: .channel('interactions').on('postgres_changes', { event: 'INSERT', filter: 'to_user_id=eq.{userId}' })
+    - Interaction history fetches last 100 interactions (configurable)
+  </constraints>
+
+  <interfaces>
+    <!-- InteractionService API (IMPLEMENTED) -->
+    <interface name="InteractionService" kind="class" signature="class InteractionService" path="src/api/interactionService.ts">
+      - sendPoke(partnerId: string): Promise&lt;SupabaseInteractionRecord&gt;
+      - sendKiss(partnerId: string): Promise&lt;SupabaseInteractionRecord&gt;
+      - subscribeInteractions(callback: (interaction: SupabaseInteractionRecord) =&gt; void): Promise&lt;() =&gt; void&gt;
+      - getInteractionHistory(limit?: number, offset?: number): Promise&lt;Interaction[]&gt;
+      - getUnviewedInteractions(): Promise&lt;Interaction[]&gt;
+      - markAsViewed(interactionId: string): Promise&lt;void&gt;
+    </interface>
+
+    <!-- Supabase Interactions Table Schema -->
+    <interface name="interactions (Supabase Table)" kind="database" signature="CREATE TABLE interactions">
+      - id: UUID PRIMARY KEY (auto-generated)
+      - type: TEXT CHECK (type IN ('poke', 'kiss'))
+      - from_user_id: UUID REFERENCES users(id)
+      - to_user_id: UUID REFERENCES users(id)
+      - viewed: BOOLEAN DEFAULT false
+      - created_at: TIMESTAMPTZ DEFAULT now()
+      RLS Policies: INSERT requires auth.uid() = from_user_id, SELECT allows auth.uid() IN (from_user_id, to_user_id)
+    </interface>
+
+    <!-- Zustand Store Extension (TO IMPLEMENT) -->
+    <interface name="AppState (interactions slice)" kind="store" signature="interface AppState" path="src/stores/useAppStore.ts">
+      - interactions: Interaction[]
+      - sendPoke: (partnerId: string) =&gt; Promise&lt;void&gt;
+      - sendKiss: (partnerId: string) =&gt; Promise&lt;void&gt;
+      - markInteractionViewed: (id: string) =&gt; Promise&lt;void&gt;
+      - getUnviewedInteractions: () =&gt; Interaction[]
+      - getInteractionHistory: (days: number) =&gt; Interaction[]
+    </interface>
+
+    <!-- Component Props (TO IMPLEMENT) -->
+    <interface name="PokeKissInterface Component" kind="component" signature="PokeKissInterface: React.FC" path="src/components/PokeKissInterface/PokeKissInterface.tsx">
+      No props - uses Zustand store hooks directly.
+      Renders: Poke button, Kiss button, notification badge with count, animation playback area.
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing Standards:
+      - Unit tests for InteractionService with 80%+ coverage (Vitest)
+      - Component tests for PokeKissInterface (React Testing Library)
+      - Integration tests for Realtime subscription (mock WebSocket)
+      - E2E tests with Playwright (send/receive flow, offline handling)
+
+      Test Naming Convention:
+      - Reference AC numbers in test names (e.g., 'AC1: Poke button triggers sendPoke action')
+      - Use descriptive test descriptions focusing on user behavior
+
+      Mocking Strategy:
+      - Mock Supabase SDK responses for unit tests
+      - Use fake-indexeddb for IndexedDB tests (already in devDependencies)
+      - Mock Realtime channel events for subscription tests
+    </standards>
+
+    <locations>
+      - src/api/interactionService.test.ts (Unit tests for service)
+      - src/utils/validation.test.ts (Zod schema validation tests)
+      - src/components/PokeKissInterface/PokeKissInterface.test.tsx (Component tests)
+      - src/components/PokeKissInterface/InteractionHistory.test.tsx (History component tests)
+      - src/api/interactionService.integration.test.ts (Realtime subscription tests)
+      - tests/e2e/poke-kiss-interactions.spec.ts (End-to-end tests)
+    </locations>
+
+    <ideas>
+      <!-- Unit Tests -->
+      - Test sendPoke() POSTs correct payload to Supabase (AC#2)
+      - Test sendKiss() POSTs correct payload to Supabase (AC#2)
+      - Test markAsViewed() PATCHes interaction with viewed: true (AC#5)
+      - Test error handling for network failures (timeout, 500 errors)
+      - Mock Supabase client responses
+      - Test UUID format validation for partnerId
+      - Test Zod schema validation for Interaction data model
+
+      <!-- Component Tests -->
+      - Test Poke button click triggers sendPoke action (AC#1, AC#2)
+      - Test Kiss button click triggers sendKiss action (AC#1, AC#2)
+      - Test notification badge displays unviewed count (AC#3)
+      - Test badge tap triggers animation playback (AC#4)
+      - Test button animation on tap (Framer Motion) (AC#1)
+      - Test history list renders last 7 days of interactions (AC#6)
+      - Test pagination/load more functionality (AC#6)
+      - Test empty state when no interactions exist
+
+      <!-- Integration Tests -->
+      - Test Realtime channel subscription receives postgres_changes events (AC#3)
+      - Test callback invoked with correct interaction payload
+      - Test unsubscribe function cleans up channel
+      - Mock Supabase Realtime WebSocket events
+
+      <!-- E2E Tests -->
+      - E2E-1: Send Poke Flow (tap button → verify toast → verify history → verify Supabase POST) (AC#1, AC#2, AC#6)
+      - E2E-2: Receive Kiss Notification (mock Realtime event → verify badge → tap badge → verify animation → verify PATCH) (AC#3, AC#4, AC#5)
+      - E2E-3: Offline Interaction Handling (disconnect network → tap button → verify queue/error → reconnect → verify sync)
+      - E2E-4: Interaction History View (send 10 interactions → navigate to history → verify list → verify sort by timestamp) (AC#6)
+    </ideas>
+  </tests>
+</story-context>

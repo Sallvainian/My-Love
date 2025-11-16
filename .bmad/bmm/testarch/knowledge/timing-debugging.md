@@ -137,9 +137,7 @@ test.describe('Deterministic Waiting Patterns', () => {
   });
 
   test('waitForResponse() with predicate function', async ({ page }) => {
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/search') && resp.status() === 200
-    );
+    const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/search') && resp.status() === 200);
 
     await page.goto('/search');
     await page.getByPlaceholder('Search').fill('laptop');
