@@ -5,8 +5,8 @@ import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Use base path only for production (GitHub Pages), not for development/testing
-  base: mode === 'production' ? '/My-Love/' : '/',
+  // Vercel deploys to root domain, no subpath needed
+  base: '/',
   build: {
     rollupOptions: {
       output: {
