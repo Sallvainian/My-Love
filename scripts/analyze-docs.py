@@ -30,11 +30,15 @@ def categorize_file(file_info: dict) -> str:
     has_outdated = file_info['has_outdated_markers']
     word_count = file_info['word_count']
 
-    # Pattern-based deletion candidates
+    # PRESERVE HISTORICAL FILES - These are project evolution records
+    # Archive files and story files are valuable historical documentation
+    if '.archive/' in path or 'docs/stories/' in path or 'sprint-artifacts/' in path:
+        return 'CURRENT'  # Preserve as historical documentation
+
+    # Pattern-based deletion candidates (only ephemeral files)
     delete_patterns = [
         '.context.xml',  # XML context files are ephemeral
-        '-review.md',    # One-time review documents
-        'project-scan-report',  # Scan reports are snapshots
+        'project-scan-report',  # Scan reports are snapshots (not historical docs)
     ]
 
     for pattern in delete_patterns:
@@ -42,8 +46,10 @@ def categorize_file(file_info: dict) -> str:
             return 'DELETE_CANDIDATE'
 
     # Untracked files over 30 days - likely abandoned
+    # But NOT if they're in claudedocs/ or other important dirs
     if git_commits == 0 and days_old > 30:
-        return 'DELETE_CANDIDATE'
+        if 'claudedocs/' not in path:
+            return 'DELETE_CANDIDATE'
 
     # Files with outdated markers
     if has_outdated:
@@ -53,13 +59,10 @@ def categorize_file(file_info: dict) -> str:
     if days_old > 60 and git_commits < 3:
         return 'UPDATE_REQUIRED'
 
-    # Archive directory files
-    if '.archive/' in path:
-        return 'DELETE_CANDIDATE'
-
-    # Duplicate content indicators
+    # Duplicate content indicators (be very conservative)
     if 'copy' in path.lower() or 'backup' in path.lower():
-        return 'DELETE_CANDIDATE'
+        if '.archive/' not in path:  # Archives are intentional
+            return 'REVIEW_NEEDED'  # Changed from DELETE to REVIEW
 
     # Very small files might be stubs
     if word_count < 50 and days_old > 30:
