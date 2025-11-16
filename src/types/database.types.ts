@@ -3,6 +3,8 @@
  *
  * This file contains type definitions for the Supabase database schema.
  * Types are structured to work with @supabase/supabase-js v2.x
+ *
+ * UPDATED: 2025-11-16 - Added partner_requests table and partner_id column
  */
 
 export type Json =
@@ -13,32 +15,42 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       users: {
         Row: {
           id: string
+          partner_id: string | null
           partner_name: string | null
-          device_id: string
-          created_at: string
-          updated_at: string
+          device_id: string | null
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id: string
+          partner_id?: string | null
           partner_name?: string | null
-          device_id?: string
-          created_at?: string
-          updated_at?: string
+          device_id?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
+          partner_id?: string | null
           partner_name?: string | null
-          device_id?: string
-          created_at?: string
-          updated_at?: string
+          device_id?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_partner_id_fkey"
+            columns: ["partner_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       moods: {
         Row: {
@@ -46,24 +58,24 @@ export interface Database {
           user_id: string
           mood_type: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful'
           note: string | null
-          created_at: string
-          updated_at: string
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
           user_id: string
           mood_type: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful'
           note?: string | null
-          created_at?: string
-          updated_at?: string
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
           user_id?: string
           mood_type?: 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful'
           note?: string | null
-          created_at?: string
-          updated_at?: string
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -80,24 +92,24 @@ export interface Database {
           type: 'poke' | 'kiss'
           from_user_id: string
           to_user_id: string
-          viewed: boolean
-          created_at: string
+          viewed: boolean | null
+          created_at: string | null
         }
         Insert: {
           id?: string
           type: 'poke' | 'kiss'
           from_user_id: string
           to_user_id: string
-          viewed?: boolean
-          created_at?: string
+          viewed?: boolean | null
+          created_at?: string | null
         }
         Update: {
           id?: string
           type?: 'poke' | 'kiss'
           from_user_id?: string
           to_user_id?: string
-          viewed?: boolean
-          created_at?: string
+          viewed?: boolean | null
+          created_at?: string | null
         }
         Relationships: [
           {
@@ -114,12 +126,59 @@ export interface Database {
           }
         ]
       }
+      partner_requests: {
+        Row: {
+          id: string
+          from_user_id: string
+          to_user_id: string
+          status: 'pending' | 'accepted' | 'declined'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          from_user_id: string
+          to_user_id: string
+          status?: 'pending' | 'accepted' | 'declined'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          from_user_id?: string
+          to_user_id?: string
+          status?: 'pending' | 'accepted' | 'declined'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_requests_from_user_id_fkey"
+            columns: ["from_user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_requests_to_user_id_fkey"
+            columns: ["to_user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accept_partner_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      decline_partner_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -6,8 +6,7 @@ import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice'
 import { createNavigationSlice, type NavigationSlice } from './slices/navigationSlice';
 import { createMoodSlice, type MoodSlice } from './slices/moodSlice';
 import { createInteractionsSlice, type InteractionsSlice } from './slices/interactionsSlice';
-// TEMPORARILY DISABLED: Partner slice has type errors due to missing partner_id column in database
-// import { createPartnerSlice, type PartnerSlice } from './slices/partnerSlice';
+import { createPartnerSlice, type PartnerSlice } from './slices/partnerSlice';
 
 // Composed AppState from all slices
 export interface AppState
@@ -16,8 +15,8 @@ export interface AppState
     SettingsSlice,
     NavigationSlice,
     MoodSlice,
-    InteractionsSlice {
-    // PartnerSlice {
+    InteractionsSlice,
+    PartnerSlice {
   // Shared/Core state
   isLoading: boolean;
   error: string | null;
@@ -83,8 +82,7 @@ export const useAppStore = create<AppState>()(
       ...createNavigationSlice(set as any, get as any, api as any),
       ...createMoodSlice(set as any, get as any, api as any),
       ...createInteractionsSlice(set as any, get as any, api as any),
-      // TEMPORARILY DISABLED: Partner slice has type errors
-      // ...createPartnerSlice(set as any, get as any, api as any),
+      ...createPartnerSlice(set as any, get as any, api as any),
 
       // Shared/Core state (minimal - initialization, loading, error)
       isLoading: false,
