@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
+import { m as motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Heart, Share2, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';

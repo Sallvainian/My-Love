@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { moodService } from '../../services/moodService';
 import type { MoodEntry } from '../../types';

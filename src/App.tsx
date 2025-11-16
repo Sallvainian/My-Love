@@ -23,7 +23,9 @@ const MoodTracker = lazy(() =>
   import('./components/MoodTracker/MoodTracker').then((m) => ({ default: m.MoodTracker }))
 );
 const PartnerMoodView = lazy(() =>
-  import('./components/PartnerMoodView/PartnerMoodView').then((m) => ({ default: m.PartnerMoodView }))
+  import('./components/PartnerMoodView/PartnerMoodView').then((m) => ({
+    default: m.PartnerMoodView,
+  }))
 );
 const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
 

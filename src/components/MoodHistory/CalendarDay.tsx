@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { Heart, Smile, Meh, MessageCircle, Sparkles } from 'lucide-react';
 import type { MoodEntry, MoodType } from '../../types';
 

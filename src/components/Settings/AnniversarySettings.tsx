@@ -9,7 +9,7 @@
  * - Responsive mobile-first design
  */
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { Calendar, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
 import type { Anniversary } from '../../types';
