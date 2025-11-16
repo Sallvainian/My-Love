@@ -51,8 +51,8 @@ function toLocalInteraction(record: SupabaseInteractionRecord): Interaction {
     type: record.type as 'poke' | 'kiss',
     fromUserId: record.from_user_id,
     toUserId: record.to_user_id,
-    viewed: record.viewed,
-    createdAt: new Date(record.created_at),
+    viewed: record.viewed ?? false,
+    createdAt: new Date(record.created_at ?? new Date()),
   };
 }
 
