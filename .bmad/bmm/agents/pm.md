@@ -69,16 +69,15 @@ You must fully embody this agent's persona and follow all activation instruction
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
-    <item cmd="*workflow-init" workflow="{project-root}/.bmad/bmm/workflows/workflow-status/init/workflow.yaml">Start a new sequenced workflow path (START HERE!)</item>
+    <item cmd="*workflow-init" workflow="{project-root}/.bmad/bmm/workflows/workflow-status/init/workflow.yaml">Start a new sequenced workflow path</item>
     <item cmd="*workflow-status" workflow="{project-root}/.bmad/bmm/workflows/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
-    <item cmd="*create-prd" workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/prd/workflow.yaml">Create Product Requirements Document (PRD) for Level 2-4 projects</item>
-    <item cmd="*create-epics-and-stories" workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/prd/create-epics-and-stories/workflow.yaml">Break PRD requirements into implementable epics and stories</item>
+    <item cmd="*create-prd" workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/prd/workflow.yaml">Create Product Requirements Document (PRD)</item>
+    <item cmd="*create-epics-and-stories" workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/create-epics-and-stories/workflow.yaml">Break PRD requirements into implementable epics and stories</item>
     <item cmd="*validate-prd" validate-workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/prd/workflow.yaml">Validate PRD + Epics + Stories completeness and quality</item>
-    <item cmd="*tech-spec" workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/tech-spec/workflow.yaml">Create Tech Spec for Level 0-1 (sometimes Level 2) projects</item>
+    <item cmd="*tech-spec" workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/tech-spec/workflow.yaml">Create Tech Spec (Simple work efforts, no PRD or Architecture docs)</item>
     <item cmd="*validate-tech-spec" validate-workflow="{project-root}/.bmad/bmm/workflows/2-plan-workflows/tech-spec/workflow.yaml">Validate Technical Specification Document</item>
     <item cmd="*correct-course" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml">Course Correction Analysis</item>
-    <item cmd="*party-mode" workflow="{project-root}/.bmad/core/workflows/party-mode/workflow.yaml">Consult with other expert agents from the party</item>
-    <item cmd="*advanced-elicitation" exec="{project-root}/.bmad/core/tasks/advanced-elicitation.xml">Advanced elicitation techniques to challenge the LLM to get better results</item>
+    <item cmd="*party-mode" workflow="{project-root}/.bmad/core/workflows/party-mode/workflow.yaml">Bring the whole team in to chat with other expert agents from the party</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>
 </agent>

@@ -1,14 +1,17 @@
 # My Love - Project Documentation Index
 
 > **Primary AI Retrieval Source**: This index is the starting point for understanding the My Love PWA codebase.
+> **Last Updated**: 2025-11-16
+> **Structure**: Sharded documentation for improved navigation
 
 ## Project Overview
 
 - **Type**: Monolith (Single Part)
-- **Primary Language**: TypeScript
-- **Architecture**: Component-based SPA with Offline-First PWA capabilities
-- **Generated**: 2025-10-30
-- **Documentation Version**: 1.0.0
+- **Primary Language**: TypeScript 5.9.3
+- **Framework**: React 19.1.1
+- **Architecture**: Component-based SPA with Offline-First PWA + Supabase Backend
+- **Documentation Version**: 3.0.0 (Sharded Structure)
+- **Status**: Feature Complete (v1.0.0)
 
 ## Quick Reference
 
@@ -16,290 +19,292 @@
 
 - **Frontend**: React 19.1.1 + TypeScript 5.9.3
 - **Build Tool**: Vite 7.1.7
-- **Styling**: Tailwind CSS 3.4.18
-- **Animations**: Framer Motion 12.23.24
-- **State Management**: Zustand 5.0.8
-- **Data Persistence**: IndexedDB (IDB 8.0.3) + LocalStorage
-- **PWA**: Vite PWA Plugin + Workbox
-- **Icons**: Lucide React
+- **State Management**: Zustand 5.0.8 (7 slices, 59 actions)
+- **Backend**: Supabase 2.81.1 (Auth, Database, Realtime)
+- **Styling**: Tailwind CSS 3.4.18 + Framer Motion 12.23.24
+- **Validation**: Zod 3.23.8
+- **Data Persistence**: IndexedDB (IDB 8.0.3) + LocalStorage + Supabase
+- **PWA**: Vite PWA Plugin 0.21.3 + Workbox
+- **Testing**: Vitest 1.6.1 + Playwright 1.52.0
+- **Icons**: Lucide React 0.475.0
 
-### Entry Points
+### Codebase Statistics
 
-- **Main Entry**: `src/main.tsx`
-- **Root Component**: `src/App.tsx`
-- **Build Config**: `vite.config.ts`
+- **Source Files**: 90 TypeScript files
+- **Directories**: 38
+- **Components**: 20 implemented (48 TSX files)
+- **Store Slices**: 7 (59 total actions)
+- **API Services**: 8 modules
+- **Business Services**: 10 classes
+- **TypeScript Interfaces**: 35+
+- **Zod Validation Schemas**: 12+
 
-### Key Features
+---
 
-- 💕 Daily rotating love messages (100 pre-written)
-- 🎨 4 Beautiful themes (Sunset, Ocean, Lavender, Rose)
-- 📱 Progressive Web App (installable, offline-first)
-- 💾 Local data storage (IndexedDB + LocalStorage)
-- ✨ Smooth animations with Framer Motion
-- 📅 Relationship day tracking
-- ⭐ Message favoriting system
+## Core Documentation (Sharded)
 
-## Generated Documentation
+### 📁 [Project Overview](./project-overview/index.md)
 
-### Start Here
+Comprehensive project introduction, features, tech stack, and getting started guides.
 
-- **[Project Overview](./project-overview.md)** - High-level project summary, goals, and features
-  - What is My Love?
-  - Current features and roadmap
-  - Use cases and user flows
-  - Browser support
+**Key Sections**:
 
-### Architecture & Design
+- [What is My Love?](./project-overview/what-is-my-love.md) - Project introduction
+- [Current Features](./project-overview/current-features-implemented.md) - All implemented features
+- [Technology Stack](./project-overview/technology-stack.md) - Dependencies and versions
+- [Architecture Overview](./project-overview/architecture-overview.md) - System design patterns
+- [Getting Started](./project-overview/getting-started.md) - Setup instructions for users and developers
+- [Performance](./project-overview/performance-characteristics.md) - Runtime optimizations
+- [Security & Privacy](./project-overview/security-privacy.md) - Data protection policies
+- [Browser Support](./project-overview/browser-support.md) - Compatibility requirements
 
-- **[Architecture](./architecture.md)** - Complete system architecture documentation
-  - Technology stack breakdown
-  - Component-based SPA pattern
-  - PWA architecture (Service Worker, Manifest)
-  - Data persistence strategy
-  - Deployment architecture
+---
 
-- **[Data Models](./data-models.md)** - TypeScript interfaces and database schemas
-  - Core types: Message, Photo, Settings, Anniversary, MoodEntry
-  - IndexedDB schema (photos, messages stores)
-  - Type definitions for state management
-  - Data validation patterns
+### 📁 [Source Tree Analysis](./source-tree-analysis/index.md)
 
-- **[State Management](./state-management.md)** - Zustand store architecture
-  - useAppStore structure and slices
-  - State persistence with middleware
-  - Actions and update patterns
-  - Performance optimization techniques
+Complete codebase structure breakdown and file organization (90 files analyzed).
 
-### Codebase Structure
+**Key Sections**:
 
-- **[Source Tree Analysis](./source-tree-analysis.md)** - Detailed codebase structure
-  - Directory organization
-  - Critical folders explained
-  - Entry points and integration points
-  - Code organization patterns
+- [Entry Points](./source-tree-analysis/entry-points.md) - Application bootstrap files
+- [Source Directory Deep Dive](./source-tree-analysis/source-directory-deep-dive.md) - Full src/ hierarchy
+- [Component Architecture](./source-tree-analysis/component-architecture-deep-dive.md) - UI component structure
+- [Service Layer](./source-tree-analysis/service-layer-architecture.md) - Business logic services
+- [API Layer](./source-tree-analysis/api-layer-architecture.md) - Supabase integration (8 services)
+- [State Management Architecture](./source-tree-analysis/state-management-architecture.md) - Zustand store composition
+- [Configuration Files](./source-tree-analysis/configuration-files.md) - Build and tooling config
+- [Testing Infrastructure](./source-tree-analysis/testing-infrastructure.md) - Test suite organization
+- [Critical File Locations](./source-tree-analysis/critical-file-locations-summary.md) - Must-know files
 
-- **[Component Inventory](./component-inventory.md)** - UI component catalog
-  - Implemented: DailyMessage, Onboarding
-  - Planned: PhotoMemory, MoodTracker, CountdownTimer, CustomNotes, Settings
-  - Component features and dependencies
-  - Animation specifications
+---
 
-### Development
+### 📁 [Component Inventory](./component-inventory/index.md)
 
-- **[Development Guide](./development-guide.md)** - Setup and development workflows
-  - Prerequisites and environment setup
-  - Development commands (`npm run dev`, `build`, `deploy`)
-  - Adding new features
-  - Customizing messages and themes
-  - Testing PWA functionality
-  - Troubleshooting guide
+Catalog of all 20 UI components organized by feature domain (48 TSX files).
 
-## Existing Project Documentation
+**Key Sections**:
 
-- **[README.md](../README.md)** - User-facing project documentation
-  - Quick start guide
-  - Deployment instructions
-  - Customization guide
-  - Project structure overview
+- [Component Summary](./component-inventory/component-summary-by-feature.md) - Quick reference table
+- [Photo Management Suite](./component-inventory/photo-management-suite.md) - 6 components (upload, gallery, carousel, edit, delete)
+- [Mood Tracking Suite](./component-inventory/mood-tracking-suite.md) - 4 components (tracker, history, partner view)
+- [Message System](./component-inventory/message-system.md) - 7 components (daily message, admin panel)
+- [Authentication Flow](./component-inventory/authentication-flow.md) - 3 components (login, setup, welcome)
+- [Partner Interaction](./component-inventory/partner-interaction.md) - 2 components (poke/kiss, history)
+- [Settings](./component-inventory/settings.md) - 2 components (preferences, anniversaries)
+- [Core Utilities](./component-inventory/core-utilities.md) - 3 components (countdown, error boundary, welcome button)
+- [Animation Specifications](./component-inventory/animation-specifications.md) - Framer Motion patterns
+- [Accessibility Features](./component-inventory/accessibility-features.md) - WCAG compliance
+
+---
+
+### 📁 [Data Models](./data-models/index.md)
+
+TypeScript interfaces, database schemas, and validation patterns (35+ interfaces).
+
+**Key Sections**:
+
+- [Core Domain Models](./data-models/core-domain-models.md) - User, Theme, Message, Photo, Mood, Interactions
+- [State Slice Interfaces](./data-models/state-slice-interfaces.md) - All 7 Zustand slice type definitions
+- [Database Schema (Supabase)](./data-models/database-schema-supabase.md) - SQL tables and RLS policies
+- [Validation Schemas (Zod)](./data-models/validation-schemas-zod.md) - Input and API response validation
+- [IndexedDB Schema](./data-models/indexeddb-schema.md) - Client-side storage structure
+- [Type Safety Best Practices](./data-models/type-safety-best-practices.md) - Generic types, type guards
+
+---
+
+### 📁 [State Management](./state-management/index.md)
+
+Zustand store architecture with 7 slices and 59 actions.
+
+**Key Sections**:
+
+- [Overview](./state-management/overview.md) - Slice-based architecture introduction
+- [Store Architecture](./state-management/store-architecture.md) - Main store composition
+- [Feature Slices Deep Dive](./state-management/feature-slices-deep-dive.md) - All 7 slices with code examples
+- [Persistence Strategy](./state-management/persistence-strategy.md) - What gets persisted where
+- [Usage Patterns](./state-management/usage-patterns.md) - Component integration examples
+- [Performance Optimizations](./state-management/performance-optimizations.md) - Selectors and memoization
+- [Best Practices](./state-management/best-practices.md) - Guidelines summary
+
+---
+
+### 📁 [API & Services Architecture](./api-services-architecture/index.md)
+
+Comprehensive API layer and business services documentation (8 API services, 10 business services).
+
+**Key Sections**:
+
+- [Executive Summary](./api-services-architecture/executive-summary.md) - Architecture overview
+- [API Layer Architecture](./api-services-architecture/api-layer-architecture.md) - Supabase integration (8 services)
+- [Services Layer Architecture](./api-services-architecture/services-layer-architecture.md) - Business logic (10 services)
+- [Authentication & Authorization](./api-services-architecture/authentication-authorization-flow.md) - Auth flows and RLS
+- [Real-time Sync Capabilities](./api-services-architecture/real-time-sync-capabilities.md) - Supabase realtime
+- [IndexedDB Service Patterns](./api-services-architecture/indexeddb-service-patterns.md) - Local storage patterns
+- [Error Handling Strategies](./api-services-architecture/error-handling-strategies.md) - Error management
+- [Data Migration Patterns](./api-services-architecture/data-migration-patterns.md) - Migration approaches
+- [Performance Monitoring](./api-services-architecture/performance-monitoring.md) - Monitoring setup
+- [Type Definitions](./api-services-architecture/appendix-type-definitions.md) - Type reference
+
+---
+
+## Additional Core Documentation
+
+- **[architecture.md](./architecture.md)** - System architecture executive summary
+- **[PRD.md](./PRD.md)** - Product requirements document
+- **[technical-decisions.md](./technical-decisions.md)** - Architecture decisions log
+- **[development-guide.md](./development-guide.md)** - Developer workflow and standards
+- **[bug-tracker.md](./bug-tracker.md)** - Known issues and critical bugs
+- **[test-design-system.md](./test-design-system.md)** - System-level test design retrospective
+
+---
+
+## Sprint Documentation
+
+### Epic Technical Specifications
+
+- **[Epic 1 Tech Spec](./sprint-artifacts/tech-spec-epic-1.md)** - Foundation & Technical Debt
+- **[Epic 2 Tech Spec](./sprint-artifacts/tech-spec-epic-2.md)** - Testing Infrastructure
+- **[Epic 3 Tech Spec](./sprint-artifacts/tech-spec-epic-3.md)** - Message Library (365 messages)
+- **[Epic 4 Tech Spec](./sprint-artifacts/tech-spec-epic-4.md)** - Photo Management Suite
+- **[Epic 5 Tech Spec](./sprint-artifacts/tech-spec-epic-5.md)** - Architecture Optimization
+- **[Epic 6 Tech Spec](./sprint-artifacts/tech-spec-epic-6.md)** - Supabase Integration
+- **[Epic 7 Tech Spec](./sprint-artifacts/tech-spec-epic-7.md)** - Offline Mode Hardening (in progress)
+
+### User Stories (40+ Completed)
+
+Located in [./stories/](./stories/):
+
+- **Epic 1**: Stories 1-1 through 1-6 (Foundation)
+- **Epic 2**: Stories 2-1 through 2-6 (Testing)
+- **Epic 3**: Stories 3-1 through 3-6 (Messages)
+- **Epic 4**: Stories 4-1 through 4-5 (Photos)
+- **Epic 5**: Stories 5-1 through 5-5 (Architecture)
+- **Epic 6**: Stories 6-0 through 6-7 (Supabase)
+- **Epic 7**: Story 7-1 (Offline Testing - in progress)
+
+### Retrospectives
+
+Located in [./retrospectives/](./retrospectives/):
+
+- [Epic 1 Retro](./retrospectives/epic-1-retro-2025-10-30.md) - Foundation lessons
+- [Epic 2 Retro](./retrospectives/epic-2-retro-2025-11-01.md) - Testing setup review
+- [Epic 3 Retro](./retrospectives/epic-3-retro-2025-11-06.md) - Message expansion
+- [Epic 4 Retro](./retrospectives/epic-4-retro-2025-11-12.md) - Photo features
+- [Epic 5 Retro](./retrospectives/epic-5-retro-2025-11-15.md) - Architecture optimization
+- [Epic 6 Retro](./retrospectives/epic-6-retro-2025-11-15.md) - Supabase integration
+
+---
+
+## Planning & Analysis
+
+### Implementation Plans
+
+Located in [./plans/](./plans/):
+
+- **[bundle-size-optimization.md](./plans/2025-11-15-bundle-size-optimization.md)** - Performance improvements
+- **[vercel-migration.md](./plans/2025-11-15-vercel-migration.md)** - Hosting migration
+- **[technical-improvements.md](./plans/2025-11-15-technical-improvements.md)** - Code quality enhancements
+- **[epic-5-code-review-fixes.md](./plans/2025-11-14-epic-5-code-review-fixes.md)** - Review feedback
+- **[epic-6-code-review-fixes.md](./plans/2025-11-15-epic-6-code-review-fixes.md)** - Review feedback
+
+### Status & Tracking
+
+- **[epics.md](./epics.md)** - Epic overview and status
+- **[implementation-readiness-report](./implementation-readiness-report-2025-11-15.md)** - Sprint readiness
+- **[sprint-change-proposal](./sprint-change-proposal-2025-11-15.md)** - Scope changes
+
+---
+
+## Guides & Resources
+
+- **[Memory Profiling Guide](./guides/memory-profiling.md)** - Performance debugging
+- **[overnight-dev.md](./overnight-dev.md)** - Autonomous development setup
+- **[partner-connection-system-design.md](./partner-connection-system-design.md)** - Partner pairing architecture
+- **[task5-icon-optimization-analysis.md](./task5-icon-optimization-analysis.md)** - Icon bundle analysis
+
+---
 
 ## Documentation Usage Guide
 
 ### For AI Agents / LLMs
 
-This documentation is optimized for AI-assisted development:
+**Retrieval Pattern** (optimized for accuracy):
 
-1. **Start with [Project Overview](./project-overview.md)** to understand project goals
-2. **Review [Architecture](./architecture.md)** for system design decisions
-3. **Check [Source Tree Analysis](./source-tree-analysis.md)** for codebase navigation
-4. **Consult specific docs** as needed:
-   - Adding features? → [Development Guide](./development-guide.md) + [Component Inventory](./component-inventory.md)
-   - State changes? → [State Management](./state-management.md)
-   - Data model changes? → [Data Models](./data-models.md)
-   - Architecture questions? → [Architecture](./architecture.md)
+1. **Context Gathering**:
+   - Start with this index for quick facts
+   - Browse sharded folders for specific topics
+   - Each sharded folder has its own `index.md`
+
+2. **Task-Specific Retrieval**:
+   - **Modifying Components** → [Component Inventory](./component-inventory/index.md) + [State Management](./state-management/index.md)
+   - **Adding Features** → [Source Tree Analysis](./source-tree-analysis/index.md) + [Data Models](./data-models/index.md)
+   - **Database Changes** → [Data Models - Supabase](./data-models/database-schema-supabase.md)
+   - **State Changes** → [State Management - Slices](./state-management/feature-slices-deep-dive.md)
+   - **API Integration** → [Source Tree - API Layer](./source-tree-analysis/api-layer-architecture.md)
+   - **Validation** → [Data Models - Zod](./data-models/validation-schemas-zod.md)
+
+3. **Key Facts**:
+   - 20 components, 7 slices, 59 actions
+   - 365 messages with deterministic rotation
+   - Supabase backend with real-time sync
+   - IndexedDB for photos (local-only)
+   - Multi-emotion mood tracking (12 options)
 
 ### For Human Developers
 
 **First Time Setup**:
 
-1. Read [README.md](../README.md) for quick start
-2. Review [Development Guide](./development-guide.md) for environment setup
-3. Skim [Project Overview](./project-overview.md) for context
+1. Review [Project Overview - Getting Started](./project-overview/getting-started.md)
+2. Configure `.env` with Supabase credentials
+3. Run `npm install && npm run dev`
+4. Browse [Source Tree Analysis](./source-tree-analysis/index.md) for codebase structure
 
 **Working on Features**:
 
-1. Check [Component Inventory](./component-inventory.md) for existing components
-2. Review [State Management](./state-management.md) if modifying state
-3. Refer to [Data Models](./data-models.md) for type definitions
-4. Follow patterns in [Source Tree Analysis](./source-tree-analysis.md)
-
-**Architecture Decisions**:
-
-1. Review [Architecture](./architecture.md) for existing patterns
-2. Understand data flow via [State Management](./state-management.md)
-3. Consider PWA implications in [Architecture](./architecture.md)
-
-## Project Statistics
-
-### Codebase
-
-- **Languages**: TypeScript (primary), CSS (Tailwind), HTML
-- **Components**: 2 implemented, 6 planned
-- **State Slices**: 8 (Settings, Onboarding, Messages, Moods, Anniversary, Theme, UI, Initialization)
-- **Data Models**: 7 primary interfaces
-- **Utilities**: 3 utility modules (themes, messageRotation, dateHelpers)
-- **Services**: 1 storage service (IndexedDB wrapper)
-
-### Documentation
-
-- **Total Files**: 7 documentation files + 1 index
-- **Total Size**: ~104 KB
-- **Coverage**: Complete (100% of implemented features documented)
-
-## Getting Started
-
-### For Users
-
-1. Visit the deployed app: `https://YOUR_USERNAME.github.io/My-Love/`
-2. Complete onboarding flow
-3. Install to home screen for best experience
-
-### For Developers
-
-```bash
-# Clone and setup
-git clone https://github.com/YOUR_USERNAME/My-Love.git
-cd My-Love
-npm install
-
-# Start development
-npm run dev
-# → http://localhost:5173/My-Love/
-
-# Build for production
-npm run build
-
-# Deploy to GitHub Pages
-npm run deploy
-```
-
-See [Development Guide](./development-guide.md) for detailed instructions.
-
-## Key Architectural Decisions
-
-### Why Progressive Web App?
-
-- Installable on mobile devices without app stores
-- Works offline after first visit
-- Native-like experience
-- Easy updates through service worker
-
-### Why IndexedDB?
-
-- Large storage capacity for photos and messages
-- Async API (non-blocking)
-- Better than LocalStorage for structured data
-- Native browser support
-
-### Why Zustand?
-
-- Simpler than Redux (less boilerplate)
-- Better TypeScript support
-- Built-in persistence middleware
-- Excellent performance with selectors
-
-### Why Tailwind CSS?
-
-- Rapid development with utility classes
-- Custom theme system matches design requirements
-- Small bundle size (tree-shaken)
-- Great DX with VSCode IntelliSense
-
-### Why Vite?
-
-- Fast HMR during development
-- Optimized production builds
-- Native ESM support
-- Excellent PWA plugin ecosystem
-
-## Browser Support
-
-- **Chrome/Edge**: ✅ Full support (recommended)
-- **Safari**: ✅ Full support
-- **Firefox**: ✅ Full support
-- **Mobile Safari**: ✅ Full PWA support
-- **Chrome Mobile**: ✅ Full PWA support
-
-## Performance Targets
-
-- **First Contentful Paint**: < 1.5s
-- **Time to Interactive**: < 3s
-- **Lighthouse PWA Score**: 100
-- **Bundle Size**: < 200KB (gzipped)
-- **Service Worker**: Precaches all assets
-
-## Security & Privacy
-
-- **No Server**: 100% client-side application
-- **No Analytics**: No tracking or data collection
-- **No External Services**: All data stored locally
-- **HTTPS**: Required for PWA features (GitHub Pages provides)
-- **Content Security Policy**: Configured in production
-
-## Version History
-
-### v1.0.0 (Current - 2025-10-30)
-
-- Initial release
-- Daily message rotation
-- Onboarding flow
-- 4 themes
-- PWA support
-- Offline functionality
-- 100 pre-written messages
-
-### Roadmap
-
-- Photo gallery with upload
-- Countdown timers for anniversaries
-- Mood tracker with insights
-- Custom notes section
-- Push notifications
-- Export/import data
-
-## Documentation Maintenance
-
-This documentation was automatically generated using the BMAD document-project workflow with **exhaustive scan** level.
-
-**Last Updated**: 2025-10-30
-**Workflow Version**: 1.2.0
-**Scan Level**: Exhaustive (all source files analyzed)
-
-To regenerate or update this documentation, run:
-
-```bash
-/bmad:bmm:workflows:document-project
-```
-
-## Need Help?
-
-### Troubleshooting
-
-See [Development Guide - Troubleshooting](./development-guide.md#troubleshooting) for common issues.
-
-### Code Questions
-
-- Check [Source Tree Analysis](./source-tree-analysis.md) for file locations
-- Review [Architecture](./architecture.md) for design patterns
-- Consult [Component Inventory](./component-inventory.md) for component usage
-
-### Feature Development
-
-1. Review [Component Inventory](./component-inventory.md) for planned features
-2. Check [State Management](./state-management.md) for state patterns
-3. Follow [Development Guide](./development-guide.md) for implementation
+1. Check [Component Inventory](./component-inventory/index.md) for patterns
+2. Review [State Management](./state-management/index.md) for store modifications
+3. Refer to [Data Models](./data-models/index.md) for types
+4. Follow architecture patterns in [Source Tree](./source-tree-analysis/architecture-patterns-summary.md)
 
 ---
 
-**🎯 Quick Navigation**: [Overview](./project-overview.md) | [Architecture](./architecture.md) | [Development](./development-guide.md) | [Components](./component-inventory.md) | [State](./state-management.md) | [Data](./data-models.md) | [Source Tree](./source-tree-analysis.md)
+## Archive
 
-_Generated with ❤️ using BMAD document-project workflow_
+Files that have been sharded or superseded are stored in [./.archive/](./.archive/).
+
+**Important**: Archived content should NOT be used as current documentation. See `.archive/claude.md` for guidelines.
+
+---
+
+## Development Commands
+
+| Command             | Purpose               |
+| ------------------- | --------------------- |
+| `npm run dev`       | Start Vite dev server |
+| `npm run build`     | Production build      |
+| `npm run preview`   | Preview production    |
+| `npm run test`      | Run Vitest unit tests |
+| `npm run test:e2e`  | Run Playwright E2E    |
+| `npm run lint`      | ESLint check          |
+| `npm run typecheck` | TypeScript validation |
+
+---
+
+## Quick Navigation
+
+**Sharded Documentation** (Start Here):
+
+- [Project Overview](./project-overview/index.md) | [Source Tree](./source-tree-analysis/index.md) | [Components](./component-inventory/index.md)
+- [Data Models](./data-models/index.md) | [State Management](./state-management/index.md) | [API Services](./api-services-architecture/index.md)
+
+**Core Docs**:
+[Architecture](./architecture.md) | [PRD](./PRD.md) | [Technical Decisions](./technical-decisions.md)
+
+**Sprint Docs**:
+[Epic Specs](./sprint-artifacts/) | [Stories](./stories/) | [Retrospectives](./retrospectives/)
+
+---
+
+**Documentation Structure**: Sharded for modularity (v3.0.0)
+**Last Updated**: 2025-11-16
+**Generated with**: BMAD document workflows

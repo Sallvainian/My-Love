@@ -40,7 +40,7 @@ npm install -D tailwindcss postcss autoprefixer @playwright/test vitest
 | **Testing (Unit)**   | Vitest          | 4.0.9    | 5             | Fast, Vite-native, excellent TypeScript support                     |
 | **Validation**       | Zod             | 3.25.76  | 5,6           | Runtime type checking, schema validation, TypeScript inference      |
 | **Icons**            | Lucide React    | 0.548.0  | All           | Consistent icon set, tree-shakeable, customizable                   |
-| **Deployment**       | GitHub Pages    | 6.3.0    | All           | Free hosting, HTTPS, simple CI/CD                                   |
+| **Deployment**       | Vercel          | -        | All           | Zero-config hosting, edge network, automatic deployments            |
 
 ## Project Structure
 
@@ -645,7 +645,7 @@ USING (
 
 - **Client-Side**: No sensitive data in plain text
 - **Server-Side**: Supabase handles encryption at rest and in transit
-- **HTTPS**: Enforced via GitHub Pages and Supabase
+- **HTTPS**: Enforced via Vercel and Supabase
 
 ### Content Security
 
@@ -686,38 +686,37 @@ USING (
 
 ## Deployment Architecture
 
-### GitHub Pages Deployment
-
-**Command**: `npm run deploy`
+### Vercel Deployment
 
 **Process**:
 
-1. Pre-deploy: `npm run build && npm run test:smoke`
-2. Build: Production bundle generation
-3. Deploy: `gh-pages` pushes `dist/` to `gh-pages` branch
-4. Post-deploy: Manual verification check
+1. Push to main branch or create PR
+2. Vercel automatically builds and deploys
+3. Environment variables injected from Vercel dashboard
+4. Automatic preview deployments for PRs
 
-**Base Path**: `/My-Love/` (configured in vite.config.ts)
+**Base Path**: `/` (root path, no subpath needed)
 
-**Live URL**: `https://<username>.github.io/My-Love/`
+**Live URL**: `https://my-love.vercel.app/` (or custom domain)
 
 ### Environment Variables
 
-**Development**:
+**Development** (`.env.local`):
 
 ```env
 VITE_SUPABASE_URL=<supabase-project-url>
 VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
 ```
 
-**Production**:
+**Production** (Vercel Dashboard):
 
-- Environment variables injected at build time
-- No runtime environment variable access (static hosting)
+- Environment variables configured in Vercel project settings
+- Automatically injected at build time
+- Separate variables for production/preview/development environments
 
 ### HTTPS & Security
 
-- GitHub Pages: Automatic HTTPS
+- Vercel: Automatic HTTPS with Let's Encrypt
 - Supabase: HTTPS API endpoints
 - Required for: Service workers, Web Share API, PWA features
 
@@ -762,8 +761,8 @@ npm run build
 # Preview production build
 npm run preview
 
-# Deploy to GitHub Pages
-npm run deploy
+# Build for deployment (Vercel handles automatically)
+npm run build
 ```
 
 ### Development Workflow
@@ -772,7 +771,7 @@ npm run deploy
 2. **Implementation**: Write code with tests
 3. **Testing**: Run E2E and unit tests
 4. **Code Review**: Manual review (solo developer: self-review)
-5. **Deployment**: Merge to main, deploy to GitHub Pages
+5. **Deployment**: Merge to main → Vercel auto-deploys
 
 ## Architecture Decision Records (ADRs)
 
