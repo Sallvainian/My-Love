@@ -1,16 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './stores/useAppStore';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
-import { AdminPanel } from './components/AdminPanel/AdminPanel';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
-import { PhotoGallery } from './components/PhotoGallery/PhotoGallery';
 import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
-import { MoodTracker } from './components/MoodTracker/MoodTracker';
 import { PokeKissInterface } from './components/PokeKissInterface';
-import { PartnerMoodView } from './components/PartnerMoodView';
 import { LoginScreen } from './components/LoginScreen';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { applyTheme } from './utils/themes';
@@ -18,6 +14,25 @@ import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { authService } from './api/authService';
 import type { Session } from '@supabase/supabase-js';
+
+// Lazy load route components for code splitting
+const PhotoGallery = lazy(() =>
+  import('./components/PhotoGallery/PhotoGallery').then((m) => ({ default: m.PhotoGallery }))
+);
+const MoodTracker = lazy(() =>
+  import('./components/MoodTracker/MoodTracker').then((m) => ({ default: m.MoodTracker }))
+);
+const PartnerMoodView = lazy(() =>
+  import('./components/PartnerMoodView/PartnerMoodView').then((m) => ({ default: m.PartnerMoodView }))
+);
+const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
+
+// Loading spinner component for Suspense fallback
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+  </div>
+);
 
 // Timer configuration
 const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
@@ -341,7 +356,9 @@ function App() {
   if (showAdmin) {
     return (
       <ErrorBoundary>
-        <AdminPanel onExit={handleAdminExit} />
+        <Suspense fallback={<LoadingSpinner />}>
+          <AdminPanel onExit={handleAdminExit} />
+        </Suspense>
       </ErrorBoundary>
     );
   }
@@ -358,13 +375,15 @@ function App() {
         {/* Conditional view rendering */}
         {currentView === 'home' && <DailyMessage onShowWelcome={showWelcomeManually} />}
 
-        {currentView === 'photos' && (
-          <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
-        )}
+        <Suspense fallback={<LoadingSpinner />}>
+          {currentView === 'photos' && (
+            <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+          )}
 
-        {currentView === 'mood' && <MoodTracker />}
+          {currentView === 'mood' && <MoodTracker />}
 
-        {currentView === 'partner' && <PartnerMoodView />}
+          {currentView === 'partner' && <PartnerMoodView />}
+        </Suspense>
 
         {/* Bottom navigation */}
         <BottomNavigation currentView={currentView} onViewChange={setView} />
