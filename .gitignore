@@ -40,6 +40,5 @@ dev-dist
 # Dot Files
 .claude
 .bmad
-.bmad-ephemeral
 .code
 

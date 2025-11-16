@@ -25,7 +25,7 @@ export interface StorageQuotaInfo {
 export function getLocalStorageUsage(): number {
   let totalBytes = 0;
 
-  for (let key in localStorage) {
+  for (const key in localStorage) {
     if (localStorage.hasOwnProperty(key)) {
       const value = localStorage.getItem(key);
       if (value !== null) {
