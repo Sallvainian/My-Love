@@ -1,0 +1,327 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>4</storyId>
+    <title>Remove Onboarding Flow & Pre-Configure Relationship Data</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-4-remove-onboarding-flow-pre-configure-relationship-data.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>the app developer</asA>
+    <iWant>to pre-configure relationship data at build time</iWant>
+    <soThat>my girlfriend never sees the onboarding wizard</soThat>
+    <tasks>
+      <task id="1" ac="1">
+        <title>Create Environment Configuration System</title>
+        <subtasks>
+          <subtask>Create `.env.production.example` file with required variables (`VITE_PARTNER_NAME`, `VITE_RELATIONSHIP_START_DATE`)</subtask>
+          <subtask>Document environment variable format and requirements in deployment guide</subtask>
+          <subtask>Create `src/config/constants.ts` to import and expose env vars at runtime</subtask>
+          <subtask>Add `.env.production` to `.gitignore` (security - never commit sensitive data)</subtask>
+          <subtask>Test: Build with env vars → verify constants available in bundle</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="3,4">
+        <title>Update Store Initialization Logic</title>
+        <subtasks>
+          <subtask>Modify `useAppStore.initializeApp()` to check if settings exist</subtask>
+          <subtask>If `settings === null` AND env vars present → inject pre-configured settings</subtask>
+          <subtask>If settings exist → preserve existing values (don't override user edits)</subtask>
+          <subtask>Set `isOnboarded = true` when pre-configuring</subtask>
+          <subtask>Verify relationship duration calculation uses pre-configured start date</subtask>
+          <subtask>Test: Fresh install → settings populated from env vars</subtask>
+          <subtask>Test: Existing user → settings preserved (not overwritten)</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="2,6">
+        <title>Remove Onboarding Component from Render Path</title>
+        <subtasks>
+          <subtask>Update `App.tsx` to remove conditional `isOnboarded` check</subtask>
+          <subtask>Always render `DailyMessage` component (single-user deployment pattern)</subtask>
+          <subtask>Remove Onboarding component import from App.tsx</subtask>
+          <subtask>Verify no code paths can reach Onboarding component</subtask>
+          <subtask>Test: Fresh install → DailyMessage renders immediately</subtask>
+          <subtask>Test: No onboarding UI visible in any scenario</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="5">
+        <title>Implement Settings Edit Interface</title>
+        <subtasks>
+          <subtask>Verify existing Settings panel allows editing partner name and start date</subtask>
+          <subtask>If Settings component doesn't exist → defer to future story (document as tech debt)</subtask>
+          <subtask>If Settings exists → test editing name/date and verify changes persist</subtask>
+          <subtask>Document edge case handling: user can manually edit pre-configured values if needed</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="2">
+        <title>Clean Up Dead Code</title>
+        <subtasks>
+          <subtask>Evaluate if Onboarding component files should be deleted or archived</subtask>
+          <subtask>Decision per Open Question Q3: Delete in Story 1.5 (dead code removal)</subtask>
+          <subtask>For Story 1.4: Leave files in place, just remove from render path</subtask>
+          <subtask>Add TODO comment for Story 1.5 to delete Onboarding component</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="1,3">
+        <title>Build and Deployment Verification</title>
+        <subtasks>
+          <subtask>Create `.env.production` locally with test values</subtask>
+          <subtask>Run `npm run build` → verify TypeScript compiles successfully</subtask>
+          <subtask>Inspect `dist/` bundle → verify env vars injected correctly (search for VITE_ constants)</subtask>
+          <subtask>Run `npm run preview` → test production build locally</subtask>
+          <subtask>Verify app loads with pre-configured data (no onboarding shown)</subtask>
+          <subtask>Deploy to test environment → verify GitHub Pages deployment works</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="6">
+        <title>Regression Testing</title>
+        <subtasks>
+          <subtask>Fresh install: Clear browser data → verify no onboarding, data pre-configured</subtask>
+          <subtask>Existing user: Keep LocalStorage → verify settings preserved</subtask>
+          <subtask>Message display: Verify daily message renders correctly</subtask>
+          <subtask>Relationship duration: Verify counter calculates from pre-configured start date</subtask>
+          <subtask>Theme switching: Verify all 4 themes work</subtask>
+          <subtask>Favorite/share: Verify existing features continue working</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="1">
+        <title>Documentation Updates</title>
+        <subtasks>
+          <subtask>Update deployment guide with env var setup instructions</subtask>
+          <subtask>Document `.env.production.example` format and required fields</subtask>
+          <subtask>Add security note: Never commit `.env.production` to git</subtask>
+          <subtask>Document fallback behavior if env vars missing (should fail gracefully)</subtask>
+          <subtask>Update architecture.md: Document simplified App.tsx render logic</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Create environment variables or config file for: partner name, relationship start date</criterion>
+    <criterion id="2">Remove Onboarding component from render path</criterion>
+    <criterion id="3">App initializes with pre-configured data on first load</criterion>
+    <criterion id="4">Relationship duration calculates correctly from pre-configured start date</criterion>
+    <criterion id="5">Settings allow editing name/date if needed (edge case)</criterion>
+    <criterion id="6">No onboarding UI visible at any point in normal flow</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1</title>
+        <section>Environment Variables (Story 1.4)</section>
+        <snippet>Defines VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE environment variables for .env.production file. Variables injected at build time via import.meta.env and exposed through src/config/constants.ts module.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1</title>
+        <section>APIs and Interfaces - Environment Configuration Interface</section>
+        <snippet>APP_CONFIG interface with defaultPartnerName, defaultStartDate, and isPreConfigured fields. Used to inject pre-configured relationship data into store initialization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1</title>
+        <section>Critical Workflow 1: Application Initialization</section>
+        <snippet>App initialization flow showing where pre-configured settings should be injected on first load. Store checks if settings exist before applying env var defaults.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Pre-Configured Experience (FR004-FR005)</section>
+        <snippet>FR004 requires eliminating onboarding flow by pre-configuring relationship data at build/deploy time. FR005 requires automatic relationship duration display without user input.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Component Architecture</section>
+        <snippet>Current architecture shows App.tsx conditionally renders Onboarding vs DailyMessage based on isOnboarded state. Target architecture removes conditional to always render DailyMessage for single-user deployment.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions.md</path>
+        <title>Technical Decisions</title>
+        <section>Decision 1.4.1: Hardcode Relationship Configuration</section>
+        <snippet>Decision to hardcode relationship configuration for single-user deployment. Configuration values: Partner Name (Gracie), Relationship Start Date (October 18, 2025), User Name (Frank). Rationale: Personal project with no need for generic onboarding flow.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Story 1.4: Remove Onboarding Flow</section>
+        <snippet>User story and acceptance criteria for removing onboarding wizard. Six acceptance criteria covering environment variables, render path removal, initialization, duration calculation, settings editing, and UI verification.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-2-fix-zustand-persist-middleware-configuration.md</path>
+        <title>Story 1.2 Completion</title>
+        <section>Dev Agent Record - Learnings</section>
+        <snippet>Error handling pattern with comprehensive try-catch blocks and console logging. State persistence pattern using Zustand persist middleware with partialize function. Pattern to follow for settings injection in Story 1.4.</snippet>
+      </doc>
+      <doc>
+        <path>docs/state-management.md</path>
+        <title>State Management Guide</title>
+        <section>Settings State and Actions</section>
+        <snippet>Settings object structure with partnerName, relationshipStartDate, theme, notificationsEnabled, and notificationTime fields. Initial value null until set via setSettings or updateSettings actions.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>6-34</lines>
+        <reason>Root component with conditional rendering logic. Currently renders Onboarding vs DailyMessage based on isOnboarded state (line 33). Must be modified to remove conditional and always render DailyMessage. Also contains initializeApp() call on mount (line 11).</reason>
+      </file>
+      <file>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>initializeApp</symbol>
+        <lines>74-107</lines>
+        <reason>Store initialization method that loads IndexedDB messages. This is where pre-configured settings should be injected on first load. Must add logic to check if settings === null and inject env var defaults while preserving existing settings if present.</reason>
+      </file>
+      <file>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>setSettings</symbol>
+        <lines>110-112</lines>
+        <reason>Settings setter action. Used by initializeApp to inject pre-configured settings. Simple setter that updates settings state.</reason>
+      </file>
+      <file>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>AppState</symbol>
+        <lines>14-53</lines>
+        <reason>Store interface definition showing settings: Settings | null and isOnboarded: boolean. Key state fields that control app initialization flow and onboarding conditional rendering.</reason>
+      </file>
+      <file>
+        <path>src/types/index.ts</path>
+        <kind>interface</kind>
+        <symbol>Settings</symbol>
+        <lines>38-54</lines>
+        <reason>Settings interface definition with relationship.startDate and relationship.partnerName fields. These are the fields that will be populated from environment variables (VITE_PARTNER_NAME, VITE_RELATIONSHIP_START_DATE).</reason>
+      </file>
+      <file>
+        <path>src/components/Onboarding/Onboarding.tsx</path>
+        <kind>component</kind>
+        <symbol>Onboarding</symbol>
+        <lines></lines>
+        <reason>Onboarding wizard component. Will be removed from App.tsx render path (but files left in place for Story 1.5 deletion). Must remove import statement from App.tsx.</reason>
+      </file>
+      <file>
+        <path>src/components/DailyMessage/DailyMessage.tsx</path>
+        <kind>component</kind>
+        <symbol>DailyMessage</symbol>
+        <lines></lines>
+        <reason>Main app view that displays daily love messages. Will become the only rendered component after removing Onboarding conditional. Verify relationship duration calculation works with pre-configured start date.</reason>
+      </file>
+      <file>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>VitePWA configuration</symbol>
+        <lines>1-60</lines>
+        <reason>Vite build configuration with PWA plugin. Vite supports VITE_ environment variables by default via import.meta.env - no configuration changes needed. Verify env var injection works during build.</reason>
+      </file>
+      <file>
+        <path>.gitignore</path>
+        <kind>config</kind>
+        <symbol>N/A</symbol>
+        <lines>13</lines>
+        <reason>Git ignore patterns. Line 13 contains *.local pattern which will ignore .env.production.local but NOT .env.production. Must add .env.production explicitly to ensure secrets never committed.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="^19.1.1">UI framework - App.tsx component mounting and hooks</package>
+        <package name="zustand" version="^5.0.8">State management - useAppStore with persist middleware for settings storage</package>
+        <package name="vite" version="^7.1.7">Build tool - Environment variable injection via import.meta.env</package>
+        <package name="vite-plugin-pwa" version="^1.1.0">PWA support - Service worker configuration (no changes needed)</package>
+        <package name="typescript" version="~5.9.3">Type safety - Settings interface definition in src/types/index.ts</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>MUST preserve existing settings if user already configured manually - never override with env vars</constraint>
+    <constraint>MUST check settings === null before injecting pre-configured defaults (backward compatibility)</constraint>
+    <constraint>MUST add .env.production to .gitignore to prevent committing sensitive relationship data</constraint>
+    <constraint>MUST follow error handling pattern from Story 1.2 - try-catch blocks with console logging</constraint>
+    <constraint>MUST NOT delete Onboarding component files in this story - defer to Story 1.5 (dead code removal)</constraint>
+    <constraint>MUST simplify App.tsx render logic to always show DailyMessage (single-user deployment pattern)</constraint>
+    <constraint>MUST NOT create UI notifications for missing env vars yet - console logging only (defer to Story 1.5)</constraint>
+    <constraint>MUST maintain Zustand persist pattern from Story 1.2 - settings persisted via partialize function</constraint>
+    <constraint>MUST use Vite's native env var support - no build configuration changes needed</constraint>
+    <constraint>MUST document all environment variables in .env.production.example with format and security notes</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>APP_CONFIG</name>
+      <kind>module exports</kind>
+      <signature>export const APP_CONFIG = {
+  defaultPartnerName: import.meta.env.VITE_PARTNER_NAME || '',
+  defaultStartDate: import.meta.env.VITE_RELATIONSHIP_START_DATE || '',
+  isPreConfigured: Boolean(import.meta.env.VITE_PARTNER_NAME),
+} as const;</signature>
+      <path>src/config/constants.ts</path>
+    </interface>
+    <interface>
+      <name>Settings</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Settings {
+  themeName: ThemeName;
+  notificationTime: string;
+  relationship: {
+    startDate: string;
+    partnerName: string;
+    anniversaries: Anniversary[];
+  };
+  customization: { accentColor: string; fontFamily: string; };
+  notifications: { enabled: boolean; time: string; };
+}</signature>
+      <path>src/types/index.ts</path>
+    </interface>
+    <interface>
+      <name>initializeApp</name>
+      <kind>store action</kind>
+      <signature>initializeApp: () => Promise&lt;void&gt;</signature>
+      <path>src/stores/useAppStore.ts</path>
+    </interface>
+    <interface>
+      <name>setSettings</name>
+      <kind>store action</kind>
+      <signature>setSettings: (settings: Settings) => void</signature>
+      <path>src/stores/useAppStore.ts</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Manual testing via browser DevTools - no automated test infrastructure exists yet per Story 1.1 audit. Testing approach: Manual verification of fresh install vs existing user scenarios using browser Application tab (LocalStorage inspection), Console logs for debugging, and visual verification of UI behavior. Follow Story 1.2 error handling pattern: comprehensive try-catch blocks with console logging for all critical operations.</standards>
+    <locations>No test files exist yet. Manual testing locations: Browser DevTools → Application → LocalStorage → 'my-love-storage' key for settings inspection. Console tab for initialization logs and error messages. Network tab for verifying no unexpected requests during initialization.</locations>
+    <ideas>
+      <test ac="1,3">
+        <description>Fresh Install with Pre-Configuration Test</description>
+        <steps>Clear browser data → Create .env.production with test values (VITE_PARTNER_NAME=TestPartner, VITE_RELATIONSHIP_START_DATE=2024-01-01) → Build and preview → Verify no onboarding shown, DailyMessage renders immediately → Check LocalStorage for settings object with correct values → Verify isOnboarded = true → Verify relationship duration counter shows correct days</steps>
+      </test>
+      <test ac="3">
+        <description>Existing User Scenario Test</description>
+        <steps>Manually add existing settings to LocalStorage → Build and run app with env vars present → Verify existing settings preserved (NOT overwritten by env vars) → Verify partner name and start date remain unchanged</steps>
+      </test>
+      <test ac="1">
+        <description>Environment Variable Injection Verification</description>
+        <steps>Build with env vars → Inspect dist/ bundle → Search for injected constants (strings matching env var values) → Add console.log in constants.ts to verify values at runtime → Verify VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE present in bundle</steps>
+      </test>
+      <test ac="2,6">
+        <description>Onboarding Component Removed Test</description>
+        <steps>Review App.tsx code → Verify Onboarding NOT imported, NOT rendered → Search codebase for Onboarding render references → Run app in all scenarios → Verify Onboarding UI never appears</steps>
+      </test>
+      <test ac="6">
+        <description>Regression Test - All Features Work</description>
+        <steps>Message display renders correctly → Favorite button works with animation → Share button works (Web Share API or clipboard) → All 4 themes work correctly → Relationship duration counter updates and calculates correctly → Entrance animation, floating hearts, decorative hearts all work</steps>
+      </test>
+      <test ac="5">
+        <description>Settings Editing Test (if Settings component exists)</description>
+        <steps>Open Settings panel → Edit partner name and start date → Save changes → Refresh browser → Verify edited values persist (Zustand persist from Story 1.2) → If Settings panel doesn't exist, document as future tech debt</steps>
+      </test>
+    </ideas>
+  </tests>
+</story-context>

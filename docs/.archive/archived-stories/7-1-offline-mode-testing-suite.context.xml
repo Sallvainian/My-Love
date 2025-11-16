@@ -1,0 +1,295 @@
+<story-context id="bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>1</storyId>
+    <title>Offline Mode Testing Suite</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/7-1-offline-mode-testing-suite.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer maintaining the My-Love PWA</asA>
+    <iWant>comprehensive tests for offline functionality</iWant>
+    <soThat>I can ensure the core PWA promise (offline-first) works reliably and regressions are caught automatically</soThat>
+    <tasks>
+      <task id="T1">Create offline-service-worker.spec.ts for AC1 (Service Worker Lifecycle Tests)</task>
+      <task id="T2">Create offline-detection.spec.ts for AC2 (Offline Mode Detection Tests)</task>
+      <task id="T3">Create offline-cache-strategy.spec.ts for AC3 (Cache-First Strategy Validation)</task>
+      <task id="T4">Create offline-sync-recovery.spec.ts for AC4 (Network Failure Recovery Tests)</task>
+      <task id="T5">Integrate tests into CI pipeline for AC5 (CI Integration)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Service Worker Lifecycle Tests">
+      <requirement>Test service worker registration on first load</requirement>
+      <requirement>Test service worker activation after registration</requirement>
+      <requirement>Test service worker update detection</requirement>
+      <requirement>Test cache invalidation on new version</requirement>
+      <requirement>Tests run in Playwright E2E suite</requirement>
+    </criterion>
+    <criterion id="AC2" title="Offline Mode Detection Tests">
+      <requirement>Test app detects when browser goes offline (navigator.onLine)</requirement>
+      <requirement>Test UI state changes when offline (visual indicator)</requirement>
+      <requirement>Test app detects when browser comes back online</requirement>
+      <requirement>Test network reconnection triggers sync</requirement>
+      <requirement>Tests simulate network conditions via Playwright</requirement>
+    </criterion>
+    <criterion id="AC3" title="Cache-First Strategy Validation">
+      <requirement>Test static assets served from cache when offline</requirement>
+      <requirement>Test message data accessible when offline</requirement>
+      <requirement>Test photo gallery accessible when offline (IndexedDB)</requirement>
+      <requirement>Test settings persist when offline</requirement>
+      <requirement>Test navigation works without network</requirement>
+    </criterion>
+    <criterion id="AC4" title="Network Failure Recovery Tests">
+      <requirement>Test graceful handling of failed API calls</requirement>
+      <requirement>Test retry mechanism for mood sync operations</requirement>
+      <requirement>Test retry mechanism for poke/kiss interactions</requirement>
+      <requirement>Test offline queue for pending sync operations</requirement>
+      <requirement>Test queue processing when network restores</requirement>
+    </criterion>
+    <criterion id="AC5" title="CI Integration">
+      <requirement>Offline tests integrated into existing test suite</requirement>
+      <requirement>Tests run on every PR via GitHub Actions</requirement>
+      <requirement>Clear failure messages when offline behavior breaks</requirement>
+      <requirement>No flaky tests (retry logic for network simulation)</requirement>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Non-Functional Requirements - NFR002</section>
+        <snippet>NFR002: **Offline Support** - App SHALL function fully offline after initial load (except mood sync and poke/kiss features). Core PWA promise requiring service worker, cache-first strategy, and graceful degradation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>PWA Configuration</section>
+        <snippet>vite-plugin-pwa v0.21.3 for service worker generation and offline functionality. Pre-caching all static assets, IndexedDB for local data access, LocalStorage for settings persistence, graceful degradation when backend unavailable.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Testing Strategy</section>
+        <snippet>Playwright 1.56.1 for E2E testing with PWA validation, offline mode testing, cross-browser support. Vitest 4.0.9 for unit testing. Use data-testid attributes for selectors.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-7.md</path>
+        <title>Epic 7 Technical Specification</title>
+        <section>Overview</section>
+        <snippet>Epic 7 addresses critical testing gaps. Highest priority risk is R-001 (Offline functionality) with CRITICAL score of 8/10. This is a PWA, and offline support is a core promise that has zero test coverage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-7.md</path>
+        <title>Epic 7 Technical Specification</title>
+        <section>Playwright Context API</section>
+        <snippet>Use context.setOffline(true/false) for network simulation. Use page.evaluate(() => navigator.serviceWorker.ready) for SW introspection. Check navigator.onLine for status detection.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-7.md</path>
+        <title>Epic 7 Technical Specification</title>
+        <section>Sync Queue Schema</section>
+        <snippet>SyncQueueItem interface with id, type ('mood'|'interaction'), payload, timestamp, retryCount, status ('pending'|'syncing'|'failed'). localStorage key: 'my-love-sync-queue'.</snippet>
+      </doc>
+      <doc>
+        <path>docs/test-design-system.md</path>
+        <title>System-Level Test Design Retrospective</title>
+        <section>Risk Priority Matrix</section>
+        <snippet>R-001 CRITICAL (Score 8): Offline functionality completely untested. Core PWA functionality untested. Immediate action required: Add service worker E2E tests, offline mode scenarios.</snippet>
+      </doc>
+      <doc>
+        <path>docs/test-design-system.md</path>
+        <title>System-Level Test Design Retrospective</title>
+        <section>NFR002 Analysis</section>
+        <snippet>GAPS: No service worker lifecycle tests, no offline mode E2E scenarios, no cache invalidation tests, no network failure recovery tests, no sync conflict resolution tests. Current coverage: 0%.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>all</lines>
+        <reason>E2E test configuration: baseURL (localhost:5173/My-Love/), webServer command (npm run dev), projects (chromium, firefox), retries config. Pattern for new tests.</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>VitePWA</symbol>
+        <lines>28-106</lines>
+        <reason>PWA and service worker configuration: registerType (autoUpdate), workbox (CacheFirst for static assets, NetworkOnly for JS/CSS/HTML), skipWaiting, clientsClaim. Tests validate this behavior.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/fixtures/baseFixture.ts</path>
+        <kind>fixture</kind>
+        <symbol>baseFixture</symbol>
+        <lines>all</lines>
+        <reason>Standard E2E test fixture pattern. Import and extend for offline tests to maintain consistency.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/support/helpers/pwaHelpers.ts</path>
+        <kind>helper</kind>
+        <symbol>getLocalStorageItem, clearLocalStorage, clearIndexedDB, getIndexedDBStore</symbol>
+        <lines>all</lines>
+        <reason>PWA helper functions for LocalStorage and IndexedDB. Reuse for offline cache validation and sync queue testing.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/persistence.spec.ts</path>
+        <kind>test-reference</kind>
+        <symbol>test.describe</symbol>
+        <lines>1-80</lines>
+        <reason>Reference for LocalStorage/IndexedDB testing patterns. Shows fixture usage and state hydration tests.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/syncService.ts</path>
+        <kind>service</kind>
+        <symbol>syncService</symbol>
+        <lines>all</lines>
+        <reason>Core sync service. Investigate for offline queue implementation. Tests AC12-15 depend on sync queue behavior.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/moodSyncService.ts</path>
+        <kind>service</kind>
+        <symbol>moodSyncService</symbol>
+        <lines>all</lines>
+        <reason>Mood sync service. Test network failure recovery and retry mechanisms (AC4).</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/photoStorageService.ts</path>
+        <kind>service</kind>
+        <symbol>photoStorageService</symbol>
+        <lines>all</lines>
+        <reason>IndexedDB photo storage. Test offline photo gallery accessibility (AC3).</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAppStore</symbol>
+        <lines>all</lines>
+        <reason>Zustand store with persist middleware. LocalStorage key: 'my-love-storage'. Tests validate state persistence offline.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/</path>
+        <kind>directory</kind>
+        <symbol>*.spec.ts (23 files)</symbol>
+        <lines>N/A</lines>
+        <reason>Existing E2E specs as reference. Follow naming convention (offline-*.spec.ts).</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="Node.js">
+        <testing>
+          <package name="@playwright/test" version="^1.56.1" usage="E2E testing framework with offline simulation" />
+          <package name="vitest" version="^4.0.9" usage="Unit test runner (Vite-native)" />
+          <package name="@vitest/coverage-v8" version="^4.0.9" usage="Test coverage reporting" />
+          <package name="@testing-library/react" version="^16.1.0" usage="React component testing" />
+          <package name="fake-indexeddb" version="^6.2.5" usage="Mock IndexedDB for unit tests" />
+          <package name="happy-dom" version="^20.0.10" usage="DOM environment for Vitest" />
+        </testing>
+        <pwa>
+          <package name="vite-plugin-pwa" version="^1.1.0" usage="Service worker generation (tested, not modified)" />
+          <package name="workbox-window" version="^7.3.0" usage="Service worker communication" />
+          <package name="idb" version="^8.0.3" usage="IndexedDB promise wrapper" />
+          <package name="zustand" version="^5.0.8" usage="State management with persist middleware" />
+        </pwa>
+        <backend>
+          <package name="@supabase/supabase-js" version="^2.81.1" usage="Backend client (offline sync testing)" />
+        </backend>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architectural">Tests MUST NOT modify production code (testing-only story). Missing features become separate implementation stories.</constraint>
+    <constraint type="testing-framework">Use Playwright context.setOffline(true/false) for network simulation. Use page.evaluate() for service worker introspection.</constraint>
+    <constraint type="test-organization">Place tests in tests/e2e/. Follow naming: offline-*.spec.ts</constraint>
+    <constraint type="test-pattern">Import from '../support/fixtures/baseFixture' and '../support/helpers/pwaHelpers' for consistency.</constraint>
+    <constraint type="ci-integration">Tests must integrate into GitHub Actions pipeline (.github/workflows/playwright.yml).</constraint>
+    <constraint type="reliability">No flaky tests. Use explicit waits, not timeouts. Add retry config for timing-sensitive tests. Validate with 10 consecutive runs.</constraint>
+    <constraint type="performance">Total CI test execution time must remain under 10 minutes.</constraint>
+    <constraint type="service-worker">Service worker generated by vite-plugin-pwa. Tests validate behavior, not configuration.</constraint>
+    <constraint type="data-testid">Use data-testid attributes for reliable element selection.</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>Playwright Context Offline API</name>
+      <kind>Playwright API</kind>
+      <signature>await context.setOffline(boolean)</signature>
+      <path>@playwright/test</path>
+    </interface>
+    <interface>
+      <name>Service Worker Registration</name>
+      <kind>Browser API via page.evaluate</kind>
+      <signature>await page.evaluate(() => navigator.serviceWorker.ready)</signature>
+      <path>Browser native</path>
+    </interface>
+    <interface>
+      <name>Online Status Detection</name>
+      <kind>Browser API via page.evaluate</kind>
+      <signature>await page.evaluate(() => navigator.onLine)</signature>
+      <path>Browser native</path>
+    </interface>
+    <interface>
+      <name>LocalStorage Helpers</name>
+      <kind>Test helpers</kind>
+      <signature>getLocalStorageItem(page, key), setLocalStorageItem(page, key, value), clearLocalStorage(page)</signature>
+      <path>tests/support/helpers/pwaHelpers.ts</path>
+    </interface>
+    <interface>
+      <name>IndexedDB Helpers</name>
+      <kind>Test helpers</kind>
+      <signature>clearIndexedDB(page), getIndexedDBStore(page, storeName)</signature>
+      <path>tests/support/helpers/pwaHelpers.ts</path>
+    </interface>
+    <interface>
+      <name>Zustand Persist Middleware</name>
+      <kind>State persistence</kind>
+      <signature>LocalStorage key: 'my-love-storage'</signature>
+      <path>src/stores/useAppStore.ts</path>
+    </interface>
+    <interface>
+      <name>SyncQueueItem (expected)</name>
+      <kind>Data contract</kind>
+      <signature>{ id: string, type: 'mood'|'interaction', payload: MoodEntry|Interaction, timestamp: Date, retryCount: number, status: 'pending'|'syncing'|'failed' }</signature>
+      <path>localStorage key: 'my-love-sync-queue' (to be validated)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Playwright for E2E tests with context.setOffline() for network simulation. Vitest for unit tests. Follow existing test patterns in tests/e2e/*.spec.ts. Use data-testid attributes. Import fixtures from '../support/fixtures/baseFixture'. Target no flaky tests with explicit waits and retry logic. CI integration via GitHub Actions.</standards>
+    <locations>
+      <location>tests/e2e/offline-service-worker.spec.ts</location>
+      <location>tests/e2e/offline-detection.spec.ts</location>
+      <location>tests/e2e/offline-cache-strategy.spec.ts</location>
+      <location>tests/e2e/offline-sync-recovery.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test SW registration: Load app, verify navigator.serviceWorker.ready resolves</idea>
+      <idea ac="AC1">Test SW activation: After registration, verify SW enters 'activated' state</idea>
+      <idea ac="AC1">Test SW update: Deploy new version, verify updatefound event fires</idea>
+      <idea ac="AC1">Test cache invalidation: Update SW, verify old caches removed via caches.keys()</idea>
+      <idea ac="AC2">Test offline detection: Use context.setOffline(true), verify navigator.onLine returns false</idea>
+      <idea ac="AC2">Test UI offline indicator: Go offline, check for visible offline badge/indicator</idea>
+      <idea ac="AC2">Test reconnection: Go online after offline, verify 'online' event triggers</idea>
+      <idea ac="AC2">Test sync trigger: Reconnection should trigger sync service operations</idea>
+      <idea ac="AC3">Test static assets cache: Go offline after initial load, reload, verify assets served from SW cache</idea>
+      <idea ac="AC3">Test message data offline: Verify message rotation works from LocalStorage when offline</idea>
+      <idea ac="AC3">Test photo gallery offline: Verify IndexedDB photos load when offline</idea>
+      <idea ac="AC3">Test settings persist: Verify settings accessible from LocalStorage when offline</idea>
+      <idea ac="AC3">Test navigation offline: Switch tabs while offline, verify all views render</idea>
+      <idea ac="AC4">Test graceful API failure: Go offline, attempt Supabase call, verify no crash and error handled</idea>
+      <idea ac="AC4">Test mood sync queue: Log mood offline, verify queued in localStorage/IndexedDB</idea>
+      <idea ac="AC4">Test poke/kiss queue: Send interaction offline, verify queued</idea>
+      <idea ac="AC4">Test queue structure: Verify queue matches SyncQueueItem schema</idea>
+      <idea ac="AC4">Test queue processing: Go online, verify queued items sent and queue cleared</idea>
+      <idea ac="AC5">Test CI integration: Verify offline tests run in GitHub Actions pipeline</idea>
+      <idea ac="AC5">Test non-flaky: Run 3x consecutively without failures</idea>
+      <idea ac="AC5">Test failure messages: Force failure, verify descriptive error output</idea>
+    </ideas>
+  </tests>
+</story-context>
