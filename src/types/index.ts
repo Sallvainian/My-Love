@@ -4,7 +4,17 @@ export type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
 
 export type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
 
-export type MoodType = 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful';
+export type MoodType =
+  | 'loved'
+  | 'happy'
+  | 'content'
+  | 'thoughtful'
+  | 'grateful'
+  | 'sad'
+  | 'anxious'
+  | 'frustrated'
+  | 'lonely'
+  | 'tired';
 
 export interface Message {
   id: number;
@@ -62,7 +72,8 @@ export interface Anniversary {
 export interface MoodEntry {
   id?: number; // Auto-increment (IndexedDB)
   userId: string; // Hardcoded for single-user (from constants.ts)
-  mood: MoodType;
+  mood: MoodType; // Primary mood (for backward compatibility)
+  moods?: MoodType[]; // Multiple mood support
   note?: string; // Optional, max 200 chars
   date: string; // ISO date string (YYYY-MM-DD)
   timestamp: Date; // Full timestamp when logged

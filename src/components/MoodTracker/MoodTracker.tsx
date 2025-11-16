@@ -10,6 +10,11 @@ import {
   CloudOff,
   CheckCircle,
   Calendar,
+  Frown,
+  AlertCircle,
+  Angry,
+  UserMinus,
+  Battery,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { MoodButton } from './MoodButton';
@@ -17,14 +22,24 @@ import { MoodHistoryCalendar } from '../MoodHistory';
 import type { MoodType } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
 
-// Mood icon mapping per story requirements
-const MOOD_CONFIG = {
+// Mood icon mapping - positive and negative emotions
+const POSITIVE_MOODS = {
   loved: { icon: Heart, label: 'Loved' },
   happy: { icon: Smile, label: 'Happy' },
   content: { icon: Meh, label: 'Content' },
   thoughtful: { icon: MessageCircle, label: 'Thoughtful' },
   grateful: { icon: Sparkles, label: 'Grateful' },
 } as const;
+
+const NEGATIVE_MOODS = {
+  sad: { icon: Frown, label: 'Sad' },
+  anxious: { icon: AlertCircle, label: 'Anxious' },
+  frustrated: { icon: Angry, label: 'Frustrated' },
+  lonely: { icon: UserMinus, label: 'Lonely' },
+  tired: { icon: Battery, label: 'Tired' },
+} as const;
+
+const MOOD_CONFIG = { ...POSITIVE_MOODS, ...NEGATIVE_MOODS } as const;
 
 // Tab types for navigation
 type MoodTabType = 'tracker' | 'history';
@@ -50,8 +65,8 @@ export function MoodTracker() {
   // Tab navigation state (Story 6.3: Task 7)
   const [activeTab, setActiveTab] = useState<MoodTabType>('tracker');
 
-  // Form state
-  const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
+  // Form state - now supports multiple mood selection
+  const [selectedMoods, setSelectedMoods] = useState<MoodType[]>([]);
   const [note, setNote] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
@@ -76,14 +91,27 @@ export function MoodTracker() {
     const existingMood = getMoodForDate(today);
 
     if (existingMood) {
-      setSelectedMood(existingMood.mood);
+      // Support both old single mood and new multiple moods
+      if (existingMood.moods && existingMood.moods.length > 0) {
+        setSelectedMoods(existingMood.moods);
+      } else {
+        setSelectedMoods([existingMood.mood]);
+      }
       setNote(existingMood.note || '');
       setIsEditing(true);
     }
   }, [getMoodForDate]);
 
   const handleMoodSelect = (mood: MoodType) => {
-    setSelectedMood(mood);
+    setSelectedMoods((prev) => {
+      if (prev.includes(mood)) {
+        // Deselect if already selected
+        return prev.filter((m) => m !== mood);
+      } else {
+        // Add to selection
+        return [...prev, mood];
+      }
+    });
     setError(null);
   };
 
@@ -98,8 +126,8 @@ export function MoodTracker() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedMood) {
-      setError('Please select a mood');
+    if (selectedMoods.length === 0) {
+      setError('Please select at least one mood');
       return;
     }
 
@@ -108,15 +136,16 @@ export function MoodTracker() {
       setError(null);
       setNoteError(null);
 
-      // Add or update mood entry via Zustand action (which calls MoodService)
-      await addMoodEntry(selectedMood, note.trim() || undefined);
+      // Use first mood as primary for backward compatibility, pass all moods
+      const primaryMood = selectedMoods[0];
+      await addMoodEntry(primaryMood, note.trim() || undefined);
 
       // Show success feedback
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
 
       if (import.meta.env.DEV) {
-        console.log('[MoodTracker] Mood entry saved successfully');
+        console.log('[MoodTracker] Mood entry saved successfully:', selectedMoods);
       }
 
       // Story 6.4: AC #1 - Trigger background sync after mood entry
@@ -150,7 +179,7 @@ export function MoodTracker() {
     }
   };
 
-  const isValid = selectedMood !== null;
+  const isValid = selectedMoods.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20" data-testid="mood-tracker">
@@ -260,23 +289,51 @@ export function MoodTracker() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Mood Selection (AC-2) */}
+              {/* Mood Selection - Multiple selection support */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Select your mood
+                  How are you feeling? (select all that apply)
                 </label>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-                  {(Object.keys(MOOD_CONFIG) as MoodType[]).map((mood) => (
-                    <MoodButton
-                      key={mood}
-                      mood={mood}
-                      icon={MOOD_CONFIG[mood].icon}
-                      label={MOOD_CONFIG[mood].label}
-                      isSelected={selectedMood === mood}
-                      onClick={() => handleMoodSelect(mood)}
-                    />
-                  ))}
+
+                {/* Positive Emotions */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Positive</p>
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                    {(Object.keys(POSITIVE_MOODS) as MoodType[]).map((mood) => (
+                      <MoodButton
+                        key={mood}
+                        mood={mood}
+                        icon={MOOD_CONFIG[mood].icon}
+                        label={MOOD_CONFIG[mood].label}
+                        isSelected={selectedMoods.includes(mood)}
+                        onClick={() => handleMoodSelect(mood)}
+                      />
+                    ))}
+                  </div>
                 </div>
+
+                {/* Negative Emotions */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Challenging</p>
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                    {(Object.keys(NEGATIVE_MOODS) as MoodType[]).map((mood) => (
+                      <MoodButton
+                        key={mood}
+                        mood={mood}
+                        icon={MOOD_CONFIG[mood].icon}
+                        label={MOOD_CONFIG[mood].label}
+                        isSelected={selectedMoods.includes(mood)}
+                        onClick={() => handleMoodSelect(mood)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {selectedMoods.length > 0 && (
+                  <p className="text-sm text-gray-600 mt-3">
+                    Selected: {selectedMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
+                  </p>
+                )}
               </div>
 
               {/* Note Input (AC-3) */}

@@ -16,6 +16,11 @@ import {
   Check,
   X,
   Users,
+  Frown,
+  AlertCircle,
+  Angry,
+  UserMinus,
+  Battery,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
@@ -24,11 +29,18 @@ import { moodSyncService } from '../../api/moodSyncService';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {
+  // Positive emotions
   loved: { icon: Heart, label: 'Loved', color: 'text-red-500' },
   happy: { icon: Smile, label: 'Happy', color: 'text-yellow-500' },
   content: { icon: Meh, label: 'Content', color: 'text-blue-500' },
   thoughtful: { icon: MessageCircle, label: 'Thoughtful', color: 'text-purple-500' },
   grateful: { icon: Sparkles, label: 'Grateful', color: 'text-pink-500' },
+  // Negative emotions
+  sad: { icon: Frown, label: 'Sad', color: 'text-gray-500' },
+  anxious: { icon: AlertCircle, label: 'Anxious', color: 'text-orange-500' },
+  frustrated: { icon: Angry, label: 'Frustrated', color: 'text-red-600' },
+  lonely: { icon: UserMinus, label: 'Lonely', color: 'text-indigo-500' },
+  tired: { icon: Battery, label: 'Tired', color: 'text-slate-500' },
 } as const;
 
 /**

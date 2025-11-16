@@ -271,16 +271,20 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       const partnerMoodRecords = await moodSyncService.fetchMoods(partnerId, limit);
 
       // Transform Supabase records to MoodEntry format
-      const transformedMoods: MoodEntry[] = partnerMoodRecords.map((record) => ({
-        id: undefined, // Partner moods don't have local IDB id
-        userId: record.user_id,
-        mood: record.mood_type,
-        note: record.note || undefined,
-        date: record.created_at.split('T')[0], // Extract YYYY-MM-DD
-        timestamp: new Date(record.created_at),
-        synced: true, // Partner moods are always synced (from Supabase)
-        supabaseId: record.id,
-      }));
+      const transformedMoods: MoodEntry[] = partnerMoodRecords.map((record) => {
+        // Handle nullable created_at (shouldn't be null in practice, but types say it can be)
+        const createdAt = record.created_at || new Date().toISOString();
+        return {
+          id: undefined, // Partner moods don't have local IDB id
+          userId: record.user_id,
+          mood: record.mood_type,
+          note: record.note || undefined,
+          date: createdAt.split('T')[0], // Extract YYYY-MM-DD
+          timestamp: new Date(createdAt),
+          synced: true, // Partner moods are always synced (from Supabase)
+          supabaseId: record.id,
+        };
+      });
 
       // Update state
       set({ partnerMoods: transformedMoods });
