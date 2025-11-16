@@ -128,17 +128,19 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
    * Story 5.5: Added runtime validation with Zod schema
    *
    * @param userId - Authenticated user's UUID from Supabase
-   * @param mood - Mood type (loved, happy, content, thoughtful, grateful)
+   * @param moods - Array of mood types (at least one required)
    * @param note - Optional note (max 200 chars)
    * @returns MoodEntry with auto-generated id
    * @throws {ValidationError} if mood data is invalid
    */
-  async create(userId: string, mood: MoodEntry['mood'], note?: string): Promise<MoodEntry> {
+  async create(userId: string, moods: MoodEntry['mood'][], note?: string): Promise<MoodEntry> {
     try {
       const today = new Date().toISOString().split('T')[0];
+      const primaryMood = moods[0]; // First mood is primary for backward compatibility
       const moodEntry: Omit<MoodEntry, 'id'> = {
         userId,
-        mood,
+        mood: primaryMood,
+        moods, // Store all selected moods
         note: note || '',
         date: today,
         timestamp: new Date(),
@@ -150,6 +152,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
       MoodEntrySchema.parse({
         date: moodEntry.date,
         mood: moodEntry.mood,
+        moods: moodEntry.moods,
         note: moodEntry.note,
       });
 
@@ -174,28 +177,32 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
    * Story 6.2: AC-5 - Can only log one mood per day (edit if logging again same day)
    *
    * @param id - Mood entry ID
-   * @param mood - Updated mood type
+   * @param moods - Updated mood types array
    * @param note - Updated note
    * @returns Updated MoodEntry
    * @throws {ValidationError} if mood data is invalid
    */
-  async updateMood(id: number, mood: MoodEntry['mood'], note?: string): Promise<MoodEntry> {
+  async updateMood(id: number, moods: MoodEntry['mood'][], note?: string): Promise<MoodEntry> {
     try {
       const existing = await this.get(id);
       if (!existing) {
         throw new Error(`Mood entry with id ${id} not found`);
       }
 
+      const primaryMood = moods[0]; // First mood is primary for backward compatibility
+
       // Validate updated mood entry
       MoodEntrySchema.parse({
         date: existing.date,
-        mood,
+        mood: primaryMood,
+        moods,
         note: note || '',
       });
 
       // Update via base class (id, updates)
       await super.update(id, {
-        mood,
+        mood: primaryMood,
+        moods, // Store all selected moods
         note: note || '',
         timestamp: new Date(), // Update timestamp
         synced: false, // Mark as unsynced after update

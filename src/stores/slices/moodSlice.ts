@@ -34,9 +34,9 @@ export interface MoodSlice {
   };
 
   // Actions
-  addMoodEntry: (mood: MoodEntry['mood'], note?: string) => Promise<void>;
+  addMoodEntry: (moods: MoodEntry['mood'][], note?: string) => Promise<void>;
   getMoodForDate: (date: string) => MoodEntry | undefined;
-  updateMoodEntry: (date: string, mood: MoodEntry['mood'], note?: string) => Promise<void>;
+  updateMoodEntry: (date: string, moods: MoodEntry['mood'][], note?: string) => Promise<void>;
   loadMoods: () => Promise<void>;
   updateSyncStatus: () => Promise<void>;
   syncPendingMoods: () => Promise<{ synced: number; failed: number }>;
@@ -56,7 +56,7 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
   },
 
   // Actions
-  addMoodEntry: async (mood, note) => {
+  addMoodEntry: async (moods, note) => {
     try {
       // Get authenticated user ID
       const userId = await authService.getCurrentUserId();
@@ -70,12 +70,12 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
 
       if (existingMood && existingMood.id) {
         // Update existing mood
-        await get().updateMoodEntry(today, mood, note);
+        await get().updateMoodEntry(today, moods, note);
         return;
       }
 
       // Create new mood entry via MoodService (validates with MoodEntrySchema)
-      const created = await moodService.create(userId, mood, note);
+      const created = await moodService.create(userId, moods, note);
 
       // Optimistic UI update - add to state immediately
       set((state) => ({
@@ -98,7 +98,7 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
     return get().moods.find((m) => m.date === date);
   },
 
-  updateMoodEntry: async (date, mood, note) => {
+  updateMoodEntry: async (date, moods, note) => {
     try {
       const existingMood = get().moods.find((m) => m.date === date);
       if (!existingMood || !existingMood.id) {
@@ -106,7 +106,7 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       }
 
       // Update via MoodService (validates with MoodEntrySchema)
-      const updated = await moodService.updateMood(existingMood.id, mood, note);
+      const updated = await moodService.updateMood(existingMood.id, moods, note);
 
       // Update state
       set((state) => ({

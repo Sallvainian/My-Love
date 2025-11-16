@@ -136,9 +136,8 @@ export function MoodTracker() {
       setError(null);
       setNoteError(null);
 
-      // Use first mood as primary for backward compatibility, pass all moods
-      const primaryMood = selectedMoods[0];
-      await addMoodEntry(primaryMood, note.trim() || undefined);
+      // Pass all selected moods to addMoodEntry (first mood becomes primary for backward compat)
+      await addMoodEntry(selectedMoods, note.trim() || undefined);
 
       // Show success feedback
       setShowSuccess(true);

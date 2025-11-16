@@ -13,6 +13,16 @@ import type { Database } from '../types/database.types';
 // Re-export Database type for convenience
 export type { Database } from '../types/database.types';
 
+// Import authService dynamically to avoid circular dependency
+
+let authServiceModule: any = null;
+const getAuthService = async () => {
+  if (!authServiceModule) {
+    authServiceModule = await import('./authService');
+  }
+  return authServiceModule.authService;
+};
+
 /**
  * Supabase configuration from environment variables
  */
@@ -69,31 +79,6 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 );
 
 /**
- * Get current authenticated user ID
- * Returns the authenticated user's ID from the Supabase Auth session
- *
- * @deprecated Use authService.getCurrentUserId() instead
- * @throws Error if no authenticated session exists
- */
-export const getCurrentUserId = async (): Promise<string> => {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error) {
-    console.error('[Supabase Auth] Failed to get user:', error);
-    throw error;
-  }
-
-  if (!user) {
-    throw new Error('No authenticated user found. Please sign in first.');
-  }
-
-  return user.id;
-};
-
-/**
  * Get partner user ID
  * Queries the database to find the other user (partner) in the system.
  * For 2-user MVP: Returns the user ID that is not the current user.
@@ -102,7 +87,13 @@ export const getCurrentUserId = async (): Promise<string> => {
  */
 export const getPartnerId = async (): Promise<string | null> => {
   try {
-    const currentUserId = await getCurrentUserId();
+    const authService = await getAuthService();
+    const currentUserId = await authService.getCurrentUserId();
+
+    if (!currentUserId) {
+      console.error('[Supabase] Cannot get partner ID: User not authenticated');
+      return null;
+    }
 
     // Query users table for the partner (the other user)
     const { data, error } = await supabase
