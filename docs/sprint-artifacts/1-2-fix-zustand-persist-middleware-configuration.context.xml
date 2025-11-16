@@ -1,0 +1,245 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>2</storyId>
+    <title>Fix Zustand Persist Middleware Configuration</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-2-fix-zustand-persist-middleware-configuration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>to fix the Zustand state persistence bug</iWant>
+    <soThat>user data (favorites, settings, message history) survives browser sessions</soThat>
+    <tasks>
+- [ ] Add error handling to persist middleware (AC: 1, 4)
+  - [ ] Implement onRehydrateStorage callback with error recovery
+  - [ ] Add fallback behavior if LocalStorage quota exceeded
+  - [ ] Clear corrupted state if rehydration fails
+  - [ ] Log persistence errors for debugging
+
+- [ ] Add state versioning for migrations (AC: 1, 2)
+  - [ ] Add version field to persisted state structure
+  - [ ] Implement version check on rehydration
+  - [ ] Create migration utility for future schema changes
+  - [ ] Document migration pattern in code comments
+
+- [ ] Verify partialize strategy (AC: 3)
+  - [ ] Review current partialize configuration in useAppStore.ts
+  - [ ] Confirm only settings, isOnboarded, messageHistory, moods are persisted
+  - [ ] Verify messages, photos, currentMessage, isLoading, error are NOT persisted
+  - [ ] Add code comments documenting partialize rationale
+
+- [ ] Add user feedback for persistence errors (AC: 4)
+  - [ ] Create error notification mechanism (toast or alert)
+  - [ ] Show user-friendly message if state cannot be saved
+  - [ ] Provide "Clear Data" option if corruption detected
+
+- [ ] Comprehensive testing (AC: 5, 6)
+  - [ ] Test: Browser refresh preserves favorites and settings
+  - [ ] Test: Tab close/reopen preserves state
+  - [ ] Test: 24-hour gap (simulate with date manipulation)
+  - [ ] Test: LocalStorage quota exceeded scenario
+  - [ ] Test: Corrupted LocalStorage data recovery
+  - [ ] Regression test: All existing features work (message display, favorites, themes)
+
+- [ ] Documentation updates (AC: 1)
+  - [ ] Update state-management.md with persist middleware patterns
+  - [ ] Document error handling approach
+  - [ ] Add troubleshooting section for persistence issues
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. Zustand persist middleware correctly saves state to LocalStorage
+2. State hydration works on app initialization without data loss
+3. Storage partializer only persists necessary state (not transient UI state)
+4. Handle storage quota exceeded errors gracefully
+5. Test persistence across browser refresh, tab close/reopen, and 24-hour gap
+6. All existing features continue working (no regression)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Foundation &amp; Core Fixes</title>
+        <section>Detailed Design - Services and Modules</section>
+        <snippet>Persist middleware is responsible for serialize/deserialize state to/from LocalStorage. Takes store state changes as input and outputs persisted JSON in LocalStorage. Owned by Story 1.2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Foundation &amp; Core Fixes</title>
+        <section>Data Models and Contracts - Zustand Store State</section>
+        <snippet>Persisted via persist middleware: settings, isOnboarded, messageHistory, moods. In-memory only (not persisted): messages, photos, currentMessage, isLoading, error.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Epic Technical Specification: Foundation &amp; Core Fixes</title>
+        <section>Workflows and Sequencing - Critical Workflow 2: State Persistence</section>
+        <snippet>Zustand persist middleware detects state change, serializes ONLY partialize state to JSON, writes to LocalStorage key 'my-love-storage'. On next app load, persist rehydrates state from LocalStorage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>State Management</section>
+        <snippet>Single Zustand store (useAppStore) with persist middleware for LocalStorage integration. Partialize strategy only persists critical state (settings, isOnboarded, messageHistory, moods).</snippet>
+      </doc>
+      <doc>
+        <path>docs/state-management.md</path>
+        <title>State Management Documentation</title>
+        <section>Persistence Configuration</section>
+        <snippet>Persist middleware configuration at lines 282-291 of useAppStore.ts uses name 'my-love-storage' and partialize function to select which state to persist.</snippet>
+      </doc>
+      <doc>
+        <path>docs/state-management.md</path>
+        <title>State Management Documentation</title>
+        <section>Persisted vs. Non-Persisted State</section>
+        <snippet>Rationale: Large data (messages, photos) → IndexedDB. Small config data → LocalStorage. Computed state → Re-calculated on load. Transient state → Not persisted.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions.md</path>
+        <title>Technical Decisions Log - Technical Debt Audit Report</title>
+        <section>2. State Management (Zustand) - 2.1 Persist Middleware Configuration</section>
+        <snippet>CRITICAL: Current implementation lacks error handling for persist failures (LocalStorage quota exceeded), no user feedback, no fallback strategy. Missing versioning/migration strategy. Recommended fix includes version: 1, onRehydrateStorage callback with error recovery.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>persist middleware configuration</symbol>
+        <lines>282-291</lines>
+        <reason>Primary modification target - Current persist configuration lacks error handling and versioning. This is the exact code that needs to be enhanced per AC 1, 2, 4.</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>AppState interface</symbol>
+        <lines>15-54</lines>
+        <reason>Defines complete store shape including what should/shouldn't be persisted. Reference for AC 3 (verify partialize strategy).</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>initializeApp action</symbol>
+        <lines>75-108</lines>
+        <reason>App initialization flow that depends on persist rehydration working correctly. Related to AC 2 (state hydration on init).</reason>
+      </artifact>
+      <artifact>
+        <path>src/stores/useAppStore.ts</path>
+        <kind>store</kind>
+        <symbol>toggleFavorite action</symbol>
+        <lines>157-178</lines>
+        <reason>Example action that updates persisted state (messageHistory.favoriteIds). Used for testing AC 5 (persistence across sessions).</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/storage.ts</path>
+        <kind>service</kind>
+        <symbol>StorageService class</symbol>
+        <lines></lines>
+        <reason>IndexedDB wrapper service used by store actions. Separate from LocalStorage persistence - understanding boundary is important for AC 3.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <name>zustand</name>
+        <version>5.0.8</version>
+        <usage>Core state management library - provides create() and persist middleware</usage>
+      </node>
+      <node>
+        <name>react</name>
+        <version>19.1.1</version>
+        <usage>UI framework - store hooks integrate with React component lifecycle</usage>
+      </node>
+      <node>
+        <name>idb</name>
+        <version>8.0.3</version>
+        <usage>IndexedDB wrapper - separate storage layer from LocalStorage persistence</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Maintain single store pattern - no store splitting or restructuring
+    - Preserve partialize strategy exactly as-is: only persist settings, isOnboarded, messageHistory, moods
+    - Do NOT persist messages, photos, currentMessage, isLoading, error (IndexedDB or computed state)
+    - Backward compatible: existing persisted state must still load after changes
+    - No breaking changes to store API - all existing action signatures remain unchanged
+    - Error handling must be non-blocking - app continues to function even if persistence fails
+    - LocalStorage key remains 'my-love-storage' - no renaming
+    - Follows imperative action pattern established in codebase
+    - TypeScript strict mode compliance required (already enabled)
+    - No external dependencies added - use only zustand/middleware features
+    - Manual testing only - no automated test infrastructure exists yet
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>persist middleware options</name>
+      <kind>zustand middleware configuration</kind>
+      <signature>{ name: string, partialize: (state: AppState) => Partial&lt;AppState&gt;, version?: number, onRehydrateStorage?: () => (state?: AppState, error?: unknown) => void }</signature>
+      <path>src/stores/useAppStore.ts</path>
+      <notes>Zustand persist middleware API - must add version and onRehydrateStorage options</notes>
+    </interface>
+    <interface>
+      <name>AppState</name>
+      <kind>TypeScript interface</kind>
+      <signature>Interface with 8 state slices + 13 actions - see lines 15-54 of useAppStore.ts</signature>
+      <path>src/stores/useAppStore.ts</path>
+      <notes>Complete store state shape - distinguish persisted vs non-persisted fields</notes>
+    </interface>
+    <interface>
+      <name>LocalStorage API</name>
+      <kind>Browser API</kind>
+      <signature>getItem(key: string): string | null, setItem(key: string, value: string): void, removeItem(key: string): void</signature>
+      <path>N/A (Browser native)</path>
+      <notes>Used by persist middleware under the hood - error handling needed for quota exceeded</notes>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Manual testing via browser DevTools only. No automated test infrastructure exists yet (Story 1.1 confirmed). Use Application tab to inspect LocalStorage, Console for error logs. Test scenarios must cover happy path, error cases, and regression.</standards>
+    <locations>No test files exist. Manual testing performed in browser:
+- Chrome DevTools → Application tab → Local Storage
+- Console for error logging
+- Network tab for offline testing</locations>
+    <ideas>
+      <test id="AC-1" criteria="Persist middleware saves state to LocalStorage">
+        - Favorite a message → Inspect 'my-love-storage' key → Verify favoriteIds updated
+        - Change theme → Verify settings.themeName persisted
+        - Add mood entry → Verify moods array includes new entry
+      </test>
+      <test id="AC-2" criteria="State hydration works on init without data loss">
+        - Set favorites, settings, moods → Close tab → Reopen → Verify all restored
+        - Check initializeApp() loads persisted state before IndexedDB operations
+        - Verify currentMessage recalculated correctly from persisted messageHistory
+      </test>
+      <test id="AC-3" criteria="Partialize only persists necessary state">
+        - Inspect 'my-love-storage' key → Confirm ONLY: settings, isOnboarded, messageHistory, moods
+        - Verify messages array NOT in LocalStorage (should be empty or missing)
+        - Verify isLoading, error, currentMessage NOT persisted
+      </test>
+      <test id="AC-4" criteria="Handle quota exceeded gracefully">
+        - Fill LocalStorage to quota → Trigger state change → Verify app doesn't crash
+        - Check console for error log with clear message
+        - Verify user sees notification about storage issue (future: add UI feedback)
+      </test>
+      <test id="AC-5" criteria="Persistence across browser actions">
+        - Browser refresh test: Favorite message → F5 → Verify favorite persists
+        - Tab close/reopen: Set theme → Close tab → Reopen → Verify theme persists
+        - 24-hour gap simulation: Manipulate system date → Verify state intact
+      </test>
+      <test id="AC-6" criteria="No regressions">
+        - Message display works (daily message shown)
+        - Favorite toggle animation plays
+        - Theme switching applies correctly
+        - Share functionality works
+        - Relationship duration counter updates
+        - All 4 themes render correctly
+      </test>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,192 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>4</storyId>
+    <title>Configure Auto-Start Preview Server for Tests</title>
+    <status>drafted</status>
+    <generatedAt>2025-10-31</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-4-configure-auto-start-preview-server.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>tests to automatically start the dev server</iWant>
+    <soThat>I can run tests without manual setup</soThat>
+    <tasks>
+      <task id="1" status="completed">Verify webServer configuration exists and is correct (AC: 1)</task>
+      <task id="2" status="pending">Test cold start scenario - no dev server running (AC: 1, 3, 4, 7)</task>
+      <task id="3" status="pending">Test warm start scenario - dev server already running (AC: 5, 7)</task>
+      <task id="4" status="pending">Test CI environment behavior (AC: 5, 6)</task>
+      <task id="5" status="pending">Test timeout handling behavior (AC: 6)</task>
+      <task id="6" status="pending">Test edge case - port conflict scenario (AC: 2)</task>
+      <task id="7" status="pending">Document webServer configuration in tests/README.md (AC: all)</task>
+      <task id="8" status="pending">Validate end-to-end single-command workflow (AC: 7)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-2.4.1">Configure playwright.config.ts webServer option to auto-start Vite dev server</criterion>
+    <criterion id="AC-2.4.2">Server starts on available port (dynamic port detection)</criterion>
+    <criterion id="AC-2.4.3">Tests wait for server readiness before execution</criterion>
+    <criterion id="AC-2.4.4">Server shuts down gracefully after tests complete</criterion>
+    <criterion id="AC-2.4.5">Works in both local development and CI environments</criterion>
+    <criterion id="AC-2.4.6">Add timeout handling for slow server starts</criterion>
+    <criterion id="AC-2.4.7">Test command runs end-to-end without manual intervention</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>NFR001 - Performance</section>
+        <snippet>Performance requirement: App shall load in under 2 seconds. webServer timeout (120 seconds) provides generous buffer for dev server startup including dependency loading, Vite bundling, and service worker registration.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Definitions</title>
+        <section>Story 2.4 - Configure Auto-Start Preview Server</section>
+        <snippet>Story 2.4 configures Playwright's webServer option to automatically start the Vite development server before test execution, eliminating manual setup steps and enabling single-command test workflows.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Story 2.4 - Auto-Start Dev Server Module</section>
+        <snippet>The Auto-Start Dev Server module integrates Playwright's webServer configuration with Vite's development server, automating the manual step of running npm run dev before tests. Configuration includes dynamic port detection, server readiness polling, and environment-specific behavior (local vs CI).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Critical Workflow 1 - Test Suite Execution (lines 249-283)</section>
+        <snippet>Story 2.4 eliminates step 1 of the Test Suite Execution workflow. Before: Developer manually runs npm run dev, then npm run test:e2e in separate terminal. After: Single command npm run test:e2e triggers Playwright to start server, wait for readiness, run tests, and shut down server.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Development Workflow</section>
+        <snippet>Current development workflow requires manual server start. Story 2.4 consolidates to single command where Playwright auto-starts server, runs tests, and shuts down automatically.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-3-add-data-testid-attributes.md</path>
+        <title>Story 2.3 - Data TestID Migration</title>
+        <section>Test Infrastructure Maturity</section>
+        <snippet>106 tests passing with 100% pass rate, zero flakiness. Stable test suite provides solid foundation for webServer verification. PWA helpers operational, service worker registration adds 2-5 seconds to server startup which 120-second timeout accommodates.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>test-configuration</kind>
+        <symbol>webServer</symbol>
+        <lines>90-98</lines>
+        <reason>Contains existing webServer configuration with all 7 acceptance criteria implemented. Command, URL, timeout, and environment-aware reuseExistingServer already configured.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>build-configuration</kind>
+        <symbol>dev script</symbol>
+        <lines>7</lines>
+        <reason>Defines npm run dev command used by webServer configuration. Must match playwright.config.ts command parameter.</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>build-configuration</kind>
+        <symbol>base path</symbol>
+        <lines>7</lines>
+        <reason>Defines base path /My-Love/ which must match webServer URL parameter in playwright.config.ts for server readiness detection.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/README.md</path>
+        <kind>documentation</kind>
+        <symbol>Testing documentation</symbol>
+        <lines>all</lines>
+        <reason>Target file for webServer configuration documentation. Will add section explaining auto-start behavior, workflows, and troubleshooting.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/e2e/</path>
+        <kind>test-suite</kind>
+        <symbol>E2E test files</symbol>
+        <lines>all</lines>
+        <reason>106 tests that validate webServer functionality. Tests are transparent to server auto-start mechanism but depend on it working correctly.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="vite" version="^7.1.7" type="dev">Development server that Playwright auto-starts via webServer configuration</package>
+        <package name="@playwright/test" version="^1.56.1" type="dev">Test framework providing webServer auto-start capability</package>
+        <package name="@vitejs/plugin-react" version="^5.0.4" type="dev">Vite plugin for React support</package>
+        <package name="vite-plugin-pwa" version="^1.1.0" type="dev">PWA integration adds service worker registration delay to server startup</package>
+        <package name="workbox-window" version="^7.3.0" type="runtime">Service worker runtime that extends server startup time by 2-5 seconds</package>
+        <package name="react" version="^19.1.1" type="runtime">Application framework served by Vite dev server</package>
+        <package name="react-dom" version="^19.1.1" type="runtime">React rendering library</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Configuration already exists in playwright.config.ts (lines 90-98) - story focuses on verification and documentation, not implementation</constraint>
+    <constraint>No changes to test files - webServer is transparent infrastructure that tests don't need to know about</constraint>
+    <constraint>Port 5173 is hardcoded in configuration - no dynamic port fallback mechanism (acceptable limitation for single-developer project)</constraint>
+    <constraint>120-second timeout must accommodate service worker registration (adds 2-5 seconds to startup time)</constraint>
+    <constraint>Base path /My-Love/ must match between vite.config.ts and playwright.config.ts webServer URL</constraint>
+    <constraint>reuseExistingServer must be environment-aware (!process.env.CI) to support both local and CI workflows</constraint>
+    <constraint>Documentation must follow existing tests/README.md style and structure established in Story 2.3</constraint>
+    <constraint>Must maintain 100% pass rate of 106 existing tests - no test behavior changes</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>Playwright webServer Configuration</name>
+      <kind>Test Framework API</kind>
+      <signature>webServer: { command: string, url: string, reuseExistingServer: boolean, timeout: number }</signature>
+      <path>playwright.config.ts:90-98</path>
+    </interface>
+    <interface>
+      <name>npm run dev</name>
+      <kind>Build Script</kind>
+      <signature>npm run dev executes vite command to start development server on port 5173</signature>
+      <path>package.json:7</path>
+    </interface>
+    <interface>
+      <name>Vite Base Configuration</name>
+      <kind>Build Configuration</kind>
+      <signature>base: '/My-Love/' - URL path prefix for all assets</signature>
+      <path>vite.config.ts:7</path>
+    </interface>
+    <interface>
+      <name>HTTP Readiness Check</name>
+      <kind>Server Health Check</kind>
+      <signature>GET http://localhost:5173/My-Love/ - Playwright polls until HTTP 200 response</signature>
+      <path>playwright.config.ts:94</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Story 2.4 uses manual verification testing approach rather than automated unit tests. Playwright E2E framework (@playwright/test ^1.56.1) provides webServer auto-start capability. Verification tests validate each acceptance criterion through targeted scenarios (cold start, warm start, CI environment, timeout handling, port conflicts, end-to-end workflow). Testing standards from Story 2.3: 106 tests with 100% pass rate, zero flakiness, multi-browser support (Chromium, Firefox). Documentation quality: comprehensive README sections with examples, troubleshooting, and known limitations.
+    </standards>
+    <locations>
+      <location>tests/e2e/ - Existing test suite (106 tests) used for verification, no test code changes</location>
+      <location>playwright.config.ts:90-98 - webServer configuration under verification</location>
+      <location>playwright-report/ - Generated HTML reports validate single-command workflow</location>
+      <location>tests/README.md - Documentation target for webServer configuration section</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-2.4.1">Verify webServer configuration structure (command, URL, timeout, reuseExistingServer) matches Playwright best practices</idea>
+      <idea ac="AC-2.4.1">Validate command matches package.json script (npm run dev = vite)</idea>
+      <idea ac="AC-2.4.1">Validate URL matches vite.config.ts base path (http://localhost:5173/My-Love/)</idea>
+      <idea ac="AC-2.4.2">Test port conflict scenario: start dummy server on 5173, observe Playwright timeout behavior</idea>
+      <idea ac="AC-2.4.2">Document port hardcoding limitation and troubleshooting steps (lsof -ti:5173 | xargs kill)</idea>
+      <idea ac="AC-2.4.3">Cold start test: no dev server running, verify Playwright spawns server and polls URL until HTTP 200</idea>
+      <idea ac="AC-2.4.3">Verify tests don't start until server responds (no "Connection refused" errors in console)</idea>
+      <idea ac="AC-2.4.4">Cold start test: verify server process terminates after tests complete (ps aux | grep vite)</idea>
+      <idea ac="AC-2.4.4">Verify port 5173 released after shutdown (lsof -ti:5173 returns empty)</idea>
+      <idea ac="AC-2.4.5">Warm start test: manual server running, verify Playwright reuses existing server (local environment)</idea>
+      <idea ac="AC-2.4.5">CI environment test: export CI=true, verify Playwright starts fresh server (ignores existing)</idea>
+      <idea ac="AC-2.4.6">Verify 120-second timeout sufficient for typical startup (10-30 seconds including PWA service worker)</idea>
+      <idea ac="AC-2.4.6">Document timeout error message format and when to increase timeout</idea>
+      <idea ac="AC-2.4.7">End-to-end test: clean environment (rm -rf playwright-report), run npm run test:e2e, verify complete workflow</idea>
+      <idea ac="AC-2.4.7">Verify can repeat immediately without cleanup (single-command workflow works repeatedly)</idea>
+      <idea ac="all">Document webServer configuration in tests/README.md: purpose, configuration structure, workflows (cold/warm/CI), troubleshooting guide, known limitations</idea>
+    </ideas>
+  </tests>
+</story-context>
