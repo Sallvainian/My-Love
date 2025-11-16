@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage } from '../../types';

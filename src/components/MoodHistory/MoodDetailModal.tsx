@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Smile, Meh, MessageCircle, Sparkles } from 'lucide-react';
 import type { MoodEntry, MoodType } from '../../types';
 import { formatModalDate, formatModalTime } from '../../utils/calendarHelpers';

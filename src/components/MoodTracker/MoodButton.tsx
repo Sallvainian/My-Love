@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 
 interface MoodButtonProps {

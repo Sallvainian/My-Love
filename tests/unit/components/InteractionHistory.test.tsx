@@ -26,10 +26,32 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 
 // Mock Framer Motion
 vi.mock('framer-motion', () => ({
-  motion: {
-    div: 'div',
-    button: 'button',
-  },
+  m: new Proxy(
+    {},
+    {
+      get: (_target, prop) => {
+        return ({ children, ...props }: any) => {
+          const { whileHover, whileTap, animate, initial, exit, transition, layoutId, ...rest } =
+            props;
+          const Component = prop as string;
+          return <Component {...rest}>{children}</Component>;
+        };
+      },
+    }
+  ),
+  motion: new Proxy(
+    {},
+    {
+      get: (_target, prop) => {
+        return ({ children, ...props }: any) => {
+          const { whileHover, whileTap, animate, initial, exit, transition, layoutId, ...rest } =
+            props;
+          const Component = prop as string;
+          return <Component {...rest}>{children}</Component>;
+        };
+      },
+    }
+  ),
   AnimatePresence: ({ children }: any) => children,
 }));
 
