@@ -326,7 +326,7 @@ export const onAuthStateChange = (callback: (session: Session | null) => void): 
 export const resetPassword = async (email: string): Promise<AuthError | null> => {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}reset-password`,
     });
 
     if (error) {
@@ -368,7 +368,7 @@ export const signInWithGoogle = async (): Promise<AuthError | null> => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}`,
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
