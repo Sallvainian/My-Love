@@ -20,14 +20,38 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
-import { Heart, Hand, History } from 'lucide-react';
+import { Heart, Hand, History, Wind } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { getPartnerId } from '../../api/supabaseClient';
 import { InteractionHistory } from '../InteractionHistory';
 import type { Interaction } from '../../types';
 
 // Interaction animation type
-type AnimationType = 'poke' | 'kiss' | null;
+type AnimationType = 'poke' | 'kiss' | 'fart' | null;
+
+// Rate limiting constants (30 minutes in milliseconds)
+const RATE_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+const RATE_LIMIT_KEYS = {
+  poke: 'lastPokeTime',
+  kiss: 'lastKissTime',
+  fart: 'lastFartTime',
+};
+
+// Get remaining cooldown time
+const getCooldownRemaining = (type: 'poke' | 'kiss' | 'fart'): number => {
+  const lastTime = localStorage.getItem(RATE_LIMIT_KEYS[type]);
+  if (!lastTime) return 0;
+
+  const elapsed = Date.now() - parseInt(lastTime, 10);
+  return Math.max(0, RATE_LIMIT_MS - elapsed);
+};
+
+// Format cooldown as minutes:seconds
+const formatCooldown = (ms: number): string => {
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
 export function PokeKissInterface() {
   const {
@@ -41,14 +65,31 @@ export function PokeKissInterface() {
 
   const [isPoking, setIsPoking] = useState(false);
   const [isKissing, setIsKissing] = useState(false);
+  const [isFarting, setIsFarting] = useState(false);
   const [showAnimation, setShowAnimation] = useState<AnimationType>(null);
   const [currentInteraction, setCurrentInteraction] = useState<Interaction | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Cooldown state
+  const [pokeCooldown, setPokeCooldown] = useState(getCooldownRemaining('poke'));
+  const [kissCooldown, setKissCooldown] = useState(getCooldownRemaining('kiss'));
+  const [fartCooldown, setFartCooldown] = useState(getCooldownRemaining('fart'));
+
   // Use ref to prevent duplicate subscriptions in React StrictMode
   const subscriptionRef = useRef<(() => void) | null>(null);
   const isSubscribingRef = useRef(false);
+
+  // Update cooldowns every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPokeCooldown(getCooldownRemaining('poke'));
+      setKissCooldown(getCooldownRemaining('kiss'));
+      setFartCooldown(getCooldownRemaining('fart'));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Subscribe to real-time interactions on mount
   useEffect(() => {
@@ -88,6 +129,13 @@ export function PokeKissInterface() {
 
   // Handle Poke button click
   const handlePoke = async () => {
+    // Check rate limit
+    if (pokeCooldown > 0) {
+      setShowToast(`Wait ${formatCooldown(pokeCooldown)} before poking again`);
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
     const partnerId = await getPartnerId();
     if (!partnerId) {
       console.error('[PokeKissInterface] No partner ID configured');
@@ -100,6 +148,9 @@ export function PokeKissInterface() {
 
     try {
       await sendPoke(partnerId);
+      // Save timestamp for rate limiting
+      localStorage.setItem(RATE_LIMIT_KEYS.poke, Date.now().toString());
+      setPokeCooldown(RATE_LIMIT_MS);
       setShowToast('Poke sent! 👆');
       setTimeout(() => setShowToast(null), 2000);
     } catch (error) {
@@ -113,6 +164,13 @@ export function PokeKissInterface() {
 
   // Handle Kiss button click
   const handleKiss = async () => {
+    // Check rate limit
+    if (kissCooldown > 0) {
+      setShowToast(`Wait ${formatCooldown(kissCooldown)} before kissing again`);
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
     const partnerId = await getPartnerId();
     if (!partnerId) {
       console.error('[PokeKissInterface] No partner ID configured');
@@ -125,6 +183,9 @@ export function PokeKissInterface() {
 
     try {
       await sendKiss(partnerId);
+      // Save timestamp for rate limiting
+      localStorage.setItem(RATE_LIMIT_KEYS.kiss, Date.now().toString());
+      setKissCooldown(RATE_LIMIT_MS);
       setShowToast('Kiss sent! 💋');
       setTimeout(() => setShowToast(null), 2000);
     } catch (error) {
@@ -133,6 +194,38 @@ export function PokeKissInterface() {
       setTimeout(() => setShowToast(null), 3000);
     } finally {
       setIsKissing(false);
+    }
+  };
+
+  // Handle Fart button click
+  const handleFart = async () => {
+    // Check rate limit
+    if (fartCooldown > 0) {
+      setShowToast(`Wait ${formatCooldown(fartCooldown)} before farting again`);
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
+    const partnerId = await getPartnerId();
+    if (!partnerId) {
+      console.error('[PokeKissInterface] No partner ID configured');
+      setShowToast('Error: Partner not configured');
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
+    setIsFarting(true);
+
+    try {
+      // For now, just show animation locally (fart doesn't need server sync)
+      // Save timestamp for rate limiting
+      localStorage.setItem(RATE_LIMIT_KEYS.fart, Date.now().toString());
+      setFartCooldown(RATE_LIMIT_MS);
+      setShowAnimation('fart');
+      setShowToast('💨 Fart sent!');
+      setTimeout(() => setShowToast(null), 2000);
+    } finally {
+      setIsFarting(false);
     }
   };
 
@@ -185,7 +278,7 @@ export function PokeKissInterface() {
         {/* Poke Button */}
         <motion.button
           onClick={handlePoke}
-          disabled={isPoking}
+          disabled={isPoking || pokeCooldown > 0}
           whileTap={{ scale: 0.95 }}
           whileHover={{ scale: 1.05 }}
           className={`
@@ -204,12 +297,17 @@ export function PokeKissInterface() {
           >
             <Hand className="w-6 h-6" />
           </motion.div>
+          {pokeCooldown > 0 && (
+            <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">
+              {formatCooldown(pokeCooldown)}
+            </span>
+          )}
         </motion.button>
 
         {/* Kiss Button */}
         <motion.button
           onClick={handleKiss}
-          disabled={isKissing}
+          disabled={isKissing || kissCooldown > 0}
           whileTap={{ scale: 0.95 }}
           whileHover={{ scale: 1.05 }}
           className={`
@@ -228,6 +326,40 @@ export function PokeKissInterface() {
           >
             <Heart className="w-6 h-6 fill-current" />
           </motion.div>
+          {kissCooldown > 0 && (
+            <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">
+              {formatCooldown(kissCooldown)}
+            </span>
+          )}
+        </motion.button>
+
+        {/* Fart Button */}
+        <motion.button
+          onClick={handleFart}
+          disabled={isFarting || fartCooldown > 0}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+          className={`
+          relative flex items-center justify-center w-12 h-12 rounded-full
+          bg-gradient-to-br from-green-400 to-green-600
+          text-white shadow-md hover:shadow-lg
+          transition-all duration-200
+          disabled:opacity-50 disabled:cursor-not-allowed
+        `}
+          data-testid="fart-button"
+          aria-label="Send Fart"
+        >
+          <motion.div
+            animate={isFarting ? { rotate: [0, 360] } : {}}
+            transition={{ duration: 0.5 }}
+          >
+            <Wind className="w-6 h-6" />
+          </motion.div>
+          {fartCooldown > 0 && (
+            <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">
+              {formatCooldown(fartCooldown)}
+            </span>
+          )}
         </motion.button>
 
         {/* Notification Badge */}
@@ -256,6 +388,7 @@ export function PokeKissInterface() {
         <AnimatePresence>
           {showAnimation === 'poke' && <PokeAnimation onComplete={handleAnimationComplete} />}
           {showAnimation === 'kiss' && <KissAnimation onComplete={handleAnimationComplete} />}
+          {showAnimation === 'fart' && <FartAnimation onComplete={() => setShowAnimation(null)} />}
         </AnimatePresence>
 
         {/* Toast Notification */}
@@ -362,6 +495,86 @@ function KissAnimation({ onComplete }: { onComplete: () => void }) {
           💗
         </motion.div>
       ))}
+    </motion.div>
+  );
+}
+
+/**
+ * Fart Animation Component
+ * Displays expanding cloud/wind animation with poop emoji
+ */
+function FartAnimation({ onComplete }: { onComplete: () => void }) {
+  const clouds = Array.from({ length: 5 }, (_, i) => i);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-yellow-50/40 backdrop-blur-sm overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onComplete}
+      data-testid="fart-animation"
+    >
+      {/* Main Poop Emoji */}
+      <motion.div
+        className="text-9xl"
+        initial={{ scale: 0, rotate: 0 }}
+        animate={{
+          scale: [0, 1.5, 1.2, 1.3, 1],
+          rotate: [0, -10, 10, -5, 0],
+        }}
+        transition={{
+          duration: 0.8,
+          ease: 'easeOut',
+        }}
+      >
+        💩
+      </motion.div>
+
+      {/* Expanding Gas Clouds */}
+      {clouds.map((i) => (
+        <motion.div
+          key={i}
+          className="absolute text-4xl"
+          style={{
+            top: '50%',
+            left: '50%',
+          }}
+          initial={{ opacity: 0, scale: 0, x: '-50%', y: '-50%' }}
+          animate={{
+            opacity: [0, 0.8, 0.6, 0],
+            scale: [0.5, 2, 3, 4],
+            x: ['-50%', `${(i - 2) * 100}px`, `${(i - 2) * 200}px`],
+            y: ['-50%', `${Math.sin(i) * 50}px`, `${Math.sin(i) * 100}px`],
+          }}
+          transition={{
+            duration: 1.5,
+            delay: i * 0.1,
+            ease: 'easeOut',
+          }}
+          onAnimationComplete={() => {
+            if (i === clouds.length - 1) {
+              setTimeout(onComplete, 300);
+            }
+          }}
+        >
+          💨
+        </motion.div>
+      ))}
+
+      {/* Brown cloud effect */}
+      <motion.div
+        className="absolute w-64 h-64 rounded-full bg-gradient-to-r from-yellow-200/30 to-green-200/30"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{
+          scale: [0, 2, 3],
+          opacity: [0.5, 0.3, 0],
+        }}
+        transition={{
+          duration: 1.2,
+          ease: 'easeOut',
+        }}
+      />
     </motion.div>
   );
 }

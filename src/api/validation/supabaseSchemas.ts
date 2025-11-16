@@ -21,8 +21,16 @@ const UUIDSchema = z.string().uuid('Invalid UUID format');
 
 /**
  * ISO timestamp schema for Supabase timestamps
+ * Uses regex to accept various ISO 8601 formats including microseconds and timezone offsets
  */
-const TimestampSchema = z.string().datetime('Invalid timestamp format');
+const TimestampSchema = z.string().refine(
+  (val) => {
+    // Accept ISO 8601 formats: 2025-01-15T10:30:00Z, 2025-01-15T10:30:00.123456+00:00, etc.
+    const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+    return isoRegex.test(val);
+  },
+  { message: 'Invalid timestamp format' }
+);
 
 // ============================================================================
 // User Schemas
@@ -35,9 +43,12 @@ const TimestampSchema = z.string().datetime('Invalid timestamp format');
 export const SupabaseUserSchema = z.object({
   id: UUIDSchema,
   partner_name: z.string().nullable(),
-  device_id: z.string(),
-  created_at: TimestampSchema,
-  updated_at: TimestampSchema,
+  device_id: z.string().uuid().nullable(),
+  created_at: TimestampSchema.nullable(),
+  updated_at: TimestampSchema.nullable(),
+  partner_id: UUIDSchema.nullable().optional(),
+  email: z.string().nullable().optional(),
+  display_name: z.string().nullable().optional(),
 });
 
 /**
@@ -68,8 +79,20 @@ export const UserUpdateSchema = z.object({
 
 /**
  * Mood type enum schema (matches database constraint)
+ * Includes both positive and negative emotions
  */
-const MoodTypeSchema = z.enum(['loved', 'happy', 'content', 'thoughtful', 'grateful']);
+const MoodTypeSchema = z.enum([
+  'loved',
+  'happy',
+  'content',
+  'thoughtful',
+  'grateful',
+  'sad',
+  'anxious',
+  'frustrated',
+  'lonely',
+  'tired',
+]);
 
 /**
  * Supabase Mood Row Schema
@@ -78,10 +101,11 @@ const MoodTypeSchema = z.enum(['loved', 'happy', 'content', 'thoughtful', 'grate
 export const SupabaseMoodSchema = z.object({
   id: UUIDSchema,
   user_id: UUIDSchema,
-  mood_type: MoodTypeSchema,
+  mood_type: MoodTypeSchema, // Legacy single mood (kept for backward compatibility)
+  mood_types: z.array(MoodTypeSchema).optional(), // New: multiple mood support
   note: z.string().nullable(),
-  created_at: TimestampSchema,
-  updated_at: TimestampSchema,
+  created_at: TimestampSchema.nullable(),
+  updated_at: TimestampSchema.nullable(),
 });
 
 /**
@@ -91,6 +115,7 @@ export const MoodInsertSchema = z.object({
   id: UUIDSchema.optional(),
   user_id: UUIDSchema,
   mood_type: MoodTypeSchema,
+  mood_types: z.array(MoodTypeSchema).optional(), // New: multiple mood support
   note: z.string().max(200, 'Note cannot exceed 200 characters').nullable().optional(),
   created_at: TimestampSchema.optional(),
   updated_at: TimestampSchema.optional(),
@@ -126,8 +151,8 @@ export const SupabaseInteractionSchema = z.object({
   type: InteractionTypeSchema,
   from_user_id: UUIDSchema,
   to_user_id: UUIDSchema,
-  viewed: z.boolean(),
-  created_at: TimestampSchema,
+  viewed: z.boolean().nullable(),
+  created_at: TimestampSchema.nullable(),
 });
 
 /**

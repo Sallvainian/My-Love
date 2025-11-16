@@ -1,14 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, Smile, Meh, MessageCircle, Sparkles } from 'lucide-react';
+import {
+  X,
+  Heart,
+  Smile,
+  Meh,
+  MessageCircle,
+  Sparkles,
+  Frown,
+  AlertCircle,
+  Angry,
+  UserMinus,
+  Battery,
+} from 'lucide-react';
 import type { MoodEntry, MoodType } from '../../types';
 import { formatModalDate, formatModalTime } from '../../utils/calendarHelpers';
 
 /**
  * Mood icon and color configuration
  * Story 6.3: AC-4 - Mood type with icon and color
+ * Updated: Added negative emotions support
  */
 const MOOD_CONFIG = {
+  // Positive emotions
   loved: { icon: Heart, color: 'text-pink-500', bgColor: 'bg-pink-100', label: 'Loved' },
   happy: { icon: Smile, color: 'text-yellow-500', bgColor: 'bg-yellow-100', label: 'Happy' },
   content: { icon: Meh, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Content' },
@@ -24,6 +38,17 @@ const MOOD_CONFIG = {
     bgColor: 'bg-green-100',
     label: 'Grateful',
   },
+  // Negative emotions
+  sad: { icon: Frown, color: 'text-gray-500', bgColor: 'bg-gray-100', label: 'Sad' },
+  anxious: {
+    icon: AlertCircle,
+    color: 'text-orange-500',
+    bgColor: 'bg-orange-100',
+    label: 'Anxious',
+  },
+  frustrated: { icon: Angry, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Frustrated' },
+  lonely: { icon: UserMinus, color: 'text-indigo-500', bgColor: 'bg-indigo-100', label: 'Lonely' },
+  tired: { icon: Battery, color: 'text-slate-500', bgColor: 'bg-slate-100', label: 'Tired' },
 } as const;
 
 interface MoodDetailModalProps {
