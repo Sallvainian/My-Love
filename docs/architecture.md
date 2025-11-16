@@ -1,531 +1,688 @@
-# Architecture Documentation
+# Architecture
 
 ## Executive Summary
 
-**My Love** is a Progressive Web Application (PWA) built to deliver daily love messages to a significant other. The application employs a component-based single-page architecture powered by React 19, with offline-first capabilities through IndexedDB and service workers. State management is centralized using Zustand with persistence middleware, ensuring user data survives browser sessions.
+**My Love** is a production-ready Progressive Web Application (PWA) built as a multi-user platform for couples to share daily love messages, photos, moods, and spontaneous interactions. The application employs a component-based single-page architecture powered by React 19, with offline-first capabilities through IndexedDB and service workers, synchronized multi-user state via Supabase backend, and comprehensive end-to-end testing infrastructure.
 
-**Core Architecture Pattern**: Component-based SPA with centralized state management and offline-first data persistence.
+**Core Architecture Pattern**: Multi-user SPA with Supabase real-time backend, offline-first data persistence, and authenticated user sessions.
 
-## Technology Stack
+**Project Maturity**: All 6 epics implemented (34 stories complete) - Foundation, Testing Infrastructure, Enhanced Messages, Photo Gallery, Code Quality, and Interactive Connection features are production-ready.
 
-| Layer                | Technology          | Version  | Purpose                                   |
-| -------------------- | ------------------- | -------- | ----------------------------------------- |
-| **UI Framework**     | React               | 19.1.1   | Component-based UI rendering              |
-| **Language**         | TypeScript          | 5.9.3    | Type-safe development                     |
-| **Build Tool**       | Vite                | 7.1.7    | Fast dev server and optimized builds      |
-| **State Management** | Zustand             | 5.0.8    | Lightweight global state with persistence |
-| **Styling**          | Tailwind CSS        | 3.4.18   | Utility-first CSS framework               |
-| **Animations**       | Framer Motion       | 12.23.24 | Declarative animations and transitions    |
-| **Data Layer**       | IndexedDB (via idb) | 8.0.3    | Client-side structured data storage       |
-| **PWA**              | vite-plugin-pwa     | 0.21.3   | Service worker and manifest generation    |
-| **Deployment**       | gh-pages            | 6.3.0    | GitHub Pages deployment                   |
+## Project Initialization
 
-## Architecture Patterns
+This project was initialized using Vite's React-TypeScript template:
 
-### 1. Component-Based Architecture
-
-**Story 1.4 Update**: Onboarding component removed from render path for single-user deployment.
-**Story 1.5 Update**: ErrorBoundary component added for graceful error handling; Onboarding files deleted.
-
-The application follows a simple component structure:
-
-```
-App (Root)
-└── ErrorBoundary (Story 1.5 - Graceful error handling)
-    └── DailyMessage (Main app view - always rendered)
-        ├── Header (relationship stats)
-        ├── Message Card (animated content)
-        │   ├── Category Badge
-        │   ├── Message Text
-        │   └── Action Buttons (favorite, share)
-        └── Navigation Hint
+```bash
+npm create vite@latest my-love -- --template react-ts
 ```
 
-**Removed Components** (Story 1.5):
+Additional core dependencies installed:
 
-- ~~Onboarding~~ - First-time setup wizard (removed in Story 1.4, files deleted in Story 1.5)
-  - Functionality replaced by environment-based pre-configuration
-  - Dead code cleanup completed
+```bash
+npm install zustand framer-motion idb @supabase/supabase-js
+npm install -D tailwindcss postcss autoprefixer @playwright/test vitest
+```
 
-**Future Components** (planned but not yet implemented):
+## Decision Summary
 
-- PhotoMemory - Photo gallery with captions
-- MoodTracker - Daily mood logging interface
-- CountdownTimer - Anniversary countdown display
-- CustomNotes - User-created custom messages
-- Settings - App configuration panel (can edit pre-configured values)
-- Layout - Shared layout components (header, footer, navigation)
+| Category             | Decision        | Version  | Affects Epics | Rationale                                                           |
+| -------------------- | --------------- | -------- | ------------- | ------------------------------------------------------------------- |
+| **UI Framework**     | React           | 19.1.1   | All           | Component-based architecture, strong ecosystem, concurrent features |
+| **Language**         | TypeScript      | 5.9.3    | All           | Type safety, better DX, catch errors at compile time                |
+| **Build Tool**       | Vite            | 7.1.7    | All           | Fast dev server, optimized builds, native ESM                       |
+| **State Management** | Zustand         | 5.0.8    | All           | Simple API, persistence middleware, excellent TypeScript support    |
+| **Styling**          | Tailwind CSS    | 3.4.18   | All           | Utility-first, custom themes, rapid development                     |
+| **Animations**       | Framer Motion   | 12.23.24 | 1,3,4,6       | Declarative animations, spring physics, gesture support             |
+| **Backend**          | Supabase        | 2.81.1   | 6             | Real-time sync, authentication, PostgreSQL, Row Level Security      |
+| **Local Data**       | IndexedDB (idb) | 8.0.3    | 1,3,4         | Large storage capacity, async API, offline support                  |
+| **PWA**              | vite-plugin-pwa | 0.21.3   | All           | Service worker generation, manifest, offline functionality          |
+| **Testing (E2E)**    | Playwright      | 1.56.1   | 2             | Multi-browser support, PWA testing, reliable automation             |
+| **Testing (Unit)**   | Vitest          | 4.0.9    | 5             | Fast, Vite-native, excellent TypeScript support                     |
+| **Validation**       | Zod             | 3.25.76  | 5,6           | Runtime type checking, schema validation, TypeScript inference      |
+| **Icons**            | Lucide React    | 0.548.0  | All           | Consistent icon set, tree-shakeable, customizable                   |
+| **Deployment**       | GitHub Pages    | 6.3.0    | All           | Free hosting, HTTPS, simple CI/CD                                   |
 
-### 2. Single Page Application (SPA)
+## Project Structure
 
-**Story 1.4 Update**: Simplified to single-view architecture.
+```
+my-love/
+├── src/
+│   ├── components/          # React components (25+ components)
+│   │   ├── AdminPanel/      # Custom message management interface
+│   │   ├── CountdownTimer/  # Anniversary countdown display
+│   │   ├── DailyMessage/    # Main message card with animations
+│   │   ├── DisplayNameSetup/# Partner display name configuration
+│   │   ├── ErrorBoundary/   # Graceful error handling
+│   │   ├── InteractionHistory/ # Poke/kiss interaction log
+│   │   ├── Layout/          # Shared layout components
+│   │   ├── LoginScreen/     # Supabase authentication UI
+│   │   ├── MoodHistory/     # Calendar view of mood entries
+│   │   ├── MoodTracker/     # Daily mood logging interface
+│   │   ├── Navigation/      # Top navigation bar
+│   │   ├── PartnerMoodView/ # View partner's mood history
+│   │   ├── PhotoCarousel/   # Full-screen photo lightbox
+│   │   ├── PhotoDeleteConfirmation/ # Delete confirmation modal
+│   │   ├── PhotoEditModal/  # Photo caption/tag editor
+│   │   ├── PhotoGallery/    # Grid view of uploaded photos
+│   │   ├── PhotoMemory/     # Photo feature integration
+│   │   ├── PhotoUpload/     # Photo upload interface
+│   │   ├── PokeKissInterface/ # Poke/kiss interaction buttons
+│   │   ├── Settings/        # App configuration panel
+│   │   ├── WelcomeButton/   # Landing page CTA
+│   │   └── WelcomeSplash/   # Landing screen for new users
+│   ├── stores/              # Zustand state management
+│   │   ├── slices/          # Feature-specific state slices
+│   │   │   ├── messagesSlice.ts    # Message state and rotation
+│   │   │   ├── photosSlice.ts      # Photo gallery state
+│   │   │   ├── settingsSlice.ts    # User preferences
+│   │   │   ├── moodSlice.ts        # Mood tracking state
+│   │   │   ├── partnerSlice.ts     # Partner data state
+│   │   │   ├── interactionsSlice.ts # Poke/kiss state
+│   │   │   └── navigationSlice.ts   # Navigation state
+│   │   └── useAppStore.ts   # Combined store with persistence
+│   ├── services/            # Data persistence layer
+│   │   ├── BaseIndexedDBService.ts  # Generic CRUD operations
+│   │   ├── customMessageService.ts  # Message persistence
+│   │   ├── photoStorageService.ts   # Photo persistence
+│   │   └── supabaseService.ts       # Backend API integration
+│   ├── api/                 # Backend integration
+│   │   └── supabaseClient.ts # Supabase client singleton
+│   ├── validation/          # Input validation layer
+│   │   ├── schemas.ts       # Zod validation schemas
+│   │   ├── errorMessages.ts # User-friendly error messages
+│   │   └── index.ts         # Validation exports
+│   ├── config/              # Configuration
+│   │   ├── constants.ts     # Pre-configured relationship data
+│   │   └── performance.ts   # Performance optimization config
+│   ├── utils/               # Utility functions
+│   │   ├── themes.ts        # Theme definitions
+│   │   ├── storageMonitor.ts # Storage quota monitoring
+│   │   └── interactionValidation.ts # Interaction helpers
+│   ├── types/               # TypeScript type definitions
+│   │   ├── index.ts         # Core type definitions
+│   │   └── database.types.ts # Supabase generated types
+│   ├── constants/           # Application constants
+│   │   └── animations.ts    # Framer Motion animation configs
+│   ├── App.tsx              # Root component
+│   └── main.tsx             # Application entry point
+├── tests/                   # Testing infrastructure
+│   ├── e2e/                 # Playwright end-to-end tests
+│   └── unit/                # Vitest unit tests
+├── public/                  # Static assets
+│   └── icons/               # PWA icons
+├── docs/                    # Project documentation
+│   ├── PRD.md               # Product Requirements Document
+│   ├── epics.md             # Epic and story breakdown
+│   ├── architecture.md      # This file
+│   └── index.md             # Documentation index
+├── vite.config.ts           # Vite build configuration
+├── playwright.config.ts     # Playwright test configuration
+├── vitest.config.ts         # Vitest test configuration
+├── tailwind.config.js       # Tailwind CSS configuration
+└── package.json             # Dependencies and scripts
+```
 
-- **No routing library**: Single main view (DailyMessage)
-- **No conditional rendering**: Always renders DailyMessage
-- **Pre-configuration**: Settings initialized from hardcoded constants at build time
-- **Configuration**: Edit `src/config/constants.ts` directly with hardcoded values
-- **Future enhancement**: React Router for multi-page navigation when features expand
+## Epic to Architecture Mapping
 
-### 3. Offline-First Architecture
+| Epic                               | Components                                                                                                                      | State Slices                               | Services             | Backend Tables             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------- | -------------------------- |
+| **Epic 1: Foundation**             | ErrorBoundary, DailyMessage, Settings                                                                                           | settingsSlice, messagesSlice               | BaseIndexedDBService | -                          |
+| **Epic 2: Testing**                | -                                                                                                                               | -                                          | -                    | -                          |
+| **Epic 3: Enhanced Messages**      | AdminPanel, CustomNotes                                                                                                         | messagesSlice                              | customMessageService | -                          |
+| **Epic 4: Photo Gallery**          | PhotoGallery, PhotoCarousel, PhotoUpload, PhotoEditModal, PhotoDeleteConfirmation                                               | photosSlice                                | photoStorageService  | -                          |
+| **Epic 5: Code Quality**           | -                                                                                                                               | All slices (refactored)                    | BaseIndexedDBService | -                          |
+| **Epic 6: Interactive Connection** | MoodTracker, MoodHistory, PartnerMoodView, PokeKissInterface, InteractionHistory, CountdownTimer, LoginScreen, DisplayNameSetup | moodSlice, partnerSlice, interactionsSlice | supabaseService      | moods, interactions, users |
 
-The application is designed to work seamlessly without network connectivity:
+## Technology Stack Details
 
-- **Service Worker**: Pre-caches all static assets (JS, CSS, HTML, images)
-- **IndexedDB**: Stores photos and messages locally
-- **LocalStorage**: Persists settings and small state
-- **PWA Manifest**: Enables installation and standalone mode
+### Core Technologies
+
+**Frontend Framework:**
+
+- React 19.1.1 with concurrent features
+- TypeScript 5.9.3 strict mode
+- Vite 7.1.7 for build tooling
+
+**State Management:**
+
+- Zustand 5.0.8 with feature slices
+- Persist middleware for LocalStorage sync
+- 7 specialized state slices for domain separation
+
+**Backend & Sync:**
+
+- Supabase 2.81.1 (PostgreSQL + Real-time + Auth)
+- Row Level Security for data isolation
+- Real-time subscriptions for mood/interaction sync
+
+**Data Persistence:**
+
+- IndexedDB via idb 8.0.3 (photos, messages)
+- LocalStorage for Zustand state persistence
+- Supabase PostgreSQL for synced data (moods, interactions, users)
+
+**Styling & Animations:**
+
+- Tailwind CSS 3.4.18 with custom theme system
+- Framer Motion 12.23.24 for declarative animations
+- 4 pre-built themes (Sunset Bliss, Ocean Dreams, Lavender Fields, Rose Garden)
+
+**Testing:**
+
+- Playwright 1.56.1 for E2E testing (Epic 2)
+- Vitest 4.0.9 for unit testing (Epic 5)
+- @testing-library/react 16.1.0 for component testing
+- fake-indexeddb 6.2.5 for testing IndexedDB operations
+
+**Validation & Quality:**
+
+- Zod 3.25.76 for runtime validation
+- ESLint + TypeScript ESLint for code quality
+- Prettier 3.6.2 for code formatting
+
+### Integration Points
+
+**Supabase Backend:**
+
+- Authentication: Email/password via Supabase Auth
+- Database: PostgreSQL with Row Level Security
+- Real-time: WebSocket subscriptions for live updates
+- API: RESTful via @supabase/supabase-js client
+
+**IndexedDB:**
+
+- Photos: Blob storage with metadata (caption, tags, uploadDate)
+- Messages: Custom messages with category and active status
+
+**LocalStorage:**
+
+- Zustand state persistence (settings, favorites, message history)
+- Authentication session storage
+
+## Implementation Patterns
+
+### Naming Conventions
+
+**Components:**
+
+- PascalCase for component names: `DailyMessage`, `PhotoGallery`
+- PascalCase for component files: `DailyMessage.tsx`
+
+**State Slices:**
+
+- camelCase with "Slice" suffix: `messagesSlice.ts`, `photosSlice.ts`
+
+**Services:**
+
+- camelCase with "Service" suffix: `customMessageService.ts`
+- Singleton exports: `export const customMessageService = new CustomMessageService()`
+
+**Database Tables:**
+
+- snake_case: `moods`, `interactions`, `users`
+
+**Database Columns:**
+
+- snake_case: `user_id`, `mood_type`, `created_at`
+
+**TypeScript Interfaces:**
+
+- PascalCase: `Message`, `Photo`, `MoodEntry`
+
+### Code Organization
+
+**Component Structure:**
+
+```typescript
+// Component file structure
+import React from 'react';
+import { motion } from 'framer-motion';
+import { useAppStore } from '@/stores/useAppStore';
+
+interface ComponentProps {
+  // Props interface
+}
+
+export const Component: React.FC<ComponentProps> = ({ props }) => {
+  // Hooks
+  const stateValue = useAppStore(state => state.value);
+
+  // Event handlers
+  const handleAction = () => {
+    // Implementation
+  };
+
+  // Render
+  return (
+    <motion.div>
+      {/* Component JSX */}
+    </motion.div>
+  );
+};
+```
+
+**State Slice Pattern:**
+
+```typescript
+// Feature slice structure
+import { StateCreator } from 'zustand';
+
+interface FeatureSlice {
+  // State
+  data: DataType[];
+  isLoading: boolean;
+  error: string | null;
+
+  // Actions
+  loadData: () => Promise<void>;
+  updateData: (id: string, updates: Partial<DataType>) => Promise<void>;
+}
+
+export const createFeatureSlice: StateCreator<FeatureSlice> = (set, get) => ({
+  data: [],
+  isLoading: false,
+  error: null,
+
+  loadData: async () => {
+    set({ isLoading: true });
+    try {
+      // Load data
+      set({ data: loadedData, isLoading: false });
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+    }
+  },
+});
+```
+
+**Service Pattern:**
+
+```typescript
+// Service extending base class
+class FeatureService extends BaseIndexedDBService<DataType> {
+  protected getStoreName(): string {
+    return 'feature_store';
+  }
+
+  protected async _doInit(): Promise<void> {
+    const db = await openDB<MyLoveDB>('my-love-db', 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('feature_store')) {
+          const store = db.createObjectStore('feature_store', {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          store.createIndex('by-date', 'createdAt');
+        }
+      },
+    });
+    this.db = db;
+  }
+
+  // Feature-specific methods
+  async getFiltered(filter: FilterType): Promise<DataType[]> {
+    // Implementation
+  }
+}
+
+export const featureService = new FeatureService();
+```
+
+### Error Handling
+
+**Global Error Boundary:**
+
+```typescript
+// ErrorBoundary component wraps entire app
+<ErrorBoundary>
+  <App />
+</ErrorBoundary>
+```
+
+**Service Layer Errors:**
+
+```typescript
+// Centralized error handling in BaseIndexedDBService
+protected handleError(operation: string, error: Error): never {
+  console.error(`IndexedDB error during ${operation}:`, error);
+
+  if (error.name === 'QuotaExceededError') {
+    this.handleQuotaExceeded();
+  }
+
+  throw new Error(`Failed to ${operation}: ${error.message}`);
+}
+```
+
+**Supabase Error Handling:**
+
+```typescript
+// Graceful degradation for offline mode
+try {
+  const { data, error } = await supabase.from('moods').insert(mood);
+  if (error) throw error;
+} catch (error) {
+  // Fall back to local-only storage
+  await localMoodService.save(mood);
+  console.warn('Offline mode: Mood saved locally');
+}
+```
+
+### Logging Strategy
+
+**Development Logging:**
+
+```typescript
+// Console logging for development
+if (import.meta.env.DEV) {
+  console.log('[StateUpdate]', { action, payload });
+}
+```
+
+**Production Error Logging:**
+
+```typescript
+// Error boundary logs errors
+componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  console.error('Component error:', error, errorInfo);
+  // Future: Send to error tracking service
+}
+```
+
+## Consistency Rules
+
+### Date/Time Handling
+
+- **Storage Format**: ISO 8601 strings (`new Date().toISOString()`)
+- **Display Format**: Locale-specific via `toLocaleDateString()`
+- **Timezone**: User's local timezone (no server timezone conversion needed)
+
+### API Response Format
+
+**Supabase Responses:**
+
+```typescript
+const { data, error } = await supabase.from('table').select();
+
+if (error) {
+  // Handle error
+  throw new Error(error.message);
+}
+
+// Use data
+```
+
+**Local Service Responses:**
+
+```typescript
+// Throw errors on failure, return data on success
+async getData(): Promise<DataType[]> {
+  try {
+    return await this.db.getAll('store_name');
+  } catch (error) {
+    this.handleError('get data', error);
+  }
+}
+```
+
+### Testing Strategy
+
+**E2E Tests (Playwright):**
+
+- Test complete user journeys
+- Validate PWA functionality (offline, service worker)
+- Cross-browser testing (Chromium, Firefox, WebKit)
+- Use `data-testid` attributes for selectors
+
+**Unit Tests (Vitest):**
+
+- Test utility functions and algorithms
+- Test service layer with fake-indexeddb
+- Test state slice logic with mocked dependencies
+- Fast feedback loop (<5 seconds total)
 
 ## Data Architecture
 
 ### IndexedDB Schema
 
-**Database**: `my-love-db` (version 1)
+**Database**: `my-love-db` (version 2)
+
+**Object Stores:**
+
+**1. messages**
 
 ```typescript
-interface MyLoveDB {
-  photos: {
-    key: number; // Auto-increment primary key
-    value: Photo;
-    indexes: {
-      'by-date': Date; // Index by uploadDate
-    };
-  };
-
-  messages: {
-    key: number; // Auto-increment primary key
-    value: Message;
-    indexes: {
-      'by-category': string; // Index by message category
-      'by-date': Date; // Index by createdAt
-    };
-  };
+interface Message {
+  id: number; // Auto-increment primary key
+  text: string;
+  category: 'reasons' | 'memories' | 'affirmations' | 'future' | 'custom';
+  isCustom: boolean;
+  isActive: boolean;
+  createdAt: Date;
 }
+
+// Indexes:
+// - by-category (category)
+// - by-date (createdAt)
 ```
 
-**Object Stores**:
+**2. photos**
 
-| Store      | Purpose                            | Indexes                  | Key Path              |
-| ---------- | ---------------------------------- | ------------------------ | --------------------- |
-| `photos`   | User-uploaded photos with captions | `by-date` (uploadDate)   | `id` (auto-increment) |
-| `messages` | Love messages (default + custom)   | `by-category`, `by-date` | `id` (auto-increment) |
+```typescript
+interface Photo {
+  id: number; // Auto-increment primary key
+  data: Blob; // Compressed image blob
+  caption: string;
+  tags: string[];
+  uploadDate: Date;
+}
+
+// Indexes:
+// - by-date (uploadDate)
+```
+
+### Supabase Database Schema
+
+**1. users**
+
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  partner_name TEXT,
+  device_id TEXT UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**2. moods**
+
+```sql
+CREATE TABLE moods (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  mood_type TEXT CHECK (mood_type IN ('loved', 'happy', 'content', 'thoughtful', 'grateful')),
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_moods_user_date ON moods(user_id, created_at);
+```
+
+**3. interactions**
+
+```sql
+CREATE TABLE interactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  type TEXT CHECK (type IN ('poke', 'kiss')),
+  from_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  to_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  viewed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_interactions_recipient ON interactions(to_user_id, viewed);
+```
 
 ### LocalStorage Schema
 
-**Storage Key**: `my-love-storage`
+**Key**: `my-love-storage`
 
 **Persisted State** (via Zustand persist middleware):
 
-- `settings` - User preferences and relationship data
-- `isOnboarded` - Onboarding completion flag
-- `messageHistory` - Message rotation tracking
-- `moods` - Daily mood entries
-
-**Non-Persisted State** (in-memory only):
-
-- `messages` - Loaded from IndexedDB on app init
-- `photos` - Loaded from IndexedDB on demand
-- `currentMessage` - Computed daily from messages
-- `isLoading`, `error` - Runtime states
-
-### Data Flow
-
-```
-User Action → Component → Zustand Store Action → Service Layer → IndexedDB/LocalStorage
-                                ↓
-                            State Update
-                                ↓
-                        Component Re-render
+```typescript
+{
+  settings: {
+    partnerName: string;
+    relationshipStartDate: string;
+    theme: 'sunset' | 'ocean' | 'lavender' | 'rose';
+  },
+  messageHistory: {
+    currentIndex: number;
+    favoriteIds: number[];
+    shownDates: string[];
+  },
+  navigationState: {
+    currentTab: 'home' | 'photos' | 'mood' | 'settings';
+  }
+}
 ```
 
-**Example: Toggling a favorite**
+## API Contracts
 
-1. User clicks heart icon in DailyMessage component
-2. Component calls `toggleFavorite(messageId)` action
-3. Store updates IndexedDB via `storageService.toggleFavorite()`
-4. Store updates in-memory message state
-5. Store updates `messageHistory.favoriteIds` in LocalStorage
-6. Component re-renders with updated favorite state
+### Supabase API Endpoints
 
-### Service Layer
-
-**Story 5.3**: Extracted BaseIndexedDBService generic class to reduce code duplication by ~80% across IndexedDB services.
-
-The service layer encapsulates all IndexedDB operations, providing a clean abstraction for data persistence. All services extend a generic base class that implements common CRUD operations, reducing boilerplate and ensuring consistency.
-
-#### BaseIndexedDBService<T>
-
-**Purpose**: Generic base class for IndexedDB CRUD operations
-
-**Type Constraint**: `<T extends { id?: number }>` ensures all entities have an optional id field for auto-increment keys
-
-**Abstract Methods** (must be implemented by services):
-
-- `getStoreName(): string` - Returns object store name ('messages', 'photos', 'moods')
-- `_doInit(): Promise<void>` - DB-specific initialization and schema upgrade logic
-
-**Shared Methods** (inherited by all services):
-
-- `init(): Promise<void>` - Initialization guard to prevent concurrent DB setup
-- `add(item: Omit<T, 'id'>): Promise<T>` - Add new item with auto-generated ID
-- `get(id: number): Promise<T | null>` - Get single item by ID
-- `getAll(): Promise<T[]>` - Get all items from store
-- `update(id: number, updates: Partial<T>): Promise<void>` - Update existing item
-- `delete(id: number): Promise<void>` - Delete item by ID
-- `clear(): Promise<void>` - Clear entire store
-- `getPage(offset: number, limit: number): Promise<T[]>` - Pagination helper
-- `handleError(operation: string, error: Error): never` - Centralized error logging
-- `handleQuotaExceeded(): never` - Storage quota error handling
-
-**File**: `src/services/BaseIndexedDBService.ts` (239 lines)
-
-#### CustomMessageService
-
-**Extends**: `BaseIndexedDBService<Message>`
-
-**Purpose**: IndexedDB CRUD operations for love messages (default + custom)
-
-**Implementation**:
-
-- `getStoreName()` returns `'messages'`
-- `_doInit()` creates messages store with `by-category` and `by-date` indexes
-
-**Inherited Methods**:
-
-- Basic CRUD: `add()`, `get()`, `update()`, `delete()`, `getAll()`
-
-**Service-Specific Methods**:
-
-- `create(input: CreateMessageInput): Promise<Message>` - Create custom message (wraps `add()` with validation)
-- `getAll(filter?: MessageFilter): Promise<Message[]>` - Overridden to support category index and filtering
-- `getActiveCustomMessages(): Promise<Message[]>` - Get only active custom messages for rotation
-- `exportMessages(): Promise<CustomMessagesExport>` - Export custom messages to JSON
-- `importMessages(data: CustomMessagesExport): Promise<{imported, skipped}>` - Import with duplicate detection
-
-**Singleton Export**: `export const customMessageService = new CustomMessageService()`
-
-**File**: `src/services/customMessageService.ts` (290 lines, reduced from 299 lines)
-
-#### PhotoStorageService
-
-**Extends**: `BaseIndexedDBService<Photo>`
-
-**Purpose**: IndexedDB CRUD operations for user-uploaded photos with metadata
-
-**Implementation**:
-
-- `getStoreName()` returns `'photos'`
-- `_doInit()` handles v1→v2 migration, creates photos store with `by-date` index
-
-**Inherited Methods**:
-
-- Basic CRUD: `add()`, `get()`, `update()`, `delete()`
-
-**Service-Specific Methods**:
-
-- `create(photo: Omit<Photo, 'id'>): Promise<Photo>` - Create photo with logging (wraps `add()`)
-- `getAll(): Promise<Photo[]>` - Overridden to use `by-date` index for efficient chronological retrieval
-- `getPage(offset, limit): Promise<Photo[]>` - Overridden for custom index-based pagination
-- `getStorageSize(): Promise<number>` - Calculate total storage usage for quota warnings
-- `estimateQuotaRemaining(): Promise<QuotaInfo>` - Estimate remaining IndexedDB quota
-
-**Singleton Export**: `export const photoStorageService = new PhotoStorageService()`
-
-**File**: `src/services/photoStorageService.ts` (239 lines, reduced from 322 lines)
-
-#### Service Architecture Diagram
-
-```
-┌─────────────────────────────────────────┐
-│   BaseIndexedDBService<T>               │
-│   - Generic CRUD operations             │
-│   - Initialization guard                │
-│   - Error handling                      │
-│   - Abstract: getStoreName(), _doInit() │
-└────────────┬────────────────────────────┘
-             │ extends
-             │
-     ┌───────┴─────────┐
-     │                 │
-┌────▼────────┐  ┌────▼────────┐
-│CustomMessage│  │PhotoStorage │
-│Service      │  │Service      │
-│<Message>    │  │<Photo>      │
-│- messages   │  │- photos     │
-│  store      │  │  store      │
-│- export/    │  │- quota      │
-│  import     │  │  tracking   │
-└─────────────┘  └─────────────┘
-```
-
-**Code Duplication Reduction** (Story 5.3):
-
-- Before: 621 lines total (299 + 322)
-- After: 768 lines total (239 base + 290 messages + 239 photos)
-- Base class extracts ~170 lines of shared logic now reusable across all services
-- PhotoStorageService reduced by 83 lines (-26%)
-- Future services (MoodService) will leverage base class, amplifying efficiency gains
-
-**Benefits**:
-
-- **Consistency**: All services use same CRUD patterns
-- **Maintainability**: Bug fixes in base class apply to all services
-- **Type Safety**: Generic type parameter enforces id field constraint
-- **Extensibility**: New services only implement store-specific logic
-- **Testing**: Base class can be unit tested once, services test only custom logic
-
-## Component Overview
-
-### Implemented Components
-
-#### DailyMessage Component
-
-**Purpose**: Main application view displaying the daily love message
-
-**Features**:
-
-- Animated message card with category badge
-- Relationship duration counter (days together)
-- Favorite toggle with floating hearts animation
-- Share functionality (Web Share API with clipboard fallback)
-- 3D rotation entrance animation
-- Responsive design (mobile-first)
-
-**State Dependencies**:
-
-- `currentMessage` - The message to display
-- `settings` - For relationship start date
-- `toggleFavorite` - Action to favorite/unfavorite
-
-**Animations**:
-
-- Card entrance: scale + 3D rotation
-- Hearts burst: 10 floating hearts on favorite
-- Decorative hearts: continuous subtle pulse
-- Category badge: scale pop-in
-
-#### ErrorBoundary Component (Story 1.5)
-
-**Purpose**: Graceful error handling with fallback UI
-
-**Features**:
-
-- Catches React component errors using `getDerivedStateFromError()`
-- Logs errors with context using `componentDidCatch()`
-- Displays user-friendly error screen with retry button
-- Prevents entire app crash from propagating errors
-- Resets error state on retry to allow recovery
-
-**Error UI Components**:
-
-- Broken heart emoji (💔) for visual indication
-- Clear error message: "Something went wrong"
-- Technical error details (error.message) for debugging
-- Retry button to reset error state and attempt recovery
-
-#### ~~Onboarding Component~~ (REMOVED - Story 1.5)
-
-**Status**: Files deleted in Story 1.5, no longer in codebase
-
-**Original Purpose**: First-time user setup wizard
-
-**Replacement**: Hardcoded pre-configuration via constants in `src/config/constants.ts`. Settings automatically initialized on first app load without user interaction.
-
-**Rationale for Removal**: Single-user deployment pattern doesn't require generic onboarding flow. Pre-configuration provides frictionless experience for target use case.
-
-### Planned Components
-
-| Component          | Purpose               | Features                                                  |
-| ------------------ | --------------------- | --------------------------------------------------------- |
-| **PhotoMemory**    | Photo gallery         | Upload, caption, tag photos; grid view; lightbox          |
-| **MoodTracker**    | Daily mood logging    | 5 mood types; note field; calendar view; mood trends      |
-| **CountdownTimer** | Anniversary countdown | Days/hours/minutes to next anniversary; animations        |
-| **CustomNotes**    | User messages         | Create custom messages; category selection; preview       |
-| **Settings**       | App configuration     | Theme switcher; notification settings; data export/import |
-| **Layout**         | Shared UI             | Header, footer, navigation, theme wrapper                 |
-
-## State Management
-
-### Zustand Store Architecture
-
-**Single Store**: `useAppStore` (no store splitting)
-
-**Store Structure**:
+**Authentication:**
 
 ```typescript
-interface AppState {
-  // State slices
-  settings: Settings | null;
-  isOnboarded: boolean;
-  messages: Message[];
-  messageHistory: MessageHistory;
-  currentMessage: Message | null;
-  moods: MoodEntry[];
-  isLoading: boolean;
-  error: string | null;
+// Sign in
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: string,
+  password: string,
+});
 
-  // Actions (15 total)
-  initializeApp: () => Promise<void>;
-  setSettings: (settings: Settings) => void;
-  updateSettings: (updates: Partial<Settings>) => void;
-  setOnboarded: (onboarded: boolean) => void;
-  loadMessages: () => Promise<void>;
-  addMessage: (text: string, category: MessageCategory) => Promise<void>;
-  toggleFavorite: (messageId: number) => Promise<void>;
-  updateCurrentMessage: () => void;
-  addMoodEntry: (mood: MoodType, note?: string) => void;
-  getMoodForDate: (date: string) => MoodEntry | undefined;
-  addAnniversary: (anniversary: Omit<Anniversary, 'id'>) => void;
-  removeAnniversary: (id: number) => void;
-  setTheme: (theme: ThemeName) => void;
-}
+// Sign out
+await supabase.auth.signOut();
+
+// Get session
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 ```
 
-**Persistence Strategy**:
+**Moods:**
 
-- **Middleware**: `persist` from `zustand/middleware`
-- **Storage**: LocalStorage (`my-love-storage` key)
-- **Partialize**: Only persists critical state (settings, isOnboarded, messageHistory, moods)
-- **Merge Strategy**: Deep merge on hydration
+```typescript
+// Save mood
+const { data, error } = await supabase.from('moods').insert({
+  user_id: string,
+  mood_type: MoodType,
+  note: string | null,
+});
 
-### State Initialization Flow
-
-**Story 1.4 Update**: Pre-configuration injection added before IndexedDB initialization.
-
-```
-1. App.tsx mounts
-2. useEffect calls initializeApp()
-3. initializeApp checks if settings === null
-   - If null AND env vars present → inject pre-configured Settings
-   - If null AND env vars missing → log warning (graceful degradation)
-   - If settings exist → preserve (don't override user edits)
-4. initializeApp initializes IndexedDB
-5. Loads messages from IndexedDB
-6. If empty, populates with 100 default messages
-7. Updates currentMessage based on date
-8. Sets isLoading = false
-9. App renders DailyMessage (always, no conditional)
+// Get moods
+const { data, error } = await supabase
+  .from('moods')
+  .select('*')
+  .eq('user_id', userId)
+  .order('created_at', { ascending: false });
 ```
 
-**Configuration**:
+**Interactions:**
 
-- Source: `src/config/constants.ts` exports `APP_CONFIG` object with hardcoded values
-- Values: `defaultPartnerName`, `defaultStartDate` directly set in source code
-- How it works: Developer edits constants.ts, values are bundled at build time
-- Validation: `APP_CONFIG.isPreConfigured` flag indicates if values are set
-- Transparency: Constants committed to version control (intentional for single-user app)
+```typescript
+// Send interaction
+const { data, error } = await supabase.from('interactions').insert({
+  type: 'poke' | 'kiss',
+  from_user_id: string,
+  to_user_id: string,
+});
 
-## PWA Architecture
+// Get unviewed interactions
+const { data, error } = await supabase
+  .from('interactions')
+  .select('*')
+  .eq('to_user_id', userId)
+  .eq('viewed', false);
 
-### Service Worker Strategy
-
-**Plugin**: `vite-plugin-pwa` with Workbox
-
-**Registration**: Auto-update mode (no user prompt)
-
-**Caching Strategies**:
-
-| Resource Type             | Strategy     | Cache Name              | Expiration             |
-| ------------------------- | ------------ | ----------------------- | ---------------------- |
-| App shell (JS, CSS, HTML) | CacheFirst   | `workbox-precache-v2`   | Never (versioned)      |
-| Google Fonts              | CacheFirst   | `google-fonts-cache`    | 1 year, 10 entries max |
-| Images (PNG, JPG, SVG)    | CacheFirst   | `workbox-precache-v2`   | Never (versioned)      |
-| Runtime requests          | NetworkFirst | `workbox-runtime-cache` | Default                |
-
-**Pre-cached Assets** (glob pattern):
-
-```javascript
-globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'];
+// Mark as viewed
+const { error } = await supabase
+  .from('interactions')
+  .update({ viewed: true })
+  .eq('id', interactionId);
 ```
 
-### PWA Manifest
+## Security Architecture
 
-**Configuration** (defined in `vite.config.ts`):
+### Authentication
 
-```json
-{
-  "name": "My Love - Daily Reminders",
-  "short_name": "My Love",
-  "description": "Daily love notes and memories",
-  "theme_color": "#FF6B9D",
-  "background_color": "#FFE5EC",
-  "display": "standalone",
-  "orientation": "portrait",
-  "start_url": "/",
-  "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "purpose": "any maskable" }
-  ]
-}
+- **Method**: Supabase Email/Password Auth
+- **Session Storage**: LocalStorage (Supabase handles securely)
+- **Session Persistence**: Auto-refresh via Supabase client
+
+### Authorization
+
+- **Row Level Security (RLS)**: Enforced at database level
+- **Policy**: Users can only access their own data and their partner's data
+- **Implementation**: Supabase RLS policies on all tables
+
+**Example RLS Policy:**
+
+```sql
+-- Users can view their own moods and their partner's moods
+CREATE POLICY "Users can view relevant moods"
+ON moods FOR SELECT
+USING (
+  user_id = auth.uid() OR
+  user_id IN (
+    SELECT partner_id FROM users WHERE id = auth.uid()
+  )
+);
 ```
 
-**Capabilities**:
+### Data Protection
 
-- Installable to home screen (iOS, Android, Desktop)
-- Standalone display (no browser chrome)
-- Portrait-only orientation
-- Splash screen on app launch
-- Offline functionality
+- **Client-Side**: No sensitive data in plain text
+- **Server-Side**: Supabase handles encryption at rest and in transit
+- **HTTPS**: Enforced via GitHub Pages and Supabase
 
-## Development Workflow
+### Content Security
 
-### Local Development
+- **XSS Protection**: React escapes content by default
+- **Input Validation**: Zod schemas validate all user inputs
+- **SQL Injection**: Supabase client prevents SQL injection
 
-```bash
-npm run dev  # Start Vite dev server on port 5173
-```
+## Performance Considerations
 
-**Features**:
+### Bundle Optimization
 
-- Hot Module Replacement (HMR)
-- Fast refresh for React components
-- TypeScript compilation on save
-- Tailwind CSS processing
-- Source maps for debugging
+- **Tree-shaking**: Vite eliminates unused code
+- **Code splitting**: Route-based with React.lazy() (future enhancement)
+- **Asset hashing**: Cache busting via [hash] filenames
+- **Compression**: Gzip/Brotli at deployment level
 
-**URL**: `http://localhost:5173/My-Love/`
+### Runtime Performance
 
-### Build Process
+- **Zustand selectors**: Prevent unnecessary re-renders
+- **Framer Motion**: GPU-accelerated animations
+- **IndexedDB**: Async operations don't block UI
+- **Photo pagination**: Lazy loading with `getPage()` method (20 photos per page)
+- **Virtual scrolling**: Considered for large photo galleries
 
-```bash
-npm run build  # TypeScript compile + Vite bundle + PWA generation
-```
+### Offline Performance
 
-**Steps**:
+- **Pre-caching**: All static assets cached by service worker
+- **IndexedDB**: No network required for local data access
+- **LocalStorage**: Settings persist across sessions
+- **Graceful Degradation**: Sync features fall back to local-only mode when offline
 
-1. **TypeScript Compilation**: `tsc -b` (type checking)
-2. **Vite Bundling**: JSX/TSX → JS, tree-shaking, minification
-3. **CSS Processing**: Tailwind → PostCSS → optimized CSS
-4. **Asset Optimization**: Image compression, font subsetting
-5. **PWA Generation**: Service worker, manifest, icons
-6. **Output**: `dist/` directory ready for deployment
+### Performance Metrics (Target)
 
-**Output Structure**:
-
-```
-dist/
-├── assets/              # Hashed JS and CSS bundles
-├── icons/               # PWA icons
-├── index.html           # Entry point
-├── manifest.webmanifest # PWA manifest
-└── sw.js                # Service worker
-```
-
-### Testing Strategy
-
-**Manual Testing**:
-
-- Browser DevTools for IndexedDB inspection
-- Application tab for service worker status
-- Network throttling for offline testing
-- Lighthouse for PWA score
-
-**Offline Testing**:
-
-1. Build: `npm run build`
-2. Preview: `npm run preview`
-3. Open DevTools → Application → Service Workers
-4. Network tab → Offline checkbox
-5. Verify app still functions
+- **First Contentful Paint**: < 1.5s
+- **Time to Interactive**: < 3s
+- **Lighthouse PWA Score**: 100
+- **Bundle Size**: < 300KB (gzipped, includes Supabase client)
 
 ## Deployment Architecture
 
@@ -533,83 +690,215 @@ dist/
 
 **Command**: `npm run deploy`
 
-**Tool**: `gh-pages` package
-
 **Process**:
 
-1. Builds production bundle
-2. Pushes `dist/` to `gh-pages` branch
-3. GitHub Pages serves from branch root
+1. Pre-deploy: `npm run build && npm run test:smoke`
+2. Build: Production bundle generation
+3. Deploy: `gh-pages` pushes `dist/` to `gh-pages` branch
+4. Post-deploy: Manual verification check
 
-**Base Path**: `/My-Love/` (configured in `vite.config.ts`)
+**Base Path**: `/My-Love/` (configured in vite.config.ts)
 
 **Live URL**: `https://<username>.github.io/My-Love/`
 
-### HTTPS Enforcement
+### Environment Variables
 
-- GitHub Pages automatically serves over HTTPS
-- Required for PWA features (service workers, notifications)
-- Web Share API requires secure context
+**Development**:
 
-## Performance Considerations
+```env
+VITE_SUPABASE_URL=<supabase-project-url>
+VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
+```
 
-### Bundle Optimization
+**Production**:
 
-- **Tree-shaking**: Vite eliminates unused code
-- **Code splitting**: Manual with `React.lazy()` (future)
-- **Asset hashing**: Cache busting via `[hash]` filenames
-- **Compression**: Gzip/Brotli at server level
+- Environment variables injected at build time
+- No runtime environment variable access (static hosting)
 
-### Runtime Performance
+### HTTPS & Security
 
-- **Zustand selectors**: Prevent unnecessary re-renders
-- **Framer Motion**: GPU-accelerated animations
-- **IndexedDB**: Async operations don't block UI
-- **Debouncing**: For search/filter features (future)
+- GitHub Pages: Automatic HTTPS
+- Supabase: HTTPS API endpoints
+- Required for: Service workers, Web Share API, PWA features
 
-### Offline Performance
+## Development Environment
 
-- **Pre-caching**: All assets available instantly offline
-- **IndexedDB**: No network required for data access
-- **LocalStorage**: Settings persist across sessions
+### Prerequisites
 
-## Security Considerations
+- Node.js 18+ (LTS recommended)
+- npm 9+ or yarn 1.22+
+- Git 2.x
+- Modern browser (Chrome, Firefox, Safari, Edge)
 
-### Data Privacy
+### Setup Commands
 
-- **No backend**: All data stored client-side
-- **No analytics**: No tracking or third-party services
-- **No authentication**: Single-user PWA (no login)
+```bash
+# Clone repository
+git clone https://github.com/<username>/My-Love.git
+cd My-Love
 
-### Content Security
+# Install dependencies
+npm install
 
-- **TypeScript**: Type safety prevents runtime errors
-- **Input sanitization**: Future feature for custom messages
-- **XSS protection**: React escapes content by default
+# Create .env.local file
+cat > .env.local << EOF
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+EOF
 
-## Future Architecture Enhancements
+# Start development server
+npm run dev
+# → http://localhost:5173/My-Love/
 
-### Planned Improvements
+# Run E2E tests
+npm run test:e2e
 
-1. **React Router**: Multi-page navigation for features
-2. **Component lazy loading**: Reduce initial bundle size
-3. **Service Worker sync**: Background data sync
-4. **Web Push API**: Real notifications (not just permission)
-5. **Backup/restore**: Export/import data via JSON
-6. **Theme customization**: User-defined color schemes
-7. **Photo compression**: Client-side image optimization
+# Run unit tests
+npm run test:unit
 
-### Scalability Considerations
+# Build for production
+npm run build
 
-- **IndexedDB limits**: ~1GB typical, ~10GB with permission
-- **Message count**: Optimized for ~1000 messages max
-- **Photo storage**: Consider compression for large collections
-- **State size**: Persist only critical data to LocalStorage
+# Preview production build
+npm run preview
 
-## Developer Resources
+# Deploy to GitHub Pages
+npm run deploy
+```
 
-- **Architecture Decisions**: See `/docs/development-guide.md`
-- **Component Inventory**: See `/docs/component-inventory.md`
-- **Data Models**: See `/docs/data-models.md`
-- **State Management**: See `/docs/state-management.md`
-- **Source Tree**: See `/docs/source-tree-analysis.md`
+### Development Workflow
+
+1. **Feature Development**: Create feature branch
+2. **Implementation**: Write code with tests
+3. **Testing**: Run E2E and unit tests
+4. **Code Review**: Manual review (solo developer: self-review)
+5. **Deployment**: Merge to main, deploy to GitHub Pages
+
+## Architecture Decision Records (ADRs)
+
+### ADR-001: Multi-User Architecture via Supabase
+
+**Context**: Project evolved from single-user prototype to multi-user couple app requiring real-time sync.
+
+**Decision**: Implement Supabase backend for authentication, data sync, and real-time features.
+
+**Rationale**:
+
+- Free tier sufficient for personal use
+- Built-in authentication and Row Level Security
+- Real-time subscriptions for live mood/interaction updates
+- PostgreSQL backend for complex queries
+
+**Consequences**:
+
+- ✅ Multi-device sync for both users
+- ✅ Real-time interaction notifications
+- ✅ Secure data isolation via RLS
+- ❌ Internet required for sync features (offline mode still works for local data)
+
+### ADR-002: State Management with Feature Slices
+
+**Context**: Original 1,268-line monolithic store became unmaintainable.
+
+**Decision**: Split into 7 feature-specific slices (messages, photos, settings, mood, partner, interactions, navigation).
+
+**Rationale**:
+
+- Separation of concerns
+- Easier testing and maintenance
+- Better TypeScript inference
+- Clear domain boundaries
+
+**Consequences**:
+
+- ✅ Improved maintainability
+- ✅ Easier to test individual features
+- ✅ Better TypeScript support
+- ❌ Slightly more boilerplate for slice creation
+
+### ADR-003: BaseIndexedDBService for Code Reuse
+
+**Context**: MessagesService and PhotosService duplicated ~80% of CRUD logic.
+
+**Decision**: Extract common operations into generic `BaseIndexedDBService<T>`.
+
+**Rationale**:
+
+- DRY principle
+- Consistent error handling
+- Type-safe operations via generics
+- Easier to add new services (e.g., MoodService)
+
+**Consequences**:
+
+- ✅ Reduced code duplication by 80%
+- ✅ Consistent CRUD patterns
+- ✅ Easier to maintain and extend
+- ❌ Slight learning curve for generic typing
+
+### ADR-004: Zod for Runtime Validation
+
+**Context**: Need to validate user inputs and prevent corrupted data in IndexedDB/Supabase.
+
+**Decision**: Centralize validation using Zod schemas.
+
+**Rationale**:
+
+- Runtime type checking
+- TypeScript type inference from schemas
+- User-friendly error messages
+- Validation at service boundary
+
+**Consequences**:
+
+- ✅ Type-safe runtime validation
+- ✅ Prevents invalid data persistence
+- ✅ Clear error messages for users
+- ❌ Additional bundle size (~14KB)
+
+### ADR-005: Comprehensive E2E Testing with Playwright
+
+**Context**: Rapid feature development risked introducing regressions.
+
+**Decision**: Implement comprehensive E2E testing infrastructure (Epic 2).
+
+**Rationale**:
+
+- Validate complete user journeys
+- Test PWA functionality (offline, service worker)
+- Multi-browser support
+- Reliable automation
+
+**Consequences**:
+
+- ✅ Confidence in refactoring
+- ✅ Catch bugs before production
+- ✅ PWA features validated
+- ❌ Test execution time (~5 minutes)
+
+### ADR-006: Pre-Configuration via Build-Time Constants
+
+**Context**: Single intended user (girlfriend) - onboarding flow adds friction.
+
+**Decision**: Pre-configure relationship data in `src/config/constants.ts` at build time.
+
+**Rationale**:
+
+- Frictionless experience for target user
+- No setup wizard needed
+- Values bundled at build time
+- Settings still editable if needed
+
+**Consequences**:
+
+- ✅ Zero onboarding friction
+- ✅ Immediate app usage
+- ✅ Simple deployment
+- ❌ Not suitable for public multi-user deployment (intentional design choice)
+
+---
+
+_Generated by BMAD Architecture Workflow v1.0_
+_Date: 2025-11-15_
+_For: Frank_
+_Project: My-Love (Production-Ready Multi-User PWA)_

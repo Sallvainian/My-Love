@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto', // Explicitly inject SW registration
       devOptions: {
         enabled: false, // Disable in dev to prevent stale code caching
         type: 'module',
@@ -69,6 +70,11 @@ export default defineConfig(({ mode }) => ({
         // Don't cache any JS/CSS/HTML - always fetch fresh to prevent stale code
         globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
         runtimeCaching: [
+          {
+            // JS/CSS/HTML - Always fetch from network (no caching)
+            urlPattern: /\.(js|css|html)$/,
+            handler: 'NetworkOnly',
+          },
           {
             // Static assets (images, fonts) - Cache First
             urlPattern: /\.(png|jpg|jpeg|svg|woff2|ico)$/,
