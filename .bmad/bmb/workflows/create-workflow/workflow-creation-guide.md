@@ -61,13 +61,13 @@ That's it! To execute, tell the BMAD agent: `workflow path/to/my-workflow/`
 
 ### Tasks vs Workflows
 
-| Aspect         | Task               | Workflow                |
-| -------------- | ------------------ | ----------------------- |
-| **Purpose**    | Single operation   | Multi-step process      |
-| **Format**     | XML                | Folder with YAML config |
-| **Location**   | `/src/core/tasks/` | `/.bmad/*/workflows/`   |
-| **User Input** | Minimal            | Extensive               |
-| **Output**     | Variable           | Usually documents       |
+| Aspect         | Task               | Workflow                      |
+| -------------- | ------------------ | ----------------------------- |
+| **Purpose**    | Single operation   | Multi-step process            |
+| **Format**     | XML                | Folder with YAML config       |
+| **Location**   | `/src/core/tasks/` | `/.bmad/*/workflows/` |
+| **User Input** | Minimal            | Extensive                     |
+| **Output**     | Variable           | Usually documents             |
 
 ### Workflow Types
 

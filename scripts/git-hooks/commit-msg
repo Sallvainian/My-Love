@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Overnight Dev Commit Message Hook
+# Enforces conventional commit format
+
+set -e
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Conventional commit pattern: type(scope?): description
+# Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
+PATTERN="^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\([a-z0-9-]+\))?: .{1,100}"
+
+if ! echo "$COMMIT_MSG" | grep -qE "$PATTERN"; then
+    echo "❌ Invalid commit message format"
+    echo ""
+    echo "Commit messages must follow conventional commit format:"
+    echo "  type(scope): description"
+    echo ""
+    echo "Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build"
+    echo ""
+    echo "Examples:"
+    echo "  feat(auth): add JWT authentication"
+    echo "  fix(ui): correct button alignment"
+    echo "  test: add unit tests for user service"
+    echo "  docs: update API documentation"
+    echo ""
+    echo "Your message: $COMMIT_MSG"
+    exit 1
+fi
+
+echo "✅ Commit message format valid"

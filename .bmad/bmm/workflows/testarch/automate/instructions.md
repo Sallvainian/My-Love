@@ -329,11 +329,7 @@ Expands test automation coverage by generating comprehensive test suites at appr
 
    ```typescript
    // tests/support/helpers/wait-for.ts
-   export const waitFor = async (
-     condition: () => Promise<boolean>,
-     timeout = 5000,
-     interval = 100
-   ): Promise<void> => {
+   export const waitFor = async (condition: () => Promise<boolean>, timeout = 5000, interval = 100): Promise<void> => {
      const startTime = Date.now();
      while (Date.now() - startTime < timeout) {
        if (await condition()) return;
@@ -399,9 +395,7 @@ Expands test automation coverage by generating comprehensive test suites at appr
        await page.click('[data-testid="login-button"]');
 
        // THEN: Error message is displayed
-       await expect(page.locator('[data-testid="error-message"]')).toHaveText(
-         'Invalid email or password'
-       );
+       await expect(page.locator('[data-testid="error-message"]')).toHaveText('Invalid email or password');
      });
    });
    ```
@@ -420,9 +414,7 @@ Expands test automation coverage by generating comprehensive test suites at appr
    import { test, expect } from '@playwright/test';
 
    test.describe('User Authentication API', () => {
-     test('[P1] POST /api/auth/login - should return token for valid credentials', async ({
-       request,
-     }) => {
+     test('[P1] POST /api/auth/login - should return token for valid credentials', async ({ request }) => {
        // GIVEN: Valid user credentials
        const credentials = {
          email: 'user@example.com',
@@ -441,9 +433,7 @@ Expands test automation coverage by generating comprehensive test suites at appr
        expect(body.token).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/); // JWT format
      });
 
-     test('[P1] POST /api/auth/login - should return 401 for invalid credentials', async ({
-       request,
-     }) => {
+     test('[P1] POST /api/auth/login - should return 401 for invalid credentials', async ({ request }) => {
        // GIVEN: Invalid credentials
        const credentials = {
          email: 'invalid@example.com',
@@ -542,7 +532,7 @@ Expands test automation coverage by generating comprehensive test suites at appr
        route.fulfill({
          status: 200,
          body: JSON.stringify({ id: 1, name: 'Test User' }),
-       })
+       }),
      );
 
      // NOW navigate

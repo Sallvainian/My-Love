@@ -1,10 +1,10 @@
 # Game Development - Use BMGD Module
 # Game development workflows have been moved to the BMad Game Development module
 
-project_type: 'game'
-level: 'all'
-field_type: 'any'
-description: '⚠️ Game development requires the BMGD module'
+project_type: "game"
+level: "all"
+field_type: "any"
+description: "⚠️ Game development requires the BMGD module"
 
 error_message: |
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -45,8 +45,8 @@ error_message: |
 # Users should install BMGD module instead
 phases:
   - phase: 1
-    name: 'ERROR - Install BMGD Module'
+    name: "ERROR - Install BMGD Module"
     workflows:
-      - id: 'install-bmgd'
+      - id: "install-bmgd"
         required: true
-        note: 'Run: bmad install bmgd'
+        note: "Run: bmad install bmgd"

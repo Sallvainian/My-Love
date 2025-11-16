@@ -1,0 +1,1 @@
+export { PokeKissInterface } from './PokeKissInterface';

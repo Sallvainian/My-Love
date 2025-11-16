@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/183</span>
+                <span class='fraction'>0/182</span>
             </div>
         
             
@@ -679,10 +679,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -811,6 +807,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1012,6 +1010,8 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1093,14 +1093,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1134,6 +1132,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1194,11 +1194,7 @@ import type {
 } from '../../types';
 import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
-import {
-  getDailyMessage,
-  formatDate,
-  getAvailableHistoryDays,
-} from '../../utils/messageRotation';
+import { getDailyMessage, formatDate, getAvailableHistoryDays } from '../../utils/messageRotation';
 &nbsp;
 export interface MessagesSlice {
   // State
@@ -1240,10 +1236,10 @@ export const createMessagesSlice: StateCreator&lt;
   // Initial state
   messages: [],
   messageHistory: {
-    currentIndex: 0,           // Story 3.3: 0 = today, 1 = yesterday, etc.
-    shownMessages: new Map(),  // Story 3.3: Date → Message ID mapping
-    maxHistoryDays: 30,        // Story 3.3: History limit
-    favoriteIds: [],           // Keep for legacy favorite tracking
+    currentIndex: 0, // Story 3.3: 0 = today, 1 = yesterday, etc.
+    shownMessages: new Map(), // Story 3.3: Date → Message ID mapping
+    maxHistoryDays: 30, // Story 3.3: History limit
+    favoriteIds: [], // Keep for legacy favorite tracking
     // Deprecated fields (migration):
     lastShownDate: '',
     lastMessageId: 0,
@@ -1318,7 +1314,7 @@ export const createMessagesSlice: StateCreator&lt;
 &nbsp;
     // Story 3.5: Filter out inactive custom messages from rotation pool
     // Keep default messages + only active custom messages
-    const rotationPool = <span class="cstat-no" title="statement not covered" >messages.filter(<span class="fstat-no" title="function not covered" >m =&gt; <span class="cstat-no" title="statement not covered" >!</span>m.isCustom || m.active !== false)</span>;</span>
+    const rotationPool = <span class="cstat-no" title="statement not covered" >messages.filter(<span class="fstat-no" title="function not covered" >(m</span>) =&gt; <span class="cstat-no" title="statement not covered" >!m.isCustom || m.active !== false)</span>;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (rotationPool.length === 0) {</span>
 <span class="cstat-no" title="statement not covered" >      console.error('[MessageHistory] No active messages available for rotation');</span>
@@ -1363,7 +1359,9 @@ export const createMessagesSlice: StateCreator&lt;
           },
         });
 <span class="cstat-no" title="statement not covered" >        if (import.meta.env.DEV) {</span>
-<span class="cstat-no" title="statement not covered" >          console.log(`[MessageRotation] Reset to today (index 0) from index ${messageHistory.currentIndex}`);</span>
+<span class="cstat-no" title="statement not covered" >          console.log(</span>
+            `[MessageRotation] Reset to today (index 0) from index ${messageHistory.currentIndex}`
+          );
         }
       }
     }
@@ -1381,7 +1379,7 @@ export const createMessagesSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >    if (!settings || messages.length === 0) <span class="cstat-no" title="statement not covered" >return;</span></span>
 &nbsp;
     // Story 3.5: Filter rotation pool (exclude inactive custom messages)
-    const rotationPool = <span class="cstat-no" title="statement not covered" >messages.filter(<span class="fstat-no" title="function not covered" >m =&gt; <span class="cstat-no" title="statement not covered" >!</span>m.isCustom || m.active !== false)</span>;</span>
+    const rotationPool = <span class="cstat-no" title="statement not covered" >messages.filter(<span class="fstat-no" title="function not covered" >(m</span>) =&gt; <span class="cstat-no" title="statement not covered" >!m.isCustom || m.active !== false)</span>;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (rotationPool.length === 0) {</span>
 <span class="cstat-no" title="statement not covered" >      console.error('[MessageHistory] No active messages available for rotation');</span>
@@ -1453,7 +1451,7 @@ export const createMessagesSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >    if (messages.length === 0) <span class="cstat-no" title="statement not covered" >return;</span></span>
 &nbsp;
     // Story 3.5: Filter rotation pool (exclude inactive custom messages)
-    const rotationPool = <span class="cstat-no" title="statement not covered" >messages.filter(<span class="fstat-no" title="function not covered" >m =&gt; <span class="cstat-no" title="statement not covered" >!</span>m.isCustom || m.active !== false)</span>;</span>
+    const rotationPool = <span class="cstat-no" title="statement not covered" >messages.filter(<span class="fstat-no" title="function not covered" >(m</span>) =&gt; <span class="cstat-no" title="statement not covered" >!m.isCustom || m.active !== false)</span>;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (rotationPool.length === 0) {</span>
 <span class="cstat-no" title="statement not covered" >      console.error('[MessageHistory] No active messages available for rotation');</span>
@@ -1515,7 +1513,7 @@ export const createMessagesSlice: StateCreator&lt;
       const customMessagesFromDB = <span class="cstat-no" title="statement not covered" >await customMessageService.getAll({ isCustom: true });</span>
 &nbsp;
       // Convert Date objects to ISO strings for CustomMessage interface
-      const customMessages: CustomMessage[] = <span class="cstat-no" title="statement not covered" >customMessagesFromDB.map(<span class="fstat-no" title="function not covered" >m =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
+      const customMessages: CustomMessage[] = <span class="cstat-no" title="statement not covered" >customMessagesFromDB.map(<span class="fstat-no" title="function not covered" >(m</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
         id: m.id,
         text: m.text,
         category: m.category,
@@ -1554,7 +1552,7 @@ export const createMessagesSlice: StateCreator&lt;
       };
 &nbsp;
       // Update state (optimistic UI update)
-<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >state =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
+<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >(s</span>tate) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
         customMessages: [...state.customMessages, newCustomMessage],
       }));
 &nbsp;
@@ -1562,7 +1560,9 @@ export const createMessagesSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      await get().loadMessages();</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      if (import.meta.env.DEV) {</span>
-<span class="cstat-no" title="statement not covered" >        console.log(`[AdminPanel] Created custom message ID: ${message.id}, category: ${input.category}`);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(</span>
+          `[AdminPanel] Created custom message ID: ${message.id}, category: ${input.category}`
+        );
       }
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error('[AdminPanel] Failed to create custom message:', error);</span>
@@ -1576,8 +1576,8 @@ export const createMessagesSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      await customMessageService.updateMessage(input);</span>
 &nbsp;
       // Update state (optimistic UI update)
-<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >state =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
-        customMessages: state.customMessages.map(<span class="fstat-no" title="function not covered" >msg =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >(s</span>tate) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+        customMessages: state.customMessages.map(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; {
 <span class="cstat-no" title="statement not covered" >          if (msg.id === input.id) {</span>
 <span class="cstat-no" title="statement not covered" >            return {</span>
               ...msg,
@@ -1610,8 +1610,8 @@ export const createMessagesSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      await customMessageService.delete(id);</span>
 &nbsp;
       // Update state (optimistic UI update)
-<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >state =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
-        customMessages: state.customMessages.filter(<span class="fstat-no" title="function not covered" >msg =&gt; <span class="cstat-no" title="statement not covered" >m</span>sg.id !== id)</span>,
+<span class="cstat-no" title="statement not covered" >      set(<span class="fstat-no" title="function not covered" >(s</span>tate) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+        customMessages: state.customMessages.filter(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.id !== id)</span>,
       }));
 &nbsp;
       // Reload messages to update rotation pool
@@ -1637,26 +1637,24 @@ export const createMessagesSlice: StateCreator&lt;
 &nbsp;
     // Filter by category
 <span class="cstat-no" title="statement not covered" >    if (filter.category &amp;&amp; filter.category !== 'all') {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >msg =&gt; <span class="cstat-no" title="statement not covered" >m</span>sg.category === filter.category)</span>;</span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.category === filter.category)</span>;</span>
     }
 &nbsp;
     // Filter by active status
 <span class="cstat-no" title="statement not covered" >    if (filter.active !== undefined) {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >msg =&gt; <span class="cstat-no" title="statement not covered" >m</span>sg.active === filter.active)</span>;</span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.active === filter.active)</span>;</span>
     }
 &nbsp;
     // Filter by search term
 <span class="cstat-no" title="statement not covered" >    if (filter.searchTerm) {</span>
       const searchLower = <span class="cstat-no" title="statement not covered" >filter.searchTerm.toLowerCase();</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >msg =&gt;</span></span>
-<span class="cstat-no" title="statement not covered" >        msg.text.toLowerCase().includes(searchLower)</span>
-      );
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >(m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.text.toLowerCase().includes(searchLower))</span>;</span>
     }
 &nbsp;
     // Filter by tags
 <span class="cstat-no" title="statement not covered" >    if (filter.tags &amp;&amp; filter.tags.length &gt; 0) {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >msg =&gt;</span></span>
-<span class="cstat-no" title="statement not covered" >        msg.tags &amp;&amp; msg.tags.some(<span class="fstat-no" title="function not covered" >tag =&gt; <span class="cstat-no" title="statement not covered" >f</span>ilter.tags!.includes(tag))</span></span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(</span>
+<span class="fstat-no" title="function not covered" >        (m</span>sg) =&gt; <span class="cstat-no" title="statement not covered" >msg.tags &amp;&amp; msg.tags.some(<span class="fstat-no" title="function not covered" >(t</span>ag) =&gt; <span class="cstat-no" title="statement not covered" >filter.tags!.includes(tag))</span></span>
       );
     }
 &nbsp;
@@ -1686,7 +1684,9 @@ export const createMessagesSlice: StateCreator&lt;
 <span class="cstat-no" title="statement not covered" >      URL.revokeObjectURL(url);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      if (import.meta.env.DEV) {</span>
-<span class="cstat-no" title="statement not covered" >        console.log(`[AdminPanel] Exported ${exportData.messageCount} custom messages to ${filename}`);</span>
+<span class="cstat-no" title="statement not covered" >        console.log(</span>
+          `[AdminPanel] Exported ${exportData.messageCount} custom messages to ${filename}`
+        );
       }
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error('[AdminPanel] Failed to export custom messages:', error);</span>
@@ -1729,7 +1729,7 @@ export const createMessagesSlice: StateCreator&lt;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-15T04:51:44.082Z
+                at 2025-11-15T18:25:01.368Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

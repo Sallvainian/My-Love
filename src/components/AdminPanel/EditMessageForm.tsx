@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage, MessageCategory } from '../../types';
@@ -189,9 +189,7 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
                 <option value="future">🌈 Future Plans</option>
                 <option value="custom">💕 Custom</option>
               </select>
-              {categoryError && (
-                <p className="text-sm text-red-600 mt-2">{categoryError}</p>
-              )}
+              {categoryError && <p className="text-sm text-red-600 mt-2">{categoryError}</p>}
             </div>
 
             {/* Active toggle (Story 3.5 AC-3.5.4) */}

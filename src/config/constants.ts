@@ -37,3 +37,14 @@ export const APP_CONFIG = {
  * Type for APP_CONFIG (read-only constant object)
  */
 export type AppConfig = typeof APP_CONFIG;
+
+/**
+ * Single-user ID for IndexedDB entries (Epic 6)
+ * Hardcoded since this is a single-user PWA
+ */
+export const USER_ID = 'default-user' as const;
+
+/**
+ * Partner name (exported for backward compatibility)
+ */
+export const PARTNER_NAME = APP_CONFIG.defaultPartnerName;

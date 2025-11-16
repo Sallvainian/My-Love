@@ -4,7 +4,17 @@ export type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
 
 export type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
 
-export type MoodType = 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful';
+export type MoodType =
+  | 'loved'
+  | 'happy'
+  | 'content'
+  | 'thoughtful'
+  | 'grateful'
+  | 'sad'
+  | 'anxious'
+  | 'frustrated'
+  | 'lonely'
+  | 'tired';
 
 export interface Message {
   id: number;
@@ -60,14 +70,34 @@ export interface Anniversary {
 }
 
 export interface MoodEntry {
-  date: string; // ISO date string
-  mood: MoodType;
-  note?: string;
+  id?: number; // Auto-increment (IndexedDB)
+  userId: string; // Hardcoded for single-user (from constants.ts)
+  mood: MoodType; // Primary mood (for backward compatibility)
+  moods?: MoodType[]; // Multiple mood support
+  note?: string; // Optional, max 200 chars
+  date: string; // ISO date string (YYYY-MM-DD)
+  timestamp: Date; // Full timestamp when logged
+  synced: boolean; // Whether uploaded to Supabase
+  supabaseId?: string; // Supabase record ID (null until sync)
 }
 
-// Pocketbase Backend Types (Epic 6)
-export type InteractionType = 'poke' | 'kiss';
+// Interaction Types (Epic 6 - Supabase Backend)
+// Re-export from interactionService for consistency
+export type {
+  Interaction,
+  SupabaseInteractionRecord,
+  InteractionType,
+} from '../api/interactionService';
 
+// Legacy Pocketbase Backend Types (DEPRECATED - kept for reference)
+/**
+ * @deprecated Use InteractionType from interactionService instead
+ */
+export type LegacyInteractionType = 'poke' | 'kiss';
+
+/**
+ * @deprecated PocketBase replaced by Supabase in Epic 6
+ */
 export interface PocketbaseUser {
   id: string;
   email: string;
@@ -77,6 +107,9 @@ export interface PocketbaseUser {
   updated: string;
 }
 
+/**
+ * @deprecated PocketBase replaced by Supabase in Epic 6
+ */
 export interface PocketbaseMood {
   id: string;
   user: string; // User ID relation
@@ -87,11 +120,14 @@ export interface PocketbaseMood {
   updated: string;
 }
 
+/**
+ * @deprecated Use Interaction from interactionService instead
+ */
 export interface PocketbaseInteraction {
   id: string;
   sender: string; // User ID relation
   receiver: string; // User ID relation
-  type: InteractionType;
+  type: LegacyInteractionType;
   viewed: boolean;
   created: string;
   updated: string;

@@ -850,6 +850,7 @@ if (state && !state.messageHistory) {
    - Test fixture needs update to check IndexedDB instead of LocalStorage
 
 3. **Custom Message Creation Count (1 test)**
+
    ```
    Error: expect(newCount).toBe(initialCount + 1)
    Expected: 74

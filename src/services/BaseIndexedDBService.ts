@@ -1,11 +1,12 @@
-import type { IDBPDatabase } from 'idb';
+import type { IDBPDatabase, DBSchema } from 'idb';
 
 /**
  * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores
  * Story 5.3: Extract shared service logic to reduce ~80% code duplication
  *
- * Generic Type Constraint: <T extends { id?: number }>
- * - Ensures all entities have optional id field for IndexedDB auto-increment keys
+ * Generic Type Constraints:
+ * - T extends { id?: number }: Entity type with optional id field for IndexedDB auto-increment keys
+ * - DBTypes extends DBSchema: Database schema type for type-safe IndexedDB operations
  * - Services provide concrete types: Message, Photo, MoodEntry
  *
  * Abstract Methods (services must implement):
@@ -27,8 +28,11 @@ import type { IDBPDatabase } from 'idb';
  *   - Prevents silent data loss or inconsistent state
  *   - Allows callers to handle failures with proper user feedback
  */
-export abstract class BaseIndexedDBService<T extends { id?: number }> {
-  protected db: IDBPDatabase<any> | null = null;
+export abstract class BaseIndexedDBService<
+  T extends { id?: number },
+  DBTypes extends DBSchema = DBSchema,
+> {
+  protected db: IDBPDatabase<DBTypes> | null = null;
   protected initPromise: Promise<void> | null = null;
 
   /**
@@ -88,7 +92,7 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      const id = await this.db!.add(storeName, item as T);
+      const id = await (this.db! as any).add(storeName, item as T);
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Added item to ${storeName}, id: ${id}`);
       }
@@ -109,7 +113,7 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      const item = await this.db!.get(storeName, id);
+      const item = await (this.db! as any).get(storeName, id);
 
       if (item) {
         if (import.meta.env.DEV) {
@@ -135,7 +139,7 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      const items = await this.db!.getAll(storeName);
+      const items = await (this.db! as any).getAll(storeName);
 
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${storeName}`);
@@ -157,14 +161,14 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      const item = await this.db!.get(storeName, id);
+      const item = await (this.db! as any).get(storeName, id);
 
       if (!item) {
         throw new Error(`Item ${id} not found in ${storeName}`);
       }
 
       const updated: T = { ...item, ...updates };
-      await this.db!.put(storeName, updated);
+      await (this.db! as any).put(storeName, updated);
 
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Updated item in ${storeName}, id: ${id}`);
@@ -184,7 +188,7 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      await this.db!.delete(storeName, id);
+      await (this.db! as any).delete(storeName, id);
 
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Deleted item from ${storeName}, id: ${id}`);
@@ -203,7 +207,7 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      await this.db!.clear(storeName);
+      await (this.db! as any).clear(storeName);
 
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Cleared all items from ${storeName}`);
@@ -231,7 +235,7 @@ export abstract class BaseIndexedDBService<T extends { id?: number }> {
       await this.init();
 
       const storeName = this.getStoreName();
-      const transaction = this.db!.transaction(storeName, 'readonly');
+      const transaction = (this.db! as any).transaction(storeName, 'readonly');
       const store = transaction.objectStore(storeName);
 
       const results: T[] = [];

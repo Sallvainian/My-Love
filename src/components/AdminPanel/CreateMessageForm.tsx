@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MessageCategory } from '../../types';

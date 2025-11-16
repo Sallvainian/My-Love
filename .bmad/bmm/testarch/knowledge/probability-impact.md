@@ -86,11 +86,7 @@ export function classifyRiskAction(score: RiskScore): RiskAction {
 /**
  * Full risk assessment with automatic classification
  */
-export function assessRisk(params: {
-  probability: Probability;
-  impact: Impact;
-  reasoning: string;
-}): RiskAssessment {
+export function assessRisk(params: { probability: Probability; impact: Impact; reasoning: string }): RiskAssessment {
   const { probability, impact, reasoning } = params;
 
   const score = calculateRiskScore(probability, impact);
@@ -114,14 +110,7 @@ export function generateRiskMatrix(): string {
     for (let probability = 1; probability <= 3; probability++) {
       const score = calculateRiskScore(probability as Probability, impact as Impact);
       const action = classifyRiskAction(score);
-      const emoji =
-        action === 'BLOCK'
-          ? '🔴'
-          : action === 'MITIGATE'
-            ? '🟠'
-            : action === 'MONITOR'
-              ? '🟡'
-              : '🟢';
+      const emoji = action === 'BLOCK' ? '🔴' : action === 'MITIGATE' ? '🟠' : action === 'MONITOR' ? '🟡' : '🟢';
       row.push(`${emoji} ${score}`);
     }
     matrix.push(row);
@@ -149,11 +138,7 @@ export function generateRiskMatrix(): string {
 
 ```typescript
 // tests/e2e/test-planning/risk-assessment.ts
-import {
-  assessRisk,
-  generateRiskMatrix,
-  type RiskAssessment,
-} from '../../../src/testing/risk-matrix';
+import { assessRisk, generateRiskMatrix, type RiskAssessment } from '../../../src/testing/risk-matrix';
 
 export type TestScenario = {
   id: string;
@@ -168,9 +153,7 @@ export type TestScenario = {
 /**
  * Assess test scenarios and auto-assign priority based on risk score
  */
-export function assessTestScenarios(
-  scenarios: Omit<TestScenario, 'risk' | 'priority'>[]
-): TestScenario[] {
+export function assessTestScenarios(scenarios: Omit<TestScenario, 'risk' | 'priority'>[]): TestScenario[] {
   return scenarios.map((scenario) => {
     // Auto-assign priority based on risk score
     const priority = mapRiskToPriority(scenario.risk.score);
@@ -255,7 +238,7 @@ export function generateRiskReport(scenarios: TestScenario[]): string {
       acc[s.priority] = (acc[s.priority] || 0) + 1;
       return acc;
     },
-    {} as Record<string, number>
+    {} as Record<string, number>,
   );
 
   const actionCounts = scenarios.reduce(
@@ -263,7 +246,7 @@ export function generateRiskReport(scenarios: TestScenario[]): string {
       acc[s.risk.action] = (acc[s.risk.action] || 0) + 1;
       return acc;
     },
-    {} as Record<string, number>
+    {} as Record<string, number>,
   );
 
   return `
@@ -287,9 +270,7 @@ ${generateRiskMatrix()}
 ## Scenarios by Risk Score (Highest First)
 ${scenarios
   .sort((a, b) => b.risk.score - a.risk.score)
-  .map(
-    (s) => `- **[${s.priority}]** ${s.id}: ${s.title} (Score: ${s.risk.score} - ${s.risk.action})`
-  )
+  .map((s) => `- **[${s.priority}]** ${s.id}: ${s.title} (Score: ${s.risk.score} - ${s.risk.action})`)
   .join('\n')}
 `.trim();
 }
@@ -411,12 +392,7 @@ export class RiskTracker {
   /**
    * Mark risk as mitigated (probability reduced)
    */
-  mitigateRisk(params: {
-    id: string;
-    newProbability: Probability;
-    mitigation: string;
-    changedBy: string;
-  }): TrackedRisk | null {
+  mitigateRisk(params: { id: string; newProbability: Probability; mitigation: string; changedBy: string }): TrackedRisk | null {
     const { id, newProbability, mitigation, changedBy } = params;
     const risk = this.reassessRisk({
       id,
@@ -440,9 +416,7 @@ export class RiskTracker {
    */
   getRisksRequiringAction(): TrackedRisk[] {
     return Array.from(this.risks.values()).filter(
-      (r) =>
-        r.status === 'OPEN' &&
-        (r.currentRisk.action === 'MITIGATE' || r.currentRisk.action === 'BLOCK')
+      (r) => r.status === 'OPEN' && (r.currentRisk.action === 'MITIGATE' || r.currentRisk.action === 'BLOCK'),
     );
   }
 
@@ -473,10 +447,7 @@ ${risk.mitigations.length > 0 ? risk.mitigations.map((m) => `- ${m}`).join('\n')
 ## History (${risk.history.length} changes)
 ${risk.history
   .reverse()
-  .map(
-    (h) =>
-      `- **${h.timestamp.toISOString()}** by ${h.changedBy}: Score ${h.assessment.score} (${h.assessment.action}) - ${h.reason}`
-  )
+  .map((h) => `- **${h.timestamp.toISOString()}** by ${h.changedBy}: Score ${h.assessment.score} (${h.assessment.action}) - ${h.reason}`)
   .join('\n')}
 `.trim();
   }
@@ -566,9 +537,7 @@ function generateGateSummary(result: Omit<GateResult, 'summary'>): string {
 
   if (monitored.length > 0) {
     lines.push(`\n**Monitored** (${monitored.length}): Watch closely`);
-    monitored.forEach((r) =>
-      lines.push(`- **${r.id}**: ${r.title} (Score: ${r.currentRisk.score})`)
-    );
+    monitored.forEach((r) => lines.push(`- **${r.id}**: ${r.title} (Score: ${r.currentRisk.score})`));
   }
 
   if (documented.length > 0) {

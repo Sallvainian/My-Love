@@ -166,9 +166,13 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
 
       // Use index if filtering by category
       if (filter?.category && filter.category !== 'all') {
-        messages = await this.db!.getAllFromIndex('messages', 'by-category', filter.category);
+        messages = await (this.db! as any).getAllFromIndex(
+          'messages',
+          'by-category',
+          filter.category
+        );
       } else {
-        messages = await this.db!.getAll('messages');
+        messages = await (this.db! as any).getAll('messages');
       }
 
       // Filter by isCustom
