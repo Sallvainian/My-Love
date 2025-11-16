@@ -92,7 +92,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
             if (migratedPhotos.length > 0) {
               for (const photo of migratedPhotos) {
                 // Remove undefined blob field before inserting
-                const { blob, ...cleanPhoto } = photo;
+                const { blob: _blob, ...cleanPhoto } = photo;
                 await photosStore.add(cleanPhoto);
               }
               if (import.meta.env.DEV) {

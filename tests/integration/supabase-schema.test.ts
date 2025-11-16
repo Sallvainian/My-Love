@@ -18,30 +18,21 @@ describe('Supabase Schema Verification (Story 6.0)', () => {
   describe('AC-1, AC-2, AC-3: Table Creation', () => {
     it('should have users table with correct columns', async () => {
       // Query information_schema to verify table structure
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .limit(0); // Just get schema, no data
+      const { data, error } = await supabase.from('users').select('*').limit(0); // Just get schema, no data
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
     });
 
     it('should have moods table with correct columns', async () => {
-      const { data, error } = await supabase
-        .from('moods')
-        .select('*')
-        .limit(0);
+      const { data, error } = await supabase.from('moods').select('*').limit(0);
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
     });
 
     it('should have interactions table with correct columns', async () => {
-      const { data, error } = await supabase
-        .from('interactions')
-        .select('*')
-        .limit(0);
+      const { data, error } = await supabase.from('interactions').select('*').limit(0);
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
@@ -72,13 +63,11 @@ describe('Supabase Schema Verification (Story 6.0)', () => {
 
   describe('AC-9: Schema Verification - CHECK Constraints', () => {
     it('should reject invalid mood_type', async () => {
-      const { error } = await supabase
-        .from('moods')
-        .insert({
-          user_id: '00000000-0000-0000-0000-000000000000', // Dummy UUID
-          mood_type: 'invalid_mood', // Should fail CHECK constraint
-          note: 'Test note'
-        });
+      const { error } = await supabase.from('moods').insert({
+        user_id: '00000000-0000-0000-0000-000000000000', // Dummy UUID
+        mood_type: 'invalid_mood', // Should fail CHECK constraint
+        note: 'Test note',
+      });
 
       expect(error).not.toBeNull();
       expect(error?.message).toContain('check');
@@ -87,26 +76,22 @@ describe('Supabase Schema Verification (Story 6.0)', () => {
     it('should reject mood note longer than 500 characters', async () => {
       const longNote = 'a'.repeat(501);
 
-      const { error } = await supabase
-        .from('moods')
-        .insert({
-          user_id: '00000000-0000-0000-0000-000000000000',
-          mood_type: 'loved',
-          note: longNote
-        });
+      const { error } = await supabase.from('moods').insert({
+        user_id: '00000000-0000-0000-0000-000000000000',
+        mood_type: 'loved',
+        note: longNote,
+      });
 
       expect(error).not.toBeNull();
       expect(error?.message).toContain('check');
     });
 
     it('should reject invalid interaction type', async () => {
-      const { error } = await supabase
-        .from('interactions')
-        .insert({
-          type: 'hug', // Invalid - should be 'poke' or 'kiss'
-          from_user_id: '00000000-0000-0000-0000-000000000000',
-          to_user_id: '00000000-0000-0000-0000-000000000001'
-        });
+      const { error } = await supabase.from('interactions').insert({
+        type: 'hug', // Invalid - should be 'poke' or 'kiss'
+        from_user_id: '00000000-0000-0000-0000-000000000000',
+        to_user_id: '00000000-0000-0000-0000-000000000001',
+      });
 
       expect(error).not.toBeNull();
       expect(error?.message).toContain('check');
@@ -117,13 +102,11 @@ describe('Supabase Schema Verification (Story 6.0)', () => {
 
       // Note: This will fail without auth, but validates the enum values are recognized
       for (const moodType of validMoodTypes) {
-        const { error } = await supabase
-          .from('moods')
-          .insert({
-            user_id: '00000000-0000-0000-0000-000000000000',
-            mood_type: moodType,
-            note: 'Test'
-          });
+        const { error } = await supabase.from('moods').insert({
+          user_id: '00000000-0000-0000-0000-000000000000',
+          mood_type: moodType,
+          note: 'Test',
+        });
 
         // Error is expected (RLS or FK violation), but NOT a CHECK constraint error
         if (error) {
@@ -135,15 +118,17 @@ describe('Supabase Schema Verification (Story 6.0)', () => {
 
   describe('AC-8: Realtime Configuration', () => {
     it('should allow subscription to moods table', () => {
-      const channel = supabase
-        .channel('moods-test')
-        .on('postgres_changes', {
+      const channel = supabase.channel('moods-test').on(
+        'postgres_changes',
+        {
           event: 'INSERT',
           schema: 'public',
-          table: 'moods'
-        }, () => {
+          table: 'moods',
+        },
+        () => {
           // Callback
-        });
+        }
+      );
 
       // Verify channel can be created (subscription will fail without auth, but channel creation should work)
       expect(channel).toBeDefined();
@@ -153,15 +138,17 @@ describe('Supabase Schema Verification (Story 6.0)', () => {
     });
 
     it('should allow subscription to interactions table', () => {
-      const channel = supabase
-        .channel('interactions-test')
-        .on('postgres_changes', {
+      const channel = supabase.channel('interactions-test').on(
+        'postgres_changes',
+        {
           event: 'INSERT',
           schema: 'public',
-          table: 'interactions'
-        }, () => {
+          table: 'interactions',
+        },
+        () => {
           // Callback
-        });
+        }
+      );
 
       expect(channel).toBeDefined();
 

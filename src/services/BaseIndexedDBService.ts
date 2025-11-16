@@ -28,7 +28,10 @@ import type { IDBPDatabase, DBSchema } from 'idb';
  *   - Prevents silent data loss or inconsistent state
  *   - Allows callers to handle failures with proper user feedback
  */
-export abstract class BaseIndexedDBService<T extends { id?: number }, DBTypes extends DBSchema = DBSchema> {
+export abstract class BaseIndexedDBService<
+  T extends { id?: number },
+  DBTypes extends DBSchema = DBSchema,
+> {
   protected db: IDBPDatabase<DBTypes> | null = null;
   protected initPromise: Promise<void> | null = null;
 

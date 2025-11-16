@@ -175,10 +175,7 @@ export function isAnniversaryPast(anniversaryDate: string): boolean {
  * @param label - Anniversary label
  * @returns Formatted countdown string
  */
-export function formatCountdownDisplay(
-  timeRemaining: TimeRemaining,
-  label: string
-): string {
+export function formatCountdownDisplay(timeRemaining: TimeRemaining, label: string): string {
   const { days, hours, minutes } = timeRemaining;
 
   if (days === 0 && hours === 0 && minutes === 0) {

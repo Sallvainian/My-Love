@@ -13,14 +13,17 @@
 ## Priority Breakdown
 
 **CRITICAL (Must fix before merge):**
+
 - Task 1-4: Story 6.1 security and type safety issues
 - Task 5: Story 6.2 failing unit tests
 - Task 6: Story 6.2 missing form validation
 
 **HIGH PRIORITY (Can proceed in parallel):**
+
 - Task 7-9: Story 6.1 enhanced functionality
 
 **MINOR (Non-blocking):**
+
 - Task 10-11: Story 6.6 code quality improvements
 
 ---
@@ -28,6 +31,7 @@
 ## Task 1: Remove Hardcoded Supabase Credentials from .env.example
 
 **Files:**
+
 - Modify: `.env.example:14-15`
 
 **CRITICAL SECURITY**: Production credentials are exposed in version control. Must be fixed immediately.
@@ -132,6 +136,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 3: Fix RLS Policy or Document Design Decision
 
 **Files:**
+
 - Create: `docs/migrations/rls-policy-fix.sql` (if fixing)
 - OR Modify: `docs/sprint-artifacts/6-1-supabase-backend-setup-api-integration.md` (if documenting)
 
@@ -140,11 +145,13 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ### Step 1: Determine approach (MVP vs Production-ready)
 
 **Option A: Document MVP Design Decision** (Faster - 2 min)
+
 - Two-user couple app = both can see all data
 - RLS still protects against external access
 - Document intention for future Story 6.4 (Partner Visibility)
 
 **Option B: Fix RLS Policy Now** (Slower - 10 min)
+
 - Restrict SELECT to `auth.uid() = user_id`
 - Requires migration and testing
 - More secure but may break current workflow
@@ -155,31 +162,37 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 Append to `docs/sprint-artifacts/6-1-supabase-backend-setup-api-integration.md`:
 
-```markdown
+````markdown
 ## 🔍 RLS Policy Design Decision
 
 **Current State:** SELECT policy allows viewing all moods in database
+
 ```sql
 CREATE POLICY "Users can view all moods" ON moods
 FOR SELECT USING (true);
 ```
+````
 
 **Rationale:**
+
 - MVP is a two-person couple app (user + partner)
 - Both users should see each other's moods (core feature)
 - RLS still enforces authentication (anon key alone cannot access data)
 - Proper partner-specific visibility will be implemented in Story 6.4
 
 **Security Analysis:**
+
 - ✅ Auth required (cannot access without valid session)
 - ✅ RLS prevents external access
-- ⚠️  Allows viewing all authenticated users' data
-- ⚠️  Assumes only 2 users in database (MVP constraint)
+- ⚠️ Allows viewing all authenticated users' data
+- ⚠️ Assumes only 2 users in database (MVP constraint)
 
 **Future Work:**
+
 - Story 6.4: Implement proper partner relationships table
 - Story 6.4: Update policy to `user_id = auth.uid() OR user_id = get_partner_id(auth.uid())`
-```
+
+````
 
 ### Step 2b: If fixing policy (ALTERNATIVE)
 
@@ -195,9 +208,10 @@ FOR SELECT
 USING (auth.uid() = user_id);
 
 -- Note: This breaks partner mood visibility until Story 6.4 implements partner relationships
-```
+````
 
 Then run migration:
+
 ```bash
 # Apply via Supabase Dashboard → SQL Editor
 # OR via Supabase CLI: supabase db push
@@ -226,6 +240,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 4: Remove 'as any' Type Assertions in moodService.ts
 
 **Files:**
+
 - Modify: `src/services/moodService.ts:43`
 - Modify: `src/api/supabaseClient.ts:136` (use proper Database type)
 
@@ -337,6 +352,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 5: Fix 7 Failing Unit Tests (by-date Unique Index Constraint)
 
 **Files:**
+
 - Modify: `tests/unit/services/moodService.test.ts` (multiple test cases)
 
 **Issue:** Tests create multiple moods with same date, violating unique index on 'by-date'
@@ -352,6 +368,7 @@ Expected: 7 tests fail with "ConstraintError: Key already exists in the object s
 ### Step 2: Identify affected tests
 
 Failing tests use same date (today):
+
 - `auto-increments id for multiple mood entries` (line 39)
 - `retrieves all mood entries` (line 115)
 - `clears all mood entries` (line 145)
@@ -379,10 +396,7 @@ function getUniqueTestDate(): string {
 /**
  * Mock moodService.create to use unique dates instead of "today"
  */
-async function createMoodWithUniqueDate(
-  mood: MoodType,
-  note?: string
-): Promise<MoodEntry> {
+async function createMoodWithUniqueDate(mood: MoodType, note?: string): Promise<MoodEntry> {
   const uniqueDate = getUniqueTestDate();
 
   // Create mood entry with unique date
@@ -598,6 +612,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 6: Add maxLength Attribute to Textarea
 
 **Files:**
+
 - Modify: `src/components/MoodTracker/MoodTracker.tsx:210`
 
 ### Step 1: Add maxLength HTML attribute
@@ -648,6 +663,7 @@ npm run dev
 ```
 
 Manual verification:
+
 1. Navigate to mood tracker
 2. Try typing >200 characters in note field
 3. Verify browser prevents input after 200 chars
@@ -682,6 +698,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 7: Wrap updateCountdowns in useCallback
 
 **Files:**
+
 - Modify: `src/components/CountdownTimer/CountdownTimer.tsx:54`
 
 ### Step 1: Import useCallback
@@ -796,6 +813,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 8: Add data-testid Attributes to CountdownTimer
 
 **Files:**
+
 - Modify: `src/components/CountdownTimer/CountdownTimer.tsx:100-273`
 
 ### Step 1: Add data-testid to container
@@ -899,6 +917,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 9: Add Zod Validation to API Services (HIGH PRIORITY)
 
 **Files:**
+
 - Create: `src/api/validation/supabaseSchemas.ts`
 - Modify: `src/api/supabaseClient.ts`
 
@@ -958,10 +977,7 @@ export class MoodApi {
    * Fetch all moods for a user with validation
    */
   static async getMoods(userId: string): Promise<SupabaseMood[]> {
-    const { data, error } = await supabase
-      .from('moods')
-      .select('*')
-      .eq('user_id', userId);
+    const { data, error } = await supabase.from('moods').select('*').eq('user_id', userId);
 
     if (error) {
       throw this.parseError(error);
@@ -1052,7 +1068,9 @@ export class MoodApi {
   private static parseError(error: any): Error {
     try {
       const parsed = SupabaseErrorSchema.parse(error);
-      return new Error(`Supabase Error: ${parsed.message}${parsed.hint ? ` (${parsed.hint})` : ''}`);
+      return new Error(
+        `Supabase Error: ${parsed.message}${parsed.hint ? ` (${parsed.hint})` : ''}`
+      );
     } catch {
       return new Error('Unknown Supabase error occurred');
     }
@@ -1162,6 +1180,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 10: Implement syncPendingMoods() with Tests (HIGH PRIORITY)
 
 **Files:**
+
 - Create: `src/services/syncService.ts`
 - Create: `tests/unit/services/syncService.test.ts`
 
@@ -1216,11 +1235,7 @@ export class SyncService {
       for (const mood of pendingMoods) {
         try {
           // Upload to Supabase
-          const supabaseMood = await MoodApi.createMood(
-            userId,
-            mood.mood,
-            mood.note || undefined
-          );
+          const supabaseMood = await MoodApi.createMood(userId, mood.mood, mood.note || undefined);
 
           // Mark as synced in IndexedDB
           await moodService.markAsSynced(mood.id!, supabaseMood.id);
@@ -1236,7 +1251,9 @@ export class SyncService {
       }
 
       if (import.meta.env.DEV) {
-        console.log(`[SyncService] Sync complete: ${syncedCount}/${pendingMoods.length} successful`);
+        console.log(
+          `[SyncService] Sync complete: ${syncedCount}/${pendingMoods.length} successful`
+        );
       }
 
       return syncedCount;
@@ -1433,6 +1450,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## Task 11: Add Realtime Error Handling (HIGH PRIORITY)
 
 **Files:**
+
 - Create: `src/services/realtimeService.ts`
 - Create: `tests/unit/services/realtimeService.test.ts`
 
@@ -1843,6 +1861,7 @@ git log --oneline --graph -12
 ```
 
 Expected output:
+
 ```
 * feat: Add Realtime service with comprehensive error handling
 * feat: Implement syncPendingMoods() with comprehensive tests
@@ -1863,30 +1882,30 @@ Update `docs/sprint-artifacts/sprint-status.yaml`:
 
 ```yaml
 stories:
-  - id: "6.1"
-    title: "Supabase Backend Setup & API Integration"
-    status: "ready_for_merge" # Was: changes_requested
+  - id: '6.1'
+    title: 'Supabase Backend Setup & API Integration'
+    status: 'ready_for_merge' # Was: changes_requested
     blockers_resolved:
-      - "Removed hardcoded credentials from .env.example"
-      - "Documented RLS policy design decision"
+      - 'Removed hardcoded credentials from .env.example'
+      - 'Documented RLS policy design decision'
       - "Replaced 'as any' with proper typing"
-      - "Added Zod validation to API services"
-      - "Implemented syncPendingMoods() with tests"
-      - "Added Realtime error handling"
+      - 'Added Zod validation to API services'
+      - 'Implemented syncPendingMoods() with tests'
+      - 'Added Realtime error handling'
 
-  - id: "6.2"
-    title: "Mood Tracking UI & Local Storage"
-    status: "ready_for_merge" # Was: conditionally_approved
+  - id: '6.2'
+    title: 'Mood Tracking UI & Local Storage'
+    status: 'ready_for_merge' # Was: conditionally_approved
     blockers_resolved:
-      - "Fixed 7 failing unit tests (by-date constraint)"
-      - "Added maxLength={200} to textarea"
+      - 'Fixed 7 failing unit tests (by-date constraint)'
+      - 'Added maxLength={200} to textarea'
 
-  - id: "6.6"
-    title: "Anniversary Countdown Timers"
-    status: "production_ready" # Was: approved_for_production
+  - id: '6.6'
+    title: 'Anniversary Countdown Timers'
+    status: 'production_ready' # Was: approved_for_production
     improvements:
-      - "Wrapped updateCountdowns in useCallback"
-      - "Added data-testid attributes for E2E stability"
+      - 'Wrapped updateCountdowns in useCallback'
+      - 'Added data-testid attributes for E2E stability'
 ```
 
 ---
@@ -1896,6 +1915,7 @@ stories:
 All critical blockers, high-priority issues, and minor improvements addressed:
 
 **CRITICAL (Completed):**
+
 - ✅ Task 1: Removed hardcoded Supabase credentials
 - ✅ Task 2: Documented credential rotation steps
 - ✅ Task 3: Documented RLS policy design decision
@@ -1904,6 +1924,7 @@ All critical blockers, high-priority issues, and minor improvements addressed:
 - ✅ Task 6: Added maxLength to textarea
 
 **HIGH PRIORITY (Completed):**
+
 - ✅ Task 7: Wrapped updateCountdowns in useCallback
 - ✅ Task 8: Added data-testid attributes
 - ✅ Task 9: Added Zod validation to API services
@@ -1911,6 +1932,7 @@ All critical blockers, high-priority issues, and minor improvements addressed:
 - ✅ Task 11: Added Realtime error handling
 
 **Ready for Production Merge:**
+
 - Story 6.1: ✅ All security fixes applied, ready for merge
 - Story 6.2: ✅ All test fixes applied, ready for merge
 - Story 6.6: ✅ Production-ready, deploy immediately! 🚀

@@ -16,6 +16,7 @@ Core features: (1) Mood logging interface with 5 mood types stored locally, (2) 
 ## Objectives and Scope
 
 **In Scope:**
+
 - Supabase backend setup with Row Level Security and API integration for mood sync and interactions
 - Mood tracking UI with 5 mood types (loved, happy, content, thoughtful, grateful) and optional notes
 - Local-first mood storage in IndexedDB with background sync to Supabase when online
@@ -27,6 +28,7 @@ Core features: (1) Mood logging interface with 5 mood types stored locally, (2) 
 - Top navigation integration for accessing new features (Mood Tracker tab)
 
 **Out of Scope:**
+
 - Web Push API notifications (browser permission complexity deferred to future enhancement)
 - Advanced mood analytics (trends, insights, correlations) - MVP focuses on logging and viewing
 - Multi-user authentication system (hardcoded partner pairing for single-use case)
@@ -37,6 +39,7 @@ Core features: (1) Mood logging interface with 5 mood types stored locally, (2) 
 ## System Architecture Alignment
 
 **Existing Architecture Leveraged:**
+
 - **Component-based SPA**: New components (MoodTracker, MoodHistoryCalendar, CountdownTimer, PokeKissInterface) follow existing React + TypeScript + Tailwind pattern
 - **Zustand State Management**: Extending `useAppStore` with new slices for moods (already partially implemented in PRD), interactions, and countdowns
 - **IndexedDB Local Storage**: Creating new object store for mood entries to maintain offline-first capability; follows existing `BaseIndexedDBService` pattern established in Story 5.3
@@ -44,6 +47,7 @@ Core features: (1) Mood logging interface with 5 mood types stored locally, (2) 
 - **PWA Offline-First**: All features work locally; Supabase sync is enhancement when online (graceful degradation)
 
 **New Architecture Components:**
+
 - **Supabase Backend**: Managed PostgreSQL with Realtime for real-time data sync
   - Tables: `moods`, `interactions`, `users` (minimal - just partner IDs)
   - Realtime channels for live updates (WebSocket-based)
@@ -57,12 +61,14 @@ Core features: (1) Mood logging interface with 5 mood types stored locally, (2) 
 - **State Management Extension**: New store slices for `interactions`, `countdowns`, `syncStatus`
 
 **Integration Points:**
+
 - **Navigation**: Extends existing DailyMessage single-view to support tabbed navigation (Home, Mood Tracker) - React Router not required yet, can use simple state-based tab switching
 - **Theme System**: Mood calendar and interaction animations use existing Tailwind theme variables for consistency
 - **Error Handling**: Leverages existing `ErrorBoundary` component (Story 1.5) for network error graceful degradation
 - **Animations**: Uses Framer Motion library already in stack for mood logging feedback and poke/kiss animations
 
 **Constraints:**
+
 - Must maintain <2s load time on 3G (NFR001)
 - Must function fully offline except sync features (NFR002)
 - Must support mobile viewports 320px-428px (NFR004)
@@ -72,50 +78,50 @@ Core features: (1) Mood logging interface with 5 mood types stored locally, (2) 
 
 ### Services and Modules
 
-| Service/Module | Responsibility | Inputs | Outputs | Owner/Location |
-|----------------|----------------|--------|---------|----------------|
-| **MoodService** | IndexedDB CRUD for mood entries | MoodEntry objects | Promise<MoodEntry[]> | `src/services/moodService.ts` |
-| - extends BaseIndexedDBService<MoodEntry> | Inherits: add, get, getAll, update, delete | - | - | Follows Story 5.3 pattern |
-| - getStoreName() | Returns 'moods' object store | - | string | - |
-| - _doInit() | Creates moods store with by-date index | - | Promise<void> | - |
-| - getMoodForDate() | Retrieve mood entry for specific date | Date | Promise<MoodEntry \| null> | Custom method |
-| - getMoodsInRange() | Get moods between start/end dates | startDate, endDate | Promise<MoodEntry[]> | For calendar view |
-| **SupabaseClient** | Singleton SDK instance for API calls | Config (URL, anon key) | Supabase instance | `src/api/supabaseClient.ts` |
-| - initialize() | Setup connection, handle auth | Supabase URL + anon key | Promise<void> | Called on app init |
-| - from() | Access Supabase tables | tableName | Table<T> | Generic table accessor |
-| **MoodSyncService** | Sync local moods to Supabase | - | - | `src/api/moodSyncService.ts` |
-| - syncMood() | Upload single mood entry | MoodEntry | Promise<SupabaseMoodRecord> | One-way sync |
-| - syncPendingMoods() | Batch upload unsynced moods | - | Promise<{synced, failed}> | Background task |
-| - subscribeMoodUpdates() | Real-time partner mood updates | callback | Unsubscribe fn | Realtime channel |
-| **InteractionService** | Send/receive poke/kiss events | - | - | `src/api/interactionService.ts` |
-| - sendPoke() | Send poke to partner | partnerId | Promise<InteractionRecord> | Inserts Supabase row |
-| - sendKiss() | Send kiss to partner | partnerId | Promise<InteractionRecord> | Inserts Supabase row |
-| - subscribeInteractions() | Listen for incoming interactions | callback | Unsubscribe fn | Realtime channel |
-| - getInteractionHistory() | Fetch past interactions | limit, offset | Promise<Interaction[]> | For history view |
-| **CountdownService** | Calculate time to anniversaries | - | - | `src/utils/countdownService.ts` |
-| - calculateTimeRemaining() | Compute days/hrs/mins to date | targetDate | {days, hours, minutes} | Pure function |
-| - getNextAnniversary() | Find nearest upcoming anniversary | Anniversary[] | Anniversary \| null | From settings |
-| - shouldTriggerCelebration() | Check if countdown reached zero | targetDate | boolean | Trigger animations |
-| **MoodTracker Component** | UI for logging daily mood | - | - | `src/components/MoodTracker.tsx` |
-| - Mood type selector (5 buttons) | User tap | MoodType | - | Uses Zustand action |
-| - Optional note input | Text input | string | - | Stored with mood |
-| - Submit handler | Form submit | - | Calls addMoodEntry() | Updates IndexedDB + Supabase |
-| **MoodHistoryCalendar Component** | Visual mood history | - | - | `src/components/MoodHistoryCalendar.tsx` |
-| - Calendar grid (month view) | - | - | Renders 30-31 days | Responsive design |
-| - Mood indicators per day | Mood data | MoodEntry[] | Color-coded dots | Uses theme colors |
-| - Day detail modal | Day tap | MoodEntry | Shows note + timestamp | Framer Motion modal |
-| **CountdownTimer Component** | Display anniversary countdown | - | - | `src/components/CountdownTimer.tsx` |
-| - Real-time countdown | setInterval (1 min) | targetDate | {days, hrs, mins} | Updates every minute |
-| - Celebration animation | countdown === 0 | - | Confetti/fireworks | Framer Motion |
-| - Multiple timers | Anniversary[] | - | Renders multiple cards | From settings |
-| **PokeKissInterface Component** | Send/receive interactions | - | - | `src/components/PokeKissInterface.tsx` |
-| - Poke button | User tap | - | Calls sendPoke() | Animated button |
-| - Kiss button | User tap | - | Calls sendKiss() | Animated button |
-| - Incoming notification badge | Real-time event | Interaction | Visual badge + count | Clears on view |
-| - Animation playback | Event received | InteractionType | Plays poke/kiss anim | Framer Motion |
-| **Navigation Component** | Tab switching | - | - | `src/components/Navigation.tsx` |
-| - Tab bar (Home, Mood, Settings) | User tap | TabName | Sets activeTab state | Simple state toggle |
-| - Active tab indicator | activeTab state | TabName | Visual highlight | Tailwind styling |
+| Service/Module                            | Responsibility                             | Inputs                  | Outputs                     | Owner/Location                           |
+| ----------------------------------------- | ------------------------------------------ | ----------------------- | --------------------------- | ---------------------------------------- |
+| **MoodService**                           | IndexedDB CRUD for mood entries            | MoodEntry objects       | Promise<MoodEntry[]>        | `src/services/moodService.ts`            |
+| - extends BaseIndexedDBService<MoodEntry> | Inherits: add, get, getAll, update, delete | -                       | -                           | Follows Story 5.3 pattern                |
+| - getStoreName()                          | Returns 'moods' object store               | -                       | string                      | -                                        |
+| - \_doInit()                              | Creates moods store with by-date index     | -                       | Promise<void>               | -                                        |
+| - getMoodForDate()                        | Retrieve mood entry for specific date      | Date                    | Promise<MoodEntry \| null>  | Custom method                            |
+| - getMoodsInRange()                       | Get moods between start/end dates          | startDate, endDate      | Promise<MoodEntry[]>        | For calendar view                        |
+| **SupabaseClient**                        | Singleton SDK instance for API calls       | Config (URL, anon key)  | Supabase instance           | `src/api/supabaseClient.ts`              |
+| - initialize()                            | Setup connection, handle auth              | Supabase URL + anon key | Promise<void>               | Called on app init                       |
+| - from()                                  | Access Supabase tables                     | tableName               | Table<T>                    | Generic table accessor                   |
+| **MoodSyncService**                       | Sync local moods to Supabase               | -                       | -                           | `src/api/moodSyncService.ts`             |
+| - syncMood()                              | Upload single mood entry                   | MoodEntry               | Promise<SupabaseMoodRecord> | One-way sync                             |
+| - syncPendingMoods()                      | Batch upload unsynced moods                | -                       | Promise<{synced, failed}>   | Background task                          |
+| - subscribeMoodUpdates()                  | Real-time partner mood updates             | callback                | Unsubscribe fn              | Realtime channel                         |
+| **InteractionService**                    | Send/receive poke/kiss events              | -                       | -                           | `src/api/interactionService.ts`          |
+| - sendPoke()                              | Send poke to partner                       | partnerId               | Promise<InteractionRecord>  | Inserts Supabase row                     |
+| - sendKiss()                              | Send kiss to partner                       | partnerId               | Promise<InteractionRecord>  | Inserts Supabase row                     |
+| - subscribeInteractions()                 | Listen for incoming interactions           | callback                | Unsubscribe fn              | Realtime channel                         |
+| - getInteractionHistory()                 | Fetch past interactions                    | limit, offset           | Promise<Interaction[]>      | For history view                         |
+| **CountdownService**                      | Calculate time to anniversaries            | -                       | -                           | `src/utils/countdownService.ts`          |
+| - calculateTimeRemaining()                | Compute days/hrs/mins to date              | targetDate              | {days, hours, minutes}      | Pure function                            |
+| - getNextAnniversary()                    | Find nearest upcoming anniversary          | Anniversary[]           | Anniversary \| null         | From settings                            |
+| - shouldTriggerCelebration()              | Check if countdown reached zero            | targetDate              | boolean                     | Trigger animations                       |
+| **MoodTracker Component**                 | UI for logging daily mood                  | -                       | -                           | `src/components/MoodTracker.tsx`         |
+| - Mood type selector (5 buttons)          | User tap                                   | MoodType                | -                           | Uses Zustand action                      |
+| - Optional note input                     | Text input                                 | string                  | -                           | Stored with mood                         |
+| - Submit handler                          | Form submit                                | -                       | Calls addMoodEntry()        | Updates IndexedDB + Supabase             |
+| **MoodHistoryCalendar Component**         | Visual mood history                        | -                       | -                           | `src/components/MoodHistoryCalendar.tsx` |
+| - Calendar grid (month view)              | -                                          | -                       | Renders 30-31 days          | Responsive design                        |
+| - Mood indicators per day                 | Mood data                                  | MoodEntry[]             | Color-coded dots            | Uses theme colors                        |
+| - Day detail modal                        | Day tap                                    | MoodEntry               | Shows note + timestamp      | Framer Motion modal                      |
+| **CountdownTimer Component**              | Display anniversary countdown              | -                       | -                           | `src/components/CountdownTimer.tsx`      |
+| - Real-time countdown                     | setInterval (1 min)                        | targetDate              | {days, hrs, mins}           | Updates every minute                     |
+| - Celebration animation                   | countdown === 0                            | -                       | Confetti/fireworks          | Framer Motion                            |
+| - Multiple timers                         | Anniversary[]                              | -                       | Renders multiple cards      | From settings                            |
+| **PokeKissInterface Component**           | Send/receive interactions                  | -                       | -                           | `src/components/PokeKissInterface.tsx`   |
+| - Poke button                             | User tap                                   | -                       | Calls sendPoke()            | Animated button                          |
+| - Kiss button                             | User tap                                   | -                       | Calls sendKiss()            | Animated button                          |
+| - Incoming notification badge             | Real-time event                            | Interaction             | Visual badge + count        | Clears on view                           |
+| - Animation playback                      | Event received                             | InteractionType         | Plays poke/kiss anim        | Framer Motion                            |
+| **Navigation Component**                  | Tab switching                              | -                       | -                           | `src/components/Navigation.tsx`          |
+| - Tab bar (Home, Mood, Settings)          | User tap                                   | TabName                 | Sets activeTab state        | Simple state toggle                      |
+| - Active tab indicator                    | activeTab state                            | TabName                 | Visual highlight            | Tailwind styling                         |
 
 ### Data Models and Contracts
 
@@ -246,13 +252,13 @@ CREATE TABLE users (
 
 **Supabase PostgREST API Endpoints:**
 
-| Method | Path | Request Body | Response | Purpose |
-|--------|------|--------------|----------|---------|
-| POST | `/rest/v1/moods` | `{ user_id, mood_type, note }` | `SupabaseMoodRecord` | Create mood entry |
-| GET | `/rest/v1/moods?select=*&user_id=eq.<id>` | - | `SupabaseMoodRecord[]` | Fetch partner moods |
-| POST | `/rest/v1/interactions` | `{ type, from_user_id, to_user_id }` | `SupabaseInteractionRecord` | Send poke/kiss |
-| GET | `/rest/v1/interactions?select=*&to_user_id=eq.<id>&viewed=eq.false` | - | `SupabaseInteractionRecord[]` | Get unviewed interactions |
-| PATCH | `/rest/v1/interactions?id=eq.<id>` | `{ viewed: true }` | `SupabaseInteractionRecord` | Mark interaction viewed |
+| Method | Path                                                                | Request Body                         | Response                      | Purpose                   |
+| ------ | ------------------------------------------------------------------- | ------------------------------------ | ----------------------------- | ------------------------- |
+| POST   | `/rest/v1/moods`                                                    | `{ user_id, mood_type, note }`       | `SupabaseMoodRecord`          | Create mood entry         |
+| GET    | `/rest/v1/moods?select=*&user_id=eq.<id>`                           | -                                    | `SupabaseMoodRecord[]`        | Fetch partner moods       |
+| POST   | `/rest/v1/interactions`                                             | `{ type, from_user_id, to_user_id }` | `SupabaseInteractionRecord`   | Send poke/kiss            |
+| GET    | `/rest/v1/interactions?select=*&to_user_id=eq.<id>&viewed=eq.false` | -                                    | `SupabaseInteractionRecord[]` | Get unviewed interactions |
+| PATCH  | `/rest/v1/interactions?id=eq.<id>`                                  | `{ viewed: true }`                   | `SupabaseInteractionRecord`   | Mark interaction viewed   |
 
 **Supabase Realtime Channels (WebSocket-based):**
 
@@ -260,7 +266,8 @@ CREATE TABLE users (
 // Subscribe to partner's mood updates
 const moodsChannel = supabaseClient
   .channel('moods')
-  .on('postgres_changes',
+  .on(
+    'postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'moods', filter: `user_id=eq.${partnerId}` },
     (payload) => {
       // Update local state with partner's new mood
@@ -272,8 +279,14 @@ const moodsChannel = supabaseClient
 // Subscribe to incoming interactions
 const interactionsChannel = supabaseClient
   .channel('interactions')
-  .on('postgres_changes',
-    { event: 'INSERT', schema: 'public', table: 'interactions', filter: `to_user_id=eq.${currentUserId}` },
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'interactions',
+      filter: `to_user_id=eq.${currentUserId}`,
+    },
     (payload) => {
       // Show notification badge + play animation
       handleIncomingInteraction(payload.new);
@@ -395,6 +408,7 @@ interface IInteractionService {
 ### Performance
 
 **Target Metrics (from PRD NFR001):**
+
 - App load time: < 2 seconds on 3G connection
 - Animation frame rate: 60fps for all Framer Motion transitions
 - IndexedDB query time: < 100ms for mood/interaction retrieval
@@ -402,6 +416,7 @@ interface IInteractionService {
 - Calendar render time: < 200ms for 30-day month view
 
 **Performance Constraints:**
+
 - **Mood sync batching**: Limit to 50 pending moods per sync batch to avoid blocking UI
 - **Realtime connection**: Maintain single persistent Realtime channel for updates; reconnect on disconnect with exponential backoff (1s, 2s, 4s, max 30s)
 - **Countdown timer updates**: Use 1-minute intervals (not 1-second) to reduce CPU usage and battery drain
@@ -409,6 +424,7 @@ interface IInteractionService {
 - **Interaction history pagination**: Load 20 interactions per page to avoid large memory footprint
 
 **Optimizations:**
+
 - Debounce mood note input (300ms) to prevent excessive re-renders
 - Use Zustand selectors to prevent unnecessary component re-renders when unrelated state changes
 - IndexedDB indexes on `by-date` for fast range queries (moods calendar view)
@@ -418,6 +434,7 @@ interface IInteractionService {
 ### Security
 
 **Authentication & Authorization (from PRD NFR005):**
+
 - **Supabase authentication**: JWT-based authentication with Row Level Security policies
   - `VITE_SUPABASE_URL`: Supabase project URL
   - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous/public key (safe for client-side)
@@ -428,6 +445,7 @@ interface IInteractionService {
 - **Token storage**: Supabase SDK handles JWT token storage automatically in LocalStorage
 
 **Data Privacy:**
+
 - **Local-only data**: Photos, messages, and settings remain client-side only (not synced to Supabase)
 - **Synced data**: Only mood entries and poke/kiss interactions synced to backend
 - **No third-party services**: No analytics, tracking, or external integrations beyond Supabase
@@ -435,11 +453,13 @@ interface IInteractionService {
 - **CORS configuration**: Supabase auto-configures CORS for all web clients (no manual setup needed)
 
 **Input Validation:**
+
 - **Mood notes**: Max 500 characters, sanitize HTML to prevent XSS (React escapes by default, PostgreSQL enforces constraints)
 - **Supabase requests**: Validate mood_type enum values before submission (enforced by PostgreSQL CHECK constraint)
 - **User IDs**: Validate UUID format for userId/partnerId to prevent injection
 
 **Threat Mitigation:**
+
 - **XSS protection**: React auto-escapes content; no dangerouslySetInnerHTML usage
 - **SQL injection**: PostgREST uses parameterized queries; Row Level Security prevents unauthorized access
 - **CSRF**: Supabase SDK handles JWT authentication automatically
@@ -448,6 +468,7 @@ interface IInteractionService {
 ### Reliability/Availability
 
 **Offline-First Resilience (from PRD NFR002):**
+
 - **Full offline functionality**: All features work without network except:
   - Mood sync to Supabase (queued for retry when online)
   - Real-time partner mood updates (shown on reconnect)
@@ -456,6 +477,7 @@ interface IInteractionService {
 - **Sync retry strategy**: Exponential backoff for failed Supabase requests (3 retries max, then user notification)
 
 **Error Handling:**
+
 - **Network errors**: Graceful degradation with user-friendly messages ("You're offline. Mood saved locally and will sync when online.")
 - **Supabase API errors**: Specific error messages for 4xx/5xx responses (e.g., "Server unavailable. Try again later.")
 - **IndexedDB quota exceeded**: Warning message when storage nears limit (90% threshold); option to clear old moods
@@ -463,11 +485,13 @@ interface IInteractionService {
 - **React ErrorBoundary**: Catches component errors; displays fallback UI without crashing app (already implemented in Story 1.5)
 
 **Availability Targets:**
+
 - **Client-side availability**: 99.9% (PWA cached offline; failures only from device issues)
 - **Supabase availability**: 99.9% uptime SLA (managed service); minimal downtime expected
 - **Sync success rate**: 98% of mood syncs succeed within 24 hours (with retry logic)
 
 **Recovery Mechanisms:**
+
 - **Failed sync recovery**: Store failed sync attempts in `syncQueue` array; retry on app focus/network reconnect
 - **Data consistency**: On Realtime reconnect, fetch latest partner moods since last sync timestamp to catch up
 - **Conflict resolution**: Last-write-wins for mood edits (though unlikely since moods are append-only)
@@ -475,6 +499,7 @@ interface IInteractionService {
 ### Observability
 
 **Logging Requirements:**
+
 - **Client-side logging**: Use `console.error()` for critical errors (IndexedDB failures, Supabase API errors)
 - **Supabase sync logging**: Log sync attempts, successes, and failures with timestamps for debugging
   - `[SYNC] Mood synced: id=123, supabaseId=abc, timestamp=...`
@@ -483,6 +508,7 @@ interface IInteractionService {
 - **Performance logging**: Optional `performance.mark()` for critical operations (IndexedDB queries, API calls)
 
 **Metrics to Track:**
+
 - **Mood sync success rate**: Percentage of moods successfully synced to Supabase
 - **Average sync latency**: Time from mood creation to successful Supabase sync
 - **Interaction delivery time**: Time from poke/kiss send to partner receipt (Realtime latency)
@@ -490,6 +516,7 @@ interface IInteractionService {
 - **Error rates**: Frequency of specific error types (network, storage quota, API errors)
 
 **Monitoring Signals:**
+
 - **User-facing indicators**:
   - Sync status badge (e.g., "3 moods pending sync" when offline)
   - Network connectivity indicator (online/offline dot in nav bar)
@@ -501,6 +528,7 @@ interface IInteractionService {
   - Service Worker status (Application tab → Service Workers)
 
 **Alerting (future enhancement):**
+
 - No automated alerting in MVP; user relies on visual indicators
 - Future: Optional Sentry or similar error tracking integration for production monitoring
 
@@ -508,31 +536,32 @@ interface IInteractionService {
 
 **Existing Dependencies (already in package.json):**
 
-| Dependency | Version | Purpose | Epic 6 Usage |
-|------------|---------|---------|--------------|
-| **@supabase/supabase-js** | ^2.38.0 | Supabase JavaScript Client | Core dependency for all Supabase API interactions (moods, interactions, Realtime) |
-| **react** | 19.1.1 | UI framework | New components: MoodTracker, MoodHistoryCalendar, CountdownTimer, PokeKissInterface |
-| **zustand** | 5.0.8 | State management | Extend store with moods, interactions, countdowns, syncStatus slices |
-| **idb** | 8.0.3 | IndexedDB wrapper | MoodService for local mood storage (extends BaseIndexedDBService) |
-| **framer-motion** | 12.23.24 | Animation library | Mood logging feedback, poke/kiss animations, celebration fireworks |
-| **lucide-react** | 0.548.0 | Icon library | Mood type icons, interaction buttons, calendar navigation icons |
-| **zod** | 3.25.76 | Schema validation | Validate MoodEntry, Interaction schemas before IndexedDB/Supabase writes |
+| Dependency                | Version  | Purpose                    | Epic 6 Usage                                                                        |
+| ------------------------- | -------- | -------------------------- | ----------------------------------------------------------------------------------- |
+| **@supabase/supabase-js** | ^2.38.0  | Supabase JavaScript Client | Core dependency for all Supabase API interactions (moods, interactions, Realtime)   |
+| **react**                 | 19.1.1   | UI framework               | New components: MoodTracker, MoodHistoryCalendar, CountdownTimer, PokeKissInterface |
+| **zustand**               | 5.0.8    | State management           | Extend store with moods, interactions, countdowns, syncStatus slices                |
+| **idb**                   | 8.0.3    | IndexedDB wrapper          | MoodService for local mood storage (extends BaseIndexedDBService)                   |
+| **framer-motion**         | 12.23.24 | Animation library          | Mood logging feedback, poke/kiss animations, celebration fireworks                  |
+| **lucide-react**          | 0.548.0  | Icon library               | Mood type icons, interaction buttons, calendar navigation icons                     |
+| **zod**                   | 3.25.76  | Schema validation          | Validate MoodEntry, Interaction schemas before IndexedDB/Supabase writes            |
 
 **New Dependencies (to be added):**
 
-| Dependency | Version | Command | Purpose |
-|------------|---------|---------|---------|
+| Dependency                | Version | Command                             | Purpose                                  |
+| ------------------------- | ------- | ----------------------------------- | ---------------------------------------- |
 | **@supabase/supabase-js** | ^2.38.0 | `npm install @supabase/supabase-js` | Supabase client SDK for API and Realtime |
 
 **Dependencies to Remove:**
 
-| Dependency | Reason |
-|------------|--------|
+| Dependency     | Reason                            |
+| -------------- | --------------------------------- |
 | **pocketbase** | Replaced by @supabase/supabase-js |
 
 **Integration Points:**
 
 **1. Supabase Backend**
+
 - **Type**: Managed PostgreSQL with Realtime (Supabase Cloud)
 - **Integration method**: PostgREST REST API + Realtime channels (WebSocket-based)
 - **Configuration**:
@@ -548,12 +577,14 @@ interface IInteractionService {
 - **CORS**: Auto-configured for all web clients (no manual setup needed)
 
 **2. IndexedDB (via idb wrapper)**
+
 - **Database**: `my-love-db` (existing)
 - **New object store**: `moods` with `by-date` index for calendar queries
 - **Migration**: Add new store in next schema version bump (v3 → v4)
 - **Service pattern**: MoodService extends BaseIndexedDBService<MoodEntry> (Story 5.3 pattern)
 
 **3. Zustand Store Extension**
+
 - **New slices**:
   - `moods: MoodEntry[]` (already in PRD, need to implement)
   - `interactions: Interaction[]` (new)
@@ -567,11 +598,13 @@ interface IInteractionService {
 - **Persistence**: Only persist `moods` array to LocalStorage (interactions are ephemeral, refetch from PB on load)
 
 **4. Service Worker (vite-plugin-pwa)**
+
 - **No changes required**: Existing PWA setup handles offline caching
 - **Background sync**: Use `syncStatus.isOnline` to trigger sync when app regains connectivity
 - **Note**: Real Web Background Sync API not used (complexity vs. benefit); simple app focus/network reconnect triggers
 
 **5. Browser APIs**
+
 - **Navigator.onLine**: Detect online/offline status for sync logic
 - **window.addEventListener('online')**: Trigger background sync on reconnect
 - **window.addEventListener('focus')**: Retry failed syncs when user returns to app
@@ -579,23 +612,24 @@ interface IInteractionService {
 
 **Dependency Version Constraints:**
 
-| Dependency | Minimum Version | Maximum Version | Reason |
-|------------|----------------|----------------|--------|
-| @supabase/supabase-js | 2.38.x | 2.x | Stable Realtime API, avoid breaking changes in 3.x |
-| react | 19.x | 19.x | React 19 features (useOptimistic for mood UI) |
-| zustand | 5.x | 5.x | Persist middleware API stable in v5 |
-| idb | 8.x | 8.x | TypeScript definitions for IndexedDB v3 |
-| framer-motion | 12.x | 12.x | Layout animations API stable in v12 |
+| Dependency            | Minimum Version | Maximum Version | Reason                                             |
+| --------------------- | --------------- | --------------- | -------------------------------------------------- |
+| @supabase/supabase-js | 2.38.x          | 2.x             | Stable Realtime API, avoid breaking changes in 3.x |
+| react                 | 19.x            | 19.x            | React 19 features (useOptimistic for mood UI)      |
+| zustand               | 5.x             | 5.x             | Persist middleware API stable in v5                |
+| idb                   | 8.x             | 8.x             | TypeScript definitions for IndexedDB v3            |
+| framer-motion         | 12.x            | 12.x            | Layout animations API stable in v12                |
 
 **External Service Dependencies:**
 
-| Service | Provider | Dependency Type | Fallback Strategy |
-|---------|----------|----------------|-------------------|
-| Supabase (PostgreSQL + Realtime) | Supabase Cloud | Required for sync features | Graceful degradation to local-only mode |
-| GitHub Pages | GitHub | Required for deployment | N/A (deployment platform) |
-| HTTPS certificate | GitHub Pages (auto) | Required for PWA + Supabase | N/A (provided automatically) |
+| Service                          | Provider            | Dependency Type             | Fallback Strategy                       |
+| -------------------------------- | ------------------- | --------------------------- | --------------------------------------- |
+| Supabase (PostgreSQL + Realtime) | Supabase Cloud      | Required for sync features  | Graceful degradation to local-only mode |
+| GitHub Pages                     | GitHub              | Required for deployment     | N/A (deployment platform)               |
+| HTTPS certificate                | GitHub Pages (auto) | Required for PWA + Supabase | N/A (provided automatically)            |
 
 **No Integration with:**
+
 - ❌ Authentication providers (OAuth, Auth0, etc.) - hardcoded user pairing
 - ❌ Analytics services (Google Analytics, Mixpanel, etc.) - privacy-first app
 - ❌ Push notification services (Firebase Cloud Messaging, etc.) - deferred to future
@@ -608,6 +642,7 @@ interface IInteractionService {
 **Epic 6 encompasses PRD requirements FR019-FR025 (mood tracking, interactions, countdowns). Each story will have specific ACs derived from these:**
 
 **AC1 - Mood Tracking UI (Story 6-2)**
+
 - GIVEN user is on Mood Tracker tab
 - WHEN user selects a mood type (loved, happy, content, thoughtful, grateful)
 - THEN mood button animates with scale + color feedback
@@ -618,6 +653,7 @@ interface IInteractionService {
 - AND mood appears in local state immediately (optimistic UI)
 
 **AC2 - Local Mood Storage (Story 6-2)**
+
 - GIVEN mood entry is logged
 - WHEN mood is saved
 - THEN IndexedDB `moods` store contains entry with: id, userId, moodType, note, timestamp, synced=false
@@ -627,6 +663,7 @@ interface IInteractionService {
 - AND mood is retrievable via `getMoodForDate(date)` and `getMoodsInRange(start, end)`
 
 **AC3 - Mood History Calendar View (Story 6-3)**
+
 - GIVEN user navigates to Mood History
 - WHEN calendar renders for current month
 - THEN 30-31 day grid displays with each day as a cell
@@ -637,6 +674,7 @@ interface IInteractionService {
 - AND calendar loads moods via `getMoodsInRange()` for visible month only
 
 **AC4 - Supabase Backend Setup (Story 6-1)**
+
 - GIVEN Supabase project is created on Supabase Cloud
 - WHEN app initializes
 - THEN SupabaseClient connects to `VITE_SUPABASE_URL` with `VITE_SUPABASE_ANON_KEY`
@@ -646,6 +684,7 @@ interface IInteractionService {
 - AND Supabase SDK is configured as singleton in `src/api/supabaseClient.ts`
 
 **AC5 - Mood Sync to Supabase (Story 6-4)**
+
 - GIVEN mood is logged locally with synced=false
 - WHEN device is online AND background sync runs
 - THEN MoodSyncService POSTs mood to `/rest/v1/moods`
@@ -655,6 +694,7 @@ interface IInteractionService {
 - AND sync retries on network reconnect or app focus
 
 **AC6 - Partner Mood Visibility (Story 6-4)**
+
 - GIVEN Supabase connection is established
 - WHEN partner logs a new mood
 - THEN Realtime channel subscription receives postgres_changes event
@@ -664,6 +704,7 @@ interface IInteractionService {
 - AND "Show partner moods" toggle controls visibility
 
 **AC7 - Poke/Kiss Interactions (Story 6-5)**
+
 - GIVEN user is on Home or Interactions view
 - WHEN user taps "Poke" or "Kiss" button
 - THEN button animates (pulse + haptic if supported)
@@ -673,6 +714,7 @@ interface IInteractionService {
 - AND interaction appears in history list with timestamp
 
 **AC8 - Receive Poke/Kiss Notifications (Story 6-5)**
+
 - GIVEN partner sends poke/kiss
 - WHEN Realtime channel postgres_changes event arrives
 - THEN PokeKissInterface shows notification badge (e.g., "1 new poke")
@@ -682,6 +724,7 @@ interface IInteractionService {
 - AND badge clears after viewing
 
 **AC9 - Anniversary Countdown Timer (Story 6-6)**
+
 - GIVEN settings.anniversaries contains at least one future date
 - WHEN CountdownTimer component renders
 - THEN displays "X days, Y hours, Z minutes until [Anniversary Title]"
@@ -690,6 +733,7 @@ interface IInteractionService {
 - AND countdown calculates from current time to target date
 
 **AC10 - Celebration Animation Trigger (Story 6-6)**
+
 - GIVEN countdown reaches 0 days, 0 hours, 0 minutes
 - WHEN shouldTriggerCelebration() returns true
 - THEN Framer Motion fireworks/confetti animation plays
@@ -698,6 +742,7 @@ interface IInteractionService {
 - AND if anniversary is recurring, countdown resets to next year's date
 
 **AC11 - Offline Functionality (Cross-cutting)**
+
 - GIVEN device is offline (Navigator.onLine === false)
 - WHEN user logs mood or views calendar
 - THEN all features work without network
@@ -707,6 +752,7 @@ interface IInteractionService {
 - AND calendar displays local moods without errors
 
 **AC12 - Error Handling (Cross-cutting)**
+
 - GIVEN Supabase API call fails (network error, 4xx, 5xx)
 - WHEN error occurs
 - THEN user sees friendly error message (not raw stack trace)
@@ -717,33 +763,34 @@ interface IInteractionService {
 
 ## Traceability Mapping
 
-| AC # | PRD Requirement | Spec Section | Component/API | Test Idea |
-|------|----------------|--------------|---------------|-----------|
-| **AC1** | FR019 (mood logging UI) | Detailed Design → MoodTracker Component | MoodTracker.tsx | E2E: Navigate to mood tab, select mood, enter note, submit, verify success feedback |
-| **AC2** | FR019 (local storage) | Data Models → MoodEntry, Services → MoodService | moodService.ts | Unit: Test MoodService.add(), verify IndexedDB record created with correct schema |
-| **AC3** | FR021 (calendar view) | Detailed Design → MoodHistoryCalendar | MoodHistoryCalendar.tsx | E2E: Open calendar, verify grid renders, tap day, verify modal shows mood details |
-| **AC4** | FR020 (Supabase sync) | Dependencies → Supabase Integration | supabaseClient.ts | Integration: Verify Supabase connection, tables exist with RLS, auth works |
-| **AC5** | FR020 (mood sync) | Workflows → Workflow 1 (sync), APIs → POST moods | moodSyncService.ts | Integration: Log mood, verify POSTed to Supabase, local record updated with supabaseId |
-| **AC6** | FR020 (partner visibility) | Workflows → Workflow 1 (real-time), APIs → Realtime | MoodSyncService, MoodHistoryCalendar | E2E: Partner logs mood, verify Realtime event, verify UI updates with notification |
-| **AC7** | FR023 (send poke/kiss) | Workflows → Workflow 2 (send), APIs → POST interactions | interactionService.ts, PokeKissInterface.tsx | E2E: Tap poke button, verify animation, verify POST to Supabase, verify history |
-| **AC8** | FR024 (receive poke/kiss) | Workflows → Workflow 2 (receive), APIs → Realtime | PokeKissInterface.tsx | E2E: Receive interaction via Realtime, verify badge appears, tap badge, verify animation plays |
-| **AC9** | FR016, FR017 (countdown display) | Detailed Design → CountdownTimer, Services → CountdownService | CountdownTimer.tsx, countdownService.ts | Unit: Test calculateTimeRemaining(), verify correct days/hrs/mins calculation |
-| **AC10** | FR018 (celebration trigger) | Workflows → Workflow 4 (celebration) | CountdownTimer.tsx | E2E: Mock countdown at 0, verify celebration animation plays, verify special message |
-| **AC11** | NFR002 (offline support) | NFR → Reliability (offline-first) | All components | E2E: Disconnect network, log mood, verify saves locally, verify sync queues, reconnect, verify sync |
-| **AC12** | NFR (error handling) | NFR → Reliability (error handling) | ErrorBoundary, all services | Unit: Mock API failure, verify error message, verify app doesn't crash, verify retry logic |
+| AC #     | PRD Requirement                  | Spec Section                                                  | Component/API                                | Test Idea                                                                                           |
+| -------- | -------------------------------- | ------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **AC1**  | FR019 (mood logging UI)          | Detailed Design → MoodTracker Component                       | MoodTracker.tsx                              | E2E: Navigate to mood tab, select mood, enter note, submit, verify success feedback                 |
+| **AC2**  | FR019 (local storage)            | Data Models → MoodEntry, Services → MoodService               | moodService.ts                               | Unit: Test MoodService.add(), verify IndexedDB record created with correct schema                   |
+| **AC3**  | FR021 (calendar view)            | Detailed Design → MoodHistoryCalendar                         | MoodHistoryCalendar.tsx                      | E2E: Open calendar, verify grid renders, tap day, verify modal shows mood details                   |
+| **AC4**  | FR020 (Supabase sync)            | Dependencies → Supabase Integration                           | supabaseClient.ts                            | Integration: Verify Supabase connection, tables exist with RLS, auth works                          |
+| **AC5**  | FR020 (mood sync)                | Workflows → Workflow 1 (sync), APIs → POST moods              | moodSyncService.ts                           | Integration: Log mood, verify POSTed to Supabase, local record updated with supabaseId              |
+| **AC6**  | FR020 (partner visibility)       | Workflows → Workflow 1 (real-time), APIs → Realtime           | MoodSyncService, MoodHistoryCalendar         | E2E: Partner logs mood, verify Realtime event, verify UI updates with notification                  |
+| **AC7**  | FR023 (send poke/kiss)           | Workflows → Workflow 2 (send), APIs → POST interactions       | interactionService.ts, PokeKissInterface.tsx | E2E: Tap poke button, verify animation, verify POST to Supabase, verify history                     |
+| **AC8**  | FR024 (receive poke/kiss)        | Workflows → Workflow 2 (receive), APIs → Realtime             | PokeKissInterface.tsx                        | E2E: Receive interaction via Realtime, verify badge appears, tap badge, verify animation plays      |
+| **AC9**  | FR016, FR017 (countdown display) | Detailed Design → CountdownTimer, Services → CountdownService | CountdownTimer.tsx, countdownService.ts      | Unit: Test calculateTimeRemaining(), verify correct days/hrs/mins calculation                       |
+| **AC10** | FR018 (celebration trigger)      | Workflows → Workflow 4 (celebration)                          | CountdownTimer.tsx                           | E2E: Mock countdown at 0, verify celebration animation plays, verify special message                |
+| **AC11** | NFR002 (offline support)         | NFR → Reliability (offline-first)                             | All components                               | E2E: Disconnect network, log mood, verify saves locally, verify sync queues, reconnect, verify sync |
+| **AC12** | NFR (error handling)             | NFR → Reliability (error handling)                            | ErrorBoundary, all services                  | Unit: Mock API failure, verify error message, verify app doesn't crash, verify retry logic          |
 
 **Cross-Story Traceability:**
 
-| Story | Primary ACs | Secondary ACs | Key Components |
-|-------|-------------|---------------|----------------|
-| **6-1: Supabase Backend Setup** | AC4 | AC5, AC6, AC7, AC8 | supabaseClient.ts, Supabase tables with RLS |
-| **6-2: Mood Tracking UI + Local Storage** | AC1, AC2 | AC11, AC12 | MoodTracker.tsx, MoodService.ts |
-| **6-3: Mood History Calendar View** | AC3 | AC11 | MoodHistoryCalendar.tsx, MoodService.getMoodsInRange() |
-| **6-4: Mood Sync + Partner Visibility** | AC5, AC6 | AC11, AC12 | MoodSyncService.ts, Realtime channel subscriptions |
-| **6-5: Poke/Kiss Interactions** | AC7, AC8 | AC12 | PokeKissInterface.tsx, InteractionService.ts |
-| **6-6: Anniversary Countdown Timers** | AC9, AC10 | - | CountdownTimer.tsx, CountdownService.ts |
+| Story                                     | Primary ACs | Secondary ACs      | Key Components                                         |
+| ----------------------------------------- | ----------- | ------------------ | ------------------------------------------------------ |
+| **6-1: Supabase Backend Setup**           | AC4         | AC5, AC6, AC7, AC8 | supabaseClient.ts, Supabase tables with RLS            |
+| **6-2: Mood Tracking UI + Local Storage** | AC1, AC2    | AC11, AC12         | MoodTracker.tsx, MoodService.ts                        |
+| **6-3: Mood History Calendar View**       | AC3         | AC11               | MoodHistoryCalendar.tsx, MoodService.getMoodsInRange() |
+| **6-4: Mood Sync + Partner Visibility**   | AC5, AC6    | AC11, AC12         | MoodSyncService.ts, Realtime channel subscriptions     |
+| **6-5: Poke/Kiss Interactions**           | AC7, AC8    | AC12               | PokeKissInterface.tsx, InteractionService.ts           |
+| **6-6: Anniversary Countdown Timers**     | AC9, AC10   | -                  | CountdownTimer.tsx, CountdownService.ts                |
 
 **Testing Coverage:**
+
 - **Unit Tests**: MoodService, CountdownService, validation functions (Zod schemas)
 - **Integration Tests**: Supabase API calls, Realtime channel subscriptions, IndexedDB operations
 - **E2E Tests**: Complete user journeys (log mood → sync → partner sees, send poke → partner receives)
@@ -754,6 +801,7 @@ interface IInteractionService {
 **RISKS:**
 
 **R1 - Supabase Free Tier Limits (LOW)**
+
 - **Risk**: MVP usage exceeds Supabase free tier limits (500MB database, 2GB storage, 50K monthly active users)
 - **Impact**: API requests throttled or blocked until next billing cycle
 - **Mitigation**:
@@ -764,6 +812,7 @@ interface IInteractionService {
 - **Probability**: Very Low (MVP usage minimal)
 
 **R2 - Realtime Connection Instability (MEDIUM)**
+
 - **Risk**: Mobile networks have intermittent connectivity, Realtime channels drop frequently
 - **Impact**: Partner mood updates and poke/kiss notifications delayed or missed
 - **Mitigation**:
@@ -775,6 +824,7 @@ interface IInteractionService {
 - **Probability**: Medium (mobile networks)
 
 **R3 - IndexedDB Quota Limits (LOW)**
+
 - **Risk**: User runs out of IndexedDB storage quota (mood entries + photos)
 - **Impact**: New moods cannot be saved; app shows error
 - **Mitigation**:
@@ -785,6 +835,7 @@ interface IInteractionService {
 - **Probability**: Low (moods are tiny compared to photos)
 
 **R4 - Partner ID Hardcoding Friction (LOW)**
+
 - **Risk**: Hardcoded partner UUIDs make setup difficult for non-technical users
 - **Impact**: Users struggle to configure partner pairing without code changes
 - **Mitigation**:
@@ -797,26 +848,31 @@ interface IInteractionService {
 **ASSUMPTIONS:**
 
 **A1 - Supabase Tables Pre-Created**
+
 - Assumption: Developer manually creates Supabase tables with Row Level Security (moods, interactions, users) before deploying app
 - Validation: Provide Supabase table DDL in spec (Data Models section); include SQL migration scripts
 - Risk if wrong: App fails to sync with "Table not found" or RLS policy errors
 
 **A2 - Single Partner Pairing**
+
 - Assumption: App is used by exactly 2 people (user + partner) with hardcoded IDs
 - Validation: Confirmed by PRD (single-user app, no multi-user functionality)
 - Risk if wrong: N/A (out of scope for Epic 6)
 
 **A3 - HTTPS Deployment**
+
 - Assumption: App is deployed to GitHub Pages (HTTPS automatically provided)
 - Validation: Deployment via `npm run deploy` to gh-pages branch
 - Risk if wrong: PWA features (service workers, WebSocket) won't work on HTTP
 
 **A4 - Modern Browser Support**
+
 - Assumption: Users use latest 2 versions of Chrome, Firefox, Safari, Edge (per PRD NFR003)
 - Validation: Use feature detection for IndexedDB, WebSocket, navigator.onLine
 - Risk if wrong: Older browsers may not support required APIs
 
 **A5 - Mood Sync is One-Way (User → Supabase)**
+
 - Assumption: User's moods sync TO Supabase but don't sync FROM Supabase back to their device (no cross-device sync for same user)
 - Validation: Confirmed by PRD (cross-device sync out of scope; only partner visibility needed)
 - Risk if wrong: User expects their moods to sync across devices (not supported in Epic 6)
@@ -824,30 +880,35 @@ interface IInteractionService {
 **OPEN QUESTIONS:**
 
 **Q1 - Supabase Auth Integration?**
+
 - Question: Should we use Supabase Auth for user management or keep hardcoded UUIDs?
 - Decision needed by: Story 6-1 (backend setup)
 - Proposed answer: Keep hardcoded UUIDs for MVP simplicity; Supabase Auth deferred to future enhancement
 - Impact: Affects partner pairing complexity and future scalability
 
 **Q2 - Interaction History Retention?**
+
 - Question: How long should poke/kiss interactions be stored? Forever? Last 30 days? Last 100 interactions?
 - Decision needed by: Story 6-5 (interactions)
 - Proposed answer: Store last 100 interactions (soft delete older ones); configurable in future
 - Impact: Storage usage and query performance
 
 **Q3 - Mood Edit/Delete Functionality?**
+
 - Question: Can users edit or delete logged moods? PRD is silent on this.
 - Decision needed by: Story 6-2 (mood tracking UI)
 - Proposed answer: MVP = append-only (no edit/delete); add in future if user requests
 - Impact: Simpler implementation, fewer sync conflicts
 
 **Q4 - Celebration Animation Customization?**
+
 - Question: Should anniversary celebration animations be different per anniversary type? Or generic confetti/fireworks?
 - Decision needed by: Story 6-6 (countdown timers)
 - Proposed answer: Generic celebration animation for MVP; custom animations per anniversary type in future
 - Impact: Animation complexity and asset size
 
 **Q5 - Partner Mood Notification Persistence?**
+
 - Question: If user doesn't open app for 3 days, should they see notifications for all 3 missed partner moods? Or just latest?
 - Decision needed by: Story 6-4 (partner visibility)
 - Proposed answer: Show notification badge with count (e.g., "3 new moods"); calendar view shows all moods
@@ -858,6 +919,7 @@ interface IInteractionService {
 **Testing Levels:**
 
 **1. Unit Tests (Vitest)**
+
 - **Target Coverage**: 80% for services and utilities
 - **Test Subjects**:
   - MoodService CRUD operations (add, get, getAll, getMoodForDate, getMoodsInRange)
@@ -875,6 +937,7 @@ interface IInteractionService {
   - `src/api/interactionService.test.ts`
 
 **2. Component Tests (Vitest + React Testing Library)**
+
 - **Target Coverage**: 70% for UI components
 - **Test Subjects**:
   - MoodTracker: Mood button clicks, note input, form submission
@@ -892,6 +955,7 @@ interface IInteractionService {
   - `src/components/PokeKissInterface.test.tsx`
 
 **3. Integration Tests (Vitest)**
+
 - **Focus**: Service-to-IndexedDB, Service-to-Supabase interactions
 - **Test Scenarios**:
   - Log mood → verify IndexedDB record created → trigger sync → verify Supabase POST called
@@ -904,6 +968,7 @@ interface IInteractionService {
   - Use in-memory IndexedDB (`fake-indexeddb`)
 
 **4. End-to-End Tests (Playwright)**
+
 - **Target Coverage**: Critical user journeys (5-7 scenarios)
 - **Test Scenarios**:
   - **E2E-1: Log Mood and View Calendar**
@@ -943,6 +1008,7 @@ interface IInteractionService {
     6. Verify retry succeeds
 
 **5. Manual Testing**
+
 - **Network Conditions**: Test on 3G, 4G, WiFi, offline, intermittent connection
 - **Mobile Devices**: Test on iOS Safari, Chrome Mobile (real devices, not just emulators)
 - **Edge Cases**:
@@ -954,23 +1020,27 @@ interface IInteractionService {
 - **Animations**: Verify 60fps performance, no jank on low-end devices
 
 **Testing Frameworks & Tools:**
+
 - **Unit/Component/Integration**: Vitest 4.0.9 (already installed)
 - **E2E**: Playwright 1.56.1 (already installed)
 - **Coverage**: `@vitest/coverage-v8` (already installed)
 - **Mocking**: `fake-indexeddb` 6.2.5 (already installed), MSW (if needed for HTTP mocking)
 
 **Test Data:**
+
 - **Fixtures**: Create fixture files with sample mood entries, interactions, anniversaries
 - **Factories**: Use factory pattern for generating test data (e.g., `createMoodEntry()` helper)
 - **Seeding**: Populate IndexedDB with test data for E2E tests
 
 **CI/CD Integration:**
+
 - **GitHub Actions**: Run tests on PR (unit, integration, E2E smoke tests)
 - **Coverage Thresholds**: Require 70% overall coverage to merge PR
 - **E2E in CI**: Run Playwright tests in headless mode on Ubuntu runner
 - **Performance Budget**: Lighthouse score >90 for PWA; fail build if <90
 
 **Acceptance Criteria Validation:**
+
 - Each AC maps to at least one test (see Traceability Mapping table)
 - Test names reference AC numbers for traceability (e.g., `test('AC1: Mood button animates on click')`)
 - All 12 ACs must have passing tests before Epic 6 is considered complete

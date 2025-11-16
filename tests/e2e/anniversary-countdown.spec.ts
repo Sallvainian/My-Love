@@ -15,12 +15,7 @@ async function navigateToSettings(page: Page) {
 }
 
 // Helper to add an anniversary
-async function addAnniversary(
-  page: Page,
-  label: string,
-  date: string,
-  description?: string
-) {
+async function addAnniversary(page: Page, label: string, date: string, description?: string) {
   await page.click('button:has-text("Add Anniversary")');
 
   // Fill form

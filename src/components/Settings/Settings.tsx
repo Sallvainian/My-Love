@@ -100,11 +100,7 @@ export const Settings: React.FC = () => {
               </div>
             )}
 
-            <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="logout-button"
-            >
+            <button onClick={handleLogout} disabled={isLoggingOut} className="logout-button">
               {isLoggingOut ? (
                 <span className="loading-spinner">
                   <svg
@@ -167,9 +163,7 @@ export const Settings: React.FC = () => {
             <div className="app-info">
               <p className="app-name">My Love</p>
               <p className="app-version">Version 1.0.0</p>
-              <p className="app-description">
-                A personal connection app for you and your partner
-              </p>
+              <p className="app-description">A personal connection app for you and your partner</p>
             </div>
           </div>
         </section>

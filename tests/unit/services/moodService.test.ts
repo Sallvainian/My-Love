@@ -17,10 +17,7 @@ function getUniqueTestDate(): string {
  * Create mood entry with unique date to avoid by-date constraint violations
  * Directly inserts into IndexedDB with specified date instead of using today
  */
-async function createMoodWithUniqueDate(
-  mood: MoodType,
-  note?: string
-): Promise<MoodEntry> {
+async function createMoodWithUniqueDate(mood: MoodType, note?: string): Promise<MoodEntry> {
   const uniqueDate = getUniqueTestDate();
 
   // Create mood entry with unique date

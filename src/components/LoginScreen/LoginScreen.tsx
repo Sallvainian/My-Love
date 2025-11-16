@@ -281,7 +281,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               type="button"
               className="signup-link"
               onClick={() => {
-                setError('Sign-up functionality coming soon. Please contact your administrator for account creation.');
+                setError(
+                  'Sign-up functionality coming soon. Please contact your administrator for account creation.'
+                );
               }}
               disabled={isLoading}
             >

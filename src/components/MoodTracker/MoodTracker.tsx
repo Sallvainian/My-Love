@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Smile, Meh, MessageCircle, Sparkles, Cloud, CloudOff, CheckCircle, Calendar } from 'lucide-react';
+import {
+  Heart,
+  Smile,
+  Meh,
+  MessageCircle,
+  Sparkles,
+  Cloud,
+  CloudOff,
+  CheckCircle,
+  Calendar,
+} from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { MoodButton } from './MoodButton';
 import { MoodHistoryCalendar } from '../MoodHistory';
@@ -151,9 +161,7 @@ export function MoodTracker() {
             <button
               onClick={() => setActiveTab('tracker')}
               className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative ${
-                activeTab === 'tracker'
-                  ? 'text-pink-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                activeTab === 'tracker' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
               }`}
               data-testid="mood-tab-tracker"
             >
@@ -169,9 +177,7 @@ export function MoodTracker() {
             <button
               onClick={() => setActiveTab('history')}
               className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative flex items-center justify-center gap-2 ${
-                activeTab === 'history'
-                  ? 'text-pink-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                activeTab === 'history' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
               }`}
               data-testid="mood-tab-history"
             >
@@ -202,9 +208,7 @@ export function MoodTracker() {
           >
             {/* Header */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                How are you feeling?
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">How are you feeling?</h1>
               <p className="text-gray-600">Track your mood for today</p>
             </div>
 
@@ -222,9 +226,7 @@ export function MoodTracker() {
                 </>
               )}
               {syncStatus.pendingMoods > 0 && (
-                <span className="ml-2 text-gray-500">
-                  ({syncStatus.pendingMoods} pending sync)
-                </span>
+                <span className="ml-2 text-gray-500">({syncStatus.pendingMoods} pending sync)</span>
               )}
             </div>
 
@@ -240,9 +242,7 @@ export function MoodTracker() {
                 >
                   <CheckCircle className="w-5 h-5" />
                   <span className="font-medium">
-                    {isEditing
-                      ? 'Mood updated successfully!'
-                      : 'Mood logged successfully!'}
+                    {isEditing ? 'Mood updated successfully!' : 'Mood logged successfully!'}
                   </span>
                 </motion.div>
               )}
@@ -281,10 +281,7 @@ export function MoodTracker() {
 
               {/* Note Input (AC-3) */}
               <div>
-                <label
-                  htmlFor="mood-note"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
+                <label htmlFor="mood-note" className="block text-sm font-medium text-gray-700 mb-2">
                   Add a note (optional)
                 </label>
                 <textarea
@@ -301,16 +298,11 @@ export function MoodTracker() {
                 />
                 <div className="flex items-center justify-between mt-2">
                   {noteError ? (
-                    <span
-                      className="text-sm text-red-600"
-                      data-testid="mood-note-error"
-                    >
+                    <span className="text-sm text-red-600" data-testid="mood-note-error">
                       {noteError}
                     </span>
                   ) : (
-                    <span className="text-sm text-gray-500">
-                      Share your thoughts
-                    </span>
+                    <span className="text-sm text-gray-500">Share your thoughts</span>
                   )}
                   <span
                     className={`text-sm ${remainingChars < 20 ? 'text-orange-600' : 'text-gray-500'}`}
@@ -332,11 +324,7 @@ export function MoodTracker() {
                 }`}
                 data-testid="mood-submit-button"
               >
-                {isSubmitting
-                  ? 'Saving...'
-                  : isEditing
-                    ? 'Update Mood'
-                    : 'Log Mood'}
+                {isSubmitting ? 'Saving...' : isEditing ? 'Update Mood' : 'Log Mood'}
               </button>
             </form>
           </motion.div>

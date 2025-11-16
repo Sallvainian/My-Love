@@ -72,7 +72,11 @@ export interface MoodEntry {
 
 // Interaction Types (Epic 6 - Supabase Backend)
 // Re-export from interactionService for consistency
-export type { Interaction, SupabaseInteractionRecord, InteractionType } from '../api/interactionService';
+export type {
+  Interaction,
+  SupabaseInteractionRecord,
+  InteractionType,
+} from '../api/interactionService';
 
 // Legacy Pocketbase Backend Types (DEPRECATED - kept for reference)
 /**

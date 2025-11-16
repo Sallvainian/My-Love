@@ -27,9 +27,7 @@ import type { MoodEntry } from '../../src/api/moodSyncService';
  */
 const skipIfNotConfigured = () => {
   if (!isSupabaseConfigured()) {
-    console.warn(
-      '[Supabase Tests] Skipping - Supabase not configured (missing env vars)'
-    );
+    console.warn('[Supabase Tests] Skipping - Supabase not configured (missing env vars)');
     return true;
   }
 
@@ -116,10 +114,7 @@ describe('Supabase Connection', () => {
   it('should connect to Supabase and query moods table', async () => {
     if (skipIfNotConfigured()) return;
 
-    const { data, error } = await supabase
-      .from('moods')
-      .select('*')
-      .limit(1);
+    const { data, error } = await supabase.from('moods').select('*').limit(1);
 
     expect(error).toBeNull();
     expect(data).toBeDefined();
@@ -129,10 +124,7 @@ describe('Supabase Connection', () => {
   it('should connect to Supabase and query interactions table', async () => {
     if (skipIfNotConfigured()) return;
 
-    const { data, error } = await supabase
-      .from('interactions')
-      .select('*')
-      .limit(1);
+    const { data, error } = await supabase.from('interactions').select('*').limit(1);
 
     expect(error).toBeNull();
     expect(data).toBeDefined();
@@ -142,10 +134,7 @@ describe('Supabase Connection', () => {
   it('should connect to Supabase and query users table', async () => {
     if (skipIfNotConfigured()) return;
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .limit(1);
+    const { data, error } = await supabase.from('users').select('*').limit(1);
 
     expect(error).toBeNull();
     expect(data).toBeDefined();
@@ -175,10 +164,7 @@ describe('Row Level Security (RLS)', () => {
 
     const userId = await getCurrentUserId();
 
-    const { data, error } = await supabase
-      .from('moods')
-      .select('*')
-      .eq('user_id', userId);
+    const { data, error } = await supabase.from('moods').select('*').eq('user_id', userId);
 
     expect(error).toBeNull();
     expect(data).toBeDefined();
@@ -373,12 +359,10 @@ describe('Realtime Subscriptions', () => {
   it('should subscribe to interaction updates', async () => {
     if (skipIfNotConfigured()) return;
 
-    const unsubscribe = await interactionService.subscribeInteractions(
-      (interaction) => {
-        expect(interaction).toBeDefined();
-        expect(interaction.id).toBeDefined();
-      }
-    );
+    const unsubscribe = await interactionService.subscribeInteractions((interaction) => {
+      expect(interaction).toBeDefined();
+      expect(interaction.id).toBeDefined();
+    });
 
     expect(typeof unsubscribe).toBe('function');
 
@@ -392,10 +376,7 @@ describe('Error Handling', () => {
     // This test validates that supabaseClient.ts throws on missing vars
     // Already tested in the configuration check
     expect(isSupabaseConfigured()).toBe(
-      !!(
-        import.meta.env.VITE_SUPABASE_URL &&
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-      )
+      !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
     );
   });
 

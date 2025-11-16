@@ -11,6 +11,7 @@ This project uses Git hooks to enforce TDD (Test-Driven Development) practices a
 ```
 
 This installs two hooks:
+
 - **pre-commit**: Runs linting and tests before each commit
 - **commit-msg**: Enforces conventional commit message format
 
@@ -51,6 +52,7 @@ Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
 ```
 
 **Examples:**
+
 ```bash
 git commit -m "feat(auth): add JWT authentication"
 git commit -m "fix(ui): correct button alignment"
@@ -76,29 +78,31 @@ The `pre-commit` hook runs:
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `testCommand` | string | `"npm run test:unit"` | Command to run tests |
-| `lintCommand` | string | `"npm run lint"` | Command to run linter |
-| `requireCoverage` | boolean | `false` | Require coverage checks |
-| `minCoverage` | number | `80` | Minimum coverage percentage |
-| `autoFix` | boolean | `true` | Auto-fix linting issues |
-| `maxAttempts` | number | `50` | Max commit attempts |
-| `stopOnMorning` | boolean | `true` | Stop work at morning hour |
-| `morningHour` | number | `7` | Hour to stop (0-23) |
-| `allowFailingTests` | boolean | `false` | Allow commits with failing tests (NOT recommended) |
+| Option              | Type    | Default               | Description                                        |
+| ------------------- | ------- | --------------------- | -------------------------------------------------- |
+| `testCommand`       | string  | `"npm run test:unit"` | Command to run tests                               |
+| `lintCommand`       | string  | `"npm run lint"`      | Command to run linter                              |
+| `requireCoverage`   | boolean | `false`               | Require coverage checks                            |
+| `minCoverage`       | number  | `80`                  | Minimum coverage percentage                        |
+| `autoFix`           | boolean | `true`                | Auto-fix linting issues                            |
+| `maxAttempts`       | number  | `50`                  | Max commit attempts                                |
+| `stopOnMorning`     | boolean | `true`                | Stop work at morning hour                          |
+| `morningHour`       | number  | `7`                   | Hour to stop (0-23)                                |
+| `allowFailingTests` | boolean | `false`               | Allow commits with failing tests (NOT recommended) |
 
 ## Troubleshooting
 
 ### "Hooks not executing"
 
 Make sure hooks are executable:
+
 ```bash
 chmod +x .git/hooks/pre-commit
 chmod +x .git/hooks/commit-msg
 ```
 
 Or reinstall:
+
 ```bash
 ./scripts/install-git-hooks.sh
 ```
@@ -106,6 +110,7 @@ Or reinstall:
 ### "Tests failing immediately"
 
 Check that you have at least 1 passing test:
+
 ```bash
 npm run test:unit
 ```
@@ -113,6 +118,7 @@ npm run test:unit
 ### "Linting errors blocking commits"
 
 Enable auto-fix in `.overnight-dev.json`:
+
 ```json
 {
   "autoFix": true
@@ -120,6 +126,7 @@ Enable auto-fix in `.overnight-dev.json`:
 ```
 
 Or fix manually:
+
 ```bash
 npm run lint:fix
 ```
@@ -129,6 +136,7 @@ npm run lint:fix
 **NOT RECOMMENDED**, but for emergency fixes:
 
 Set in `.overnight-dev.json`:
+
 ```json
 {
   "allowFailingTests": true
@@ -150,6 +158,7 @@ Remember to set it back to `false` after fixing issues!
 ### Starting a Session
 
 1. Define your goal:
+
    ```
    Task: Implement user profile editing
    Success: All tests pass, coverage > 85%
@@ -168,11 +177,13 @@ Remember to set it back to `false` after fixing issues!
 ### Morning Review
 
 Check overnight progress:
+
 ```bash
 git log --oneline --since="yesterday"
 ```
 
 Review test coverage:
+
 ```bash
 npm run test:unit:coverage
 ```

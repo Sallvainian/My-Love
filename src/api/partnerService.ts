@@ -283,12 +283,8 @@ class PartnerService {
       }));
 
       // Separate sent and received
-      const sent = enrichedRequests.filter(
-        (req) => req.from_user_id === currentUser.user.id
-      );
-      const received = enrichedRequests.filter(
-        (req) => req.to_user_id === currentUser.user.id
-      );
+      const sent = enrichedRequests.filter((req) => req.from_user_id === currentUser.user.id);
+      const received = enrichedRequests.filter((req) => req.to_user_id === currentUser.user.id);
 
       return { sent, received };
     } catch (error) {

@@ -48,9 +48,7 @@ test.describe('Poke & Kiss Interactions', () => {
       await expect(historyButton).toBeVisible();
 
       // Verify buttons are in top-right corner
-      const interfaceBox = await page
-        .locator('[data-testid="poke-kiss-interface"]')
-        .boundingBox();
+      const interfaceBox = await page.locator('[data-testid="poke-kiss-interface"]').boundingBox();
       if (interfaceBox) {
         expect(interfaceBox.y).toBeLessThan(100); // Top of viewport
       }
@@ -75,9 +73,7 @@ test.describe('Poke & Kiss Interactions', () => {
 
       // Wait for toast notification
       await expect(page.locator('[data-testid="toast-notification"]')).toBeVisible();
-      await expect(page.locator('[data-testid="toast-notification"]')).toContainText(
-        'Poke sent!'
-      );
+      await expect(page.locator('[data-testid="toast-notification"]')).toContainText('Poke sent!');
     });
 
     test('should send kiss when kiss button is clicked', async ({ page }) => {
@@ -258,9 +254,7 @@ test.describe('Poke & Kiss Interactions', () => {
     }) => {
       // Step 1: Send a poke
       await page.click('[data-testid="poke-button"]');
-      await expect(page.locator('[data-testid="toast-notification"]')).toContainText(
-        'Poke sent!'
-      );
+      await expect(page.locator('[data-testid="toast-notification"]')).toContainText('Poke sent!');
       await page.waitForTimeout(2500); // Wait for toast to disappear
 
       // Step 2: Send a kiss

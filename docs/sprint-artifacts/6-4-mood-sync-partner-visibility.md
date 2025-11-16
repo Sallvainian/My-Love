@@ -73,7 +73,7 @@ so that I can check in on how she's feeling even when we're apart.
 
 - [ ] **Task 3: Fetch Partner Moods from Supabase** (AC: #2, #4, #5)
   - [ ] Add fetchPartnerMoods() to moodSyncService.ts
-  - [ ] Query: supabaseClient.from('moods').select('*').eq('user_id', partnerId).order('timestamp', { ascending: false })
+  - [ ] Query: supabaseClient.from('moods').select('\*').eq('user_id', partnerId).order('timestamp', { ascending: false })
   - [ ] Map Supabase response to MoodEntry[] interface (convert timestamps to Date objects)
   - [ ] Store partner moods in Zustand: add partnerMoods: MoodEntry[] to moodSlice
   - [ ] Handle errors gracefully: display toast "Failed to fetch partner moods" on error
@@ -164,18 +164,20 @@ so that I can check in on how she's feeling even when we're apart.
   - **Reuse pattern**: Call moodService.getAll() to fetch unsynced moods (WHERE synced === false)
 
 - **MoodEntry Interface** (from `src/types/index.ts`):
+
   ```typescript
   interface MoodEntry {
-    id?: number;             // Auto-increment (IndexedDB)
-    userId: string;          // Hardcoded from constants.ts
-    mood: MoodType;          // 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful'
-    note?: string;           // Optional, max 200 chars
-    date: string;            // ISO date string (YYYY-MM-DD)
-    timestamp: Date;         // Full timestamp when logged
-    synced: boolean;         // Whether uploaded to Supabase (NEW: Story 6.4)
-    supabaseId?: string;     // Supabase record ID after sync (NEW: Story 6.4)
+    id?: number; // Auto-increment (IndexedDB)
+    userId: string; // Hardcoded from constants.ts
+    mood: MoodType; // 'loved' | 'happy' | 'content' | 'thoughtful' | 'grateful'
+    note?: string; // Optional, max 200 chars
+    date: string; // ISO date string (YYYY-MM-DD)
+    timestamp: Date; // Full timestamp when logged
+    synced: boolean; // Whether uploaded to Supabase (NEW: Story 6.4)
+    supabaseId?: string; // Supabase record ID after sync (NEW: Story 6.4)
   }
   ```
+
   - **Action Required**: Update MoodEntry interface to add `synced: boolean` and `supabaseId?: string` fields
 
 - **MoodSlice Integration**: `src/stores/slices/moodSlice.ts` (152 lines)
@@ -199,6 +201,7 @@ so that I can check in on how she's feeling even when we're apart.
   - **Reuse in 6.4**: Import supabase from supabaseClient.ts for all API calls
 
 - **Moods Table Schema** (Supabase PostgreSQL):
+
   ```sql
   CREATE TABLE moods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -214,16 +217,19 @@ so that I can check in on how she's feeling even when we're apart.
   CREATE INDEX idx_moods_user_date ON moods(user_id, date);
   CREATE INDEX idx_moods_timestamp ON moods(timestamp DESC);
   ```
+
   - **RLS Policy**: Users can view moods WHERE user_id = current_user_id OR user_id = partner_id
   - **Realtime Enabled**: Configured in Supabase Dashboard for moods table
 
 - **Environment Variables** (from .env):
+
   ```
   VITE_SUPABASE_URL=https://your-project.supabase.co
   VITE_SUPABASE_ANON_KEY=your-anon-key
   VITE_USER_ID=user-uuid-1
   VITE_PARTNER_ID=user-uuid-2
   ```
+
   - **Use in 6.4**: Access via import.meta.env.VITE_PARTNER_ID
 
 ### Architecture Alignment
@@ -236,6 +242,7 @@ so that I can check in on how she's feeling even when we're apart.
   - Error handling: Try/catch blocks, console.error logging
 
 - **Supabase API Calls**: Follow pattern from `supabaseClient.ts`
+
   ```typescript
   // INSERT mood
   const { data, error } = await supabase
@@ -253,10 +260,12 @@ so that I can check in on how she's feeling even when we're apart.
   ```
 
 - **Realtime Subscriptions**: Follow Supabase Realtime docs pattern
+
   ```typescript
   const channel = supabase
     .channel('moods-channel')
-    .on('postgres_changes',
+    .on(
+      'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'moods', filter: `user_id=eq.${partnerId}` },
       (payload) => handleNewMood(payload.new)
     )
@@ -285,18 +294,21 @@ so that I can check in on how she's feeling even when we're apart.
 ### Technical Constraints (from Tech Spec)
 
 **Performance Requirements:**
+
 - IndexedDB query time: <100ms for mood retrieval (validated in 6.2/6.3)
 - Supabase API response time: <500ms for sync operations (when online)
 - Realtime connection: Single persistent channel with exponential backoff reconnect (1s, 2s, 4s, max 30s)
 - Sync batching: Limit to 50 pending moods per sync batch to avoid blocking UI
 
 **Offline-First Requirements (NFR002):**
+
 - All features work without network except mood sync and partner mood fetch
 - Moods queue for sync when offline (synced: false flag in IndexedDB)
 - Partner moods display cached data when offline
 - Auto-sync on network reconnect
 
 **Security Requirements:**
+
 - Row Level Security enforces user_id filtering at database level
 - JWT authentication handled by Supabase SDK (auto-managed)
 - Input validation: Zod schema for MoodEntry before Supabase write
@@ -357,7 +369,7 @@ src/
 2. On mount: fetchPartnerMoods() if cache expired (>60 seconds old)
 3. User taps "Refresh" button
 4. Show loading spinner, call fetchPartnerMoods(force: true)
-5. Query Supabase: SELECT * FROM moods WHERE user_id = partnerId ORDER BY timestamp DESC
+5. Query Supabase: SELECT \* FROM moods WHERE user_id = partnerId ORDER BY timestamp DESC
 6. Parse response, update partnerMoods in Zustand
 7. Hide loading spinner, display "Last updated: just now"
 
@@ -374,6 +386,7 @@ src/
 ### Validation & Testing Strategy
 
 **Unit Tests** (Vitest):
+
 - Test `moodSyncService.syncPendingMoods()` with mock Supabase responses
 - Test exponential backoff retry logic (verify delays: 1s, 2s, 4s)
 - Test `fetchPartnerMoods()` query filtering by partnerId
@@ -381,11 +394,13 @@ src/
 - Test offline detection: verify syncPendingMoods() not called when offline
 
 **Integration Tests** (Vitest):
+
 - Mock Supabase API: INSERT mood, verify IndexedDB record updated (synced: true)
 - Mock Realtime INSERT event: verify Zustand store updated, toast displayed
 - Test offline → online transition: verify auto-sync triggered
 
 **E2E Tests** (Playwright):
+
 - Log mood → verify synced to Supabase (check network tab for POST request)
 - Navigate to Partner Moods → verify list renders
 - Mock Realtime event → verify toast notification appears
@@ -395,18 +410,22 @@ src/
 ### Open Questions & Decisions
 
 **Q1: Should users be able to edit/delete partner moods?**
+
 - **Decision**: No. Partner moods are read-only in MVP. Users can only view partner's moods, not modify.
 - **Rationale**: Prevents accidental data corruption; editing partner's moods violates privacy expectations.
 
 **Q2: How to handle sync conflicts if user logs same-day mood on multiple devices?**
+
 - **Decision**: Last-write-wins based on Supabase timestamp. IndexedDB unique constraint on date prevents local duplicates.
 - **Rationale**: Epic 6 assumes single-device usage per user (cross-device sync out of scope per PRD).
 
 **Q3: Should Realtime channel stay open always or only when Partner Mood View is active?**
+
 - **Decision**: Keep Realtime channel open always (from App.tsx or root component).
 - **Rationale**: Notifications should appear even when user isn't viewing Partner Mood screen.
 
 **Q4: What happens if VITE_PARTNER_ID is not configured?**
+
 - **Decision**: Display error message: "Partner not configured. Set VITE_PARTNER_ID in .env file."
 - **Rationale**: Graceful degradation with clear action item for developer.
 

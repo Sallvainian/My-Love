@@ -51,9 +51,7 @@ export function AnniversarySettings() {
     setEditingId(null);
   };
 
-  const editingAnniversary = editingId
-    ? anniversaries.find((a) => a.id === editingId)
-    : undefined;
+  const editingAnniversary = editingId ? anniversaries.find((a) => a.id === editingId) : undefined;
 
   return (
     <div className="space-y-6">

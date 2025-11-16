@@ -102,7 +102,9 @@ test.describe('Authentication Flow (Story 6.7)', () => {
 
     // Wait for successful login - should redirect to main app
     // The app should show the main navigation/content instead of login screen
-    await expect(page.getByRole('heading', { name: /welcome back/i })).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /welcome back/i })).not.toBeVisible({
+      timeout: 5000,
+    });
 
     // Verify we're now in the authenticated app (check for main navigation)
     await expect(page.getByTestId('bottom-navigation')).toBeVisible({ timeout: 5000 });
@@ -144,7 +146,9 @@ test.describe('Authentication Flow (Story 6.7)', () => {
     await page.getByRole('button', { name: /sign out/i }).click();
 
     // Should redirect back to login screen
-    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible({
+      timeout: 5000,
+    });
     await expect(page.getByTestId('bottom-navigation')).not.toBeVisible();
   });
 
@@ -158,7 +162,9 @@ test.describe('Authentication Flow (Story 6.7)', () => {
     // Logout
     await page.getByTestId('nav-settings').click();
     await page.getByRole('button', { name: /sign out/i }).click();
-    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Reload page - should still show login screen (session cleared)
     await page.reload();

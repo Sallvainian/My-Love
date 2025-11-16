@@ -24,7 +24,15 @@ const WELCOME_DISPLAY_INTERVAL = 3600000; // 60 minutes in milliseconds
 const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
 
 function App() {
-  const { settings, initializeApp, isLoading, currentView, setView, syncPendingMoods, updateSyncStatus } = useAppStore();
+  const {
+    settings,
+    initializeApp,
+    isLoading,
+    currentView,
+    setView,
+    syncPendingMoods,
+    updateSyncStatus,
+  } = useAppStore();
   const hasInitialized = useRef(false);
 
   // Story 6.7: Authentication state
@@ -112,7 +120,10 @@ function App() {
           setAuthLoading(false);
 
           if (import.meta.env.DEV) {
-            console.log('[App] Auth check:', currentSession ? 'authenticated' : 'not authenticated');
+            console.log(
+              '[App] Auth check:',
+              currentSession ? 'authenticated' : 'not authenticated'
+            );
           }
         }
       } catch (error) {

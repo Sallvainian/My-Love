@@ -184,98 +184,94 @@ export function PokeKissInterface() {
 
         {/* Poke Button */}
         <motion.button
-        onClick={handlePoke}
-        disabled={isPoking}
-        whileTap={{ scale: 0.95 }}
-        whileHover={{ scale: 1.05 }}
-        className={`
+          onClick={handlePoke}
+          disabled={isPoking}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+          className={`
           relative flex items-center justify-center w-12 h-12 rounded-full
           bg-gradient-to-br from-pink-400 to-pink-500
           text-white shadow-md hover:shadow-lg
           transition-all duration-200
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
-        data-testid="poke-button"
-        aria-label="Send Poke"
-      >
-        <motion.div
-          animate={isPoking ? { rotate: [0, -15, 15, -15, 0] } : {}}
-          transition={{ duration: 0.5 }}
+          data-testid="poke-button"
+          aria-label="Send Poke"
         >
-          <Hand className="w-6 h-6" />
-        </motion.div>
-      </motion.button>
+          <motion.div
+            animate={isPoking ? { rotate: [0, -15, 15, -15, 0] } : {}}
+            transition={{ duration: 0.5 }}
+          >
+            <Hand className="w-6 h-6" />
+          </motion.div>
+        </motion.button>
 
-      {/* Kiss Button */}
-      <motion.button
-        onClick={handleKiss}
-        disabled={isKissing}
-        whileTap={{ scale: 0.95 }}
-        whileHover={{ scale: 1.05 }}
-        className={`
+        {/* Kiss Button */}
+        <motion.button
+          onClick={handleKiss}
+          disabled={isKissing}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+          className={`
           relative flex items-center justify-center w-12 h-12 rounded-full
           bg-gradient-to-br from-red-400 to-pink-500
           text-white shadow-md hover:shadow-lg
           transition-all duration-200
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
-        data-testid="kiss-button"
-        aria-label="Send Kiss"
-      >
-        <motion.div
-          animate={isKissing ? { scale: [1, 1.2, 1, 1.2, 1] } : {}}
-          transition={{ duration: 0.6 }}
+          data-testid="kiss-button"
+          aria-label="Send Kiss"
         >
-          <Heart className="w-6 h-6 fill-current" />
-        </motion.div>
-      </motion.button>
-
-      {/* Notification Badge */}
-      {unviewedCount > 0 && (
-        <motion.button
-          onClick={handleBadgeClick}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          exit={{ scale: 0 }}
-          whileTap={{ scale: 0.9 }}
-          className="relative flex items-center justify-center w-10 h-10 rounded-full bg-purple-500 text-white shadow-lg cursor-pointer"
-          data-testid="notification-badge"
-          aria-label={`${unviewedCount} unviewed interaction${unviewedCount > 1 ? 's' : ''}`}
-        >
-          <span className="text-sm font-bold">{unviewedCount}</span>
           <motion.div
-            className="absolute inset-0 rounded-full bg-purple-400"
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            style={{ opacity: 0.5 }}
-          />
-        </motion.button>
-      )}
-
-      {/* Animation Overlay */}
-      <AnimatePresence>
-        {showAnimation === 'poke' && (
-          <PokeAnimation onComplete={handleAnimationComplete} />
-        )}
-        {showAnimation === 'kiss' && (
-          <KissAnimation onComplete={handleAnimationComplete} />
-        )}
-      </AnimatePresence>
-
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full shadow-lg z-50"
-            data-testid="toast-notification"
+            animate={isKissing ? { scale: [1, 1.2, 1, 1.2, 1] } : {}}
+            transition={{ duration: 0.6 }}
           >
-            {showToast}
+            <Heart className="w-6 h-6 fill-current" />
           </motion.div>
+        </motion.button>
+
+        {/* Notification Badge */}
+        {unviewedCount > 0 && (
+          <motion.button
+            onClick={handleBadgeClick}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0 }}
+            whileTap={{ scale: 0.9 }}
+            className="relative flex items-center justify-center w-10 h-10 rounded-full bg-purple-500 text-white shadow-lg cursor-pointer"
+            data-testid="notification-badge"
+            aria-label={`${unviewedCount} unviewed interaction${unviewedCount > 1 ? 's' : ''}`}
+          >
+            <span className="text-sm font-bold">{unviewedCount}</span>
+            <motion.div
+              className="absolute inset-0 rounded-full bg-purple-400"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              style={{ opacity: 0.5 }}
+            />
+          </motion.button>
         )}
-      </AnimatePresence>
+
+        {/* Animation Overlay */}
+        <AnimatePresence>
+          {showAnimation === 'poke' && <PokeAnimation onComplete={handleAnimationComplete} />}
+          {showAnimation === 'kiss' && <KissAnimation onComplete={handleAnimationComplete} />}
+        </AnimatePresence>
+
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {showToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full shadow-lg z-50"
+              data-testid="toast-notification"
+            >
+              {showToast}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Interaction History Modal */}

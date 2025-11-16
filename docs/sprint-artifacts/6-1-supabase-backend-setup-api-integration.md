@@ -309,9 +309,8 @@ export class MoodSyncService {
   subscribeMoodUpdates(callback: (mood: SupabaseMoodRecord) => void): () => void {
     const channel = supabase
       .channel('moods')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'moods' },
-        (payload) => callback(payload.new as SupabaseMoodRecord)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moods' }, (payload) =>
+        callback(payload.new as SupabaseMoodRecord)
       )
       .subscribe();
 
@@ -552,6 +551,7 @@ claude-sonnet-4-5-20250929
 ### Debug Log References
 
 **Implementation Plan:**
+
 1. Installed @supabase/supabase-js dependency, removed pocketbase
 2. Created src/api/ directory structure for Supabase integration
 3. Created docs/migrations/ directory with SQL migration script
@@ -564,12 +564,14 @@ claude-sonnet-4-5-20250929
 10. Verified all tests pass and build succeeds
 
 **TypeScript Build Challenges:**
+
 - Supabase SDK's generic type inference was strict, causing type errors
 - Used explicit type assertions (`as unknown as SupabaseMoodRecord`) to bypass strict typing
 - Added `eslint-disable-next-line @typescript-eslint/no-explicit-any` for insert/update calls
 - This is acceptable for MVP/stub code; will be refined in Story 6.2
 
 **Testing Notes:**
+
 - Unit tests pass for error handlers (100% coverage)
 - Integration tests skip if Supabase env vars not configured (graceful fallback)
 - Pre-existing moodService test failures are unrelated to this story
@@ -580,6 +582,7 @@ claude-sonnet-4-5-20250929
 ✅ **Supabase Backend Integration Complete**
 
 **What was implemented:**
+
 - Replaced PocketBase with Supabase as backend service (managed PostgreSQL with Realtime)
 - Created complete database schema with Row Level Security policies
 - Implemented typed Supabase client singleton with environment variable validation
@@ -588,13 +591,15 @@ claude-sonnet-4-5-20250929
 - Documented complete Supabase setup process in README with troubleshooting guide
 
 **Key technical decisions:**
+
 1. **Supabase over PocketBase**: Managed service, better free tier, built-in Realtime, Row Level Security
 2. **Type assertions for SDK**: Used `as unknown as` to bypass strict TypeScript inference in stub code
 3. **Stub implementations**: Services have complete interfaces but limited implementation (Story 6.2 will integrate with Zustand store)
 4. **Offline-first preserved**: All features work locally, Supabase sync is enhancement when online
-5. **Environment variables**: Used VITE_ prefix for Vite compatibility, documented in .env.example
+5. **Environment variables**: Used VITE\_ prefix for Vite compatibility, documented in .env.example
 
 **Files created:**
+
 - `src/api/supabaseClient.ts` - Singleton client with Database types
 - `src/api/moodSyncService.ts` - Mood sync operations stub
 - `src/api/interactionService.ts` - Poke/kiss interactions stub
@@ -604,14 +609,17 @@ claude-sonnet-4-5-20250929
 - `tests/unit/api/errorHandlers.test.ts` - Unit tests for error handlers
 
 **Files modified:**
+
 - `package.json` - Added @supabase/supabase-js, removed pocketbase
 - `.env.example` - Added Supabase configuration with documentation
 - `README.md` - Added comprehensive Supabase setup section with troubleshooting
 
 **Files deleted:**
+
 - `src/services/pocketbaseService.ts` - Replaced by Supabase
 
 **Next steps (Story 6.2):**
+
 - Integrate moodSyncService with Zustand store
 - Implement syncPendingMoods() for batch uploads
 - Create MoodTracker UI component
@@ -620,6 +628,7 @@ claude-sonnet-4-5-20250929
 ### File List
 
 **Created:**
+
 - src/api/supabaseClient.ts
 - src/api/moodSyncService.ts
 - src/api/interactionService.ts
@@ -629,12 +638,14 @@ claude-sonnet-4-5-20250929
 - tests/unit/api/errorHandlers.test.ts
 
 **Modified:**
+
 - package.json
 - .env.example
 - README.md
 - docs/sprint-artifacts/sprint-status.yaml
 
 **Deleted:**
+
 - src/services/pocketbaseService.ts
 
 ---
@@ -666,84 +677,94 @@ All 10 acceptance criteria are **FULLY IMPLEMENTED** with verified evidence. All
 ### ✅ IMPLEMENTATION EXCELLENCE (10 areas)
 
 **1. Zero-Defect Type Safety**
-   - NO `as any` type assertions found in entire codebase
-   - Proper Supabase SDK typing: `.insert(obj).select().single()`
-   - Zod schemas provide runtime + compile-time type safety
-   - Clean TypeScript throughout all services
-   - Files: `src/api/moodApi.ts`, `src/api/moodSyncService.ts`, `src/api/interactionService.ts`
-   - **Resolution**: Issue C4 from previous review COMPLETELY RESOLVED
+
+- NO `as any` type assertions found in entire codebase
+- Proper Supabase SDK typing: `.insert(obj).select().single()`
+- Zod schemas provide runtime + compile-time type safety
+- Clean TypeScript throughout all services
+- Files: `src/api/moodApi.ts`, `src/api/moodSyncService.ts`, `src/api/interactionService.ts`
+- **Resolution**: Issue C4 from previous review COMPLETELY RESOLVED
 
 **2. Production-Grade Validation Layer (Zod Integration)**
-   - Complete `moodApi.ts` service with Zod validation on ALL operations
-   - `SupabaseMoodSchema` validates all API responses before returning
-   - Custom `ApiValidationError` for validation failures
-   - Input/output validation ensures data integrity across API boundary
-   - File: `src/api/moodApi.ts` (Lines 1-458), `src/api/validation/supabaseSchemas.ts`
-   - **Resolution**: Issue M1 from previous review COMPLETELY RESOLVED
+
+- Complete `moodApi.ts` service with Zod validation on ALL operations
+- `SupabaseMoodSchema` validates all API responses before returning
+- Custom `ApiValidationError` for validation failures
+- Input/output validation ensures data integrity across API boundary
+- File: `src/api/moodApi.ts` (Lines 1-458), `src/api/validation/supabaseSchemas.ts`
+- **Resolution**: Issue M1 from previous review COMPLETELY RESOLVED
 
 **3. Secure Credential Management**
-   - `.env.example` has proper placeholders: "your-project-id.supabase.co"
-   - No real credentials committed to version control
-   - Clear documentation on how to obtain values
-   - Environment variable validation with helpful error messages
-   - File: `.env.example`, `src/api/supabaseClient.ts` (Lines 107-114)
-   - **Resolution**: Issue C1 from previous review COMPLETELY RESOLVED
+
+- `.env.example` has proper placeholders: "your-project-id.supabase.co"
+- No real credentials committed to version control
+- Clear documentation on how to obtain values
+- Environment variable validation with helpful error messages
+- File: `.env.example`, `src/api/supabaseClient.ts` (Lines 107-114)
+- **Resolution**: Issue C1 from previous review COMPLETELY RESOLVED
 
 **4. Complete Authentication Integration**
-   - Anonymous authentication via `initializeAuth()` using `supabase.auth.signInAnonymously()`
-   - Proper auth.uid() usage via `getCurrentUserId()` and `getPartnerId()`
-   - Session persistence across page reloads
-   - RLS policies correctly enforced using auth.uid()
-   - File: `src/api/supabaseClient.ts` (Lines 160-220)
-   - **Resolution**: Issue C3 from previous review COMPLETELY RESOLVED
+
+- Anonymous authentication via `initializeAuth()` using `supabase.auth.signInAnonymously()`
+- Proper auth.uid() usage via `getCurrentUserId()` and `getPartnerId()`
+- Session persistence across page reloads
+- RLS policies correctly enforced using auth.uid()
+- File: `src/api/supabaseClient.ts` (Lines 160-220)
+- **Resolution**: Issue C3 from previous review COMPLETELY RESOLVED
 
 **5. Excellent Error Handling Architecture**
-   - Custom `SupabaseServiceError` class with network detection
-   - Type guards for PostgrestError and SupabaseServiceError
-   - User-friendly error messages with context
-   - Exponential backoff retry logic with configurable parameters
-   - 100% test coverage for error handlers
-   - File: `src/api/errorHandlers.ts` (Lines 1-236)
-   - Tests: `tests/unit/api/errorHandlers.test.ts` (399 lines)
+
+- Custom `SupabaseServiceError` class with network detection
+- Type guards for PostgrestError and SupabaseServiceError
+- User-friendly error messages with context
+- Exponential backoff retry logic with configurable parameters
+- 100% test coverage for error handlers
+- File: `src/api/errorHandlers.ts` (Lines 1-236)
+- Tests: `tests/unit/api/errorHandlers.test.ts` (399 lines)
 
 **6. Clean Service Layer Design**
-   - Singleton pattern correctly implemented (moodSyncService, interactionService)
-   - Clear separation of concerns (client, API layer, services, error handling)
-   - Comprehensive JSDoc documentation for all public methods with @examples
-   - Realtime subscription management with proper cleanup
-   - Files: `src/api/moodSyncService.ts` (229 lines), `src/api/interactionService.ts`
+
+- Singleton pattern correctly implemented (moodSyncService, interactionService)
+- Clear separation of concerns (client, API layer, services, error handling)
+- Comprehensive JSDoc documentation for all public methods with @examples
+- Realtime subscription management with proper cleanup
+- Files: `src/api/moodSyncService.ts` (229 lines), `src/api/interactionService.ts`
 
 **7. Strong Database Schema Design**
-   - Proper PostgreSQL constraints (CHECK, max length, foreign keys, CASCADE)
-   - Efficient indexes (idx_moods_user_created, idx_interactions_to_user_viewed)
-   - Comprehensive comments explaining table purpose and column constraints
-   - Verification queries included for post-migration validation
-   - File: `docs/migrations/001_initial_schema.sql` (Lines 1-169)
+
+- Proper PostgreSQL constraints (CHECK, max length, foreign keys, CASCADE)
+- Efficient indexes (idx_moods_user_created, idx_interactions_to_user_viewed)
+- Comprehensive comments explaining table purpose and column constraints
+- Verification queries included for post-migration validation
+- File: `docs/migrations/001_initial_schema.sql` (Lines 1-169)
 
 **8. Comprehensive Row Level Security Policies**
-   - RLS enabled on all tables (users, moods, interactions)
-   - CRUD policies covering INSERT, SELECT, UPDATE, DELETE
-   - Policies use auth.uid() for access control
-   - Policy names clearly describe their purpose
-   - SELECT policy documented as intentional for 2-user MVP (Line 84-86 comment)
-   - File: `docs/migrations/001_initial_schema.sql` (Lines 70-138)
-   - **Resolution**: Issue C2 documented as design decision
+
+- RLS enabled on all tables (users, moods, interactions)
+- CRUD policies covering INSERT, SELECT, UPDATE, DELETE
+- Policies use auth.uid() for access control
+- Policy names clearly describe their purpose
+- SELECT policy documented as intentional for 2-user MVP (Line 84-86 comment)
+- File: `docs/migrations/001_initial_schema.sql` (Lines 70-138)
+- **Resolution**: Issue C2 documented as design decision
 
 **9. Excellent Documentation Quality**
-   - README has step-by-step Supabase setup (83 lines)
-   - .env.example has inline comments explaining each variable
-   - SQL migration includes architecture notes and verification queries
-   - All services have detailed JSDoc with @example blocks
-   - Clear next steps documented for Story 6.2
+
+- README has step-by-step Supabase setup (83 lines)
+- .env.example has inline comments explaining each variable
+- SQL migration includes architecture notes and verification queries
+- All services have detailed JSDoc with @example blocks
+- Clear next steps documented for Story 6.2
 
 **10. Robust Test Coverage**
-   - Unit tests for error handlers (100% coverage)
-   - Unit tests for Zod schemas validation
-   - Unit tests for moodApi with all CRUD operations
-   - Integration tests for Supabase connection
-   - Graceful skip logic if Supabase not configured
-   - Test cleanup with afterAll hooks
-   - Files: `tests/unit/api/errorHandlers.test.ts`, `tests/unit/api/supabaseSchemas.test.ts`, `tests/unit/api/moodApi.test.ts`
+
+- Unit tests for error handlers (100% coverage)
+- Unit tests for Zod schemas validation
+- Unit tests for moodApi with all CRUD operations
+- Integration tests for Supabase connection
+- Graceful skip logic if Supabase not configured
+- Test cleanup with afterAll hooks
+- Files: `tests/unit/api/errorHandlers.test.ts`, `tests/unit/api/supabaseSchemas.test.ts`, `tests/unit/api/moodApi.test.ts`
 
 ---
 
@@ -793,76 +814,86 @@ All 10 acceptance criteria are **FULLY IMPLEMENTED** with verified evidence. All
 **✅ FULLY COMPLIANT (10/10 ACs) - 100%**
 
 **AC-1: Supabase Project Setup** ✅
-   - Environment variables configured with placeholders in .env.example
-   - Connection verification code present in supabaseClient.ts
-   - Environment variable validation with clear error messages
-   - Evidence: `.env.example`, `src/api/supabaseClient.ts` Lines 107-114
+
+- Environment variables configured with placeholders in .env.example
+- Connection verification code present in supabaseClient.ts
+- Environment variable validation with clear error messages
+- Evidence: `.env.example`, `src/api/supabaseClient.ts` Lines 107-114
 
 **AC-2: Database Schema Creation** ✅
-   - All 3 tables created with correct columns (users, moods, interactions)
-   - Proper CHECK constraints for enums (mood_type, interaction type)
-   - Indexes created for performance (idx_moods_user_created, idx_interactions_to_user_viewed)
-   - Migration script complete and documented
-   - Evidence: `docs/migrations/001_initial_schema.sql` (169 lines)
+
+- All 3 tables created with correct columns (users, moods, interactions)
+- Proper CHECK constraints for enums (mood_type, interaction type)
+- Indexes created for performance (idx_moods_user_created, idx_interactions_to_user_viewed)
+- Migration script complete and documented
+- Evidence: `docs/migrations/001_initial_schema.sql` (169 lines)
 
 **AC-3: Row Level Security Policies** ✅
-   - RLS enabled on all tables
-   - INSERT policies enforce auth.uid() = user_id
-   - SELECT policies configured (simplified for 2-user MVP with documentation)
-   - UPDATE/DELETE policies enforce ownership
-   - Policies use auth.uid() correctly
-   - Evidence: `docs/migrations/001_initial_schema.sql` Lines 75-138
+
+- RLS enabled on all tables
+- INSERT policies enforce auth.uid() = user_id
+- SELECT policies configured (simplified for 2-user MVP with documentation)
+- UPDATE/DELETE policies enforce ownership
+- Policies use auth.uid() correctly
+- Evidence: `docs/migrations/001_initial_schema.sql` Lines 75-138
 
 **AC-4: Realtime Configuration** ✅
-   - Documentation explains how to enable Realtime in dashboard
-   - Realtime subscription code implemented in services
-   - Proper channel cleanup on unsubscribe
-   - Evidence: `src/api/moodSyncService.ts` Lines 162-195
+
+- Documentation explains how to enable Realtime in dashboard
+- Realtime subscription code implemented in services
+- Proper channel cleanup on unsubscribe
+- Evidence: `src/api/moodSyncService.ts` Lines 162-195
 
 **AC-5: Supabase Client SDK Integration** ✅
-   - @supabase/supabase-js installed (v2.81.1)
-   - Singleton supabaseClient created with typed Database interface
-   - Client exported for use across services
-   - JWT authentication configured
-   - Evidence: `src/api/supabaseClient.ts`, `package.json`
+
+- @supabase/supabase-js installed (v2.81.1)
+- Singleton supabaseClient created with typed Database interface
+- Client exported for use across services
+- JWT authentication configured
+- Evidence: `src/api/supabaseClient.ts`, `package.json`
 
 **AC-6: API Service Layer Structure** ✅
-   - `src/api/` directory created with complete structure
-   - supabaseClient, moodSyncService, interactionService, moodApi all present
-   - Services import client and expose typed methods
-   - Comprehensive JSDoc documentation with @examples
-   - Evidence: All files in `src/api/` directory
+
+- `src/api/` directory created with complete structure
+- supabaseClient, moodSyncService, interactionService, moodApi all present
+- Services import client and expose typed methods
+- Comprehensive JSDoc documentation with @examples
+- Evidence: All files in `src/api/` directory
 
 **AC-7: Authentication Configuration** ✅
-   - Anonymous authentication implemented via `initializeAuth()`
-   - Environment variables set up: VITE_USER_ID, VITE_PARTNER_ID
-   - README documents partner UUID setup
-   - Session persistence configured
-   - Evidence: `src/api/supabaseClient.ts` Lines 160-220, README.md
+
+- Anonymous authentication implemented via `initializeAuth()`
+- Environment variables set up: VITE_USER_ID, VITE_PARTNER_ID
+- README documents partner UUID setup
+- Session persistence configured
+- Evidence: `src/api/supabaseClient.ts` Lines 160-220, README.md
 
 **AC-8: Error Handling Infrastructure** ✅
-   - Network error detection via `navigator.onLine`
-   - Graceful degradation pattern implemented
-   - Custom `SupabaseServiceError` class with user-friendly messages
-   - PostgrestError handling with error code mapping
-   - Retry logic with exponential backoff
-   - Evidence: `src/api/errorHandlers.ts` (236 lines)
+
+- Network error detection via `navigator.onLine`
+- Graceful degradation pattern implemented
+- Custom `SupabaseServiceError` class with user-friendly messages
+- PostgrestError handling with error code mapping
+- Retry logic with exponential backoff
+- Evidence: `src/api/errorHandlers.ts` (236 lines)
 
 **AC-9: Documentation** ✅
-   - README.md has comprehensive Supabase setup section
-   - .env.example documented with inline comments
-   - SQL migration scripts in docs/migrations/
-   - RLS policy rationale explained in migration comments
-   - Troubleshooting guide included
-   - Evidence: README.md, `.env.example`, `docs/migrations/001_initial_schema.sql`
+
+- README.md has comprehensive Supabase setup section
+- .env.example documented with inline comments
+- SQL migration scripts in docs/migrations/
+- RLS policy rationale explained in migration comments
+- Troubleshooting guide included
+- Evidence: README.md, `.env.example`, `docs/migrations/001_initial_schema.sql`
 
 **AC-10: Verification Testing** ✅
-   - Unit tests for error handlers (100% coverage)
-   - Unit tests for Zod schemas
-   - Unit tests for moodApi
-   - Integration tests test connection (graceful skip if not configured)
-   - Environment variable loading tested
-   - Evidence: `tests/unit/api/errorHandlers.test.ts` (399 lines), `tests/unit/api/supabaseSchemas.test.ts`, `tests/unit/api/moodApi.test.ts`
+
+- Unit tests for error handlers (100% coverage)
+- Unit tests for Zod schemas
+- Unit tests for moodApi
+- Integration tests test connection (graceful skip if not configured)
+- Environment variable loading tested
+- Evidence: `tests/unit/api/errorHandlers.test.ts` (399 lines), `tests/unit/api/supabaseSchemas.test.ts`, `tests/unit/api/moodApi.test.ts`
 
 ---
 
@@ -871,6 +902,7 @@ All 10 acceptance criteria are **FULLY IMPLEMENTED** with verified evidence. All
 **Overall Code Quality: A (Excellent) - Upgraded from B+**
 
 **Scoring Breakdown:**
+
 - **Architecture Design**: A (Clean separation, excellent patterns)
 - **Type Safety**: A (Zero compromises, proper SDK usage, Zod validation)
 - **Error Handling**: A (Comprehensive, well-tested, user-friendly)
@@ -880,6 +912,7 @@ All 10 acceptance criteria are **FULLY IMPLEMENTED** with verified evidence. All
 - **Production Readiness**: A (Ready for deployment)
 
 **Comparison to Senior Developer Standards:**
+
 - ✅ Follows established patterns (validation layer, error handling)
 - ✅ Comprehensive error handling with retry logic
 - ✅ Clean code with clear naming and structure
@@ -895,6 +928,7 @@ All 10 acceptance criteria are **FULLY IMPLEMENTED** with verified evidence. All
 ### 🎯 FINAL NOTES
 
 **What Went Exceptionally Well:**
+
 - **Complete issue resolution** - All 4 critical and 2 major issues from previous review RESOLVED
 - **Zod validation layer** - Production-grade input/output validation
 - **Zero type compromises** - Clean TypeScript without any `as any` assertions
@@ -903,17 +937,20 @@ All 10 acceptance criteria are **FULLY IMPLEMENTED** with verified evidence. All
 - **Documentation excellence** - Clear setup guide, inline comments, troubleshooting
 
 **Technical Excellence Highlights:**
+
 - Proper separation of concerns (API layer, validation, error handling)
 - Enterprise-grade error handling with retry logic
 - Offline-first design maintained
 - Security best practices applied throughout
 
 **Risk Assessment:**
+
 - **NO HIGH RISKS** - All critical issues resolved
 - **NO MEDIUM RISKS** - Authentication and RLS properly implemented
 - **NO LOW RISKS** - Type safety maintained, validation complete
 
 **Approval Status:**
+
 - ✅ **APPROVED for Production Deployment**
 - ✅ **Ready for Story 6.2 Integration**
 - ✅ **Foundation Solid for Epic 6**
