@@ -1,6 +1,6 @@
-# Epic Technical Specification: Foundation & Authentication
+# Epic Technical Specification: PWA Foundation Audit & Stabilization
 
-Date: 2025-11-16
+Date: 2025-11-17
 Author: Frank
 Epic ID: 1
 Status: Draft
@@ -9,521 +9,725 @@ Status: Draft
 
 ## Overview
 
-This technical specification provides the implementation blueprint for Epic 1: Foundation & Authentication, which establishes the core infrastructure for My-Love Mobile. The epic delivers the foundational project setup, Supabase backend integration, magic link authentication, session persistence, and network resilience - enabling all subsequent feature development.
+Epic 1 establishes a stable foundation for the My-Love PWA by systematically auditing the existing codebase, validating core dependencies, and ensuring fundamental infrastructure (authentication, session management, network resilience) functions correctly. This epic transforms the current brownfield PWA from an uncertain state into a verified, reliable baseline that all subsequent features can build upon.
 
-Epic 1 is the critical first step that transforms the PRD's vision of "deeper connection through native mobile performance" into a working React Native + Expo application skeleton with secure, passwordless authentication. The epic ensures that partners can securely access their intimate connection app with minimal friction while establishing the technical patterns that all subsequent epics will leverage.
+The existing PWA uses React 19.1.1 + Vite 7.1.7 + TypeScript 5.9 (strict mode) + Zustand 5.0.8 + Tailwind CSS 3.4.18 with Supabase 2.81+ for backend services. Rather than adding new features, Epic 1 focuses on **auditing what exists**, **fixing what's broken**, and **ensuring deployment infrastructure works**. This audit-first approach prevents building new features on an unstable foundation.
+
+The epic delivers value to developers by providing confidence in the existing codebase and to users by ensuring basic functionality (login, session persistence, offline indication) works reliably across modern browsers (Chrome 90+, Firefox 90+, Safari 15+, Edge 90+).
 
 ## Objectives and Scope
 
 **In Scope:**
 
-- React Native + Expo SDK 54 project initialization with TypeScript
-- Expo Router file-based navigation structure
-- TanStack Query v5 server state management configuration
-- Supabase JS client v2.79+ integration (Auth, Database, Realtime, Storage)
-- React Native Paper v5 UI framework with Coral Heart theme foundation
-- MMKV v4 local storage for preferences
-- Secure token storage via Expo SecureStore
-- Magic link (passwordless) authentication flow with deep linking
-- Session persistence across app launches (30-day timeout)
-- Logout functionality with proper cleanup
-- Network status detection and offline resilience
-- iOS 15.0+ / Android 10+ platform targeting
+- Audit all dependencies in package.json for compatibility and security vulnerabilities
+- Validate TypeScript strict mode compliance with zero type errors
+- Verify ESLint and Vite build pass without warnings
+- Confirm PWA manifest.json and service worker configuration (vite-plugin-pwa)
+- **Validate GitHub Pages deployment pipeline succeeds** (explicit deployment validation)
+- Validate Supabase client connection and configuration with environment variables
+- Verify Zustand store persistence via localStorage/IndexedDB
+- Test magic link authentication flow including URL redirect handling on production domain
+- Ensure session management persists across browser sessions
+- Validate existing network status detection OR document gap for future implementation
+- Verify Row Level Security (RLS) policies exist and are accessible (test query, not creation)
+- Confirm responsive design works from 320px to 1920px viewports (FR61)
+- **Capture baseline metrics** (bundle size, load time, test coverage percentage) before Epic 2
 
 **Out of Scope:**
 
-- Feature-specific screens (Love Notes, Mood Tracker, Photos, etc.)
-- Push notification implementation (Epic 3)
-- Biometric authentication setup (Epic 7)
-- Partner pairing/relationship setup (assumed pre-existing in Supabase)
-- App Store/Google Play submission
-- Production EAS Build configuration
-- Privacy policy and legal documents
+- New feature development (Love Notes, Push Notifications, etc.)
+- Database schema creation (handled in subsequent epics)
+- UI component development beyond status indicators
+- Performance optimization beyond baseline requirements
+- User-facing feature enhancements
+- Backend/Supabase Edge Functions development
+- Creating new RLS policies (only validate existing ones)
+
+**Validation Failure Protocol:**
+
+When validation reveals issues, apply this decision tree:
+
+- **Critical (blocks Epic 2):** Fix immediately within this epic
+- **Non-critical (doesn't block):** Document in "Technical Debt" section, defer to appropriate epic
+- **Unknown state:** Document gap with recommended remediation, flag for architecture review
+
+**Success Criteria:**
+
+1. All tests pass (Vitest + Playwright)
+2. Zero npm audit vulnerabilities (or documented exceptions with risk assessment)
+3. Zero TypeScript errors in strict mode
+4. Magic link auth completes end-to-end on production domain (GitHub Pages)
+5. Sessions persist across browser close/reopen
+6. Network status detection validated OR gap documented with implementation plan
+7. PWA installable with valid manifest and service worker
+8. **GitHub Pages deployment succeeds without manual intervention**
+9. **Baseline metrics captured:** Bundle size < 500KB, initial load < 3s, test coverage documented
 
 ## System Architecture Alignment
 
-This epic implements the foundational architecture decisions from the Architecture document:
+**Referenced Architecture Components:**
 
-**Key Architectural Patterns Referenced:**
+This epic directly validates the core infrastructure defined in the Architecture document:
 
-- **ADR 001:** Online-first architecture with TanStack Query caching (not offline-first sync)
-- **ADR 002:** React Native Paper for UI with heavy theming customization
-- **ADR 004:** Expo Router for file-based navigation with deep linking
-- **ADR 005:** MMKV for fast local storage (preferences, not sensitive data)
-- **ADR 006:** TanStack Query for server state management
+| Component                  | Architecture Reference         | Epic 1 Validation                                    |
+| -------------------------- | ------------------------------ | ---------------------------------------------------- |
+| **React 19 + Vite 7**      | Core framework stack           | Story 1.1: Build passes, HMR works, no deprecations  |
+| **TypeScript 5.9**         | Strict mode enforced           | Story 1.1: Zero type errors, ESLint compliance       |
+| **Supabase 2.81+**         | Auth, Database, Realtime       | Story 1.2: Client connects, RLS accessible           |
+| **Zustand 5.0.8**          | Client state + persistence     | Story 1.2: Stores hydrate on reload                  |
+| **localStorage/IndexedDB** | Preference persistence (FR62)  | Story 1.2 & 1.4: Preferences survive sessions        |
+| **PWA Manifest + SW**      | Installability (FR60)          | Story 1.1: Valid manifest, service worker registered |
+| **Magic Link Auth**        | Supabase Auth (FR1, FR4)       | Story 1.3: Full flow validates                       |
+| **Session Management**     | Persistent sessions (FR2, FR3) | Story 1.4: Sessions survive browser restart          |
+| **Online-First Pattern**   | Service worker caching         | Story 1.5: Graceful degradation on network loss      |
 
-**Technology Constraints:**
+**Architectural Constraints:**
 
-- Expo SDK 54 managed workflow (no native code ejection)
-- Supabase as sole backend provider (Auth, Database, Realtime, Storage)
-- TypeScript strict mode for type safety
-- Minimum targets: iOS 15.0+ / Android 10+ (FR60, FR61)
+- Online-first architecture (NOT offline-first sync) - aligns with NFR-I1
+- Service worker caching via Workbox for static assets only
+- Supabase client must handle reconnection gracefully (NFR-I2)
+- Environment variables must use `VITE_` prefix for Vite compatibility
+- Hash-based or history-based routing must work with GitHub Pages deployment
 
-**Security Requirements:**
+**Integration Points Validated:**
 
-- NFR-S1: Session tokens in SecureStore (device keychain), not plain storage
-- NFR-S6: 30-day session timeout with server-side revocation
-- NFR-I1: Supabase JS Client v2.79+ compatibility with graceful degradation
+- Supabase Auth → Magic link redirect URL handling
+- Supabase Client → Environment variable configuration
+- Zustand → localStorage persistence middleware
+- Service Worker → vite-plugin-pwa configuration
+- Browser APIs → navigator.onLine, 'online'/'offline' events
+
+**Critical Risk Mitigations:**
+
+| Risk                                          | Mitigation Strategy                                                                               | Validation Point                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Magic link redirects fail on GitHub Pages** | Test with actual production domain (/My-Love/ base path), verify hash routing compatibility       | Story 1.3: End-to-end auth on deployed site              |
+| **Service worker caches stale auth tokens**   | Configure cache-first ONLY for static assets (JS/CSS/images), network-first for all API calls     | Story 1.1: Review vite-plugin-pwa config                 |
+| **RLS policies don't exist**                  | Test query with authenticated user, verify policies return expected data, NOT create new policies | Story 1.2: SELECT query against tables with auth context |
+| **Safari localStorage quota exceeded**        | Add quota check before storing, implement fallback strategy if quota < 5MB                        | Story 1.4: Test with Safari, check available quota       |
+| **Environment variables exposed**             | Verify VITE_SUPABASE_ANON_KEY is anon key (safe to expose), never SUPABASE_SERVICE_KEY            | Story 1.2: Audit .env file, verify no service keys       |
 
 ## Detailed Design
 
 ### Services and Modules
 
-| Module                                                 | Responsibility                                         | Inputs                                         | Outputs                                         |
-| ------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------- | ----------------------------------------------- |
-| **Supabase Client** (`src/lib/supabase.ts`)            | Configure Supabase connection with SecureStore adapter | Environment variables (SUPABASE_URL, ANON_KEY) | Configured client instance                      |
-| **Auth Provider** (`src/providers/AuthProvider.tsx`)   | Manage authentication state and session lifecycle      | Supabase client, user events                   | Auth context with user, session, loading states |
-| **Query Provider** (`src/providers/QueryProvider.tsx`) | Provide TanStack Query client to app tree              | QueryClient configuration                      | QueryClientProvider wrapper                     |
-| **Theme Provider** (`src/providers/ThemeProvider.tsx`) | Provide React Native Paper theming                     | Theme tokens (Coral Heart)                     | PaperProvider with custom theme                 |
-| **Storage** (`src/lib/storage.ts`)                     | MMKV storage wrapper for preferences                   | Key-value pairs                                | Persistent local storage                        |
-| **Network Monitor** (`src/hooks/useNetworkStatus.ts`)  | Monitor network connectivity changes                   | NetInfo events                                 | Online/offline/connecting states                |
-| **Root Layout** (`app/_layout.tsx`)                    | Wire all providers and establish app structure         | Child routes                                   | Provider-wrapped navigation tree                |
+Epic 1 validates the existing module structure rather than creating new modules. The expected structure under validation:
+
+```
+src/
+├── lib/
+│   ├── supabase.ts          # Story 1.2: Supabase client configuration
+│   └── env.ts               # Story 1.2: Environment variable validation
+├── stores/
+│   ├── authStore.ts         # Story 1.4: Auth session persistence
+│   ├── userStore.ts         # Story 1.4: User preferences persistence
+│   └── index.ts             # Story 1.2: Zustand store exports
+├── hooks/
+│   ├── useAuth.ts           # Story 1.3: Auth flow hook
+│   ├── useNetworkStatus.ts  # Story 1.5: Online/offline detection
+│   └── useSession.ts        # Story 1.4: Session management hook
+├── pages/
+│   ├── Login.tsx            # Story 1.3: Magic link login page
+│   ├── AuthCallback.tsx     # Story 1.3: URL redirect handler
+│   └── Home.tsx             # Story 1.4: Authenticated home page
+├── components/
+│   └── StatusIndicator.tsx  # Story 1.5: Network status UI (if exists)
+└── types/
+    ├── auth.ts              # Story 1.3: Auth type definitions
+    └── env.d.ts             # Story 1.1: Vite env type declarations
+```
+
+**Module Validation Criteria:**
+
+| Module                       | Validation                                                  | Story |
+| ---------------------------- | ----------------------------------------------------------- | ----- |
+| `src/lib/supabase.ts`        | Creates client with VITE\_ env vars, handles auth callbacks | 1.2   |
+| `src/stores/*`               | Zustand persist middleware configured, hydrates on reload   | 1.2   |
+| `src/hooks/useAuth.ts`       | Magic link flow works end-to-end                            | 1.3   |
+| `src/pages/AuthCallback.tsx` | Handles redirect URLs without infinite loops                | 1.3   |
+| `vite.config.ts`             | Build passes, PWA plugin configured, base path set          | 1.1   |
+| `package.json`               | No security vulnerabilities, compatible versions            | 1.1   |
+
+**Gap Documentation:** If any module is missing or incomplete, document in "Technical Debt" section with severity assessment.
 
 ### Data Models and Contracts
 
-**User Session (Supabase Auth):**
+Epic 1 validates data contracts but does NOT create new database schemas. Validation focuses on:
+
+**1. Supabase Auth Session (Story 1.3, 1.4)**
 
 ```typescript
+// Expected session structure from Supabase Auth
 interface Session {
   access_token: string;
   refresh_token: string;
   expires_in: number;
-  expires_at?: number;
+  expires_at: number;
   token_type: string;
   user: User;
 }
 
 interface User {
-  id: string;
+  id: string; // UUID
   email: string;
+  created_at: string; // ISO timestamp
+  updated_at: string;
   app_metadata: {
     provider?: string;
+    providers?: string[];
   };
-  user_metadata: {
-    display_name?: string;
-    partner_id?: string;
-  };
-  created_at: string;
+  user_metadata: Record<string, unknown>;
 }
 ```
 
-**Auth Context State:**
+**Validation:** Session persists in localStorage via `supabase-auth-token` key, refresh works, expires_at honored.
+
+**2. Zustand Store Persistence (Story 1.2, 1.4)**
 
 ```typescript
-interface AuthContextState {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
+// Expected persisted state structure
+interface PersistedAuthState {
   isAuthenticated: boolean;
-  signIn: (email: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
+  userId: string | null;
+  email: string | null;
+}
+
+interface PersistedUserPrefs {
+  theme: 'light' | 'dark' | 'system';
+  lastSync: number; // Unix timestamp
 }
 ```
 
-**Network Status:**
+**Validation:** States serialize to JSON, survive browser restart, version migrations handled.
+
+**3. Environment Variables Contract (Story 1.2)**
 
 ```typescript
-type NetworkStatus = 'online' | 'offline' | 'connecting';
-
-interface NetworkState {
-  status: NetworkStatus;
-  lastSyncedAt: Date | null;
-  isInternetReachable: boolean;
+// Expected .env structure
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string; // https://xxx.supabase.co
+  readonly VITE_SUPABASE_ANON_KEY: string; // eyJ... (public anon key)
+  readonly MODE: string; // development | production
+  readonly BASE_URL: string; // /My-Love/
 }
 ```
 
-**Theme Tokens:**
-
-```typescript
-const tokens = {
-  colors: {
-    primary: '#FF6B6B',
-    secondary: '#FFA8A8',
-    surface: '#FFF5F5',
-    dark: '#C92A2A',
-    background: '#FFFFFF',
-    text: '#495057',
-    success: '#51CF66',
-    warning: '#FCC419',
-    error: '#FF6B6B',
-    info: '#339AF0',
-  },
-  spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
-  borderRadius: { sm: 8, md: 12, lg: 16, full: 9999 },
-};
-```
+**Validation:** All VITE\_ prefixed vars accessible, no service keys exposed, BASE_URL matches GitHub Pages path.
 
 ### APIs and Interfaces
 
-**Supabase Auth API (Magic Link):**
+**Browser APIs Under Validation:**
+
+| API                                           | Purpose                  | Story    | Validation Method                      |
+| --------------------------------------------- | ------------------------ | -------- | -------------------------------------- |
+| `navigator.onLine`                            | Network status detection | 1.5      | Toggle airplane mode, verify detection |
+| `window.addEventListener('online'/'offline')` | Network change events    | 1.5      | Listen for events on network toggle    |
+| `localStorage.setItem/getItem`                | State persistence        | 1.2, 1.4 | Store and retrieve test data           |
+| `localStorage.remainingSpace`                 | Quota checking (Safari)  | 1.4      | Verify quota available                 |
+| `IndexedDB`                                   | Alternative persistence  | 1.2      | Test if Zustand uses IDB fallback      |
+| `ServiceWorker.register()`                    | PWA service worker       | 1.1      | Verify SW registered and active        |
+
+**Supabase Client API Methods Validated:**
 
 ```typescript
-// Send magic link email
-const { error } = await supabase.auth.signInWithOtp({
-  email: userEmail,
-  options: {
-    emailRedirectTo: 'mylove://auth/callback',
+// Story 1.2: Client initialization
+supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    storage: localStorage,
+    autoRefreshToken: true,
+    detectSessionInUrl: true, // Critical for magic link handling
   },
 });
 
-// Get current session
-const {
-  data: { session },
-  error,
-} = await supabase.auth.getSession();
+// Story 1.3: Magic link authentication
+await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } });
+await supabase.auth.getSession(); // After redirect callback
 
-// Sign out
-const { error } = await supabase.auth.signOut();
-
-// Listen to auth state changes
+// Story 1.4: Session management
 supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN') {
-    /* handle sign in */
-  }
-  if (event === 'SIGNED_OUT') {
-    /* handle sign out */
-  }
-  if (event === 'TOKEN_REFRESHED') {
-    /* token auto-refreshed */
-  }
+  /* handle */
 });
+await supabase.auth.signOut();
+
+// Story 1.2: RLS policy test
+await supabase.from('profiles').select('*').single(); // Should respect RLS
 ```
 
-**Deep Link Schema:**
-
-```
-mylove://                       # App scheme (configured in app.json)
-mylove://auth/callback          # Magic link verification endpoint
-```
-
-**Error Codes:**
-
-- `invalid_grant`: Magic link expired or already used
-- `invalid_request`: Malformed authentication request
-- `invalid_credentials`: Invalid token during verification
-- Network errors: Standard fetch errors, retryable
+**Validation:** Each method executes without errors, returns expected shapes, handles errors gracefully.
 
 ### Workflows and Sequencing
 
-**Magic Link Authentication Flow:**
+**Story Execution Order (Dependencies):**
 
-```
-1. User opens app → Check for existing session
-2. If no session → Show Login screen
-3. User enters email → Validate (RFC 5322)
-4. Tap "Send Magic Link" → supabase.auth.signInWithOtp()
-5. Email sent → Show "Check your email" message
-6. User receives email → Tap magic link
-7. Deep link opens app → mylove://auth/callback?token=xxx
-8. Expo Linking intercepts → Extract token
-9. Supabase verifies token → Session established
-10. Session stored in SecureStore → User redirected to Home
-11. Auth state updated → App re-renders authenticated state
-```
+```mermaid
+graph TD
+    S1[Story 1.1: Codebase Audit] --> S2[Story 1.2: Supabase Config]
+    S2 --> S3[Story 1.3: Magic Link Auth]
+    S3 --> S4[Story 1.4: Session Management]
+    S2 --> S5[Story 1.5: Network Status]
 
-**App Launch Flow:**
-
-```
-1. App launches (cold/warm start)
-2. Root layout mounts providers
-3. AuthProvider checks SecureStore for existing session
-4. If session found → Validate with Supabase
-5. If valid → Set authenticated state, skip login
-6. If invalid/expired → Clear storage, show login
-7. If no session → Show login screen
-8. Network status monitoring starts
+    S1 -->|Build must pass| S2
+    S2 -->|Client must connect| S3
+    S3 -->|Auth must work| S4
+    S2 -->|Config must be valid| S5
 ```
 
-**Logout Flow:**
+**Validation Workflow Per Story:**
 
-```
-1. User taps "Log Out" in Settings
-2. supabase.auth.signOut() called
-3. Server revokes session
-4. SecureStore cleared (tokens only)
-5. TanStack Query cache cleared
-6. MMKV preferences retained (theme, etc.)
-7. Navigation reset to Login screen
-8. Auth state updated to unauthenticated
-```
+1. **Story 1.1** - Codebase Audit
+   - Run `npm audit` → Fix or document vulnerabilities
+   - Run `tsc --noEmit` → Zero errors required
+   - Run `npm run lint` → Zero errors required
+   - Run `npm run build` → Success required
+   - Inspect `manifest.json` → Valid PWA metadata
+   - Verify service worker registration → Active SW required
+
+2. **Story 1.2** - Supabase Configuration
+   - Load `.env` → Verify VITE\_ vars present
+   - Import supabase client → No runtime errors
+   - Call `supabase.auth.getSession()` → Returns null or valid session
+   - Query test table → RLS policies respond (403 or data, not connection error)
+   - Check Zustand stores → `persist` middleware configured
+
+3. **Story 1.3** - Magic Link Flow
+   - Navigate to login page → Renders without error
+   - Submit email → Supabase sends magic link (check email)
+   - Click magic link → Redirects to app with token in URL
+   - App extracts token → Session established
+   - User lands on home → Authenticated state confirmed
+
+4. **Story 1.4** - Session Persistence
+   - Authenticated user → Close browser completely
+   - Reopen browser → App auto-restores session (no login screen)
+   - Click logout → Session cleared, redirect to login
+   - Verify localStorage → Auth tokens removed on logout
+   - Test quota → Safari localStorage has >1MB available
+
+5. **Story 1.5** - Network Resilience
+   - Online state → Status indicator shows green "Online"
+   - Toggle network off → Status changes to red "Offline" within 2s
+   - Toggle network on → Status returns to green "Online"
+   - Offline during API call → Graceful error message, no hang
+   - Service worker → Cached static assets load offline
 
 ## Non-Functional Requirements
 
 ### Performance
 
-**NFR-P1 (App Launch Time):**
+**Baseline Metrics to Capture (Success Criteria #9):**
 
-- Cold start target: < 2 seconds to interactive
-- Warm start target: < 500ms to interactive
-- Implementation: Minimal initial bundle, lazy load non-essential modules
-- Measurement: Profile with React Native Performance Monitor on physical devices
+| Metric                   | Target        | Measurement Method                |
+| ------------------------ | ------------- | --------------------------------- |
+| Bundle Size (gzip)       | < 500KB total | `npm run build` → check dist size |
+| Initial Load (3G)        | < 3 seconds   | Lighthouse performance audit      |
+| Time to Interactive      | < 4 seconds   | Lighthouse TTI metric             |
+| First Contentful Paint   | < 1.5 seconds | Lighthouse FCP metric             |
+| Largest Contentful Paint | < 2.5 seconds | Lighthouse LCP metric             |
+| TypeScript compilation   | < 30 seconds  | `time tsc --noEmit`               |
 
-**NFR-P7 (TanStack Query Caching):**
+**Performance Validation (Story 1.1):**
 
-- Cache configuration with stale-while-revalidate pattern
-- Background refetch on app focus
-- Retry logic: 3 attempts with exponential backoff (1s, 2s, 4s)
+- Build completes without memory errors
+- No render-blocking scripts in `<head>`
+- Service worker precaches critical assets only (not all assets)
+- Zustand store serialization < 10ms
+- No React Strict Mode double-render warnings in production
+
+**Not Optimized in Epic 1:** Image optimization, code splitting strategy, lazy loading patterns (deferred to Epic 4+).
 
 ### Security
 
-**NFR-S1 (Authentication Security):**
+**Security Validation Checklist:**
 
-- Magic link tokens expire after 60 minutes (Supabase default)
-- Session tokens stored in SecureStore (OS keychain/keystore)
-- No passwords stored on device
-- Biometric auth uses OS secure enclave (Epic 7)
+1. **Environment Variables (Story 1.2)**
+   - ✅ `VITE_SUPABASE_ANON_KEY` is anon key (safe to expose in client)
+   - ❌ `SUPABASE_SERVICE_ROLE_KEY` NOT in any VITE\_ prefixed var
+   - ✅ `.env` file listed in `.gitignore`
+   - ✅ `.env.example` exists with placeholder values
+   - ✅ No hardcoded API keys in source code
 
-**NFR-S6 (Session Management):**
+2. **Authentication Security (Story 1.3)**
+   - ✅ Magic link tokens single-use and time-limited (Supabase default: 1 hour)
+   - ✅ Redirect URL validated against whitelist in Supabase dashboard
+   - ✅ CSRF protection via `state` parameter in OAuth flow
+   - ✅ Auth tokens stored in localStorage (acceptable for SPAs)
+   - ⚠️ Session tokens refreshed before expiry (autoRefreshToken: true)
 
-- Session timeout: 30 days of inactivity
-- Manual logout clears server-side session
-- Device-specific sessions (multi-device support)
-- Automatic token refresh handled by Supabase client
+3. **Row Level Security (Story 1.2)**
+   - ✅ RLS enabled on all tables by default
+   - ✅ Policies restrict access to authenticated user's own data
+   - ✅ Test query returns 403 or filtered data, NOT all data
+   - ❌ No SELECT \* without WHERE auth.uid() = user_id
+
+4. **NPM Dependencies (Story 1.1)**
+   - `npm audit` returns zero critical/high vulnerabilities
+   - OR documented exceptions with risk assessment and timeline
+   - Dependencies from trusted sources (no typosquatting)
+   - No deprecated packages with known CVEs
+
+**Not Addressed in Epic 1:** Content Security Policy headers, HTTPS enforcement (handled by GitHub Pages), rate limiting (Supabase handles).
 
 ### Reliability/Availability
 
-**NFR-R3 (Offline Resilience):**
+**Target Uptime:** 99.5% (GitHub Pages + Supabase free tier SLAs)
 
-- Show cached data marked as potentially stale when offline
-- Fail write operations immediately with retry prompt (no offline queue)
-- App remains navigable with cached content
-- Network recovery triggers automatic TanStack Query refetch
+**Reliability Validation:**
 
-**NFR-I1 (Supabase Client Compatibility):**
+| Aspect                    | Validation Method       | Story | Expected Behavior                             |
+| ------------------------- | ----------------------- | ----- | --------------------------------------------- |
+| **Graceful degradation**  | Disconnect network      | 1.5   | UI shows offline banner, cached assets load   |
+| **Session recovery**      | Token expires           | 1.4   | Auto-refresh works OR redirect to login       |
+| **Build stability**       | Run `npm run build` 3x  | 1.1   | Identical output each time (deterministic)    |
+| **Error boundaries**      | Trigger component error | 1.1   | App doesn't white-screen, shows error message |
+| **Supabase reconnection** | Simulate API timeout    | 1.2   | Client retries automatically                  |
 
-- Compatible with Supabase JS Client v2.79+
-- Graceful degradation on service unavailability
-- Retry logic for transient network failures
+**Availability Constraints:**
+
+- GitHub Pages: ~100% uptime for static assets (CDN-backed)
+- Supabase Free Tier: 500MB database, 2 realtime connections (sufficient for 2-user app)
+- Magic link email delivery: Depends on Supabase email provider (may have delays)
+
+**Not Validated:** Long-term storage retention, database backup strategy (Supabase handles), DDoS protection (GitHub Pages handles).
 
 ### Observability
 
-**Logging Strategy:**
+**Minimal Observability for Epic 1:**
 
-```typescript
-const logger = {
-  error: (msg: string, ctx?: object) => console.error(`[ERROR] ${msg}`, ctx),
-  warn: (msg: string, ctx?: object) => console.warn(`[WARN] ${msg}`, ctx),
-  info: (msg: string, ctx?: object) => __DEV__ && console.info(`[INFO] ${msg}`, ctx),
-  debug: (msg: string, ctx?: object) => __DEV__ && console.debug(`[DEBUG] ${msg}`, ctx),
-};
+Since Epic 1 is audit/validation work, full observability is deferred. However, baseline monitoring includes:
 
-// Log events:
-// - Authentication events (login, logout, token refresh)
-// - Network status changes
-// - Session expiration
-// - Error occurrences
-```
+1. **Browser Console Monitoring**
+   - No uncaught exceptions during Stories 1.1-1.5
+   - No React warnings in production build
+   - Service worker logs show successful registration
+   - Network errors surfaced with useful messages
 
-**Privacy Compliance:**
+2. **Build Metrics (Story 1.1)**
+   - Bundle size report generated (`vite-bundle-visualizer` or similar)
+   - TypeScript compilation time logged
+   - ESLint error count tracked
 
-- Never log email content or tokens
-- Log only event types and metadata
-- No sensitive user data in logs
+3. **Manual Validation Logs**
+   - Screenshot of Lighthouse audit (capture baseline)
+   - Console output of `npm audit` saved
+   - Service worker status in DevTools → Application tab
+
+4. **Error Tracking Preparation**
+   - Verify `console.error` calls include stack traces
+   - Auth errors return descriptive messages (not generic "Error")
+   - Network errors distinguish timeout vs 403 vs 500
+
+**Not Implemented:** Sentry/LogRocket integration, analytics tracking, performance monitoring dashboards (deferred to Epic 5+).
 
 ## Dependencies and Integrations
 
-**Core Dependencies (package.json):**
+### External Dependencies
 
-```json
-{
-  "dependencies": {
-    "expo": "~54.0.0",
-    "expo-router": "^4.0.0",
-    "expo-linking": "~7.1.0",
-    "expo-secure-store": "~14.1.0",
-    "expo-haptics": "~14.1.0",
-    "expo-notifications": "~0.32.0",
-    "expo-image-picker": "~16.0.0",
-    "@supabase/supabase-js": "^2.79.0",
-    "@tanstack/react-query": "^5.90.0",
-    "react-native-mmkv": "^4.0.0",
-    "react-native-paper": "^5.0.0",
-    "react-native-safe-area-context": "^4.0.0",
-    "@react-native-community/netinfo": "^11.0.0",
-    "react-native": "0.81.0",
-    "react": "18.2.0",
-    "typescript": "~5.3.0"
-  }
-}
-```
+| Dependency          | Version | Purpose                  | Epic 1 Validation                        |
+| ------------------- | ------- | ------------------------ | ---------------------------------------- |
+| **Supabase**        | 2.81+   | Auth, Database, Realtime | Story 1.2: Client connects successfully  |
+| **GitHub Pages**    | -       | Static hosting           | Story 1.1: Deployment pipeline works     |
+| **Vite**            | 7.1.7   | Build tooling            | Story 1.1: Build completes without error |
+| **React**           | 19.1.1  | UI framework             | Story 1.1: No deprecation warnings       |
+| **Zustand**         | 5.0.8   | State management         | Story 1.2: Persist middleware works      |
+| **TypeScript**      | 5.4+    | Type safety              | Story 1.1: Zero compilation errors       |
+| **Tailwind CSS**    | 3.4.18  | Styling                  | Story 1.1: Styles compile correctly      |
+| **vite-plugin-pwa** | 0.20+   | PWA support              | Story 1.1: SW registered, manifest valid |
 
-**DevDependencies:**
+### Integration Points
 
-```json
-{
-  "devDependencies": {
-    "@babel/core": "^7.20.0",
-    "@types/react": "~18.2.0",
-    "@types/react-native": "~0.73.0",
-    "typescript": "~5.3.0"
-  }
-}
-```
+**1. Supabase Dashboard Configuration (Pre-requisites)**
 
-**Environment Configuration:**
+- ✅ Project exists at `VITE_SUPABASE_URL`
+- ✅ Magic link email template configured
+- ✅ Redirect URL whitelist includes:
+  - `http://localhost:5173/*` (dev)
+  - `https://{username}.github.io/My-Love/*` (prod)
+- ✅ RLS enabled by default on all tables
+- ✅ At least one table exists for RLS test query
 
-```bash
-# .env.local (not committed)
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-EXPO_PUBLIC_APP_SCHEME=mylove
-```
+**2. GitHub Repository Configuration**
 
-**Platform Targeting:**
+- ✅ GitHub Pages enabled in Settings
+- ✅ Source: Deploy from branch OR GitHub Actions
+- ✅ Branch: `main` or `gh-pages`
+- ✅ Custom domain: None (using `username.github.io/My-Love`)
+- ✅ `.github/workflows/deploy.yml` (if using Actions) or manual push to branch
 
-```json
-// app.json
-{
-  "expo": {
-    "scheme": "mylove",
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.mylove.app" },
-    "android": { "package": "com.mylove.app", "adaptiveIcon": {} },
-    "plugins": [["expo-router", { "origin": "https://mylove.app" }]]
-  }
-}
-```
+**3. Environment Variable Injection**
+
+- **Local Development:**
+  ```bash
+  # .env.local (not committed)
+  VITE_SUPABASE_URL=https://xxx.supabase.co
+  VITE_SUPABASE_ANON_KEY=eyJ...
+  ```
+- **GitHub Pages Deployment:**
+  - Set secrets in GitHub repo Settings → Secrets
+  - Inject via `dotenv` or build script
+  - OR hardcode anon key (safe for public client)
+
+### Blocking Dependencies for Epic 2
+
+Epic 2 (Core Data Models) cannot start until:
+
+- ✅ Story 1.1: Build passes (foundation stable)
+- ✅ Story 1.2: Supabase client connects (backend reachable)
+- ⚠️ RLS policies accessible (can query authenticated data)
+
+If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expansion).
 
 ## Acceptance Criteria (Authoritative)
 
-**AC1:** Project initializes successfully with `npx expo start` without errors (FR60, FR61, FR62, FR63)
+### Story 1.1: Codebase Audit & Dependency Validation
 
-**AC2:** All core dependencies install without version conflicts (Expo SDK 54, Supabase 2.79+, TanStack Query 5.90+, MMKV v4, React Native Paper v5)
+**GIVEN** the existing PWA codebase
+**WHEN** developer runs validation commands
+**THEN**:
 
-**AC3:** Project structure matches Architecture document specification (app/, src/components/, src/hooks/, src/lib/, src/providers/, src/theme/, src/types/, src/utils/)
+- [ ] AC1.1.1: `npm audit` returns zero critical/high vulnerabilities OR documented exceptions
+- [ ] AC1.1.2: `tsc --noEmit` completes with zero errors (strict mode)
+- [ ] AC1.1.3: `npm run lint` passes with zero errors
+- [ ] AC1.1.4: `npm run build` succeeds and generates dist folder
+- [ ] AC1.1.5: `manifest.json` contains valid PWA metadata (name, icons, start_url, display)
+- [ ] AC1.1.6: Service worker registers successfully in DevTools → Application
+- [ ] AC1.1.7: GitHub Pages deployment completes without manual intervention
+- [ ] AC1.1.8: Baseline metrics captured: bundle size < 500KB, Lighthouse score documented
 
-**AC4:** Supabase client connects successfully using environment variables and SecureStore adapter (NFR-S1)
+### Story 1.2: Supabase Client & Configuration Validation
 
-**AC5:** TanStack Query provider wraps application with proper configuration (staleTime: 0, retry: 3, refetchOnWindowFocus: true)
+**GIVEN** environment variables are configured
+**WHEN** application loads
+**THEN**:
 
-**AC6:** React Native Paper theme applies Coral Heart colors (Primary #FF6B6B, Surface #FFF5F5, Text #495057)
+- [ ] AC1.2.1: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` accessible via `import.meta.env`
+- [ ] AC1.2.2: `.env` file exists and is listed in `.gitignore`
+- [ ] AC1.2.3: No `SUPABASE_SERVICE_ROLE_KEY` in any VITE\_ prefixed variable
+- [ ] AC1.2.4: `supabase.auth.getSession()` returns null or valid Session object (no errors)
+- [ ] AC1.2.5: Zustand stores configured with `persist` middleware (check store source code)
+- [ ] AC1.2.6: Zustand state survives page reload (store data in localStorage/IndexedDB)
+- [ ] AC1.2.7: Test query to Supabase table returns 403 (RLS enabled) or filtered data (policies exist)
 
-**AC7:** User can enter email and request magic link with validation (FR1)
+### Story 1.3: Magic Link Authentication Flow Validation
 
-**AC8:** Magic link deep links successfully intercept `mylove://auth/callback` and complete authentication (FR4)
+**GIVEN** user is on login page
+**WHEN** user submits email for magic link
+**THEN**:
 
-**AC9:** Session persists across app launches via SecureStore (FR2)
+- [ ] AC1.3.1: Login page renders without errors
+- [ ] AC1.3.2: Email input validates email format before submission
+- [ ] AC1.3.3: `supabase.auth.signInWithOtp()` called with correct `emailRedirectTo`
+- [ ] AC1.3.4: User receives magic link email (check inbox/spam)
+- [ ] AC1.3.5: Clicking magic link redirects to app with token in URL fragment
+- [ ] AC1.3.6: App extracts token via `detectSessionInUrl: true`
+- [ ] AC1.3.7: User lands on authenticated home page (no login screen)
+- [ ] AC1.3.8: Session object contains valid user data (email, id, created_at)
 
-**AC10:** User can log out, clearing session from SecureStore and server (FR3)
+### Story 1.4: Session Management & Persistence Fixes
 
-**AC11:** Network status indicator displays correct state: online (green), connecting (yellow), offline (red) (FR64)
+**GIVEN** user is authenticated
+**WHEN** user closes and reopens browser
+**THEN**:
 
-**AC12:** Offline mode shows cached data with staleness indication and fails write operations with retry prompt (NFR-R3)
+- [ ] AC1.4.1: App auto-restores session without requiring login
+- [ ] AC1.4.2: `localStorage` contains `supabase-auth-token` key
+- [ ] AC1.4.3: Logout clears session tokens from localStorage
+- [ ] AC1.4.4: Logout redirects user to login page
+- [ ] AC1.4.5: Auth state changes trigger `onAuthStateChange` callback
+- [ ] AC1.4.6: Safari localStorage quota check passes (>1MB available)
+- [ ] AC1.4.7: Session refresh happens automatically before token expiry (autoRefreshToken)
 
-**AC13:** App launches in < 2 seconds cold start on target devices (NFR-P1)
+### Story 1.5: Network Status & Offline Resilience
 
-**AC14:** Session automatically refreshes without user intervention (NFR-S6)
+**GIVEN** app is running
+**WHEN** network connectivity changes
+**THEN**:
 
-**AC15:** Error messages are user-friendly, not technical jargon (NFR-R2)
+- [ ] AC1.5.1: Online state shows visual indicator (green dot, "Online" text, etc.)
+- [ ] AC1.5.2: Offline state detected within 2 seconds of network loss
+- [ ] AC1.5.3: Offline state shows visual indicator (red dot, "Offline" text, etc.)
+- [ ] AC1.5.4: Network recovery detected within 2 seconds of reconnection
+- [ ] AC1.5.5: Cached static assets (JS/CSS) load while offline
+- [ ] AC1.5.6: API calls during offline show graceful error message (not hang)
+- [ ] AC1.5.7: `navigator.onLine` and 'online'/'offline' events hooked correctly
+
+**OR (Gap Documentation):**
+
+- [ ] AC1.5.GAP: Network status detection does NOT exist; documented in Technical Debt with implementation plan
 
 ## Traceability Mapping
 
-| AC # | Tech Spec Section   | Component(s) / API(s)                               | Test Idea                                                       |
-| ---- | ------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
-| AC1  | Project Structure   | Root project, package.json, tsconfig.json           | Run `npx expo start`, verify no errors in console               |
-| AC2  | Dependencies        | package.json                                        | Run `npm install`, check for version conflict warnings          |
-| AC3  | Project Structure   | Folder structure                                    | File system check for all required directories                  |
-| AC4  | Supabase Client     | `src/lib/supabase.ts`, Expo SecureStore             | Mock Supabase connection, verify token storage in SecureStore   |
-| AC5  | Query Provider      | `src/lib/queryClient.ts`, QueryProvider             | Verify QueryClientProvider wraps app, check retry config        |
-| AC6  | Theme Provider      | `src/theme/tokens.ts`, ThemeProvider                | Visual inspection of color application across components        |
-| AC7  | Auth Flow           | Login screen, `supabase.auth.signInWithOtp()`       | Enter valid email, verify API call made with correct redirectTo |
-| AC8  | Deep Linking        | `app.json scheme`, Expo Linking                     | Trigger deep link, verify auth completion flow                  |
-| AC9  | Session Persistence | AuthProvider, SecureStore                           | Close app, reopen, verify auto-login without prompt             |
-| AC10 | Logout Flow         | `supabase.auth.signOut()`, SecureStore, QueryClient | Tap logout, verify all caches cleared, redirected to login      |
-| AC11 | Network Status      | `useNetworkStatus`, StatusIndicator                 | Toggle airplane mode, verify indicator color changes            |
-| AC12 | Offline Resilience  | TanStack Query cache, Network Monitor               | Disconnect network, verify cached data shows with stale marker  |
-| AC13 | Performance         | Root layout, minimal bundle                         | Profile with Performance Monitor, measure time to interactive   |
-| AC14 | Session Management  | Supabase client auto-refresh                        | Wait for token expiration, verify seamless refresh              |
-| AC15 | Error Handling      | Error utilities, toast components                   | Trigger network error, verify friendly message displayed        |
+### FR → Epic 1 Story Mapping
+
+| Functional Requirement | Description                                      | Story | Acceptance Criteria        |
+| ---------------------- | ------------------------------------------------ | ----- | -------------------------- |
+| **FR1**                | Users shall authenticate via Supabase magic link | 1.3   | AC1.3.1-1.3.8              |
+| **FR2**                | Sessions shall persist across browser restarts   | 1.4   | AC1.4.1-1.4.2              |
+| **FR3**                | Logout shall clear session and redirect          | 1.4   | AC1.4.3-1.4.4              |
+| **FR4**                | Auth errors shall provide clear feedback         | 1.3   | AC1.3.2 (email validation) |
+| **FR60**               | App shall be installable as PWA                  | 1.1   | AC1.1.5-1.1.6              |
+| **FR61**               | App shall be responsive 320px-1920px             | 1.1   | (Implicit in build pass)   |
+| **FR62**               | Preferences shall persist locally                | 1.2   | AC1.2.5-1.2.6              |
+| **FR63**               | App shall detect network status                  | 1.5   | AC1.5.1-1.5.7              |
+| **FR64**               | Offline mode shall show cached UI                | 1.5   | AC1.5.5-1.5.6              |
+| **FR65**               | Auto-reconnect shall sync data                   | 1.5   | AC1.5.4 (detection only)   |
+
+### NFR → Epic 1 Validation Mapping
+
+| Non-Functional Requirement | Description                | Story | Validation Method                  |
+| -------------------------- | -------------------------- | ----- | ---------------------------------- |
+| **NFR-P1**                 | Load time < 3s on 3G       | 1.1   | Lighthouse audit baseline          |
+| **NFR-P2**                 | Bundle size optimized      | 1.1   | AC1.1.8: < 500KB target            |
+| **NFR-S1**                 | Secure auth implementation | 1.3   | Magic link + CSRF protection       |
+| **NFR-S2**                 | Data encrypted in transit  | 1.2   | Supabase HTTPS default             |
+| **NFR-I1**                 | Online-first architecture  | 1.5   | AC1.5.5-1.5.6 graceful degradation |
+| **NFR-I2**                 | Graceful reconnection      | 1.5   | AC1.5.4 recovery detection         |
+
+### Epic 1 → Epic 2 Handoff Requirements
+
+| Epic 1 Output     | Epic 2 Dependency           | Handoff Validation |
+| ----------------- | --------------------------- | ------------------ |
+| Build passes      | Can add new modules         | AC1.1.4            |
+| Supabase connects | Can create tables           | AC1.2.4            |
+| Auth works        | Can query with auth context | AC1.3.8            |
+| Session persists  | Can test RLS policies       | AC1.4.1            |
+| Network status    | Can implement sync logic    | AC1.5.1-1.5.4      |
 
 ## Risks, Assumptions, Open Questions
 
-**Risks:**
+### Risks
 
-1. **RISK: Magic Link Deep Linking Failure in Production Builds** (MEDIUM)
-   - Risk: Deep linking may behave differently in TestFlight/production vs development
-   - Mitigation: Test auth flow in TestFlight builds early, document exact app.json configuration, use Expo Router's built-in deep link handling
-   - Contingency: Provide manual token entry fallback
+| Risk ID | Risk                                                                                                  | Probability | Impact   | Mitigation                                                                      | Owner |
+| ------- | ----------------------------------------------------------------------------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------- | ----- |
+| R1      | **React 19 instability** - Very new release (Dec 2024), may have undiscovered issues                  | Medium      | High     | Monitor React GitHub issues, have fallback to 18.x if critical bugs found       | Dev   |
+| R2      | **Magic link redirect fails on GitHub Pages** - Hash routing may conflict with Supabase token parsing | High        | Critical | Test on production domain BEFORE marking Story 1.3 done, verify BASE_URL config | Dev   |
+| R3      | **RLS policies don't exist** - Database tables may not have policies configured                       | Medium      | High     | Test query first (Story 1.2), if missing, escalate to architecture review       | Dev   |
+| R4      | **Safari localStorage quota** - Safari has 5MB limit, may block session persistence                   | Medium      | Medium   | Implement quota check in Story 1.4, document fallback strategy                  | Dev   |
+| R5      | **Service worker caches auth tokens** - Stale tokens cause auth failures                              | Medium      | Critical | Configure network-first for API routes, cache-first ONLY for static assets      | Dev   |
+| R6      | **GitHub Pages deployment breaks** - Incorrect base path or GitHub Actions failure                    | Medium      | High     | Test deployment pipeline explicitly in Story 1.1, document manual fallback      | Dev   |
+| R7      | **Supabase free tier limits** - 2 concurrent realtime connections may cause issues                    | Low         | Medium   | Acceptable for 2-user app, monitor usage                                        | User  |
 
-2. **RISK: SecureStore Limitations on Older Devices** (LOW)
-   - Risk: SecureStore may not work correctly on minimum supported devices (iOS 15.0, Android 10)
-   - Mitigation: Test on minimum target devices, implement fallback to encrypted AsyncStorage if needed
-   - Contingency: Graceful degradation with security warning
+### Assumptions
 
-3. **RISK: TanStack Query Cache Invalidation Complexity** (MEDIUM)
-   - Risk: Improper cache invalidation may cause stale data issues
-   - Mitigation: Establish clear query key conventions from start, document invalidation patterns
-   - Contingency: Conservative cache settings initially, tune based on testing
+1. **A1: Supabase project exists** - A Supabase project with valid URL and anon key is already created
+2. **A2: GitHub repo exists** - Repository is already set up with GitHub Pages enabled
+3. **A3: Brownfield codebase** - Existing code structure follows React + Vite conventions
+4. **A4: Single developer** - Frank is working alone (no partner testing required)
+5. **A5: Modern browsers only** - Support limited to Chrome 90+, Firefox 90+, Safari 15+, Edge 90+
+6. **A6: Online-first architecture** - App requires network for most operations (not offline-first sync)
+7. **A7: Free tier sufficient** - Supabase and GitHub Pages free tiers meet performance needs
+8. **A8: Email delivery works** - Supabase sends magic link emails without significant delay
 
-**Assumptions:**
+**If assumptions are invalid:**
 
-- **A1:** Supabase project is already configured with Auth enabled and magic link support
-- **A2:** User profiles table exists in Supabase with partner_id relationship established
-- **A3:** Both partners have already been paired in existing web PWA (no pairing flow needed)
-- **A4:** Network connectivity is generally available (online-first architecture acceptable)
-- **A5:** Developer has Node.js 20+, npm 10+, and Expo CLI installed
-- **A6:** EAS CLI access configured for future builds (not required for Epic 1)
+- A1 invalid → Story 1.2 blocked, need to create Supabase project first
+- A2 invalid → Story 1.1 blocked for deployment, need repo setup
+- A3 invalid → Story 1.1 scope expands significantly (major restructuring)
+- A5 invalid → Need polyfills, scope expansion
+- A8 invalid → Investigate Supabase email provider settings
 
-**Open Questions:**
+### Open Questions
 
-1. **Q1:** Should session timeout be configurable or fixed at 30 days?
-   - Current: Fixed at 30 days per NFR-S6
-   - Alternative: User preference in settings
-
-2. **Q2:** What is the exact relationship schema for partner_id in user_metadata vs separate table?
-   - Current: Assume user_metadata.partner_id
-   - Need: Confirm with existing Supabase schema
-
-3. **Q3:** Should network status banner be dismissible or always visible when offline?
-   - Current: Always visible when offline
-   - Alternative: Dismissible with persistent indicator
+| ID  | Question                                               | Impact               | Decision Needed By      | Default Answer                                               |
+| --- | ------------------------------------------------------ | -------------------- | ----------------------- | ------------------------------------------------------------ |
+| Q1  | Does the PWA already have a service worker configured? | Story 1.1 scope      | Before Story 1.1 starts | Assume NO, will create if missing                            |
+| Q2  | Are there existing Zustand stores with persistence?    | Story 1.2 validation | Before Story 1.2 starts | Assume NO, will configure if missing                         |
+| Q3  | Is there an existing login page?                       | Story 1.3 scope      | Before Story 1.3 starts | Assume NO, will create minimal login UI                      |
+| Q4  | Does network status detection already exist?           | Story 1.5 scope      | Before Story 1.5 starts | Assume NO, document gap OR implement basic version           |
+| Q5  | What tables exist in Supabase for RLS testing?         | Story 1.2 validation | During Story 1.2        | Use any authenticated table, create test table if none exist |
+| Q6  | Is GitHub Actions or manual deploy used?               | Story 1.1 deployment | Before Story 1.1 starts | Assume manual branch push, verify in GitHub Settings         |
 
 ## Test Strategy Summary
 
-**Test Levels:**
+### Testing Approach by Story
 
-1. **Unit Tests** (Jest + React Native Testing Library)
-   - Auth hook state management
-   - Network status detection logic
-   - Theme token application
-   - MMKV storage wrapper functions
-   - Date/validation utilities
+**Story 1.1: Codebase Audit**
 
-2. **Integration Tests**
-   - Provider composition (Auth + Query + Theme)
-   - Supabase client initialization
-   - Deep link routing with Expo Router
-   - SecureStore token persistence
+- **Type:** Static analysis + build validation
+- **Tools:** npm audit, tsc, eslint, vite build
+- **Automation:** CI/CD pipeline validates on every commit
+- **Manual:** Lighthouse audit, PWA inspection in DevTools
 
-3. **E2E Tests** (Detox or Maestro)
-   - Complete magic link flow (simulated)
-   - Session persistence across app restart
-   - Logout flow clearing all state
-   - Network status indicator transitions
+**Story 1.2: Supabase Configuration**
 
-4. **Manual Testing Checklist**
-   - [ ] Magic link email delivery
-   - [ ] Deep link interception on iOS/Android
-   - [ ] Session restore after 24+ hours
-   - [ ] Logout clears credentials but retains preferences
-   - [ ] Offline indicator accurate with airplane mode
-   - [ ] Cold start < 2 seconds on physical device
-   - [ ] Warm start < 500ms
+- **Type:** Integration testing
+- **Tools:** Manual browser testing, console inspection
+- **Automation:** Vitest unit tests for environment variable loading
+- **Manual:** Query Supabase table, verify RLS response
 
-**Coverage Targets:**
+**Story 1.3: Magic Link Auth**
 
-- Unit tests: 80%+ coverage on utils, hooks, providers
-- Integration tests: All critical user paths (auth, session, network)
-- E2E tests: Core happy paths (login, persist, logout)
+- **Type:** End-to-end testing
+- **Tools:** Playwright (if time permits), manual browser testing
+- **Automation:** Playwright script for auth flow (optional for Epic 1)
+- **Manual:** Complete magic link flow on production domain
 
-**Test Frameworks:**
+**Story 1.4: Session Management**
 
-- Jest for unit testing
-- React Native Testing Library for component tests
-- Detox or Maestro for E2E (future story if needed)
+- **Type:** Functional testing + persistence verification
+- **Tools:** Manual browser testing, DevTools Application tab
+- **Automation:** Vitest tests for Zustand store persistence
+- **Manual:** Close/reopen browser, verify session restored
 
----
+**Story 1.5: Network Resilience**
 
-_Generated by BMAD Epic Tech Context Workflow_
-_Date: 2025-11-16_
-_Epic: Foundation & Authentication (Epic 1)_
-_Status: Ready for Implementation_
+- **Type:** Behavioral testing
+- **Tools:** Browser DevTools Network throttling, airplane mode toggle
+- **Automation:** Difficult to automate network toggle reliably
+- **Manual:** Toggle network on/off, verify UI response
+
+### Test Coverage Requirements
+
+**Minimum for Epic 1 Completion:**
+
+- All acceptance criteria manually validated ✅
+- Screenshots/logs captured as evidence ✅
+- Baseline metrics documented ✅
+
+**Ideal (if time permits):**
+
+- Vitest unit tests for utility functions (env vars, store persistence)
+- Playwright E2E test for magic link flow
+- Automated Lighthouse CI in GitHub Actions
+
+### Test Environment Setup
+
+**Local Development:**
+
+```bash
+npm run dev          # Vite dev server on :5173
+npm run test         # Vitest unit tests
+npm run test:e2e     # Playwright E2E tests (if configured)
+npm run lint         # ESLint validation
+npm run typecheck    # TypeScript validation
+```
+
+**Production Validation:**
+
+- Deploy to GitHub Pages
+- Test magic link with production redirect URL
+- Verify service worker activation in DevTools
+- Run Lighthouse audit on deployed site
+
+### Definition of Done (DoD) for Epic 1
+
+- [ ] All Stories 1.1-1.5 acceptance criteria pass
+- [ ] Zero TypeScript errors, zero ESLint errors
+- [ ] Zero npm audit critical/high vulnerabilities (or documented)
+- [ ] GitHub Pages deployment successful
+- [ ] Baseline metrics captured and documented
+- [ ] Technical debt items documented (if any)
+- [ ] Sprint status updated: Epic 1 → contexted
+- [ ] Ready for Epic 2: Core Data Models
+
+### Test Evidence Artifacts
+
+| Story | Evidence Required                                                         |
+| ----- | ------------------------------------------------------------------------- |
+| 1.1   | Screenshot of npm audit output, Lighthouse report PDF, bundle size report |
+| 1.2   | Console log of successful Supabase connection, localStorage inspection    |
+| 1.3   | Video or screenshot sequence of magic link flow completing                |
+| 1.4   | Screenshot of session persisting after browser restart                    |
+| 1.5   | Video of network toggle showing UI status change (or gap documentation)   |
+
+These artifacts should be stored in `docs/sprint-artifacts/epic-1-evidence/` folder.

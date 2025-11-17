@@ -1,11 +1,8 @@
 {
   "mcpServers": {
-    "code-executor": {
-      "command": "npx",
-      "args": ["-y", "code-executor-mcp"],
-      "env": {
-        "DENO_PATH": "/home/sallvain/.deno/bin/deno"
-      }
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=vdltoyxpujbsaidctzjb"
     }
   }
 }
