@@ -40,6 +40,16 @@ story_location: docs/sprint-artifacts
 # for PWA focus. Ready for Epic 1 contexting and Story 1.1 implementation.
 
 development_status:
+  # Epic 0: Deployment & Backend Infrastructure Setup
+  # NOTE: TRUE foundation - creates deployment pipeline and backend connection FIRST
+  epic-0: backlog # Deployment infrastructure must exist before audit
+  0-1-github-actions-deployment-pipeline: backlog # NEW: GitHub Actions + GitHub Pages deployment
+  0-2-environment-variables-secrets-management: backlog # NEW: Vite env vars + GitHub Secrets
+  0-3-supabase-project-initialization-connection: backlog # NEW: Supabase project setup + connection
+  0-4-production-deployment-validation: backlog # NEW: E2E deployment validation
+  0-5-deployment-monitoring-rollback-strategy: backlog # OPTIONAL: Health checks + rollback
+  epic-0-retrospective: optional
+
   # Epic 1: PWA Foundation Audit & Stabilization
   # NOTE: Epics rewritten for PWA audit/bug fixes approach - ready for contexting
   epic-1: contexted # Tech spec created 2025-11-17
