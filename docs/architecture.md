@@ -1,903 +1,1113 @@
-# Architecture
+# My-Love Mobile Architecture
 
 ## Executive Summary
 
-**My Love** is a production-ready Progressive Web Application (PWA) built as a multi-user platform for couples to share daily love messages, photos, moods, and spontaneous interactions. The application employs a component-based single-page architecture powered by React 19, with offline-first capabilities through IndexedDB and service workers, synchronized multi-user state via Supabase backend, and comprehensive end-to-end testing infrastructure.
+This architecture document defines the technical decisions for **My-Love Mobile**, a React Native + Expo mobile application that transforms the existing My-Love web PWA into a native mobile experience for iOS and Android. The architecture leverages Expo's managed workflow with SDK 54, Supabase for backend services (Auth, Database, Realtime, Storage), and TanStack Query for efficient server state management.
 
-**Core Architecture Pattern**: Multi-user SPA with Supabase real-time backend, offline-first data persistence, and authenticated user sessions.
-
-**Project Maturity**: All 6 epics implemented (34 stories complete) - Foundation, Testing Infrastructure, Enhanced Messages, Photo Gallery, Code Quality, and Interactive Connection features are production-ready.
+The core architectural approach is **online-first with smart caching** - prioritizing native performance and real-time capabilities over offline-first complexity. This decision aligns with the two-person intimate scale of the application and the user's expectation of reliable network connectivity.
 
 ## Project Initialization
 
-This project was initialized using Vite's React-TypeScript template:
+**First implementation story should execute:**
 
 ```bash
-npm create vite@latest my-love -- --template react-ts
+npx create-expo-app@latest my-love-mobile --template blank-typescript
 ```
 
-Additional core dependencies installed:
+This establishes the base architecture with:
+
+- TypeScript support (type safety across codebase)
+- Expo SDK 54 managed workflow
+- Expo Router (file-based navigation)
+- Metro bundler configuration
+- Basic project structure
+
+**Post-initialization setup (same story):**
 
 ```bash
-npm install zustand framer-motion idb @supabase/supabase-js
-npm install -D tailwindcss postcss autoprefixer @playwright/test vitest
+cd my-love-mobile
+npx expo install expo-router expo-notifications expo-linking expo-secure-store expo-haptics expo-image-picker
+npm install @supabase/supabase-js @tanstack/react-query react-native-mmkv react-native-paper react-native-safe-area-context
 ```
 
 ## Decision Summary
 
-| Category             | Decision        | Version  | Affects Epics | Rationale                                                           |
-| -------------------- | --------------- | -------- | ------------- | ------------------------------------------------------------------- |
-| **UI Framework**     | React           | 19.1.1   | All           | Component-based architecture, strong ecosystem, concurrent features |
-| **Language**         | TypeScript      | 5.9.3    | All           | Type safety, better DX, catch errors at compile time                |
-| **Build Tool**       | Vite            | 7.1.7    | All           | Fast dev server, optimized builds, native ESM                       |
-| **State Management** | Zustand         | 5.0.8    | All           | Simple API, persistence middleware, excellent TypeScript support    |
-| **Styling**          | Tailwind CSS    | 3.4.18   | All           | Utility-first, custom themes, rapid development                     |
-| **Animations**       | Framer Motion   | 12.23.24 | 1,3,4,6       | Declarative animations, spring physics, gesture support             |
-| **Backend**          | Supabase        | 2.81.1   | 6             | Real-time sync, authentication, PostgreSQL, Row Level Security      |
-| **Local Data**       | IndexedDB (idb) | 8.0.3    | 1,3,4         | Large storage capacity, async API, offline support                  |
-| **PWA**              | vite-plugin-pwa | 0.21.3   | All           | Service worker generation, manifest, offline functionality          |
-| **Testing (E2E)**    | Playwright      | 1.56.1   | 2             | Multi-browser support, PWA testing, reliable automation             |
-| **Testing (Unit)**   | Vitest          | 4.0.9    | 5             | Fast, Vite-native, excellent TypeScript support                     |
-| **Validation**       | Zod             | 3.25.76  | 5,6           | Runtime type checking, schema validation, TypeScript inference      |
-| **Icons**            | Lucide React    | 0.548.0  | All           | Consistent icon set, tree-shakeable, customizable                   |
-| **Deployment**       | Vercel          | -        | All           | Zero-config hosting, edge network, automatic deployments            |
+| Category        | Decision            | Version            | Affects FR Categories                 | Rationale                                            |
+| --------------- | ------------------- | ------------------ | ------------------------------------- | ---------------------------------------------------- |
+| Framework       | React Native + Expo | SDK 54 / RN 0.81   | All FRs                               | Managed workflow, cross-platform, native performance |
+| Language        | TypeScript          | 5.x (Expo default) | All FRs                               | Type safety, IDE support, maintainability            |
+| Navigation      | Expo Router         | ^4.0.0             | FR4, FR18, FR59                       | File-based routing, deep linking support             |
+| Backend         | Supabase            | 2.79+              | FR1-6, FR7-13, FR22-28, FR29-35, FR65 | Auth, Database, Realtime, Storage in one platform    |
+| Server State    | TanStack Query      | 5.90.9             | FR7-13, FR22-28, FR55-59, FR63        | Caching, optimistic updates, background sync         |
+| Local Storage   | MMKV                | v4.x               | FR48-54, FR62                         | Fast key-value storage, preferences persistence      |
+| UI Framework    | React Native Paper  | 5.x                | All UI FRs                            | Material Design 3, accessibility, theming            |
+| Notifications   | Expo Notifications  | 0.32.12            | FR14-21                               | Push + local notifications, unified API              |
+| Authentication  | Supabase Auth       | 2.79+              | FR1-6                                 | Magic link, session management, deep linking         |
+| Real-time       | Supabase Realtime   | 2.79+              | FR8-9, FR15                           | WebSocket subscriptions for Love Notes               |
+| File Storage    | Supabase Storage    | 2.79+              | FR29-35                               | Photo uploads with RLS policies                      |
+| Haptic Feedback | Expo Haptics        | SDK 54 included    | FR13, FR27, FR43                      | Native haptic patterns                               |
+| Image Handling  | Expo Image Picker   | SDK 54 included    | FR29-35                               | Gallery selection, compression                       |
+| Secure Storage  | Expo SecureStore    | SDK 54 included    | NFR-S1, FR5                           | Keychain/Keystore for tokens                         |
 
 ## Project Structure
 
 ```
-my-love/
+my-love-mobile/
+├── app/                              # Expo Router file-based routing
+│   ├── _layout.tsx                   # Root layout with providers
+│   ├── index.tsx                     # Home/Dashboard screen
+│   ├── (auth)/                       # Auth group (unauthenticated)
+│   │   ├── _layout.tsx
+│   │   ├── login.tsx                 # Magic link login
+│   │   └── verify.tsx                # Magic link verification
+│   ├── (tabs)/                       # Main tab navigation
+│   │   ├── _layout.tsx               # Bottom tab navigator
+│   │   ├── home.tsx                  # Dashboard/Feature Hub
+│   │   ├── notes.tsx                 # Love Notes chat
+│   │   ├── mood.tsx                  # Mood tracker
+│   │   └── settings.tsx              # Settings & preferences
+│   ├── photos/                       # Photo gallery screens
+│   │   ├── index.tsx                 # Gallery grid view
+│   │   └── [id].tsx                  # Full-screen photo viewer
+│   ├── message.tsx                   # Daily love message display
+│   └── +not-found.tsx                # 404 handler
 ├── src/
-│   ├── components/          # React components (25+ components)
-│   │   ├── AdminPanel/      # Custom message management interface
-│   │   ├── CountdownTimer/  # Anniversary countdown display
-│   │   ├── DailyMessage/    # Main message card with animations
-│   │   ├── DisplayNameSetup/# Partner display name configuration
-│   │   ├── ErrorBoundary/   # Graceful error handling
-│   │   ├── InteractionHistory/ # Poke/kiss interaction log
-│   │   ├── Layout/          # Shared layout components
-│   │   ├── LoginScreen/     # Supabase authentication UI
-│   │   ├── MoodHistory/     # Calendar view of mood entries
-│   │   ├── MoodTracker/     # Daily mood logging interface
-│   │   ├── Navigation/      # Top navigation bar
-│   │   ├── PartnerMoodView/ # View partner's mood history
-│   │   ├── PhotoCarousel/   # Full-screen photo lightbox
-│   │   ├── PhotoDeleteConfirmation/ # Delete confirmation modal
-│   │   ├── PhotoEditModal/  # Photo caption/tag editor
-│   │   ├── PhotoGallery/    # Grid view of uploaded photos
-│   │   ├── PhotoMemory/     # Photo feature integration
-│   │   ├── PhotoUpload/     # Photo upload interface
-│   │   ├── PokeKissInterface/ # Poke/kiss interaction buttons
-│   │   ├── Settings/        # App configuration panel
-│   │   ├── WelcomeButton/   # Landing page CTA
-│   │   └── WelcomeSplash/   # Landing screen for new users
-│   ├── stores/              # Zustand state management
-│   │   ├── slices/          # Feature-specific state slices
-│   │   │   ├── messagesSlice.ts    # Message state and rotation
-│   │   │   ├── photosSlice.ts      # Photo gallery state
-│   │   │   ├── settingsSlice.ts    # User preferences
-│   │   │   ├── moodSlice.ts        # Mood tracking state
-│   │   │   ├── partnerSlice.ts     # Partner data state
-│   │   │   ├── interactionsSlice.ts # Poke/kiss state
-│   │   │   └── navigationSlice.ts   # Navigation state
-│   │   └── useAppStore.ts   # Combined store with persistence
-│   ├── services/            # Data persistence layer
-│   │   ├── BaseIndexedDBService.ts  # Generic CRUD operations
-│   │   ├── customMessageService.ts  # Message persistence
-│   │   ├── photoStorageService.ts   # Photo persistence
-│   │   └── supabaseService.ts       # Backend API integration
-│   ├── api/                 # Backend integration
-│   │   └── supabaseClient.ts # Supabase client singleton
-│   ├── validation/          # Input validation layer
-│   │   ├── schemas.ts       # Zod validation schemas
-│   │   ├── errorMessages.ts # User-friendly error messages
-│   │   └── index.ts         # Validation exports
-│   ├── config/              # Configuration
-│   │   ├── constants.ts     # Pre-configured relationship data
-│   │   └── performance.ts   # Performance optimization config
-│   ├── utils/               # Utility functions
-│   │   ├── themes.ts        # Theme definitions
-│   │   ├── storageMonitor.ts # Storage quota monitoring
-│   │   └── interactionValidation.ts # Interaction helpers
-│   ├── types/               # TypeScript type definitions
-│   │   ├── index.ts         # Core type definitions
-│   │   └── database.types.ts # Supabase generated types
-│   ├── constants/           # Application constants
-│   │   └── animations.ts    # Framer Motion animation configs
-│   ├── App.tsx              # Root component
-│   └── main.tsx             # Application entry point
-├── tests/                   # Testing infrastructure
-│   ├── e2e/                 # Playwright end-to-end tests
-│   └── unit/                # Vitest unit tests
-├── public/                  # Static assets
-│   └── icons/               # PWA icons
-├── docs/                    # Project documentation
-│   ├── PRD.md               # Product Requirements Document
-│   ├── epics.md             # Epic and story breakdown
-│   ├── architecture.md      # This file
-│   └── index.md             # Documentation index
-├── vite.config.ts           # Vite build configuration
-├── playwright.config.ts     # Playwright test configuration
-├── vitest.config.ts         # Vitest test configuration
-├── tailwind.config.js       # Tailwind CSS configuration
-└── package.json             # Dependencies and scripts
+│   ├── components/
+│   │   ├── core/                     # Base themed components
+│   │   │   ├── ThemedButton.tsx
+│   │   │   ├── ThemedCard.tsx
+│   │   │   ├── ThemedInput.tsx
+│   │   │   └── LoadingSpinner.tsx
+│   │   ├── love-notes/
+│   │   │   ├── LoveNoteMessage.tsx
+│   │   │   ├── MessageList.tsx
+│   │   │   └── MessageInput.tsx
+│   │   ├── mood/
+│   │   │   ├── MoodEmojiPicker.tsx
+│   │   │   ├── MoodHistoryItem.tsx
+│   │   │   └── PartnerMoodDisplay.tsx
+│   │   ├── photos/
+│   │   │   ├── PhotoThumbnail.tsx
+│   │   │   ├── PhotoViewer.tsx
+│   │   │   └── PhotoUploader.tsx
+│   │   └── shared/
+│   │       ├── DaysTogetherCounter.tsx
+│   │       ├── FeatureListItem.tsx
+│   │       ├── NotificationBadge.tsx
+│   │       └── StatusIndicator.tsx
+│   ├── hooks/
+│   │   ├── useAuth.ts                # Supabase auth hook
+│   │   ├── useLoveNotes.ts           # Love Notes query hook
+│   │   ├── useMood.ts                # Mood tracking hook
+│   │   ├── usePhotos.ts              # Photo gallery hook
+│   │   ├── useNotifications.ts       # Push notification hook
+│   │   ├── usePartner.ts             # Partner data hook
+│   │   └── useHaptics.ts             # Haptic feedback hook
+│   ├── lib/
+│   │   ├── supabase.ts               # Supabase client configuration
+│   │   ├── queryClient.ts            # TanStack Query client
+│   │   ├── storage.ts                # MMKV storage wrapper
+│   │   └── notifications.ts          # Notification handlers
+│   ├── providers/
+│   │   ├── AuthProvider.tsx          # Auth context provider
+│   │   ├── QueryProvider.tsx         # TanStack Query provider
+│   │   └── ThemeProvider.tsx         # React Native Paper theming
+│   ├── theme/
+│   │   ├── tokens.ts                 # Design tokens (colors, spacing)
+│   │   ├── paperTheme.ts             # RN Paper theme configuration
+│   │   └── breakpoints.ts            # Responsive breakpoints
+│   ├── types/
+│   │   ├── database.ts               # Supabase generated types
+│   │   ├── navigation.ts             # Route parameter types
+│   │   └── models.ts                 # Domain model types
+│   └── utils/
+│       ├── date.ts                   # Date formatting utilities
+│       ├── validation.ts             # Input validation
+│       └── compression.ts            # Image compression
+├── assets/
+│   ├── images/                       # Static images
+│   ├── fonts/                        # Custom fonts (if needed)
+│   └── sounds/                       # Notification sounds (optional)
+├── __tests__/                        # Test files mirror src structure
+│   ├── components/
+│   ├── hooks/
+│   └── utils/
+├── app.json                          # Expo configuration
+├── eas.json                          # EAS Build configuration
+├── tsconfig.json                     # TypeScript configuration
+├── babel.config.js                   # Babel configuration
+├── metro.config.js                   # Metro bundler configuration
+├── package.json
+└── README.md
 ```
 
-## Epic to Architecture Mapping
+## FR Category to Architecture Mapping
 
-| Epic                               | Components                                                                                                                      | State Slices                               | Services             | Backend Tables             |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------- | -------------------------- |
-| **Epic 1: Foundation**             | ErrorBoundary, DailyMessage, Settings                                                                                           | settingsSlice, messagesSlice               | BaseIndexedDBService | -                          |
-| **Epic 2: Testing**                | -                                                                                                                               | -                                          | -                    | -                          |
-| **Epic 3: Enhanced Messages**      | AdminPanel, CustomNotes                                                                                                         | messagesSlice                              | customMessageService | -                          |
-| **Epic 4: Photo Gallery**          | PhotoGallery, PhotoCarousel, PhotoUpload, PhotoEditModal, PhotoDeleteConfirmation                                               | photosSlice                                | photoStorageService  | -                          |
-| **Epic 5: Code Quality**           | -                                                                                                                               | All slices (refactored)                    | BaseIndexedDBService | -                          |
-| **Epic 6: Interactive Connection** | MoodTracker, MoodHistory, PartnerMoodView, PokeKissInterface, InteractionHistory, CountdownTimer, LoginScreen, DisplayNameSetup | moodSlice, partnerSlice, interactionsSlice | supabaseService      | moods, interactions, users |
+| FR Category                               | Architecture Components                                                                         | Key Technologies                                    |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **User Account & Authentication** (FR1-6) | `app/(auth)/*`, `src/hooks/useAuth.ts`, `src/lib/supabase.ts`, `src/providers/AuthProvider.tsx` | Supabase Auth, Expo Linking, SecureStore            |
+| **Love Notes** (FR7-13)                   | `app/(tabs)/notes.tsx`, `src/components/love-notes/*`, `src/hooks/useLoveNotes.ts`              | Supabase Realtime, TanStack Query, Expo Haptics     |
+| **Push Notifications** (FR14-21)          | `src/lib/notifications.ts`, `src/hooks/useNotifications.ts`, `app/_layout.tsx`                  | Expo Notifications, Supabase Edge Functions         |
+| **Mood Tracking** (FR22-28)               | `app/(tabs)/mood.tsx`, `src/components/mood/*`, `src/hooks/useMood.ts`                          | Supabase Database, TanStack Query, Expo Haptics     |
+| **Photo Gallery** (FR29-35)               | `app/photos/*`, `src/components/photos/*`, `src/hooks/usePhotos.ts`                             | Supabase Storage, Expo Image Picker, TanStack Query |
+| **Daily Love Messages** (FR36-39)         | `app/message.tsx`, `src/hooks/useDailyMessage.ts`                                               | Supabase Database, Expo Notifications               |
+| **Partner Interactions** (FR40-44)        | `src/hooks/usePartner.ts`, `src/components/shared/*`                                            | Supabase Database, Expo Haptics                     |
+| **Anniversary & Milestones** (FR45-47)    | `src/components/shared/DaysTogetherCounter.tsx`, `src/hooks/usePartner.ts`                      | Supabase Database, Expo Notifications               |
+| **Settings & Preferences** (FR48-54)      | `app/(tabs)/settings.tsx`, `src/lib/storage.ts`, `src/providers/ThemeProvider.tsx`              | MMKV, React Native Paper                            |
+| **Dashboard & Overview** (FR55-59)        | `app/(tabs)/home.tsx`, `src/components/shared/*`                                                | TanStack Query (aggregated queries)                 |
+| **Technical Platform** (FR60-65)          | `app.json`, `eas.json`, `src/lib/*`, `src/providers/*`                                          | Expo SDK 54, Supabase RLS                           |
 
 ## Technology Stack Details
 
 ### Core Technologies
 
-**Frontend Framework:**
+**React Native + Expo SDK 54**
 
-- React 19.1.1 with concurrent features
-- TypeScript 5.9.3 strict mode
-- Vite 7.1.7 for build tooling
+- Managed workflow (no native code ejection needed)
+- React Native 0.81 (latest stable)
+- Metro bundler with tree-shaking
+- EAS Build for production builds
+- EAS Submit for App Store/Google Play deployment
 
-**State Management:**
+**Supabase Backend (Self-contained platform)**
 
-- Zustand 5.0.8 with feature slices
-- Persist middleware for LocalStorage sync
-- 7 specialized state slices for domain separation
+- **Auth**: Magic link passwordless authentication
+- **Database**: PostgreSQL with Row Level Security (RLS)
+- **Realtime**: WebSocket subscriptions for Love Notes
+- **Storage**: Photo uploads with access policies
+- **Edge Functions**: Scheduled notifications (cron jobs)
 
-**Backend & Sync:**
+**TanStack Query v5**
 
-- Supabase 2.81.1 (PostgreSQL + Real-time + Auth)
-- Row Level Security for data isolation
-- Real-time subscriptions for mood/interaction sync
+- Server state management
+- Automatic caching with stale-while-revalidate
+- Optimistic updates for instant UI feedback
+- Background refetch on app focus
+- Query invalidation on mutations
 
-**Data Persistence:**
+**React Native Paper v5**
 
-- IndexedDB via idb 8.0.3 (photos, messages)
-- LocalStorage for Zustand state persistence
-- Supabase PostgreSQL for synced data (moods, interactions, users)
-
-**Styling & Animations:**
-
-- Tailwind CSS 3.4.18 with custom theme system
-- Framer Motion 12.23.24 for declarative animations
-- 4 pre-built themes (Sunset Bliss, Ocean Dreams, Lavender Fields, Rose Garden)
-
-**Testing:**
-
-- Playwright 1.56.1 for E2E testing (Epic 2)
-- Vitest 4.0.9 for unit testing (Epic 5)
-- @testing-library/react 16.1.0 for component testing
-- fake-indexeddb 6.2.5 for testing IndexedDB operations
-
-**Validation & Quality:**
-
-- Zod 3.25.76 for runtime validation
-- ESLint + TypeScript ESLint for code quality
-- Prettier 3.6.2 for code formatting
+- Material Design 3 component library
+- Full theming support (Coral Heart theme)
+- Accessibility defaults (WCAG AA compliant)
+- Dark mode support
+- TypeScript support
 
 ### Integration Points
 
-**Supabase Backend:**
+**Authentication Flow:**
 
-- Authentication: Email/password via Supabase Auth
-- Database: PostgreSQL with Row Level Security
-- Real-time: WebSocket subscriptions for live updates
-- API: RESTful via @supabase/supabase-js client
+```
+User → Login Screen → Supabase Magic Link → Email → Deep Link → App → Verify Token → Home Screen
+```
 
-**IndexedDB:**
+**Love Notes Real-time Flow:**
 
-- Photos: Blob storage with metadata (caption, tags, uploadDate)
-- Messages: Custom messages with category and active status
+```
+User Sends → Optimistic UI Update → Supabase Insert → Realtime Broadcast → Partner Receives → Push Notification
+```
 
-**LocalStorage:**
+**Data Synchronization:**
 
-- Zustand state persistence (settings, favorites, message history)
-- Authentication session storage
+```
+App Focus → TanStack Query Refetch → Supabase Queries → Cache Update → UI Re-render
+```
+
+**Push Notification Flow:**
+
+```
+Supabase Edge Function (cron) → Expo Push Service → APNs/FCM → Device → Deep Link Handler → Screen Navigation
+```
 
 ## Implementation Patterns
 
-### Naming Conventions
+These patterns ensure consistent implementation across all AI agents:
 
-**Components:**
-
-- PascalCase for component names: `DailyMessage`, `PhotoGallery`
-- PascalCase for component files: `DailyMessage.tsx`
-
-**State Slices:**
-
-- camelCase with "Slice" suffix: `messagesSlice.ts`, `photosSlice.ts`
-
-**Services:**
-
-- camelCase with "Service" suffix: `customMessageService.ts`
-- Singleton exports: `export const customMessageService = new CustomMessageService()`
-
-**Database Tables:**
-
-- snake_case: `moods`, `interactions`, `users`
-
-**Database Columns:**
-
-- snake_case: `user_id`, `mood_type`, `created_at`
-
-**TypeScript Interfaces:**
-
-- PascalCase: `Message`, `Photo`, `MoodEntry`
-
-### Code Organization
-
-**Component Structure:**
+### API Response Pattern
 
 ```typescript
-// Component file structure
-import React from 'react';
-import { motion } from 'framer-motion';
-import { useAppStore } from '@/stores/useAppStore';
-
-interface ComponentProps {
-  // Props interface
+// Standard API response wrapper
+interface ApiResponse<T> {
+  data: T | null;
+  error: PostgrestError | null;
 }
 
-export const Component: React.FC<ComponentProps> = ({ props }) => {
-  // Hooks
-  const stateValue = useAppStore(state => state.value);
+// Usage in hooks
+const { data, error } = await supabase
+  .from('love_notes')
+  .select('*')
+  .order('created_at', { ascending: false });
+```
 
-  // Event handlers
-  const handleAction = () => {
-    // Implementation
+### TanStack Query Pattern
+
+```typescript
+// Query key factory
+export const queryKeys = {
+  loveNotes: ['love-notes'] as const,
+  moods: ['moods'] as const,
+  partnerMood: ['partner', 'mood'] as const,
+  photos: ['photos'] as const,
+  dailyMessage: ['daily-message'] as const,
+};
+
+// Query hook pattern
+export const useLoveNotes = () => {
+  return useQuery({
+    queryKey: queryKeys.loveNotes,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('love_notes')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 0, // Always consider stale for real-time data
+    refetchOnWindowFocus: true,
+  });
+};
+
+// Mutation with optimistic update
+export const useSendLoveNote = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (message: string) => {
+      const { data, error } = await supabase
+        .from('love_notes')
+        .insert({ content: message })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onMutate: async (message) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.loveNotes });
+      const previousNotes = queryClient.getQueryData(queryKeys.loveNotes);
+
+      queryClient.setQueryData(queryKeys.loveNotes, (old: LoveNote[]) => [
+        { id: 'temp', content: message, created_at: new Date().toISOString(), sending: true },
+        ...old,
+      ]);
+
+      return { previousNotes };
+    },
+    onError: (err, message, context) => {
+      queryClient.setQueryData(queryKeys.loveNotes, context?.previousNotes);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.loveNotes });
+    },
+  });
+};
+```
+
+### Supabase Realtime Pattern
+
+```typescript
+// Real-time subscription setup
+useEffect(() => {
+  const channel = supabase
+    .channel('love-notes-channel')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'love_notes',
+        filter: `receiver_id=eq.${userId}`,
+      },
+      (payload) => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.loveNotes });
+        triggerHaptic('receive');
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [userId]);
+```
+
+### Component Pattern
+
+```typescript
+// Themed component with haptics
+interface ThemedButtonProps {
+  onPress: () => void;
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'destructive';
+  loading?: boolean;
+}
+
+export const ThemedButton: React.FC<ThemedButtonProps> = ({
+  onPress,
+  children,
+  variant = 'primary',
+  loading = false,
+}) => {
+  const { triggerHaptic } = useHaptics();
+
+  const handlePress = () => {
+    triggerHaptic('tap');
+    onPress();
   };
 
-  // Render
   return (
-    <motion.div>
-      {/* Component JSX */}
-    </motion.div>
+    <Button
+      mode={variant === 'primary' ? 'contained' : 'outlined'}
+      onPress={handlePress}
+      loading={loading}
+      disabled={loading}
+      style={styles.button}
+    >
+      {children}
+    </Button>
   );
 };
 ```
 
-**State Slice Pattern:**
+### Error Handling Pattern
 
 ```typescript
-// Feature slice structure
-import { StateCreator } from 'zustand';
-
-interface FeatureSlice {
-  // State
-  data: DataType[];
-  isLoading: boolean;
-  error: string | null;
-
-  // Actions
-  loadData: () => Promise<void>;
-  updateData: (id: string, updates: Partial<DataType>) => Promise<void>;
-}
-
-export const createFeatureSlice: StateCreator<FeatureSlice> = (set, get) => ({
-  data: [],
-  isLoading: false,
-  error: null,
-
-  loadData: async () => {
-    set({ isLoading: true });
-    try {
-      // Load data
-      set({ data: loadedData, isLoading: false });
-    } catch (error) {
-      set({ error: error.message, isLoading: false });
-    }
-  },
-});
-```
-
-**Service Pattern:**
-
-```typescript
-// Service extending base class
-class FeatureService extends BaseIndexedDBService<DataType> {
-  protected getStoreName(): string {
-    return 'feature_store';
+// Centralized error handler
+export const handleError = (error: unknown): string => {
+  if (error instanceof PostgrestError) {
+    return mapPostgrestError(error);
   }
-
-  protected async _doInit(): Promise<void> {
-    const db = await openDB<MyLoveDB>('my-love-db', 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains('feature_store')) {
-          const store = db.createObjectStore('feature_store', {
-            keyPath: 'id',
-            autoIncrement: true,
-          });
-          store.createIndex('by-date', 'createdAt');
-        }
-      },
-    });
-    this.db = db;
+  if (error instanceof Error) {
+    return error.message;
   }
+  return 'An unexpected error occurred. Please try again.';
+};
 
-  // Feature-specific methods
-  async getFiltered(filter: FilterType): Promise<DataType[]> {
-    // Implementation
+// User-friendly error mapping
+const mapPostgrestError = (error: PostgrestError): string => {
+  switch (error.code) {
+    case '23505': return 'This entry already exists.';
+    case '42501': return 'You do not have permission to perform this action.';
+    case 'PGRST301': return 'Unable to connect. Please check your internet connection.';
+    default: return 'Something went wrong. Please try again.';
   }
-}
+};
 
-export const featureService = new FeatureService();
-```
-
-### Error Handling
-
-**Global Error Boundary:**
-
-```typescript
-// ErrorBoundary component wraps entire app
-<ErrorBoundary>
-  <App />
-</ErrorBoundary>
-```
-
-**Service Layer Errors:**
-
-```typescript
-// Centralized error handling in BaseIndexedDBService
-protected handleError(operation: string, error: Error): never {
-  console.error(`IndexedDB error during ${operation}:`, error);
-
-  if (error.name === 'QuotaExceededError') {
-    this.handleQuotaExceeded();
-  }
-
-  throw new Error(`Failed to ${operation}: ${error.message}`);
-}
-```
-
-**Supabase Error Handling:**
-
-```typescript
-// Graceful degradation for offline mode
-try {
-  const { data, error } = await supabase.from('moods').insert(mood);
-  if (error) throw error;
-} catch (error) {
-  // Fall back to local-only storage
-  await localMoodService.save(mood);
-  console.warn('Offline mode: Mood saved locally');
-}
-```
-
-### Logging Strategy
-
-**Development Logging:**
-
-```typescript
-// Console logging for development
-if (import.meta.env.DEV) {
-  console.log('[StateUpdate]', { action, payload });
-}
-```
-
-**Production Error Logging:**
-
-```typescript
-// Error boundary logs errors
-componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-  console.error('Component error:', error, errorInfo);
-  // Future: Send to error tracking service
-}
+// Error boundary component
+export const ErrorFallback: React.FC<{ error: Error; resetError: () => void }> = ({
+  error,
+  resetError,
+}) => (
+  <View style={styles.errorContainer}>
+    <Text style={styles.errorText}>{handleError(error)}</Text>
+    <ThemedButton onPress={resetError}>Try Again</ThemedButton>
+  </View>
+);
 ```
 
 ## Consistency Rules
 
-### Date/Time Handling
+### Naming Conventions
 
-- **Storage Format**: ISO 8601 strings (`new Date().toISOString()`)
-- **Display Format**: Locale-specific via `toLocaleDateString()`
-- **Timezone**: User's local timezone (no server timezone conversion needed)
+**Files and Directories:**
 
-### API Response Format
+- Components: PascalCase (e.g., `LoveNoteMessage.tsx`)
+- Hooks: camelCase with `use` prefix (e.g., `useLoveNotes.ts`)
+- Utilities: camelCase (e.g., `dateFormatter.ts`)
+- Types: PascalCase (e.g., `LoveNote.ts`)
+- Test files: `*.test.ts` or `*.test.tsx` (co-located in `__tests__/`)
 
-**Supabase Responses:**
+**TypeScript:**
+
+- Interfaces: PascalCase, no `I` prefix (e.g., `LoveNote`, not `ILoveNote`)
+- Types: PascalCase (e.g., `MoodType`)
+- Enums: PascalCase with PascalCase values (e.g., `MoodCategory.Happy`)
+- Functions: camelCase (e.g., `sendLoveNote`)
+- Constants: SCREAMING_SNAKE_CASE (e.g., `MAX_MESSAGE_LENGTH`)
+
+**Supabase Database:**
+
+- Tables: snake_case plural (e.g., `love_notes`, `mood_entries`)
+- Columns: snake_case (e.g., `created_at`, `user_id`)
+- Foreign keys: `{table}_id` pattern (e.g., `sender_id`, `receiver_id`)
+
+**React Native Paper Components:**
+
+- Theme tokens reference: `theme.colors.primary`, `theme.spacing.md`
+- Style objects: `StyleSheet.create()` at bottom of file
+- Style naming: camelCase (e.g., `container`, `messageText`)
+
+### Code Organization
+
+**Import Order (enforced by ESLint):**
+
+1. React/React Native imports
+2. Third-party libraries (alphabetical)
+3. Internal absolute imports (`@/` or `src/`)
+4. Relative imports
+5. Type imports (last)
 
 ```typescript
-const { data, error } = await supabase.from('table').select();
+// Example import structure
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { Button, Text } from 'react-native-paper';
+import { useQuery } from '@tanstack/react-query';
 
-if (error) {
-  // Handle error
-  throw new Error(error.message);
-}
+import { ThemedCard } from '@/components/core/ThemedCard';
+import { useLoveNotes } from '@/hooks/useLoveNotes';
+import { supabase } from '@/lib/supabase';
 
-// Use data
+import type { LoveNote } from '@/types/models';
 ```
 
-**Local Service Responses:**
+**Component Structure:**
+
+1. Type definitions (interfaces/types)
+2. Component function
+3. Hook calls (useQuery, useState, etc.)
+4. Event handlers
+5. JSX return
+6. StyleSheet at bottom
+
+**Hook Structure:**
+
+1. Query/mutation setup
+2. Error handling
+3. Return object with data, loading, error states
+
+### Error Handling
+
+**Error Types:**
+
+- **Network errors**: Show offline banner, allow retry
+- **Validation errors**: Inline field errors, red border, error text below input
+- **Server errors**: Toast notification with retry option
+- **Auth errors**: Redirect to login with message
+
+**Error Display Pattern:**
 
 ```typescript
-// Throw errors on failure, return data on success
-async getData(): Promise<DataType[]> {
-  try {
-    return await this.db.getAll('store_name');
-  } catch (error) {
-    this.handleError('get data', error);
-  }
-}
+// Toast for transient errors
+showToast({
+  type: 'error',
+  message: handleError(error),
+  duration: 5000,
+  action: { label: 'Retry', onPress: retryAction },
+});
+
+// Inline for validation
+<TextInput
+  error={!!validationError}
+  errorText={validationError}
+/>
 ```
 
-### Testing Strategy
+**Retry Logic:**
 
-**E2E Tests (Playwright):**
+- Automatic retry: 3 attempts with exponential backoff (1s, 2s, 4s)
+- Manual retry: Show retry button after automatic attempts fail
+- No retry: Auth errors, validation errors
 
-- Test complete user journeys
-- Validate PWA functionality (offline, service worker)
-- Cross-browser testing (Chromium, Firefox, WebKit)
-- Use `data-testid` attributes for selectors
+### Logging Strategy
 
-**Unit Tests (Vitest):**
+**Log Levels:**
 
-- Test utility functions and algorithms
-- Test service layer with fake-indexeddb
-- Test state slice logic with mocked dependencies
-- Fast feedback loop (<5 seconds total)
+- `error`: Caught exceptions, failed API calls, critical failures
+- `warn`: Degraded functionality, fallback paths, non-critical issues
+- `info`: User actions, feature usage, lifecycle events
+- `debug`: Development-only detailed traces
+
+**Log Format:**
+
+```typescript
+// Structured logging
+const logger = {
+  error: (message: string, context?: object) => {
+    console.error(`[ERROR] ${message}`, context);
+    // In production: send to error tracking service (e.g., Sentry)
+  },
+  warn: (message: string, context?: object) => {
+    console.warn(`[WARN] ${message}`, context);
+  },
+  info: (message: string, context?: object) => {
+    if (__DEV__) console.info(`[INFO] ${message}`, context);
+  },
+  debug: (message: string, context?: object) => {
+    if (__DEV__) console.debug(`[DEBUG] ${message}`, context);
+  },
+};
+
+// Usage
+logger.info('Love note sent', { messageId: note.id });
+logger.error('Failed to send love note', { error, messageContent });
+```
+
+**What to Log:**
+
+- User authentication events (login, logout)
+- Feature interactions (mood logged, note sent, photo uploaded)
+- Error occurrences with context
+- Real-time connection status changes
+- Push notification received/tapped
+
+**Privacy Compliance:**
+
+- Never log message content or mood details
+- Log only IDs and metadata
+- No sensitive user data in logs
 
 ## Data Architecture
 
-### IndexedDB Schema
+### Supabase Schema (Additions to Existing)
 
-**Database**: `my-love-db` (version 2)
+**New Table: love_notes**
 
-**Object Stores:**
+```sql
+CREATE TABLE love_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_id UUID REFERENCES auth.users(id) NOT NULL,
+  receiver_id UUID REFERENCES auth.users(id) NOT NULL,
+  content TEXT NOT NULL CHECK (char_length(content) <= 1000),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  read_at TIMESTAMPTZ
+);
 
-**1. messages**
+-- RLS Policies
+ALTER TABLE love_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own messages"
+  ON love_notes FOR SELECT
+  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+CREATE POLICY "Users can insert their own messages"
+  ON love_notes FOR INSERT
+  WITH CHECK (auth.uid() = sender_id);
+```
+
+**Existing Tables (from web PWA):**
+
+- `mood_entries`: Already has user_id, mood_type, note, created_at
+- `photos`: Already has user_id, url, caption, created_at
+- `user_profiles`: Add `push_token` column for notification delivery
+- `partner_relationships`: Existing two-user relationship mapping
+
+**Push Token Storage:**
+
+```sql
+ALTER TABLE user_profiles
+ADD COLUMN push_token TEXT;
+```
+
+### Domain Models
 
 ```typescript
-interface Message {
-  id: number; // Auto-increment primary key
-  text: string;
-  category: 'reasons' | 'memories' | 'affirmations' | 'future' | 'custom';
-  isCustom: boolean;
-  isActive: boolean;
-  createdAt: Date;
+// src/types/models.ts
+export interface LoveNote {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  read_at: string | null;
 }
 
-// Indexes:
-// - by-category (category)
-// - by-date (createdAt)
-```
-
-**2. photos**
-
-```typescript
-interface Photo {
-  id: number; // Auto-increment primary key
-  data: Blob; // Compressed image blob
-  caption: string;
-  tags: string[];
-  uploadDate: Date;
+export interface MoodEntry {
+  id: string;
+  user_id: string;
+  mood_type: MoodType;
+  note: string | null;
+  created_at: string;
 }
 
-// Indexes:
-// - by-date (uploadDate)
-```
+export type MoodType =
+  | 'happy'
+  | 'sad'
+  | 'excited'
+  | 'anxious'
+  | 'calm'
+  | 'angry'
+  | 'loving'
+  | 'grateful'
+  | 'tired'
+  | 'energetic'
+  | 'confused'
+  | 'hopeful';
 
-### Supabase Database Schema
+export interface Photo {
+  id: string;
+  user_id: string;
+  url: string;
+  caption: string | null;
+  created_at: string;
+}
 
-**1. users**
-
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  partner_name TEXT,
-  device_id TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**2. moods**
-
-```sql
-CREATE TABLE moods (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  mood_type TEXT CHECK (mood_type IN ('loved', 'happy', 'content', 'thoughtful', 'grateful')),
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_moods_user_date ON moods(user_id, created_at);
-```
-
-**3. interactions**
-
-```sql
-CREATE TABLE interactions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  type TEXT CHECK (type IN ('poke', 'kiss')),
-  from_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  to_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  viewed BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_interactions_recipient ON interactions(to_user_id, viewed);
-```
-
-### LocalStorage Schema
-
-**Key**: `my-love-storage`
-
-**Persisted State** (via Zustand persist middleware):
-
-```typescript
-{
-  settings: {
-    partnerName: string;
-    relationshipStartDate: string;
-    theme: 'sunset' | 'ocean' | 'lavender' | 'rose';
-  },
-  messageHistory: {
-    currentIndex: number;
-    favoriteIds: number[];
-    shownDates: string[];
-  },
-  navigationState: {
-    currentTab: 'home' | 'photos' | 'mood' | 'settings';
-  }
+export interface UserProfile {
+  id: string;
+  email: string;
+  display_name: string;
+  partner_id: string;
+  push_token: string | null;
+  created_at: string;
 }
 ```
 
 ## API Contracts
 
-### Supabase API Endpoints
+### Supabase Client Patterns
 
 **Authentication:**
 
 ```typescript
-// Sign in
-const { data, error } = await supabase.auth.signInWithPassword({
-  email: string,
-  password: string,
+// Magic link sign in
+const { error } = await supabase.auth.signInWithOtp({
+  email: userEmail,
+  options: {
+    emailRedirectTo: 'mylove://auth/callback',
+  },
 });
 
-// Sign out
-await supabase.auth.signOut();
-
-// Get session
+// Session check
 const {
   data: { session },
 } = await supabase.auth.getSession();
+
+// Sign out
+await supabase.auth.signOut();
 ```
 
-**Moods:**
+**Database Queries:**
 
 ```typescript
-// Save mood
-const { data, error } = await supabase.from('moods').insert({
-  user_id: string,
-  mood_type: MoodType,
-  note: string | null,
-});
-
-// Get moods
+// Insert love note
 const { data, error } = await supabase
-  .from('moods')
+  .from('love_notes')
+  .insert({
+    content: messageText,
+    receiver_id: partnerId,
+  })
+  .select()
+  .single();
+
+// Fetch mood history
+const { data, error } = await supabase
+  .from('mood_entries')
   .select('*')
   .eq('user_id', userId)
-  .order('created_at', { ascending: false });
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+// Upload photo
+const { data: uploadData, error: uploadError } = await supabase.storage
+  .from('photos')
+  .upload(`${userId}/${fileName}`, compressedImage);
 ```
 
-**Interactions:**
+**Real-time Subscriptions:**
 
 ```typescript
-// Send interaction
-const { data, error } = await supabase.from('interactions').insert({
-  type: 'poke' | 'kiss',
-  from_user_id: string,
-  to_user_id: string,
-});
+// Subscribe to new love notes
+const channel = supabase
+  .channel('love-notes')
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'love_notes',
+      filter: `receiver_id=eq.${userId}`,
+    },
+    handleNewMessage
+  )
+  .subscribe();
+```
 
-// Get unviewed interactions
-const { data, error } = await supabase
-  .from('interactions')
-  .select('*')
-  .eq('to_user_id', userId)
-  .eq('viewed', false);
+### Deep Link Schema
 
-// Mark as viewed
-const { error } = await supabase
-  .from('interactions')
-  .update({ viewed: true })
-  .eq('id', interactionId);
+```
+mylove://                           # App scheme
+mylove://auth/callback              # Magic link authentication
+mylove://notes                      # Love Notes screen
+mylove://notes?id={noteId}          # Specific note
+mylove://mood                       # Mood tracker screen
+mylove://message                    # Daily message screen
+mylove://photos                     # Photo gallery
+```
+
+**Expo Router Configuration:**
+
+```typescript
+// app.json
+{
+  "expo": {
+    "scheme": "mylove",
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://mylove.app"
+        }
+      ]
+    ]
+  }
+}
 ```
 
 ## Security Architecture
 
-### Authentication
+### Authentication & Authorization
 
-- **Method**: Supabase Email/Password Auth
-- **Session Storage**: LocalStorage (Supabase handles securely)
-- **Session Persistence**: Auto-refresh via Supabase client
+**Magic Link Flow:**
 
-### Authorization
+1. User enters email on login screen
+2. Supabase sends magic link to email
+3. User taps link, which opens app via deep link
+4. App verifies token with Supabase
+5. Session stored in SecureStore (device keychain)
+6. Session auto-refreshes until 30-day inactivity timeout
 
-- **Row Level Security (RLS)**: Enforced at database level
-- **Policy**: Users can only access their own data and their partner's data
-- **Implementation**: Supabase RLS policies on all tables
+**Session Management:**
 
-**Example RLS Policy:**
+- Tokens stored in SecureStore (not plain storage)
+- Session refresh handled by Supabase client automatically
+- Logout clears all local storage and SecureStore
+- No password storage on device
 
-```sql
--- Users can view their own moods and their partner's moods
-CREATE POLICY "Users can view relevant moods"
-ON moods FOR SELECT
-USING (
-  user_id = auth.uid() OR
-  user_id IN (
-    SELECT partner_id FROM users WHERE id = auth.uid()
-  )
-);
-```
+**Row Level Security (RLS):**
+
+- Every table has RLS enabled
+- Users can only access their own data and partner's shared data
+- Partner relationship verified server-side
+- No client-side security decisions
 
 ### Data Protection
 
-- **Client-Side**: No sensitive data in plain text
-- **Server-Side**: Supabase handles encryption at rest and in transit
-- **HTTPS**: Enforced via Vercel and Supabase
+**In Transit:**
 
-### Content Security
+- All Supabase connections over HTTPS/TLS 1.3
+- WebSocket connections encrypted
+- Push notification payloads contain only IDs (not message content)
 
-- **XSS Protection**: React escapes content by default
-- **Input Validation**: Zod schemas validate all user inputs
-- **SQL Injection**: Supabase client prevents SQL injection
+**At Rest:**
+
+- Supabase encrypts database at rest
+- Photos stored with Supabase Storage access policies
+- Local preferences (MMKV) in app sandbox
+- Session tokens in device keychain/keystore
+
+**Input Validation:**
+
+- Love Notes: Max 1000 characters
+- Mood notes: Max 200 characters
+- Photos: Max 10MB, image types only (JPEG, PNG, HEIC)
+- XSS prevention: No HTML rendering, text-only display
 
 ## Performance Considerations
 
-### Bundle Optimization
+### Critical Performance Targets (from NFRs)
 
-- **Tree-shaking**: Vite eliminates unused code
-- **Code splitting**: Route-based with React.lazy() (future enhancement)
-- **Asset hashing**: Cache busting via [hash] filenames
-- **Compression**: Gzip/Brotli at deployment level
+| Metric                | Target       | Implementation Strategy                                       |
+| --------------------- | ------------ | ------------------------------------------------------------- |
+| App Launch (cold)     | < 2 seconds  | Minimal bundle size, lazy loading, no heavy initialization    |
+| App Launch (warm)     | < 500ms      | Fast resume from background                                   |
+| Screen Transitions    | < 300ms      | Native navigation animations, minimal JS overhead             |
+| Mood Log (end-to-end) | < 5 seconds  | Single-tap selection, optimistic update, fast Supabase insert |
+| Love Note Delivery    | < 2 seconds  | Supabase Realtime instant broadcast + push notification       |
+| Image Upload          | < 10 seconds | Client-side compression, progress indicator                   |
+| Memory Footprint      | < 150MB      | Image virtualization, no memory leaks                         |
 
-### Runtime Performance
+### Optimization Strategies
 
-- **Zustand selectors**: Prevent unnecessary re-renders
-- **Framer Motion**: GPU-accelerated animations
-- **IndexedDB**: Async operations don't block UI
-- **Photo pagination**: Lazy loading with `getPage()` method (20 photos per page)
-- **Virtual scrolling**: Considered for large photo galleries
+**Code Splitting:**
 
-### Offline Performance
+- Expo Router automatic route-based splitting
+- Lazy load heavy components (PhotoViewer, MoodHistory)
+- Tree-shaking unused React Native Paper components
 
-- **Pre-caching**: All static assets cached by service worker
-- **IndexedDB**: No network required for local data access
-- **LocalStorage**: Settings persist across sessions
-- **Graceful Degradation**: Sync features fall back to local-only mode when offline
+**Image Optimization:**
 
-### Performance Metrics (Target)
+- Client-side compression before upload (max 1MB)
+- Thumbnail generation for gallery grid
+- Progressive loading with blur placeholder
+- FlashList for virtualized image grids
 
-- **First Contentful Paint**: < 1.5s
-- **Time to Interactive**: < 3s
-- **Lighthouse PWA Score**: 100
-- **Bundle Size**: < 300KB (gzipped, includes Supabase client)
+**Query Optimization:**
+
+- TanStack Query caching (stale-while-revalidate)
+- Background refetch on app focus
+- Optimistic updates for immediate UI feedback
+- Query key invalidation on mutations
+
+**React Native Performance:**
+
+- Use `memo()` for expensive components
+- Avoid inline functions in render
+- Use native driver for animations
+- Measure with Flipper and React DevTools
 
 ## Deployment Architecture
 
-### Vercel Deployment
+### Development Workflow
 
-**Process**:
+1. **Local Development**: `npx expo start` with Expo Go (limited - no push notifications)
+2. **Development Build**: `eas build --profile development` for physical device testing
+3. **Preview Build**: `eas build --profile preview` for beta testing
+4. **Production Build**: `eas build --profile production` for App Store/Google Play
 
-1. Push to main branch or create PR
-2. Vercel automatically builds and deploys
-3. Environment variables injected from Vercel dashboard
-4. Automatic preview deployments for PRs
+### EAS Build Configuration
 
-**Base Path**: `/` (root path, no subpath needed)
-
-**Live URL**: `https://my-love.vercel.app/` (or custom domain)
-
-### Environment Variables
-
-**Development** (`.env.local`):
-
-```env
-VITE_SUPABASE_URL=<supabase-project-url>
-VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
+```json
+// eas.json
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "frank@example.com",
+        "ascAppId": "YOUR_APP_STORE_CONNECT_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./service-account.json"
+      }
+    }
+  }
+}
 ```
 
-**Production** (Vercel Dashboard):
+### App Store Submission
 
-- Environment variables configured in Vercel project settings
-- Automatically injected at build time
-- Separate variables for production/preview/development environments
+**iOS (TestFlight/App Store):**
 
-### HTTPS & Security
+- Bundle ID: `com.mylove.app`
+- Privacy Policy URL required
+- App Store Privacy Labels completed
+- Age Rating: 4+ (no objectionable content)
+- Category: Lifestyle
 
-- Vercel: Automatic HTTPS with Let's Encrypt
-- Supabase: HTTPS API endpoints
-- Required for: Service workers, Web Share API, PWA features
+**Android (Google Play):**
+
+- Package: `com.mylove.app`
+- Data Safety section completed
+- Content Rating: Everyone
+- Target API 34 (Android 14)
 
 ## Development Environment
 
 ### Prerequisites
 
-- Node.js 18+ (LTS recommended)
-- npm 9+ or yarn 1.22+
-- Git 2.x
-- Modern browser (Chrome, Firefox, Safari, Edge)
+- Node.js 20+ (LTS)
+- npm 10+ or yarn 1.22+
+- Git
+- Expo CLI: `npm install -g expo-cli`
+- EAS CLI: `npm install -g eas-cli`
+- Xcode 15+ (for iOS builds, macOS only)
+- Android Studio (for Android builds)
+- Physical device recommended for push notification testing
 
 ### Setup Commands
 
 ```bash
 # Clone repository
-git clone https://github.com/<username>/My-Love.git
-cd My-Love
+git clone https://github.com/yourname/my-love-mobile.git
+cd my-love-mobile
 
 # Install dependencies
 npm install
 
-# Create .env.local file
-cat > .env.local << EOF
-VITE_SUPABASE_URL=your-supabase-url
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-EOF
+# Configure environment variables
+cp .env.example .env.local
+# Edit .env.local with your Supabase credentials:
+# EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+# EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
 # Start development server
-npm run dev
-# → http://localhost:5173/My-Love/
+npx expo start
 
-# Run E2E tests
-npm run test:e2e
+# Create development build (for push notifications testing)
+eas build --profile development --platform ios
+eas build --profile development --platform android
 
-# Run unit tests
-npm run test:unit
+# Run on specific platform
+npx expo start --ios
+npx expo start --android
 
-# Build for production
-npm run build
+# Generate Supabase types
+npx supabase gen types typescript --project-id your-project-id > src/types/database.ts
 
-# Preview production build
-npm run preview
+# Run tests
+npm test
 
-# Build for deployment (Vercel handles automatically)
-npm run build
+# Lint and format
+npm run lint
+npm run format
 ```
 
-### Development Workflow
+### Environment Variables
 
-1. **Feature Development**: Create feature branch
-2. **Implementation**: Write code with tests
-3. **Testing**: Run E2E and unit tests
-4. **Code Review**: Manual review (solo developer: self-review)
-5. **Deployment**: Merge to main → Vercel auto-deploys
+```bash
+# .env.local (not committed to git)
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_APP_SCHEME=mylove
+```
+
+### Development vs Production Differences
+
+| Aspect             | Development                                  | Production                      |
+| ------------------ | -------------------------------------------- | ------------------------------- |
+| Push Notifications | Not available in Expo Go; requires dev build | Full support via EAS            |
+| Deep Linking       | localhost testing                            | Production URL scheme           |
+| Error Reporting    | Console logging                              | Error tracking service (Sentry) |
+| Supabase           | Local or dev project                         | Production project              |
+| Build              | `expo start`                                 | EAS Build production profile    |
 
 ## Architecture Decision Records (ADRs)
 
-### ADR-001: Multi-User Architecture via Supabase
+### ADR 001: Online-First Architecture (Not Offline-First)
 
-**Context**: Project evolved from single-user prototype to multi-user couple app requiring real-time sync.
+**Context:** The user expects reliable network connectivity and wants to avoid the complexity of offline-first sync (PowerSync).
 
-**Decision**: Implement Supabase backend for authentication, data sync, and real-time features.
+**Decision:** Implement online-first with TanStack Query caching for performance optimization, not offline data persistence.
 
-**Rationale**:
+**Rationale:**
 
-- Free tier sufficient for personal use
-- Built-in authentication and Row Level Security
-- Real-time subscriptions for live mood/interaction updates
-- PostgreSQL backend for complex queries
+- User stated: "I expect to really never be offline"
+- Eliminates conflict resolution complexity
+- TanStack Query provides smart caching without sync overhead
+- Reduces technical complexity and development time
+- Graceful degradation (show cached data, fail writes) is acceptable
 
-**Consequences**:
+**Consequences:**
 
-- ✅ Multi-device sync for both users
-- ✅ Real-time interaction notifications
-- ✅ Secure data isolation via RLS
-- ❌ Internet required for sync features (offline mode still works for local data)
+- Writes fail immediately when offline (no queue)
+- Cached data may be stale (marked as such)
+- Requires reliable network for full functionality
+- Simpler architecture and maintenance
 
-### ADR-002: State Management with Feature Slices
+### ADR 002: React Native Paper for UI Components
 
-**Context**: Original 1,268-line monolithic store became unmaintainable.
+**Context:** Need a design system that supports the "Love" theme aesthetic while providing accessibility and native performance.
 
-**Decision**: Split into 7 feature-specific slices (messages, photos, settings, mood, partner, interactions, navigation).
+**Decision:** Use React Native Paper with heavy theming customization for Coral Heart color palette.
 
-**Rationale**:
+**Rationale:**
 
-- Separation of concerns
-- Easier testing and maintenance
-- Better TypeScript inference
-- Clear domain boundaries
+- Material Design 3 supports dynamic theming
+- Accessibility defaults (WCAG AA) out of the box
+- Comprehensive component library covers all MVP needs
+- Active maintenance and TypeScript support
+- Customizable enough for romantic aesthetic
 
-**Consequences**:
+**Consequences:**
 
-- ✅ Improved maintainability
-- ✅ Easier to test individual features
-- ✅ Better TypeScript support
-- ❌ Slightly more boilerplate for slice creation
+- Need to override default Material colors
+- Some components may need wrapping for haptic feedback
+- Follows Material Design patterns (familiar to Android users)
+- iOS users get cross-platform consistency, not native iOS look
 
-### ADR-003: BaseIndexedDBService for Code Reuse
+### ADR 003: Supabase Realtime for Love Notes
 
-**Context**: MessagesService and PhotosService duplicated ~80% of CRUD logic.
+**Context:** Love Notes require real-time delivery with push notification integration.
 
-**Decision**: Extract common operations into generic `BaseIndexedDBService<T>`.
+**Decision:** Use Supabase Realtime WebSocket subscriptions for instant message delivery.
 
-**Rationale**:
+**Rationale:**
 
-- DRY principle
-- Consistent error handling
-- Type-safe operations via generics
-- Easier to add new services (e.g., MoodService)
+- Already using Supabase for backend
+- WebSocket subscriptions are included in Supabase plan
+- Integrates naturally with RLS security model
+- Simpler than adding separate real-time service
+- Combined with push notifications for offline delivery
 
-**Consequences**:
+**Consequences:**
 
-- ✅ Reduced code duplication by 80%
-- ✅ Consistent CRUD patterns
-- ✅ Easier to maintain and extend
-- ❌ Slight learning curve for generic typing
+- Need to handle WebSocket reconnection on network changes
+- Must manage subscription lifecycle (subscribe/unsubscribe)
+- Depends on Supabase service availability
+- In-app notification history as fallback for missed messages
 
-### ADR-004: Zod for Runtime Validation
+### ADR 004: Expo Router for Navigation
 
-**Context**: Need to validate user inputs and prevent corrupted data in IndexedDB/Supabase.
+**Context:** Need file-based routing with deep linking support for magic link auth and notification navigation.
 
-**Decision**: Centralize validation using Zod schemas.
+**Decision:** Use Expo Router (file-based navigation built on React Navigation).
 
-**Rationale**:
+**Rationale:**
 
-- Runtime type checking
-- TypeScript type inference from schemas
-- User-friendly error messages
-- Validation at service boundary
+- File-system based routing reduces boilerplate
+- Native deep linking support for magic links
+- TypeScript route parameter typing
+- Integrates with Expo SDK ecosystem
+- Automatic code splitting by route
 
-**Consequences**:
+**Consequences:**
 
-- ✅ Type-safe runtime validation
-- ✅ Prevents invalid data persistence
-- ✅ Clear error messages for users
-- ❌ Additional bundle size (~14KB)
+- Route structure determined by file structure
+- Less flexibility than pure React Navigation (but sufficient for this app)
+- Must follow Expo Router conventions
+- Benefits from Expo ecosystem updates
 
-### ADR-005: Comprehensive E2E Testing with Playwright
+### ADR 005: MMKV for Local Storage
 
-**Context**: Rapid feature development risked introducing regressions.
+**Context:** Need fast local storage for user preferences and cached data.
 
-**Decision**: Implement comprehensive E2E testing infrastructure (Epic 2).
+**Decision:** Use react-native-mmkv v4 (Nitro Module) instead of AsyncStorage.
 
-**Rationale**:
+**Rationale:**
 
-- Validate complete user journeys
-- Test PWA functionality (offline, service worker)
-- Multi-browser support
-- Reliable automation
+- ~30x faster than AsyncStorage
+- Synchronous API for preferences
+- Small storage footprint
+- Native integration (Nitro Module in v4)
+- Suitable for non-sensitive local data
 
-**Consequences**:
+**Consequences:**
 
-- ✅ Confidence in refactoring
-- ✅ Catch bugs before production
-- ✅ PWA features validated
-- ❌ Test execution time (~5 minutes)
+- New Architecture requirement (TurboModules)
+- Migration from AsyncStorage if coming from web PWA patterns
+- Not for sensitive data (use SecureStore for tokens)
+- Additional native dependency
 
-### ADR-006: Pre-Configuration via Build-Time Constants
+### ADR 006: TanStack Query for Server State
 
-**Context**: Single intended user (girlfriend) - onboarding flow adds friction.
+**Context:** Need to manage server state with caching, background sync, and optimistic updates.
 
-**Decision**: Pre-configure relationship data in `src/config/constants.ts` at build time.
+**Decision:** Use TanStack Query v5 instead of Redux or Zustand for server state.
 
-**Rationale**:
+**Rationale:**
 
-- Frictionless experience for target user
-- No setup wizard needed
-- Values bundled at build time
-- Settings still editable if needed
+- Purpose-built for server state management
+- Automatic caching with configurable stale time
+- Optimistic updates for instant UI feedback
+- Background refetch on app focus
+- No global store boilerplate for server data
 
-**Consequences**:
+**Consequences:**
 
-- ✅ Zero onboarding friction
-- ✅ Immediate app usage
-- ✅ Simple deployment
-- ❌ Not suitable for public multi-user deployment (intentional design choice)
+- Separate concern from local/UI state
+- Learning curve for query key patterns
+- Must manage query invalidation properly
+- Integrates well with Supabase client
 
 ---
 
-_Generated by BMAD Architecture Workflow v1.0_
-_Date: 2025-11-15_
+_Generated by BMAD Decision Architecture Workflow v1.0_
+_Date: 2025-11-16_
 _For: Frank_
-_Project: My-Love (Production-Ready Multi-User PWA)_

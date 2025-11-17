@@ -1,0 +1,27 @@
+flowchart TD
+    E1[Epic 1<br/>Foundation & Auth<br/>5 stories]
+    E2[Epic 2<br/>Love Notes<br/>4 stories]
+    E3[Epic 3<br/>Push Notifications<br/>6 stories]
+    E4[Epic 4<br/>Dashboard<br/>5 stories]
+    E5[Epic 5<br/>Mood Tracking<br/>4 stories]
+    E6[Epic 6<br/>Photo Gallery<br/>4 stories]
+    E7A[Epic 7.1, 7.3, 7.5<br/>Theme/Bio/Profile<br/>3 stories]
+    E7B[Epic 7.2, 7.4<br/>Notif Prefs/Pokes<br/>2 stories]
+
+    E1 --> E2
+    E1 --> E4
+    E1 --> E5
+    E1 --> E6
+    E1 --> E7A
+
+    E2 --> E3
+    E3 --> E7B
+
+    style E1 fill:#FF6B6B,color:#fff,stroke:#333,stroke-width:2px
+    style E2 fill:#4ECDC4,color:#fff,stroke:#333,stroke-width:2px
+    style E4 fill:#4ECDC4,color:#fff,stroke:#333,stroke-width:2px
+    style E5 fill:#4ECDC4,color:#fff,stroke:#333,stroke-width:2px
+    style E6 fill:#4ECDC4,color:#fff,stroke:#333,stroke-width:2px
+    style E7A fill:#4ECDC4,color:#fff,stroke:#333,stroke-width:2px
+    style E3 fill:#45B7D1,color:#fff,stroke:#333,stroke-width:2px
+    style E7B fill:#96CEB4,color:#fff,stroke:#333,stroke-width:2px
