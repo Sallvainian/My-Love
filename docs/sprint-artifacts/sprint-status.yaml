@@ -30,14 +30,20 @@
 
 generated: 2025-11-16
 project: My-Love
-project_key: my-love-mobile
+project_key: my-love-pwa
 tracking_system: file-system
 story_location: docs/sprint-artifacts
 
+# PLATFORM PIVOT NOTE (2025-11-17):
+# Project pivoted from React Native mobile to PWA enhancement.
+# Native mobile work deleted. All documentation (PRD, Architecture, Epics) fully rewritten
+# for PWA focus. Ready for Epic 1 contexting and Story 1.1 implementation.
+
 development_status:
-  # Epic 1: Foundation & Authentication
-  epic-1: contexted
-  1-1-project-initialization-core-dependencies: drafted
+  # Epic 1: PWA Foundation Audit & Stabilization
+  # NOTE: Epics rewritten for PWA audit/bug fixes approach - ready for contexting
+  epic-1: contexted # Tech spec created 2025-11-17
+  1-1-codebase-audit-dependency-validation: backlog # NEW: Replaces native project init
   1-2-supabase-client-provider-configuration: backlog
   1-3-magic-link-authentication-flow: backlog
   1-4-session-management-persistence: backlog

@@ -1,82 +1,87 @@
-# My-Love Mobile Architecture
+# My-Love PWA Architecture
+
+> **Document Version:** 2.0 (Platform Pivot Update)
+> **Last Updated:** 2025-11-17
+> **Status:** Partially updated - Core sections reflect PWA stack, some legacy React Native references remain in ADRs
+> **Note:** ADRs at end of document still reference React Native patterns and need full rewrite
 
 ## Executive Summary
 
-This architecture document defines the technical decisions for **My-Love Mobile**, a React Native + Expo mobile application that transforms the existing My-Love web PWA into a native mobile experience for iOS and Android. The architecture leverages Expo's managed workflow with SDK 54, Supabase for backend services (Auth, Database, Realtime, Storage), and TanStack Query for efficient server state management.
+This architecture document defines the technical decisions for **My-Love PWA**, a Progressive Web App built with React 19 + Vite 7 that provides relationship tracking and communication features. The architecture leverages modern web technologies with Supabase for backend services (Auth, Database, Realtime, Storage), and Zustand for efficient client state management.
 
-The core architectural approach is **online-first with smart caching** - prioritizing native performance and real-time capabilities over offline-first complexity. This decision aligns with the two-person intimate scale of the application and the user's expectation of reliable network connectivity.
+The core architectural approach is **online-first with service worker caching** - prioritizing web performance and real-time capabilities over offline-first complexity. This decision aligns with the two-person intimate scale of the application and the user's expectation of reliable network connectivity.
 
-## Project Initialization
+## Existing Project Stack
 
-**First implementation story should execute:**
+**The current PWA is built with:**
 
 ```bash
-npx create-expo-app@latest my-love-mobile --template blank-typescript
+# Core Stack (already in place)
+- React 19.1.1
+- Vite 7.1.7 (build tool)
+- TypeScript 5.9 (strict mode)
+- Tailwind CSS 3.4.18
+- Framer Motion 12.23.24
 ```
 
 This establishes the base architecture with:
 
 - TypeScript support (type safety across codebase)
-- Expo SDK 54 managed workflow
-- Expo Router (file-based navigation)
-- Metro bundler configuration
-- Basic project structure
+- Vite for fast development and optimized builds
+- React Router or similar for navigation
+- Modern bundler with tree-shaking
+- PWA support via vite-plugin-pwa
 
-**Post-initialization setup (same story):**
+**Existing dependencies:**
 
 ```bash
-cd my-love-mobile
-npx expo install expo-router expo-notifications expo-linking expo-secure-store expo-haptics expo-image-picker
-npm install @supabase/supabase-js @tanstack/react-query react-native-mmkv react-native-paper react-native-safe-area-context
+# Already installed
+@supabase/supabase-js ^2.81.1
+zustand ^5.0.8
+idb ^8.0.3
+lucide-react ^0.548.0
+workbox-window ^7.3.0
+zod ^3.25.76
 ```
 
 ## Decision Summary
 
-| Category        | Decision            | Version            | Affects FR Categories                 | Rationale                                            |
-| --------------- | ------------------- | ------------------ | ------------------------------------- | ---------------------------------------------------- |
-| Framework       | React Native + Expo | SDK 54 / RN 0.81   | All FRs                               | Managed workflow, cross-platform, native performance |
-| Language        | TypeScript          | 5.x (Expo default) | All FRs                               | Type safety, IDE support, maintainability            |
-| Navigation      | Expo Router         | ^4.0.0             | FR4, FR18, FR59                       | File-based routing, deep linking support             |
-| Backend         | Supabase            | 2.79+              | FR1-6, FR7-13, FR22-28, FR29-35, FR65 | Auth, Database, Realtime, Storage in one platform    |
-| Server State    | TanStack Query      | 5.90.9             | FR7-13, FR22-28, FR55-59, FR63        | Caching, optimistic updates, background sync         |
-| Local Storage   | MMKV                | v4.x               | FR48-54, FR62                         | Fast key-value storage, preferences persistence      |
-| UI Framework    | React Native Paper  | 5.x                | All UI FRs                            | Material Design 3, accessibility, theming            |
-| Notifications   | Expo Notifications  | 0.32.12            | FR14-21                               | Push + local notifications, unified API              |
-| Authentication  | Supabase Auth       | 2.79+              | FR1-6                                 | Magic link, session management, deep linking         |
-| Real-time       | Supabase Realtime   | 2.79+              | FR8-9, FR15                           | WebSocket subscriptions for Love Notes               |
-| File Storage    | Supabase Storage    | 2.79+              | FR29-35                               | Photo uploads with RLS policies                      |
-| Haptic Feedback | Expo Haptics        | SDK 54 included    | FR13, FR27, FR43                      | Native haptic patterns                               |
-| Image Handling  | Expo Image Picker   | SDK 54 included    | FR29-35                               | Gallery selection, compression                       |
-| Secure Storage  | Expo SecureStore    | SDK 54 included    | NFR-S1, FR5                           | Keychain/Keystore for tokens                         |
+| Category       | Decision               | Version           | Affects FR Categories                 | Rationale                                         |
+| -------------- | ---------------------- | ----------------- | ------------------------------------- | ------------------------------------------------- |
+| Framework      | React + Vite           | 19.1.1 / 7.1.7    | All FRs                               | Modern build tool, fast HMR, optimized bundles    |
+| Language       | TypeScript             | 5.9 (strict mode) | All FRs                               | Type safety, IDE support, maintainability         |
+| Navigation     | React Router/Custom    | TBD               | FR4, FR18, FR59                       | SPA routing with hash or history API              |
+| Backend        | Supabase               | 2.81+             | FR1-6, FR7-13, FR22-28, FR29-35, FR65 | Auth, Database, Realtime, Storage in one platform |
+| Client State   | Zustand                | 5.0.8             | FR7-13, FR22-28, FR55-59, FR63        | Lightweight state management, optimistic updates  |
+| Local Storage  | IndexedDB/localStorage | idb 8.0.3         | FR48-54, FR62                         | Web storage APIs, preferences persistence         |
+| UI Framework   | Tailwind CSS           | 3.4.18            | All UI FRs                            | Utility-first CSS, responsive design, theming     |
+| Animations     | Framer Motion          | 12.23.24          | All UI FRs                            | Declarative animations, gestures                  |
+| Notifications  | Web Push API           | Browser native    | FR14-21                               | Service worker push notifications                 |
+| Authentication | Supabase Auth          | 2.81+             | FR1-6                                 | Magic link, session management, URL redirects     |
+| Real-time      | Supabase Realtime      | 2.81+             | FR8-9, FR15                           | WebSocket subscriptions for Love Notes            |
+| File Storage   | Supabase Storage       | 2.81+             | FR29-35                               | Photo uploads with RLS policies                   |
+| Vibration      | Vibration API          | Browser native    | FR13, FR27, FR43                      | Mobile browser tactile feedback                   |
+| Image Handling | File API + Canvas      | Browser native    | FR29-35                               | File selection, client-side compression           |
+| Icons          | Lucide React           | 0.548.0           | All UI FRs                            | Consistent icon set                               |
 
 ## Project Structure
 
 ```
-my-love-mobile/
-├── app/                              # Expo Router file-based routing
-│   ├── _layout.tsx                   # Root layout with providers
-│   ├── index.tsx                     # Home/Dashboard screen
-│   ├── (auth)/                       # Auth group (unauthenticated)
-│   │   ├── _layout.tsx
-│   │   ├── login.tsx                 # Magic link login
-│   │   └── verify.tsx                # Magic link verification
-│   ├── (tabs)/                       # Main tab navigation
-│   │   ├── _layout.tsx               # Bottom tab navigator
-│   │   ├── home.tsx                  # Dashboard/Feature Hub
-│   │   ├── notes.tsx                 # Love Notes chat
-│   │   ├── mood.tsx                  # Mood tracker
-│   │   └── settings.tsx              # Settings & preferences
-│   ├── photos/                       # Photo gallery screens
-│   │   ├── index.tsx                 # Gallery grid view
-│   │   └── [id].tsx                  # Full-screen photo viewer
-│   ├── message.tsx                   # Daily love message display
-│   └── +not-found.tsx                # 404 handler
+my-love/
+├── public/                           # Static assets
+│   ├── favicon.ico
+│   ├── manifest.json                 # PWA manifest
+│   └── icons/                        # PWA icons (192x192, 512x512)
 ├── src/
+│   ├── main.tsx                      # App entry point
+│   ├── App.tsx                       # Root component with providers
+│   ├── vite-env.d.ts                 # Vite type declarations
+│   ├── index.css                     # Global styles + Tailwind imports
 │   ├── components/
-│   │   ├── core/                     # Base themed components
-│   │   │   ├── ThemedButton.tsx
-│   │   │   ├── ThemedCard.tsx
-│   │   │   ├── ThemedInput.tsx
+│   │   ├── ui/                       # Base UI components
+│   │   │   ├── Button.tsx
+│   │   │   ├── Card.tsx
+│   │   │   ├── Input.tsx
 │   │   │   └── LoadingSpinner.tsx
 │   │   ├── love-notes/
 │   │   │   ├── LoveNoteMessage.tsx
@@ -95,79 +100,88 @@ my-love-mobile/
 │   │       ├── FeatureListItem.tsx
 │   │       ├── NotificationBadge.tsx
 │   │       └── StatusIndicator.tsx
+│   ├── pages/                        # Page components (routes)
+│   │   ├── Home.tsx                  # Dashboard/Feature Hub
+│   │   ├── Login.tsx                 # Magic link login
+│   │   ├── Notes.tsx                 # Love Notes chat
+│   │   ├── Mood.tsx                  # Mood tracker
+│   │   ├── Photos.tsx                # Photo gallery
+│   │   ├── Settings.tsx              # Settings & preferences
+│   │   └── NotFound.tsx              # 404 handler
 │   ├── hooks/
 │   │   ├── useAuth.ts                # Supabase auth hook
-│   │   ├── useLoveNotes.ts           # Love Notes query hook
+│   │   ├── useLoveNotes.ts           # Love Notes state hook
 │   │   ├── useMood.ts                # Mood tracking hook
 │   │   ├── usePhotos.ts              # Photo gallery hook
-│   │   ├── useNotifications.ts       # Push notification hook
+│   │   ├── useNotifications.ts       # Web Push notification hook
 │   │   ├── usePartner.ts             # Partner data hook
-│   │   └── useHaptics.ts             # Haptic feedback hook
+│   │   └── useVibration.ts           # Vibration API hook
 │   ├── lib/
 │   │   ├── supabase.ts               # Supabase client configuration
-│   │   ├── queryClient.ts            # TanStack Query client
-│   │   ├── storage.ts                # MMKV storage wrapper
-│   │   └── notifications.ts          # Notification handlers
-│   ├── providers/
-│   │   ├── AuthProvider.tsx          # Auth context provider
-│   │   ├── QueryProvider.tsx         # TanStack Query provider
-│   │   └── ThemeProvider.tsx         # React Native Paper theming
+│   │   ├── store.ts                  # Zustand store setup
+│   │   ├── storage.ts                # IndexedDB/localStorage wrapper
+│   │   └── notifications.ts          # Web Push handlers
+│   ├── stores/                       # Zustand state slices
+│   │   ├── authStore.ts              # Auth state
+│   │   ├── notesStore.ts             # Love Notes state
+│   │   ├── moodStore.ts              # Mood state
+│   │   └── settingsStore.ts          # User preferences
 │   ├── theme/
 │   │   ├── tokens.ts                 # Design tokens (colors, spacing)
-│   │   ├── paperTheme.ts             # RN Paper theme configuration
-│   │   └── breakpoints.ts            # Responsive breakpoints
+│   │   └── tailwind.config.ts        # Tailwind theme configuration
 │   ├── types/
 │   │   ├── database.ts               # Supabase generated types
-│   │   ├── navigation.ts             # Route parameter types
+│   │   ├── routes.ts                 # Route parameter types
 │   │   └── models.ts                 # Domain model types
 │   └── utils/
 │       ├── date.ts                   # Date formatting utilities
-│       ├── validation.ts             # Input validation
-│       └── compression.ts            # Image compression
-├── assets/
-│   ├── images/                       # Static images
-│   ├── fonts/                        # Custom fonts (if needed)
-│   └── sounds/                       # Notification sounds (optional)
-├── __tests__/                        # Test files mirror src structure
+│       ├── validation.ts             # Input validation (Zod)
+│       └── compression.ts            # Image compression (Canvas API)
+├── tests/                            # Test files
 │   ├── components/
 │   ├── hooks/
 │   └── utils/
-├── app.json                          # Expo configuration
-├── eas.json                          # EAS Build configuration
+├── scripts/                          # Build and deployment scripts
+│   ├── dev-with-cleanup.sh
+│   └── smoke-tests.cjs
+├── vite.config.ts                    # Vite configuration
+├── tailwind.config.js                # Tailwind CSS configuration
+├── postcss.config.js                 # PostCSS configuration
 ├── tsconfig.json                     # TypeScript configuration
-├── babel.config.js                   # Babel configuration
-├── metro.config.js                   # Metro bundler configuration
+├── eslint.config.js                  # ESLint configuration
+├── playwright.config.ts              # E2E test configuration
+├── vitest.config.ts                  # Unit test configuration
 ├── package.json
 └── README.md
 ```
 
 ## FR Category to Architecture Mapping
 
-| FR Category                               | Architecture Components                                                                         | Key Technologies                                    |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| **User Account & Authentication** (FR1-6) | `app/(auth)/*`, `src/hooks/useAuth.ts`, `src/lib/supabase.ts`, `src/providers/AuthProvider.tsx` | Supabase Auth, Expo Linking, SecureStore            |
-| **Love Notes** (FR7-13)                   | `app/(tabs)/notes.tsx`, `src/components/love-notes/*`, `src/hooks/useLoveNotes.ts`              | Supabase Realtime, TanStack Query, Expo Haptics     |
-| **Push Notifications** (FR14-21)          | `src/lib/notifications.ts`, `src/hooks/useNotifications.ts`, `app/_layout.tsx`                  | Expo Notifications, Supabase Edge Functions         |
-| **Mood Tracking** (FR22-28)               | `app/(tabs)/mood.tsx`, `src/components/mood/*`, `src/hooks/useMood.ts`                          | Supabase Database, TanStack Query, Expo Haptics     |
-| **Photo Gallery** (FR29-35)               | `app/photos/*`, `src/components/photos/*`, `src/hooks/usePhotos.ts`                             | Supabase Storage, Expo Image Picker, TanStack Query |
-| **Daily Love Messages** (FR36-39)         | `app/message.tsx`, `src/hooks/useDailyMessage.ts`                                               | Supabase Database, Expo Notifications               |
-| **Partner Interactions** (FR40-44)        | `src/hooks/usePartner.ts`, `src/components/shared/*`                                            | Supabase Database, Expo Haptics                     |
-| **Anniversary & Milestones** (FR45-47)    | `src/components/shared/DaysTogetherCounter.tsx`, `src/hooks/usePartner.ts`                      | Supabase Database, Expo Notifications               |
-| **Settings & Preferences** (FR48-54)      | `app/(tabs)/settings.tsx`, `src/lib/storage.ts`, `src/providers/ThemeProvider.tsx`              | MMKV, React Native Paper                            |
-| **Dashboard & Overview** (FR55-59)        | `app/(tabs)/home.tsx`, `src/components/shared/*`                                                | TanStack Query (aggregated queries)                 |
-| **Technical Platform** (FR60-65)          | `app.json`, `eas.json`, `src/lib/*`, `src/providers/*`                                          | Expo SDK 54, Supabase RLS                           |
+| FR Category                               | Architecture Components                                                                         | Key Technologies                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **User Account & Authentication** (FR1-6) | `src/pages/Login.tsx`, `src/hooks/useAuth.ts`, `src/lib/supabase.ts`, `src/stores/authStore.ts` | Supabase Auth, URL redirects, localStorage     |
+| **Love Notes** (FR7-13)                   | `src/pages/Notes.tsx`, `src/components/love-notes/*`, `src/hooks/useLoveNotes.ts`               | Supabase Realtime, Zustand, Vibration API      |
+| **Push Notifications** (FR14-21)          | `src/lib/notifications.ts`, `src/hooks/useNotifications.ts`, Service Worker                     | Web Push API, Supabase Edge Functions          |
+| **Mood Tracking** (FR22-28)               | `src/pages/Mood.tsx`, `src/components/mood/*`, `src/hooks/useMood.ts`                           | Supabase Database, Zustand, Vibration API      |
+| **Photo Gallery** (FR29-35)               | `src/pages/Photos.tsx`, `src/components/photos/*`, `src/hooks/usePhotos.ts`                     | Supabase Storage, File API, Canvas compression |
+| **Daily Love Messages** (FR36-39)         | `src/pages/Home.tsx`, `src/hooks/useDailyMessage.ts`                                            | Supabase Database, Web Push API                |
+| **Partner Interactions** (FR40-44)        | `src/hooks/usePartner.ts`, `src/components/shared/*`                                            | Supabase Database, Vibration API               |
+| **Anniversary & Milestones** (FR45-47)    | `src/components/shared/DaysTogetherCounter.tsx`, `src/hooks/usePartner.ts`                      | Supabase Database, Web Push API                |
+| **Settings & Preferences** (FR48-54)      | `src/pages/Settings.tsx`, `src/lib/storage.ts`, `src/stores/settingsStore.ts`                   | localStorage/IndexedDB, Tailwind CSS           |
+| **Dashboard & Overview** (FR55-59)        | `src/pages/Home.tsx`, `src/components/shared/*`                                                 | Zustand (aggregated state)                     |
+| **Technical Platform** (FR60-65)          | `vite.config.ts`, `public/manifest.json`, `src/lib/*`, Service Worker                           | Vite, vite-plugin-pwa, Supabase RLS            |
 
 ## Technology Stack Details
 
 ### Core Technologies
 
-**React Native + Expo SDK 54**
+**React 19 + Vite 7**
 
-- Managed workflow (no native code ejection needed)
-- React Native 0.81 (latest stable)
-- Metro bundler with tree-shaking
-- EAS Build for production builds
-- EAS Submit for App Store/Google Play deployment
+- Modern React with concurrent features
+- Vite for instant HMR and optimized production builds
+- ESBuild for fast TypeScript compilation
+- Rollup for production bundling with tree-shaking
+- GitHub Pages deployment via gh-pages package
 
 **Supabase Backend (Self-contained platform)**
 
@@ -177,46 +191,46 @@ my-love-mobile/
 - **Storage**: Photo uploads with access policies
 - **Edge Functions**: Scheduled notifications (cron jobs)
 
-**TanStack Query v5**
+**Zustand v5**
 
-- Server state management
-- Automatic caching with stale-while-revalidate
+- Lightweight client state management
+- Minimal boilerplate, TypeScript-first
 - Optimistic updates for instant UI feedback
-- Background refetch on app focus
-- Query invalidation on mutations
+- Persistence via localStorage/IndexedDB
+- No provider wrapping required
 
-**React Native Paper v5**
+**Tailwind CSS v3 + Framer Motion**
 
-- Material Design 3 component library
-- Full theming support (Coral Heart theme)
-- Accessibility defaults (WCAG AA compliant)
-- Dark mode support
-- TypeScript support
+- Utility-first CSS framework
+- Full theming support via configuration
+- Responsive design out of the box
+- Dark mode support (class-based)
+- Declarative animations and gestures
 
 ### Integration Points
 
 **Authentication Flow:**
 
 ```
-User → Login Screen → Supabase Magic Link → Email → Deep Link → App → Verify Token → Home Screen
+User → Login Screen → Supabase Magic Link → Email → URL Redirect → App → Verify Token → Home Screen
 ```
 
 **Love Notes Real-time Flow:**
 
 ```
-User Sends → Optimistic UI Update → Supabase Insert → Realtime Broadcast → Partner Receives → Push Notification
+User Sends → Optimistic UI Update → Supabase Insert → Realtime Broadcast → Partner Receives → Web Push Notification
 ```
 
 **Data Synchronization:**
 
 ```
-App Focus → TanStack Query Refetch → Supabase Queries → Cache Update → UI Re-render
+Page Focus → Zustand Store Refresh → Supabase Queries → State Update → UI Re-render
 ```
 
-**Push Notification Flow:**
+**Web Push Notification Flow:**
 
 ```
-Supabase Edge Function (cron) → Expo Push Service → APNs/FCM → Device → Deep Link Handler → Screen Navigation
+Supabase Edge Function (cron) → Web Push Service → Service Worker → Browser Notification → Click Handler → Screen Navigation
 ```
 
 ## Implementation Patterns
@@ -239,67 +253,85 @@ const { data, error } = await supabase
   .order('created_at', { ascending: false });
 ```
 
-### TanStack Query Pattern
+### Zustand Store Pattern
 
 ```typescript
-// Query key factory
-export const queryKeys = {
-  loveNotes: ['love-notes'] as const,
-  moods: ['moods'] as const,
-  partnerMood: ['partner', 'mood'] as const,
-  photos: ['photos'] as const,
-  dailyMessage: ['daily-message'] as const,
-};
+// Zustand store with TypeScript
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-// Query hook pattern
+interface LoveNotesState {
+  notes: LoveNote[];
+  isLoading: boolean;
+  error: string | null;
+  fetchNotes: () => Promise<void>;
+  sendNote: (message: string) => Promise<void>;
+}
+
+export const useLoveNotesStore = create<LoveNotesState>()(
+  persist(
+    (set, get) => ({
+      notes: [],
+      isLoading: false,
+      error: null,
+
+      fetchNotes: async () => {
+        set({ isLoading: true, error: null });
+        const { data, error } = await supabase
+          .from('love_notes')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          set({ error: error.message, isLoading: false });
+        } else {
+          set({ notes: data, isLoading: false });
+        }
+      },
+
+      sendNote: async (message: string) => {
+        // Optimistic update
+        const tempNote = {
+          id: 'temp',
+          content: message,
+          created_at: new Date().toISOString(),
+          sending: true,
+        };
+        set((state) => ({ notes: [tempNote, ...state.notes] }));
+
+        const { data, error } = await supabase
+          .from('love_notes')
+          .insert({ content: message })
+          .select()
+          .single();
+
+        if (error) {
+          // Rollback on error
+          set((state) => ({
+            notes: state.notes.filter((n) => n.id !== 'temp'),
+            error: error.message,
+          }));
+        } else {
+          // Replace temp with real note
+          set((state) => ({
+            notes: state.notes.map((n) => (n.id === 'temp' ? data : n)),
+          }));
+        }
+      },
+    }),
+    { name: 'love-notes-storage' }
+  )
+);
+
+// Hook usage
 export const useLoveNotes = () => {
-  return useQuery({
-    queryKey: queryKeys.loveNotes,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('love_notes')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 0, // Always consider stale for real-time data
-    refetchOnWindowFocus: true,
-  });
-};
+  const { notes, isLoading, error, fetchNotes, sendNote } = useLoveNotesStore();
 
-// Mutation with optimistic update
-export const useSendLoveNote = () => {
-  const queryClient = useQueryClient();
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
 
-  return useMutation({
-    mutationFn: async (message: string) => {
-      const { data, error } = await supabase
-        .from('love_notes')
-        .insert({ content: message })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onMutate: async (message) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.loveNotes });
-      const previousNotes = queryClient.getQueryData(queryKeys.loveNotes);
-
-      queryClient.setQueryData(queryKeys.loveNotes, (old: LoveNote[]) => [
-        { id: 'temp', content: message, created_at: new Date().toISOString(), sending: true },
-        ...old,
-      ]);
-
-      return { previousNotes };
-    },
-    onError: (err, message, context) => {
-      queryClient.setQueryData(queryKeys.loveNotes, context?.previousNotes);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.loveNotes });
-    },
-  });
+  return { notes, isLoading, error, sendNote };
 };
 ```
 
@@ -319,8 +351,8 @@ useEffect(() => {
         filter: `receiver_id=eq.${userId}`,
       },
       (payload) => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.loveNotes });
-        triggerHaptic('receive');
+        useLoveNotesStore.getState().fetchNotes();
+        triggerVibration('receive');
       }
     )
     .subscribe();
@@ -334,37 +366,41 @@ useEffect(() => {
 ### Component Pattern
 
 ```typescript
-// Themed component with haptics
-interface ThemedButtonProps {
-  onPress: () => void;
+// Tailwind component with vibration feedback
+interface ButtonProps {
+  onClick: () => void;
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'destructive';
   loading?: boolean;
 }
 
-export const ThemedButton: React.FC<ThemedButtonProps> = ({
-  onPress,
+export const Button: React.FC<ButtonProps> = ({
+  onClick,
   children,
   variant = 'primary',
   loading = false,
 }) => {
-  const { triggerHaptic } = useHaptics();
+  const { triggerVibration } = useVibration();
 
-  const handlePress = () => {
-    triggerHaptic('tap');
-    onPress();
+  const handleClick = () => {
+    triggerVibration('tap');
+    onClick();
+  };
+
+  const variantClasses = {
+    primary: 'bg-pink-500 hover:bg-pink-600 text-white',
+    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
+    destructive: 'bg-red-500 hover:bg-red-600 text-white',
   };
 
   return (
-    <Button
-      mode={variant === 'primary' ? 'contained' : 'outlined'}
-      onPress={handlePress}
-      loading={loading}
+    <button
+      onClick={handleClick}
       disabled={loading}
-      style={styles.button}
+      className={`px-4 py-2 rounded-lg font-medium transition-colors ${variantClasses[variant]} disabled:opacity-50`}
     >
-      {children}
-    </Button>
+      {loading ? <LoadingSpinner /> : children}
+    </button>
   );
 };
 ```
