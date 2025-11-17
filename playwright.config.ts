@@ -39,8 +39,8 @@ export default defineConfig({
 
   // Global test settings
   use: {
-    // Base URL (matches Vite dev server with base path)
-    baseURL: 'http://localhost:5173/My-Love/',
+    // Base URL (Vite dev server without base path - production uses /My-Love/)
+    baseURL: 'http://localhost:5173/',
 
     // Run in headless mode for massive speed improvement (30-50% faster)
     headless: true,
@@ -106,7 +106,7 @@ export default defineConfig({
   // Playwright will automatically start the dev server before running tests
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173/My-Love/',
+    url: 'http://localhost:5173/',
     reuseExistingServer: !process.env.CI,
     timeout: 180000, // 3 minutes for slow starts
     retries: 3, // Retry server startup if it fails
