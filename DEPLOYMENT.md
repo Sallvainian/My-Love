@@ -1,18 +1,19 @@
 # Deployment Guide for My-Love PWA
 
-This guide covers the complete deployment process for the My-Love Progressive Web App to GitHub Pages.
+This guide covers the complete deployment process for the My-Love Progressive Web App to Vercel.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
 2. [Quick Start](#quick-start)
-3. [Environment Configuration](#environment-configuration)
-4. [Build Process](#build-process)
-5. [Deployment](#deployment)
-6. [Verification](#verification)
-7. [Troubleshooting](#troubleshooting)
-8. [Rollback Procedure](#rollback-procedure)
-9. [Security Considerations](#security-considerations)
+3. [Vercel Setup](#vercel-setup)
+4. [Environment Configuration](#environment-configuration)
+5. [Build Process](#build-process)
+6. [Automatic Deployments](#automatic-deployments)
+7. [Verification](#verification)
+8. [Troubleshooting](#troubleshooting)
+9. [Rollback Procedure](#rollback-procedure)
+10. [Security Considerations](#security-considerations)
 
 ---
 
@@ -30,21 +31,20 @@ This guide covers the complete deployment process for the My-Love Progressive We
 - **Git**: v2.x or later
   - Check version: `git --version`
 
-### GitHub Pages Setup
+### Vercel Account Setup
 
-1. **Enable GitHub Pages** in your repository settings:
-   - Navigate to: `Settings → Pages`
-   - Source: `Deploy from a branch`
-   - Branch: `gh-pages` (will be created automatically on first deployment)
-   - Folder: `/ (root)`
+1. **Create Vercel account** at https://vercel.com/signup
+   - Recommended: Sign up with GitHub for seamless integration
 
-2. **Verify base path** in `vite.config.ts`:
+2. **Install Vercel CLI** (optional, for local testing):
 
-   ```typescript
-   base: '/My-Love/',  // Must match your repository name
+   ```bash
+   npm install -g vercel
    ```
 
-3. **HTTPS is automatically enforced** by GitHub Pages (required for PWA features).
+3. **Connect GitHub repository**:
+   - Vercel automatically detects Vite projects
+   - Zero configuration needed for React + Vite
 
 ---
 
@@ -56,58 +56,113 @@ For experienced developers who want to deploy immediately:
 # 1. Edit src/config/constants.ts with your relationship data
 nano src/config/constants.ts
 
-# 2. Install dependencies (if not already done)
-npm install
+# 2. Push to GitHub
+git add . && git commit -m "Configure app" && git push
 
-# 3. Deploy (builds, tests, and deploys in one command)
-npm run deploy
+# 3. Import project to Vercel (one-time setup)
+# Go to: https://vercel.com/new
+# Select your GitHub repository
+# Add environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+# Click "Deploy"
 ```
 
-That's it! Your site will be live at `https://yourusername.github.io/My-Love/`
+That's it! Vercel automatically deploys on every push to main.
+
+**Live URL**: `https://your-project.vercel.app/`
 
 ---
 
-## Configuration
+## Vercel Setup
 
-### Edit the App Constants
+### Initial Project Import
 
-The app uses pre-configured constants for relationship data. Edit `src/config/constants.ts`:
+1. **Go to Vercel Dashboard**: https://vercel.com/dashboard
+
+2. **Import Git Repository**:
+   - Click "Add New" → "Project"
+   - Select "Import Git Repository"
+   - Choose your My-Love repository
+   - Vercel auto-detects Vite configuration
+
+3. **Configure Build Settings** (auto-detected):
+
+   ```
+   Framework Preset: Vite
+   Build Command: npm run build
+   Output Directory: dist
+   Install Command: npm install
+   ```
+
+4. **Add Environment Variables**:
+   - `VITE_SUPABASE_URL` → Your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY` → Your Supabase anonymous key
+
+5. **Deploy**: Click "Deploy" button
+
+### Project Settings
+
+After initial deployment, configure additional settings:
+
+**General**:
+
+- Project Name: `my-love` (or custom name)
+- Root Directory: `.` (project root)
+
+**Domains**:
+
+- Default: `your-project.vercel.app`
+- Custom domain: Add your own domain (optional)
+
+**Environment Variables**:
+
+- Production, Preview, Development environments supported
+- Add variables for each environment as needed
+
+---
+
+## Environment Configuration
+
+### Local Development (`.env.local`)
+
+Create a `.env.local` file in your project root:
+
+```bash
+# .env.local (gitignored)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+### Vercel Dashboard Configuration
+
+1. **Navigate to Project Settings** → **Environment Variables**
+
+2. **Add Required Variables**:
+
+   | Variable                 | Value                              | Environments                     |
+   | ------------------------ | ---------------------------------- | -------------------------------- |
+   | `VITE_SUPABASE_URL`      | `https://your-project.supabase.co` | Production, Preview, Development |
+   | `VITE_SUPABASE_ANON_KEY` | `your-anon-key`                    | Production, Preview, Development |
+
+3. **Redeploy** to apply new variables (or wait for next push)
+
+### App Configuration
+
+Edit `src/config/constants.ts` with your relationship data:
 
 ```typescript
 // src/config/constants.ts
 export const APP_CONFIG = {
-  defaultPartnerName: 'YourPartnerName', // Partner's name (displayed throughout the app)
-  defaultStartDate: '2024-01-15', // Relationship start date (YYYY-MM-DD format)
+  defaultPartnerName: 'YourPartnerName',
+  defaultStartDate: '2024-01-15', // YYYY-MM-DD format
   isPreConfigured: true,
 } as const;
 ```
-
-**Format Requirements:**
-
-- `defaultPartnerName`: Any string (first name or nickname recommended)
-- `defaultStartDate`: ISO 8601 date (YYYY-MM-DD), must be a valid past date
-
-**Examples:**
-
-```typescript
-// Option 1
-defaultPartnerName: 'Sarah',
-defaultStartDate: '2024-01-15',
-
-// Option 2
-defaultPartnerName: 'My Love',
-defaultStartDate: '2025-10-18',
-```
-
-**That's it!** When you build and deploy, these values will be hardcoded into the app.
 
 ---
 
 ## Build Process
 
-### Manual Build
-
-To build without deploying:
+### Local Build (Testing)
 
 ```bash
 npm run build
@@ -139,38 +194,13 @@ dist/
     └── index-[hash].css    # CSS bundle (~3KB gzipped)
 ```
 
-**Expected build output:**
-
-```
-✓ 2080 modules transformed.
-dist/index.html                   0.62 kB │ gzip:   0.35 kB
-dist/assets/index-*.css          16.64 kB │ gzip:   3.55 kB
-dist/assets/index-*.js          354.14 kB │ gzip: 112.68 kB
-✓ built in ~2s
-
-PWA v1.1.0
-precache  11 entries (365.66 KiB)
-files generated
-  dist/sw.js
-  dist/workbox-*.js
-```
-
-**Build must succeed with:**
-
-- ✅ Zero TypeScript errors
-- ✅ Total bundle size <200KB gzipped (target: NFR001)
-- ✅ Service worker generated successfully
-- ✅ PWA manifest generated
-
 ### Preview Build Locally
-
-Test the production build before deploying:
 
 ```bash
 npm run preview
 ```
 
-Open: http://localhost:4173/My-Love/
+Open: http://localhost:4173/
 
 **Verify:**
 
@@ -182,117 +212,58 @@ Open: http://localhost:4173/My-Love/
 
 ---
 
-## Deployment
+## Automatic Deployments
 
-### Automated Deployment (Recommended)
+### Production Deployments
 
-Deploy with automated smoke tests:
+**Trigger**: Push to `main` branch
 
-```bash
-npm run deploy
-```
+**Process**:
 
-**What happens:**
+1. Vercel detects push via GitHub webhook
+2. Starts new deployment automatically
+3. Runs `npm install` and `npm run build`
+4. Deploys to production URL
+5. Sends notification (email/Slack if configured)
 
-1. **Predeploy hook** runs automatically:
-   - `npm run build` → Builds production bundle
-   - `npm run test:smoke` → Runs smoke tests
-2. **Smoke tests** validate build output (15 automated checks)
-3. **gh-pages deployment** → Pushes `dist/` to `gh-pages` branch
-4. **GitHub Actions** → Deploys to GitHub Pages
-5. **Postdeploy message** → Suggests running post-deploy validation
+**Timeline**: ~1-2 minutes from push to live
 
-**Expected output:**
+### Preview Deployments
 
-```
-> npm run deploy
+**Trigger**: Create or update Pull Request
 
-> predeploy
-> npm run build && npm run test:smoke
+**Process**:
 
-...build output...
+1. Vercel creates unique preview URL
+2. Builds with PR changes
+3. Comments preview URL on PR
+4. Updates preview on each new commit
 
-> test:smoke
-╔═══════════════════════════════════════════════════════╗
-║        Pre-Deploy Smoke Tests for My-Love PWA       ║
-╚═══════════════════════════════════════════════════════╝
+**URL Pattern**: `https://my-love-<branch>-<user>.vercel.app`
 
-✅ All smoke tests passed (15/15)
-✨ Build is ready for deployment!
-
-> deploy
-> gh-pages -d dist
-
-Published
-```
-
-**Deployment timing:**
-
-- Build: ~2 seconds
-- Smoke tests: ~1 second
-- gh-pages push: ~5-10 seconds
-- GitHub Pages propagation: 1-2 minutes
-
-**Live URL:** `https://yourusername.github.io/My-Love/`
-
-### Manual Deployment Steps
-
-If you need to deploy without automation:
+### Manual Deployment (CLI)
 
 ```bash
-# 1. Build
-npm run build
+# Deploy current directory to Vercel
+vercel
 
-# 2. Run smoke tests (optional but recommended)
-npm run test:smoke
+# Deploy to production (from main branch)
+vercel --prod
 
-# 3. Deploy
-npm run deploy
+# Deploy specific commit
+git checkout <commit-hash>
+vercel --prod
 ```
 
 ---
 
 ## Verification
 
-### Automated Pre-Deploy Validation (Smoke Tests)
-
-Smoke tests run automatically during `npm run deploy`. They validate:
-
-1. **✅ File Existence**: `index.html`, `manifest.webmanifest`, `sw.js`
-2. **✅ HTML Structure**: Viewport meta tag, manifest link
-3. **✅ PWA Manifest**: Valid JSON, required fields (name, icons, theme_color)
-4. **✅ Service Worker**: Contains caching logic and precache manifest
-5. **✅ Environment Variables**: APP_CONFIG constants injected into bundle
-6. **✅ Bundle Size**: Total <200KB gzipped (NFR001 compliance)
-7. **✅ Critical Assets**: Icons, JavaScript bundles, CSS bundles
-
-**Smoke tests are fail-fast**: Deployment is blocked if any test fails.
-
-To run smoke tests independently:
-
-```bash
-npm run test:smoke
-```
-
-### Post-Deploy Validation (Optional)
-
-After deployment, verify the live site:
-
-```bash
-node scripts/post-deploy-check.cjs https://yourusername.github.io/My-Love/
-```
-
-**Automated checks:**
-
-- HTTP 200 response from live URL
-- Manifest link present in HTML
-- Manifest is accessible and valid JSON
-
-**Manual verification steps:**
+### Post-Deploy Validation
 
 #### 1. Open Live Site
 
-Navigate to: `https://yourusername.github.io/My-Love/`
+Navigate to: `https://your-project.vercel.app/`
 
 **Verify:**
 
@@ -353,7 +324,7 @@ Manual regression testing:
 - ✅ **Share button**: Click share → Web Share API or clipboard copy works
 - ✅ **Theme switcher**: All 4 themes apply correctly
 - ✅ **Animations**: Smooth 60fps, no jank
-- ✅ **Relationship counter**: Duration calculates correctly from env date
+- ✅ **Relationship counter**: Duration calculates correctly
 
 ---
 
@@ -363,193 +334,55 @@ Manual regression testing:
 
 #### TypeScript Errors
 
-**Symptom:** `npm run build` fails with TypeScript errors
+**Symptom:** Build fails in Vercel logs with TypeScript errors
 
 **Solution:**
 
 ```bash
-# Run type check to see detailed errors
+# Test locally first
 npx tsc -b
 
-# Fix errors in source code
-# Then rebuild
-npm run build
+# Fix errors, then push
+git add . && git commit -m "Fix type errors" && git push
 ```
 
-**Common causes:**
+#### Missing Environment Variables
 
-- Type mismatches in React components
-- Missing type definitions
-- Strict mode violations
-
-#### Vite Build Errors
-
-**Symptom:** Vite bundling fails after TypeScript succeeds
+**Symptom:** `undefined` values or API connection failures
 
 **Solution:**
 
-- Check for import errors or missing files
-- Verify all dependencies are installed: `npm install`
-- Clear Vite cache: `rm -rf node_modules/.vite`
+1. Check Vercel Dashboard → Project Settings → Environment Variables
+2. Ensure variables are added for correct environment (Production/Preview)
+3. Redeploy after adding variables
 
-### Smoke Test Failures
+#### Build Command Fails
 
-#### Test 1: File Existence
-
-**Error:** `❌ Required file not found: [filename]`
+**Symptom:** `npm run build` fails in Vercel
 
 **Solution:**
 
-- Verify build completed successfully
-- Check `dist/` directory exists
-- Rebuild: `npm run build`
-
-#### Test 5: Configuration Constants
-
-**Warning:** `⚠️ Warning: APP_CONFIG constants not found in bundle`
-
-**Cause:** `src/config/constants.ts` values were not properly set during build
-
-**Solution:**
-
-```bash
-# 1. Edit src/config/constants.ts
-nano src/config/constants.ts
-
-# 2. Verify defaultPartnerName and defaultStartDate are set with non-empty values
-# Example:
-#   defaultPartnerName: 'Gracie',
-#   defaultStartDate: '2025-10-18',
-
-# 3. Save the file and rebuild
-npm run build
-```
-
-**Impact:** App will function but without pre-configured data (falls back to empty settings)
-
-#### Test 6: Bundle Size
-
-**Error:** `❌ Bundle size exceeds 200KB limit`
-
-**Solution:**
-
-1. Analyze bundle composition:
-
-   ```bash
-   npm run build -- --sourcemap
-   # Inspect generated source maps in dist/assets/
-   ```
-
-2. Common optimizations:
-   - Remove unused dependencies from `package.json`
-   - Ensure Tailwind CSS purge is working (verify in `tailwind.config.js`)
-   - Check for accidentally imported large libraries
-   - Verify tree-shaking is working (check bundle for dead code)
-
-3. Use bundle analyzer:
-   ```bash
-   npm install --save-dev rollup-plugin-visualizer
-   # Add to vite.config.ts plugins array
-   ```
-
-### Deployment Failures
-
-#### gh-pages Push Fails
-
-**Error:** `fatal: could not read Username`
-
-**Solution:**
-
-```bash
-# Configure Git credentials
-git config user.name "Your Name"
-git config user.email "your.email@example.com"
-
-# Retry deployment
-npm run deploy
-```
-
-#### GitHub Pages Not Updating
-
-**Symptom:** Deployment succeeds but site shows old version
-
-**Solution:**
-
-1. **Wait 1-2 minutes** for GitHub Pages to propagate changes
-2. **Hard refresh** browser: Cmd+Shift+R (Mac) or Ctrl+Shift+F5 (Windows)
-3. **Clear browser cache** or test in incognito mode
-4. **Check gh-pages branch**:
-   ```bash
-   git fetch
-   git log origin/gh-pages
-   # Verify latest commit timestamp
-   ```
+1. Check Vercel build logs for specific error
+2. Ensure `package.json` scripts are correct
+3. Verify all dependencies are in `dependencies` (not just `devDependencies`)
 
 ### Runtime Issues
 
 #### Partner Name Not Showing
 
-**Symptom:** App loads but partner name is empty or "Unknown"
-
 **Checklist:**
 
-1. ✅ `src/config/constants.ts` exists in project root
-2. ✅ `defaultPartnerName` is set to a non-empty string
-3. ✅ Rebuilt after editing `constants.ts`: `npm run build`
-4. ✅ Check browser console for APP_CONFIG warnings
-
-**Debug steps:**
-
-```bash
-# Verify constants were set correctly
-cat src/config/constants.ts | grep defaultPartnerName
-
-# Should show: defaultPartnerName: 'YourName',
-# If not set, edit the file and rebuild with: npm run build
-```
-
-#### Relationship Duration Shows "NaN"
-
-**Symptom:** Duration counter displays "NaN days" or incorrect value
-
-**Causes:**
-
-- Invalid date format (must be YYYY-MM-DD)
-- Invalid date (e.g., 2024-02-30)
-- Future date (causes negative duration)
-
-**Solution:**
-
-```bash
-# Verify date format in src/config/constants.ts
-cat src/config/constants.ts | grep defaultStartDate
-
-# Correct format example:
-defaultStartDate: '2024-01-15',
-
-# Rebuild after fixing
-npm run build && npm run deploy
-```
+1. ✅ `src/config/constants.ts` has `defaultPartnerName` set
+2. ✅ Rebuilt and deployed after editing
+3. ✅ Check browser console for APP_CONFIG warnings
 
 #### Service Worker Not Registering
 
-**Symptom:** DevTools shows service worker status "Redundant" or no service worker
-
 **Checklist:**
 
-1. ✅ HTTPS is enabled (GitHub Pages enforces this automatically)
+1. ✅ HTTPS is enabled (Vercel enforces automatically)
 2. ✅ `sw.js` exists in deployed site root
 3. ✅ No console errors in browser DevTools
-4. ✅ Hard refresh page to update service worker
-
-**Debug steps:**
-
-```javascript
-// In browser console, check registration manually
-navigator.serviceWorker.getRegistrations().then((regs) => {
-  console.log('Registered service workers:', regs);
-});
-```
 
 **Force service worker update:**
 
@@ -557,84 +390,81 @@ navigator.serviceWorker.getRegistrations().then((regs) => {
 2. Check "Update on reload"
 3. Hard refresh page (Cmd+Shift+R)
 
-#### Offline Mode Not Working
+#### Environment Variables Not Working
 
-**Symptom:** App doesn't load when offline
+**Common causes:**
+
+- Variables not prefixed with `VITE_` (Vite requirement)
+- Variables added after deployment (need redeploy)
+- Wrong environment selected (Production vs Preview)
+
+**Debug:**
+
+```javascript
+// In browser console
+console.log(import.meta.env);
+```
+
+### Deployment Issues
+
+#### Deployment Stuck
 
 **Solution:**
 
-1. **First load must be online** (service worker needs to cache assets)
-2. **Verify service worker is activated** (see Service Worker troubleshooting)
-3. **Check cache storage**:
-   - DevTools → Application → Cache Storage
-   - Verify assets are cached
-4. **Test again**:
-   - Refresh page while online (to cache everything)
-   - Go offline
-   - Refresh again
+1. Check Vercel Dashboard for deployment status
+2. Cancel stuck deployment
+3. Re-trigger by pushing empty commit:
+   ```bash
+   git commit --allow-empty -m "Trigger redeploy"
+   git push
+   ```
+
+#### Custom Domain Not Working
+
+**Checklist:**
+
+1. ✅ DNS records configured correctly (CNAME or A record)
+2. ✅ Domain verified in Vercel
+3. ✅ SSL certificate provisioned (automatic, may take time)
 
 ---
 
 ## Rollback Procedure
 
-If a deployment introduces issues, you can rollback to a previous version.
+### Instant Rollback via Vercel Dashboard
 
-### Quick Rollback (Revert Last Deployment)
+1. **Go to Vercel Dashboard** → Your Project → **Deployments**
+
+2. **Find Previous Working Deployment**:
+   - List shows all deployments with timestamps
+   - Click on deployment to preview
+
+3. **Promote to Production**:
+   - Click "..." menu on deployment
+   - Select "Promote to Production"
+   - Instant rollback (no rebuild needed)
+
+### Rollback via Git
 
 ```bash
-# 1. Checkout gh-pages branch
-git fetch
-git checkout gh-pages
-
-# 2. Revert the last commit
+# Revert last commit
 git revert HEAD
+git push
 
-# 3. Push the revert
-git push origin gh-pages
-
-# 4. Return to main branch
-git checkout main
+# Vercel auto-deploys the revert
 ```
-
-**Result:** Site will rollback to the previous deployment within 1-2 minutes.
 
 ### Rollback to Specific Version
 
 ```bash
-# 1. Checkout gh-pages branch
-git fetch
-git checkout gh-pages
-
-# 2. View deployment history
+# Find working commit
 git log --oneline -10
 
-# 3. Find the commit hash of the version you want (e.g., abc1234)
-
-# 4. Reset to that commit
-git reset --hard abc1234
-
-# 5. Force push (overwrites history)
-git push --force origin gh-pages
-
-# 6. Return to main branch
-git checkout main
-```
-
-**Warning:** `--force` push overwrites history. Use with caution.
-
-### Alternative: Deploy Previous Build
-
-```bash
-# 1. Checkout the working commit on main branch
-git log --oneline -10
-git checkout abc1234
-
-# 2. Rebuild and deploy
-npm run build
-npm run deploy
-
-# 3. Return to latest main
-git checkout main
+# Revert to that commit
+git revert HEAD~<number>
+# or
+git checkout <commit-hash>
+git push
 ```
 
 ---
@@ -651,83 +481,93 @@ git checkout main
 
 **❌ Never commit:**
 
-- `dist/` directory (build output, regenerated on each build)
-- `node_modules/` (dependencies, installed via npm)
+- `.env.local` (local secrets)
+- `dist/` directory (build output)
+- `node_modules/` (dependencies)
 
 ### Relationship Data Storage
 
-**Your relationship data is stored in source code:**
+- `defaultPartnerName` and `defaultStartDate` are in source code
+- Values are public in the deployed app (DevTools accessible)
+- Designed for personal/couple use, not public multi-user deployment
 
-- `defaultPartnerName` and `defaultStartDate` values are in `src/config/constants.ts`
-- This file IS committed to version control (it's part of your app)
-- Anyone with repository access can see these values
-- The app is designed for single-user deployment by you for your partner
+### Environment Variable Security
 
-**Privacy considerations:**
+- **Vercel Dashboard**: Variables encrypted at rest
+- **Build Time**: Variables injected during build process
+- **Runtime**: Values embedded in bundle (no server-side secrets)
+- **Never expose**: Service role keys or admin tokens
 
-- Relationship data (partner name, start date) is personal but not sensitive
-- Single-user PWA deployment assumes you control access to the URL
-- The data is publicly visible in the deployed app (browser DevTools)
-- If you need true privacy:
-  - Deploy to a private server with authentication
-  - Use a deployment platform with environment variables (e.g., Vercel, Netlify)
-  - Implement authentication and server-side rendering
+### HTTPS & Security
 
-### How Configuration Works
-
-The constants are directly embedded in your source code:
-
-1. **You edit**: `src/config/constants.ts` with your values
-2. **Build time**: Vite bundles the constants as hardcoded values
-3. **Runtime**: App reads the hardcoded values from `APP_CONFIG` object
-4. **Deployment**: Bundle is deployed with values permanently embedded
-
-**How it works:**
-
-```typescript
-// Your source: src/config/constants.ts
-export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie',
-  defaultStartDate: '2025-10-18',
-} as const;
-
-// After build: Embedded directly in the app
-// At runtime: APP_CONFIG.defaultPartnerName === 'Gracie'
-```
+- Vercel enforces HTTPS automatically
+- Let's Encrypt certificates (free, auto-renewed)
+- Required for PWA features (service worker, Web Share API)
 
 ---
 
 ## Deployment Checklist
 
-Use this checklist before each deployment:
-
 ### Pre-Deployment
 
 - [ ] `src/config/constants.ts` edited with partner name and relationship start date
 - [ ] Date format is YYYY-MM-DD
-- [ ] Partner name is not an empty string
-- [ ] Code committed to main branch
-- [ ] TypeScript compiles with zero errors: `npx tsc -b`
-- [ ] ESLint passes with zero warnings: `npm run lint`
+- [ ] Partner name is not empty
+- [ ] TypeScript compiles: `npx tsc -b`
+- [ ] Lint passes: `npm run lint`
+- [ ] Local build works: `npm run build`
+- [ ] Environment variables configured in Vercel Dashboard
 
 ### Deployment
 
-- [ ] Run: `npm run deploy`
-- [ ] All smoke tests pass (15/15)
-- [ ] gh-pages push succeeds
-- [ ] Wait 1-2 minutes for GitHub Pages propagation
+- [ ] Code pushed to `main` branch
+- [ ] Vercel deployment triggered
+- [ ] Build succeeds in Vercel logs
+- [ ] Deployment completes (~1-2 minutes)
 
 ### Post-Deployment
 
-- [ ] Open live site: `https://yourusername.github.io/My-Love/`
+- [ ] Open live site
 - [ ] Partner name displays correctly
 - [ ] Relationship duration calculates correctly
-- [ ] No onboarding wizard shown
-- [ ] Service worker registered (DevTools → Application → Service Workers)
-- [ ] Offline mode works (DevTools → Network → Offline)
+- [ ] Service worker registered
+- [ ] Offline mode works
 - [ ] All themes work
 - [ ] Lighthouse PWA score: 100
 - [ ] No console errors
+
+---
+
+## Advanced Configuration
+
+### Custom Domain Setup
+
+1. **Add domain in Vercel**:
+   - Project Settings → Domains → Add
+   - Enter your domain name
+
+2. **Configure DNS**:
+   - CNAME record pointing to `cname.vercel-dns.com`
+   - Or A record to Vercel IP addresses
+
+3. **SSL Certificate**:
+   - Automatically provisioned
+   - Takes ~10-15 minutes
+
+### Preview Deployment Protection
+
+Protect preview deployments with password:
+
+1. Project Settings → Deployment Protection
+2. Enable "Vercel Authentication" or "Password Protection"
+3. Set password for preview URLs
+
+### Build Caching
+
+Vercel caches `node_modules/` and build cache automatically:
+
+- First deployment: ~2 minutes
+- Subsequent deployments: ~30-60 seconds
 
 ---
 
@@ -735,34 +575,15 @@ Use this checklist before each deployment:
 
 ### Documentation
 
-- **Vite Documentation**: https://vite.dev/
-- **vite-plugin-pwa**: https://vite-pwa-org.netlify.app/
-- **GitHub Pages**: https://docs.github.com/en/pages
-- **gh-pages package**: https://www.npmjs.com/package/gh-pages
-
-### Project Structure
-
-```
-.
-├── .env.production          # Your relationship data (gitignored)
-├── .env.production.example  # Template with instructions
-├── vite.config.ts           # Build configuration
-├── package.json             # Scripts and dependencies
-├── scripts/
-│   ├── smoke-tests.cjs      # Pre-deploy validation
-│   └── post-deploy-check.cjs # Post-deploy validation
-├── src/
-│   ├── config/
-│   │   └── constants.ts     # APP_CONFIG (env var exposure)
-│   └── ...                  # App source code
-└── dist/                    # Build output (generated, not committed)
-```
+- **Vercel Documentation**: https://vercel.com/docs
+- **Vite + Vercel**: https://vitejs.dev/guide/static-deploy.html#vercel
+- **Supabase Documentation**: https://supabase.com/docs
 
 ### Commands Reference
 
 ```bash
 # Development
-npm run dev              # Start dev server (http://localhost:5173/My-Love/)
+npm run dev              # Start dev server (http://localhost:5173/)
 
 # Building
 npm run build            # Build production bundle
@@ -772,25 +593,25 @@ npm run preview          # Preview production build locally
 npm run lint             # Run ESLint
 npm run test:smoke       # Run smoke tests on dist/
 
-# Deployment
-npm run deploy           # Build, test, and deploy to GitHub Pages
-
-# Validation
-node scripts/post-deploy-check.cjs [URL]  # Validate live deployment
+# Vercel CLI (optional)
+vercel                   # Deploy preview
+vercel --prod            # Deploy to production
+vercel env pull          # Pull environment variables
 ```
 
 ---
 
 ## Version History
 
-- **v1.0.0** (2025-10-30): Initial deployment guide
-  - Story 1.6: Build & Deployment Configuration Hardening
-  - Automated smoke tests
-  - Pre-configured relationship data via environment variables
-  - Bundle size optimization (<200KB gzipped)
-  - Service worker and PWA manifest generation
-  - GitHub Pages deployment with gh-pages package
+- **v2.0.0** (2025-11-16): Migrated to Vercel deployment
+  - Removed GitHub Pages configuration
+  - Added Vercel automatic deployment setup
+  - Updated environment variable management
+  - Simplified deployment process (zero-config)
+  - Added instant rollback via Vercel Dashboard
+
+- **v1.0.0** (2025-10-30): Initial deployment guide (GitHub Pages)
 
 ---
 
-**Questions or Issues?** Check the [Troubleshooting](#troubleshooting) section or review the smoke test output for specific error messages.
+**Questions or Issues?** Check the [Troubleshooting](#troubleshooting) section or review Vercel deployment logs in the dashboard.

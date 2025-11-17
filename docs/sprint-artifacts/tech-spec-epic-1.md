@@ -1,6 +1,6 @@
-# Epic Technical Specification: Foundation & Core Fixes
+# Epic Technical Specification: PWA Foundation Audit & Stabilization
 
-Date: 2025-10-30
+Date: 2025-11-17
 Author: Frank
 Epic ID: 1
 Status: Draft
@@ -9,1024 +9,725 @@ Status: Draft
 
 ## Overview
 
-Epic 1 addresses critical technical debt and foundational issues in the My Love PWA that prevent it from being production-ready. The v0.1.0 prototype successfully validated the core concept through rapid vibe-coding, but introduced persistence bugs, unnecessary onboarding friction, and code quality issues that must be resolved before feature expansion.
+Epic 1 establishes a stable foundation for the My-Love PWA by systematically auditing the existing codebase, validating core dependencies, and ensuring fundamental infrastructure (authentication, session management, network resilience) functions correctly. This epic transforms the current brownfield PWA from an uncertain state into a verified, reliable baseline that all subsequent features can build upon.
 
-This epic delivers a stable, production-ready foundation by fixing Zustand persist middleware configuration (FR001-FR003), eliminating the onboarding flow through pre-configured relationship data (FR004-FR005), ensuring IndexedDB operations work correctly with service workers, addressing critical code smells and architectural inconsistencies, and hardening the build/deployment pipeline. Upon completion, the app will reliably persist data across browser sessions, provide a frictionless experience for the single intended user (your girlfriend), and maintain clean, maintainable code ready for Epic 2-4 feature additions.
+The existing PWA uses React 19.1.1 + Vite 7.1.7 + TypeScript 5.9 (strict mode) + Zustand 5.0.8 + Tailwind CSS 3.4.18 with Supabase 2.81+ for backend services. Rather than adding new features, Epic 1 focuses on **auditing what exists**, **fixing what's broken**, and **ensuring deployment infrastructure works**. This audit-first approach prevents building new features on an unstable foundation.
+
+The epic delivers value to developers by providing confidence in the existing codebase and to users by ensuring basic functionality (login, session persistence, offline indication) works reliably across modern browsers (Chrome 90+, Firefox 90+, Safari 15+, Edge 90+).
 
 ## Objectives and Scope
 
 **In Scope:**
 
-- Fix Zustand persist middleware to correctly save/restore state from LocalStorage (Story 1.2)
-- Ensure IndexedDB transactions complete successfully when service worker is active (Story 1.3)
-- Remove Onboarding component from render path and pre-configure relationship data via hardcoded constants (Story 1.4)
-- Conduct technical debt audit documenting code smells, architectural issues, and unused dependencies (Story 1.1)
-- Refactor critical code quality issues: TypeScript strict mode compliance, error boundaries, unused code removal (Story 1.5)
-- Harden build process with configuration constant bundling and deployment smoke tests (Story 1.6)
-- Maintain 100% feature parity - no regressions in existing functionality
-- Document all architectural decisions in technical-decisions.md
+- Audit all dependencies in package.json for compatibility and security vulnerabilities
+- Validate TypeScript strict mode compliance with zero type errors
+- Verify ESLint and Vite build pass without warnings
+- Confirm PWA manifest.json and service worker configuration (vite-plugin-pwa)
+- **Validate GitHub Pages deployment pipeline succeeds** (explicit deployment validation)
+- Validate Supabase client connection and configuration with environment variables
+- Verify Zustand store persistence via localStorage/IndexedDB
+- Test magic link authentication flow including URL redirect handling on production domain
+- Ensure session management persists across browser sessions
+- Validate existing network status detection OR document gap for future implementation
+- Verify Row Level Security (RLS) policies exist and are accessible (test query, not creation)
+- Confirm responsive design works from 320px to 1920px viewports (FR61)
+- **Capture baseline metrics** (bundle size, load time, test coverage percentage) before Epic 2
 
 **Out of Scope:**
 
-- New feature development (photo gallery, mood tracking, countdowns) - deferred to Epics 2-4
-- Backend integration or external service setup - not needed for foundation work
-- UI/UX redesigns - focus is stability and code quality, not visual changes
-- Performance optimization beyond fixing blocking bugs - defer to later sprints
-- Migration from Tailwind CSS v3 (current stable version working correctly)
+- New feature development (Love Notes, Push Notifications, etc.)
+- Database schema creation (handled in subsequent epics)
+- UI component development beyond status indicators
+- Performance optimization beyond baseline requirements
+- User-facing feature enhancements
+- Backend/Supabase Edge Functions development
+- Creating new RLS policies (only validate existing ones)
+
+**Validation Failure Protocol:**
+
+When validation reveals issues, apply this decision tree:
+
+- **Critical (blocks Epic 2):** Fix immediately within this epic
+- **Non-critical (doesn't block):** Document in "Technical Debt" section, defer to appropriate epic
+- **Unknown state:** Document gap with recommended remediation, flag for architecture review
+
+**Success Criteria:**
+
+1. All tests pass (Vitest + Playwright)
+2. Zero npm audit vulnerabilities (or documented exceptions with risk assessment)
+3. Zero TypeScript errors in strict mode
+4. Magic link auth completes end-to-end on production domain (GitHub Pages)
+5. Sessions persist across browser close/reopen
+6. Network status detection validated OR gap documented with implementation plan
+7. PWA installable with valid manifest and service worker
+8. **GitHub Pages deployment succeeds without manual intervention**
+9. **Baseline metrics captured:** Bundle size < 500KB, initial load < 3s, test coverage documented
 
 ## System Architecture Alignment
 
-This epic aligns with and strengthens the existing architecture documented in [architecture.md](./architecture.md):
+**Referenced Architecture Components:**
 
-**Component Architecture:** Maintains component-based SPA pattern; removes Onboarding component after Story 1.4, simplifies App.tsx render logic to always show DailyMessage for single-user deployment.
+This epic directly validates the core infrastructure defined in the Architecture document:
 
-**State Management:** Fixes Zustand persist middleware (currently broken) to correctly implement the documented "partialize" strategy that persists only critical state (settings, isOnboarded, messageHistory, moods) to LocalStorage while keeping transient state (messages, photos, currentMessage, isLoading, error) in memory only.
+| Component                  | Architecture Reference         | Epic 1 Validation                                    |
+| -------------------------- | ------------------------------ | ---------------------------------------------------- |
+| **React 19 + Vite 7**      | Core framework stack           | Story 1.1: Build passes, HMR works, no deprecations  |
+| **TypeScript 5.9**         | Strict mode enforced           | Story 1.1: Zero type errors, ESLint compliance       |
+| **Supabase 2.81+**         | Auth, Database, Realtime       | Story 1.2: Client connects, RLS accessible           |
+| **Zustand 5.0.8**          | Client state + persistence     | Story 1.2: Stores hydrate on reload                  |
+| **localStorage/IndexedDB** | Preference persistence (FR62)  | Story 1.2 & 1.4: Preferences survive sessions        |
+| **PWA Manifest + SW**      | Installability (FR60)          | Story 1.1: Valid manifest, service worker registered |
+| **Magic Link Auth**        | Supabase Auth (FR1, FR4)       | Story 1.3: Full flow validates                       |
+| **Session Management**     | Persistent sessions (FR2, FR3) | Story 1.4: Sessions survive browser restart          |
+| **Online-First Pattern**   | Service worker caching         | Story 1.5: Graceful degradation on network loss      |
 
-**Data Layer:** Ensures IndexedDB operations (via idb 8.0.3) work reliably with Workbox service worker caching strategy. No schema changes required - fixes operational reliability.
+**Architectural Constraints:**
 
-**PWA Service Worker:** No changes to caching strategies or manifest configuration. Ensures IndexedDB transactions don't conflict with CacheFirst strategy for app shell assets.
+- Online-first architecture (NOT offline-first sync) - aligns with NFR-I1
+- Service worker caching via Workbox for static assets only
+- Supabase client must handle reconnection gracefully (NFR-I2)
+- Environment variables must use `VITE_` prefix for Vite compatibility
+- Hash-based or history-based routing must work with GitHub Pages deployment
 
-**Build/Deploy:** Hardens existing Vite build → gh-pages deployment pipeline with configuration constant bundling and automated smoke testing.
+**Integration Points Validated:**
 
-**Constraints:**
+- Supabase Auth → Magic link redirect URL handling
+- Supabase Client → Environment variable configuration
+- Zustand → localStorage persistence middleware
+- Service Worker → vite-plugin-pwa configuration
+- Browser APIs → navigator.onLine, 'online'/'offline' events
 
-- Must maintain offline-first capability (FR002, NFR002)
-- No breaking changes to existing data schemas (backward compatibility)
-- Preserve all 4 existing themes and animation behaviors
-- Keep bundle size under 200KB gzipped target
+**Critical Risk Mitigations:**
+
+| Risk                                          | Mitigation Strategy                                                                               | Validation Point                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Magic link redirects fail on GitHub Pages** | Test with actual production domain (/My-Love/ base path), verify hash routing compatibility       | Story 1.3: End-to-end auth on deployed site              |
+| **Service worker caches stale auth tokens**   | Configure cache-first ONLY for static assets (JS/CSS/images), network-first for all API calls     | Story 1.1: Review vite-plugin-pwa config                 |
+| **RLS policies don't exist**                  | Test query with authenticated user, verify policies return expected data, NOT create new policies | Story 1.2: SELECT query against tables with auth context |
+| **Safari localStorage quota exceeded**        | Add quota check before storing, implement fallback strategy if quota < 5MB                        | Story 1.4: Test with Safari, check available quota       |
+| **Environment variables exposed**             | Verify VITE_SUPABASE_ANON_KEY is anon key (safe to expose), never SUPABASE_SERVICE_KEY            | Story 1.2: Audit .env file, verify no service keys       |
 
 ## Detailed Design
 
 ### Services and Modules
 
-| Module/Service                   | Responsibilities                                 | Input                     | Output                             | Owner/Story    |
-| -------------------------------- | ------------------------------------------------ | ------------------------- | ---------------------------------- | -------------- |
-| **zustand store (useAppStore)**  | State management with persistence                | User actions, DB queries  | State updates, LocalStorage writes | Story 1.2      |
-| **persist middleware**           | Serialize/deserialize state to/from LocalStorage | Store state changes       | Persisted JSON in LocalStorage     | Story 1.2      |
-| **storageService (idb wrapper)** | IndexedDB CRUD operations                        | Photo/message data        | Promise<result>                    | Story 1.3      |
-| **App.tsx**                      | Root component, initialization flow              | None                      | Rendered UI tree                   | Story 1.4, 1.5 |
-| **DailyMessage component**       | Main app view with message display               | currentMessage from store | Message card UI                    | No changes     |
-| **Configuration constants**      | Build-time configuration bundling                | src/config/constants.ts   | Runtime constants                  | Story 1.4, 1.6 |
-| **Build pipeline**               | TypeScript → Vite bundle → PWA generation        | Source files              | dist/ output                       | Story 1.6      |
-| **Deployment script**            | GitHub Pages deploy with smoke tests             | dist/ directory           | Live URL + validation              | Story 1.6      |
+Epic 1 validates the existing module structure rather than creating new modules. The expected structure under validation:
 
-**Key Service Interactions:**
+```
+src/
+├── lib/
+│   ├── supabase.ts          # Story 1.2: Supabase client configuration
+│   └── env.ts               # Story 1.2: Environment variable validation
+├── stores/
+│   ├── authStore.ts         # Story 1.4: Auth session persistence
+│   ├── userStore.ts         # Story 1.4: User preferences persistence
+│   └── index.ts             # Story 1.2: Zustand store exports
+├── hooks/
+│   ├── useAuth.ts           # Story 1.3: Auth flow hook
+│   ├── useNetworkStatus.ts  # Story 1.5: Online/offline detection
+│   └── useSession.ts        # Story 1.4: Session management hook
+├── pages/
+│   ├── Login.tsx            # Story 1.3: Magic link login page
+│   ├── AuthCallback.tsx     # Story 1.3: URL redirect handler
+│   └── Home.tsx             # Story 1.4: Authenticated home page
+├── components/
+│   └── StatusIndicator.tsx  # Story 1.5: Network status UI (if exists)
+└── types/
+    ├── auth.ts              # Story 1.3: Auth type definitions
+    └── env.d.ts             # Story 1.1: Vite env type declarations
+```
 
-- App.tsx → useAppStore.initializeApp() → storageService.init() → IndexedDB open
-- User action → Component → Store action → storageService → IndexedDB + LocalStorage
-- Build process → inject env vars → bundled constants available at runtime
+**Module Validation Criteria:**
+
+| Module                       | Validation                                                  | Story |
+| ---------------------------- | ----------------------------------------------------------- | ----- |
+| `src/lib/supabase.ts`        | Creates client with VITE\_ env vars, handles auth callbacks | 1.2   |
+| `src/stores/*`               | Zustand persist middleware configured, hydrates on reload   | 1.2   |
+| `src/hooks/useAuth.ts`       | Magic link flow works end-to-end                            | 1.3   |
+| `src/pages/AuthCallback.tsx` | Handles redirect URLs without infinite loops                | 1.3   |
+| `vite.config.ts`             | Build passes, PWA plugin configured, base path set          | 1.1   |
+| `package.json`               | No security vulnerabilities, compatible versions            | 1.1   |
+
+**Gap Documentation:** If any module is missing or incomplete, document in "Technical Debt" section with severity assessment.
 
 ### Data Models and Contracts
 
-**No schema changes required** - Epic 1 fixes operational issues without modifying existing data models.
+Epic 1 validates data contracts but does NOT create new database schemas. Validation focuses on:
 
-**Existing Data Models** (from [data-models.md](./data-models.md)):
+**1. Supabase Auth Session (Story 1.3, 1.4)**
 
 ```typescript
-// Settings (persisted to LocalStorage via Zustand)
-interface Settings {
-  partnerName: string; // Pre-configured at build time (Story 1.4)
-  relationshipStartDate: string; // Pre-configured at build time (Story 1.4)
-  theme: ThemeName;
-  notificationsEnabled: boolean;
-  notificationTime: string;
+// Expected session structure from Supabase Auth
+interface Session {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  expires_at: number;
+  token_type: string;
+  user: User;
 }
 
-// Zustand Store State (partial persistence)
-interface AppState {
-  // PERSISTED via persist middleware (Story 1.2 fixes)
-  settings: Settings | null;
-  isOnboarded: boolean; // Will be true by default (Story 1.4)
-  messageHistory: MessageHistory;
-  moods: MoodEntry[];
-
-  // IN-MEMORY ONLY (not persisted)
-  messages: Message[]; // Loaded from IndexedDB on init
-  photos: Photo[]; // Loaded from IndexedDB on demand
-  currentMessage: Message | null;
-  isLoading: boolean;
-  error: string | null;
-}
-
-// IndexedDB Schema (no changes)
-interface MyLoveDB {
-  photos: {
-    key: number;
-    value: Photo;
-    indexes: { 'by-date': Date };
+interface User {
+  id: string; // UUID
+  email: string;
+  created_at: string; // ISO timestamp
+  updated_at: string;
+  app_metadata: {
+    provider?: string;
+    providers?: string[];
   };
-  messages: {
-    key: number;
-    value: Message;
-    indexes: { 'by-category': string; 'by-date': Date };
-  };
+  user_metadata: Record<string, unknown>;
 }
 ```
 
-**Configuration Constants** (Story 1.4):
+**Validation:** Session persists in localStorage via `supabase-auth-token` key, refresh works, expires_at honored.
+
+**2. Zustand Store Persistence (Story 1.2, 1.4)**
 
 ```typescript
-// src/config/constants.ts - Edit this file directly to configure
-export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie', // Edit this value directly
-  defaultStartDate: '2025-10-18', // Edit this value directly (YYYY-MM-DD format)
-} as const;
+// Expected persisted state structure
+interface PersistedAuthState {
+  isAuthenticated: boolean;
+  userId: string | null;
+  email: string | null;
+}
 
-// Available at runtime as:
-APP_CONFIG.defaultPartnerName;
-APP_CONFIG.defaultStartDate;
+interface PersistedUserPrefs {
+  theme: 'light' | 'dark' | 'system';
+  lastSync: number; // Unix timestamp
+}
 ```
 
-**Migration Strategy:**
+**Validation:** States serialize to JSON, survive browser restart, version migrations handled.
 
-- Story 1.2: Fix persist middleware without changing data shape
-- Story 1.4: Initialize settings from hardcoded constants on first load, preserve if already exists
-- No user data migration required - backward compatible
+**3. Environment Variables Contract (Story 1.2)**
+
+```typescript
+// Expected .env structure
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string; // https://xxx.supabase.co
+  readonly VITE_SUPABASE_ANON_KEY: string; // eyJ... (public anon key)
+  readonly MODE: string; // development | production
+  readonly BASE_URL: string; // /My-Love/
+}
+```
+
+**Validation:** All VITE\_ prefixed vars accessible, no service keys exposed, BASE_URL matches GitHub Pages path.
 
 ### APIs and Interfaces
 
-**No external APIs** - all functionality is client-side.
+**Browser APIs Under Validation:**
 
-**Internal Module Interfaces:**
+| API                                           | Purpose                  | Story    | Validation Method                      |
+| --------------------------------------------- | ------------------------ | -------- | -------------------------------------- |
+| `navigator.onLine`                            | Network status detection | 1.5      | Toggle airplane mode, verify detection |
+| `window.addEventListener('online'/'offline')` | Network change events    | 1.5      | Listen for events on network toggle    |
+| `localStorage.setItem/getItem`                | State persistence        | 1.2, 1.4 | Store and retrieve test data           |
+| `localStorage.remainingSpace`                 | Quota checking (Safari)  | 1.4      | Verify quota available                 |
+| `IndexedDB`                                   | Alternative persistence  | 1.2      | Test if Zustand uses IDB fallback      |
+| `ServiceWorker.register()`                    | PWA service worker       | 1.1      | Verify SW registered and active        |
 
-**1. StorageService (IndexedDB wrapper)**
-
-```typescript
-// src/services/storageService.ts
-class StorageService {
-  // Initialization (Story 1.3 fixes)
-  init(): Promise<IDBDatabase>;
-
-  // Message operations (no changes)
-  getMessages(): Promise<Message[]>;
-  addMessage(message: Omit<Message, 'id'>): Promise<number>;
-  updateMessage(id: number, updates: Partial<Message>): Promise<void>;
-  toggleFavorite(id: number): Promise<void>;
-
-  // Photo operations (future - no changes in Epic 1)
-  getPhotos(): Promise<Photo[]>;
-  addPhoto(photo: Omit<Photo, 'id'>): Promise<number>;
-  deletePhoto(id: number): Promise<void>;
-}
-```
-
-**2. Zustand Store Actions (Story 1.2 fixes)**
+**Supabase Client API Methods Validated:**
 
 ```typescript
-// src/store/useAppStore.ts
-interface AppStore extends AppState {
-  // Initialization (fix in Story 1.2, 1.3)
-  initializeApp(): Promise<void>; // Fix: ensure persist rehydrates before DB load
+// Story 1.2: Client initialization
+supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    storage: localStorage,
+    autoRefreshToken: true,
+    detectSessionInUrl: true, // Critical for magic link handling
+  },
+});
 
-  // Settings (Story 1.4 changes)
-  setSettings(settings: Settings): void;
-  updateSettings(updates: Partial<Settings>): void;
+// Story 1.3: Magic link authentication
+await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } });
+await supabase.auth.getSession(); // After redirect callback
 
-  // No changes to other actions
-  setOnboarded(value: boolean): void;
-  loadMessages(): Promise<void>;
-  addMessage(text: string, category: MessageCategory): Promise<void>;
-  toggleFavorite(messageId: number): Promise<void>;
-  updateCurrentMessage(): void;
-  // ... other actions unchanged
-}
+// Story 1.4: Session management
+supabase.auth.onAuthStateChange((event, session) => {
+  /* handle */
+});
+await supabase.auth.signOut();
+
+// Story 1.2: RLS policy test
+await supabase.from('profiles').select('*').single(); // Should respect RLS
 ```
 
-**3. Configuration Constants Module (Story 1.4, 1.6)**
-
-```typescript
-// src/config/constants.ts - Hardcoded configuration constants
-export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie', // Edit this value directly
-  defaultStartDate: '2025-10-18', // Edit this value directly (YYYY-MM-DD format)
-} as const;
-```
-
-**4. Error Boundary Interface (Story 1.5)**
-
-```typescript
-// src/components/ErrorBoundary.tsx (new component)
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-}
-
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState;
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void;
-  render(): React.ReactNode;
-}
-```
-
-**Browser APIs Used:**
-
-- IndexedDB API (via idb library) - Story 1.3 ensures compatibility with service worker
-- LocalStorage API - Story 1.2 fixes persist middleware usage
-- Service Worker API - No changes, verify compatibility only
+**Validation:** Each method executes without errors, returns expected shapes, handles errors gracefully.
 
 ### Workflows and Sequencing
 
-**Story Execution Sequence:** 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 (sequential, each builds on previous)
+**Story Execution Order (Dependencies):**
 
-**Critical Workflow 1: Application Initialization (Fixed in Stories 1.2, 1.3)**
+```mermaid
+graph TD
+    S1[Story 1.1: Codebase Audit] --> S2[Story 1.2: Supabase Config]
+    S2 --> S3[Story 1.3: Magic Link Auth]
+    S3 --> S4[Story 1.4: Session Management]
+    S2 --> S5[Story 1.5: Network Status]
 
-```
-User opens app
-    ↓
-App.tsx mounts
-    ↓
-useEffect calls initializeApp()
-    ↓
-[Story 1.2 FIX] Wait for Zustand persist rehydration
-    ↓
-[Story 1.3 FIX] Initialize IndexedDB (ensure no SW conflicts)
-    ↓
-Load messages from IndexedDB
-    ↓
-If empty → populate with 100 default messages
-    ↓
-Update currentMessage based on date
-    ↓
-[Story 1.4 FIX] Check if settings exist
-    ↓
-If NOT exists AND isPreConfigured → inject env vars
-    ↓
-Set isOnboarded = true (skip onboarding)
-    ↓
-Set isLoading = false
-    ↓
-Render DailyMessage component
+    S1 -->|Build must pass| S2
+    S2 -->|Client must connect| S3
+    S3 -->|Auth must work| S4
+    S2 -->|Config must be valid| S5
 ```
 
-**Critical Workflow 2: State Persistence (Story 1.2 Fix)**
+**Validation Workflow Per Story:**
 
-```
-User performs action (e.g., favorite message)
-    ↓
-Component calls store action: toggleFavorite(messageId)
-    ↓
-Action updates in-memory state: messages[id].isFavorite = true
-    ↓
-Action calls storageService.toggleFavorite(messageId)
-    ↓
-IndexedDB transaction updates message record
-    ↓
-[Story 1.2 FIX] Zustand persist middleware detects state change
-    ↓
-Middleware serializes ONLY partialize state to JSON
-    ↓
-Write to LocalStorage key: 'my-love-storage'
-    ↓
-On next app load → persist rehydrates state from LocalStorage
-    ↓
-In-memory state restored, IndexedDB still canonical for messages/photos
-```
+1. **Story 1.1** - Codebase Audit
+   - Run `npm audit` → Fix or document vulnerabilities
+   - Run `tsc --noEmit` → Zero errors required
+   - Run `npm run lint` → Zero errors required
+   - Run `npm run build` → Success required
+   - Inspect `manifest.json` → Valid PWA metadata
+   - Verify service worker registration → Active SW required
 
-**Critical Workflow 3: Build & Deploy (Story 1.6)**
+2. **Story 1.2** - Supabase Configuration
+   - Load `.env` → Verify VITE\_ vars present
+   - Import supabase client → No runtime errors
+   - Call `supabase.auth.getSession()` → Returns null or valid session
+   - Query test table → RLS policies respond (403 or data, not connection error)
+   - Check Zustand stores → `persist` middleware configured
 
-```
-Developer runs: npm run deploy
-    ↓
-predeploy hook triggers: npm run build
-    ↓
-TypeScript compilation: tsc -b (type checking)
-    ↓
-Vite build process:
-  - Bundle React app with configuration constants from src/config/constants.ts
-  - Process Tailwind CSS
-  - Generate PWA assets (SW, manifest)
-  - Minify and hash assets
-    ↓
-Output to dist/ directory
-    ↓
-[Story 1.6 ADD] Run smoke test script:
-  - Verify index.html exists
-  - Verify manifest.webmanifest exists
-  - Verify sw.js contains expected routes
-  - Verify constants bundled (grep bundle for APP_CONFIG constants)
-    ↓
-If smoke tests pass → gh-pages deploys dist/ to gh-pages branch
-    ↓
-GitHub Pages serves updated site
-    ↓
-[Story 1.6 ADD] Post-deploy validation:
-  - curl live URL, verify 200 response
-  - Check manifest loads
-  - Verify SW registers
-```
+3. **Story 1.3** - Magic Link Flow
+   - Navigate to login page → Renders without error
+   - Submit email → Supabase sends magic link (check email)
+   - Click magic link → Redirects to app with token in URL
+   - App extracts token → Session established
+   - User lands on home → Authenticated state confirmed
 
-**Error Handling Sequence (Story 1.5):**
+4. **Story 1.4** - Session Persistence
+   - Authenticated user → Close browser completely
+   - Reopen browser → App auto-restores session (no login screen)
+   - Click logout → Session cleared, redirect to login
+   - Verify localStorage → Auth tokens removed on logout
+   - Test quota → Safari localStorage has >1MB available
 
-```
-Component renders
-    ↓
-Error thrown (e.g., null reference, network failure)
-    ↓
-[Story 1.5 ADD] ErrorBoundary catches error
-    ↓
-Display fallback UI with error message
-    ↓
-Log error to console with stack trace
-    ↓
-User sees "Something went wrong" with retry button
-    ↓
-Click retry → ErrorBoundary resets state → re-render
-```
+5. **Story 1.5** - Network Resilience
+   - Online state → Status indicator shows green "Online"
+   - Toggle network off → Status changes to red "Offline" within 2s
+   - Toggle network on → Status returns to green "Online"
+   - Offline during API call → Graceful error message, no hang
+   - Service worker → Cached static assets load offline
 
 ## Non-Functional Requirements
 
 ### Performance
 
-**Targets** (from NFR001):
+**Baseline Metrics to Capture (Success Criteria #9):**
 
-- App load time: < 2 seconds on 3G connection
-- Animations: 60fps (16.67ms frame budget)
-- Bundle size: < 200KB gzipped (currently ~150KB baseline)
+| Metric                   | Target        | Measurement Method                |
+| ------------------------ | ------------- | --------------------------------- |
+| Bundle Size (gzip)       | < 500KB total | `npm run build` → check dist size |
+| Initial Load (3G)        | < 3 seconds   | Lighthouse performance audit      |
+| Time to Interactive      | < 4 seconds   | Lighthouse TTI metric             |
+| First Contentful Paint   | < 1.5 seconds | Lighthouse FCP metric             |
+| Largest Contentful Paint | < 2.5 seconds | Lighthouse LCP metric             |
+| TypeScript compilation   | < 30 seconds  | `time tsc --noEmit`               |
 
-**Epic 1 Performance Considerations:**
+**Performance Validation (Story 1.1):**
 
-**Story 1.2 (Zustand Persist Fix):**
+- Build completes without memory errors
+- No render-blocking scripts in `<head>`
+- Service worker precaches critical assets only (not all assets)
+- Zustand store serialization < 10ms
+- No React Strict Mode double-render warnings in production
 
-- LocalStorage read/write must not block UI thread
-- Persist middleware should debounce writes (avoid thrashing on rapid state changes)
-- Target: < 10ms for state serialization + LocalStorage write
-- Hydration on app load: < 50ms to restore persisted state
-
-**Story 1.3 (IndexedDB/SW Compatibility):**
-
-- IndexedDB transactions must remain async (non-blocking)
-- Service worker should not intercept IndexedDB operations
-- Target: Message load from IndexedDB < 100ms for 365 messages
-- Photo operations (future) should lazy load, not affect initial render
-
-**Story 1.5 (Refactoring):**
-
-- Remove unused dependencies to reduce bundle size
-- Tree-shaking must eliminate dead code
-- No performance regressions from refactoring (baseline: 150KB gzipped)
-- Error boundaries should have minimal overhead (< 1ms render impact)
-
-**Story 1.6 (Build Optimization):**
-
-- Vite build should produce optimal chunks
-- Environment variable injection adds < 1KB to bundle
-- Smoke tests should complete in < 30 seconds
-- Deploy process total time: < 5 minutes from `npm run deploy` to live
-
-**Monitoring:**
-
-- Use Chrome DevTools Performance tab for profiling
-- Lighthouse CI score must remain 100 for PWA category
-- Bundle Analyzer to verify no bloat from refactoring
+**Not Optimized in Epic 1:** Image optimization, code splitting strategy, lazy loading patterns (deferred to Epic 4+).
 
 ### Security
 
-**Architecture Security** (from NFR005):
+**Security Validation Checklist:**
 
-- No backend - all data stored client-side (privacy by design)
-- HTTPS enforced via GitHub Pages (required for PWA features)
-- No third-party analytics or tracking
+1. **Environment Variables (Story 1.2)**
+   - ✅ `VITE_SUPABASE_ANON_KEY` is anon key (safe to expose in client)
+   - ❌ `SUPABASE_SERVICE_ROLE_KEY` NOT in any VITE\_ prefixed var
+   - ✅ `.env` file listed in `.gitignore`
+   - ✅ `.env.example` exists with placeholder values
+   - ✅ No hardcoded API keys in source code
 
-**Epic 1 Security Considerations:**
+2. **Authentication Security (Story 1.3)**
+   - ✅ Magic link tokens single-use and time-limited (Supabase default: 1 hour)
+   - ✅ Redirect URL validated against whitelist in Supabase dashboard
+   - ✅ CSRF protection via `state` parameter in OAuth flow
+   - ✅ Auth tokens stored in localStorage (acceptable for SPAs)
+   - ⚠️ Session tokens refreshed before expiry (autoRefreshToken: true)
 
-**Story 1.4 (Pre-Configuration):**
+3. **Row Level Security (Story 1.2)**
+   - ✅ RLS enabled on all tables by default
+   - ✅ Policies restrict access to authenticated user's own data
+   - ✅ Test query returns 403 or filtered data, NOT all data
+   - ❌ No SELECT \* without WHERE auth.uid() = user_id
 
-- Configuration constants are hardcoded in `src/config/constants.ts`
-- Constants are committed to version control (intentional for single-user app)
-- Only non-sensitive data: partner name, relationship date (not secrets)
-- No secrets or API keys involved (client-side only app)
+4. **NPM Dependencies (Story 1.1)**
+   - `npm audit` returns zero critical/high vulnerabilities
+   - OR documented exceptions with risk assessment and timeline
+   - Dependencies from trusted sources (no typosquatting)
+   - No deprecated packages with known CVEs
 
-**Story 1.5 (Code Quality):**
-
-- TypeScript strict mode prevents type-related vulnerabilities
-- React automatic XSS protection (content escaping by default)
-- Error boundaries prevent error stack traces leaking sensitive state
-- Input sanitization: not needed yet (no user text input in Epic 1, defer to Epic 2)
-
-**Story 1.6 (Build Hardening):**
-
-- Verify smoke tests don't expose sensitive data in logs
-- GitHub Actions deployment secrets (gh-pages token) already secured
-- CSP headers: defer to future (GitHub Pages defaults sufficient for Epic 1)
-
-**Data Privacy:**
-
-- LocalStorage and IndexedDB data remains on user's device only
-- No network requests except for initial app load (static assets)
-- Service worker cache is device-local, not synced
-
-**Threat Model:**
-
-- **Out of scope:** Multi-user authentication (single-user app)
-- **Out of scope:** Data encryption at rest (device security is user's responsibility)
-- **Mitigated:** XSS via React escaping + TypeScript strict typing
-- **Accepted risk:** Physical device access (user must secure their own device)
+**Not Addressed in Epic 1:** Content Security Policy headers, HTTPS enforcement (handled by GitHub Pages), rate limiting (Supabase handles).
 
 ### Reliability/Availability
 
-**Targets** (from NFR002, NFR003):
+**Target Uptime:** 99.5% (GitHub Pages + Supabase free tier SLAs)
 
-- Offline functionality: 100% of features work offline after initial load (except future mood sync/poke features in Epic 4)
-- Browser compatibility: Latest 2 versions of Chrome, Firefox, Safari, Edge
-- Zero data loss on browser refresh, tab close, or 24-hour gap
+**Reliability Validation:**
 
-**Epic 1 Reliability Improvements:**
+| Aspect                    | Validation Method       | Story | Expected Behavior                             |
+| ------------------------- | ----------------------- | ----- | --------------------------------------------- |
+| **Graceful degradation**  | Disconnect network      | 1.5   | UI shows offline banner, cached assets load   |
+| **Session recovery**      | Token expires           | 1.4   | Auto-refresh works OR redirect to login       |
+| **Build stability**       | Run `npm run build` 3x  | 1.1   | Identical output each time (deterministic)    |
+| **Error boundaries**      | Trigger component error | 1.1   | App doesn't white-screen, shows error message |
+| **Supabase reconnection** | Simulate API timeout    | 1.2   | Client retries automatically                  |
 
-**Story 1.2 (Persistence Fix) - CRITICAL:**
+**Availability Constraints:**
 
-- **Problem:** Current bug causes data loss on browser refresh
-- **Solution:** Fix persist middleware to correctly save state before page unload
-- **Test:** Favorite message → close tab → reopen → verify favorite persists
-- **Test:** Change theme → close browser entirely → reopen next day → verify theme persists
-- **Graceful degradation:** If LocalStorage quota exceeded, log error but don't crash app
+- GitHub Pages: ~100% uptime for static assets (CDN-backed)
+- Supabase Free Tier: 500MB database, 2 realtime connections (sufficient for 2-user app)
+- Magic link email delivery: Depends on Supabase email provider (may have delays)
 
-**Story 1.3 (IndexedDB/SW Fix) - CRITICAL:**
-
-- **Problem:** Service worker may interfere with IndexedDB transactions
-- **Solution:** Ensure SW cache strategy doesn't block DB operations
-- **Test:** Go offline → favorite message → go online → verify IndexedDB updated correctly
-- **Test:** Add 365 messages → service worker updates → verify DB integrity
-- **Fallback:** If IndexedDB fails to open, app should still render with in-memory messages
-
-**Story 1.5 (Error Boundaries):**
-
-- **Resilience:** ErrorBoundary prevents full app crash from component errors
-- **Recovery:** User can retry failed operation without losing entire session
-- **Logging:** Console errors provide debugging info without breaking UX
-
-**Story 1.6 (Deployment Reliability):**
-
-- **Smoke tests:** Catch deployment failures before users see broken builds
-- **Rollback:** GitHub Pages keeps history, can revert to previous gh-pages commit
-- **Validation:** Post-deploy checks ensure live site is functional
-
-**Failure Scenarios & Handling:**
-
-| Failure                          | Impact                           | Mitigation                                         | Story |
-| -------------------------------- | -------------------------------- | -------------------------------------------------- | ----- |
-| LocalStorage quota exceeded      | Settings/favorites won't persist | Show user warning, continue with defaults          | 1.2   |
-| IndexedDB open fails             | Messages/photos unavailable      | Load default 100 messages, show error banner       | 1.3   |
-| Service worker fails to register | No offline support               | App still works online, log warning                | 1.3   |
-| React component error            | UI crashes                       | ErrorBoundary shows fallback, log error            | 1.5   |
-| Build smoke test fails           | Bad deploy prevented             | Halt deployment, notify developer                  | 1.6   |
-| GitHub Pages down                | App unavailable                  | Users see GitHub's error page (out of our control) | N/A   |
+**Not Validated:** Long-term storage retention, database backup strategy (Supabase handles), DDoS protection (GitHub Pages handles).
 
 ### Observability
 
-**No external monitoring** - client-side debugging only (aligns with no-backend architecture).
+**Minimal Observability for Epic 1:**
 
-**Epic 1 Observability Additions:**
+Since Epic 1 is audit/validation work, full observability is deferred. However, baseline monitoring includes:
 
-**Story 1.2 (Persist Debugging):**
+1. **Browser Console Monitoring**
+   - No uncaught exceptions during Stories 1.1-1.5
+   - No React warnings in production build
+   - Service worker logs show successful registration
+   - Network errors surfaced with useful messages
 
-- Console log on persist middleware init: "Zustand persist hydrated from LocalStorage"
-- Error logging if LocalStorage write fails (quota exceeded, private browsing mode)
-- DevTools Application tab inspection: view `my-love-storage` key contents
+2. **Build Metrics (Story 1.1)**
+   - Bundle size report generated (`vite-bundle-visualizer` or similar)
+   - TypeScript compilation time logged
+   - ESLint error count tracked
 
-**Story 1.3 (IndexedDB Monitoring):**
+3. **Manual Validation Logs**
+   - Screenshot of Lighthouse audit (capture baseline)
+   - Console output of `npm audit` saved
+   - Service worker status in DevTools → Application tab
 
-- Console log on DB init: "IndexedDB 'my-love-db' version 1 opened successfully"
-- Error logging for DB transaction failures with operation details
-- DevTools Application tab: inspect `my-love-db` object stores (photos, messages)
+4. **Error Tracking Preparation**
+   - Verify `console.error` calls include stack traces
+   - Auth errors return descriptive messages (not generic "Error")
+   - Network errors distinguish timeout vs 403 vs 500
 
-**Story 1.5 (Error Boundary Logging):**
-
-- ErrorBoundary logs caught errors with component stack to console
-- Include error message, stack trace, and component tree
-- No external error reporting (Sentry, etc.) - keep it simple for single-user app
-
-**Story 1.6 (Build/Deploy Observability):**
-
-- Build script logs: TypeScript compilation status, bundle size, asset count
-- Smoke test output: pass/fail status for each check
-- Post-deploy validation: HTTP status codes, SW registration status
-- GitHub Actions logs (if automated): full deploy pipeline visibility
-
-**Development Debugging Tools:**
-
-- Chrome DevTools Sources tab: Source maps enabled for debugging
-- React DevTools: Inspect component state and props
-- Application tab: View LocalStorage, IndexedDB, Service Worker, Manifest
-- Network tab: Verify service worker caching (offline mode testing)
-- Performance tab: Profile persist middleware and IndexedDB operations
-
-**Production Monitoring (User-Facing):**
-
-- No user analytics or telemetry (privacy-first)
-- No crash reporting to external services
-- Users can open browser console to see error logs if they encounter issues
-- Future: Consider opt-in local error log export for support purposes (Epic 4+)
-
-**Key Signals to Monitor:**
-
-| Signal                         | Location             | Purpose                     | Story |
-| ------------------------------ | -------------------- | --------------------------- | ----- |
-| Persist hydration success/fail | Console log          | Verify LocalStorage restore | 1.2   |
-| IndexedDB init success/fail    | Console log          | Verify DB availability      | 1.3   |
-| Service worker registration    | Console log          | Verify PWA features active  | 1.3   |
-| Error boundary catches         | Console error log    | Track component failures    | 1.5   |
-| Build bundle size              | Build output         | Prevent bloat               | 1.6   |
-| Smoke test results             | Deploy script output | Catch bad deploys           | 1.6   |
+**Not Implemented:** Sentry/LogRocket integration, analytics tracking, performance monitoring dashboards (deferred to Epic 5+).
 
 ## Dependencies and Integrations
 
-**External Dependencies** (from [package.json](../package.json)):
+### External Dependencies
 
-### Production Dependencies
-
-| Package            | Version  | Purpose               | Epic 1 Impact                      |
-| ------------------ | -------- | --------------------- | ---------------------------------- |
-| **react**          | 19.1.1   | UI framework          | No changes                         |
-| **react-dom**      | 19.1.1   | React DOM renderer    | No changes                         |
-| **zustand**        | 5.0.8    | State management      | Story 1.2 fixes persist usage      |
-| **idb**            | 8.0.3    | IndexedDB wrapper     | Story 1.3 ensures SW compatibility |
-| **framer-motion**  | 12.23.24 | Animations            | No changes                         |
-| **lucide-react**   | 0.548.0  | Icon library          | No changes                         |
-| **workbox-window** | 7.3.0    | Service worker client | Story 1.3 verifies no conflicts    |
-
-### Development Dependencies
-
-| Package             | Version | Purpose              | Epic 1 Impact                      |
-| ------------------- | ------- | -------------------- | ---------------------------------- |
-| **typescript**      | 5.9.3   | Type checking        | Story 1.5 enforces strict mode     |
-| **vite**            | 7.1.7   | Build tool           | Story 1.6 env var injection        |
-| **tailwindcss**     | 3.4.18  | CSS framework        | No changes (v3 working correctly)  |
-| **eslint**          | 9.36.0  | Linting              | Story 1.5 reduces warnings to zero |
-| **vite-plugin-pwa** | 1.1.0   | PWA generation       | Story 1.6 verifies manifest/SW     |
-| **gh-pages**        | 6.3.0   | Deployment           | Story 1.6 adds smoke tests         |
-| **autoprefixer**    | 10.4.21 | CSS vendor prefixing | No changes                         |
-| **postcss**         | 8.5.6   | CSS processing       | No changes                         |
-
-**Dependencies to Remove** (Story 1.5):
-
-- Audit for unused packages (none identified in initial scan, verify during Story 1.1 audit)
-
-**No New Dependencies Added** - Epic 1 uses existing stack only.
+| Dependency          | Version | Purpose                  | Epic 1 Validation                        |
+| ------------------- | ------- | ------------------------ | ---------------------------------------- |
+| **Supabase**        | 2.81+   | Auth, Database, Realtime | Story 1.2: Client connects successfully  |
+| **GitHub Pages**    | -       | Static hosting           | Story 1.1: Deployment pipeline works     |
+| **Vite**            | 7.1.7   | Build tooling            | Story 1.1: Build completes without error |
+| **React**           | 19.1.1  | UI framework             | Story 1.1: No deprecation warnings       |
+| **Zustand**         | 5.0.8   | State management         | Story 1.2: Persist middleware works      |
+| **TypeScript**      | 5.4+    | Type safety              | Story 1.1: Zero compilation errors       |
+| **Tailwind CSS**    | 3.4.18  | Styling                  | Story 1.1: Styles compile correctly      |
+| **vite-plugin-pwa** | 0.20+   | PWA support              | Story 1.1: SW registered, manifest valid |
 
 ### Integration Points
 
-**Browser APIs:**
+**1. Supabase Dashboard Configuration (Pre-requisites)**
 
-- **LocalStorage API** - Story 1.2 fixes persist middleware integration
-- **IndexedDB API** - Story 1.3 ensures service worker compatibility
-- **Service Worker API** - Story 1.3 verifies registration, no code changes
-- **Web Share API** - No changes (existing DailyMessage feature)
-- **Notification API** - No changes (permission requested in onboarding, unused after removal)
+- ✅ Project exists at `VITE_SUPABASE_URL`
+- ✅ Magic link email template configured
+- ✅ Redirect URL whitelist includes:
+  - `http://localhost:5173/*` (dev)
+  - `https://{username}.github.io/My-Love/*` (prod)
+- ✅ RLS enabled by default on all tables
+- ✅ At least one table exists for RLS test query
 
-**Build-Time Integrations:**
+**2. GitHub Repository Configuration**
 
-- **Configuration Constants** - Story 1.4, 1.6 bundles src/config/constants.ts into app
-- **TypeScript Compiler** - Story 1.5 enforces strict mode
-- **ESLint** - Story 1.5 eliminates warnings
-- **PostCSS + Tailwind** - No changes to CSS pipeline
-- **Workbox (via vite-plugin-pwa)** - No configuration changes
+- ✅ GitHub Pages enabled in Settings
+- ✅ Source: Deploy from branch OR GitHub Actions
+- ✅ Branch: `main` or `gh-pages`
+- ✅ Custom domain: None (using `username.github.io/My-Love`)
+- ✅ `.github/workflows/deploy.yml` (if using Actions) or manual push to branch
 
-**Deployment Integrations:**
+**3. Environment Variable Injection**
 
-- **GitHub Pages** - Story 1.6 adds smoke test validation
-- **gh-pages CLI** - No changes to deployment mechanism
-- **Git hooks** - Future consideration (not in Epic 1 scope)
+- **Local Development:**
+  ```bash
+  # .env.local (not committed)
+  VITE_SUPABASE_URL=https://xxx.supabase.co
+  VITE_SUPABASE_ANON_KEY=eyJ...
+  ```
+- **GitHub Pages Deployment:**
+  - Set secrets in GitHub repo Settings → Secrets
+  - Inject via `dotenv` or build script
+  - OR hardcode anon key (safe for public client)
 
-**No External Services:**
+### Blocking Dependencies for Epic 2
 
-- No backend APIs
-- No CDN dependencies (all assets bundled)
-- No analytics or monitoring services
-- No payment processors
-- No authentication providers
+Epic 2 (Core Data Models) cannot start until:
 
-### Version Constraints
+- ✅ Story 1.1: Build passes (foundation stable)
+- ✅ Story 1.2: Supabase client connects (backend reachable)
+- ⚠️ RLS policies accessible (can query authenticated data)
 
-**Node.js:** >= 18.0.0 (required for React 19)
-**npm:** >= 9.0.0 (or yarn/pnpm equivalent)
-**Browser Targets:**
-
-- Chrome/Edge: >= 120 (last 2 versions)
-- Firefox: >= 120 (last 2 versions)
-- Safari: >= 17 (last 2 versions)
-- Mobile Safari: >= 17
-- Chrome Mobile: >= 120
-
-**Compatibility Notes:**
-
-- React 19 requires modern JavaScript features (ES2022+)
-- IndexedDB v2 API (supported in all target browsers)
-- Service Worker API (HTTPS required, provided by GitHub Pages)
-- LocalStorage API (universally supported)
+If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expansion).
 
 ## Acceptance Criteria (Authoritative)
 
-These acceptance criteria are extracted from [epics.md](./epics.md) Epic 1 and serve as the authoritative source for story completion validation.
+### Story 1.1: Codebase Audit & Dependency Validation
 
-### Story 1.1: Technical Debt Audit & Refactoring Plan
+**GIVEN** the existing PWA codebase
+**WHEN** developer runs validation commands
+**THEN**:
 
-**AC-1.1.1** Complete code review identifying: code smells, architectural inconsistencies, missing error handling, unused dependencies
-**AC-1.1.2** Document findings in technical-decisions.md
-**AC-1.1.3** Create prioritized refactoring checklist (critical vs. nice-to-have)
-**AC-1.1.4** Estimate effort for each refactoring item
-**AC-1.1.5** No code changes in this story - pure analysis
+- [ ] AC1.1.1: `npm audit` returns zero critical/high vulnerabilities OR documented exceptions
+- [ ] AC1.1.2: `tsc --noEmit` completes with zero errors (strict mode)
+- [ ] AC1.1.3: `npm run lint` passes with zero errors
+- [ ] AC1.1.4: `npm run build` succeeds and generates dist folder
+- [ ] AC1.1.5: `manifest.json` contains valid PWA metadata (name, icons, start_url, display)
+- [ ] AC1.1.6: Service worker registers successfully in DevTools → Application
+- [ ] AC1.1.7: GitHub Pages deployment completes without manual intervention
+- [ ] AC1.1.8: Baseline metrics captured: bundle size < 500KB, Lighthouse score documented
 
-### Story 1.2: Fix Zustand Persist Middleware Configuration
+### Story 1.2: Supabase Client & Configuration Validation
 
-**AC-1.2.1** Zustand persist middleware correctly saves state to LocalStorage
-**AC-1.2.2** State hydration works on app initialization without data loss
-**AC-1.2.3** Storage partializer only persists necessary state (not transient UI state)
-**AC-1.2.4** Handle storage quota exceeded errors gracefully
-**AC-1.2.5** Test persistence across browser refresh, tab close/reopen, and 24-hour gap
-**AC-1.2.6** All existing features continue working (no regression)
+**GIVEN** environment variables are configured
+**WHEN** application loads
+**THEN**:
 
-### Story 1.3: IndexedDB Service Worker Cache Fix
+- [ ] AC1.2.1: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` accessible via `import.meta.env`
+- [ ] AC1.2.2: `.env` file exists and is listed in `.gitignore`
+- [ ] AC1.2.3: No `SUPABASE_SERVICE_ROLE_KEY` in any VITE\_ prefixed variable
+- [ ] AC1.2.4: `supabase.auth.getSession()` returns null or valid Session object (no errors)
+- [ ] AC1.2.5: Zustand stores configured with `persist` middleware (check store source code)
+- [ ] AC1.2.6: Zustand state survives page reload (store data in localStorage/IndexedDB)
+- [ ] AC1.2.7: Test query to Supabase table returns 403 (RLS enabled) or filtered data (policies exist)
 
-**AC-1.3.1** IndexedDB operations complete successfully even when offline
-**AC-1.3.2** Service worker doesn't interfere with IndexedDB transactions
-**AC-1.3.3** Cache strategy updated if needed for IndexedDB compatibility
-**AC-1.3.4** Test: Add photo offline, go online, verify photo persists
-**AC-1.3.5** Test: Favorite message, restart app, verify favorite persists
+### Story 1.3: Magic Link Authentication Flow Validation
 
-### Story 1.4: Remove Onboarding Flow & Pre-Configure Relationship Data
+**GIVEN** user is on login page
+**WHEN** user submits email for magic link
+**THEN**:
 
-**AC-1.4.1** Create environment variables or config file for: partner name, relationship start date
-**AC-1.4.2** Remove Onboarding component from render path
-**AC-1.4.3** App initializes with pre-configured data on first load
-**AC-1.4.4** Relationship duration calculates correctly from pre-configured start date
-**AC-1.4.5** Settings allow editing name/date if needed (edge case)
-**AC-1.4.6** No onboarding UI visible at any point in normal flow
+- [ ] AC1.3.1: Login page renders without errors
+- [ ] AC1.3.2: Email input validates email format before submission
+- [ ] AC1.3.3: `supabase.auth.signInWithOtp()` called with correct `emailRedirectTo`
+- [ ] AC1.3.4: User receives magic link email (check inbox/spam)
+- [ ] AC1.3.5: Clicking magic link redirects to app with token in URL fragment
+- [ ] AC1.3.6: App extracts token via `detectSessionInUrl: true`
+- [ ] AC1.3.7: User lands on authenticated home page (no login screen)
+- [ ] AC1.3.8: Session object contains valid user data (email, id, created_at)
 
-### Story 1.5: Critical Refactoring - Code Quality Improvements
+### Story 1.4: Session Management & Persistence Fixes
 
-**AC-1.5.1** Address all "critical" items from Story 1.1 refactoring checklist
-**AC-1.5.2** Ensure TypeScript strict mode compliance (no `any` types without justification)
-**AC-1.5.3** Add error boundaries for graceful error handling
-**AC-1.5.4** Remove unused dependencies and dead code
-**AC-1.5.5** ESLint warnings reduced to zero
-**AC-1.5.6** All existing features continue working (regression testing)
+**GIVEN** user is authenticated
+**WHEN** user closes and reopens browser
+**THEN**:
 
-### Story 1.6: Build & Deployment Configuration Hardening
+- [ ] AC1.4.1: App auto-restores session without requiring login
+- [ ] AC1.4.2: `localStorage` contains `supabase-auth-token` key
+- [ ] AC1.4.3: Logout clears session tokens from localStorage
+- [ ] AC1.4.4: Logout redirects user to login page
+- [ ] AC1.4.5: Auth state changes trigger `onAuthStateChange` callback
+- [ ] AC1.4.6: Safari localStorage quota check passes (>1MB available)
+- [ ] AC1.4.7: Session refresh happens automatically before token expiry (autoRefreshToken)
 
-**AC-1.6.1** Vite build process includes environment variable injection for relationship data
-**AC-1.6.2** GitHub Pages deployment correctly serves PWA with pre-configured data
-**AC-1.6.3** Service worker generation works correctly in production build
-**AC-1.6.4** Build produces optimized, minified bundles
-**AC-1.6.5** Deployment script includes smoke test verification
-**AC-1.6.6** Document deployment process in README or deployment guide
+### Story 1.5: Network Status & Offline Resilience
 
-**Total Acceptance Criteria:** 30 atomic, testable criteria across 6 stories
+**GIVEN** app is running
+**WHEN** network connectivity changes
+**THEN**:
+
+- [ ] AC1.5.1: Online state shows visual indicator (green dot, "Online" text, etc.)
+- [ ] AC1.5.2: Offline state detected within 2 seconds of network loss
+- [ ] AC1.5.3: Offline state shows visual indicator (red dot, "Offline" text, etc.)
+- [ ] AC1.5.4: Network recovery detected within 2 seconds of reconnection
+- [ ] AC1.5.5: Cached static assets (JS/CSS) load while offline
+- [ ] AC1.5.6: API calls during offline show graceful error message (not hang)
+- [ ] AC1.5.7: `navigator.onLine` and 'online'/'offline' events hooked correctly
+
+**OR (Gap Documentation):**
+
+- [ ] AC1.5.GAP: Network status detection does NOT exist; documented in Technical Debt with implementation plan
 
 ## Traceability Mapping
 
-This table maps acceptance criteria to technical specifications, impacted components, and test approaches.
+### FR → Epic 1 Story Mapping
 
-| AC ID        | Spec Section           | Component/Module                          | Test Approach                                                |
-| ------------ | ---------------------- | ----------------------------------------- | ------------------------------------------------------------ |
-| **AC-1.1.1** | Overview               | All source files                          | Manual code review with checklist                            |
-| **AC-1.1.2** | Detailed Design        | docs/technical-decisions.md               | Verify document exists and contains findings                 |
-| **AC-1.1.3** | Risks                  | technical-decisions.md                    | Review checklist structure (critical/nice-to-have)           |
-| **AC-1.1.4** | Risks                  | technical-decisions.md                    | Verify effort estimates provided                             |
-| **AC-1.1.5** | Overview               | N/A                                       | Git diff confirms no code changes                            |
-| **AC-1.2.1** | Data Models, Workflows | useAppStore, persist middleware           | Unit test: modify state → verify LocalStorage write          |
-| **AC-1.2.2** | Workflows              | useAppStore.initializeApp()               | Integration test: refresh browser → verify state restored    |
-| **AC-1.2.3** | Data Models            | persist middleware config                 | Unit test: verify partializer only saves specified keys      |
-| **AC-1.2.4** | NFR Reliability        | persist middleware error handling         | Unit test: mock quota exceeded → verify graceful handling    |
-| **AC-1.2.5** | Workflows              | Full app                                  | Manual test: favorite → close tab → reopen (3 scenarios)     |
-| **AC-1.2.6** | Overview               | All features                              | Regression test suite (manual or automated)                  |
-| **AC-1.3.1** | APIs, Workflows        | storageService, IndexedDB                 | Integration test: offline mode → IndexedDB operations        |
-| **AC-1.3.2** | NFR Reliability        | storageService, service worker            | Integration test: SW active → IndexedDB transaction succeeds |
-| **AC-1.3.3** | System Architecture    | vite.config.ts, SW config                 | Review SW cache strategy code                                |
-| **AC-1.3.4** | Workflows              | Photo storage (future)                    | Manual test: offline photo add → online verification         |
-| **AC-1.3.5** | Workflows              | Message favoriting                        | Manual test: favorite → restart → verify persists            |
-| **AC-1.4.1** | Data Models, APIs      | src/config/constants.ts                   | Verify constants exist and loaded correctly                  |
-| **AC-1.4.2** | Services               | App.tsx                                   | Code review: Onboarding component removed from render        |
-| **AC-1.4.3** | Workflows              | useAppStore.initializeApp()               | Integration test: first load → settings populated from env   |
-| **AC-1.4.4** | Services               | DailyMessage, relationship duration logic | Unit test: verify duration calculation from env start date   |
-| **AC-1.4.5** | Data Models            | Settings UI (future)                      | Manual test: edit settings → verify changes persist          |
-| **AC-1.4.6** | Services               | App.tsx, Onboarding component             | Manual test: fresh install → no onboarding shown             |
-| **AC-1.5.1** | Detailed Design        | Multiple files per checklist              | Code review: verify critical items addressed                 |
-| **AC-1.5.2** | NFR Security           | tsconfig.json, all .ts files              | TypeScript compiler: strict mode enabled, no errors          |
-| **AC-1.5.3** | APIs                   | ErrorBoundary component                   | Unit test: throw error → verify boundary catches             |
-| **AC-1.5.4** | Dependencies           | package.json, unused files                | npm audit, code search for unused imports                    |
-| **AC-1.5.5** | Overview               | All source files                          | ESLint: run lint command → 0 warnings                        |
-| **AC-1.5.6** | NFR Reliability        | All features                              | Full regression test suite                                   |
-| **AC-1.6.1** | APIs, Workflows        | vite.config.ts, build script              | Build test: verify env vars in bundle                        |
-| **AC-1.6.2** | System Architecture    | GitHub Pages, dist/ output                | Deploy test: access live URL → verify functionality          |
-| **AC-1.6.3** | System Architecture    | vite-plugin-pwa config                    | Build test: verify sw.js generated correctly                 |
-| **AC-1.6.4** | NFR Performance        | Vite build output                         | Build test: verify bundle size < 200KB gzipped               |
-| **AC-1.6.5** | Workflows              | deploy script, smoke tests                | Automated test: smoke tests pass before deploy               |
-| **AC-1.6.6** | Overview               | README.md or docs/                        | Documentation review: deployment process documented          |
+| Functional Requirement | Description                                      | Story | Acceptance Criteria        |
+| ---------------------- | ------------------------------------------------ | ----- | -------------------------- |
+| **FR1**                | Users shall authenticate via Supabase magic link | 1.3   | AC1.3.1-1.3.8              |
+| **FR2**                | Sessions shall persist across browser restarts   | 1.4   | AC1.4.1-1.4.2              |
+| **FR3**                | Logout shall clear session and redirect          | 1.4   | AC1.4.3-1.4.4              |
+| **FR4**                | Auth errors shall provide clear feedback         | 1.3   | AC1.3.2 (email validation) |
+| **FR60**               | App shall be installable as PWA                  | 1.1   | AC1.1.5-1.1.6              |
+| **FR61**               | App shall be responsive 320px-1920px             | 1.1   | (Implicit in build pass)   |
+| **FR62**               | Preferences shall persist locally                | 1.2   | AC1.2.5-1.2.6              |
+| **FR63**               | App shall detect network status                  | 1.5   | AC1.5.1-1.5.7              |
+| **FR64**               | Offline mode shall show cached UI                | 1.5   | AC1.5.5-1.5.6              |
+| **FR65**               | Auto-reconnect shall sync data                   | 1.5   | AC1.5.4 (detection only)   |
 
-**Coverage Summary:**
+### NFR → Epic 1 Validation Mapping
 
-- **Overview/Scope**: 4 ACs
-- **System Architecture**: 4 ACs
-- **Data Models**: 5 ACs
-- **APIs/Interfaces**: 5 ACs
-- **Workflows**: 8 ACs
-- **NFR Performance**: 1 AC
-- **NFR Security**: 1 AC
-- **NFR Reliability**: 5 ACs
-- **Dependencies**: 1 AC
-- **Risks**: 2 ACs
+| Non-Functional Requirement | Description                | Story | Validation Method                  |
+| -------------------------- | -------------------------- | ----- | ---------------------------------- |
+| **NFR-P1**                 | Load time < 3s on 3G       | 1.1   | Lighthouse audit baseline          |
+| **NFR-P2**                 | Bundle size optimized      | 1.1   | AC1.1.8: < 500KB target            |
+| **NFR-S1**                 | Secure auth implementation | 1.3   | Magic link + CSRF protection       |
+| **NFR-S2**                 | Data encrypted in transit  | 1.2   | Supabase HTTPS default             |
+| **NFR-I1**                 | Online-first architecture  | 1.5   | AC1.5.5-1.5.6 graceful degradation |
+| **NFR-I2**                 | Graceful reconnection      | 1.5   | AC1.5.4 recovery detection         |
+
+### Epic 1 → Epic 2 Handoff Requirements
+
+| Epic 1 Output     | Epic 2 Dependency           | Handoff Validation |
+| ----------------- | --------------------------- | ------------------ |
+| Build passes      | Can add new modules         | AC1.1.4            |
+| Supabase connects | Can create tables           | AC1.2.4            |
+| Auth works        | Can query with auth context | AC1.3.8            |
+| Session persists  | Can test RLS policies       | AC1.4.1            |
+| Network status    | Can implement sync logic    | AC1.5.1-1.5.4      |
 
 ## Risks, Assumptions, Open Questions
 
 ### Risks
 
-**R1: Zustand Persist Middleware Complexity (HIGH)**
-
-- **Risk:** Fixing persist middleware may reveal deeper architectural issues with state management
-- **Impact:** Story 1.2 could take longer than estimated; may require refactoring store structure
-- **Mitigation:** Story 1.1 audit will identify state management issues early; have backup plan to simplify state if needed
-- **Owner:** Story 1.2
-
-**R2: Service Worker/IndexedDB Interference (MEDIUM)**
-
-- **Risk:** Service worker cache strategy may fundamentally conflict with IndexedDB operations
-- **Impact:** May require service worker reconfiguration or IndexedDB transaction retries
-- **Mitigation:** Research Workbox + IndexedDB best practices in Story 1.1; test offline scenarios thoroughly
-- **Owner:** Story 1.3
-
-**R3: Pre-Configuration Deployment Complexity (MEDIUM)**
-
-- **Risk:** Environment variable injection at build time may fail in GitHub Actions or require additional configuration
-- **Impact:** Deployment pipeline breaks; may need alternative config approach
-- **Mitigation:** Constants properly configured in src/config/constants.ts before pushing
-- **Owner:** Story 1.6
-
-**R4: TypeScript Strict Mode Migration Effort (MEDIUM)**
-
-- **Risk:** Enabling strict mode may reveal hundreds of type errors in vibe-coded prototype
-- **Impact:** Story 1.5 could exceed time estimate; may need to defer some fixes
-- **Mitigation:** Story 1.1 audit includes strict mode dry-run; prioritize critical errors only
-- **Owner:** Story 1.5
-
-**R5: Regression Risk from Refactoring (HIGH)**
-
-- **Risk:** Code quality improvements in Story 1.5 may introduce bugs or break existing features
-- **Impact:** Features that worked in v0.1.0 stop working after Epic 1
-- **Mitigation:** Manual regression test checklist before each story completion; ErrorBoundary catches crashes
-- **Owner:** Story 1.5, 1.6
-
-**R6: Browser Compatibility Issues (LOW)**
-
-- **Risk:** Fixes may work in Chrome but break in Safari or Firefox
-- **Impact:** Users on non-Chrome browsers experience issues
-- **Mitigation:** Test on all target browsers (Chrome, Firefox, Safari) for Story 1.2, 1.3, 1.4
-- **Owner:** All stories
+| Risk ID | Risk                                                                                                  | Probability | Impact   | Mitigation                                                                      | Owner |
+| ------- | ----------------------------------------------------------------------------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------- | ----- |
+| R1      | **React 19 instability** - Very new release (Dec 2024), may have undiscovered issues                  | Medium      | High     | Monitor React GitHub issues, have fallback to 18.x if critical bugs found       | Dev   |
+| R2      | **Magic link redirect fails on GitHub Pages** - Hash routing may conflict with Supabase token parsing | High        | Critical | Test on production domain BEFORE marking Story 1.3 done, verify BASE_URL config | Dev   |
+| R3      | **RLS policies don't exist** - Database tables may not have policies configured                       | Medium      | High     | Test query first (Story 1.2), if missing, escalate to architecture review       | Dev   |
+| R4      | **Safari localStorage quota** - Safari has 5MB limit, may block session persistence                   | Medium      | Medium   | Implement quota check in Story 1.4, document fallback strategy                  | Dev   |
+| R5      | **Service worker caches auth tokens** - Stale tokens cause auth failures                              | Medium      | Critical | Configure network-first for API routes, cache-first ONLY for static assets      | Dev   |
+| R6      | **GitHub Pages deployment breaks** - Incorrect base path or GitHub Actions failure                    | Medium      | High     | Test deployment pipeline explicitly in Story 1.1, document manual fallback      | Dev   |
+| R7      | **Supabase free tier limits** - 2 concurrent realtime connections may cause issues                    | Low         | Medium   | Acceptable for 2-user app, monitor usage                                        | User  |
 
 ### Assumptions
 
-**A1: Onboarding Flow Is Unnecessary**
+1. **A1: Supabase project exists** - A Supabase project with valid URL and anon key is already created
+2. **A2: GitHub repo exists** - Repository is already set up with GitHub Pages enabled
+3. **A3: Brownfield codebase** - Existing code structure follows React + Vite conventions
+4. **A4: Single developer** - Frank is working alone (no partner testing required)
+5. **A5: Modern browsers only** - Support limited to Chrome 90+, Firefox 90+, Safari 15+, Edge 90+
+6. **A6: Online-first architecture** - App requires network for most operations (not offline-first sync)
+7. **A7: Free tier sufficient** - Supabase and GitHub Pages free tiers meet performance needs
+8. **A8: Email delivery works** - Supabase sends magic link emails without significant delay
 
-- **Assumption:** Your girlfriend will never need to set up the app herself; pre-configuration is sufficient
-- **Validation:** Confirmed by PRD requirement FR004
-- **Impact if wrong:** May need to add admin settings panel in future epic
+**If assumptions are invalid:**
 
-**A2: LocalStorage Quota Is Sufficient**
-
-- **Assumption:** LocalStorage 5-10MB quota is enough for settings, messageHistory, and moods (not photos/messages)
-- **Validation:** Settings + messageHistory ≈ 50KB estimated
-- **Impact if wrong:** Need to implement quota management or move to IndexedDB
-
-**A3: No Multi-Device Sync Needed**
-
-- **Assumption:** Data stays local to each device; no backend sync in Epic 1
-- **Validation:** PRD explicitly excludes cross-device sync
-- **Impact if wrong:** Out of scope for Epic 1; defer to Epic 4 (mood sync only)
-
-**A4: Current Tech Stack Is Optimal**
-
-- **Assumption:** React 19, Zustand, Tailwind v3 are correct choices; no major replacements needed
-- **Validation:** Architecture review in Story 1.1 will validate this
-- **Impact if wrong:** Major refactor required (very unlikely)
-
-**A5: GitHub Pages Hosting Is Reliable**
-
-- **Assumption:** GitHub Pages uptime is acceptable for personal PWA use
-- **Validation:** GitHub Pages SLA is 99.9%+
-- **Impact if wrong:** Consider alternative hosting (Vercel, Netlify) - future consideration
+- A1 invalid → Story 1.2 blocked, need to create Supabase project first
+- A2 invalid → Story 1.1 blocked for deployment, need repo setup
+- A3 invalid → Story 1.1 scope expands significantly (major restructuring)
+- A5 invalid → Need polyfills, scope expansion
+- A8 invalid → Investigate Supabase email provider settings
 
 ### Open Questions
 
-**Q1: Should We Add Automated Tests in Epic 1?** (Priority: HIGH)
-
-- **Question:** Story 1.5 focuses on code quality, but no acceptance criteria for unit tests. Should we add tests now or defer?
-- **Impact:** Adding tests increases Epic 1 effort but reduces regression risk
-- **Recommendation:** Add basic tests for Story 1.2 (persist middleware) and Story 1.3 (IndexedDB) only; defer comprehensive test suite to future epic
-- **Decision needed by:** Story 1.1 completion
-
-**Q2: What Is "Critical" Priority for Refactoring Checklist?** (Priority: MEDIUM)
-
-- **Question:** Story 1.1 creates prioritized checklist, but criteria for "critical" vs "nice-to-have" not defined
-- **Impact:** May defer important refactoring or waste time on low-value changes
-- **Recommendation:** Critical = blocks Epic 2-4 features OR high crash risk; Nice-to-have = code style, minor optimizations
-- **Decision needed by:** Story 1.1 completion
-
-**Q3: Should Onboarding Component Be Deleted or Hidden?** (Priority: LOW)
-
-- **Question:** Story 1.4 removes from render path, but should we delete the component files entirely?
-- **Impact:** Keeping files adds minimal bundle size; deleting prevents future reuse
-- **Recommendation:** Delete Onboarding component files in Story 1.5 (dead code removal)
-- **Decision needed by:** Story 1.4 completion
-
-**Q4: How to Handle Users Who Already Completed Onboarding?** (Priority: MEDIUM)
-
-- **Question:** If someone already has settings in LocalStorage from onboarding, should Story 1.4 override with env vars?
-- **Impact:** May overwrite user's custom settings if they edited name/date
-- **Recommendation:** Only inject env vars if `settings === null`; preserve existing settings if present
-- **Decision needed by:** Story 1.4 implementation
-
-**Q5: Should We Implement Build-Time Smoke Tests or Runtime?** (Priority: HIGH)
-
-- **Question:** Story 1.6 adds smoke tests, but should they run post-build (on dist/) or post-deploy (on live URL)?
-- **Impact:** Post-build catches issues faster; post-deploy validates actual deployment
-- **Recommendation:** Both - post-build checks files/bundles, post-deploy validates live site
-- **Decision needed by:** Story 1.6 planning
+| ID  | Question                                               | Impact               | Decision Needed By      | Default Answer                                               |
+| --- | ------------------------------------------------------ | -------------------- | ----------------------- | ------------------------------------------------------------ |
+| Q1  | Does the PWA already have a service worker configured? | Story 1.1 scope      | Before Story 1.1 starts | Assume NO, will create if missing                            |
+| Q2  | Are there existing Zustand stores with persistence?    | Story 1.2 validation | Before Story 1.2 starts | Assume NO, will configure if missing                         |
+| Q3  | Is there an existing login page?                       | Story 1.3 scope      | Before Story 1.3 starts | Assume NO, will create minimal login UI                      |
+| Q4  | Does network status detection already exist?           | Story 1.5 scope      | Before Story 1.5 starts | Assume NO, document gap OR implement basic version           |
+| Q5  | What tables exist in Supabase for RLS testing?         | Story 1.2 validation | During Story 1.2        | Use any authenticated table, create test table if none exist |
+| Q6  | Is GitHub Actions or manual deploy used?               | Story 1.1 deployment | Before Story 1.1 starts | Assume manual branch push, verify in GitHub Settings         |
 
 ## Test Strategy Summary
 
-### Test Levels
+### Testing Approach by Story
 
-**Manual Testing (Primary Approach for Epic 1):**
+**Story 1.1: Codebase Audit**
 
-- **Rationale:** Rapid prototyping phase; automated test infrastructure not yet established
-- **Coverage:** All acceptance criteria validated manually using test scenarios
-- **Tools:** Browser DevTools, manual browser testing across Chrome/Firefox/Safari
-- **Documentation:** Test checklist created during Story 1.1, executed after each story
+- **Type:** Static analysis + build validation
+- **Tools:** npm audit, tsc, eslint, vite build
+- **Automation:** CI/CD pipeline validates on every commit
+- **Manual:** Lighthouse audit, PWA inspection in DevTools
 
-**Unit Testing (Selective):**
+**Story 1.2: Supabase Configuration**
 
-- **Scope:** Story 1.2 (persist middleware logic), Story 1.3 (IndexedDB error handling)
-- **Framework:** Consider Vitest (matches Vite ecosystem) - decision in Story 1.1
-- **Coverage target:** 80%+ for critical persistence logic only
-- **Not in scope:** Full component testing (defer to future epic)
+- **Type:** Integration testing
+- **Tools:** Manual browser testing, console inspection
+- **Automation:** Vitest unit tests for environment variable loading
+- **Manual:** Query Supabase table, verify RLS response
 
-**Integration Testing (Manual):**
+**Story 1.3: Magic Link Auth**
 
-- **Scope:** Full app initialization flow, offline mode, state persistence across sessions
-- **Scenarios:** Browser refresh, tab close/reopen, 24-hour gap, offline → online transition
-- **Tools:** Chrome DevTools Network throttling, Application tab (LocalStorage/IndexedDB)
+- **Type:** End-to-end testing
+- **Tools:** Playwright (if time permits), manual browser testing
+- **Automation:** Playwright script for auth flow (optional for Epic 1)
+- **Manual:** Complete magic link flow on production domain
 
-**Build/Deploy Testing (Automated):**
+**Story 1.4: Session Management**
 
-- **Scope:** Story 1.6 smoke tests (post-build validation)
-- **Checks:** dist/ file existence, bundle size, env var injection, manifest validity
-- **Tools:** Custom bash script or npm script in package.json
+- **Type:** Functional testing + persistence verification
+- **Tools:** Manual browser testing, DevTools Application tab
+- **Automation:** Vitest tests for Zustand store persistence
+- **Manual:** Close/reopen browser, verify session restored
 
-### Test Coverage by Story
+**Story 1.5: Network Resilience**
 
-**Story 1.1 (Audit):**
+- **Type:** Behavioral testing
+- **Tools:** Browser DevTools Network throttling, airplane mode toggle
+- **Automation:** Difficult to automate network toggle reliably
+- **Manual:** Toggle network on/off, verify UI response
 
-- No testing (analysis only)
-- Deliverable: Test checklist for Stories 1.2-1.6
+### Test Coverage Requirements
 
-**Story 1.2 (Persist Fix):**
+**Minimum for Epic 1 Completion:**
 
-- Unit tests: persist middleware save/restore logic (8 test cases)
-- Integration tests: Browser refresh preserves state (3 scenarios)
-- Manual tests: AC-1.2.5 persistence across browser actions
+- All acceptance criteria manually validated ✅
+- Screenshots/logs captured as evidence ✅
+- Baseline metrics documented ✅
 
-**Story 1.3 (IndexedDB/SW Fix):**
+**Ideal (if time permits):**
 
-- Unit tests: IndexedDB error handling (4 test cases)
-- Integration tests: Offline IndexedDB operations (3 scenarios)
-- Manual tests: AC-1.3.4, AC-1.3.5 offline photo/favorite persistence
+- Vitest unit tests for utility functions (env vars, store persistence)
+- Playwright E2E test for magic link flow
+- Automated Lighthouse CI in GitHub Actions
 
-**Story 1.4 (Pre-Configuration):**
+### Test Environment Setup
 
-- Integration tests: First load with env vars (2 scenarios)
-- Manual tests: AC-1.4.6 no onboarding shown (3 user flows)
-- Build tests: Verify env vars in bundle
+**Local Development:**
 
-**Story 1.5 (Refactoring):**
+```bash
+npm run dev          # Vite dev server on :5173
+npm run test         # Vitest unit tests
+npm run test:e2e     # Playwright E2E tests (if configured)
+npm run lint         # ESLint validation
+npm run typecheck    # TypeScript validation
+```
 
-- Static analysis: TypeScript strict mode, ESLint (automated)
-- Unit tests: ErrorBoundary component (3 test cases)
-- Regression tests: Full manual test checklist from Story 1.1
+**Production Validation:**
 
-**Story 1.6 (Build Hardening):**
+- Deploy to GitHub Pages
+- Test magic link with production redirect URL
+- Verify service worker activation in DevTools
+- Run Lighthouse audit on deployed site
 
-- Smoke tests: Automated post-build checks (6 checks)
-- Manual tests: Deploy to GitHub Pages, verify live site
-- Performance tests: Bundle size validation
+### Definition of Done (DoD) for Epic 1
 
-### Test Scenarios (Critical Paths)
+- [ ] All Stories 1.1-1.5 acceptance criteria pass
+- [ ] Zero TypeScript errors, zero ESLint errors
+- [ ] Zero npm audit critical/high vulnerabilities (or documented)
+- [ ] GitHub Pages deployment successful
+- [ ] Baseline metrics captured and documented
+- [ ] Technical debt items documented (if any)
+- [ ] Sprint status updated: Epic 1 → contexted
+- [ ] Ready for Epic 2: Core Data Models
 
-**Scenario 1: Fresh Install with Pre-Configuration**
+### Test Evidence Artifacts
 
-1. Clear all browser data (LocalStorage, IndexedDB)
-2. Open app URL
-3. Verify: No onboarding shown, DailyMessage renders, relationship duration correct
-4. Verify: Settings populated from env vars (partner name, start date)
-5. **Acceptance Criteria Validated:** AC-1.4.2, AC-1.4.3, AC-1.4.4, AC-1.4.6
+| Story | Evidence Required                                                         |
+| ----- | ------------------------------------------------------------------------- |
+| 1.1   | Screenshot of npm audit output, Lighthouse report PDF, bundle size report |
+| 1.2   | Console log of successful Supabase connection, localStorage inspection    |
+| 1.3   | Video or screenshot sequence of magic link flow completing                |
+| 1.4   | Screenshot of session persisting after browser restart                    |
+| 1.5   | Video of network toggle showing UI status change (or gap documentation)   |
 
-**Scenario 2: State Persistence After Browser Refresh**
-
-1. Favorite a message
-2. Change theme to Ocean Dreams
-3. Close tab
-4. Reopen tab
-5. Verify: Message still favorited, theme still Ocean Dreams
-6. **Acceptance Criteria Validated:** AC-1.2.1, AC-1.2.2, AC-1.2.5
-
-**Scenario 3: Offline Functionality**
-
-1. Open app online
-2. Switch network to offline (DevTools)
-3. Favorite a message
-4. Verify: Favorite action succeeds (IndexedDB write)
-5. Switch back online
-6. Refresh page
-7. Verify: Favorite persists
-8. **Acceptance Criteria Validated:** AC-1.3.1, AC-1.3.2, AC-1.3.5
-
-**Scenario 4: Build and Deploy Pipeline**
-
-1. Edit src/config/constants.ts with test values
-2. Run: npm run deploy
-3. Verify: Build succeeds, smoke tests pass
-4. Access live GitHub Pages URL
-5. Verify: App loads, env vars present, SW registered
-6. **Acceptance Criteria Validated:** AC-1.6.1, AC-1.6.2, AC-1.6.3, AC-1.6.5
-
-### Regression Testing
-
-**Baseline Features (Must Not Break):**
-
-- Daily message rotation (correct message for today's date)
-- Favorite/unfavorite message with heart animation
-- Share message via Web Share API or clipboard
-- Theme switching (all 4 themes render correctly)
-- Relationship duration counter updates
-- Smooth animations (card entrance, hearts burst, decorative hearts)
-
-**Regression Test Checklist (Run After Each Story):**
-
-- [ ] App loads without errors
-- [ ] Today's message displays correctly
-- [ ] Favorite button works (heart animation plays)
-- [ ] Share button works (Web Share API or clipboard)
-- [ ] All 4 themes switch correctly
-- [ ] Relationship duration calculates correctly
-- [ ] Animations are smooth (60fps)
-- [ ] No console errors in normal operation
-- [ ] Service worker registers successfully
-- [ ] Offline mode works (after first load)
-
-### Edge Cases to Test
-
-**LocalStorage Edge Cases:**
-
-- Quota exceeded (fill LocalStorage manually)
-- Private browsing mode (LocalStorage disabled)
-- LocalStorage corrupted (invalid JSON)
-
-**IndexedDB Edge Cases:**
-
-- DB fails to open (permission denied)
-- Transaction timeout (simulate slow disk)
-- Version mismatch (simulate DB schema change)
-
-**Service Worker Edge Cases:**
-
-- SW fails to register (HTTP instead of HTTPS)
-- SW update pending (user doesn't refresh)
-- Cache out of date (stale assets)
-
-**Build/Deploy Edge Cases:**
-
-- Configuration constants not set (should fail gracefully)
-- GitHub Pages down (deployment fails)
-- Smoke tests fail (halt deployment)
-
-### Test Tools and Frameworks
-
-**Browser DevTools:**
-
-- Application tab: LocalStorage, IndexedDB, Service Worker, Manifest
-- Network tab: Offline mode, cache inspection
-- Performance tab: Animation profiling (60fps validation)
-- Console: Error log monitoring
-
-**Testing Frameworks (Future Consideration):**
-
-- **Vitest** - Unit testing (matches Vite ecosystem)
-- **React Testing Library** - Component testing (deferred to Epic 2+)
-- **Playwright** - E2E testing (deferred to Epic 2+)
-
-**Static Analysis:**
-
-- **TypeScript Compiler** - Type checking (strict mode in Story 1.5)
-- **ESLint** - Linting (0 warnings goal in Story 1.5)
-- **Bundle Analyzer** - Bundle size monitoring (Story 1.6)
-
-### Definition of Done (Testing Perspective)
-
-A story is complete when:
-
-1. All acceptance criteria pass manual validation
-2. Regression test checklist passes (no broken features)
-3. No console errors in normal operation
-4. Code compiles with TypeScript strict mode (Stories 1.5+)
-5. ESLint shows 0 warnings (Stories 1.5+)
-6. Browser compatibility verified (Chrome, Firefox, Safari)
-7. Offline functionality works (after first load)
-8. Build and deploy succeeds (Story 1.6)
+These artifacts should be stored in `docs/sprint-artifacts/epic-1-evidence/` folder.
