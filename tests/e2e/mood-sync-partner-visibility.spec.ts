@@ -41,7 +41,7 @@ test.describe('Mood Sync & Partner Visibility', () => {
       // @ts-ignore
       window.import_meta_env = {
         VITE_SUPABASE_URL: 'https://test-project.supabase.co',
-        VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+        VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'test-anon-key',
         VITE_USER_ID: '00000000-0000-0000-0000-000000000001',
         VITE_PARTNER_ID: '00000000-0000-0000-0000-000000000002',
       };

@@ -29,7 +29,7 @@
 - Task 2: Configure Environment Variable Injection (AC: 0.1.3)
   - Add environment variables section to deploy job
   - Map GitHub Secret VITE_SUPABASE_URL to environment variable
-  - Map GitHub Secret VITE_SUPABASE_ANON_KEY to environment variable
+  - Map GitHub Secret VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY to environment variable
   - Verify vite.config.ts includes environment variable handling
   - Document secret setup requirements in .env.example
 
@@ -76,7 +76,7 @@ AC-0.1.2: Build Steps Execution
 - Workflow successfully executes all build steps in sequence: checkout, Node.js 20.x setup, npm install, TypeScript compilation, Vite production build
 
 AC-0.1.3: Environment Variable Injection
-- Build process correctly injects environment variables from GitHub Secrets (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+- Build process correctly injects environment variables from GitHub Secrets (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
 - Environment variables accessible via import.meta.env.VITE_* in build output
 
 AC-0.1.4: PWA Artifact Generation
@@ -147,7 +147,7 @@ AC-0.1.8: Deployment Verification
 
       - path: .env.example
         kind: config
-        symbol: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+        symbol: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
         lines: 1-32
         reason: Environment variable template documenting required Supabase configuration for build-time injection. Includes comments explaining Epic 6 Supabase integration and authentication setup.
 
@@ -245,7 +245,7 @@ AC-0.1.8: Deployment Verification
         - deploy: Deploy artifact to GitHub Pages
     - secrets:
         - VITE_SUPABASE_URL: Supabase project URL
-        - VITE_SUPABASE_ANON_KEY: Supabase anonymous key
+        - VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: Supabase anonymous key
         - SUPABASE_ACCESS_TOKEN: For type generation
     - artifacts:
         - Upload pages artifact from dist/ directory
@@ -295,7 +295,7 @@ AC-0.1.8: Deployment Verification
 
     Environment Variables Contract:
     - VITE_SUPABASE_URL: string (format: https://<project-id>.supabase.co)
-    - VITE_SUPABASE_ANON_KEY: string (public anonymous key from Supabase)
+    - VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: string (public anonymous key from Supabase)
     - Source: GitHub Secrets (CI/CD) or .env file (local dev)
     - Access: import.meta.env.VITE_* in TypeScript code
     - Validation: Build-time check for required vars

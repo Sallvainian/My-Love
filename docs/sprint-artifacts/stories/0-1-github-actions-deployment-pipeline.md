@@ -33,7 +33,7 @@ so that code changes automatically deploy to production on merge to main.
 
 - Build process correctly injects environment variables from GitHub Secrets:
   - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - Environment variables accessible via `import.meta.env.VITE_*` in build output
 
 ### AC-0.1.4: PWA Artifact Generation
@@ -89,7 +89,7 @@ so that code changes automatically deploy to production on merge to main.
 - [x] **Task 2: Configure Environment Variable Injection** (AC: 0.1.3)
   - [x] Add environment variables section to deploy job
   - [x] Map GitHub Secret `VITE_SUPABASE_URL` to environment variable
-  - [x] Map GitHub Secret `VITE_SUPABASE_ANON_KEY` to environment variable
+  - [x] Map GitHub Secret `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` to environment variable
   - [x] Verify `vite.config.ts` includes environment variable handling (already configured)
   - [x] Document secret setup requirements in `.env.example`
 
@@ -144,7 +144,7 @@ so that code changes automatically deploy to production on merge to main.
   - `vite.config.ts` - Verify base path configuration (likely already correct)
 - **GitHub Secrets Required:**
   - `VITE_SUPABASE_URL` - Supabase project URL
-  - `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key (public-safe)
+  - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anonymous key (public-safe)
 
 ### Architecture Alignment
 

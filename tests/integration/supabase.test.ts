@@ -78,7 +78,7 @@ describe('Supabase Configuration', () => {
     }
 
     expect(import.meta.env.VITE_SUPABASE_URL).toBeDefined();
-    expect(import.meta.env.VITE_SUPABASE_ANON_KEY).toBeDefined();
+    expect(import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY).toBeDefined();
     expect(import.meta.env.VITE_TEST_USER_EMAIL).toBeDefined();
     expect(import.meta.env.VITE_TEST_USER_PASSWORD).toBeDefined();
   });
@@ -376,7 +376,7 @@ describe('Error Handling', () => {
     // This test validates that supabaseClient.ts throws on missing vars
     // Already tested in the configuration check
     expect(isSupabaseConfigured()).toBe(
-      !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+      !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
     );
   });
 

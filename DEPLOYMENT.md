@@ -62,7 +62,7 @@ git add . && git commit -m "Configure app" && git push
 # 3. Import project to Vercel (one-time setup)
 # Go to: https://vercel.com/new
 # Select your GitHub repository
-# Add environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+# Add environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
 # Click "Deploy"
 ```
 
@@ -95,7 +95,7 @@ That's it! Vercel automatically deploys on every push to main.
 
 4. **Add Environment Variables**:
    - `VITE_SUPABASE_URL` → Your Supabase project URL
-   - `VITE_SUPABASE_ANON_KEY` → Your Supabase anonymous key
+   - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` → Your Supabase anonymous key
 
 5. **Deploy**: Click "Deploy" button
 
@@ -129,7 +129,7 @@ Create a `.env.local` file in your project root:
 ```bash
 # .env.local (gitignored)
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key-here
 ```
 
 ### Vercel Dashboard Configuration
@@ -141,7 +141,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
    | Variable                 | Value                              | Environments                     |
    | ------------------------ | ---------------------------------- | -------------------------------- |
    | `VITE_SUPABASE_URL`      | `https://your-project.supabase.co` | Production, Preview, Development |
-   | `VITE_SUPABASE_ANON_KEY` | `your-anon-key`                    | Production, Preview, Development |
+   | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | `your-anon-key`                    | Production, Preview, Development |
 
 3. **Redeploy** to apply new variables (or wait for next push)
 
