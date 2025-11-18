@@ -44,12 +44,11 @@ dev-dist
 
 # Documentation files with exposed secrets
 # Keep: architecture.md, index.md, state-management.md
-docs/PRD.md
+# NOTE: epics.md, prd.md restored after full rewrite (2025-11-17 PWA pivot - secrets removed)
 docs/bug-tracker.md
 docs/component-inventory.md
 docs/data-models.md
 docs/development-guide.md
-docs/epics.md
 docs/overnight-dev.md
 docs/partner-connection-system-design.md
 docs/project-overview.md
