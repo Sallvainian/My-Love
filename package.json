@@ -44,15 +44,9 @@
     "@testing-library/react": "^16.1.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.1.16",
-<<<<<<< HEAD
-    "@types/react-dom": "^19.1.9",
-    "@vitejs/plugin-react": "^5.1.1",
-    "@vitest/coverage-v8": "^4.0.9",
-=======
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.0.4",
+    "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.10",
->>>>>>> origin/main
     "@vitest/ui": "^4.0.9",
     "autoprefixer": "^10.4.22",
     "eslint": "^9.36.0",
