@@ -44,6 +44,9 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
+      - name: Run smoke tests
+        run: npm run test:smoke
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

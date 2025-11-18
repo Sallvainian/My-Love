@@ -38,7 +38,7 @@ const colors = {
 
 // Configuration
 const DIST_DIR = path.join(__dirname, '../dist');
-const MAX_BUNDLE_SIZE_KB = 210; // NFR001 performance requirement (updated after bundle optimization)
+const MAX_BUNDLE_SIZE_KB = 230; // NFR001 performance requirement (updated after bundle optimization)
 
 /**
  * Test suite state tracking

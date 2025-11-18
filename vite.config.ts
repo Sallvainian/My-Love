@@ -5,8 +5,8 @@ import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  // Vercel deploys to root domain, no subpath needed
-  base: '/',
+  // GitHub Pages deployment requires repository name as subpath
+  base: '/My-Love/',
   build: {
     rollupOptions: {
       output: {
