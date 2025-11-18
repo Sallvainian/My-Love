@@ -30,7 +30,7 @@
     "eventsource": "^4.0.0",
     "framer-motion": "^12.23.24",
     "idb": "^8.0.3",
-    "lucide-react": "^0.548.0",
+    "lucide-react": "^0.554.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "workbox-window": "^7.3.0",
