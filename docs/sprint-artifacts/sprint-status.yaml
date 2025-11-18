@@ -31,8 +31,8 @@ story_location: docs/sprint-artifacts
 development_status:
   # Epic 0: Deployment & Backend Infrastructure Setup
   epic-0: contexted
-  0-1-github-actions-deployment-pipeline: review
-  0-2-environment-variables-secrets-management: backlog
+  0-1-github-actions-deployment-pipeline: done
+  0-2-environment-variables-secrets-management: review
   0-3-supabase-project-initialization-connection: backlog
   0-4-production-deployment-validation: backlog
   0-5-deployment-monitoring-rollback-strategy: backlog
