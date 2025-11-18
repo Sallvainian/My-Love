@@ -14,7 +14,7 @@ The enhancement isn't about rewriting everything - it's about systematically imp
 
 ### What Makes This Special
 
-**Deeper connection through web-first reliability.** The PWA transforms daily rituals - morning mood logs, midday Love Notes, evening photo shares - into accessible moments from any device with a browser. Web performance means fast interactions: mood logged in under 5 seconds, Love Notes delivered in real-time with Web Push notification heartbeat, photos shared with progress feedback. It's not about adding complexity - it's about the existing connection experience being *stable, maintainable, and consistently reliable*.
+**Deeper connection through web-first reliability.** The PWA transforms daily rituals - morning mood logs, midday Love Notes, evening photo shares - into accessible moments from any device with a browser. Web performance means fast interactions: mood logged in under 5 seconds, Love Notes delivered in real-time with Web Push notification heartbeat, photos shared with progress feedback. It's not about adding complexity - it's about the existing connection experience being _stable, maintainable, and consistently reliable_.
 
 The full transparency model (both partners see everything) combined with real-time delivery creates genuine emotional synchronization. When she logs her mood, you know. When you send a Love Note, she gets it instantly. This isn't a social media app for broadcasting - it's an intimate space designed for exactly two people.
 
@@ -29,6 +29,7 @@ The full transparency model (both partners see everything) combined with real-ti
 This is a Progressive Web App (PWA) enhancement project for personal relationship tracking between two partners. It operates in the general domain without regulatory complexity (no healthcare, fintech, or compliance requirements). The technical focus is on bug fixes, deployment repair, and code quality improvements - not architectural overhauls.
 
 **Key Classification Factors:**
+
 - Progressive Web App with React 19 + Vite 7 + TypeScript
 - Online-first architecture with Zustand state management
 - Leverages existing Supabase backend infrastructure
@@ -44,6 +45,7 @@ This is a Progressive Web App (PWA) enhancement project for personal relationshi
 **Domain Brief Path:** None (general domain, no specialized research required)
 
 **Research Documents:**
+
 - Brainstorming Session Results (2025-11-16) - Architecture decisions, tech stack finalization, risk analysis
 - My-Love PWA Documentation (comprehensive brownfield codebase analysis)
 - Existing Supabase integration patterns from Epic 6 retrospective
@@ -60,7 +62,7 @@ This isn't about notification volume or technical delivery rates - it's about em
 
 1. **Morning Daily Message Ritual** - The 7 AM notification becomes a welcomed start to the day. Both partners anticipate it, and it sets a positive emotional tone. Success: neither partner disables or mutes these notifications.
 
-2. **Love Note Anticipation** - When a partner sends a Love Note, the recipient genuinely looks forward to the notification. The real-time delivery creates moments of connection throughout the day. Success: Love Notes are exchanged multiple times per day because it *feels good* to send and receive them.
+2. **Love Note Anticipation** - When a partner sends a Love Note, the recipient genuinely looks forward to the notification. The real-time delivery creates moments of connection throughout the day. Success: Love Notes are exchanged multiple times per day because it _feels good_ to send and receive them.
 
 3. **Notification Reliability Breeds Trust** - Notifications arrive consistently and promptly. No "I sent it but you didn't get it" frustrations. Success: both partners trust the app enough to rely on it for their connection rituals.
 
@@ -85,6 +87,7 @@ This isn't about notification volume or technical delivery rates - it's about em
 The MVP delivers a complete native mobile experience that replicates and enhances the web PWA's core connection features, with Love Notes as the flagship new capability.
 
 **Core Foundation:**
+
 - React 19 + Vite 7 with TypeScript strict mode
 - React Router or file-based routing solution
 - Zustand for client state management + Supabase client
@@ -154,17 +157,20 @@ Ambitious capabilities that transform the app from utility to relationship compa
 ### Platform Support
 
 **Target Platforms:**
+
 - Modern browsers: Chrome 90+, Firefox 90+, Safari 15+, Edge 90+
 - Desktop and mobile web browsers
 - PWA installable on supported platforms (Chrome, Edge, Safari iOS)
 
 **Development Approach:**
+
 - React 19 + Vite 7 + TypeScript
 - Single codebase for all platforms
 - vite-plugin-pwa for service worker and manifest generation
 - Workbox for caching strategies
 
 **Deployment:**
+
 - GitHub Pages for static hosting
 - Automated deployment via GitHub Actions
 - Preview deployments for testing
@@ -247,6 +253,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
    - Priority: Default
 
 **Technical Implementation:**
+
 - Web Push API with VAPID keys
 - Service Worker for background notification handling
 - Supabase Edge Functions for server-side scheduling
@@ -255,6 +262,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - Badge API for unread counts (where supported)
 
 **Pre-mortem Risk Mitigation:**
+
 - Test across different browsers (Chrome, Firefox, Safari)
 - Handle Safari iOS limitations (requires PWA installation for push)
 - Handle browser notification permission policies
@@ -290,6 +298,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
    - Core Web Vitals compliance
 
 **Pre-mortem Risk: Browser Compatibility**
+
 - Mitigation: Test across major browsers regularly
 - Mitigation: Graceful degradation for unsupported features
 - Mitigation: Feature detection before using advanced APIs
@@ -302,6 +311,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 ### Visual Personality
 
 **"Love" Theme:**
+
 - Warm, romantic color palette (soft pinks, reds, warm neutrals)
 - Intimate and personal feel (not clinical or corporate)
 - Gentle rounded corners and soft shadows
@@ -309,6 +319,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - Typography that feels warm yet readable
 
 **Dark Mode Support:**
+
 - Toggle in settings for user preference
 - System preference detection as default
 - Dark theme maintains "Love" warmth (warm grays, not cold blacks)
@@ -316,6 +327,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - Persistence of preference via localStorage/IndexedDB
 
 **Overall Aesthetic:**
+
 - Clean and minimal (not cluttered)
 - Soft animations with Framer Motion patterns (from web PWA)
 - Lucide icons for consistency with web version
@@ -324,6 +336,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 ### Key Interaction Patterns
 
 **1. Notification Deep Linking:**
+
 - Click notification → land directly in relevant context
 - Love Note notification → opens chat at that message
 - Daily message notification → opens message display
@@ -331,6 +344,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - No intermediate screens, no friction
 
 **2. Quick Mood Logging (< 5 seconds):**
+
 - Open app OR click mood reminder notification
 - See emoji grid (12 emotions from web PWA)
 - Single click to select mood
@@ -339,6 +353,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - Done. Back to life.
 
 **3. Love Notes Chat:**
+
 - Simple conversational interface
 - Text input at bottom, messages scroll above
 - Partner messages on left, yours on right
@@ -348,6 +363,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - Real-time updates when partner sends
 
 **4. Photo Sharing:**
+
 - Pick from file system or drag-and-drop (single or multi-select)
 - See compression/upload progress indicator
 - Thumbnail preview before confirm
@@ -355,6 +371,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 - Click to view full screen with navigation controls
 
 **5. Dashboard Quick Glance:**
+
 - Partner's current mood prominently displayed
 - Last Love Note preview
 - Days together counter
@@ -479,6 +496,7 @@ This section defines WHAT capabilities the product must have. Each FR is a testa
 **FR Count: 65 functional requirements**
 
 **Self-Validation Check:**
+
 - ✅ All MVP features covered (Love Notes, Notifications, Moods, Photos, Migrations)
 - ✅ Mobile-specific requirements included (deep linking, haptics, biometrics, permissions)
 - ✅ UX patterns captured (quick mood logging, notification deep linking, dashboard)
@@ -497,24 +515,28 @@ Non-functional requirements define HOW the system performs rather than WHAT it d
 Performance is critical because the primary user excitement is "being more connected through web-first reliability." The app must feel responsive - fast page loads, smooth interactions, and consistent behavior across browsers.
 
 **NFR-P1: Page Load Time**
+
 - Initial page load to interactive: < 2 seconds on typical connections
 - Subsequent navigation (cached): < 500ms to interactive
 - Rationale: Fast web apps compete with native alternatives
 - Measurement: Lighthouse performance metrics, Core Web Vitals
 
 **NFR-P2: Client-Side Navigation Performance**
+
 - Navigation between views: < 300ms transition animation
 - No jank during transitions (60fps maintained)
 - Rationale: Smooth transitions improve perceived quality
 - Measurement: Browser DevTools Performance panel, frame rate profiling
 
 **NFR-P3: Love Notes Real-Time Latency**
+
 - Message sent to notification received: < 2 seconds under normal conditions
 - Message appears in chat: < 500ms after Supabase Realtime event
 - Rationale: Real-time messaging is core value proposition
 - Measurement: End-to-end latency tests with Supabase Realtime
 
 **NFR-P4: Mood Logging Speed**
+
 - From click to saved confirmation: < 5 seconds total interaction
 - UI response to emoji click: < 100ms visual feedback
 - Save operation: < 1 second server roundtrip
@@ -522,6 +544,7 @@ Performance is critical because the primary user excitement is "being more conne
 - Measurement: User timing with stopwatch, network profiling
 
 **NFR-P5: Image Upload Performance**
+
 - Compression: < 3 seconds for typical photo
 - Upload progress visible and accurate
 - Total time to uploaded and visible: < 10 seconds for standard photo
@@ -529,6 +552,7 @@ Performance is critical because the primary user excitement is "being more conne
 - Measurement: Upload timing tests on various image sizes
 
 **NFR-P6: Memory Usage**
+
 - Tab memory footprint: < 150MB under normal use
 - No memory leaks during extended sessions
 - Image gallery virtualized (only visible images loaded)
@@ -536,6 +560,7 @@ Performance is critical because the primary user excitement is "being more conne
 - Measurement: Browser DevTools Memory panel, heap snapshots
 
 **NFR-P7: Service Worker Caching**
+
 - Cache hit for static assets: < 50ms response
 - Stale data shown immediately while revalidating in background
 - Optimistic updates reflected in UI immediately
@@ -547,6 +572,7 @@ Performance is critical because the primary user excitement is "being more conne
 Security matters because the app handles intimate personal data (moods, photos, private messages) between two partners. Data protection is essential for trust.
 
 **NFR-S1: Authentication Security**
+
 - Supabase magic link tokens expire after 60 minutes
 - Session tokens stored securely in browser storage (HttpOnly cookies where possible)
 - Web Authentication API uses platform secure enclave when available
@@ -555,6 +581,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 - Validation: Security audit of auth flow, token storage inspection
 
 **NFR-S2: Data in Transit Encryption**
+
 - All Supabase API calls over HTTPS (TLS 1.3)
 - WebSocket connections encrypted for Realtime subscriptions
 - Push notification payloads don't contain sensitive message content (ID references only)
@@ -562,6 +589,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 - Validation: Network traffic analysis, HTTPS enforcement verification
 
 **NFR-S3: Data at Rest Protection**
+
 - Supabase enforces Row Level Security (RLS) policies
 - Only authenticated user and their partner can access shared data
 - Photos stored in Supabase Storage with access policies
@@ -570,6 +598,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 - Validation: RLS policy testing, storage permissions audit
 
 **NFR-S4: Push Subscription Security**
+
 - Push subscriptions stored only in user's Supabase profile
 - Subscriptions not exposed through any API responses
 - Subscription refresh handled automatically by service worker
@@ -577,6 +606,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 - Validation: API response inspection, subscription storage verification
 
 **NFR-S5: Input Validation**
+
 - Love Notes: Max 1000 characters, XSS sanitization
 - Mood notes: Max 200 characters
 - Profile fields: Type validation and length limits
@@ -585,6 +615,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 - Validation: Input fuzzing tests, boundary testing
 
 **NFR-S6: Session Management**
+
 - Session timeout after 30 days of inactivity
 - User can manually log out from settings
 - Session revoked server-side on logout
@@ -597,6 +628,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 Integration requirements focus on the Supabase ecosystem and third-party services that the app depends on for core functionality.
 
 **NFR-I1: Supabase Client Compatibility**
+
 - Compatible with Supabase JS Client v2.x
 - Support for Supabase Auth, Database, Realtime, Storage
 - Handle Supabase service degradation gracefully (show cached data, retry logic)
@@ -604,6 +636,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Validation: Integration tests against Supabase APIs, error handling tests
 
 **NFR-I2: Supabase Realtime Reliability**
+
 - WebSocket reconnection on network change
 - Subscription recovery after app backgrounds
 - Handle Realtime service unavailability (fallback to polling or cached data)
@@ -611,6 +644,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Validation: Network disruption tests, background/foreground cycling
 
 **NFR-I3: Web Push API Compatibility**
+
 - VAPID keys configuration for push subscriptions
 - Service worker handles push events
 - Handle notification permission denial gracefully
@@ -619,6 +653,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Validation: Notification delivery tests across browsers
 
 **NFR-I4: Zustand State Management Integration**
+
 - Version compatibility with React 19
 - Proper state slice organization
 - Optimistic updates on mutations
@@ -627,6 +662,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Validation: State lifecycle tests, persistence checks
 
 **NFR-I5: URL Routing Support**
+
 - React Router or similar handles navigation
 - Authentication redirects route correctly
 - Handle invalid URLs gracefully with 404 fallback
@@ -634,6 +670,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Validation: Route handling tests for all navigation scenarios
 
 **NFR-I6: Browser-Specific APIs**
+
 - Vibration API for tactile feedback (mobile browsers)
 - Web Authentication API for passkey support
 - File API for photo upload handling
@@ -643,6 +680,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 ### Reliability Requirements
 
 **NFR-R1: Error Tolerance**
+
 - JavaScript error rate: < 1% of sessions
 - No data loss on errors (unsent messages queued for retry)
 - Graceful error recovery (no permanent stuck states)
@@ -650,6 +688,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Measurement: Error reporting via console monitoring or Sentry
 
 **NFR-R2: Error Handling**
+
 - User-friendly error messages (not technical jargon)
 - Network errors show retry options
 - Validation errors prevent data corruption
@@ -658,6 +697,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - Validation: Error scenario testing, message clarity review
 
 **NFR-R3: Offline Resilience (Graceful Degradation)**
+
 - Show cached data clearly marked as potentially stale
 - Fail operations immediately with retry prompt (no offline queue)
 - App remains navigable when offline (view cached content)
@@ -669,12 +709,14 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 **NFR Count: 18 non-functional requirements across 4 categories**
 
 **Category Breakdown:**
+
 - Performance: 7 NFRs (P1-P7)
 - Security: 6 NFRs (S1-S6)
 - Integration: 6 NFRs (I1-I6)
 - Reliability: 3 NFRs (R1-R3)
 
 **Skipped Categories:**
+
 - ❌ Scale/Capacity: N/A - 2-user intimate app, no growth concerns
 - ❌ Accessibility/Compliance: N/A - Personal app for specific users, standard platform accessibility sufficient
 
@@ -685,10 +727,12 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 ### Total Requirements
 
 **83 Total Requirements:**
+
 - 65 Functional Requirements (WHAT the system does)
 - 18 Non-Functional Requirements (HOW the system performs)
 
 **Coverage by Feature:**
+
 - User Account & Authentication: 6 FRs
 - Love Notes (Real-Time Messaging): 7 FRs
 - Push Notification Infrastructure: 8 FRs
@@ -707,7 +751,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 
 ### Key Differentiators
 
-1. **Web Push Notification Focus** - The app's core value proposition centers on notifications being emotionally anticipated, not just technically delivered. Success is measured by partners *looking forward* to notifications.
+1. **Web Push Notification Focus** - The app's core value proposition centers on notifications being emotionally anticipated, not just technically delivered. Success is measured by partners _looking forward_ to notifications.
 
 2. **Love Notes Real-Time Messaging** - New feature enhancing the PWA. Supabase Realtime + optimistic updates + Web Push notifications create instant partner connection.
 
@@ -798,12 +842,14 @@ If Frank prefers to rewrite Architecture and Epics first (documentation-driven a
 **Status:** Complete - Ready for PWA stabilization workflows
 
 **Input Sources:**
+
 - Original PRD (2025-11-16)
 - My-Love PWA Brownfield Documentation
 - Platform pivot decision (2025-11-17)
 - Existing PWA codebase analysis (React 19, Vite, Zustand, Tailwind)
 
 **Output Handoff:**
+
 - 65 Functional Requirements → Bug audit, feature implementation
 - 18 Non-Functional Requirements → Architecture (performance, security, integration)
 - Success Criteria → Validation framework for PWA enhancement
@@ -813,4 +859,3 @@ If Frank prefers to rewrite Architecture and Epics first (documentation-driven a
 ---
 
 **End of Product Requirements Document**
-
