@@ -3,7 +3,7 @@
 # Queries remote Supabase database to show current schema
 
 echo "=== Supabase Database Inspector ==="
-echo "Project: vdltoyxpujbsaidctzjb"
+echo "Project: xojempkrugifnaveqtqc"
 echo ""
 
 # Show tables with details
