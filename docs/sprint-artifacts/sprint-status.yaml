@@ -32,9 +32,9 @@ development_status:
   # Epic 0: Deployment & Backend Infrastructure Setup
   epic-0: contexted
   0-1-github-actions-deployment-pipeline: done
-  0-2-environment-variables-secrets-management: review
-  0-3-supabase-project-initialization-connection: backlog
-  0-4-production-deployment-validation: backlog
+  0-2-environment-variables-secrets-management: done
+  0-3-supabase-project-initialization-connection: done  # Code review passed, AC tests added 2025-11-18
+  0-4-production-deployment-validation: in-progress  # Dev-story started 2025-11-18
   0-5-deployment-monitoring-rollback-strategy: backlog
   epic-0-retrospective: optional
 

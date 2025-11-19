@@ -395,6 +395,11 @@ function App() {
 
         {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected */}
         <PhotoCarousel />
+
+        {/* Story 0.4: Deployment validation timestamp */}
+        <footer className="fixed bottom-16 left-0 right-0 text-center py-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm">
+          <p>Last validated: 2025-11-18</p>
+        </footer>
       </div>
     </ErrorBoundary>
   );
