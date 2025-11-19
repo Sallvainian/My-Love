@@ -47,9 +47,12 @@ export const createNavigationSlice: StateCreator<NavigationSlice, [], [], Naviga
         mood: '/mood',
         partner: '/partner',
       };
-      const path = pathMap[view];
-      window.history.pushState({ view }, '', path);
-      console.log(`[AppStore] View changed to '${view}', URL: ${path}`);
+      const basePath = pathMap[view];
+      // Respect base URL in production (e.g., /My-Love/ for GitHub Pages)
+      const base = import.meta.env.BASE_URL || '/';
+      const fullPath = base === '/' ? basePath : base.slice(0, -1) + basePath;
+      window.history.pushState({ view }, '', fullPath);
+      console.log(`[AppStore] View changed to '${view}', URL: ${fullPath}`);
     }
   },
 

@@ -4,9 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
   // GitHub Pages deployment requires repository name as subpath
-  base: '/My-Love/',
+  // Use base path only in production, root path in development
+  base: mode === 'production' ? '/My-Love/' : '/',
   build: {
     rollupOptions: {
       output: {
@@ -66,7 +67,9 @@ export default defineConfig(() => ({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        navigateFallback: null,
+        // Serve index.html for all navigation requests (SPA routing support)
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api/, /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/],
         // Don't cache any JS/CSS/HTML - always fetch fresh to prevent stale code
         globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
         runtimeCaching: [
