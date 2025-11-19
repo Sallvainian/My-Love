@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto', // Explicitly inject SW registration
+      srcDir: 'src',
+      filename: 'sw-custom.ts',
+      strategies: 'injectManifest',
       devOptions: {
         enabled: false, // Disable in dev to prevent stale code caching
         type: 'module',

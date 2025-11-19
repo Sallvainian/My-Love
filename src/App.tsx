@@ -14,6 +14,7 @@ import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { authService } from './api/authService';
 import type { Session } from '@supabase/supabase-js';
+import { setupServiceWorkerListener } from './utils/backgroundSync';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -49,6 +50,7 @@ function App() {
     setView,
     syncPendingMoods,
     updateSyncStatus,
+    syncStatus,
   } = useAppStore();
   const hasInitialized = useRef(false);
 
@@ -274,6 +276,54 @@ function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, [syncPendingMoods, updateSyncStatus]);
+
+  // Hybrid Sync Solution: Periodic background sync + immediate sync on mount
+  useEffect(() => {
+    // Part 1: Immediate sync on app mount (if online and authenticated)
+    if (syncStatus.isOnline && session) {
+      if (import.meta.env.DEV) {
+        console.log('[App] Initial sync on mount - checking for pending moods');
+      }
+      syncPendingMoods().catch((error) => {
+        console.error('[App] Initial sync on mount failed:', error);
+      });
+    }
+
+    // Part 2: Periodic sync every 5 minutes while app is open
+    const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+    const syncInterval = setInterval(() => {
+      if (syncStatus.isOnline && session) {
+        if (import.meta.env.DEV) {
+          console.log('[App] Periodic sync triggered (5-minute interval)');
+        }
+        syncPendingMoods().catch((error) => {
+          console.error('[App] Periodic sync failed:', error);
+        });
+      }
+    }, SYNC_INTERVAL_MS);
+
+    // Cleanup interval on unmount
+    return () => {
+      clearInterval(syncInterval);
+      if (import.meta.env.DEV) {
+        console.log('[App] Periodic sync interval cleared');
+      }
+    };
+  }, [syncPendingMoods, syncStatus.isOnline, session]);
+
+  // Part 3: Service Worker Background Sync listener
+  useEffect(() => {
+    // Setup listener for background sync requests from service worker
+    const cleanup = setupServiceWorkerListener(async () => {
+      if (import.meta.env.DEV) {
+        console.log('[App] Service Worker requested background sync');
+      }
+      await syncPendingMoods();
+    });
+
+    // Cleanup on unmount
+    return cleanup;
+  }, [syncPendingMoods]);
 
   // Story 6.7: Show loading screen while checking authentication
   if (authLoading) {
