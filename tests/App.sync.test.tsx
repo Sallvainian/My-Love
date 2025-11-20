@@ -83,6 +83,7 @@ describe('App sync mechanisms', () => {
     // Setup default mock implementations
     mockSyncPendingMoods.mockResolvedValue(undefined);
     vi.mocked(backgroundSyncModule.setupServiceWorkerListener).mockReturnValue(() => {});
+    vi.mocked(backgroundSyncModule.isServiceWorkerSupported).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -239,6 +240,28 @@ describe('App sync mechanisms', () => {
       // Verify listener was setup with callback function
       const listenerCall = vi.mocked(backgroundSyncModule.setupServiceWorkerListener).mock.calls[0];
       expect(listenerCall[0]).toBeInstanceOf(Function);
+    });
+
+    it('should skip service worker listener setup when service workers are not supported', async () => {
+      // Mock isServiceWorkerSupported to return false
+      vi.mocked(backgroundSyncModule.isServiceWorkerSupported).mockReturnValue(false);
+
+      const consoleSpy = vi.spyOn(console, 'log');
+
+      render(<App />);
+
+      // Wait a bit to ensure all effects have run
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify setupServiceWorkerListener was not called
+      expect(backgroundSyncModule.setupServiceWorkerListener).not.toHaveBeenCalled();
+
+      // Verify console log was called
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[App] Service Worker not supported, skipping background sync listener'
+      );
+
+      consoleSpy.mockRestore();
     });
 
     it('should trigger sync when service worker sends message', async () => {
