@@ -2,9 +2,9 @@
 
 **Epic**: 0 - Deployment & Backend Infrastructure Setup
 **Story ID**: 0.4
-**Status**: ready-for-dev
+**Status**: review
 **Created**: 2025-11-18
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-11-20
 
 ---
 
@@ -550,6 +550,7 @@ git push --force origin main
 |------|--------|--------|
 | 2025-11-18 | Dev Agent | Story created from epics.md (Epic 0, Story 0.4) |
 | 2025-11-19 | Dev Agent | Automated deployment validation completed - 4/10 ACs validated, 6 require manual browser testing |
+| 2025-11-20 | Dev Agent | Story marked for review - automated pipeline validation complete, manual browser validation pending |
 
 ---
 
