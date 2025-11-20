@@ -246,7 +246,7 @@ describe('App sync mechanisms', () => {
       // Mock isServiceWorkerSupported to return false
       vi.mocked(backgroundSyncModule.isServiceWorkerSupported).mockReturnValue(false);
 
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       render(<App />);
 
