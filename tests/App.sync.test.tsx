@@ -29,7 +29,7 @@ vi.mock('../src/stores/useAppStore', () => ({
       partnerId: 'test-partner-id',
       partnerName: 'Test Partner',
       displayName: 'Test User',
-      themeName: 'sunset', // Add themeName to prevent theme errors
+      themeName: 'sunset', // Add themeName to prevent undefined theme errors in theme application logic
     },
     initializeApp: mockInitializeApp,
     isLoading: false,
