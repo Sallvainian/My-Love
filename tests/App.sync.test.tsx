@@ -326,7 +326,7 @@ describe('App sync mechanisms', () => {
       // Error should be logged
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
-          '[App] Service Worker requested background sync',
+          '[BackgroundSync] Sync request failed:',
           expect.any(Error)
         );
       });
