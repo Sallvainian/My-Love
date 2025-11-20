@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       injectRegister: 'auto', // Explicitly inject SW registration
       srcDir: 'src',
-      filename: 'sw-custom.ts',
+      filename: 'sw.ts', // Renamed from sw-custom.ts to output sw.js
       strategies: 'injectManifest',
       devOptions: {
         enabled: false, // Disable in dev to prevent stale code caching
