@@ -313,6 +313,15 @@ function App() {
 
   // Part 3: Service Worker Background Sync listener
   useEffect(() => {
+    // Guard: Skip setup if service workers are not supported
+    // (e.g., Safari private mode, older browsers)
+    if (!('serviceWorker' in navigator)) {
+      if (import.meta.env.DEV) {
+        console.log('[App] Service Worker not supported, skipping background sync listener');
+      }
+      return () => {}; // Return noop cleanup function
+    }
+
     // Setup listener for background sync requests from service worker
     const cleanup = setupServiceWorkerListener(async () => {
       if (import.meta.env.DEV) {
