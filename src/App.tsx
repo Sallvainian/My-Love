@@ -14,7 +14,7 @@ import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { authService } from './api/authService';
 import type { Session } from '@supabase/supabase-js';
-import { setupServiceWorkerListener } from './utils/backgroundSync';
+import { setupServiceWorkerListener, isServiceWorkerSupported } from './utils/backgroundSync';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -315,7 +315,7 @@ function App() {
   useEffect(() => {
     // Guard: Skip setup if service workers are not supported
     // (e.g., Safari private mode, older browsers)
-    if (!('serviceWorker' in navigator)) {
+    if (!isServiceWorkerSupported()) {
       if (import.meta.env.DEV) {
         console.log('[App] Service Worker not supported, skipping background sync listener');
       }
