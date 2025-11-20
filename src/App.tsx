@@ -319,7 +319,7 @@ function App() {
       if (import.meta.env.DEV) {
         console.log('[App] Service Worker not supported, skipping background sync listener');
       }
-      return () => {}; // Return noop cleanup function
+      return; // No cleanup needed
     }
 
     // Setup listener for background sync requests from service worker
