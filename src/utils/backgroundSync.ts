@@ -69,6 +69,15 @@ export async function registerBackgroundSync(tag: string): Promise<void> {
 export function setupServiceWorkerListener(
   onSyncRequest: () => Promise<void>
 ): () => void {
+  // Guard: Check if service workers are supported (defense-in-depth)
+  if (!isServiceWorkerSupported()) {
+    if (import.meta.env.DEV) {
+      console.log('[BackgroundSync] Service Worker not supported, skipping listener setup');
+    }
+    // Return noop cleanup function
+    return () => {};
+  }
+
   const handleMessage = (event: MessageEvent) => {
     if (event.data?.type === 'BACKGROUND_SYNC_REQUEST') {
       if (import.meta.env.DEV) {
@@ -92,7 +101,22 @@ export function setupServiceWorkerListener(
 }
 
 /**
+ * Check if Service Worker API is supported
+ *
+ * Used for basic service worker functionality like message listening.
+ * More permissive than isBackgroundSyncSupported().
+ *
+ * @returns true if supported, false otherwise
+ */
+export function isServiceWorkerSupported(): boolean {
+  return 'serviceWorker' in navigator;
+}
+
+/**
  * Check if Background Sync API is supported
+ *
+ * Used for registering background sync tags (requires both SW and SyncManager).
+ * More restrictive than isServiceWorkerSupported().
  *
  * @returns true if supported, false otherwise
  */
