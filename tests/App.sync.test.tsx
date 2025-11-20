@@ -7,14 +7,21 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import { App } from '../src/App';
+import App from '../src/App';
 import * as backgroundSyncModule from '../src/utils/backgroundSync';
 
-// Mock useAppStore
+// Mock useAppStore with configurable state
 const mockSyncPendingMoods = vi.fn();
 const mockUpdateSyncStatus = vi.fn();
 const mockInitializeApp = vi.fn();
 const mockSetView = vi.fn();
+
+// Mutable mock state that can be reconfigured between tests
+let mockSyncStatus = {
+  isOnline: true,
+  pendingMoods: 0,
+  lastSync: null as Date | null,
+};
 
 vi.mock('../src/stores/useAppStore', () => ({
   useAppStore: () => ({
@@ -22,6 +29,7 @@ vi.mock('../src/stores/useAppStore', () => ({
       partnerId: 'test-partner-id',
       partnerName: 'Test Partner',
       displayName: 'Test User',
+      themeName: 'sunset', // Add themeName to prevent theme errors
     },
     initializeApp: mockInitializeApp,
     isLoading: false,
@@ -29,11 +37,7 @@ vi.mock('../src/stores/useAppStore', () => ({
     setView: mockSetView,
     syncPendingMoods: mockSyncPendingMoods,
     updateSyncStatus: mockUpdateSyncStatus,
-    syncStatus: {
-      isOnline: true,
-      pendingMoods: 0,
-      lastSync: null,
-    },
+    syncStatus: mockSyncStatus,
   }),
 }));
 
@@ -71,6 +75,11 @@ describe('App sync mechanisms', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
 
+    // Reset mock state to default (online)
+    mockSyncStatus.isOnline = true;
+    mockSyncStatus.pendingMoods = 0;
+    mockSyncStatus.lastSync = null;
+
     // Setup default mock implementations
     mockSyncPendingMoods.mockResolvedValue(undefined);
     vi.mocked(backgroundSyncModule.setupServiceWorkerListener).mockReturnValue(() => {});
@@ -94,31 +103,9 @@ describe('App sync mechanisms', () => {
     });
 
     it('should not sync when offline on mount', async () => {
-      // Mock offline status
-      vi.mock('../src/stores/useAppStore', async () => {
-        const actual = await vi.importActual('../src/stores/useAppStore');
-        return {
-          ...(actual as object),
-          useAppStore: () => ({
-            settings: {
-              partnerId: 'test-partner-id',
-              partnerName: 'Test Partner',
-              displayName: 'Test User',
-            },
-            initializeApp: mockInitializeApp,
-            isLoading: false,
-            currentView: 'mood',
-            setView: mockSetView,
-            syncPendingMoods: mockSyncPendingMoods,
-            updateSyncStatus: mockUpdateSyncStatus,
-            syncStatus: {
-              isOnline: false, // Offline
-              pendingMoods: 2,
-              lastSync: null,
-            },
-          }),
-        };
-      });
+      // Configure mock state to simulate offline status
+      mockSyncStatus.isOnline = false;
+      mockSyncStatus.pendingMoods = 2;
 
       render(<App />);
 
@@ -178,21 +165,21 @@ describe('App sync mechanisms', () => {
     });
 
     it('should not trigger periodic sync when offline', async () => {
-      // Start with online status
+      // Configure mock state to simulate offline status
+      mockSyncStatus.isOnline = false;
+      mockSyncStatus.pendingMoods = 2;
+
       render(<App />);
 
-      await waitFor(() => {
-        expect(mockSyncPendingMoods).toHaveBeenCalledTimes(1);
-      });
+      // Initial mount should not sync when offline
+      await vi.advanceTimersByTimeAsync(100);
+      expect(mockSyncPendingMoods).not.toHaveBeenCalled();
 
-      // Mock going offline (in real scenario, this would update via store)
-      // For this test, we're just verifying the interval logic
-
-      // Advance 5 minutes - would normally trigger sync
+      // Advance 5 minutes - should not trigger sync when offline
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
-      // In this test setup, it will still call because we can't dynamically change the mock
-      // In production, the syncStatus.isOnline check prevents the sync
+      // Sync should still not be called when offline
+      expect(mockSyncPendingMoods).not.toHaveBeenCalled();
     });
 
     it('should cleanup interval on unmount', async () => {
