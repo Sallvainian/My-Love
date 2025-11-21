@@ -31,11 +31,11 @@ story_location: docs/sprint-artifacts
 development_status:
   # Epic 0: Deployment & Backend Infrastructure Setup
   epic-0: contexted
-  0-1-github-actions-deployment-pipeline: review
-  0-2-environment-variables-secrets-management: backlog
-  0-3-supabase-project-initialization-connection: backlog
-  0-4-production-deployment-validation: backlog
-  0-5-deployment-monitoring-rollback-strategy: backlog
+  0-1-github-actions-deployment-pipeline: done
+  0-2-environment-variables-secrets-management: done
+  0-3-supabase-project-initialization-connection: done # Code review passed, AC tests added 2025-11-18
+  0-4-production-deployment-validation: done # Code review APPROVED 2025-11-20 - Manual validation complete: Console (zero errors), Supabase (200 OK), Cross-browser (all browsers), Lighthouse (87 score)
+  0-5-deployment-monitoring-rollback-strategy: done # Completed 2025-11-21 - All AC met: Health checks (AC 0.5.1-3), failure test validated (AC 0.5.4), ROLLBACK.md with decision tree (AC 0.5.5), default notifications (AC 0.5.6)
   epic-0-retrospective: optional
 
   # Epic 1: PWA Foundation Audit & Stabilization

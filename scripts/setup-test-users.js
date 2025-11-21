@@ -4,15 +4,31 @@
  * Creates two test users in Supabase Auth for testing purposes.
  * Users can sign in via email/password or Google OAuth.
  * Partner relationships must be configured separately via the app UI.
+ *
+ * Requirements:
+ * - .env file with VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY, SUPABASE_SERVICE_KEY
+ * - Run from project root: node scripts/setup-test-users.js
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
 
-const SUPABASE_URL = 'https://vdltoyxpujbsaidctzjb.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHRveXhwdWpic2FpZGN0empiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxODg1ODUsImV4cCI6MjA3ODc2NDU4NX0.zPeI2Syr_eC4yZi_MLftclZYaNvx9Q88Xz2VVMKKu_w';
-const SUPABASE_SERVICE_KEY =
-  'REDACTED_SERVICE_KEY';
+// Load environment variables from .env
+config();
+
+// Validate required environment variables
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_KEY) {
+  console.error('❌ Missing required environment variables in .env file:');
+  if (!SUPABASE_URL) console.error('  - VITE_SUPABASE_URL');
+  if (!SUPABASE_ANON_KEY) console.error('  - VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY');
+  if (!SUPABASE_SERVICE_KEY) console.error('  - SUPABASE_SERVICE_KEY');
+  console.error('\nPlease check your .env file and try again.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);

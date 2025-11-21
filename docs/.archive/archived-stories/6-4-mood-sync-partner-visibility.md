@@ -196,7 +196,7 @@ so that I can check in on how she's feeling even when we're apart.
 **From Story 6.1 (Status: done) - Supabase Backend Setup**
 
 - **Supabase Client**: `src/api/supabaseClient.ts` exports configured SupabaseClient
-  - Environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+  - Environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
   - Client initialized as singleton: `export const supabase = createClient(url, key)`
   - **Reuse in 6.4**: Import supabase from supabaseClient.ts for all API calls
 
@@ -225,7 +225,7 @@ so that I can check in on how she's feeling even when we're apart.
 
   ```
   VITE_SUPABASE_URL=https://your-project.supabase.co
-  VITE_SUPABASE_ANON_KEY=your-anon-key
+  VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key
   VITE_USER_ID=user-uuid-1
   VITE_PARTNER_ID=user-uuid-2
   ```

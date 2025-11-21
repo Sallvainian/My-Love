@@ -133,7 +133,7 @@
         <path>docs/sprint-artifacts/tech-spec-epic-6.md</path>
         <title>Epic 6 Technical Specification</title>
         <section>Security - Authentication &amp; Authorization</section>
-        <snippet>Supabase authentication: JWT-based with Row Level Security policies. VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for client-side. RLS enforced by PostgreSQL policies. Token storage automatic via Supabase SDK in LocalStorage.</snippet>
+        <snippet>Supabase authentication: JWT-based with Row Level Security policies. VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY for client-side. RLS enforced by PostgreSQL policies. Token storage automatic via Supabase SDK in LocalStorage.</snippet>
       </doc>
       <doc>
         <path>docs/sprint-artifacts/tech-spec-epic-6.md</path>

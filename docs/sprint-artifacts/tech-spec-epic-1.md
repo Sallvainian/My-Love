@@ -105,7 +105,7 @@ This epic directly validates the core infrastructure defined in the Architecture
 | **Service worker caches stale auth tokens**   | Configure cache-first ONLY for static assets (JS/CSS/images), network-first for all API calls     | Story 1.1: Review vite-plugin-pwa config                 |
 | **RLS policies don't exist**                  | Test query with authenticated user, verify policies return expected data, NOT create new policies | Story 1.2: SELECT query against tables with auth context |
 | **Safari localStorage quota exceeded**        | Add quota check before storing, implement fallback strategy if quota < 5MB                        | Story 1.4: Test with Safari, check available quota       |
-| **Environment variables exposed**             | Verify VITE_SUPABASE_ANON_KEY is anon key (safe to expose), never SUPABASE_SERVICE_KEY            | Story 1.2: Audit .env file, verify no service keys       |
+| **Environment variables exposed**             | Verify VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY is anon key (safe to expose), never SUPABASE_SERVICE_KEY            | Story 1.2: Audit .env file, verify no service keys       |
 
 ## Detailed Design
 
@@ -206,7 +206,7 @@ interface PersistedUserPrefs {
 // Expected .env structure
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string; // https://xxx.supabase.co
-  readonly VITE_SUPABASE_ANON_KEY: string; // eyJ... (public anon key)
+  readonly VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: string; // eyJ... (public anon key)
   readonly MODE: string; // development | production
   readonly BASE_URL: string; // /My-Love/
 }
@@ -231,7 +231,7 @@ interface ImportMetaEnv {
 
 ```typescript
 // Story 1.2: Client initialization
-supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, {
+supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY, {
   auth: {
     persistSession: true,
     storage: localStorage,
@@ -341,7 +341,7 @@ graph TD
 **Security Validation Checklist:**
 
 1. **Environment Variables (Story 1.2)**
-   - ✅ `VITE_SUPABASE_ANON_KEY` is anon key (safe to expose in client)
+   - ✅ `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` is anon key (safe to expose in client)
    - ❌ `SUPABASE_SERVICE_ROLE_KEY` NOT in any VITE\_ prefixed var
    - ✅ `.env` file listed in `.gitignore`
    - ✅ `.env.example` exists with placeholder values
@@ -460,7 +460,7 @@ Since Epic 1 is audit/validation work, full observability is deferred. However, 
   ```bash
   # .env.local (not committed)
   VITE_SUPABASE_URL=https://xxx.supabase.co
-  VITE_SUPABASE_ANON_KEY=eyJ...
+  VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJ...
   ```
 - **GitHub Pages Deployment:**
   - Set secrets in GitHub repo Settings → Secrets
@@ -500,7 +500,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 **WHEN** application loads
 **THEN**:
 
-- [ ] AC1.2.1: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` accessible via `import.meta.env`
+- [ ] AC1.2.1: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` accessible via `import.meta.env`
 - [ ] AC1.2.2: `.env` file exists and is listed in `.gitignore`
 - [ ] AC1.2.3: No `SUPABASE_SERVICE_ROLE_KEY` in any VITE\_ prefixed variable
 - [ ] AC1.2.4: `supabase.auth.getSession()` returns null or valid Session object (no errors)

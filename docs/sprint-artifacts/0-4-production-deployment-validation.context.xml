@@ -1,0 +1,256 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>0.4</storyId>
+    <title>Production Deployment End-to-End Validation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-18</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-4-production-deployment-validation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>to validate the complete deployment pipeline works end-to-end</iWant>
+    <soThat>I can confidently build subsequent features on a working foundation</soThat>
+    <tasks>
+      <task id="1" title="Prepare Trivial Code Change">Update homepage text to trigger deployment, verify locally, commit with clear message</task>
+      <task id="2" title="Trigger Deployment Pipeline">Push to main, navigate to GitHub Actions, verify workflow triggers, monitor build</task>
+      <task id="3" title="Validate Build Success">Wait for completion, verify no errors, check deployment job, note build time</task>
+      <task id="4" title="Verify Deployment on GitHub Pages">Navigate to GitHub Pages URL, verify update appears within 2 minutes, hard refresh, verify HTTPS</task>
+      <task id="5" title="Console Error Validation">Open DevTools Console, refresh with console open, verify ZERO errors, document warnings</task>
+      <task id="6" title="Network Connection Validation">Open DevTools Network tab, filter Supabase requests, verify 200 OK status, check env vars in request</task>
+      <task id="7" title="Cross-Browser Compatibility">Test Chrome desktop, Firefox desktop, Safari mobile, Chrome mobile, verify consistent rendering</task>
+      <task id="8" title="Lighthouse Performance Audit">Run PWA audit in mobile mode, verify score ≥ 80, document recommendations</task>
+      <task id="9" title="CI Integration Test Validation">Verify GitHub Actions runs test suite, check test step logs, verify all 25 tests pass, confirm test failure blocks deployment</task>
+      <task id="10" title="Documentation & Rollback Strategy">Document validation checklist, document rollback procedure, update README, create GitHub issue template</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-0.4.1">Trivial code change triggers automated deployment - Manual test: update homepage text, commit, push to main, verify workflow triggers</criterion>
+    <criterion id="AC-0.4.2">GitHub Actions build completes successfully - GitHub Actions tab: verify green checkmark, no build errors</criterion>
+    <criterion id="AC-0.4.3">GitHub Pages reflects changes within 2 minutes - Manual test: verify homepage update on live URL within 2 minutes</criterion>
+    <criterion id="AC-0.4.4">Deployed site loads without console errors - DevTools Console: F12, refresh, verify ZERO red errors</criterion>
+    <criterion id="AC-0.4.5">Network tab shows successful Supabase connection - DevTools Network: filter 'supabase', verify 200 OK status</criterion>
+    <criterion id="AC-0.4.6">Site accessible on desktop and mobile browsers - Manual test: Chrome, Firefox, Safari, mobile Chrome</criterion>
+    <criterion id="AC-0.4.7">HTTPS certificate is valid - Browser address bar: verify lock icon, GitHub Pages auto-SSL</criterion>
+    <criterion id="AC-0.4.8">Lighthouse PWA score ≥ 80 - DevTools Lighthouse: run PWA audit in mobile mode</criterion>
+    <criterion id="AC-0.4.9">Integration tests pass in CI environment - GitHub Actions: verify test step runs, all 25 integration tests pass</criterion>
+    <criterion id="AC-0.4.10">Deployment pipeline documented - This story file: validation checklist and rollback procedure documented</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>My-Love Product Requirements Document</title>
+        <section>Executive Summary</section>
+        <snippet>PWA enhancement project focusing on bug fixes, deployment repair, and code quality improvements. Real-time Love Notes via Supabase Realtime, Web Push notifications, modern React 19 + Vite stack.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>PWA Specific Requirements - Deployment</section>
+        <snippet>GitHub Pages for static hosting, automated deployment via GitHub Actions, preview deployments for testing. Modern browsers: Chrome 90+, Firefox 90+, Safari 15+, Edge 90+.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>My-Love PWA Architecture</title>
+        <section>Technology Stack - Core Technologies</section>
+        <snippet>React 19 + Vite 7 with ESBuild for fast TypeScript compilation, Rollup for production bundling with tree-shaking, GitHub Pages deployment via gh-pages package. Supabase Backend with Auth, Database, Realtime, Storage, Edge Functions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-0.md</path>
+        <title>Epic Technical Specification: Deployment & Backend Infrastructure Setup</title>
+        <section>Detailed Design - GitHub Actions Workflow</section>
+        <snippet>Workflow triggers on push to main, executes build steps, injects environment variables from GitHub Secrets, runs smoke tests, deploys to GitHub Pages. Target completion: 5 minutes from push to production.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-0.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Non-Functional Requirements - Performance</section>
+        <snippet>Build performance targets: TypeScript compilation &lt; 30s, Vite production build &lt; 2min, Total CI/CD pipeline &lt; 5min. GitHub Pages deployment propagation &lt; 2min.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-0.md</path>
+        <title>Epic Technical Specification</title>
+        <section>Acceptance Criteria - Story 0.4</section>
+        <snippet>8 ACs covering deployment validation: post-deployment script, HTTP 200 response, PWA manifest validation, service worker registration, Supabase health check, clear error messages, rollback instructions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/0-3-supabase-project-initialization-connection.md</path>
+        <title>Story 0.3: Supabase Project Initialization & Connection</title>
+        <section>Technical Notes - Key Learnings</section>
+        <snippet>Integration tests caught issues early - ensure tests run in CI before deployment. New files to verify: src/api/supabaseClient.ts, tests/integration/supabase.test.ts (25 tests), scripts/inspect-db.sh.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>.github/workflows/deploy.yml</path>
+        <kind>workflow</kind>
+        <symbol>Deploy to GitHub Pages</symbol>
+        <lines>1-65</lines>
+        <reason>Main deployment workflow that builds, tests, and deploys to GitHub Pages. Validates successful deployment pipeline execution.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/supabaseClient.ts</path>
+        <kind>service</kind>
+        <symbol>supabase</symbol>
+        <lines>64-79</lines>
+        <reason>Supabase client configuration that must work in production environment. Validates environment variable injection and backend connection.</reason>
+      </artifact>
+      <artifact>
+        <path>src/api/supabaseClient.ts</path>
+        <kind>function</kind>
+        <symbol>isSupabaseConfigured</symbol>
+        <lines>121-123</lines>
+        <reason>Health check function to validate Supabase connection in production deployment.</reason>
+      </artifact>
+      <artifact>
+        <path>tests/integration/supabase.test.ts</path>
+        <kind>test</kind>
+        <symbol>Supabase Integration Tests</symbol>
+        <lines>1-50</lines>
+        <reason>25 integration tests that must pass in CI environment before deployment. Validates database schema, RLS policies, Realtime functionality.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>scripts</symbol>
+        <lines>6-26</lines>
+        <reason>Build and deployment scripts including test:smoke, predeploy, deploy, postdeploy workflows.</reason>
+      </artifact>
+      <artifact>
+        <path>scripts/smoke-tests.cjs</path>
+        <kind>script</kind>
+        <symbol>smoke-tests</symbol>
+        <lines>N/A</lines>
+        <reason>Smoke test validation script that runs before deployment to verify dist/ structure and critical assets.</reason>
+      </artifact>
+      <artifact>
+        <path>scripts/post-deploy-check.cjs</path>
+        <kind>script</kind>
+        <symbol>post-deploy-check</symbol>
+        <lines>N/A</lines>
+        <reason>Post-deployment validation script referenced in AC-0.4.1. May need to be created if doesn't exist.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>react-dom</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>vite</package>
+        <version>^7.2.2</version>
+      </node>
+      <node>
+        <package>@supabase/supabase-js</package>
+        <version>^2.81.1</version>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+      </node>
+      <node>
+        <package>workbox-window</package>
+        <version>^7.3.0</version>
+      </node>
+      <node>
+        <package>vite-plugin-pwa</package>
+        <version>^1.1.0</version>
+      </node>
+      <node>
+        <package>gh-pages</package>
+        <version>^6.3.0</version>
+      </node>
+      <node>
+        <package>@playwright/test</package>
+        <version>^1.56.1</version>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^4.0.9</version>
+      </node>
+      <node>
+        <package>typescript</package>
+        <version>~5.9.3</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Deployment must complete within 5 minutes from push to production</constraint>
+    <constraint>All 25 integration tests must pass before deployment proceeds</constraint>
+    <constraint>PWA Lighthouse score must be ≥ 80 (mobile mode)</constraint>
+    <constraint>Zero console errors allowed on production deployment</constraint>
+    <constraint>Supabase connection must return 200 OK status from deployed app</constraint>
+    <constraint>HTTPS certificate must be valid (GitHub Pages auto-provides SSL)</constraint>
+    <constraint>Cross-browser compatibility required: Chrome, Firefox, Safari (desktop and mobile)</constraint>
+    <constraint>GitHub Pages deployment propagation must complete within 2 minutes</constraint>
+    <constraint>Service worker must register successfully in production environment</constraint>
+    <constraint>Environment variables must inject correctly via GitHub Secrets (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>GitHub Actions Workflow API</name>
+      <kind>CI/CD Pipeline</kind>
+      <signature>Triggers on push to main, runs build/test/deploy jobs, outputs deployment URL</signature>
+      <path>.github/workflows/deploy.yml</path>
+    </interface>
+    <interface>
+      <name>GitHub Pages Deployment</name>
+      <kind>Static Hosting</kind>
+      <signature>Receives dist/ artifacts, serves via CDN with HTTPS, returns deployment URL</signature>
+      <path>GitHub Pages Service (external)</path>
+    </interface>
+    <interface>
+      <name>Supabase Client Health Check</name>
+      <kind>Function</kind>
+      <signature>isSupabaseConfigured(): boolean</signature>
+      <path>src/api/supabaseClient.ts</path>
+    </interface>
+    <interface>
+      <name>Smoke Test Validation</name>
+      <kind>Script</kind>
+      <signature>Validates dist/ structure, checks critical assets, returns exit code 0 on success</signature>
+      <path>scripts/smoke-tests.cjs</path>
+    </interface>
+    <interface>
+      <name>Post-Deployment Validation</name>
+      <kind>Script</kind>
+      <signature>Checks HTTP 200, validates manifest.json, verifies service worker, tests Supabase connection</signature>
+      <path>scripts/post-deploy-check.cjs (may need creation)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows Vitest for unit tests and Playwright for E2E tests. Integration tests validate Supabase connection, database schema, and RLS policies. Smoke tests run in CI before deployment to verify dist/ structure. All tests must pass before deployment proceeds. Code coverage target: ≥ 80% for critical infrastructure code.
+    </standards>
+    <locations>
+      <location>tests/integration/supabase.test.ts - 25 integration tests for Supabase connection</location>
+      <location>tests/integration/environment.test.ts - Environment variable validation tests</location>
+      <location>scripts/smoke-tests.cjs - Pre-deployment smoke tests</location>
+      <location>scripts/post-deploy-check.cjs - Post-deployment validation (may need creation)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-0.4.1">Manual test: Update homepage text, commit, push, verify workflow triggers automatically</idea>
+      <idea ac="AC-0.4.2">GitHub Actions test: Verify all build steps complete with green checkmark, no errors in logs</idea>
+      <idea ac="AC-0.4.3">Timing test: Measure time from deployment completion to GitHub Pages reflecting changes (target: &lt; 2 min)</idea>
+      <idea ac="AC-0.4.4">DevTools test: Open F12 console, refresh page, assert ZERO red error messages</idea>
+      <idea ac="AC-0.4.5">Network test: Filter DevTools Network for 'supabase', verify 200 OK status on API calls</idea>
+      <idea ac="AC-0.4.6">Cross-browser test: Load on Chrome, Firefox, Safari (desktop), Chrome (mobile), assert consistent rendering</idea>
+      <idea ac="AC-0.4.7">Security test: Verify lock icon in browser address bar, confirm GitHub Pages SSL certificate</idea>
+      <idea ac="AC-0.4.8">Lighthouse test: Run PWA audit in mobile mode, assert score ≥ 80</idea>
+      <idea ac="AC-0.4.9">CI test validation: Verify GitHub Actions workflow includes test step, all 25 integration tests pass</idea>
+      <idea ac="AC-0.4.10">Documentation test: Verify rollback procedure documented, validation checklist complete</idea>
+    </ideas>
+  </tests>
+</story-context>

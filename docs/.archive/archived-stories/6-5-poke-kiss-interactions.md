@@ -438,7 +438,7 @@ const interactionsChannel = supabaseClient
 Required Supabase configuration (should be set in Story 6.1):
 
 - `VITE_SUPABASE_URL` - Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous/public key
+- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anonymous/public key
 - `VITE_USER_ID` - Current user UUID
 - `VITE_PARTNER_ID` - Partner user UUID for interaction targeting
 
@@ -929,7 +929,7 @@ During blocker resolution verification, discovered and fixed test infrastructure
     - testuser2@example.com (ID: 14bbb8a6-1098-4151-a36f-22332f3c9a00)
   - ✅ Updated `.env` with all credentials:
     - VITE_SUPABASE_URL=https://vdltoyxpujbsaidctzjb.supabase.co
-    - VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...(valid JWT)
+    - VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...(valid JWT)
     - VITE_USER_ID=752fb10d-ef11-4748-878c-4d6407fa1a65
     - VITE_PARTNER_ID=14bbb8a6-1098-4151-a36f-22332f3c9a00
   - ✅ Fixed build error: Added missing `PARTNER_NAME` export to `constants.ts`

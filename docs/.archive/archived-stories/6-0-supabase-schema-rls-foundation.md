@@ -298,7 +298,7 @@ From [.env.example](.env.example):
 
 ```bash
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-supabase-anon-key-here
 VITE_USER_ID=<UUID from Supabase Auth - your user ID>
 VITE_PARTNER_ID=<Partner UUID from Supabase Auth - your partner's user ID>
 ```

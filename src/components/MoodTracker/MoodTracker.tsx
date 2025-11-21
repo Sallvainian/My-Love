@@ -21,6 +21,7 @@ import { MoodButton } from './MoodButton';
 import { MoodHistoryCalendar } from '../MoodHistory';
 import type { MoodType } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
+import { registerBackgroundSync } from '../../utils/backgroundSync';
 
 // Mood icon mapping - positive and negative emotions
 const POSITIVE_MOODS = {
@@ -153,6 +154,11 @@ export function MoodTracker() {
         syncPendingMoods().catch((syncError) => {
           // Log sync errors but don't show to user (graceful degradation)
           console.error('[MoodTracker] Background sync failed:', syncError);
+        });
+      } else {
+        // Offline: Register background sync to sync when connection is restored
+        registerBackgroundSync('sync-pending-moods').catch((syncError) => {
+          console.error('[MoodTracker] Failed to register background sync:', syncError);
         });
       }
     } catch (err) {

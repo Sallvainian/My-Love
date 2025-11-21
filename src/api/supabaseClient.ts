@@ -27,7 +27,7 @@ const getAuthService = async () => {
  * Supabase configuration from environment variables
  */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY as string;
 
 /**
  * Validate required environment variables
@@ -35,9 +35,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('[Supabase] Missing required environment variables');
   console.error('[Supabase] VITE_SUPABASE_URL:', supabaseUrl ? '✓' : '✗');
-  console.error('[Supabase] VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✓' : '✗');
+  console.error('[Supabase] VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY:', supabaseAnonKey ? '✓' : '✗');
   throw new Error(
-    'Supabase configuration missing. Check .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.'
+    'Supabase configuration missing. Check .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY are set.'
   );
 }
 
