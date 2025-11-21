@@ -1,0 +1,29 @@
+name: "CodeQL Config"
+
+# Exclude auto-generated and third-party code from analysis
+paths-ignore:
+  - 'node_modules/**'
+  - 'dist/**'
+  - 'dist-ssr/**'
+  - 'coverage/**'
+  - '.nyc_output/**'
+  - 'build/**'
+  - 'playwright-report/**'
+  - 'test-results/**'
+  - '**/*.min.js'
+  - '**/*.bundle.js'
+  - 'public/mockServiceWorker.js'  # MSW service worker
+
+# Query filters for known false positives
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Disable specific queries that produce false positives
+query-filters:
+  - exclude:
+      id: js/xss-through-dom
+      # Reason: This rule has high false positive rate for:
+      # 1. React components using blob URLs (PhotoUpload.tsx)
+      # 2. Coverage report scripts (sorter.js - auto-generated)
+      # 3. Data storage operations that don't render HTML

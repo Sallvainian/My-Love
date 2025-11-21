@@ -33,9 +33,24 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
 
     setError('');
     setWarning('');
+
+    // Validate file type (defense-in-depth)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please select a valid image file (JPEG, PNG, or WebP)');
+      return;
+    }
+
+    // Validate file size (prevent huge files)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      setError('File size must be less than 50MB');
+      return;
+    }
+
     setSelectedFile(file);
 
-    // Create preview URL
+    // Create preview URL - safe from XSS as it's a browser-generated blob URL
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
 

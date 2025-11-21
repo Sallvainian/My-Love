@@ -11,7 +11,7 @@
  * - Supabase project with schema created (users, moods, interactions tables)
  * - RLS policies enabled and created per migration script
  * - Two test users in Supabase Auth (or use anonymous auth)
- * - Environment variables set: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+ * - Environment variables set: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
  *
  * @story 6-0-supabase-schema-rls-foundation
  * @acceptance-criteria AC-10
@@ -22,7 +22,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Environment variables for Supabase connection
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY || '';
 
 // Test users (will be created via anonymous auth)
 let userAClient: SupabaseClient;
@@ -80,7 +80,7 @@ test.describe('Supabase RLS Policy Behavioral Validation (AC-10)', () => {
     // Validate environment variables
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       throw new Error(
-        'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY'
+        'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY'
       );
     }
 

@@ -59,7 +59,7 @@ The My-Love application implements a sophisticated **offline-first, cloud-synchr
 // Configuration
 const supabase: SupabaseClient<Database> = createClient<Database>(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
   {
     auth: {
       persistSession: true, // Persist JWT tokens in browser

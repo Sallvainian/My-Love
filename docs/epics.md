@@ -280,7 +280,7 @@ This document provides the complete epic and story breakdown for My-Love PWA enh
 - `.env.example` file documents all required `VITE_` environment variables
 - GitHub repository secrets contain production Supabase credentials:
   - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - GitHub Actions workflow injects secrets into build environment
 - Production build successfully accesses environment variables via `import.meta.env.VITE_*`
 - Local development uses `.env.local` (gitignored) for dev credentials
@@ -314,7 +314,7 @@ This document provides the complete epic and story breakdown for My-Love PWA enh
 - Supabase project created with appropriate region selection
 - Database initialized with connection pooling configured
 - Supabase client initialization code exists in `/src/lib/supabase.ts`
-- Client uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- Client uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - Deployed PWA successfully connects to Supabase (verify via network tab)
 - Console shows no Supabase connection errors
 - Auth service responds (test magic link can be requested)
@@ -469,7 +469,7 @@ public/
 **Then**
 
 - `src/lib/supabase.ts` creates client with environment variables
-- Environment variables properly loaded (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+- Environment variables properly loaded (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
 - Supabase client connects successfully to project
 - Auth session persistence uses localStorage with proper storage adapter
 - Realtime subscription capability verified (FR8)

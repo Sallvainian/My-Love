@@ -30,7 +30,7 @@
   <acceptanceCriteria>
     AC-1: Supabase Project Setup
       - Create Supabase project on https://supabase.com (free tier)
-      - Configure environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+      - Configure environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
       - Document Supabase project URL and anon key in .env.example
       - Verify connection from client app
 
@@ -180,7 +180,7 @@
       <artifact>
         <path>.env.example</path>
         <kind>config</kind>
-        <symbol>VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_USER_ID, VITE_PARTNER_ID</symbol>
+        <symbol>VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY, VITE_USER_ID, VITE_PARTNER_ID</symbol>
         <lines>full</lines>
         <reason>Template for environment variables. This story must update this file with Supabase credentials and document how to obtain values from Supabase Dashboard.</reason>
       </artifact>
@@ -238,7 +238,7 @@
 
     Security Constraints:
       - MUST NOT commit .env with real credentials to version control
-      - MUST document that VITE_SUPABASE_ANON_KEY is safe for client-side use
+      - MUST document that VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY is safe for client-side use
       - MUST rely on Row Level Security for access control (not application-level checks)
       - MUST validate all user inputs with Zod schemas before API calls
       - MUST use parameterized queries (PostgREST handles automatically)
@@ -311,7 +311,7 @@
       <interface>
         <name>SupabaseClient</name>
         <kind>Singleton service</kind>
-        <signature>export const supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+        <signature>export const supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
           Type: SupabaseClient&lt;Database&gt;
           Methods: from(table), channel(name), auth, storage</signature>
         <path>src/api/supabaseClient.ts (to be created)</path>
@@ -355,7 +355,7 @@
     <ideas>
       <idea ac="AC-1">
         Test: Supabase client initialization with environment variables
-        Given: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY set in .env
+        Given: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY set in .env
         When: App initializes
         Then: supabaseClient instance created successfully, connection verified via simple query
       </idea>

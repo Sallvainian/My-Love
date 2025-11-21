@@ -889,7 +889,7 @@ So that I can sync mood and interaction data between devices.
 2. Create tables with Row Level Security: `moods` (id, user_id, mood_type, note, created_at, updated_at), `interactions` (id, type, from_user_id, to_user_id, viewed, created_at), `users` (id, partner_name, device_id)
 3. Enable Realtime for `moods` and `interactions` tables
 4. API service layer created: `supabase.service.ts` using `@supabase/supabase-js` with methods: saveMood, getMoods, sendInteraction, getInteractions
-5. Authentication configured (Supabase URL and anon key stored in env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+5. Authentication configured (Supabase URL and anon key stored in env vars: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
 6. Row Level Security policies enforce access control at database level (users can insert own moods, view own and partner moods/interactions)
 7. Error handling for network failures (graceful degradation to local-only mode)
 8. SupabaseClient configured as singleton in `src/api/supabaseClient.ts` with JWT authentication

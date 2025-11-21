@@ -12,7 +12,7 @@ so that I can sync mood and interaction data between devices.
 
 1. **Supabase Project Setup**
    - Create Supabase project on https://supabase.com (free tier)
-   - Configure environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+   - Configure environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
    - Document Supabase project URL and anon key in .env.example
    - Verify connection from client app
 
@@ -90,7 +90,7 @@ so that I can sync mood and interaction data between devices.
   - [x] Create new project: "my-love-backend" (or similar)
   - [x] Copy Supabase project URL from Settings → API
   - [x] Copy anon/public key from Settings → API
-  - [x] Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to `.env.local`
+  - [x] Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` to `.env.local`
   - [x] Update `.env.example` with placeholder values and comments
 
 - [x] **Task 2: Database Schema Creation** (AC: #2)
@@ -129,7 +129,7 @@ so that I can sync mood and interaction data between devices.
   - [x] Run `npm install @supabase/supabase-js`
   - [x] Create `src/api/supabaseClient.ts` file
   - [x] Import `createClient` from `@supabase/supabase-js`
-  - [x] Initialize client with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+  - [x] Initialize client with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
   - [x] Export singleton instance: `export const supabase = createClient(...)`
   - [x] Add TypeScript types for Supabase tables (using `Database` type from generated types)
 
@@ -152,7 +152,7 @@ so that I can sync mood and interaction data between devices.
   - [x] Add `VITE_PARTNER_ID` to .env.local (hardcoded UUID for partner)
   - [x] Update `.env.example` with all 4 required variables:
     - VITE_SUPABASE_URL=your-project-url.supabase.co
-    - VITE_SUPABASE_ANON_KEY=your-anon-key
+    - VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key
     - VITE_USER_ID=your-user-uuid
     - VITE_PARTNER_ID=partner-user-uuid
   - [x] Add comments explaining how to obtain each value
@@ -276,7 +276,7 @@ CREATE POLICY "Users can view interactions to/from them" ON interactions
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -328,7 +328,7 @@ export const moodSyncService = new MoodSyncService();
 ```bash
 # .env.local (not committed)
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-from-supabase-dashboard
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key-from-supabase-dashboard
 VITE_USER_ID=00000000-0000-0000-0000-000000000001
 VITE_PARTNER_ID=00000000-0000-0000-0000-000000000002
 ```
@@ -336,7 +336,7 @@ VITE_PARTNER_ID=00000000-0000-0000-0000-000000000002
 **How to Obtain Values:**
 
 1. **VITE_SUPABASE_URL**: Supabase Dashboard → Settings → API → Project URL
-2. **VITE_SUPABASE_ANON_KEY**: Supabase Dashboard → Settings → API → Project API keys → anon/public key
+2. **VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY**: Supabase Dashboard → Settings → API → Project API keys → anon/public key
 3. **VITE_USER_ID**: Generate UUID (e.g., `uuidgen` on macOS/Linux) or use online UUID generator
 4. **VITE_PARTNER_ID**: Generate second UUID for partner
 

@@ -14,6 +14,7 @@ import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { authService } from './api/authService';
 import type { Session } from '@supabase/supabase-js';
+import { setupServiceWorkerListener, isServiceWorkerSupported } from './utils/backgroundSync';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -49,6 +50,7 @@ function App() {
     setView,
     syncPendingMoods,
     updateSyncStatus,
+    syncStatus,
   } = useAppStore();
   const hasInitialized = useRef(false);
 
@@ -83,6 +85,16 @@ function App() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
 
+  // Helper to get route path without base (handles both dev and production)
+  const getRoutePath = (pathname: string): string => {
+    // Strip the base path in production (/My-Love/)
+    const base = import.meta.env.BASE_URL || '/';
+    if (base !== '/' && pathname.startsWith(base)) {
+      return pathname.slice(base.length - 1); // Keep leading slash
+    }
+    return pathname;
+  };
+
   // Story 4.5: Initial route detection and popstate listener (AC-4.5.5, AC-4.5.6)
   useEffect(() => {
     // Check admin route
@@ -92,26 +104,26 @@ function App() {
     }
 
     // AC-4.5.5: Initial route detection - set view based on URL
-    const initialPath = window.location.pathname;
+    const routePath = getRoutePath(window.location.pathname);
     const initialView =
-      initialPath === '/photos'
+      routePath === '/photos'
         ? 'photos'
-        : initialPath === '/mood'
+        : routePath === '/mood'
           ? 'mood'
-          : initialPath === '/partner'
+          : routePath === '/partner'
             ? 'partner'
             : 'home';
     setView(initialView, true); // Skip history update on initial load
 
     // AC-4.5.6: Browser back/forward button support
     const handlePopState = () => {
-      const pathname = window.location.pathname;
+      const routePath = getRoutePath(window.location.pathname);
       const view =
-        pathname === '/photos'
+        routePath === '/photos'
           ? 'photos'
-          : pathname === '/mood'
+          : routePath === '/mood'
             ? 'mood'
-            : pathname === '/partner'
+            : routePath === '/partner'
               ? 'partner'
               : 'home';
       setView(view, true); // Skip history update to prevent loop
@@ -265,6 +277,63 @@ function App() {
     };
   }, [syncPendingMoods, updateSyncStatus]);
 
+  // Hybrid Sync Solution: Periodic background sync + immediate sync on mount
+  useEffect(() => {
+    // Part 1: Immediate sync on app mount (if online and authenticated)
+    if (syncStatus.isOnline && session) {
+      if (import.meta.env.DEV) {
+        console.log('[App] Initial sync on mount - checking for pending moods');
+      }
+      syncPendingMoods().catch((error) => {
+        console.error('[App] Initial sync on mount failed:', error);
+      });
+    }
+
+    // Part 2: Periodic sync every 5 minutes while app is open
+    const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+    const syncInterval = setInterval(() => {
+      if (syncStatus.isOnline && session) {
+        if (import.meta.env.DEV) {
+          console.log('[App] Periodic sync triggered (5-minute interval)');
+        }
+        syncPendingMoods().catch((error) => {
+          console.error('[App] Periodic sync failed:', error);
+        });
+      }
+    }, SYNC_INTERVAL_MS);
+
+    // Cleanup interval on unmount
+    return () => {
+      clearInterval(syncInterval);
+      if (import.meta.env.DEV) {
+        console.log('[App] Periodic sync interval cleared');
+      }
+    };
+  }, [syncPendingMoods, syncStatus.isOnline, session]);
+
+  // Part 3: Service Worker Background Sync listener
+  useEffect(() => {
+    // Guard: Skip setup if service workers are not supported
+    // (e.g., Safari private mode, older browsers)
+    if (!isServiceWorkerSupported()) {
+      if (import.meta.env.DEV) {
+        console.log('[App] Service Worker not supported, skipping background sync listener');
+      }
+      return; // No cleanup needed
+    }
+
+    // Setup listener for background sync requests from service worker
+    const cleanup = setupServiceWorkerListener(async () => {
+      if (import.meta.env.DEV) {
+        console.log('[App] Service Worker requested background sync');
+      }
+      await syncPendingMoods();
+    });
+
+    // Cleanup on unmount
+    return cleanup;
+  }, [syncPendingMoods]);
+
   // Story 6.7: Show loading screen while checking authentication
   if (authLoading) {
     return (
@@ -395,6 +464,11 @@ function App() {
 
         {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected */}
         <PhotoCarousel />
+
+        {/* Story 0.4: Deployment validation timestamp */}
+        <footer className="fixed bottom-16 left-0 right-0 text-center py-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm">
+          <p>Last validated: 2025-11-18</p>
+        </footer>
       </div>
     </ErrorBoundary>
   );

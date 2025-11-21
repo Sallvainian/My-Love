@@ -70,7 +70,7 @@ This epic aligns with the documented architecture by:
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------- |
 | **GitHub Actions CI/CD Pipeline**    | - Execute build process (`npm run build`)<br/>- Run smoke tests pre-deployment<br/>- Deploy static assets to GitHub Pages<br/>- Trigger on push to main branch  | - Source code (main branch)<br/>- Environment secrets (GitHub Secrets)<br/>- Build configuration (vite.config.ts) | - Compiled static assets in `dist/`<br/>- Deployment to GitHub Pages<br/>- Build status notifications          | Story 0.1   |
 | **Vite PWA Plugin**                  | - Generate PWA manifest.json<br/>- Generate and inject service worker<br/>- Configure workbox caching strategies<br/>- Handle offline asset caching             | - PWA configuration (vite.config.ts)<br/>- Static assets (icons, fonts)<br/>- Workbox cache rules                 | - Service worker (sw.js)<br/>- PWA manifest.json<br/>- Registered service worker in browser                    | Story 0.1   |
-| **Supabase Client Module**           | - Initialize Supabase client with env vars<br/>- Provide auth, database, storage APIs<br/>- Handle real-time subscriptions<br/>- Enforce Row Level Security     | - VITE_SUPABASE_URL<br/>- VITE_SUPABASE_ANON_KEY<br/>- User session tokens                                        | - Authenticated Supabase client instance<br/>- Database query interfaces<br/>- Real-time subscription handlers | Story 0.3   |
+| **Supabase Client Module**           | - Initialize Supabase client with env vars<br/>- Provide auth, database, storage APIs<br/>- Handle real-time subscriptions<br/>- Enforce Row Level Security     | - VITE_SUPABASE_URL<br/>- VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY<br/>- User session tokens                                        | - Authenticated Supabase client instance<br/>- Database query interfaces<br/>- Real-time subscription handlers | Story 0.3   |
 | **Environment Configuration Module** | - Load environment variables at build time<br/>- Validate required env vars present<br/>- Provide type-safe env var access<br/>- Separate dev/test/prod configs | - .env files (.env, .env.example)<br/>- Build environment context                                                 | - Typed environment configuration object<br/>- Runtime env validation errors                                   | Story 0.2   |
 | **Deployment Validation Suite**      | - Verify deployed assets accessible<br/>- Check service worker registration<br/>- Validate PWA manifest loaded<br/>- Test Supabase connection health            | - Deployed production URL<br/>- Expected asset checksums<br/>- Supabase connection credentials                    | - Validation test results<br/>- Deployment health status<br/>- Rollback trigger if validation fails            | Story 0.4   |
 
@@ -82,11 +82,11 @@ This epic aligns with the documented architecture by:
 // Required build-time environment variables
 interface EnvironmentConfig {
   VITE_SUPABASE_URL: string; // Format: https://<project-id>.supabase.co
-  VITE_SUPABASE_ANON_KEY: string; // Public anonymous key from Supabase dashboard
+  VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: string; // Public anonymous key from Supabase dashboard
 }
 
 // Runtime validation
-const requiredEnvVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'] as const;
+const requiredEnvVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY'] as const;
 ```
 
 **PWA Manifest Configuration:**
@@ -138,7 +138,7 @@ interface SupabaseConfig {
 // Client singleton
 const supabase: SupabaseClient = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
   {
     auth: {
       persistSession: true,
@@ -212,7 +212,7 @@ jobs:
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
 
       - name: Run smoke tests
         run: npm run test:smoke
@@ -258,7 +258,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Validate environment variables at startup
 function validateEnv(): void {
-  const required = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+  const required = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY'];
   const missing = required.filter((key) => !import.meta.env[key]);
 
   if (missing.length > 0) {
@@ -270,7 +270,7 @@ validateEnv();
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
   {
     auth: {
       persistSession: true, // Store session in browser
@@ -345,7 +345,7 @@ export async function checkSupabaseConnection(): Promise<boolean> {
    ↓
 3. Add credentials to GitHub Secrets
    ├─ VITE_SUPABASE_URL
-   └─ VITE_SUPABASE_ANON_KEY
+   └─ VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
    ↓
 4. Initialize database schema
    ├─ Create tables (deferred to Epic 1-7)
@@ -742,7 +742,7 @@ GitHub Actions
 
 **AC-0.1.2:** Workflow successfully executes all build steps: checkout, Node.js setup, dependency installation, TypeScript compilation, Vite build
 
-**AC-0.1.3:** Build process injects environment variables from GitHub Secrets (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+**AC-0.1.3:** Build process injects environment variables from GitHub Secrets (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`)
 
 **AC-0.1.4:** PWA artifacts are generated in `dist/` directory: `manifest.json`, `sw.js` (service worker), optimized bundles
 
@@ -760,7 +760,7 @@ GitHub Actions
 
 **AC-0.2.2:** `.gitignore` prevents `.env` file from being committed to version control
 
-**AC-0.2.3:** GitHub Secrets configured with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+**AC-0.2.3:** GitHub Secrets configured with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 
 **AC-0.2.4:** Build process validates required environment variables are present at compile time
 

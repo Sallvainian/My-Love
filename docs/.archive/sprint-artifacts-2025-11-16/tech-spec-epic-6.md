@@ -437,7 +437,7 @@ interface IInteractionService {
 
 - **Supabase authentication**: JWT-based authentication with Row Level Security policies
   - `VITE_SUPABASE_URL`: Supabase project URL
-  - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous/public key (safe for client-side)
+  - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`: Supabase anonymous/public key (safe for client-side)
   - `VITE_USER_ID`: Hardcoded user UUID for current user
   - `VITE_PARTNER_ID`: Hardcoded partner UUID for mood visibility
 - **Row Level Security (RLS)**: Database-level access control enforced by PostgreSQL policies
@@ -566,7 +566,7 @@ interface IInteractionService {
 - **Integration method**: PostgREST REST API + Realtime channels (WebSocket-based)
 - **Configuration**:
   - `VITE_SUPABASE_URL`: Environment variable for Supabase project URL
-  - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous/public key
+  - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`: Supabase anonymous/public key
   - `VITE_USER_ID`: Hardcoded user UUID for current user
   - `VITE_PARTNER_ID`: Hardcoded partner UUID for mood visibility
 - **Tables to create**:
@@ -677,7 +677,7 @@ interface IInteractionService {
 
 - GIVEN Supabase project is created on Supabase Cloud
 - WHEN app initializes
-- THEN SupabaseClient connects to `VITE_SUPABASE_URL` with `VITE_SUPABASE_ANON_KEY`
+- THEN SupabaseClient connects to `VITE_SUPABASE_URL` with `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - AND authenticates using JWT
 - AND tables exist with Row Level Security: `moods`, `interactions`, `users`
 - AND Realtime is enabled for `moods` and `interactions` tables

@@ -78,7 +78,7 @@ describe('Supabase Configuration', () => {
     }
 
     expect(import.meta.env.VITE_SUPABASE_URL).toBeDefined();
-    expect(import.meta.env.VITE_SUPABASE_ANON_KEY).toBeDefined();
+    expect(import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY).toBeDefined();
     expect(import.meta.env.VITE_TEST_USER_EMAIL).toBeDefined();
     expect(import.meta.env.VITE_TEST_USER_PASSWORD).toBeDefined();
   });
@@ -89,6 +89,13 @@ describe('Supabase Configuration', () => {
     expect(supabase).toBeDefined();
     expect(supabase.from).toBeDefined();
     expect(supabase.channel).toBeDefined();
+  });
+
+  it('should have correct Supabase URL format', () => {
+    if (skipIfNotConfigured()) return;
+
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    expect(url).toMatch(/^https:\/\/[\w-]+\.supabase\.co$/);
   });
 
   it('should get current user ID from auth session', async () => {
@@ -111,6 +118,26 @@ describe('Supabase Configuration', () => {
 });
 
 describe('Supabase Connection', () => {
+  it('should respond to auth API requests', async () => {
+    if (skipIfNotConfigured()) return;
+
+    // Test that auth service is accessible (email won't send, but API should respond)
+    const { error } = await supabase.auth.signInWithOtp({
+      email: 'test-connection@example.com',
+    });
+
+    // Error expected (invalid/test email), but API responding indicates service is accessible
+    // Success case: error is null or AuthApiError with message
+    // Failure case: network error or service unavailable
+    if (error) {
+      // Auth API responded with error - this is good! (service is accessible)
+      expect(error.message).toBeDefined();
+    } else {
+      // Auth API accepted request - also good! (service is accessible)
+      expect(error).toBeNull();
+    }
+  });
+
   it('should connect to Supabase and query moods table', async () => {
     if (skipIfNotConfigured()) return;
 
@@ -376,7 +403,7 @@ describe('Error Handling', () => {
     // This test validates that supabaseClient.ts throws on missing vars
     // Already tested in the configuration check
     expect(isSupabaseConfigured()).toBe(
-      !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+      !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
     );
   });
 

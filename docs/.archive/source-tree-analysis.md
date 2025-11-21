@@ -369,11 +369,11 @@ src/api/
 ```bash
 # .env (gitignored)
 VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # .env.test.example
 VITE_SUPABASE_URL=http://localhost:54321
-VITE_SUPABASE_ANON_KEY=test-key
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=test-key
 ```
 
 ## Testing Infrastructure
