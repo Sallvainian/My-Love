@@ -89,7 +89,7 @@ jobs:
       - name: Health Check - HTTP Status (with retry)
         run: |
           echo "🔍 Running HTTP health checks..."
-          DEPLOYMENT_URL="https://sallvainian.github.io/My-Love/"
+          DEPLOYMENT_URL="https://sallvainian.github.io/My-Love/nonexistent-test-path"
           MAX_ATTEMPTS=3
           RETRY_DELAY=10
 
