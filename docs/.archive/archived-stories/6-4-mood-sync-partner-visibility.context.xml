@@ -194,7 +194,7 @@
         <kind>api</kind>
         <symbol>supabase (client singleton)</symbol>
         <lines>all</lines>
-        <reason>Core Supabase client configuration. Exported singleton used for all API interactions including mood sync and Realtime subscriptions. Already configured with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</reason>
+        <reason>Core Supabase client configuration. Exported singleton used for all API interactions including mood sync and Realtime subscriptions. Already configured with VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY.</reason>
       </artifact>
       <artifact>
         <path>src/api/moodSyncService.ts</path>

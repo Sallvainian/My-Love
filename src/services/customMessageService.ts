@@ -17,7 +17,7 @@ import {
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 1;
+const DB_VERSION = 3; // Story 6.2: Updated to 3 to match moodService for version compatibility
 
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages
@@ -39,13 +39,13 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
   }
 
   /**
-   * Initialize IndexedDB connection (DB v1 - messages store only)
-   * Note: photoStorageService handles v2 upgrade with photos store
+   * Initialize IndexedDB connection (DB v3 for version compatibility)
+   * Story 6.2: Updated to v3 to match moodService and photoStorageService
    */
   protected async _doInit(): Promise<void> {
     try {
       if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Initializing IndexedDB connection...');
+        console.log('[CustomMessageService] Initializing IndexedDB (version 3)...');
       }
 
       this.db = await openDB<any>(DB_NAME, DB_VERSION, {
@@ -68,11 +68,35 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
               console.log('[CustomMessageService] Created messages store with indexes');
             }
           }
+
+          // Ensure photos store exists (should have been created in v2)
+          if (!db.objectStoreNames.contains('photos')) {
+            const photoStore = db.createObjectStore('photos', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            photoStore.createIndex('by-date', 'uploadDate', { unique: false });
+            if (import.meta.env.DEV) {
+              console.log('[CustomMessageService] Created photos store (fallback)');
+            }
+          }
+
+          // Ensure moods store exists (should have been created in v3)
+          if (!db.objectStoreNames.contains('moods')) {
+            const moodsStore = db.createObjectStore('moods', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            moodsStore.createIndex('by-date', 'date', { unique: true });
+            if (import.meta.env.DEV) {
+              console.log('[CustomMessageService] Created moods store (fallback)');
+            }
+          }
         },
       });
 
       if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] IndexedDB connection established');
+        console.log('[CustomMessageService] IndexedDB initialized successfully (v3)');
       }
     } catch (error) {
       this.handleError('initialize', error as Error);

@@ -8,7 +8,7 @@ import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../confi
 import { performanceMonitor } from './performanceMonitor';
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 2; // Story 4.1: Increment from 1 to 2 for photos store enhancement
+const DB_VERSION = 3; // Story 6.2: Updated to 3 to match moodService for version compatibility
 
 /**
  * Photo Storage Service - IndexedDB CRUD operations for photos
@@ -34,13 +34,14 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
   }
 
   /**
-   * Initialize IndexedDB connection with DB version 2
+   * Initialize IndexedDB connection with DB version 3
    * Story 4.1: Migrate from v1 to v2 if needed
+   * Story 6.2: Updated to v3 for version compatibility with moodService
    */
   protected async _doInit(): Promise<void> {
     try {
       if (import.meta.env.DEV) {
-        console.log('[PhotoStorage] Initializing IndexedDB (version 2)...');
+        console.log('[PhotoStorage] Initializing IndexedDB (version 3)...');
       }
 
       this.db = await openDB<any>(DB_NAME, DB_VERSION, {
@@ -115,11 +116,23 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
               console.log('[PhotoStorage] Created messages store (fallback)');
             }
           }
+
+          // Ensure moods store exists (should have been created in v3)
+          if (!db.objectStoreNames.contains('moods')) {
+            const moodsStore = db.createObjectStore('moods', {
+              keyPath: 'id',
+              autoIncrement: true,
+            });
+            moodsStore.createIndex('by-date', 'date', { unique: true });
+            if (import.meta.env.DEV) {
+              console.log('[PhotoStorage] Created moods store (fallback)');
+            }
+          }
         },
       });
 
       if (import.meta.env.DEV) {
-        console.log('[PhotoStorage] IndexedDB initialized successfully (v2)');
+        console.log('[PhotoStorage] IndexedDB initialized successfully (v3)');
       }
     } catch (error) {
       this.handleError('initialize', error as Error);

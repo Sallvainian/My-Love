@@ -208,7 +208,7 @@ cp .env.example .env
 
 ```env
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-from-dashboard
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key-from-dashboard
 ```
 
 **Note**: The anon key is safe for client-side use. Supabase uses Row Level Security to protect your data.
@@ -295,7 +295,7 @@ Once set up, your app supports:
 #### "Missing environment variables" error
 
 - Verify `.env` file exists in project root
-- Check both variables are set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Check both variables are set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - Restart dev server after changing `.env`
 
 #### "Table not found" error

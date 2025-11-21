@@ -20,7 +20,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
-import { Heart, Hand, History, Wind } from 'lucide-react';
+import { Hand, History, Wind } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { getPartnerId } from '../../api/supabaseClient';
 import { InteractionHistory } from '../InteractionHistory';
@@ -324,7 +324,9 @@ export function PokeKissInterface() {
             animate={isKissing ? { scale: [1, 1.2, 1, 1.2, 1] } : {}}
             transition={{ duration: 0.6 }}
           >
-            <Heart className="w-6 h-6 fill-current" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 fill-current" aria-hidden="true">
+              <path d="M12 8c-2.5-2-5-2-7 0-1 1-1 3-1 5s1 4 2 5c2 2 4 2 6 0 2 2 4 2 6 0 1-1 2-3 2-5s0-4-1-5c-2-2-4.5-2-7 0Z"/>
+            </svg>
           </motion.div>
           {kissCooldown > 0 && (
             <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">

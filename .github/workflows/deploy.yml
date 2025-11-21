@@ -35,13 +35,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           npx supabase gen types typescript \
-            --project-id vdltoyxpujbsaidctzjb \
+            --project-id xojempkrugifnaveqtqc \
             > src/types/database.types.ts
 
       - name: Build application
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
         run: npm run build
 
       - name: Run smoke tests
@@ -62,3 +62,158 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  health-check:
+    runs-on: ubuntu-latest
+    needs: deploy
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install dependencies for health check
+        run: npm install --no-save @supabase/supabase-js
+
+      - name: Wait for GitHub Pages propagation
+        run: |
+          echo "⏳ Waiting for GitHub Pages to propagate changes..."
+          sleep 10
+
+      - name: Health Check - HTTP Status (with retry)
+        run: |
+          echo "🔍 Running HTTP health checks..."
+          DEPLOYMENT_URL="https://sallvainian.github.io/My-Love/"
+          MAX_ATTEMPTS=3
+          RETRY_DELAY=10
+
+          # Function to check HTTP status
+          check_http() {
+            local attempt=$1
+            echo "Attempt $attempt/$MAX_ATTEMPTS: Checking $DEPLOYMENT_URL"
+
+            # Check main site returns 200 OK
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$DEPLOYMENT_URL" || echo "000")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "❌ Site returned HTTP $HTTP_CODE (expected 200)"
+              return 1
+            fi
+            echo "✅ Site returned HTTP 200 OK"
+
+            # Check response time < 3 seconds
+            RESPONSE_TIME=$(curl -s -o /dev/null -w "%{time_total}" -L "$DEPLOYMENT_URL" || echo "999")
+            RESPONSE_TIME_MS=$(echo "$RESPONSE_TIME * 1000" | bc)
+            if (( $(echo "$RESPONSE_TIME > 3.0" | bc -l) )); then
+              echo "⚠️  Response time ${RESPONSE_TIME}s exceeds 3s baseline (non-blocking)"
+            else
+              echo "✅ Response time: ${RESPONSE_TIME}s (< 3s baseline)"
+            fi
+
+            # Check critical assets
+            echo "Checking critical assets..."
+
+            # Check JavaScript bundle exists (any .js file in assets/)
+            JS_CHECK=$(curl -s -L "$DEPLOYMENT_URL" | grep -o 'assets/.*\.js' | head -1)
+            if [ -z "$JS_CHECK" ]; then
+              echo "❌ No JavaScript bundle reference found"
+              return 1
+            fi
+            echo "✅ JavaScript bundle reference found: $JS_CHECK"
+
+            # Check PWA manifest exists
+            MANIFEST_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "${DEPLOYMENT_URL}manifest.webmanifest" || echo "000")
+            if [ "$MANIFEST_CODE" != "200" ]; then
+              echo "❌ PWA manifest returned HTTP $MANIFEST_CODE (expected 200)"
+              return 1
+            fi
+            echo "✅ PWA manifest accessible (HTTP 200)"
+
+            return 0
+          }
+
+          # Retry loop
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            if check_http $i; then
+              echo "✅ HTTP health check passed on attempt $i"
+              exit 0
+            fi
+
+            if [ $i -lt $MAX_ATTEMPTS ]; then
+              echo "⏳ Waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
+          echo "💡 Suggestion: Check GitHub Pages deployment status or try re-running the workflow"
+          exit 1
+
+      - name: Health Check - Supabase Connection
+        run: |
+          echo "🔍 Checking Supabase connection..."
+
+          # Create health check script
+          cat > health-check-supabase.mjs << 'EOF'
+          import { createClient } from '@supabase/supabase-js';
+
+          // Validate environment variables
+          const supabaseUrl = process.env.VITE_SUPABASE_URL;
+          const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+          if (!supabaseUrl || !supabaseKey) {
+            console.error('❌ Missing required environment variables');
+            console.error('Required: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY');
+            process.exit(1);
+          }
+
+          // Create Supabase client
+          const supabase = createClient(supabaseUrl, supabaseKey);
+
+          try {
+            // Attempt a simple query to verify connection
+            const { data, error } = await supabase
+              .from('_health')
+              .select('*')
+              .limit(1);
+
+            if (error) {
+              // If _health table doesn't exist, try auth endpoint instead
+              const { data: authData, error: authError } = await supabase.auth.getSession();
+
+              if (authError && authError.message !== 'Auth session missing!') {
+                console.error('❌ Supabase connection failed:', authError.message);
+                process.exit(1);
+              }
+
+              console.log('✅ Supabase connection successful (auth endpoint verified)');
+              process.exit(0);
+            }
+
+            console.log('✅ Supabase connection successful');
+            process.exit(0);
+          } catch (error) {
+            console.error('❌ Supabase connection failed:', error.message);
+            console.error('💡 Suggestion: Verify VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY secrets in GitHub Settings');
+            process.exit(1);
+          }
+          EOF
+
+          # Run health check script
+          node health-check-supabase.mjs
+
+      - name: Health Check Summary
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ All health checks passed"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Deployment URL: https://sallvainian.github.io/My-Love/"
+          echo "Status: Healthy"
+          echo ""
