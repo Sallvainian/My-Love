@@ -65,17 +65,32 @@ test.describe('Epic 1.1 - Codebase Baseline Validation', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
+    // Define explicit return type to avoid race condition type confusion
+    interface SwResult {
+      registered: boolean;
+      state?: string;
+      scope?: string;
+      timeout?: boolean;
+      error?: string;
+      supported?: boolean;
+    }
+
     // Wait for service worker with timeout (PWA may take time in dev mode)
-    const swRegistered = await page.evaluate(
-      async () => {
+    const swRegistered: SwResult = await page.evaluate(
+      async (): Promise<SwResult> => {
+        // First check if service worker is supported
+        if (!('serviceWorker' in navigator)) {
+          return { registered: false, supported: false, error: 'ServiceWorker not supported' };
+        }
+
         try {
           // Give service worker up to 30s to register (dev mode can be slow)
-          const timeout = new Promise((resolve) =>
+          const timeout = new Promise<SwResult>((resolve) =>
             setTimeout(() => resolve({ registered: false, timeout: true }), 30000)
           );
 
           const registration = await Promise.race([
-            navigator.serviceWorker.ready.then((reg) => ({
+            navigator.serviceWorker.ready.then((reg): SwResult => ({
               registered: reg.active !== null,
               state: reg.active?.state,
               scope: reg.scope,
@@ -89,6 +104,17 @@ test.describe('Epic 1.1 - Codebase Baseline Validation', () => {
         }
       }
     );
+
+    // Fail fast with clear messages for different failure modes
+    if (swRegistered.supported === false) {
+      throw new Error('ServiceWorker API not supported in this browser context');
+    }
+    if (swRegistered.timeout) {
+      throw new Error('ServiceWorker registration timed out after 30s - check SW configuration');
+    }
+    if (swRegistered.error) {
+      throw new Error(`ServiceWorker error: ${swRegistered.error}`);
+    }
 
     expect(swRegistered.registered).toBe(true);
     expect(swRegistered.state).toBe('activated');
@@ -119,11 +145,28 @@ test.describe('Epic 1.2 - Supabase Connection Validation', () => {
     // Validate Supabase API health
     const health = validateSupabaseHealth(networkMonitor);
 
-    // Assert all Supabase connections successful
+    // CRITICAL: Assert at least one Supabase request was observed
+    // This catches misconfigured/uninitialized clients that would otherwise
+    // pass due to zero failures (because zero traffic = zero failures)
+    const supabaseRequests = networkMonitor.getByDomain('supabase.co');
+    expect(
+      supabaseRequests.length,
+      'No Supabase requests observed - client may be misconfigured or not initialized'
+    ).toBeGreaterThan(0);
+
+    // Assert auth or REST endpoint was contacted (proves actual connection)
+    expect(
+      health.authOk || health.restOk,
+      'Neither Supabase Auth nor REST API responded successfully'
+    ).toBe(true);
+
+    // Assert no failures among observed requests
     expect(health.allOk).toBe(true);
     expect(health.failures).toHaveLength(0);
 
     console.log('✓ Supabase client connected successfully');
+    console.log(`  Auth requests: ${health.authOk ? 'OK' : 'None/Failed'}`);
+    console.log(`  REST requests: ${health.restOk ? 'OK' : 'None/Failed'}`);
     console.log(networkMonitor.getSummary());
   });
 
@@ -145,28 +188,72 @@ test.describe('Epic 1.2 - Supabase Connection Validation', () => {
     }
   });
 
-  test('AC-1.2.3: Environment variables loaded correctly', async ({ page }) => {
+  test('AC-1.2.3: Environment variables loaded correctly', async ({ page, networkMonitor }) => {
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
-    // Verify environment variables are accessible (without exposing values)
-    // Note: import.meta.env is not serializable, so we check via window
-    const envCheck = await page.evaluate(() => {
-      // Access via window if set by Vite, or check for presence in errors
-      const scripts = Array.from(document.querySelectorAll('script[type="module"]'));
-      const hasViteConfig = scripts.some(s => s.textContent?.includes('VITE_'));
+    // Strategy: Verify env vars are working by checking their effects
+    // 1. Supabase URL env var → Supabase requests go to correct host
+    // 2. No "undefined" or "null" in Supabase request URLs (misconfigured env)
+    // 3. App doesn't show env-related error states
+
+    const supabaseRequests = networkMonitor.getByDomain('supabase.co');
+
+    // Check 1: At least one Supabase request was made (proves URL is configured)
+    const hasSupabaseUrl = supabaseRequests.length > 0;
+
+    // Check 2: No malformed URLs (would indicate undefined env vars)
+    const hasMalformedUrls = supabaseRequests.some(
+      (r) =>
+        r.url.includes('undefined') ||
+        r.url.includes('null') ||
+        r.url.includes('VITE_')  // Unresolved placeholder
+    );
+
+    // Check 3: Verify app rendered without env-related errors
+    const envErrorCheck = await page.evaluate(() => {
+      // Check for common env var error indicators in the DOM
+      const bodyText = document.body.innerText.toLowerCase();
+      const hasEnvError =
+        bodyText.includes('missing environment') ||
+        bodyText.includes('supabase_url') ||
+        bodyText.includes('supabase_anon_key') ||
+        bodyText.includes('configuration error');
+
+      // Check if app root mounted (React/Vue apps fail to mount with bad env)
+      const appRoot = document.getElementById('root') || document.getElementById('app');
+      const appMounted = appRoot && appRoot.children.length > 0;
 
       return {
-        hasScripts: scripts.length > 0,
-        hasModuleScripts: true,
-        // Environment is embedded at build time, can't directly access
-        buildDetected: true,
+        hasEnvError,
+        appMounted,
       };
     });
 
-    expect(envCheck.hasScripts).toBe(true);
-    expect(envCheck.hasModuleScripts).toBe(true);
+    // Assertions with clear failure messages
+    expect(
+      hasSupabaseUrl,
+      'VITE_SUPABASE_URL not configured - no Supabase requests observed'
+    ).toBe(true);
 
-    console.log('✓ Environment variables detected (build-time injection)');
+    expect(
+      hasMalformedUrls,
+      'Malformed Supabase URLs detected - env vars may contain undefined/null'
+    ).toBe(false);
+
+    expect(
+      envErrorCheck.hasEnvError,
+      'Environment error message detected in UI'
+    ).toBe(false);
+
+    expect(
+      envErrorCheck.appMounted,
+      'App failed to mount - possible env var configuration issue'
+    ).toBe(true);
+
+    console.log('✓ Environment variables loaded correctly');
+    console.log(`  Supabase requests: ${supabaseRequests.length}`);
+    console.log(`  App mounted: ${envErrorCheck.appMounted}`);
   });
 });
 
