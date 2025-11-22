@@ -1,8 +1,8 @@
 # My Love - Project Documentation Index
 
 > **Primary AI Retrieval Source**: This index is the starting point for understanding the My Love PWA codebase.
-> **Last Updated**: 2025-11-16
-> **Structure**: Sharded documentation for improved navigation
+> **Last Updated**: 2025-11-21
+> **Structure**: Phase-based numbered organization for clarity and navigation
 
 ## Project Overview
 
@@ -10,8 +10,28 @@
 - **Primary Language**: TypeScript 5.9.3
 - **Framework**: React 19.1.1
 - **Architecture**: Component-based SPA with Offline-First PWA + Supabase Backend
-- **Documentation Version**: 3.0.0 (Sharded Structure)
+- **Documentation Version**: 4.0.0 (Phase-Based Organization)
 - **Status**: Feature Complete (v1.0.0)
+
+## Documentation Organization
+
+Documentation is organized in numbered phases following the development lifecycle:
+
+- **00-Vision-Strategy/** - Product vision, brainstorming, strategic planning
+- **01-PRD/** - Product requirements documents
+- **02-Architecture/** - System architecture, patterns, analysis
+- **03-Development/** - Development guides, procedures, rollback strategies
+- **04-Testing-QA/** - Test design, QA documentation
+- **05-Epics-Stories/** - Sprint artifacts (stories, tech specs, epics)
+- **06-Session-Logs/** - Session and development logs
+- **07-Images/** - Diagrams, images, visual assets
+- **08-Database/** - Data models, schemas, database documentation
+- **09-UX-Spec/** - UX design specifications
+- **10-Retrospectives/** - Epic and sprint retrospectives
+- **99-Archive/** - Archived documentation
+- **99-migrations/** - Database and system migrations
+- **dataflow/** - Dataflow diagrams and documentation
+- **prompts/** - AI prompts and templates
 
 ## Quick Reference
 
@@ -43,38 +63,56 @@
 
 ## Core Documentation (Sharded)
 
-### 📁 [Project Overview](./project-overview/index.md)
+### 📁 [Project Overview](./03-Development/project-overview/index.md)
 
 Comprehensive project introduction, features, tech stack, and getting started guides.
 
 **Key Sections**:
 
-- [What is My Love?](./project-overview/what-is-my-love.md) - Project introduction
-- [Current Features](./project-overview/current-features-implemented.md) - All implemented features
-- [Technology Stack](./project-overview/technology-stack.md) - Dependencies and versions
-- [Architecture Overview](./project-overview/architecture-overview.md) - System design patterns
-- [Getting Started](./project-overview/getting-started.md) - Setup instructions for users and developers
-- [Performance](./project-overview/performance-characteristics.md) - Runtime optimizations
-- [Security & Privacy](./project-overview/security-privacy.md) - Data protection policies
-- [Browser Support](./project-overview/browser-support.md) - Compatibility requirements
+- [What is My Love?](./03-Development/project-overview/what-is-my-love.md) - Project introduction
+- [Current Features](./03-Development/project-overview/current-features-implemented.md) - All implemented features
+- [Technology Stack](./03-Development/project-overview/technology-stack.md) - Dependencies and versions
+- [Architecture Overview](./03-Development/project-overview/architecture-overview.md) - System design patterns
+- [Getting Started](./03-Development/project-overview/getting-started.md) - Setup instructions for users and developers
+- [Performance](./03-Development/project-overview/performance-characteristics.md) - Runtime optimizations
+- [Security & Privacy](./03-Development/project-overview/security-privacy.md) - Data protection policies
+- [Browser Support](./03-Development/project-overview/browser-support.md) - Compatibility requirements
 
 ---
 
-### 📁 [Source Tree Analysis](./source-tree-analysis/index.md)
+### 📁 [Architecture Documentation](./02-Architecture/)
 
-Complete codebase structure breakdown and file organization (90 files analyzed).
+Complete system architecture, patterns, and codebase analysis.
 
-**Key Sections**:
+**Key Files**:
 
-- [Entry Points](./source-tree-analysis/entry-points.md) - Application bootstrap files
-- [Source Directory Deep Dive](./source-tree-analysis/source-directory-deep-dive.md) - Full src/ hierarchy
-- [Component Architecture](./source-tree-analysis/component-architecture-deep-dive.md) - UI component structure
-- [Service Layer](./source-tree-analysis/service-layer-architecture.md) - Business logic services
-- [API Layer](./source-tree-analysis/api-layer-architecture.md) - Supabase integration (8 services)
-- [State Management Architecture](./source-tree-analysis/state-management-architecture.md) - Zustand store composition
-- [Configuration Files](./source-tree-analysis/configuration-files.md) - Build and tooling config
-- [Testing Infrastructure](./source-tree-analysis/testing-infrastructure.md) - Test suite organization
-- [Critical File Locations](./source-tree-analysis/critical-file-locations-summary.md) - Must-know files
+- [Architecture Overview](./02-Architecture/architecture.md) - Comprehensive system architecture
+- [Source Tree Analysis](./02-Architecture/source-tree-analysis/index.md) - Codebase structure breakdown
+- [State Management](./02-Architecture/ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE/index.md) - Zustand architecture
+- [API Services](./02-Architecture/api-services-architecture/) - Supabase integration patterns
+- [Component Inventory](./02-Architecture/component-inventory/) - UI component catalog
+
+---
+
+### 📁 [Product Requirements](./01-PRD/)
+
+Product vision and requirements documentation.
+
+**Key Files**:
+
+- [PRD](./01-PRD/prd.md) - Product Requirements Document
+
+---
+
+### 📁 [Development Guides](./03-Development/)
+
+Development procedures, guides, and operational documentation.
+
+**Key Files**:
+
+- [Development Guide](./03-Development/development-guide.md) - Development workflows
+- [Rollback Procedures](./03-Development/ROLLBACK.md) - Emergency rollback guide
+- [Guides](./03-Development/guides/) - Specific how-to guides
 
 ---
 
