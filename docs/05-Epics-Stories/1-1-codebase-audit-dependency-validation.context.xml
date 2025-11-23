@@ -1,0 +1,252 @@
+<story-context id="1-1-codebase-audit-dependency-validation" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.1</storyId>
+    <title>Codebase Audit &amp; Dependency Validation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/05-Epics-Stories/1-1-codebase-audit-dependency-validation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>to audit the existing PWA codebase and validate all dependencies</iWant>
+    <soThat>I understand the current state and can identify issues to fix before building new features</soThat>
+    <tasks>
+      <task id="1" ac="AC-1.1.1" goal="Run Security Audit">
+        <subtask>1.1: Run npm audit to identify vulnerabilities</subtask>
+        <subtask>1.2: Run npm audit fix if vulnerabilities found (no --force)</subtask>
+        <subtask>1.3: Document remaining vulnerabilities with risk assessment</subtask>
+      </task>
+      <task id="2" ac="AC-1.1.2" goal="Validate TypeScript Strict Mode Compliance">
+        <subtask>2.1: Verify tsconfig.json has strict mode enabled</subtask>
+        <subtask>2.2: Run npx tsc --noEmit (expect exit code 0)</subtask>
+        <subtask>2.3: Fix any type errors found (avoid @ts-ignore or any)</subtask>
+      </task>
+      <task id="3" ac="AC-1.1.3" goal="Run ESLint Validation">
+        <subtask>3.1: Run npm run lint (expect zero errors)</subtask>
+        <subtask>3.2: Fix lint errors with npm run lint:fix</subtask>
+        <subtask>3.3: Document any rule exceptions if needed</subtask>
+      </task>
+      <task id="4" ac="AC-1.1.4" goal="Validate Build Process">
+        <subtask>4.1: Run npm run build (expect dist/ created)</subtask>
+        <subtask>4.2: Verify build output: dist/index.html, dist/assets/</subtask>
+        <subtask>4.3: Run smoke tests: node scripts/smoke-tests.cjs</subtask>
+      </task>
+      <task id="5" ac="AC-1.1.5" goal="Validate PWA Manifest">
+        <subtask>5.1: Inspect vite.config.ts for PWA manifest fields</subtask>
+        <subtask>5.2: Validate icon files exist (icons/icon-192.png, icons/icon-512.png)</subtask>
+        <subtask>5.3: Verify manifest link in index.html</subtask>
+      </task>
+      <task id="6" ac="AC-1.1.6" goal="Validate Service Worker Configuration">
+        <subtask>6.1: Verify vite-plugin-pwa config in vite.config.ts</subtask>
+        <subtask>6.2: Build and verify sw.js generated in dist/</subtask>
+        <subtask>6.3: Test SW registration in browser DevTools - Application</subtask>
+      </task>
+      <task id="7" ac="AC-1.1.7" goal="Verify GitHub Pages Deployment">
+        <subtask>7.1: Review GitHub Actions workflow health checks</subtask>
+        <subtask>7.2: Make trivial change and verify deployment</subtask>
+        <subtask>7.3: Verify deployed site: https://sallvainian.github.io/My-Love/</subtask>
+      </task>
+      <task id="8" ac="AC-1.1.8" goal="Capture Baseline Metrics">
+        <subtask>8.1: Record bundle size (target: &lt;500KB, current: 221.01KB)</subtask>
+        <subtask>8.2: Run Lighthouse audit and capture scores</subtask>
+        <subtask>8.3: Document baseline metrics in architecture docs</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="AC-1.1.1">npm audit returns zero critical/high vulnerabilities OR documented exceptions</ac>
+    <ac id="AC-1.1.2">tsc --noEmit completes with zero errors (strict mode)</ac>
+    <ac id="AC-1.1.3">npm run lint passes with zero errors</ac>
+    <ac id="AC-1.1.4">npm run build succeeds and generates dist folder</ac>
+    <ac id="AC-1.1.5">manifest.json contains valid PWA metadata (name, icons, start_url, display)</ac>
+    <ac id="AC-1.1.6">Service worker registers successfully in DevTools - Application</ac>
+    <ac id="AC-1.1.7">GitHub Pages deployment completes without manual intervention</ac>
+    <ac id="AC-1.1.8">Baseline metrics captured: bundle size &lt;500KB, Lighthouse score documented</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/05-Epics-Stories/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Acceptance Criteria (Authoritative)</section>
+        <snippet>Contains AC1.1.1-AC1.1.8 with validation methods and expected outcomes for each audit criterion.</snippet>
+      </doc>
+      <doc>
+        <path>docs/02-Architecture/architecture.md</path>
+        <title>My-Love PWA Architecture</title>
+        <section>Technology Stack Details</section>
+        <snippet>React 19.1.1 + Vite 7.1.7 + TypeScript 5.9 strict mode + Zustand 5.0.8 + Tailwind CSS 3.4.18 + Supabase 2.81+</snippet>
+      </doc>
+      <doc>
+        <path>docs/01-PRD/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR60-FR65 Technical Platform Requirements</section>
+        <snippet>FR60: PWA installable on mobile/desktop. FR62: localStorage/IndexedDB persistence. FR63: Service worker caching.</snippet>
+      </doc>
+      <doc>
+        <path>docs/03-Development/ROLLBACK.md</path>
+        <title>Rollback Procedures</title>
+        <section>Emergency Rollback Guide</section>
+        <snippet>Decision tree for rollback procedures, health check patterns, retry logic documentation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/index.md</path>
+        <title>Project Documentation Index</title>
+        <section>Development Commands</section>
+        <snippet>npm run dev, npm run build, npm run test, npm run lint, npm run typecheck commands reference.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>scripts</symbol>
+        <lines>6-27</lines>
+        <reason>Defines npm scripts for build, lint, test:smoke, predeploy - all validation commands for Story 1.1</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>VitePWA</symbol>
+        <lines>29-113</lines>
+        <reason>PWA plugin configuration: manifest, service worker, workbox caching strategies - validates AC-1.1.5, AC-1.1.6</reason>
+      </artifact>
+      <artifact>
+        <path>tsconfig.app.json</path>
+        <kind>config</kind>
+        <symbol>compilerOptions</symbol>
+        <lines>2-26</lines>
+        <reason>TypeScript strict mode configuration - validates AC-1.1.2</reason>
+      </artifact>
+      <artifact>
+        <path>eslint.config.js</path>
+        <kind>config</kind>
+        <symbol>tseslint.config</symbol>
+        <lines>7-87</lines>
+        <reason>ESLint configuration with TypeScript rules - validates AC-1.1.3</reason>
+      </artifact>
+      <artifact>
+        <path>scripts/smoke-tests.cjs</path>
+        <kind>script</kind>
+        <symbol>main</symbol>
+        <lines>381-433</lines>
+        <reason>Pre-deploy smoke tests: file existence, manifest, SW, bundle size validation (230KB limit)</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/deploy.yml</path>
+        <kind>workflow</kind>
+        <symbol>build/deploy/health-check</symbol>
+        <lines>1-220</lines>
+        <reason>GitHub Actions deployment pipeline with health checks - validates AC-1.1.7</reason>
+      </artifact>
+      <artifact>
+        <path>src/sw.ts</path>
+        <kind>service-worker</kind>
+        <symbol>sw</symbol>
+        <reason>Custom service worker source - validates AC-1.1.6 (generates sw.js on build)</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <production>
+          <package name="@supabase/supabase-js" version="^2.81.1" />
+          <package name="react" version="^19.1.1" />
+          <package name="react-dom" version="^19.1.1" />
+          <package name="zustand" version="^5.0.8" />
+          <package name="framer-motion" version="^12.23.24" />
+          <package name="idb" version="^8.0.3" />
+          <package name="lucide-react" version="^0.554.0" />
+          <package name="workbox-window" version="^7.3.0" />
+          <package name="zod" version="^3.25.76" />
+          <package name="eventsource" version="^4.0.0" />
+        </production>
+        <development>
+          <package name="typescript" version="~5.9.3" />
+          <package name="vite" version="^7.2.2" />
+          <package name="vite-plugin-pwa" version="^1.1.0" />
+          <package name="eslint" version="^9.39.1" />
+          <package name="@vitejs/plugin-react" version="^5.1.1" />
+          <package name="tailwindcss" version="^3.4.18" />
+          <package name="vitest" version="^4.0.9" />
+          <package name="@playwright/test" version="^1.56.1" />
+          <package name="gh-pages" version="^6.3.0" />
+          <package name="prettier" version="^3.6.2" />
+        </development>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="typescript">TypeScript strict mode MUST be enabled - no @ts-ignore or any type usage</constraint>
+    <constraint type="bundle">Bundle size MUST remain under 500KB gzipped (current: 221.01KB, smoke test limit: 230KB)</constraint>
+    <constraint type="pwa">PWA manifest must include: name, short_name, icons (192x192, 512x512), start_url, display: standalone</constraint>
+    <constraint type="service-worker">Service worker caching: CacheFirst for static assets only, NetworkOnly for JS/CSS/HTML</constraint>
+    <constraint type="deployment">GitHub Pages base path: /My-Love/ in production, / in development</constraint>
+    <constraint type="env-vars">Environment variables must use VITE_ prefix for Vite compatibility</constraint>
+    <constraint type="security">No service role keys in VITE_ prefixed variables - only anon keys</constraint>
+    <constraint type="browser-support">Target: Chrome 90+, Firefox 90+, Safari 15+, Edge 90+</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>npm scripts</name>
+      <kind>CLI commands</kind>
+      <signature>npm run build | npm run lint | npm run test:smoke | npm run dev</signature>
+      <path>package.json</path>
+    </interface>
+    <interface>
+      <name>tsc validation</name>
+      <kind>CLI command</kind>
+      <signature>npx tsc --noEmit (exit code 0 = success)</signature>
+      <path>tsconfig.app.json</path>
+    </interface>
+    <interface>
+      <name>smoke-tests</name>
+      <kind>Node script</kind>
+      <signature>node scripts/smoke-tests.cjs (exit 0=pass, 1=fail)</signature>
+      <path>scripts/smoke-tests.cjs</path>
+    </interface>
+    <interface>
+      <name>GitHub Actions deploy</name>
+      <kind>CI/CD workflow</kind>
+      <signature>on push to main: build → smoke tests → deploy → health-check</signature>
+      <path>.github/workflows/deploy.yml</path>
+    </interface>
+    <interface>
+      <name>Vite PWA Plugin</name>
+      <kind>Build plugin</kind>
+      <signature>VitePWA({ registerType: 'autoUpdate', strategies: 'injectManifest', ... })</signature>
+      <path>vite.config.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit tests (npm run test:unit), Playwright for E2E (npm run test:e2e), smoke-tests.cjs for build validation.
+      Story 1.1 is primarily validation/audit work - manual command execution with output verification.
+      Existing smoke tests validate: file existence, manifest, service worker, bundle size (230KB limit), critical assets.
+    </standards>
+    <locations>
+      <location>tests/**/*.test.{ts,tsx}</location>
+      <location>scripts/smoke-tests.cjs</location>
+      <location>.github/workflows/deploy.yml (health-check job)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-1.1.1">Run npm audit, capture output, verify no critical/high vulnerabilities</idea>
+      <idea ac="AC-1.1.2">Run npx tsc --noEmit, verify exit code 0, capture any error output</idea>
+      <idea ac="AC-1.1.3">Run npm run lint, verify exit code 0, capture any error output</idea>
+      <idea ac="AC-1.1.4">Run npm run build, verify dist/ folder created with index.html and assets/</idea>
+      <idea ac="AC-1.1.5">Verify vite.config.ts manifest fields match PWA requirements, check icons exist</idea>
+      <idea ac="AC-1.1.6">Build and verify sw.js in dist/, test registration in browser DevTools</idea>
+      <idea ac="AC-1.1.7">Push trivial change, verify GitHub Actions workflow succeeds, health-check passes</idea>
+      <idea ac="AC-1.1.8">Run Lighthouse audit on deployed site, capture scores, record bundle size from build</idea>
+    </ideas>
+  </tests>
+</story-context>

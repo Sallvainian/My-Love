@@ -108,6 +108,7 @@ expect.extend({
 
 // TypeScript declaration merging for custom matchers
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- Required for Playwright custom matcher type declarations
   namespace PlaywrightTest {
     interface Matchers<R> {
       toHaveNoErrors(): R;
