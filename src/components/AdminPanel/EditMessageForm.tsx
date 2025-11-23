@@ -23,6 +23,7 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   // Reset form when message changes
+   
   useEffect(() => {
     setText(message.text);
     setCategory(message.category);

@@ -171,6 +171,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
               <motion.div
                 key={i}
                 className="absolute text-4xl"
+                 
                 initial={{
                   x: Math.random() * window.innerWidth,
                   y: window.innerHeight,
@@ -179,6 +180,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                 animate={{
                   y: ANIMATION_VALUES.FLOATING_HEARTS_TARGET_Y,
                   opacity: [0, 1, 1, 0],
+                  // eslint-disable-next-line react-hooks/purity -- Animation randomization is intentional for visual variety
                   x: Math.random() * window.innerWidth,
                 }}
                 exit={{ opacity: 0 }}

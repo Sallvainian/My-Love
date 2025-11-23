@@ -36,6 +36,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   // Create blob URL for photo preview
   const [imageUrl, setImageUrl] = useState('');
 
+   
   useEffect(() => {
     if (photo.imageBlob) {
       const url = URL.createObjectURL(photo.imageBlob);
@@ -48,6 +49,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   }, [photo.imageBlob]);
 
   // Validate caption (max 500 characters)
+   
   useEffect(() => {
     if (caption.length > 500) {
       setCaptionError(`Caption is too long (${caption.length}/500 characters)`);
@@ -57,6 +59,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   }, [caption]);
 
   // Validate tags (max 10 tags, max 50 chars per tag)
+   
   useEffect(() => {
     if (!tagsInput.trim()) {
       setTagsError(null);

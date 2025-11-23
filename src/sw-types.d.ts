@@ -7,6 +7,7 @@
 
 /// <reference lib="webworker" />
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Type declaration for service worker global scope
 declare const self: ServiceWorkerGlobalScope;
 
 // Background Sync API types
