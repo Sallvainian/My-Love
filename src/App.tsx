@@ -4,6 +4,7 @@ import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
+import { RelationshipTimers } from './components/RelationshipTimers';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
 import { PokeKissInterface } from './components/PokeKissInterface';
@@ -444,7 +445,18 @@ function App() {
         </div>
 
         {/* Conditional view rendering */}
-        {currentView === 'home' && <DailyMessage onShowWelcome={showWelcomeManually} />}
+        {currentView === 'home' && (
+          <div className="max-w-6xl mx-auto px-4 py-4">
+            {/* Grid layout: Message + Timers side by side on desktop, stacked on mobile */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Daily Message - Left column */}
+              <DailyMessage onShowWelcome={showWelcomeManually} />
+
+              {/* Relationship Timers - Right column */}
+              <RelationshipTimers className="lg:sticky lg:top-4" />
+            </div>
+          </div>
+        )}
 
         <Suspense fallback={<LoadingSpinner />}>
           {currentView === 'photos' && (
