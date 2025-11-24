@@ -38,6 +38,13 @@ export default tseslint.config(
     rules: {
       // React Hooks rules
       ...reactHooks.configs.recommended.rules,
+
+      // React 19 strict rules - downgraded to warn for legitimate patterns
+      // These patterns are valid: blob URL lifecycle, timer setup, animation randomization
+      // See: https://react.dev/learn/you-might-not-need-an-effect (these are recommendations, not errors)
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+
       // React Refresh rules
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 

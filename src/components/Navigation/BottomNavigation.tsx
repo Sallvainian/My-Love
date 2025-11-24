@@ -1,5 +1,6 @@
-import { Heart, Camera, Smile, Users } from 'lucide-react';
+import { Heart, Camera, Smile, Users, LogOut } from 'lucide-react';
 import type { ViewType } from '../../stores/slices/navigationSlice';
+import { authService } from '../../api/authService';
 
 interface BottomNavigationProps {
   currentView: ViewType;
@@ -63,6 +64,17 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         >
           <Camera className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium">Photos</span>
+        </button>
+
+        {/* Logout Button */}
+        <button
+          onClick={() => authService.signOut()}
+          className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-red-500"
+          data-testid="nav-logout"
+          aria-label="Logout"
+        >
+          <LogOut className="w-6 h-6 mb-1" />
+          <span className="text-xs font-medium">Logout</span>
         </button>
       </div>
     </nav>

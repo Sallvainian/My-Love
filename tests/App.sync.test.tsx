@@ -17,7 +17,7 @@ const mockInitializeApp = vi.fn();
 const mockSetView = vi.fn();
 
 // Mutable mock state that can be reconfigured between tests
-let mockSyncStatus = {
+const mockSyncStatus = {
   isOnline: true,
   pendingMoods: 0,
   lastSync: null as Date | null,
