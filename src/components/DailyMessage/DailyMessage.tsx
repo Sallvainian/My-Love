@@ -1,8 +1,7 @@
 import { m as motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { Heart, Share2, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
-import { formatRelationshipDuration, getDaysSinceStart } from '../../utils/messageRotation';
+import { Heart, Share2, RefreshCw, AlertCircle } from 'lucide-react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { APP_CONFIG } from '../../config/constants';
 import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
@@ -126,17 +125,6 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     );
   }
 
-  const startDate = new Date(settings.relationship.startDate);
-
-  // BUG FIX: Calculate day number based on history navigation position
-  // When viewing past messages (currentIndex > 0), adjust the date calculation
-  const today = new Date();
-  const adjustedDate = new Date(today);
-  adjustedDate.setDate(today.getDate() - messageHistory.currentIndex);
-
-  const daysTogether = getDaysSinceStart(startDate, adjustedDate);
-  const durationText = formatRelationshipDuration(startDate, adjustedDate);
-
   const handleFavorite = async () => {
     setShowHearts(true);
     await toggleFavorite(currentMessage.id);
@@ -196,22 +184,6 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Header with relationship stats */}
-      <motion.div
-        initial={{ opacity: 0, y: ANIMATION_VALUES.HEADER_INITIAL_Y }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: ANIMATION_TIMING.HEADER_FADE_DELAY }}
-        className="text-center mb-6"
-        data-testid="message-duration-counter"
-      >
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
-          <h2 className="text-lg font-semibold text-gray-700">Day {daysTogether} Together</h2>
-          <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
-        </div>
-        <p className="text-sm text-gray-500">{durationText}</p>
-      </motion.div>
 
       {/* Main message card */}
       <AnimatePresence mode="wait" initial={false}>

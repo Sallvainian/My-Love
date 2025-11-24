@@ -4,6 +4,8 @@ import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
+import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/RelationshipTimers';
+import { RELATIONSHIP_DATES } from './config/relationshipDates';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
 import { PokeKissInterface } from './components/PokeKissInterface';
@@ -444,7 +446,43 @@ function App() {
         </div>
 
         {/* Conditional view rendering */}
-        {currentView === 'home' && <DailyMessage onShowWelcome={showWelcomeManually} />}
+        {currentView === 'home' && (
+          <div className="max-w-4xl mx-auto px-4 py-4 space-y-6">
+            {/* Time Together - replaces Day 37 Together header */}
+            <TimeTogether />
+
+            {/* Countdown timers grid: Birthdays (left) | Wedding+Visits (right) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left column - Birthdays */}
+              <div className="space-y-4">
+                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.frank} />
+                <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.gracie} />
+              </div>
+
+              {/* Right column - Wedding & Visits */}
+              <div className="space-y-4">
+                <EventCountdown
+                  label="Wedding"
+                  icon="ring"
+                  date={RELATIONSHIP_DATES.wedding}
+                  placeholderText="Date TBD"
+                />
+                {RELATIONSHIP_DATES.visits.map((visit) => (
+                  <EventCountdown
+                    key={visit.id}
+                    label={visit.label}
+                    icon="plane"
+                    date={visit.date}
+                    description={visit.description}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Daily Message */}
+            <DailyMessage onShowWelcome={showWelcomeManually} />
+          </div>
+        )}
 
         <Suspense fallback={<LoadingSpinner />}>
           {currentView === 'photos' && (
