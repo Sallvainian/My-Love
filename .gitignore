@@ -66,3 +66,7 @@ docs/technical-decisions.md
 .cursor/
 .gemini/
 .opencode/
+
+# MCP server artifacts
+.playwright-mcp/
+.serena/
