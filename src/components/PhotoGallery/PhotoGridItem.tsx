@@ -21,6 +21,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
 
   // AC-4.2.3: Generate blob URL for image display
   // IMPORTANT: Clean up blob URLs to prevent memory leaks
+   
   useEffect(() => {
     if (photo.imageBlob) {
       const url = URL.createObjectURL(photo.imageBlob);

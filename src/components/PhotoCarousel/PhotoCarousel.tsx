@@ -39,6 +39,7 @@ export function PhotoCarousel() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // AC-4.3.3 & Task 6: Blob URL management (cleanup to prevent memory leaks)
+   
   useEffect(() => {
     if (currentPhoto?.imageBlob) {
       try {

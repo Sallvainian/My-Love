@@ -79,6 +79,7 @@ export function CountdownTimer({
   }, [upcomingAnniversaries, celebratingId]);
 
   // Update countdowns every 1 minute (60000ms) - Story requirement
+   
   useEffect(() => {
     updateCountdowns(); // Initial calculation
 
@@ -239,6 +240,7 @@ function CelebrationAnimation() {
         <motion.div
           key={i}
           className="absolute"
+           
           initial={{
             x: `${Math.random() * 100}%`,
             y: '100%',
