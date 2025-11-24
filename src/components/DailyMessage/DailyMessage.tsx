@@ -197,22 +197,6 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
         )}
       </AnimatePresence>
 
-      {/* Header with relationship stats */}
-      <motion.div
-        initial={{ opacity: 0, y: ANIMATION_VALUES.HEADER_INITIAL_Y }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: ANIMATION_TIMING.HEADER_FADE_DELAY }}
-        className="text-center mb-6"
-        data-testid="message-duration-counter"
-      >
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
-          <h2 className="text-lg font-semibold text-gray-700">Day {daysTogether} Together</h2>
-          <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
-        </div>
-        <p className="text-sm text-gray-500">{durationText}</p>
-      </motion.div>
-
       {/* Main message card */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div

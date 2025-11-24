@@ -55,9 +55,13 @@ export function EventCountdown({
   const [timeDiff, setTimeDiff] = useState<TimeDifference | null>(null);
   const [isEventToday, setIsEventToday] = useState(false);
 
+  // Calculate calendar days (not 24-hour periods) for more intuitive display
+  const [calendarDays, setCalendarDays] = useState<number>(0);
+
   const updateCountdown = useCallback(() => {
     if (!date) {
       setTimeDiff(null);
+      setCalendarDays(0);
       return;
     }
 
@@ -65,20 +69,25 @@ export function EventCountdown({
     const diff = calculateTimeDifference(now, date);
     setTimeDiff(diff);
 
+    // Calculate calendar days: difference between date portions only
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const daysDiff = Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+    setCalendarDays(daysDiff);
+
     // Check if event is today
-    const today = new Date();
     const isToday =
-      today.getFullYear() === date.getFullYear() &&
-      today.getMonth() === date.getMonth() &&
-      today.getDate() === date.getDate();
+      now.getFullYear() === date.getFullYear() &&
+      now.getMonth() === date.getMonth() &&
+      now.getDate() === date.getDate();
     setIsEventToday(isToday);
   }, [date]);
 
-  // Update every minute (battery optimization)
+  // Update every second for real-time countdown
   useEffect(() => {
     updateCountdown(); // Initial calculation
 
-    const interval = setInterval(updateCountdown, 60000);
+    const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
   }, [updateCountdown]);
@@ -135,16 +144,16 @@ export function EventCountdown({
           // Event has passed
           <p className="text-lg text-gray-500 dark:text-gray-400">Event passed</p>
         ) : timeDiff ? (
-          // Show countdown
+          // Show countdown using calendar days for intuitive display
           <>
             <p className={`text-xl font-bold ${colors.text}`}>
-              {timeDiff.years * 365 + timeDiff.days}{' '}
-              {timeDiff.years * 365 + timeDiff.days === 1 ? 'day' : 'days'}
+              {calendarDays} {calendarDays === 1 ? 'day' : 'days'}
             </p>
             <div className="flex justify-center gap-2 mt-2 text-sm text-gray-600 dark:text-gray-300">
               <span className="font-mono">
                 {String(timeDiff.hours).padStart(2, '0')}:
-                {String(timeDiff.minutes).padStart(2, '0')}:00
+                {String(timeDiff.minutes).padStart(2, '0')}:
+                {String(timeDiff.seconds).padStart(2, '0')}
               </span>
             </div>
           </>

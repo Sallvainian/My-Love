@@ -40,11 +40,11 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
     setIsBirthdayToday(isToday);
   }, [birthday]);
 
-  // Update every minute (battery optimization)
+  // Update every second for real-time countdown
   useEffect(() => {
     updateCountdown(); // Initial calculation
 
-    const interval = setInterval(updateCountdown, 60000);
+    const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
   }, [updateCountdown]);
@@ -113,7 +113,8 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
             <div className="flex justify-center gap-2 mt-2 text-sm text-gray-600 dark:text-gray-300">
               <span className="font-mono">
                 {String(timeDiff.hours).padStart(2, '0')}:
-                {String(timeDiff.minutes).padStart(2, '0')}:00
+                {String(timeDiff.minutes).padStart(2, '0')}:
+                {String(timeDiff.seconds).padStart(2, '0')}
               </span>
             </div>
           </>
