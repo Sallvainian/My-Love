@@ -40,8 +40,8 @@ development_status:
 
   # Epic 1: PWA Foundation Audit & Stabilization
   epic-1: contexted
-  1-1-codebase-audit-dependency-validation: backlog
-  1-2-supabase-client-provider-configuration: backlog
+  1-1-codebase-audit-dependency-validation: done # Code review APPROVED 2025-11-23 - All 8 ACs verified, all tasks verified complete
+  1-2-supabase-client-provider-configuration: ready-for-dev
   1-3-magic-link-authentication-flow: backlog
   1-4-session-management-persistence: backlog
   1-5-network-status-indicator-offline-resilience: backlog
