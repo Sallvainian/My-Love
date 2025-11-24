@@ -68,5 +68,6 @@ docs/technical-decisions.md
 .opencode/
 
 # MCP server artifacts
+.mcp.json
 .playwright-mcp/
 .serena/
