@@ -68,15 +68,20 @@ export const RELATIONSHIP_DATES: RelationshipDatesConfig = {
   // Wedding date not yet set
   wedding: null,
 
-  // No visits planned yet - can be added here when scheduled
+  // Planned visits (using local dates to avoid UTC timezone issues)
   visits: [
-    // Example format for when visits are planned:
-    // {
-    //   id: 'visit-1',
-    //   label: 'Frank visits Gracie',
-    //   date: new Date('2026-01-15'),
-    //   description: 'First in-person visit!'
-    // },
+    {
+      id: 'visit-1',
+      label: 'Next Visit',
+      date: new Date(2025, 10, 26), // November 26, 2025 (month is 0-indexed)
+      description: 'November visit',
+    },
+    {
+      id: 'visit-2',
+      label: 'Following Visit',
+      date: new Date(2025, 11, 20), // December 20, 2025
+      description: 'December visit',
+    },
   ],
 };
 
