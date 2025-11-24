@@ -25,12 +25,15 @@ export function TimeTogether() {
     setTimeDiff(diff);
   }, []);
 
+  // Initial calculation on mount
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    updateTime();
+  }, []);
+
   // Update every second for real-time feel
   useEffect(() => {
-    updateTime(); // Initial calculation
-
     const interval = setInterval(updateTime, 1000);
-
     return () => clearInterval(interval);
   }, [updateTime]);
 

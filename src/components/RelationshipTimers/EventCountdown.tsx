@@ -3,7 +3,7 @@
  *
  * Generic countdown for events like wedding or visits.
  * Shows XX:XX:XX placeholder when date is not yet set.
- * Updates every minute for battery optimization.
+ * Updates every second for real-time countdown display.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -83,12 +83,15 @@ export function EventCountdown({
     setIsEventToday(isToday);
   }, [date]);
 
+  // Initial calculation on mount
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    updateCountdown();
+  }, []);
+
   // Update every second for real-time countdown
   useEffect(() => {
-    updateCountdown(); // Initial calculation
-
     const interval = setInterval(updateCountdown, 1000);
-
     return () => clearInterval(interval);
   }, [updateCountdown]);
 
