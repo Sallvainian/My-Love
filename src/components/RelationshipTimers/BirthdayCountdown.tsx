@@ -2,7 +2,7 @@
  * BirthdayCountdown Component
  *
  * Countdown to a person's birthday with their upcoming age displayed.
- * Updates every minute for battery optimization.
+ * Updates every second for real-time countdown display.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -40,12 +40,15 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
     setIsBirthdayToday(isToday);
   }, [birthday]);
 
+  // Initial calculation on mount
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    updateCountdown();
+  }, []);
+
   // Update every second for real-time countdown
   useEffect(() => {
-    updateCountdown(); // Initial calculation
-
     const interval = setInterval(updateCountdown, 1000);
-
     return () => clearInterval(interval);
   }, [updateCountdown]);
 

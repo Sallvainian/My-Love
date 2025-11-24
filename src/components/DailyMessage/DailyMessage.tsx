@@ -1,8 +1,7 @@
 import { m as motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { Heart, Share2, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
-import { formatRelationshipDuration, getDaysSinceStart } from '../../utils/messageRotation';
+import { Heart, Share2, RefreshCw, AlertCircle } from 'lucide-react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { APP_CONFIG } from '../../config/constants';
 import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
@@ -125,17 +124,6 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
       </div>
     );
   }
-
-  const startDate = new Date(settings.relationship.startDate);
-
-  // BUG FIX: Calculate day number based on history navigation position
-  // When viewing past messages (currentIndex > 0), adjust the date calculation
-  const today = new Date();
-  const adjustedDate = new Date(today);
-  adjustedDate.setDate(today.getDate() - messageHistory.currentIndex);
-
-  const daysTogether = getDaysSinceStart(startDate, adjustedDate);
-  const durationText = formatRelationshipDuration(startDate, adjustedDate);
 
   const handleFavorite = async () => {
     setShowHearts(true);
