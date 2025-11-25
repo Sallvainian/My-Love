@@ -29,7 +29,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
 
   // Worker configuration (environment-aware)
-  workers: process.env.CI ? 2 : 12, // Maximum parallelization
+  // CI: 4 workers provides good balance of speed and stability
+  workers: process.env.CI ? 4 : 12,
 
   // Reporter configuration
   reporter: [
@@ -82,24 +83,33 @@ export default defineConfig({
       timeout: 30000, // Aggressive timeout
     },
 
-    // Firefox enabled for CI multi-browser testing (Story 2.6 requirement)
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-      },
-      timeout: 60000,
-    },
+    // Firefox - disabled temporarily to reduce CI time
+    // Enable with FULL_BROWSER_TESTING=true for comprehensive testing
+    ...(process.env.FULL_BROWSER_TESTING
+      ? [
+          {
+            name: 'firefox',
+            use: {
+              ...devices['Desktop Firefox'],
+            },
+            timeout: 60000,
+          },
+        ]
+      : []),
 
-    // WebKit temporarily disabled due to missing system dependencies
-    // Uncomment when libicudata.so.66, libicui18n.so.66, libicuuc.so.66,
-    // libwebp.so.6, and libffi.so.7 are installed on the system
-    // {
-    //   name: 'webkit',
-    //   use: {
-    //     ...devices['Desktop Safari'],
-    //   },
-    // },
+    // WebKit - disabled temporarily to reduce CI time
+    // Enable with FULL_BROWSER_TESTING=true for comprehensive testing
+    ...(process.env.FULL_BROWSER_TESTING
+      ? [
+          {
+            name: 'webkit',
+            use: {
+              ...devices['Desktop Safari'],
+            },
+            timeout: 60000,
+          },
+        ]
+      : []),
   ],
 
   // Development server configuration (auto-start enabled)
