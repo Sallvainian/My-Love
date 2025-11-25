@@ -10,8 +10,8 @@ const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
 const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
 
 /**
- * Helper to complete login and any onboarding steps.
- * The test user might need to complete profile setup after first login.
+ * Helper to complete login and any onboarding/intro steps.
+ * The test user might need to complete profile setup and dismiss intro screens.
  */
 async function loginAndCompleteOnboarding(page) {
   await page.goto('/');
@@ -19,15 +19,21 @@ async function loginAndCompleteOnboarding(page) {
   await page.getByLabel(/password/i).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: /sign in|login/i }).click();
 
-  // Wait for either main app, or onboarding screen
+  // Wait for response
   await page.waitForTimeout(2000);
 
-  // Check if onboarding screen appears (asking for display name)
+  // Step 1: Check if onboarding screen appears (asking for display name)
   const displayNameInput = page.getByLabel(/display name/i);
   if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    // Complete onboarding
     await displayNameInput.fill('TestUser');
     await page.getByRole('button', { name: /continue|save|submit/i }).click();
+    await page.waitForTimeout(1000);
+  }
+
+  // Step 2: Check if welcome/intro screen appears ("Welcome to Your App")
+  const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
+  if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.getByRole('button', { name: /continue/i }).click();
     await page.waitForTimeout(1000);
   }
 
@@ -51,15 +57,21 @@ test.describe('Authentication', () => {
     // Submit
     await page.getByRole('button', { name: /sign in|login/i }).click();
 
-    // Wait for either main app, or onboarding screen
+    // Wait for response
     await page.waitForTimeout(2000);
 
-    // Check if onboarding screen appears (asking for display name)
+    // Step 1: Check if onboarding screen appears (asking for display name)
     const displayNameInput = page.getByLabel(/display name/i);
     if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Complete onboarding
       await displayNameInput.fill('TestUser');
       await page.getByRole('button', { name: /continue|save|submit/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Step 2: Check if welcome/intro screen appears ("Welcome to Your App")
+    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
+    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await page.getByRole('button', { name: /continue/i }).click();
       await page.waitForTimeout(1000);
     }
 

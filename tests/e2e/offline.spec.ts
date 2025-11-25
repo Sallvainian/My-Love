@@ -26,6 +26,13 @@ test.describe('Offline Resilience', () => {
       await page.waitForTimeout(1000);
     }
 
+    // Handle welcome/intro screen if needed
+    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
+    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await page.getByRole('button', { name: /continue/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
     // Wait for app to load
     await expect(
       page.locator('nav, [data-testid="bottom-navigation"]').first()
@@ -62,6 +69,13 @@ test.describe('Offline Resilience', () => {
     if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
       await displayNameInput.fill('TestUser');
       await page.getByRole('button', { name: /continue|save|submit/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Handle welcome/intro screen if needed
+    const welcomeHeading2 = page.getByRole('heading', { name: /welcome to your app/i });
+    if (await welcomeHeading2.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await page.getByRole('button', { name: /continue/i }).click();
       await page.waitForTimeout(1000);
     }
 
