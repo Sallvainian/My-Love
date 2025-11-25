@@ -13,7 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -32,6 +32,13 @@ jobs:
 
       - name: Run Playwright tests
         run: npm run test:e2e
+        env:
+          # Supabase configuration (required for app to work)
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+          # Test user credentials (optional - auth tests skip if not set)
+          VITE_TEST_USER_EMAIL: ${{ secrets.VITE_TEST_USER_EMAIL }}
+          VITE_TEST_USER_PASSWORD: ${{ secrets.VITE_TEST_USER_PASSWORD }}
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v5
