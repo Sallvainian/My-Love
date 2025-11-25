@@ -9,6 +9,34 @@ import { test, expect } from '@playwright/test';
 const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
 const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
 
+/**
+ * Helper to complete login and any onboarding steps.
+ * The test user might need to complete profile setup after first login.
+ */
+async function loginAndCompleteOnboarding(page) {
+  await page.goto('/');
+  await page.getByLabel(/email/i).fill(TEST_EMAIL);
+  await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+  await page.getByRole('button', { name: /sign in|login/i }).click();
+
+  // Wait for either main app, or onboarding screen
+  await page.waitForTimeout(2000);
+
+  // Check if onboarding screen appears (asking for display name)
+  const displayNameInput = page.getByLabel(/display name/i);
+  if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+    // Complete onboarding
+    await displayNameInput.fill('TestUser');
+    await page.getByRole('button', { name: /continue|save|submit/i }).click();
+    await page.waitForTimeout(1000);
+  }
+
+  // Now wait for main navigation
+  await expect(
+    page.locator('nav, [data-testid="bottom-navigation"], [role="navigation"]').first()
+  ).toBeVisible({ timeout: 10000 });
+}
+
 test.describe('Authentication', () => {
   test('user can login with valid credentials', async ({ page }) => {
     await page.goto('/');
@@ -23,8 +51,19 @@ test.describe('Authentication', () => {
     // Submit
     await page.getByRole('button', { name: /sign in|login/i }).click();
 
+    // Wait for either main app, or onboarding screen
+    await page.waitForTimeout(2000);
+
+    // Check if onboarding screen appears (asking for display name)
+    const displayNameInput = page.getByLabel(/display name/i);
+    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      // Complete onboarding
+      await displayNameInput.fill('TestUser');
+      await page.getByRole('button', { name: /continue|save|submit/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
     // Should navigate to main app (no longer on login screen)
-    // Wait for either main content or bottom navigation (indicates logged in)
     await expect(
       page.locator('nav, [data-testid="bottom-navigation"], [role="navigation"]').first()
     ).toBeVisible({ timeout: 10000 });
@@ -34,16 +73,8 @@ test.describe('Authentication', () => {
   });
 
   test('user can logout', async ({ page }) => {
-    // First login
-    await page.goto('/');
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-
-    // Wait for main app to load
-    await expect(
-      page.locator('nav, [data-testid="bottom-navigation"], [role="navigation"]').first()
-    ).toBeVisible({ timeout: 10000 });
+    // First login (with onboarding handling)
+    await loginAndCompleteOnboarding(page);
 
     // Find and click logout button (usually in settings or profile)
     // Try common locations

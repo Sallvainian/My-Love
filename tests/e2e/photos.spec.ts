@@ -18,6 +18,15 @@ test.describe('Photo Sharing', () => {
     await page.getByLabel(/password/i).fill(TEST_PASSWORD);
     await page.getByRole('button', { name: /sign in|login/i }).click();
 
+    // Handle onboarding if needed
+    await page.waitForTimeout(2000);
+    const displayNameInput = page.getByLabel(/display name/i);
+    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await displayNameInput.fill('TestUser');
+      await page.getByRole('button', { name: /continue|save|submit/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
     // Wait for app to load
     await expect(
       page.locator('nav, [data-testid="bottom-navigation"]').first()
