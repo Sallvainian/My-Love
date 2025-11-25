@@ -32,11 +32,10 @@ export default defineConfig({
   // CI: 4 workers provides good balance of speed and stability
   workers: process.env.CI ? 4 : 12,
 
-  // Reporter configuration
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['github'], // GitHub Actions annotations
-  ],
+  // Reporter configuration (CI uses blob for sharding, local uses html)
+  reporter: process.env.CI
+    ? [['blob'], ['github']]
+    : [['html', { outputFolder: 'playwright-report' }]],
 
   // Global test settings
   use: {
