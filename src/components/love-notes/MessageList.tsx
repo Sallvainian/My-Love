@@ -37,6 +37,8 @@ export interface MessageListProps {
   onLoadMore?: () => void;
   /** Whether there are more messages to load */
   hasMore?: boolean;
+  /** Callback when user clicks retry on a failed message (Story 2.2) */
+  onRetry?: (tempId: string) => void;
 }
 
 /**
@@ -53,6 +55,7 @@ export function MessageList({
   isLoading,
   onLoadMore,
   hasMore = false,
+  onRetry,
 }: MessageListProps): ReactNode {
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToBottom = useRef(false);
@@ -153,6 +156,7 @@ export function MessageList({
               message={note}
               isOwnMessage={isOwnMessage}
               senderName={senderName}
+              onRetry={onRetry}
             />
           );
         })}

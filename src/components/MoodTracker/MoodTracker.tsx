@@ -22,11 +22,13 @@ import {
 import { useAppStore } from '../../stores/useAppStore';
 import { MoodButton } from './MoodButton';
 import { MoodHistoryCalendar } from '../MoodHistory';
+import { PartnerMoodDisplay } from './PartnerMoodDisplay';
 import type { MoodType } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
 import { registerBackgroundSync } from '../../utils/backgroundSync';
 import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
 import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
+import { getPartnerId } from '../../api/supabaseClient';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {
@@ -91,6 +93,9 @@ export function MoodTracker() {
   const [offlineError, setOfflineError] = useState<boolean>(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
+  // Story 5.3: Partner mood viewing (AC-5.3.1)
+  const [partnerId, setPartnerId] = useState<string | null>(null);
+
   // Character counter
   const maxNoteLength = 200;
   const remainingChars = maxNoteLength - note.length;
@@ -99,6 +104,15 @@ export function MoodTracker() {
   useEffect(() => {
     loadMoods();
   }, [loadMoods]);
+
+  // Load partner ID for partner mood display (Story 5.3)
+  useEffect(() => {
+    async function loadPartnerId() {
+      const id = await getPartnerId();
+      setPartnerId(id);
+    }
+    loadPartnerId();
+  }, []);
 
   // Check if mood already exists for today (AC-5)
   useEffect(() => {
@@ -296,6 +310,9 @@ export function MoodTracker() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">How are you feeling?</h1>
               <p className="text-gray-600">Track your mood for today</p>
             </div>
+
+            {/* Story 5.3: Partner Mood Display (AC-5.3.1, AC-5.3.2) */}
+            {partnerId && <PartnerMoodDisplay partnerId={partnerId} />}
 
             {/* Sync Status Indicator (AC-7) */}
             <div className="mb-6 flex items-center gap-2 text-sm">

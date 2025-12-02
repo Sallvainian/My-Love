@@ -38,6 +38,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
     })),
   },
   getCurrentUserId: vi.fn(),
+  getPartnerId: vi.fn().mockResolvedValue('partner-123'),
 }));
 
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';

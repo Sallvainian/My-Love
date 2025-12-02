@@ -446,6 +446,33 @@ export class MoodSyncService {
     // Use validated moodApi.fetchByUser() for query with automatic validation
     return await moodApi.fetchByUser(userId, limit);
   }
+
+  /**
+   * Fetch the most recent mood for a specific user (typically partner)
+   *
+   * Used for displaying partner's current emotional state.
+   *
+   * @param userId - User ID to fetch mood for (partner ID)
+   * @returns Latest mood record or null if user has no moods logged
+   * @throws ApiValidationError if response validation fails
+   *
+   * @example
+   * ```typescript
+   * const latestMood = await moodSyncService.getLatestPartnerMood(partnerId);
+   * if (latestMood) {
+   *   console.log('Partner is feeling:', latestMood.mood_type);
+   * }
+   * ```
+   */
+  async getLatestPartnerMood(userId: string): Promise<SupabaseMoodRecord | null> {
+    try {
+      const moods = await this.fetchMoods(userId, 1);
+      return moods.length > 0 ? moods[0] : null;
+    } catch (error) {
+      console.error('[MoodSyncService] Failed to fetch latest partner mood:', error);
+      return null; // Graceful degradation for read operations
+    }
+  }
 }
 
 /**

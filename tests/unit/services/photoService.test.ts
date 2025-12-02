@@ -574,6 +574,122 @@ describe('PhotoService', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should call progress callback during upload (AC 6.2.2, 6.2.3)', async () => {
+      const progressCallback = vi.fn();
+      const mockUpload = vi.fn().mockImplementation((path, file, options) => {
+        // Simulate progress updates
+        if (options?.onUploadProgress) {
+          options.onUploadProgress({ loaded: 0, total: 1000 });
+          options.onUploadProgress({ loaded: 500, total: 1000 });
+          options.onUploadProgress({ loaded: 1000, total: 1000 });
+        }
+        return Promise.resolve({ error: null });
+      });
+
+      mockFrom.mockImplementation(() => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: mockPhoto, error: null }),
+          }),
+        }),
+      }));
+
+      mockStorageFrom.mockReturnValue({
+        upload: mockUpload,
+        createSignedUrl: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+
+      await photoService.uploadPhoto(mockUploadInput, progressCallback);
+
+      expect(progressCallback).toHaveBeenCalledWith(0);
+      expect(progressCallback).toHaveBeenCalledWith(50);
+      expect(progressCallback).toHaveBeenCalledWith(100);
+      expect(progressCallback).toHaveBeenCalledTimes(3);
+    });
+
+    it('should work without progress callback (optional parameter)', async () => {
+      mockFrom.mockImplementation(() => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: mockPhoto, error: null }),
+          }),
+        }),
+      }));
+
+      mockStorageFrom.mockReturnValue({
+        upload: vi.fn().mockResolvedValue({ error: null }),
+        createSignedUrl: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+
+      const result = await photoService.uploadPhoto(mockUploadInput);
+
+      expect(result).toEqual(mockPhoto);
+    });
+
+    it('should reject upload before storage if quota > 95% (AC 6.2.11)', async () => {
+      // Mock critical quota (96%)
+      mockFrom.mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: [{ file_size: 1030792151 }], // 96% of 1GB
+            error: null,
+          }),
+        }),
+      });
+
+      const mockUpload = vi.fn();
+      mockStorageFrom.mockReturnValue({
+        upload: mockUpload,
+      });
+
+      const result = await photoService.uploadPhoto(mockUploadInput);
+
+      expect(result).toBeNull();
+      expect(mockUpload).not.toHaveBeenCalled(); // Should never reach upload
+    });
+
+    it('should log warning after upload if quota > 80% (AC 6.2.10)', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Mock quota checks: before = 75%, after = 81%
+      let quotaCallCount = 0;
+      mockFrom.mockImplementation(() => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: quotaCallCount++ === 0
+              ? [{ file_size: 805306368 }]  // 75% - ok to upload
+              : [{ file_size: 869793587 }], // 81% - warning after upload
+            error: null,
+          }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: mockPhoto, error: null }),
+          }),
+        }),
+      }));
+
+      mockStorageFrom.mockReturnValue({
+        upload: vi.fn().mockResolvedValue({ error: null }),
+        createSignedUrl: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+
+      const result = await photoService.uploadPhoto(mockUploadInput);
+
+      expect(result).toEqual(mockPhoto);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Storage warning')
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
   });
 
   describe('deletePhoto', () => {

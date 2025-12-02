@@ -34,6 +34,10 @@ export interface UseLoveNotesResult {
   fetchOlderNotes: () => Promise<void>;
   /** Clear any error state */
   clearError: () => void;
+  /** Send a new love note (Story 2.2) */
+  sendNote: (content: string) => Promise<void>;
+  /** Retry sending a failed message (Story 2.2) */
+  retryFailedMessage: (tempId: string) => Promise<void>;
 }
 
 /**
@@ -74,6 +78,8 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
   const fetchNotesAction = useAppStore((state) => state.fetchNotes);
   const fetchOlderNotesAction = useAppStore((state) => state.fetchOlderNotes);
   const clearNotesError = useAppStore((state) => state.clearNotesError);
+  const sendNoteAction = useAppStore((state) => state.sendNote);
+  const retryFailedMessageAction = useAppStore((state) => state.retryFailedMessage);
 
   // Memoize fetch functions
   const fetchNotes = useCallback(async () => {
@@ -87,6 +93,14 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
   const clearError = useCallback(() => {
     clearNotesError();
   }, [clearNotesError]);
+
+  const sendNote = useCallback(async (content: string) => {
+    await sendNoteAction(content);
+  }, [sendNoteAction]);
+
+  const retryFailedMessage = useCallback(async (tempId: string) => {
+    await retryFailedMessageAction(tempId);
+  }, [retryFailedMessageAction]);
 
   // Auto-fetch notes on mount
   useEffect(() => {
@@ -103,6 +117,8 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     fetchNotes,
     fetchOlderNotes,
     clearError,
+    sendNote,
+    retryFailedMessage,
   };
 }
 

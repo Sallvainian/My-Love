@@ -274,25 +274,37 @@ class PhotoService {
 
   /**
    * Upload a photo to Supabase Storage and create metadata record
-   * This is a foundation method - full implementation in Story 6-2
    *
    * @param input - Photo upload input from compression service
+   * @param onProgress - Optional callback for upload progress (0-100%)
    * @returns Created photo record or null on error
    *
    * AC 6.0.5: Users can INSERT photos only with their own user_id
    * AC 6.0.7: Storage RLS restricts uploads to user's own folder
+   * AC 6.2.2: Progress bar shows 0-100% during upload
+   * AC 6.2.3: Progress updates at least every 100ms
+   * AC 6.2.10: Warning if storage quota > 80%
+   * AC 6.2.11: Upload rejected if storage quota > 95%
    */
-  async uploadPhoto(input: PhotoUploadInput): Promise<SupabasePhoto | null> {
+  async uploadPhoto(
+    input: PhotoUploadInput,
+    onProgress?: (percent: number) => void
+  ): Promise<SupabasePhoto | null> {
     try {
       const { data: currentUser } = await supabase.auth.getUser();
       if (!currentUser?.user) {
         throw new Error('Not authenticated');
       }
 
-      // Check storage quota before upload
+      // Check storage quota before upload - reject if critical (AC 6.2.11)
       const quota = await this.checkStorageQuota();
       if (quota.warning === 'exceeded') {
         throw new Error('Storage quota exceeded. Please delete some photos to free up space.');
+      }
+      if (quota.warning === 'critical') {
+        throw new Error(
+          `Storage nearly full (${quota.percent}%) - delete photos to continue`
+        );
       }
 
       const userId = currentUser.user.id;
@@ -300,12 +312,18 @@ class PhotoService {
       const uniqueId = crypto.randomUUID();
       const storagePath = `${userId}/${uniqueId}.${fileExt}`;
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage with progress tracking (AC 6.2.2, 6.2.3)
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(storagePath, input.file, {
           contentType: input.mimeType,
           upsert: false, // Don't overwrite existing
+          onUploadProgress: onProgress
+            ? (progress) => {
+                const percent = Math.round((progress.loaded / progress.total) * 100);
+                onProgress(percent);
+              }
+            : undefined,
         });
 
       if (uploadError) {

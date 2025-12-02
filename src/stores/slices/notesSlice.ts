@@ -28,6 +28,7 @@ export interface NotesSlice {
   notesIsLoading: boolean;
   notesError: string | null;
   notesHasMore: boolean;
+  sentMessageTimestamps: number[]; // For rate limiting
 
   // Actions
   fetchNotes: (limit?: number) => Promise<void>;
@@ -36,9 +37,13 @@ export interface NotesSlice {
   setNotes: (notes: LoveNote[]) => void;
   setNotesError: (error: string | null) => void;
   clearNotesError: () => void;
+  sendNote: (content: string) => Promise<void>;
+  retryFailedMessage: (tempId: string) => Promise<void>;
 }
 
 const NOTES_PAGE_SIZE = 50;
+const RATE_LIMIT_MAX_MESSAGES = 10;
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 
 export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (set, get) => ({
   // Initial state
@@ -46,6 +51,7 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
   notesIsLoading: false,
   notesError: null,
   notesHasMore: true,
+  sentMessageTimestamps: [],
 
   // Actions
 
@@ -215,5 +221,188 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
    */
   clearNotesError: () => {
     set({ notesError: null });
+  },
+
+  /**
+   * Send a new love note with optimistic updates
+   * Story 2.2 - AC-2.2.2, AC-2.2.3
+   */
+  sendNote: async (content: string) => {
+    try {
+      // Check rate limiting
+      const { sentMessageTimestamps } = get();
+      const now = Date.now();
+      const recentTimestamps = sentMessageTimestamps.filter(
+        (timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS
+      );
+
+      if (recentTimestamps.length >= RATE_LIMIT_MAX_MESSAGES) {
+        throw new Error('Rate limit exceeded: Maximum 10 messages per minute');
+      }
+
+      // Get authenticated user ID and partner ID
+      const userId = await authService.getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      const partnerId = await getPartnerId();
+      if (!partnerId) {
+        throw new Error('Partner not configured');
+      }
+
+      // Generate temporary ID for optimistic update
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create optimistic note
+      const optimisticNote: LoveNote = {
+        id: tempId,
+        tempId,
+        from_user_id: userId,
+        to_user_id: partnerId,
+        content,
+        created_at: new Date().toISOString(),
+        sending: true,
+      };
+
+      // Optimistic update - add note immediately
+      set((state) => ({
+        notes: [...state.notes, optimisticNote],
+        sentMessageTimestamps: [...recentTimestamps, now],
+      }));
+
+      if (import.meta.env.DEV) {
+        console.log('[NotesSlice] Sending note (optimistic):', { tempId, content });
+      }
+
+      // Background insert to Supabase
+      const { data, error } = await supabase
+        .from('love_notes')
+        .insert({
+          content,
+          to_user_id: partnerId,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // Mark message as failed
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.tempId === tempId
+              ? { ...note, sending: false, error: true }
+              : note
+          ),
+        }));
+
+        if (import.meta.env.DEV) {
+          console.error('[NotesSlice] Failed to send note:', error);
+        }
+
+        return;
+      }
+
+      // Success - replace optimistic note with server response
+      set((state) => ({
+        notes: state.notes.map((note) =>
+          note.tempId === tempId
+            ? { ...data, sending: false, error: false }
+            : note
+        ),
+      }));
+
+      if (import.meta.env.DEV) {
+        console.log('[NotesSlice] Note sent successfully:', data.id);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send note';
+      console.error('[NotesSlice] Error sending note:', error);
+
+      // If it's a rate limit error, throw it up
+      if (errorMessage.includes('Rate limit')) {
+        throw error;
+      }
+
+      set({ notesError: errorMessage });
+    }
+  },
+
+  /**
+   * Retry sending a failed message
+   * Story 2.2 - AC-2.2.4
+   */
+  retryFailedMessage: async (tempId: string) => {
+    try {
+      const { notes } = get();
+
+      // Find the failed message
+      const failedNote = notes.find((note) => note.tempId === tempId);
+      if (!failedNote) {
+        throw new Error('Message not found');
+      }
+
+      // Get partner ID
+      const partnerId = await getPartnerId();
+      if (!partnerId) {
+        throw new Error('Partner not configured');
+      }
+
+      // Mark as sending again
+      set((state) => ({
+        notes: state.notes.map((note) =>
+          note.tempId === tempId
+            ? { ...note, sending: true, error: false }
+            : note
+        ),
+      }));
+
+      if (import.meta.env.DEV) {
+        console.log('[NotesSlice] Retrying failed message:', tempId);
+      }
+
+      // Attempt to send again
+      const { data, error } = await supabase
+        .from('love_notes')
+        .insert({
+          content: failedNote.content,
+          to_user_id: partnerId,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // Mark as failed again
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.tempId === tempId
+              ? { ...note, sending: false, error: true }
+              : note
+          ),
+        }));
+
+        if (import.meta.env.DEV) {
+          console.error('[NotesSlice] Retry failed:', error);
+        }
+
+        return;
+      }
+
+      // Success - replace with server response
+      set((state) => ({
+        notes: state.notes.map((note) =>
+          note.tempId === tempId
+            ? { ...data, sending: false, error: false }
+            : note
+        ),
+      }));
+
+      if (import.meta.env.DEV) {
+        console.log('[NotesSlice] Retry successful:', data.id);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to retry message';
+      console.error('[NotesSlice] Error retrying message:', error);
+      throw error;
+    }
   },
 });
