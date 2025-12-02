@@ -13,8 +13,38 @@ import type { LoveNote } from '../../../src/types/models';
 
 // Mock the store
 vi.mock('../../../src/stores/useAppStore');
-vi.mock('../../../src/api/supabaseClient');
-vi.mock('../../../src/api/authService');
+
+// Mock Supabase client before any imports that use it
+vi.mock('../../../src/api/supabaseClient', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+    })),
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
+    channel: vi.fn(() => ({
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnThis(),
+      unsubscribe: vi.fn(),
+    })),
+  },
+}));
+
+vi.mock('../../../src/api/authService', () => ({
+  authService: {
+    getCurrentUser: vi.fn().mockResolvedValue(null),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  },
+}));
 
 describe('useLoveNotes', () => {
   const mockNotes: LoveNote[] = [
