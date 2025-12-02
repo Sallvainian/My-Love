@@ -12,31 +12,62 @@
 
 import { test, expect } from '@playwright/test';
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
+const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL;
+const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD;
 
 test.describe('Quick Mood Logging Flow', () => {
-  test.beforeEach(async ({ page }) => {
-    // Login first
-    await page.goto('/');
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in|login/i }).click();
+  test.beforeEach(async ({ page, context }) => {
+    // Skip tests if no test credentials configured
+    test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured in environment');
 
-    // Handle onboarding if needed
-    await page.waitForTimeout(2000);
-    const displayNameInput = page.getByLabel(/display name/i);
-    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await displayNameInput.fill('TestUser');
-      await page.getByRole('button', { name: /continue|save|submit/i }).click();
-      await page.waitForTimeout(1000);
+    // Clear all storage to ensure clean state for each test
+    await context.clearCookies();
+    await context.clearPermissions();
+
+    // Login
+    await page.goto('/');
+
+    // Wait for either login form OR app content (if already authenticated somehow)
+    // First check if we're already authenticated by looking for navigation
+    const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+    const isAlreadyAuthenticated = await nav.isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (!isAlreadyAuthenticated) {
+      // Wait for auth loading to complete and login form to appear
+      const emailInput = page.getByLabel(/email/i);
+      await expect(emailInput).toBeVisible({ timeout: 10000 });
+
+      await emailInput.fill(TEST_EMAIL!);
+      await page.getByLabel(/password/i).fill(TEST_PASSWORD!);
+
+      // Click sign in and wait for response
+      await page.getByRole('button', { name: /sign in|login/i }).click();
+
+      // Wait for successful authentication (navigation appears)
+      await expect(nav).toBeVisible({ timeout: 15000 });
+    }
+
+    // Handle onboarding if needed (use more robust detection)
+    try {
+      const displayNameInput = page.getByLabel(/display name/i);
+      if (await displayNameInput.isVisible({ timeout: 3000 })) {
+        await displayNameInput.fill('TestUser');
+        await page.getByRole('button', { name: /continue|save|submit/i }).click();
+        await page.waitForTimeout(1000);
+      }
+    } catch {
+      // No onboarding needed
     }
 
     // Handle welcome/intro screen if needed
-    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await page.getByRole('button', { name: /continue/i }).click();
-      await page.waitForTimeout(1000);
+    try {
+      const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
+      if (await welcomeHeading.isVisible({ timeout: 2000 })) {
+        await page.getByRole('button', { name: /continue/i }).click();
+        await page.waitForTimeout(500);
+      }
+    } catch {
+      // No welcome screen
     }
 
     // Wait for app to load
