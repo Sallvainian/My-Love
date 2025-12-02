@@ -15,6 +15,9 @@ import {
   Angry,
   UserMinus,
   Battery,
+  WifiOff,
+  RefreshCw,
+  Zap,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { MoodButton } from './MoodButton';
@@ -22,25 +25,29 @@ import { MoodHistoryCalendar } from '../MoodHistory';
 import type { MoodType } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
 import { registerBackgroundSync } from '../../utils/backgroundSync';
+import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
+import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
 
-// Mood icon mapping - positive and negative emotions
+// Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {
   loved: { icon: Heart, label: 'Loved' },
   happy: { icon: Smile, label: 'Happy' },
   content: { icon: Meh, label: 'Content' },
+  excited: { icon: Zap, label: 'Excited' },
   thoughtful: { icon: MessageCircle, label: 'Thoughtful' },
   grateful: { icon: Sparkles, label: 'Grateful' },
 } as const;
 
-const NEGATIVE_MOODS = {
+const CHALLENGING_MOODS = {
   sad: { icon: Frown, label: 'Sad' },
   anxious: { icon: AlertCircle, label: 'Anxious' },
   frustrated: { icon: Angry, label: 'Frustrated' },
+  angry: { icon: Angry, label: 'Angry' },
   lonely: { icon: UserMinus, label: 'Lonely' },
   tired: { icon: Battery, label: 'Tired' },
 } as const;
 
-const MOOD_CONFIG = { ...POSITIVE_MOODS, ...NEGATIVE_MOODS } as const;
+const MOOD_CONFIG = { ...POSITIVE_MOODS, ...CHALLENGING_MOODS } as const;
 
 // Tab types for navigation
 type MoodTabType = 'tracker' | 'history';
@@ -63,6 +70,9 @@ type MoodTabType = 'tracker' | 'history';
 export function MoodTracker() {
   const { addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods } = useAppStore();
 
+  // Story 5.2: AC-5.2.1 - Performance timing for < 5 second flow validation
+  const [mountTime] = useState(() => performance.now());
+
   // Tab navigation state (Story 6.3: Task 7)
   const [activeTab, setActiveTab] = useState<MoodTabType>('tracker');
 
@@ -76,6 +86,10 @@ export function MoodTracker() {
   const [noteError, setNoteError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Story 1.5: Offline error state with retry action (AC-1.5.3)
+  const [offlineError, setOfflineError] = useState<boolean>(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Character counter
   const maxNoteLength = 200;
@@ -132,6 +146,9 @@ export function MoodTracker() {
       return;
     }
 
+    // Story 1.5: Clear previous offline error state (AC-1.5.3)
+    setOfflineError(false);
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -142,10 +159,13 @@ export function MoodTracker() {
 
       // Show success feedback
       setShowSuccess(true);
+      triggerMoodSaveHaptic(); // Story 5.2: AC-5.2.2 - Haptic feedback on successful save
       setTimeout(() => setShowSuccess(false), 3000);
 
       if (import.meta.env.DEV) {
+        const elapsed = performance.now() - mountTime;
         console.log('[MoodTracker] Mood entry saved successfully:', selectedMoods);
+        console.debug(`[Mood Log] Complete flow: ${elapsed.toFixed(0)}ms (target: <5000ms)`);
       }
 
       // Story 6.4: AC #1 - Trigger background sync after mood entry
@@ -156,13 +176,16 @@ export function MoodTracker() {
           console.error('[MoodTracker] Background sync failed:', syncError);
         });
       } else {
-        // Offline: Register background sync to sync when connection is restored
+        // Story 1.5: Show offline notification and register background sync (AC-1.5.3)
+        setOfflineError(true);
+        // Register background sync to sync when connection is restored
         registerBackgroundSync('sync-pending-moods').catch((syncError) => {
           console.error('[MoodTracker] Failed to register background sync:', syncError);
         });
       }
     } catch (err) {
       console.error('[MoodTracker] Failed to save mood entry:', err);
+      triggerErrorHaptic(); // Story 5.2: AC-5.2.2 - Error haptic feedback
 
       // Handle validation errors with field-specific messages (Story 5.5)
       if (isValidationError(err)) {
@@ -181,6 +204,34 @@ export function MoodTracker() {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Story 1.5: Retry sync when back online (AC-1.5.3)
+  const handleRetrySync = async () => {
+    if (isOffline()) {
+      // Still offline - show feedback
+      if (import.meta.env.DEV) {
+        console.log('[MoodTracker] Retry blocked - still offline');
+      }
+      return;
+    }
+
+    setIsRetrying(true);
+    try {
+      await syncPendingMoods();
+      setOfflineError(false);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+
+      if (import.meta.env.DEV) {
+        console.log('[MoodTracker] Retry sync successful');
+      }
+    } catch (err) {
+      console.error('[MoodTracker] Retry sync failed:', err);
+      setError('Sync failed. Please try again later.');
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -282,6 +333,36 @@ export function MoodTracker() {
               )}
             </AnimatePresence>
 
+            {/* Story 1.5: Offline Error with Retry Button (AC-1.5.3) */}
+            <AnimatePresence>
+              {offlineError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="mb-4 flex items-center justify-between gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
+                  data-testid="mood-offline-error"
+                >
+                  <div className="flex items-center gap-2">
+                    <WifiOff className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                    <span className="text-sm text-yellow-800">
+                      {OFFLINE_ERROR_MESSAGE}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRetrySync}
+                    disabled={isRetrying}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition-colors disabled:opacity-50"
+                    data-testid="mood-retry-button"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                    {isRetrying ? 'Syncing...' : 'Retry'}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Error Display */}
             {error && (
               <div
@@ -300,10 +381,10 @@ export function MoodTracker() {
                   How are you feeling? (select all that apply)
                 </label>
 
-                {/* Positive Emotions */}
+                {/* Positive Emotions - 6 moods in 2 rows of 3 */}
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Positive</p>
-                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                  <div className="grid grid-cols-3 gap-3">
                     {(Object.keys(POSITIVE_MOODS) as MoodType[]).map((mood) => (
                       <MoodButton
                         key={mood}
@@ -317,11 +398,11 @@ export function MoodTracker() {
                   </div>
                 </div>
 
-                {/* Negative Emotions */}
+                {/* Challenging Emotions - 6 moods in 2 rows of 3 */}
                 <div>
                   <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Challenging</p>
-                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-                    {(Object.keys(NEGATIVE_MOODS) as MoodType[]).map((mood) => (
+                  <div className="grid grid-cols-3 gap-3">
+                    {(Object.keys(CHALLENGING_MOODS) as MoodType[]).map((mood) => (
                       <MoodButton
                         key={mood}
                         mood={mood}

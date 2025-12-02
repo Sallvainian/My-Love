@@ -85,6 +85,19 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       // Update sync status
       await get().updateSyncStatus();
 
+      // Immediate sync if online (standard pattern)
+      if (navigator.onLine) {
+        try {
+          await get().syncPendingMoods();
+          if (import.meta.env.DEV) {
+            console.log('[MoodSlice] Immediate sync completed for new mood');
+          }
+        } catch (syncError) {
+          // Don't fail the add if sync fails - background sync will retry
+          console.warn('[MoodSlice] Immediate sync failed, will retry via background sync:', syncError);
+        }
+      }
+
       if (import.meta.env.DEV) {
         console.log('[MoodSlice] Added mood entry:', created);
       }
@@ -115,6 +128,19 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
 
       // Update sync status
       await get().updateSyncStatus();
+
+      // Immediate sync if online (standard pattern)
+      if (navigator.onLine) {
+        try {
+          await get().syncPendingMoods();
+          if (import.meta.env.DEV) {
+            console.log('[MoodSlice] Immediate sync completed for updated mood');
+          }
+        } catch (syncError) {
+          // Don't fail the update if sync fails - background sync will retry
+          console.warn('[MoodSlice] Immediate sync failed, will retry via background sync:', syncError);
+        }
+      }
 
       if (import.meta.env.DEV) {
         console.log('[MoodSlice] Updated mood entry:', updated);

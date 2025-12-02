@@ -8,11 +8,13 @@ export type MoodType =
   | 'loved'
   | 'happy'
   | 'content'
+  | 'excited'
   | 'thoughtful'
   | 'grateful'
   | 'sad'
   | 'anxious'
   | 'frustrated'
+  | 'angry'
   | 'lonely'
   | 'tired';
 
