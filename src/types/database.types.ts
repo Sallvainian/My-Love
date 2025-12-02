@@ -5,6 +5,8 @@
  * Types are structured to work with @supabase/supabase-js v2.x
  *
  * UPDATED: 2025-11-16 - Added partner_requests table and partner_id column
+ * UPDATED: 2025-11-25 - Added photos table for Photo Gallery (Epic 6, Story 6.0)
+ * UPDATED: 2025-11-30 - Added love_notes table for Love Notes (Epic 2, Story 2.0)
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -190,6 +192,89 @@ export type Database = {
           },
           {
             foreignKeyName: 'partner_requests_to_user_id_fkey';
+            columns: ['to_user_id'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      photos: {
+        Row: {
+          id: string;
+          user_id: string;
+          storage_path: string;
+          filename: string;
+          caption: string | null;
+          mime_type: 'image/jpeg' | 'image/png' | 'image/webp';
+          file_size: number;
+          width: number;
+          height: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          storage_path: string;
+          filename: string;
+          caption?: string | null;
+          mime_type?: 'image/jpeg' | 'image/png' | 'image/webp';
+          file_size: number;
+          width: number;
+          height: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          storage_path?: string;
+          filename?: string;
+          caption?: string | null;
+          mime_type?: 'image/jpeg' | 'image/png' | 'image/webp';
+          file_size?: number;
+          width?: number;
+          height?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'photos_user_id_fkey';
+            columns: ['user_id'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      love_notes: {
+        Row: {
+          id: string;
+          from_user_id: string;
+          to_user_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          from_user_id: string;
+          to_user_id: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          from_user_id?: string;
+          to_user_id?: string;
+          content?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'love_notes_from_user_id_fkey';
+            columns: ['from_user_id'];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'love_notes_to_user_id_fkey';
             columns: ['to_user_id'];
             referencedRelation: 'users';
             referencedColumns: ['id'];
