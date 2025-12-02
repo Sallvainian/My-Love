@@ -172,7 +172,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 - **Task 1**: Created imageCompressionService with Canvas API-based compression. Implements all ACs: 2048px max dimensions, 80% JPEG quality, performance timing with console warnings for >3s compression, EXIF stripping via canvas redraw.
 - **Task 2**: Created PhotoUploader component with file input accepting JPEG/PNG/WebP, capture="environment" for mobile camera, 25MB file size validation, image preview with URL.createObjectURL(), and memory leak prevention via object URL cleanup.
-- **Task 3**: Integrated compression into uploader - calls compressImage() on upload, shows error messages on failure, passes compressed blob + metadata to onUpload callback.
+- **Task 3**: Integrated compression into uploader with full AC-6.1.8 fallback logic. If compression fails and file is < 10MB, uses original file with dimension extraction. If compression fails and file >= 10MB, shows descriptive error. Added 5 dedicated fallback tests in `tests/unit/components/PhotoUploader.fallback.test.tsx`.
 - **Task 4**: Created useImageCompression hook wrapping compression service with React state management. Tracks status (idle/compressing/complete/error), exposes compress(), result, isCompressing, error, and reset().
 - **Task 5**: Wrote 19 unit tests for imageCompressionService covering all ACs - dimension reduction, aspect ratio preservation, JPEG output, compression timing, fallback behavior, file type validation.
 - **Task 6**: Wrote 15 component tests for PhotoUploader covering file input attributes, size validation, preview display, upload workflow, object URL cleanup, and cancel functionality.
@@ -184,6 +184,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - src/hooks/useImageCompression.ts
 - tests/unit/services/imageCompressionService.test.ts
 - tests/unit/components/PhotoUploader.test.tsx
+- tests/unit/components/PhotoUploader.fallback.test.tsx (AC-6.1.8 fallback tests - 5 tests)
 
 **Modified Files:**
 - src/services/imageCompressionService.ts (enhanced with full implementation)
@@ -195,3 +196,4 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 |------|---------|-------------|
 | 2025-11-26 | 0.1.0 | Story drafted via create-story workflow |
 | 2025-12-02 | 1.0.0 | Implementation complete - All 6 tasks done, 34 unit tests passing (19 service + 15 component). All 10 ACs satisfied. Ready for Review. |
+| 2025-12-02 | 1.1.0 | Enhanced AC-6.1.8 fallback logic with dedicated tests. Added 5 fallback tests. Total: 39 unit tests passing. |

@@ -37,6 +37,14 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   getCurrentUserId: vi.fn(() => Promise.resolve('550e8400-e29b-41d4-a716-446655440001')),
 }));
 
+// Mock authService - CRITICAL: interactionService calls authService.getCurrentUserId()
+vi.mock('../../../src/api/authService', () => ({
+  authService: {
+    getCurrentUserId: vi.fn(() => Promise.resolve('550e8400-e29b-41d4-a716-446655440001')),
+    getCurrentUser: vi.fn(() => Promise.resolve({ id: '550e8400-e29b-41d4-a716-446655440001' })),
+  },
+}));
+
 // Mock error handlers
 vi.mock('../../../src/api/errorHandlers', () => ({
   isOnline: vi.fn(() => true),

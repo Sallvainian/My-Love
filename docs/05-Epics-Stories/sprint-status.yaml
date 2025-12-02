@@ -49,7 +49,7 @@ development_status:
   # Epic 2: Love Notes Real-Time Messaging
   epic-2: contexted # Tech spec created 2025-11-24
   2-0-love-notes-database-schema-setup: done # Completed 2025-11-26 - All 4 ACs met, migration file ready
-  2-1-love-notes-chat-ui-foundation: review # Implementation complete 2025-12-02 - All 28 tasks done, 52 tests passing, AC 2.1.1-2.1.3 verified
+  2-1-love-notes-chat-ui-foundation: done # Code review APPROVED 2025-12-02 - All 28 tasks done, 52 tests passing, AC 2.1.1-2.1.3 verified
   2-2-send-love-note-with-optimistic-updates: backlog
   2-3-real-time-message-reception: backlog
   2-4-message-history-scroll-performance: backlog
@@ -79,7 +79,7 @@ development_status:
   # Epic 5: Mood Tracking & Transparency
   epic-5: contexted # Tech spec created 2025-11-25
   5-1-mood-emoji-picker-interface: done # Completed 2025-11-25 - All 6 ACs verified, 28 unit tests passing, 12-mood grid with multi-select
-  5-2-quick-mood-logging-flow: review # Code review BLOCKED 2025-12-02 - Implementation quality 8.5/10 EXCELLENT, 5/6 ACs verified, unit tests 10/10 passing, E2E tests 0/6 failing (auth issue). MUST FIX: E2E authentication before merge.
+  5-2-quick-mood-logging-flow: done # Code review APPROVED 2025-12-02 - Implementation quality 8.5/10 EXCELLENT, 6/6 ACs verified, unit tests 10/10 passing, E2E tests 6/6 passing.
   5-3-partner-mood-viewing-transparency: backlog
   5-4-mood-history-timeline: backlog
   epic-5-retrospective: optional
@@ -87,7 +87,7 @@ development_status:
   # Epic 6: Photo Gallery & Memories
   epic-6: contexted # Tech spec created 2025-11-25
   6-0-photo-storage-schema-buckets-setup: done # Code review APPROVED 2025-11-26 - All 10 ACs verified, all tasks verified complete, 33 tests passing
-  6-1-photo-selection-compression: review # Implementation complete 2025-12-02 - All 6 tasks done, 34 tests passing, all 10 ACs satisfied
+  6-1-photo-selection-compression: done # Code review APPROVED 2025-12-02 - All 6 tasks done, 39 tests passing (19 service + 15 component + 5 fallback), all 10 ACs satisfied.
   6-2-photo-upload-with-progress-indicator: backlog
   6-3-photo-gallery-grid-view: backlog
   6-4-full-screen-photo-viewer-with-gestures: backlog

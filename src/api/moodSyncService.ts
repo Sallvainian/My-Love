@@ -91,7 +91,82 @@ export class MoodSyncService {
     };
 
     // Use validated moodApi.create() for insert with automatic validation
-    return await moodApi.create(moodInsert);
+    const syncedMood = await moodApi.create(moodInsert);
+
+    // Broadcast to partner after successful sync (fire-and-forget)
+    const partnerId = await getPartnerId();
+    if (partnerId) {
+      this.broadcastMoodToPartner(syncedMood, partnerId).catch((err) => {
+        console.error('[MoodSyncService] Background broadcast failed:', err);
+      });
+    }
+
+    return syncedMood;
+  }
+
+  /**
+   * Broadcast a mood update to partner's channel
+   *
+   * Uses Supabase Broadcast API (client-to-client messaging) which
+   * doesn't require RLS permissions. Called after successful mood sync.
+   *
+   * @param mood - The synced mood record from Supabase
+   * @param partnerId - Partner's user ID to broadcast to
+   * @returns void - Fire-and-forget, errors are logged but not thrown
+   */
+  private async broadcastMoodToPartner(
+    mood: SupabaseMoodRecord,
+    partnerId: string
+  ): Promise<void> {
+    try {
+      if (!isOnline()) {
+        if (import.meta.env.DEV) {
+          console.log('[MoodSyncService] Skipping broadcast - device is offline');
+        }
+        return;
+      }
+
+      // Create ephemeral channel to partner's mood-updates channel
+      const channel = supabase.channel(`mood-updates:${partnerId}`);
+
+      // Subscribe briefly to send the broadcast
+      await new Promise<void>((resolve, reject) => {
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            try {
+              // Send broadcast to partner
+              const result = await channel.send({
+                type: 'broadcast',
+                event: 'new_mood',
+                payload: {
+                  id: mood.id,
+                  user_id: mood.user_id,
+                  mood_type: mood.mood_type,
+                  note: mood.note,
+                  created_at: mood.created_at,
+                },
+              });
+
+              if (import.meta.env.DEV) {
+                console.log('[MoodSyncService] Broadcast sent to partner:', result);
+              }
+              resolve();
+            } catch (sendError) {
+              reject(sendError);
+            } finally {
+              // Always cleanup: unsubscribe and remove channel
+              await supabase.removeChannel(channel);
+            }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            await supabase.removeChannel(channel);
+            reject(new Error(`Channel subscription failed: ${status}`));
+          }
+        });
+      });
+    } catch (error) {
+      // Fire-and-forget: log error but don't throw
+      console.error('[MoodSyncService] Failed to broadcast mood to partner:', error);
+    }
   }
 
   /**
@@ -258,10 +333,14 @@ export class MoodSyncService {
   }
 
   /**
-   * Subscribe to real-time partner mood updates
+   * Subscribe to real-time partner mood updates via Broadcast API
    *
-   * Listens for INSERT events on the moods table filtered by partner ID.
-   * Calls the provided callback whenever partner logs a new mood.
+   * Listens for broadcast events on the current user's mood-updates channel.
+   * Partner sends broadcasts to this channel when they log new moods.
+   *
+   * NOTE: This uses Broadcast API instead of postgres_changes because
+   * RLS policies on moods table prevent postgres_changes from working
+   * (complex subquery for partner lookup cannot be evaluated by Realtime).
    *
    * @param callback - Function called with new mood record
    * @param onStatusChange - Optional callback for connection status changes
@@ -286,32 +365,50 @@ export class MoodSyncService {
     callback: (mood: SupabaseMoodRecord) => void,
     onStatusChange?: (status: string) => void
   ): Promise<() => void> {
-    const partnerId = await getPartnerId();
+    // Get current user ID - we subscribe to OUR OWN channel
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const currentUserId = session?.user?.id;
 
-    if (!partnerId) {
-      console.error('[MoodSyncService] Partner ID not found');
-      // Return no-op unsubscribe function if partner ID not found
+    if (!currentUserId) {
+      console.error('[MoodSyncService] Cannot subscribe: User not authenticated');
       return () => {};
     }
 
-    // Create Realtime channel for mood updates
+    if (import.meta.env.DEV) {
+      console.log(`[MoodSyncService] Subscribing to mood-updates:${currentUserId}`);
+    }
+
+    // Create Broadcast channel for receiving mood updates
+    // Each user subscribes to their OWN channel; partner broadcasts TO this channel
     this.realtimeChannel = supabase
-      .channel('partner-moods')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'moods',
-          filter: `user_id=eq.${partnerId}`,
+      .channel(`mood-updates:${currentUserId}`, {
+        config: {
+          broadcast: { self: false }, // Don't receive own broadcasts
         },
-        (payload) => {
-          console.log('[MoodSyncService] Received partner mood update:', payload);
-          callback(payload.new as SupabaseMoodRecord);
+      })
+      .on('broadcast', { event: 'new_mood' }, (payload) => {
+        if (import.meta.env.DEV) {
+          console.log('[MoodSyncService] Received partner mood broadcast:', payload);
         }
-      )
+
+        // Transform broadcast payload to SupabaseMoodRecord format
+        const mood: SupabaseMoodRecord = {
+          id: payload.payload.id,
+          user_id: payload.payload.user_id,
+          mood_type: payload.payload.mood_type,
+          note: payload.payload.note,
+          created_at: payload.payload.created_at,
+          updated_at: payload.payload.created_at, // Use created_at as fallback
+        };
+
+        callback(mood);
+      })
       .subscribe((status) => {
-        console.log('[MoodSyncService] Realtime subscription status:', status);
+        if (import.meta.env.DEV) {
+          console.log('[MoodSyncService] Broadcast subscription status:', status);
+        }
         if (onStatusChange) {
           onStatusChange(status);
         }
@@ -322,7 +419,9 @@ export class MoodSyncService {
       if (this.realtimeChannel) {
         supabase.removeChannel(this.realtimeChannel);
         this.realtimeChannel = null;
-        console.log('[MoodSyncService] Unsubscribed from partner mood updates');
+        if (import.meta.env.DEV) {
+          console.log('[MoodSyncService] Unsubscribed from mood broadcasts');
+        }
       }
     };
   }

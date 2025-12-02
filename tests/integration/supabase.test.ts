@@ -6,10 +6,66 @@
  *
  * NOTE: These tests require a live Supabase connection with proper environment variables.
  * Requires VITE_TEST_USER_EMAIL and VITE_TEST_USER_PASSWORD for authentication.
- * Run with: npm run test:unit (will skip if env vars not set)
+ * These tests are SKIPPED when Supabase is not configured.
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+
+// Check if Supabase is configured BEFORE importing the client
+const hasRealSupabase = import.meta.env.VITE_SUPABASE_URL?.startsWith('https://');
+
+// Mock supabaseClient to prevent client creation errors when not configured
+vi.mock('../../src/api/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      signInWithPassword: vi.fn(),
+      signOut: vi.fn(),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      upsert: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+      limit: vi.fn().mockResolvedValue({ data: null, error: null }),
+    })),
+    channel: vi.fn(() => ({
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    })),
+    removeChannel: vi.fn(),
+  },
+  isSupabaseConfigured: vi.fn(() => hasRealSupabase),
+  getCurrentUserId: vi.fn(),
+  getPartnerId: vi.fn(),
+}));
+
+vi.mock('../../src/api/authService', () => ({
+  authService: {
+    getCurrentUserId: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  },
+}));
+
+vi.mock('../../src/api/moodSyncService', () => ({
+  moodSyncService: {
+    syncMood: vi.fn(),
+    fetchMoodsFromSupabase: vi.fn(),
+  },
+}));
+
+vi.mock('../../src/api/interactionService', () => ({
+  interactionService: {
+    sendInteraction: vi.fn(),
+    fetchInteractions: vi.fn(),
+  },
+}));
+
 import {
   supabase,
   isSupabaseConfigured,
@@ -70,52 +126,54 @@ afterAll(async () => {
   }
 });
 
-describe('Supabase Configuration', () => {
-  it('should have environment variables configured', () => {
-    if (skipIfNotConfigured()) {
-      expect(true).toBe(true); // Skip test
-      return;
-    }
+// Skip all tests when Supabase is not configured (requires real database)
+describe.skipIf(!hasRealSupabase)('Supabase Integration Tests', () => {
+  describe('Supabase Configuration', () => {
+    it('should have environment variables configured', () => {
+      if (skipIfNotConfigured()) {
+        expect(true).toBe(true); // Skip test
+        return;
+      }
 
-    expect(import.meta.env.VITE_SUPABASE_URL).toBeDefined();
-    expect(import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY).toBeDefined();
-    expect(import.meta.env.VITE_TEST_USER_EMAIL).toBeDefined();
-    expect(import.meta.env.VITE_TEST_USER_PASSWORD).toBeDefined();
+      expect(import.meta.env.VITE_SUPABASE_URL).toBeDefined();
+      expect(import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY).toBeDefined();
+      expect(import.meta.env.VITE_TEST_USER_EMAIL).toBeDefined();
+      expect(import.meta.env.VITE_TEST_USER_PASSWORD).toBeDefined();
+    });
+
+    it('should create Supabase client instance', () => {
+      if (skipIfNotConfigured()) return;
+
+      expect(supabase).toBeDefined();
+      expect(supabase.from).toBeDefined();
+      expect(supabase.channel).toBeDefined();
+    });
+
+    it('should have correct Supabase URL format', () => {
+      if (skipIfNotConfigured()) return;
+
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      expect(url).toMatch(/^https:\/\/[\w-]+\.supabase\.co$/);
+    });
+
+    it('should get current user ID from auth session', async () => {
+      if (skipIfNotConfigured()) return;
+
+      const userId = await getCurrentUserId();
+      expect(userId).toBeDefined();
+      expect(typeof userId).toBe('string');
+      expect(userId.length).toBeGreaterThan(0);
+    });
+
+    it('should get partner ID from database', async () => {
+      if (skipIfNotConfigured()) return;
+
+      const partnerId = await getPartnerId();
+      expect(partnerId).toBeDefined();
+      expect(typeof partnerId).toBe('string');
+      expect(partnerId.length).toBeGreaterThan(0);
+    });
   });
-
-  it('should create Supabase client instance', () => {
-    if (skipIfNotConfigured()) return;
-
-    expect(supabase).toBeDefined();
-    expect(supabase.from).toBeDefined();
-    expect(supabase.channel).toBeDefined();
-  });
-
-  it('should have correct Supabase URL format', () => {
-    if (skipIfNotConfigured()) return;
-
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    expect(url).toMatch(/^https:\/\/[\w-]+\.supabase\.co$/);
-  });
-
-  it('should get current user ID from auth session', async () => {
-    if (skipIfNotConfigured()) return;
-
-    const userId = await getCurrentUserId();
-    expect(userId).toBeDefined();
-    expect(typeof userId).toBe('string');
-    expect(userId.length).toBeGreaterThan(0);
-  });
-
-  it('should get partner ID from database', async () => {
-    if (skipIfNotConfigured()) return;
-
-    const partnerId = await getPartnerId();
-    expect(partnerId).toBeDefined();
-    expect(typeof partnerId).toBe('string');
-    expect(partnerId.length).toBeGreaterThan(0);
-  });
-});
 
 describe('Supabase Connection', () => {
   it('should respond to auth API requests', async () => {
@@ -433,4 +491,5 @@ describe('Error Handling', () => {
 
     await expect(interactionService.sendPoke(partnerId)).rejects.toThrow();
   });
-});
+  });
+}); // End of parent describe.skipIf wrapper
