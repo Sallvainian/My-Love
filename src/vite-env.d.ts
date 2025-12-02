@@ -21,6 +21,16 @@ interface ImportMetaEnv {
    * Get from: Supabase Dashboard → Project Settings → API → anon/public key
    */
   readonly VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: string;
+
+  /**
+   * Test user email for E2E tests (optional - only needed for E2E testing)
+   */
+  readonly VITE_TEST_USER_EMAIL?: string;
+
+  /**
+   * Test user password for E2E tests (optional - only needed for E2E testing)
+   */
+  readonly VITE_TEST_USER_PASSWORD?: string;
 }
 
 interface ImportMeta {

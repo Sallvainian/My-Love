@@ -238,7 +238,7 @@ describe('Supabase Validation Schemas', () => {
       const validUser = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         partner_name: 'Jane Doe',
-        device_id: 'device-123',
+        device_id: '550e8400-e29b-41d4-a716-446655440099',
         created_at: '2024-01-15T10:30:00.000Z',
         updated_at: '2024-01-15T10:30:00.000Z',
       };
@@ -250,7 +250,7 @@ describe('Supabase Validation Schemas', () => {
       const validUser = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         partner_name: null,
-        device_id: 'device-123',
+        device_id: '550e8400-e29b-41d4-a716-446655440099',
         created_at: '2024-01-15T10:30:00.000Z',
         updated_at: '2024-01-15T10:30:00.000Z',
       };
@@ -272,7 +272,7 @@ describe('Supabase Validation Schemas', () => {
       const validInsert = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         partner_name: 'Jane Doe',
-        device_id: 'device-123',
+        device_id: '550e8400-e29b-41d4-a716-446655440099',
         created_at: '2024-01-15T10:30:00.000Z',
         updated_at: '2024-01-15T10:30:00.000Z',
       };

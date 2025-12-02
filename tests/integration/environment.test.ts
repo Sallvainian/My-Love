@@ -72,13 +72,16 @@ describe('Environment Configuration Integration', () => {
     });
   });
 
-  describe('AC-0.2.2: Git Ignore Configuration', () => {
-    it('should have .env file entry in .gitignore', () => {
+  describe('AC-0.2.2: Git Ignore Configuration (dotenvx encrypted)', () => {
+    // NOTE: Using dotenvx - .env is encrypted and safe to commit
+    // Only .env.keys (decryption key) must be gitignored
+
+    it('should have .env.keys in .gitignore (dotenvx decryption key)', () => {
       const gitignorePath = path.join(projectRoot, '.gitignore');
       const gitignore = fs.readFileSync(gitignorePath, 'utf-8');
 
-      // Check for .env entry (exact match on own line)
-      expect(gitignore).toMatch(/^\.env$/m);
+      // Check for .env.keys entry (contains decryption key - must be secret)
+      expect(gitignore).toMatch(/^\.env\.keys$/m);
     });
 
     it('should have .env.local file entry in .gitignore', () => {
@@ -173,18 +176,24 @@ describe('Environment Configuration Integration', () => {
       expect(() => fs.accessSync(gitignorePath, fs.constants.R_OK)).not.toThrow();
     });
 
-    it('should warn if actual .env file exists (security check)', () => {
+    it('should verify dotenvx encryption if .env file exists', () => {
       const envPath = path.join(projectRoot, '.env');
 
       if (fs.existsSync(envPath)) {
-        // Verify it's in .gitignore
+        const envContent = fs.readFileSync(envPath, 'utf-8');
+
+        // With dotenvx, .env should contain DOTENV_PUBLIC_KEY (encrypted)
+        // or be an encrypted file safe to commit
+        const hasDotenvxPublicKey = envContent.includes('DOTENV_PUBLIC_KEY');
+        const isEncrypted = envContent.includes('encrypted:');
+
+        // Either has public key (dotenvx managed) or contains encrypted values
+        expect(hasDotenvxPublicKey || isEncrypted).toBe(true);
+
+        // Verify .env.keys (decryption key) is in .gitignore
         const gitignorePath = path.join(projectRoot, '.gitignore');
         const gitignore = fs.readFileSync(gitignorePath, 'utf-8');
-        expect(gitignore).toMatch(/^\.env$/m);
-
-        console.warn(
-          '[Security Warning] .env file exists. Ensure it contains no real secrets during testing.'
-        );
+        expect(gitignore).toMatch(/^\.env\.keys$/m);
       }
     });
   });

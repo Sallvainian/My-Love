@@ -328,8 +328,8 @@ function App() {
   // Story 1.5: Enhanced to show sync completion feedback (AC-1.5.4)
   useEffect(() => {
     // Guard: Skip setup if service workers are not supported
-    // (e.g., Safari private mode, older browsers)
-    if (!isServiceWorkerSupported()) {
+    // (e.g., Safari private mode, older browsers, test environment)
+    if (!isServiceWorkerSupported() || !navigator.serviceWorker) {
       if (import.meta.env.DEV) {
         console.log('[App] Service Worker not supported, skipping background sync listener');
       }

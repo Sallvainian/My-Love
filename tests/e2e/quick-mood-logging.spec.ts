@@ -43,14 +43,25 @@ test.describe('Quick Mood Logging Flow', () => {
       // Click sign in and wait for response
       await page.getByRole('button', { name: /sign in|login/i }).click();
 
-      // Wait for successful authentication (navigation appears)
-      await expect(nav).toBeVisible({ timeout: 15000 });
+      // Wait for either navigation OR welcome/onboarding screen
+      await page.waitForTimeout(2000);
     }
 
-    // Handle onboarding if needed (use more robust detection)
+    // Handle welcome/intro screen if needed (this appears BEFORE nav)
+    try {
+      const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
+      if (await welcomeHeading.isVisible({ timeout: 3000 })) {
+        await page.getByRole('button', { name: /continue/i }).click();
+        await page.waitForTimeout(1000);
+      }
+    } catch {
+      // No welcome screen
+    }
+
+    // Handle onboarding if needed
     try {
       const displayNameInput = page.getByLabel(/display name/i);
-      if (await displayNameInput.isVisible({ timeout: 3000 })) {
+      if (await displayNameInput.isVisible({ timeout: 2000 })) {
         await displayNameInput.fill('TestUser');
         await page.getByRole('button', { name: /continue|save|submit/i }).click();
         await page.waitForTimeout(1000);
@@ -59,21 +70,10 @@ test.describe('Quick Mood Logging Flow', () => {
       // No onboarding needed
     }
 
-    // Handle welcome/intro screen if needed
-    try {
-      const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-      if (await welcomeHeading.isVisible({ timeout: 2000 })) {
-        await page.getByRole('button', { name: /continue/i }).click();
-        await page.waitForTimeout(500);
-      }
-    } catch {
-      // No welcome screen
-    }
-
-    // Wait for app to load
+    // Wait for app navigation to load
     await expect(
       page.locator('nav, [data-testid="bottom-navigation"]').first()
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout: 15000 });
 
     // Navigate to mood page if not already there
     const moodNav = page.getByRole('button', { name: /mood|feeling|heart/i }).or(

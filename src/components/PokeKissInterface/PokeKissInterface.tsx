@@ -402,6 +402,7 @@ export function PokeKissInterface() {
                 handleBadgeClick();
               }}
               data-testid="notification-badge"
+              aria-label={`${unviewedCount} unviewed interaction${unviewedCount === 1 ? '' : 's'}`}
             >
               {unviewedCount}
               <motion.div

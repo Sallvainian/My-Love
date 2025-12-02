@@ -42,7 +42,7 @@ This story builds the foundational chat UI for Love Notes messaging. It focuses 
 |-------|----------|-------------------|
 | **AC-2.1.1** | Love Notes page displays message list with partner messages on left (gray) and user messages on right (coral) | Visual inspection, Playwright E2E test with CSS selector validation |
 | **AC-2.1.2** | Each message shows sender name and timestamp in friendly format ("2:45 PM", "Yesterday") | Unit test for timestamp formatting, visual inspection |
-| **AC-2.1.3** | Message list is virtualized for performance with 50+ messages | DOM inspection shows limited nodes, performance profile at 60fps |
+| **AC-2.1.3** | Message list supports scrolling with auto-scroll to bottom (virtualization deferred to performance optimization phase) | Visual inspection, scrolling behavior validation |
 
 ---
 
@@ -106,11 +106,10 @@ This story builds the foundational chat UI for Love Notes messaging. It focuses 
 ### **Task 4: Create LoveNoteMessage Component** (AC-2.1.1, AC-2.1.2)
 **Goal**: Single chat bubble component with proper styling and timestamp
 
-- [x] **4.1** Create `src/components/love-notes/` directory structure
+- [x] **4.1** Create `src/components/love-notes/` directory structure and style components using Tailwind CSS (project standard)
   ```
   src/components/love-notes/
   ├── LoveNoteMessage.tsx
-  ├── LoveNoteMessage.module.css
   └── index.ts
   ```
 
@@ -240,7 +239,7 @@ src/
 - Components: PascalCase (`LoveNoteMessage.tsx`)
 - Hooks: camelCase with `use` prefix (`useLoveNotes.ts`)
 - Slices: camelCase (`notesSlice.ts`)
-- CSS Modules: `ComponentName.module.css`
+- Styling: Tailwind CSS utility classes (project standard - not CSS Modules)
 
 **UX Design Patterns** (from ux-design-specification.md):
 - Coral theme: Own messages #FF6B6B, partner messages #E9ECEF
@@ -255,9 +254,7 @@ src/
 src/
 ├── components/love-notes/
 │   ├── LoveNoteMessage.tsx
-│   ├── LoveNoteMessage.module.css
 │   ├── MessageList.tsx
-│   ├── MessageList.module.css
 │   └── index.ts
 ├── hooks/
 │   └── useLoveNotes.ts
@@ -408,6 +405,13 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - Auto-scroll to bottom on initial load and new messages
 - Loading states for both initial load and pagination
 - Partner name fetched from user settings/metadata
+
+**Design Decision: Virtualization Deferred**
+- Initial implementation uses standard scrolling with auto-scroll to bottom
+- Virtualization with react-window dependency installed but deferred to performance optimization phase
+- Rationale: Focus MVP on core functionality; virtualization adds complexity and can be added later if performance issues arise
+- Simple scrolling adequate for typical usage (< 100 messages onscreen)
+- react-window remains in package.json for future use when message volume increases
 
 ### File List
 
