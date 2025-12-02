@@ -2,22 +2,25 @@
  * LoveNotes Component
  *
  * Main page container for the Love Notes chat feature.
- * Composes MessageList and header into a full chat view.
+ * Composes MessageList, MessageInput, and header into a full chat view.
  *
  * Features:
  * - Full-screen chat layout
- * - Header with title
+ * - Header with title and refresh
  * - Scrollable message list
+ * - Message input with send functionality
  * - Safe area handling for mobile
- * - Error state display
+ * - Error state display with retry
  *
  * Story 2.1: AC-2.1.1 (message display), AC-2.1.3 (message list)
+ * Story 2.2: AC-2.2.1 (message input), AC-2.2.2 (send functionality)
  */
 
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 import { MessageList } from './MessageList';
+import { MessageInput } from './MessageInput';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useAppStore } from '../../stores/useAppStore';
 import { authService } from '../../api/authService';
@@ -29,7 +32,7 @@ import { authService } from '../../api/authService';
  * and eventually a message input (Story 2.2).
  */
 export function LoveNotes(): ReactElement {
-  const { notes, isLoading, error, hasMore, fetchOlderNotes, fetchNotes, clearError } =
+  const { notes, isLoading, error, hasMore, fetchOlderNotes, fetchNotes, clearError, retryFailedMessage } =
     useLoveNotes();
 
   // Get navigation function
@@ -125,14 +128,11 @@ export function LoveNotes(): ReactElement {
         isLoading={isLoading}
         onLoadMore={fetchOlderNotes}
         hasMore={hasMore}
+        onRetry={retryFailedMessage}
       />
 
-      {/* Message input placeholder - Story 2.2 will add actual input */}
-      <div className="relative z-10 flex-shrink-0 px-4 py-3 bg-white border-t border-gray-100 safe-area-bottom">
-        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl text-gray-400 text-sm">
-          <span>Message input coming in Story 2.2...</span>
-        </div>
-      </div>
+      {/* Message input - Story 2.2 */}
+      <MessageInput />
     </div>
   );
 }

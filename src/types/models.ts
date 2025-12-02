@@ -31,6 +31,7 @@ export interface LoveNote {
   // Client-side only fields for optimistic updates
   sending?: boolean;
   error?: boolean;
+  tempId?: string; // For optimistic messages before server ID
 }
 
 /**
@@ -41,4 +42,22 @@ export interface LoveNotesState {
   isLoading: boolean;
   error: string | null;
   hasMore: boolean;
+}
+
+/**
+ * SendMessageInput interface - Input for sending a new love note
+ * (Story 2.2)
+ */
+export interface SendMessageInput {
+  content: string;
+  timestamp: string;
+}
+
+/**
+ * MessageValidationResult interface - Result of message validation
+ * (Story 2.2)
+ */
+export interface MessageValidationResult {
+  valid: boolean;
+  error?: string;
 }

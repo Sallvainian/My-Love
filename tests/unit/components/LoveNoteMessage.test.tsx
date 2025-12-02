@@ -272,7 +272,7 @@ describe('LoveNoteMessage', () => {
         />
       );
 
-      expect(screen.getByText('Failed to send')).toBeInTheDocument();
+      expect(screen.getByText('Failed to send · Tap to retry')).toBeInTheDocument();
     });
 
     it('applies error border styling', () => {

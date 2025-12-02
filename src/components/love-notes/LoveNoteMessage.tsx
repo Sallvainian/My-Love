@@ -24,6 +24,8 @@ export interface LoveNoteMessageProps {
   isOwnMessage: boolean;
   /** Display name for the sender */
   senderName: string;
+  /** Callback when user clicks retry on a failed message (Story 2.2) */
+  onRetry?: (tempId: string) => void;
 }
 
 /**
@@ -41,6 +43,7 @@ function LoveNoteMessageComponent({
   message,
   isOwnMessage,
   senderName,
+  onRetry,
 }: LoveNoteMessageProps): ReactElement {
   const formattedTime = formatMessageTimestamp(message.created_at);
   const fullTimestamp = formatFullTimestamp(message.created_at);
@@ -88,9 +91,14 @@ function LoveNoteMessageComponent({
         </span>
       )}
       {hasError && (
-        <span className="text-xs text-red-500 mt-1 px-1" aria-live="assertive">
-          Failed to send
-        </span>
+        <button
+          onClick={() => onRetry?.(message.tempId || message.id)}
+          className="text-xs text-red-500 mt-1 px-1 hover:text-red-700 hover:underline cursor-pointer flex items-center gap-1"
+          aria-live="assertive"
+          aria-label="Retry sending message"
+        >
+          Failed to send · Tap to retry
+        </button>
       )}
     </motion.div>
   );
