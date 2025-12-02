@@ -18,11 +18,9 @@ dev-dist
 coverage/
 .nyc_output/
 
-# Prevent .env files from being tracked (app uses hardcoded constants)
-# Keep .env.test.example for Playwright tests
-.env
-.env.development
-.env.production
+# dotenvx: Keep .env.keys secret (contains decryption key)
+# Encrypted .env files are now safe to commit
+.env.keys
 .env.local
 
 # Playwright test artifacts
