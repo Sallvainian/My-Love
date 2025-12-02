@@ -7,6 +7,7 @@ import { createNavigationSlice, type NavigationSlice } from './slices/navigation
 import { createMoodSlice, type MoodSlice } from './slices/moodSlice';
 import { createInteractionsSlice, type InteractionsSlice } from './slices/interactionsSlice';
 import { createPartnerSlice, type PartnerSlice } from './slices/partnerSlice';
+import { createNotesSlice, type NotesSlice } from './slices/notesSlice';
 
 // Composed AppState from all slices
 export interface AppState
@@ -16,7 +17,8 @@ export interface AppState
     NavigationSlice,
     MoodSlice,
     InteractionsSlice,
-    PartnerSlice {
+    PartnerSlice,
+    NotesSlice {
   // Shared/Core state
   isLoading: boolean;
   error: string | null;
@@ -83,6 +85,7 @@ export const useAppStore = create<AppState>()(
       ...createMoodSlice(set as any, get as any, api as any),
       ...createInteractionsSlice(set as any, get as any, api as any),
       ...createPartnerSlice(set as any, get as any, api as any),
+      ...createNotesSlice(set as any, get as any, api as any),
 
       // Shared/Core state (minimal - initialization, loading, error)
       isLoading: false,

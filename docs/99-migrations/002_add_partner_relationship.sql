@@ -139,7 +139,8 @@ BEGIN
     AND (from_user_id IN (v_from_user_id, v_to_user_id)
          OR to_user_id IN (v_from_user_id, v_to_user_id));
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_catalog;
 
 -- ============================================
 -- 6. Create database function to decline partner request
@@ -170,7 +171,8 @@ BEGIN
   SET status = 'declined', updated_at = now()
   WHERE id = p_request_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_catalog;
 
 COMMIT;
 

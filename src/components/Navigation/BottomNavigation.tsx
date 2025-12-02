@@ -1,4 +1,4 @@
-import { Heart, Camera, Smile, Users, LogOut } from 'lucide-react';
+import { Heart, Camera, Smile, Users, LogOut, MessageCircle } from 'lucide-react';
 import type { ViewType } from '../../stores/slices/navigationSlice';
 import { authService } from '../../api/authService';
 
@@ -38,6 +38,21 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         >
           <Smile className={`w-6 h-6 mb-1 ${currentView === 'mood' ? 'fill-current' : ''}`} />
           <span className="text-xs font-medium">Mood</span>
+        </button>
+
+        {/* Notes Tab - Story 2.1: Love Notes Chat */}
+        <button
+          onClick={() => onViewChange('notes')}
+          className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+            currentView === 'notes' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+          }`}
+          data-testid="nav-notes"
+          aria-label="Love Notes"
+        >
+          <MessageCircle
+            className={`w-6 h-6 mb-1 ${currentView === 'notes' ? 'fill-current' : ''}`}
+          />
+          <span className="text-xs font-medium">Notes</span>
         </button>
 
         {/* Partner Tab - Story 6.4: Task 5 */}

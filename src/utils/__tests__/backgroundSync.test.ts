@@ -174,7 +174,7 @@ describe('backgroundSync utilities', () => {
   });
 
   describe('setupServiceWorkerListener', () => {
-    it('should setup message listener and call callback on BACKGROUND_SYNC_REQUEST', async () => {
+    it('should setup message listener and call callback on BACKGROUND_SYNC_COMPLETED', async () => {
       const mockCallback = vi.fn().mockResolvedValue(undefined);
 
       setupServiceWorkerListener(mockCallback);
@@ -187,11 +187,12 @@ describe('backgroundSync utilities', () => {
       // Get the registered handler
       const messageHandler = addEventListenerCalls[0][1] as (event: MessageEvent) => void;
 
-      // Simulate a BACKGROUND_SYNC_REQUEST message
+      // Simulate a BACKGROUND_SYNC_COMPLETED message
       const mockEvent = {
         data: {
-          type: 'BACKGROUND_SYNC_REQUEST',
-          tag: 'sync-pending-moods',
+          type: 'BACKGROUND_SYNC_COMPLETED',
+          successCount: 3,
+          failCount: 0,
         },
       } as MessageEvent;
 
@@ -203,7 +204,7 @@ describe('backgroundSync utilities', () => {
       });
     });
 
-    it('should not call callback for non-BACKGROUND_SYNC_REQUEST messages', () => {
+    it('should not call callback for non-BACKGROUND_SYNC_COMPLETED messages', () => {
       const mockCallback = vi.fn();
 
       setupServiceWorkerListener(mockCallback);
@@ -258,7 +259,7 @@ describe('backgroundSync utilities', () => {
 
     it('should handle callback errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const mockCallback = vi.fn().mockRejectedValue(new Error('Sync failed'));
+      const mockCallback = vi.fn().mockRejectedValue(new Error('Refresh failed'));
 
       setupServiceWorkerListener(mockCallback);
 
@@ -268,7 +269,9 @@ describe('backgroundSync utilities', () => {
 
       const mockEvent = {
         data: {
-          type: 'BACKGROUND_SYNC_REQUEST',
+          type: 'BACKGROUND_SYNC_COMPLETED',
+          successCount: 1,
+          failCount: 0,
         },
       } as MessageEvent;
 
@@ -277,7 +280,7 @@ describe('backgroundSync utilities', () => {
       // Wait for async error handling
       await vi.waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
-          '[BackgroundSync] Sync request failed:',
+          '[BackgroundSync] Failed to refresh after sync:',
           expect.any(Error)
         );
       });
@@ -346,10 +349,9 @@ describe('backgroundSync utilities', () => {
 
       const complexEvent = {
         data: {
-          type: 'BACKGROUND_SYNC_REQUEST',
-          tag: 'sync-pending-moods',
-          timestamp: Date.now(),
-          metadata: { attempt: 1, priority: 'high' },
+          type: 'BACKGROUND_SYNC_COMPLETED',
+          successCount: 5,
+          failCount: 1,
         },
       } as MessageEvent;
 
