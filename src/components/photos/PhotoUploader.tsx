@@ -126,6 +126,7 @@ export function PhotoUploader({
 
       if (selectedFile.size <= FALLBACK_SIZE_LIMIT) {
         // Fallback: Use original file if under 10MB
+        console.warn('[PhotoUploader] Compression failed, using original file as fallback:', (err as Error).message);
         try {
           const dimensions = await getImageDimensions(selectedFile);
 
@@ -139,7 +140,7 @@ export function PhotoUploader({
           // Cleanup
           handleClear();
         } catch (dimensionError) {
-          setError('Failed to process image dimensions. Please try a different photo.');
+          setError('Unable to process this image file. The file may be corrupted or in an unsupported format. Please try a different photo.');
         }
       } else {
         // File too large to upload without compression
