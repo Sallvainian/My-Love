@@ -57,7 +57,7 @@ zod ^3.25.76
 | UI Framework   | Tailwind CSS           | 3.4.18            | All UI FRs                            | Utility-first CSS, responsive design, theming     |
 | Animations     | Framer Motion          | 12.23.24          | All UI FRs                            | Declarative animations, gestures                  |
 | Notifications  | Web Push API           | Browser native    | FR14-21                               | Service worker push notifications                 |
-| Authentication | Supabase Auth          | 2.81+             | FR1-6                                 | Magic link, session management, URL redirects     |
+| Authentication | Supabase Auth          | 2.81+             | FR1-6                                 | Email/password, Google OAuth, session management  |
 | Real-time      | Supabase Realtime      | 2.81+             | FR8-9, FR15                           | WebSocket subscriptions for Love Notes            |
 | File Storage   | Supabase Storage       | 2.81+             | FR29-35                               | Photo uploads with RLS policies                   |
 | Vibration      | Vibration API          | Browser native    | FR13, FR27, FR43                      | Mobile browser tactile feedback                   |
@@ -102,7 +102,7 @@ my-love/
 │   │       └── StatusIndicator.tsx
 │   ├── pages/                        # Page components (routes)
 │   │   ├── Home.tsx                  # Dashboard/Feature Hub
-│   │   ├── Login.tsx                 # Magic link login
+│   │   ├── Login.tsx                 # Email/password + OAuth login
 │   │   ├── Notes.tsx                 # Love Notes chat
 │   │   ├── Mood.tsx                  # Mood tracker
 │   │   ├── Photos.tsx                # Photo gallery
@@ -185,7 +185,7 @@ my-love/
 
 **Supabase Backend (Self-contained platform)**
 
-- **Auth**: Magic link passwordless authentication
+- **Auth**: Email/password and Google OAuth authentication
 - **Database**: PostgreSQL with Row Level Security (RLS)
 - **Realtime**: WebSocket subscriptions for Love Notes
 - **Storage**: Photo uploads with access policies
@@ -212,7 +212,7 @@ my-love/
 **Authentication Flow:**
 
 ```
-User → Login Screen → Supabase Magic Link → Email → URL Redirect → App → Verify Token → Home Screen
+User → Login Screen → Email/Password or Google OAuth → Supabase Auth → Session Established → Home Screen
 ```
 
 **Love Notes Real-time Flow:**
@@ -695,12 +695,16 @@ export interface UserProfile {
 **Authentication:**
 
 ```typescript
-// Magic link sign in
-const { error } = await supabase.auth.signInWithOtp({
+// Email/password sign in
+const { data, error } = await supabase.auth.signInWithPassword({
   email: userEmail,
-  options: {
-    emailRedirectTo: 'mylove://auth/callback',
-  },
+  password: userPassword,
+});
+
+// Google OAuth sign in
+const { error: oauthError } = await supabase.auth.signInWithOAuth({
+  provider: 'google',
+  options: { redirectTo: window.location.origin },
 });
 
 // Session check
@@ -762,7 +766,7 @@ const channel = supabase
 
 ```
 mylove://                           # App scheme
-mylove://auth/callback              # Magic link authentication
+mylove://auth/callback              # OAuth callback
 mylove://notes                      # Love Notes screen
 mylove://notes?id={noteId}          # Specific note
 mylove://mood                       # Mood tracker screen
@@ -793,14 +797,13 @@ mylove://photos                     # Photo gallery
 
 ### Authentication & Authorization
 
-**Magic Link Flow:**
+**Authentication Flow:**
 
-1. User enters email on login screen
-2. Supabase sends magic link to email
-3. User taps link, which opens app via deep link
-4. App verifies token with Supabase
-5. Session stored in SecureStore (device keychain)
-6. Session auto-refreshes until 30-day inactivity timeout
+1. User enters email/password on login screen OR taps Google OAuth button
+2. Supabase validates credentials or processes OAuth callback
+3. On success, JWT session token returned
+4. Session stored in localStorage (browser storage)
+5. Session auto-refreshes until 30-day inactivity timeout
 
 **Session Management:**
 
@@ -1081,14 +1084,14 @@ EXPO_PUBLIC_APP_SCHEME=mylove
 
 ### ADR 004: Expo Router for Navigation
 
-**Context:** Need file-based routing with deep linking support for magic link auth and notification navigation.
+**Context:** Need file-based routing with deep linking support for OAuth callbacks and notification navigation.
 
 **Decision:** Use Expo Router (file-based navigation built on React Navigation).
 
 **Rationale:**
 
 - File-system based routing reduces boilerplate
-- Native deep linking support for magic links
+- Native deep linking support for OAuth callbacks
 - TypeScript route parameter typing
 - Integrates with Expo SDK ecosystem
 - Automatic code splitting by route
