@@ -210,5 +210,55 @@ describe('PhotoUploader - AC-6.1.8 Fallback Logic', () => {
 
       expect(mockOnUpload).not.toHaveBeenCalled();
     });
+
+    it('AC-6.1.8: shows error when dimension extraction fails during fallback', async () => {
+      // Arrange - Mock compression to fail
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({
+        valid: true,
+      });
+      vi.mocked(imageCompressionService.compressImage).mockRejectedValue(
+        new Error('Canvas context failed')
+      );
+
+      // Mock Image to fail loading at global level
+      const originalImage = global.Image;
+      global.Image = class MockFailingImage {
+        set src(_: string) {
+          setTimeout(() => {
+            if (this.onerror) this.onerror(new Event('error'));
+          }, 0);
+        }
+        onerror: ((ev: Event) => void) | null = null;
+        onload: (() => void) | null = null;
+      } as any;
+
+      const { container } = render(<PhotoUploader onUpload={mockOnUpload} />);
+      const input = getFileInput(container);
+
+      // Create small file that would trigger fallback (5MB < 10MB)
+      const file = new File([new ArrayBuffer(5 * 1024 * 1024)], 'test.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
+
+      // Act
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(screen.getByText('Upload Photo', { selector: 'button' })).toBeInTheDocument();
+      });
+
+      const uploadButton = screen.getByText('Upload Photo', { selector: 'button' });
+      fireEvent.click(uploadButton);
+
+      // Assert - should show dimension error
+      await waitFor(() => {
+        expect(screen.getByText(/unable to process this image file.*corrupted or.*unsupported format/i)).toBeInTheDocument();
+      });
+
+      // Should NOT call onUpload
+      expect(mockOnUpload).not.toHaveBeenCalled();
+
+      // Restore
+      global.Image = originalImage;
+    });
   });
 });

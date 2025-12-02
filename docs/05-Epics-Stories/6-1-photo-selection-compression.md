@@ -1,6 +1,6 @@
 # Story 6.1: Photo Selection & Compression
 
-Status: drafted
+Status: Ready for Review
 
 ## Story
 
@@ -23,53 +23,53 @@ so that **sharing is fast and doesn't consume excessive storage**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create imageCompressionService** (AC: 6.1.4, 6.1.5, 6.1.6, 6.1.7, 6.1.9)
-  - [ ] Create `src/services/imageCompressionService.ts`
-  - [ ] Implement `compressImage(file: File): Promise<CompressionResult>` using Canvas API
-  - [ ] Calculate max dimensions (2048px longest side) while preserving aspect ratio
-  - [ ] Export to JPEG at 80% quality via `canvas.toBlob()`
-  - [ ] Implement EXIF stripping (Canvas redraw removes EXIF metadata)
-  - [ ] Add performance timing for compression benchmark (< 3s target)
-  - [ ] Return `CompressionResult` with blob, dimensions, originalSize, compressedSize
+- [x] **Task 1: Create imageCompressionService** (AC: 6.1.4, 6.1.5, 6.1.6, 6.1.7, 6.1.9)
+  - [x] Create `src/services/imageCompressionService.ts`
+  - [x] Implement `compressImage(file: File): Promise<CompressionResult>` using Canvas API
+  - [x] Calculate max dimensions (2048px longest side) while preserving aspect ratio
+  - [x] Export to JPEG at 80% quality via `canvas.toBlob()`
+  - [x] Implement EXIF stripping (Canvas redraw removes EXIF metadata)
+  - [x] Add performance timing for compression benchmark (< 3s target)
+  - [x] Return `CompressionResult` with blob, dimensions, originalSize, compressedSize
 
-- [ ] **Task 2: Create PhotoUploader component foundation** (AC: 6.1.1, 6.1.2, 6.1.3, 6.1.10)
-  - [ ] Create `src/components/photos/PhotoUploader.tsx`
-  - [ ] Add file input with `accept="image/jpeg,image/png,image/webp"`
-  - [ ] Add `capture="environment"` attribute for mobile camera access
-  - [ ] Implement file size validation (reject > 25MB raw)
-  - [ ] Display user-friendly error message for oversized files
-  - [ ] Show image preview using `URL.createObjectURL()`
-  - [ ] Clean up object URLs on component unmount to prevent memory leaks
+- [x] **Task 2: Create PhotoUploader component foundation** (AC: 6.1.1, 6.1.2, 6.1.3, 6.1.10)
+  - [x] Create `src/components/photos/PhotoUploader.tsx`
+  - [x] Add file input with `accept="image/jpeg,image/png,image/webp"`
+  - [x] Add `capture="environment"` attribute for mobile camera access
+  - [x] Implement file size validation (reject > 25MB raw)
+  - [x] Display user-friendly error message for oversized files
+  - [x] Show image preview using `URL.createObjectURL()`
+  - [x] Clean up object URLs on component unmount to prevent memory leaks
 
-- [ ] **Task 3: Integrate compression with uploader** (AC: 6.1.4-6.1.8)
-  - [ ] Call `compressImage()` on file selection
-  - [ ] Show compression progress/status indicator
-  - [ ] Handle compression failure gracefully (fallback to original if < 10MB)
-  - [ ] Show error if original > 10MB and compression fails
-  - [ ] Store compressed blob for upload (next story)
+- [x] **Task 3: Integrate compression with uploader** (AC: 6.1.4-6.1.8)
+  - [x] Call `compressImage()` on file selection
+  - [x] Show compression progress/status indicator
+  - [x] Handle compression failure gracefully (fallback to original if < 10MB)
+  - [x] Show error if original > 10MB and compression fails
+  - [x] Store compressed blob for upload (next story)
 
-- [ ] **Task 4: Add useImageCompression hook** (AC: 6.1.4-6.1.9)
-  - [ ] Create `src/hooks/useImageCompression.ts`
-  - [ ] Wrap compression service with React state management
-  - [ ] Track compression status: `idle`, `compressing`, `complete`, `error`
-  - [ ] Expose: `compress(file)`, `result`, `isCompressing`, `error`
+- [x] **Task 4: Add useImageCompression hook** (AC: 6.1.4-6.1.9)
+  - [x] Create `src/hooks/useImageCompression.ts`
+  - [x] Wrap compression service with React state management
+  - [x] Track compression status: `idle`, `compressing`, `complete`, `error`
+  - [x] Expose: `compress(file)`, `result`, `isCompressing`, `error`
 
-- [ ] **Task 5: Write unit tests for imageCompressionService** (AC: All)
-  - [ ] Create `tests/unit/services/imageCompressionService.test.ts`
-  - [ ] Test dimension reduction (> 2048px → max 2048px)
-  - [ ] Test aspect ratio preservation
-  - [ ] Test JPEG format output
-  - [ ] Test compression timing (mock performance.now())
-  - [ ] Test fallback behavior on compression failure
-  - [ ] Test file type validation
+- [x] **Task 5: Write unit tests for imageCompressionService** (AC: All)
+  - [x] Create `tests/unit/services/imageCompressionService.test.ts`
+  - [x] Test dimension reduction (> 2048px → max 2048px)
+  - [x] Test aspect ratio preservation
+  - [x] Test JPEG format output
+  - [x] Test compression timing (mock performance.now())
+  - [x] Test fallback behavior on compression failure
+  - [x] Test file type validation
 
-- [ ] **Task 6: Write component tests for PhotoUploader** (AC: 6.1.1-6.1.3, 6.1.10)
-  - [ ] Create `tests/unit/components/PhotoUploader.test.tsx`
-  - [ ] Test file input accepts only valid image types
-  - [ ] Test file size rejection for > 25MB
-  - [ ] Test preview display after selection
-  - [ ] Test camera option via capture attribute
-  - [ ] Test error message display
+- [x] **Task 6: Write component tests for PhotoUploader** (AC: 6.1.1-6.1.3, 6.1.10)
+  - [x] Create `tests/unit/components/PhotoUploader.test.tsx`
+  - [x] Test file input accepts only valid image types
+  - [x] Test file size rejection for > 25MB
+  - [x] Test preview display after selection
+  - [x] Test camera option via capture attribute
+  - [x] Test error message display
 
 ## Dev Notes
 
@@ -158,20 +158,40 @@ export interface CompressionResult {
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/05-Epics-Stories/6-1-photo-selection-compression.context.xml
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+- None required - clean implementation
+
 ### Completion Notes List
 
+- **Task 1**: Created imageCompressionService with Canvas API-based compression. Implements all ACs: 2048px max dimensions, 80% JPEG quality, performance timing with console warnings for >3s compression, EXIF stripping via canvas redraw.
+- **Task 2**: Created PhotoUploader component with file input accepting JPEG/PNG/WebP, capture="environment" for mobile camera, 25MB file size validation, image preview with URL.createObjectURL(), and memory leak prevention via object URL cleanup.
+- **Task 3**: Integrated compression into uploader - calls compressImage() on upload, shows error messages on failure, passes compressed blob + metadata to onUpload callback.
+- **Task 4**: Created useImageCompression hook wrapping compression service with React state management. Tracks status (idle/compressing/complete/error), exposes compress(), result, isCompressing, error, and reset().
+- **Task 5**: Wrote 19 unit tests for imageCompressionService covering all ACs - dimension reduction, aspect ratio preservation, JPEG output, compression timing, fallback behavior, file type validation.
+- **Task 6**: Wrote 15 component tests for PhotoUploader covering file input attributes, size validation, preview display, upload workflow, object URL cleanup, and cancel functionality.
+
 ### File List
+
+**New Files:**
+- src/components/photos/PhotoUploader.tsx
+- src/hooks/useImageCompression.ts
+- tests/unit/services/imageCompressionService.test.ts
+- tests/unit/components/PhotoUploader.test.tsx
+
+**Modified Files:**
+- src/services/imageCompressionService.ts (enhanced with full implementation)
+- src/types/index.ts (CompressionOptions, CompressionResult interfaces)
 
 ## Change Log
 
 | Date | Version | Description |
 |------|---------|-------------|
 | 2025-11-26 | 0.1.0 | Story drafted via create-story workflow |
+| 2025-12-02 | 1.0.0 | Implementation complete - All 6 tasks done, 34 unit tests passing (19 service + 15 component). All 10 ACs satisfied. Ready for Review. |

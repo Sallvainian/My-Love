@@ -24,9 +24,10 @@ cleanup() {
 # Trap signals
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start vite in the background
-echo "🚀 Starting Vite dev server..."
-npx vite &
+# Start vite in the background with dotenvx for encrypted .env
+# --overload forces decrypted values to override any pre-existing env vars
+echo "🚀 Starting Vite dev server with dotenvx..."
+dotenvx run --overload -- npx vite &
 VITE_PID=$!
 
 # Wait for vite to exit

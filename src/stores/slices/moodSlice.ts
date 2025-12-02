@@ -58,8 +58,9 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
   // Actions
   addMoodEntry: async (moods, note) => {
     try {
-      // Get authenticated user ID
-      const userId = await authService.getCurrentUserId();
+      // Get authenticated user ID (offline-safe - uses cached session)
+      // Story 5.2: AC-5.2.6 - Use offline-safe auth for local saves
+      const userId = await authService.getCurrentUserIdOfflineSafe();
       if (!userId) {
         throw new Error('User not authenticated');
       }

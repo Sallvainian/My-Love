@@ -122,15 +122,26 @@ After initial deployment, configure additional settings:
 
 ## Environment Configuration
 
-### Local Development (`.env.local`)
+### Local Development (dotenvx)
 
-Create a `.env.local` file in your project root:
+This project uses [dotenvx](https://dotenvx.com) for encrypted environment variables. The `.env` file is encrypted and committed to the repository.
+
+**Setup:**
+
+1. Get the `DOTENV_KEY` from a team member or your password manager
+2. Create `.env.keys` file:
 
 ```bash
-# .env.local (gitignored)
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key-here
+echo "DOTENV_KEY='your-decryption-key-here'" > .env.keys
 ```
+
+3. Run with dotenvx (auto-decrypts at runtime):
+
+```bash
+dotenvx run -- npm run dev
+```
+
+**Note**: The `.env.keys` file is gitignored. Never commit or share it.
 
 ### Vercel Dashboard Configuration
 
@@ -475,13 +486,15 @@ git push
 
 **✅ Safe to commit:**
 
+- `.env` (encrypted with dotenvx - secrets are encrypted)
 - `src/config/constants.ts` (your relationship data)
 - `vite.config.ts` (build configuration)
 - All source code
 
 **❌ Never commit:**
 
-- `.env.local` (local secrets)
+- `.env.keys` (decryption key - keep this secret!)
+- `.env.local` (local overrides)
 - `dist/` directory (build output)
 - `node_modules/` (dependencies)
 

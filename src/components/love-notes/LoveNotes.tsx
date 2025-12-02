@@ -128,7 +128,7 @@ export function LoveNotes(): ReactElement {
       />
 
       {/* Message input placeholder - Story 2.2 will add actual input */}
-      <div className="px-4 py-3 bg-white border-t border-gray-100 safe-area-bottom">
+      <div className="relative z-10 flex-shrink-0 px-4 py-3 bg-white border-t border-gray-100 safe-area-bottom">
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl text-gray-400 text-sm">
           <span>Message input coming in Story 2.2...</span>
         </div>
