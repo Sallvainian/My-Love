@@ -40,7 +40,7 @@ vi.mock('../../../src/api/authService', () => ({
 
 // Helper to create store for testing
 const createTestStore = () => {
-  let storeState: NotesSlice;
+  const storeState: NotesSlice = {} as NotesSlice;
   const set = vi.fn((updater: any) => {
     if (typeof updater === 'function') {
       const newState = updater(storeState);
