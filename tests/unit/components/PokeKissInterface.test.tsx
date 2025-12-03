@@ -22,11 +22,38 @@ import * as supabaseClient from '../../../src/api/supabaseClient';
 // Mock Zustand store
 vi.mock('../../../src/stores/useAppStore');
 
-// Mock Supabase client
+// Mock Supabase client - MUST include supabase export for authService dependency
 vi.mock('../../../src/api/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: 'test-user-id' } } },
+        error: null,
+      }),
+      onAuthStateChange: vi.fn(() => ({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      })),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+    })),
+  },
   getPartnerId: vi.fn(),
-  getCurrentUserId: vi.fn(),
+  getCurrentUserId: vi.fn().mockResolvedValue('test-user-id'),
   initializeAuth: vi.fn(),
+}));
+
+// Mock authService - required for components that use authentication
+vi.mock('../../../src/api/authService', () => ({
+  authService: {
+    getCurrentUserId: vi.fn(() => Promise.resolve('test-user-id')),
+    getCurrentUser: vi.fn(() => Promise.resolve({ id: 'test-user-id' })),
+    getUser: vi.fn(() => Promise.resolve({ id: 'test-user-id' })),
+  },
 }));
 
 // Mock Framer Motion to avoid animation issues in tests
@@ -73,6 +100,9 @@ describe('PokeKissInterface', () => {
     // Reset all mocks
     vi.clearAllMocks();
 
+    // Clear localStorage to reset rate limiting between tests
+    localStorage.clear();
+
     // Setup default mock implementations
     mockSubscribeToInteractions.mockResolvedValue(mockUnsubscribe);
     mockGetUnviewedInteractions.mockReturnValue([]);
@@ -95,29 +125,38 @@ describe('PokeKissInterface', () => {
     vi.restoreAllMocks();
   });
 
+  // Helper to expand FAB menu before accessing action buttons
+  const expandFAB = () => {
+    const fabButton = screen.getByTestId('fab-main-button');
+    fireEvent.click(fabButton);
+  };
+
   describe('AC#1: Interaction buttons in interface', () => {
     it('should render poke button', () => {
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       expect(pokeButton).toBeInTheDocument();
-      expect(pokeButton).toHaveAttribute('aria-label', 'Send Poke');
+      expect(pokeButton).toHaveAttribute('aria-label', 'Poke');
     });
 
     it('should render kiss button', () => {
       render(<PokeKissInterface />);
+      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       expect(kissButton).toBeInTheDocument();
-      expect(kissButton).toHaveAttribute('aria-label', 'Send Kiss');
+      expect(kissButton).toHaveAttribute('aria-label', 'Kiss');
     });
 
     it('should render history button', () => {
       render(<PokeKissInterface />);
+      expandFAB();
 
       const historyButton = screen.getByTestId('history-button');
       expect(historyButton).toBeInTheDocument();
-      expect(historyButton).toHaveAttribute('aria-label', 'View Interaction History');
+      expect(historyButton).toHaveAttribute('aria-label', 'History');
     });
   });
 
@@ -126,6 +165,7 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -139,6 +179,7 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       fireEvent.click(kissButton);
@@ -152,6 +193,7 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -166,6 +208,7 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       fireEvent.click(kissButton);
@@ -180,6 +223,7 @@ describe('PokeKissInterface', () => {
       vi.mocked(supabaseClient.getPartnerId).mockReturnValue(null);
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -194,6 +238,7 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockRejectedValue(new Error('Network error'));
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -204,30 +249,32 @@ describe('PokeKissInterface', () => {
       });
     });
 
-    it('should disable poke button while sending', async () => {
-      // Create a promise that won't resolve immediately
-      let resolvePoke: any;
-      const pokePromise = new Promise((resolve) => {
-        resolvePoke = resolve;
-      });
-      mockSendPoke.mockReturnValue(pokePromise);
+    it('should set rate limit timestamp in localStorage after successful send', async () => {
+      mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
 
-      // Click button
+      // Button should be enabled initially (no cooldown)
+      expect(pokeButton).not.toBeDisabled();
+
+      // Click button to send poke
       fireEvent.click(pokeButton);
 
-      // Button should be disabled while pending
-      expect(pokeButton).toBeDisabled();
-
-      // Resolve the promise
-      resolvePoke({ id: 'poke-1', type: 'poke' });
-
-      // Wait for button to be enabled again
+      // Wait for send to complete
       await waitFor(() => {
-        expect(pokeButton).not.toBeDisabled();
+        expect(mockSendPoke).toHaveBeenCalledWith('partner-uuid-123');
+      });
+
+      // Verify localStorage was updated with rate limit timestamp
+      await waitFor(() => {
+        const lastPokeTime = localStorage.getItem('lastPokeTime');
+        expect(lastPokeTime).toBeTruthy();
+        // Timestamp should be recent (within last 5 seconds)
+        const timeDiff = Date.now() - parseInt(lastPokeTime!, 10);
+        expect(timeDiff).toBeLessThan(5000);
       });
     });
   });
@@ -379,6 +426,7 @@ describe('PokeKissInterface', () => {
   describe('History modal', () => {
     it('should open history modal when history button is clicked', async () => {
       render(<PokeKissInterface />);
+      expandFAB();
 
       const historyButton = screen.getByTestId('history-button');
       fireEvent.click(historyButton);
@@ -390,37 +438,108 @@ describe('PokeKissInterface', () => {
     });
   });
 
-  describe('AC#7: Unlimited interactions', () => {
-    it('should allow multiple poke sends without limit', async () => {
+  describe('AC#7: Rate limiting', () => {
+    it('should allow first poke when no cooldown active', async () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
+      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
+      fireEvent.click(pokeButton);
 
-      // Send 10 pokes in sequence
-      for (let i = 0; i < 10; i++) {
-        fireEvent.click(pokeButton);
-        await waitFor(() => {
-          expect(mockSendPoke).toHaveBeenCalledTimes(i + 1);
-        });
-      }
+      await waitFor(() => {
+        expect(mockSendPoke).toHaveBeenCalledWith('partner-uuid-123');
+      });
     });
 
-    it('should allow multiple kiss sends without limit', async () => {
+    it('should allow first kiss when no cooldown active', async () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
+      expandFAB();
+
+      const kissButton = screen.getByTestId('kiss-button');
+      fireEvent.click(kissButton);
+
+      await waitFor(() => {
+        expect(mockSendKiss).toHaveBeenCalledWith('partner-uuid-123');
+      });
+    });
+
+    it('should disable poke button when cooldown is active', async () => {
+      // Set recent poke time in localStorage (within 30 min)
+      localStorage.setItem('lastPokeTime', String(Date.now()));
+      mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
+
+      render(<PokeKissInterface />);
+      expandFAB();
+
+      const pokeButton = screen.getByTestId('poke-button');
+
+      // Button should be disabled when cooldown is active
+      await waitFor(() => {
+        expect(pokeButton).toBeDisabled();
+      });
+
+      // Clicking disabled button should not call sendPoke
+      fireEvent.click(pokeButton);
+      expect(mockSendPoke).not.toHaveBeenCalled();
+    });
+
+    it('should disable kiss button when cooldown is active', async () => {
+      // Set recent kiss time in localStorage (within 30 min)
+      localStorage.setItem('lastKissTime', String(Date.now()));
+      mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
+
+      render(<PokeKissInterface />);
+      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
 
-      // Send 10 kisses in sequence
-      for (let i = 0; i < 10; i++) {
-        fireEvent.click(kissButton);
-        await waitFor(() => {
-          expect(mockSendKiss).toHaveBeenCalledTimes(i + 1);
-        });
-      }
+      // Button should be disabled when cooldown is active
+      await waitFor(() => {
+        expect(kissButton).toBeDisabled();
+      });
+
+      // Clicking disabled button should not call sendKiss
+      fireEvent.click(kissButton);
+      expect(mockSendKiss).not.toHaveBeenCalled();
+    });
+
+    it('should allow poke after cooldown expires', async () => {
+      // Set poke time to 31 minutes ago (cooldown expired)
+      const thirtyOneMinutesAgo = Date.now() - (31 * 60 * 1000);
+      localStorage.setItem('lastPokeTime', String(thirtyOneMinutesAgo));
+      mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
+
+      render(<PokeKissInterface />);
+      expandFAB();
+
+      const pokeButton = screen.getByTestId('poke-button');
+      fireEvent.click(pokeButton);
+
+      await waitFor(() => {
+        expect(mockSendPoke).toHaveBeenCalledWith('partner-uuid-123');
+      });
+    });
+
+    it('should allow independent cooldowns for poke and kiss', async () => {
+      // Set poke on cooldown but kiss available
+      localStorage.setItem('lastPokeTime', String(Date.now()));
+      // Don't set lastKissTime - kiss should be available
+      mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
+
+      render(<PokeKissInterface />);
+      expandFAB();
+
+      const kissButton = screen.getByTestId('kiss-button');
+      fireEvent.click(kissButton);
+
+      // Kiss should work even though poke is on cooldown
+      await waitFor(() => {
+        expect(mockSendKiss).toHaveBeenCalledWith('partner-uuid-123');
+      });
     });
   });
 });

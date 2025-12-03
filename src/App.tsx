@@ -8,7 +8,7 @@ import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/Re
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
-import { PokeKissInterface } from './components/PokeKissInterface';
+// PokeKissInterface moved to PartnerMoodView
 import { LoginScreen } from './components/LoginScreen';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { applyTheme } from './utils/themes';
@@ -16,7 +16,8 @@ import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { authService } from './api/authService';
 import type { Session } from '@supabase/supabase-js';
-import { setupServiceWorkerListener, isServiceWorkerSupported } from './utils/backgroundSync';
+import { isServiceWorkerSupported } from './utils/backgroundSync';
+import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -31,6 +32,9 @@ const PartnerMoodView = lazy(() =>
   }))
 );
 const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
+const LoveNotes = lazy(() =>
+  import('./components/love-notes').then((m) => ({ default: m.LoveNotes }))
+);
 
 // Loading spinner component for Suspense fallback
 const LoadingSpinner = () => (
@@ -87,6 +91,9 @@ function App() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [isPhotoUploadOpen, setIsPhotoUploadOpen] = useState(false);
 
+  // Story 1.5: Sync completion feedback state (AC-1.5.4)
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+
   // Helper to get route path without base (handles both dev and production)
   const getRoutePath = (pathname: string): string => {
     // Strip the base path in production (/My-Love/)
@@ -114,7 +121,9 @@ function App() {
           ? 'mood'
           : routePath === '/partner'
             ? 'partner'
-            : 'home';
+            : routePath === '/notes'
+              ? 'notes'
+              : 'home';
     setView(initialView, true); // Skip history update on initial load
 
     // AC-4.5.6: Browser back/forward button support
@@ -127,7 +136,9 @@ function App() {
             ? 'mood'
             : routePath === '/partner'
               ? 'partner'
-              : 'home';
+              : routePath === '/notes'
+                ? 'notes'
+                : 'home';
       setView(view, true); // Skip history update to prevent loop
       console.log(`[App] Popstate: navigated to ${view}`);
     };
@@ -314,27 +325,46 @@ function App() {
   }, [syncPendingMoods, syncStatus.isOnline, session]);
 
   // Part 3: Service Worker Background Sync listener
+  // Story 1.5: Enhanced to show sync completion feedback (AC-1.5.4)
   useEffect(() => {
     // Guard: Skip setup if service workers are not supported
-    // (e.g., Safari private mode, older browsers)
-    if (!isServiceWorkerSupported()) {
+    // (e.g., Safari private mode, older browsers, test environment)
+    if (!isServiceWorkerSupported() || !navigator.serviceWorker) {
       if (import.meta.env.DEV) {
         console.log('[App] Service Worker not supported, skipping background sync listener');
       }
       return; // No cleanup needed
     }
 
-    // Setup listener for background sync requests from service worker
-    const cleanup = setupServiceWorkerListener(async () => {
-      if (import.meta.env.DEV) {
-        console.log('[App] Service Worker requested background sync');
+    // Direct message listener to capture sync counts for toast notification
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'BACKGROUND_SYNC_COMPLETED') {
+        const { successCount, failCount } = event.data;
+
+        if (import.meta.env.DEV) {
+          console.log('[App] Service Worker completed background sync:', {
+            successCount,
+            failCount,
+          });
+        }
+
+        // Refresh local state after SW completed sync
+        await updateSyncStatus();
+
+        // Story 1.5: Show sync completion toast (AC-1.5.4)
+        if (successCount > 0 || failCount > 0) {
+          setSyncResult({ successCount, failCount });
+        }
       }
-      await syncPendingMoods();
-    });
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
 
     // Cleanup on unmount
-    return cleanup;
-  }, [syncPendingMoods]);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+    };
+  }, [updateSyncStatus]);
 
   // Story 6.7: Show loading screen while checking authentication
   if (authLoading) {
@@ -440,10 +470,13 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen pb-16">
-        {/* Story 6.5: Poke/Kiss Interaction Interface - Fixed top-right position (AC#1) */}
-        <div className="fixed top-4 right-4 z-50">
-          <PokeKissInterface />
-        </div>
+        {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
+        <NetworkStatusIndicator showOnlyWhenOffline />
+
+        {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
+        <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
+
+        {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
         {/* Conditional view rendering */}
         {currentView === 'home' && (
@@ -492,6 +525,8 @@ function App() {
           {currentView === 'mood' && <MoodTracker />}
 
           {currentView === 'partner' && <PartnerMoodView />}
+
+          {currentView === 'notes' && <LoveNotes />}
         </Suspense>
 
         {/* Bottom navigation */}

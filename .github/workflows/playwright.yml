@@ -13,10 +13,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -28,17 +28,18 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: npm run test:e2e
+        run: npx dotenvx run -- npx playwright test
+        env:
+          CI: true
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_KEY }}
 
-      - name: Upload test artifacts
+      - name: Upload test report
         uses: actions/upload-artifact@v5
-        if: always()
+        if: failure()
         with:
-          name: playwright-report-${{ github.run_number }}
-          path: |
-            playwright-report/
-            test-results/
+          name: playwright-report
+          path: playwright-report/
           retention-days: 7

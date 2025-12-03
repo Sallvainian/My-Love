@@ -8,11 +8,13 @@ export type MoodType =
   | 'loved'
   | 'happy'
   | 'content'
+  | 'excited'
   | 'thoughtful'
   | 'grateful'
   | 'sad'
   | 'anxious'
   | 'frustrated'
+  | 'angry'
   | 'lonely'
   | 'tired';
 
@@ -49,8 +51,8 @@ export interface PhotoUploadInput {
 }
 
 export interface CompressionOptions {
-  maxWidth: number; // Default: 1920px
-  maxHeight: number; // Default: 1920px
+  maxWidth: number; // Default: 2048px (Story 6.1)
+  maxHeight: number; // Default: 2048px (Story 6.1)
   quality: number; // Default: 0.8 (80%)
 }
 
