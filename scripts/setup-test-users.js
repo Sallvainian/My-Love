@@ -11,9 +11,9 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { config } from '@dotenvx/dotenvx';
+import { config } from 'dotenv';
 
-// Load environment variables from encrypted .env file
+// Load environment variables from .env
 config();
 
 // Validate required environment variables

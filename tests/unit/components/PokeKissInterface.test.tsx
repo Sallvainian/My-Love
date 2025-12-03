@@ -22,38 +22,11 @@ import * as supabaseClient from '../../../src/api/supabaseClient';
 // Mock Zustand store
 vi.mock('../../../src/stores/useAppStore');
 
-// Mock Supabase client - MUST include supabase export for authService dependency
+// Mock Supabase client
 vi.mock('../../../src/api/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({
-        data: { session: { user: { id: 'test-user-id' } } },
-        error: null,
-      }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-    })),
-  },
   getPartnerId: vi.fn(),
-  getCurrentUserId: vi.fn().mockResolvedValue('test-user-id'),
+  getCurrentUserId: vi.fn(),
   initializeAuth: vi.fn(),
-}));
-
-// Mock authService - required for components that use authentication
-vi.mock('../../../src/api/authService', () => ({
-  authService: {
-    getCurrentUserId: vi.fn(() => Promise.resolve('test-user-id')),
-    getCurrentUser: vi.fn(() => Promise.resolve({ id: 'test-user-id' })),
-    getUser: vi.fn(() => Promise.resolve({ id: 'test-user-id' })),
-  },
 }));
 
 // Mock Framer Motion to avoid animation issues in tests
@@ -125,38 +98,29 @@ describe('PokeKissInterface', () => {
     vi.restoreAllMocks();
   });
 
-  // Helper to expand FAB menu before accessing action buttons
-  const expandFAB = () => {
-    const fabButton = screen.getByTestId('fab-main-button');
-    fireEvent.click(fabButton);
-  };
-
   describe('AC#1: Interaction buttons in interface', () => {
     it('should render poke button', () => {
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       expect(pokeButton).toBeInTheDocument();
-      expect(pokeButton).toHaveAttribute('aria-label', 'Poke');
+      expect(pokeButton).toHaveAttribute('aria-label', 'Send Poke');
     });
 
     it('should render kiss button', () => {
       render(<PokeKissInterface />);
-      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       expect(kissButton).toBeInTheDocument();
-      expect(kissButton).toHaveAttribute('aria-label', 'Kiss');
+      expect(kissButton).toHaveAttribute('aria-label', 'Send Kiss');
     });
 
     it('should render history button', () => {
       render(<PokeKissInterface />);
-      expandFAB();
 
       const historyButton = screen.getByTestId('history-button');
       expect(historyButton).toBeInTheDocument();
-      expect(historyButton).toHaveAttribute('aria-label', 'History');
+      expect(historyButton).toHaveAttribute('aria-label', 'View Interaction History');
     });
   });
 
@@ -165,7 +129,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -179,7 +142,6 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       fireEvent.click(kissButton);
@@ -193,7 +155,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -208,7 +169,6 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       fireEvent.click(kissButton);
@@ -223,7 +183,6 @@ describe('PokeKissInterface', () => {
       vi.mocked(supabaseClient.getPartnerId).mockReturnValue(null);
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -238,7 +197,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockRejectedValue(new Error('Network error'));
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -253,7 +211,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
 
@@ -426,7 +383,6 @@ describe('PokeKissInterface', () => {
   describe('History modal', () => {
     it('should open history modal when history button is clicked', async () => {
       render(<PokeKissInterface />);
-      expandFAB();
 
       const historyButton = screen.getByTestId('history-button');
       fireEvent.click(historyButton);
@@ -443,7 +399,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -457,7 +412,6 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       fireEvent.click(kissButton);
@@ -473,7 +427,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
 
@@ -493,7 +446,6 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
 
@@ -514,7 +466,6 @@ describe('PokeKissInterface', () => {
       mockSendPoke.mockResolvedValue({ id: 'poke-1', type: 'poke' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const pokeButton = screen.getByTestId('poke-button');
       fireEvent.click(pokeButton);
@@ -531,7 +482,6 @@ describe('PokeKissInterface', () => {
       mockSendKiss.mockResolvedValue({ id: 'kiss-1', type: 'kiss' });
 
       render(<PokeKissInterface />);
-      expandFAB();
 
       const kissButton = screen.getByTestId('kiss-button');
       fireEvent.click(kissButton);

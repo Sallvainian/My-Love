@@ -21,27 +21,7 @@ vi.mock('../../../src/stores/useAppStore');
 
 // Mock Supabase client
 vi.mock('../../../src/api/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({
-        data: { session: { user: { id: 'user-1' } } },
-        error: null,
-      }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-    },
-  },
   getCurrentUserId: vi.fn(),
-}));
-
-// Mock authService - component uses this for getCurrentUserId
-const mockGetCurrentUserId = vi.fn();
-vi.mock('../../../src/api/authService', () => ({
-  authService: {
-    getCurrentUserId: () => mockGetCurrentUserId(),
-    getCurrentUser: vi.fn(() => Promise.resolve({ id: 'user-1' })),
-  },
 }));
 
 // Mock Framer Motion
@@ -94,7 +74,7 @@ describe('InteractionHistory', () => {
     vi.clearAllMocks();
 
     mockGetInteractionHistory.mockReturnValue([]);
-    mockGetCurrentUserId.mockResolvedValue('user-1');
+    vi.mocked(supabaseClient.getCurrentUserId).mockReturnValue('user-1');
 
     vi.mocked(useAppStore).mockReturnValue({
       loadInteractionHistory: mockLoadInteractionHistory,
@@ -228,7 +208,7 @@ describe('InteractionHistory', () => {
       await waitFor(() => {
         const interaction = screen.getByTestId('interaction-poke-1');
         expect(interaction).toBeInTheDocument();
-        expect(interaction).toHaveTextContent(/poke/i);
+        expect(interaction).toHaveTextContent('Poke');
       });
     });
 
@@ -246,7 +226,7 @@ describe('InteractionHistory', () => {
       await waitFor(() => {
         const interaction = screen.getByTestId('interaction-kiss-1');
         expect(interaction).toBeInTheDocument();
-        expect(interaction).toHaveTextContent(/kiss/i);
+        expect(interaction).toHaveTextContent('Kiss');
       });
     });
 
