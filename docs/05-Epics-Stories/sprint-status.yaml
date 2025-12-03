@@ -51,7 +51,7 @@ development_status:
   2-1-love-notes-chat-ui-foundation: done # Code review APPROVED 2025-12-02 - All 28 tasks done, 52 tests passing, AC 2.1.1-2.1.3 verified
   2-2-send-love-note-with-optimistic-updates: done # Code review APPROVED 2025-12-02 - All issues fixed: XSS sanitization, rate limiting on retry, E2E tests added
   2-3-real-time-message-reception: done # Code review APPROVED 2025-12-03 - Migrated to Broadcast API, deduplication, hook extraction
-  2-4-message-history-scroll-performance: backlog
+  2-4-message-history-scroll-performance: ready-for-dev # Story created 2025-12-03 - Virtualized scroll, infinite pagination, 60fps performance
   epic-2-retrospective: optional
 
   # Epic 3: Push Notifications & Daily Engagement
@@ -89,7 +89,7 @@ development_status:
   6-1-photo-selection-compression: done # Code review APPROVED 2025-12-02 - All 6 tasks done, 39 tests passing (19 service + 15 component + 5 fallback), all 10 ACs satisfied.
   6-2-photo-upload-with-progress-indicator: done # Code review APPROVED 2025-12-02 - All issues fixed: pre-upload quota check restored, 100ms timing test added, constants extracted
   6-3-photo-gallery-grid-view: done # Code review APPROVED 2025-12-03 - Fixed grid columns (3-col mobile), removed console.log pollution
-  6-4-full-screen-photo-viewer-with-gestures: backlog
+  6-4-full-screen-photo-viewer-with-gestures: ready-for-dev # Story created 2025-12-02 - Full-screen viewer with gestures (swipe, pinch-to-zoom, double-tap, pan, delete)
   epic-6-retrospective: optional
 
   # Epic 7: Settings, Interactions & Personalization
