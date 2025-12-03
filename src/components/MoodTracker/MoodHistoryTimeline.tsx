@@ -7,9 +7,9 @@
  * @module components/MoodTracker/MoodHistoryTimeline
  */
 
-import { useMemo, useEffect, useRef } from 'react';
-import { VariableSizeList as List } from 'react-window';
-import InfiniteLoader from 'react-window-infinite-loader';
+import { useMemo, useEffect } from 'react';
+import { List } from 'react-window';
+import { useInfiniteLoader } from 'react-window-infinite-loader';
 import { useMoodHistory } from '../../hooks/useMoodHistory';
 import { MoodHistoryItem } from './MoodHistoryItem';
 import { groupMoodsByDate, type MoodGroup } from '../../utils/moodGrouping';
@@ -135,6 +135,32 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
     }
   };
 
+  // Variable sizing function per story spec
+  const getRowHeight = (index: number): number => {
+    const item = timelineItems[index];
+    if (!item) return 80; // Default for loading items
+
+    if (item.type === 'date-header') {
+      return 40; // Date headers are compact
+    }
+
+    // Mood items vary by note length
+    const noteLength = item.mood.note?.length || 0;
+    if (noteLength > 100) {
+      return 120; // Long notes need more space
+    }
+    return 80; // Standard mood item height
+  };
+
+  // Setup infinite loading hook - must be called before any conditional returns
+  const onRowsRendered = useInfiniteLoader({
+    isRowLoaded: isRowLoaded,
+    loadMoreRows: loadMoreRows,
+    rowCount: timelineItems.length + (hasMore ? 1 : 0),
+    threshold: 15,
+    minimumBatchSize: 10,
+  });
+
   // Show empty state
   if (!isLoading && moods.length === 0) {
     return <EmptyMoodHistoryState />;
@@ -153,62 +179,42 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
     );
   }
 
-  // Variable sizing function per story spec
-  const getItemSize = (index: number): number => {
+  // Row component for List
+  const RowComponent = ({
+    index,
+    style,
+  }: {
+    ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
+    index: number;
+    style: React.CSSProperties;
+  }) => {
     const item = timelineItems[index];
-    if (!item) return 80; // Default for loading items
 
-    if (item.type === 'date-header') {
-      return 40; // Date headers are compact
+    if (!item) {
+      return <div style={style} />;
     }
 
-    // Mood items vary by note length
-    const noteLength = item.mood.note?.length || 0;
-    if (noteLength > 100) {
-      return 120; // Long notes need more space
-    }
-    return 80; // Standard mood item height
+    return (
+      <div style={style}>
+        {item.type === 'date-header' ? (
+          <DateHeader date={item.dateLabel} />
+        ) : (
+          <MoodHistoryItem mood={item.mood} isPartnerView={isPartnerView} />
+        )}
+      </div>
+    );
   };
-
-  // Create ref for VariableSizeList
-  const listRef = useRef<InstanceType<typeof List>>(null);
 
   return (
     <div className="w-full h-full" data-testid="mood-history-timeline">
-      <InfiniteLoader
-        isItemLoaded={isRowLoaded}
-        itemCount={timelineItems.length + (hasMore ? 1 : 0)}
-        loadMoreItems={loadMoreRows}
-      >
-        {({ onItemsRendered, ref }) => (
-          <List
-            ref={(list) => {
-              // Assign to both refs
-              ref(list);
-              if (listRef) listRef.current = list;
-            }}
-            height={600}
-            itemCount={timelineItems.length}
-            itemSize={getItemSize}
-            width="100%"
-            onItemsRendered={onItemsRendered}
-          >
-            {({ index, style }) => {
-              const item = timelineItems[index];
-
-              return (
-                <div style={style}>
-                  {item.type === 'date-header' ? (
-                    <DateHeader date={item.dateLabel} />
-                  ) : (
-                    <MoodHistoryItem mood={item.mood} isPartnerView={isPartnerView} />
-                  )}
-                </div>
-              );
-            }}
-          </List>
-        )}
-      </InfiniteLoader>
+      <List
+        rowCount={timelineItems.length}
+        rowHeight={getRowHeight}
+        onRowsRendered={onRowsRendered}
+        defaultHeight={600}
+        rowComponent={RowComponent}
+        rowProps={{}}
+      />
 
       {isLoading && (
         <div className="text-center py-4">

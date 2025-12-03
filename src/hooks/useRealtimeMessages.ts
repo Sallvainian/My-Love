@@ -111,9 +111,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     };
   }, [enabled, handleNewMessage]);
 
-  return {
-    isSubscribed: channelRef.current !== null,
-  };
+  // Return empty object - subscription status can be checked via side effects
+  // Note: Accessing refs during render is not recommended
+  return {};
 }
 
 export default useRealtimeMessages;
