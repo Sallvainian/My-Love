@@ -178,6 +178,101 @@ export async function ensurePartnerRelationship(
 }
 
 /**
+ * Valid mood types for seeding
+ */
+export type MoodType =
+  | 'loved'
+  | 'happy'
+  | 'content'
+  | 'thoughtful'
+  | 'grateful'
+  | 'sad'
+  | 'anxious'
+  | 'frustrated'
+  | 'lonely'
+  | 'tired';
+
+/**
+ * Seed a mood for a user (for deterministic E2E tests)
+ *
+ * This bypasses the UI to create a mood directly in the database.
+ * Useful for testing partner mood viewing without flaky UI interactions.
+ *
+ * @param userId - The user ID to seed mood for
+ * @param moodType - The type of mood to create
+ * @param note - Optional note text
+ * @returns The created mood ID
+ */
+export async function seedPartnerMood(
+  userId: string,
+  moodType: MoodType,
+  note?: string
+): Promise<string> {
+  const admin = getAdminClient();
+
+  const { data, error } = await admin
+    .from('moods')
+    .insert({
+      user_id: userId,
+      mood_type: moodType,
+      note: note ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to seed mood: ${error.message}`);
+  }
+
+  console.log(`[PartnerSetup] Seeded mood for user ${userId}: ${moodType}`);
+  return data.id;
+}
+
+/**
+ * Clear all moods for a user (for testing empty state)
+ *
+ * @param userId - The user ID to clear moods for
+ */
+export async function clearPartnerMood(userId: string): Promise<void> {
+  const admin = getAdminClient();
+
+  const { error } = await admin.from('moods').delete().eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to clear moods: ${error.message}`);
+  }
+
+  console.log(`[PartnerSetup] Cleared all moods for user ${userId}`);
+}
+
+/**
+ * Get the latest mood for a user (for verification)
+ *
+ * @param userId - The user ID to get mood for
+ * @returns The latest mood or null
+ */
+export async function getLatestMood(
+  userId: string
+): Promise<{ id: string; mood_type: MoodType; note: string | null } | null> {
+  const admin = getAdminClient();
+
+  const { data, error } = await admin
+    .from('moods')
+    .select('id, mood_type, note')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`[PartnerSetup] Error fetching mood: ${error.message}`);
+    return null;
+  }
+
+  return data as { id: string; mood_type: MoodType; note: string | null } | null;
+}
+
+/**
  * Remove partner relationship (for cleanup in tests)
  *
  * Note: This requires careful handling as it affects both users' records.
