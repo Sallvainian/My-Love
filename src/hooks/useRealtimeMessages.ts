@@ -21,9 +21,18 @@ export interface UseRealtimeMessagesOptions {
   enabled?: boolean;
 }
 
+// Retry configuration for subscription failures
+const RETRY_CONFIG = {
+  maxRetries: 5,
+  baseDelay: 1000, // 1 second
+  maxDelay: 30000, // 30 seconds max
+};
+
 export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   const { onNewMessage, enabled = true } = options;
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const retryCountRef = useRef(0);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addNote = useAppStore((state) => state.addNote);
 
   const handleNewMessage = useCallback(
@@ -79,15 +88,49 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
               console.log('[useRealtimeMessages] Subscription status:', status, err || '');
             }
 
-            // Handle subscription errors (AC-2.3.5)
+            // Reset retry count on successful subscription
+            if (status === 'SUBSCRIBED') {
+              retryCountRef.current = 0;
+              return;
+            }
+
+            // Handle subscription errors with exponential backoff (AC-2.3.5)
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
               console.error('[useRealtimeMessages] Subscription error:', err);
-              // Attempt reconnection after delay
-              setTimeout(() => {
+
+              // Check if max retries exceeded
+              if (retryCountRef.current >= RETRY_CONFIG.maxRetries) {
+                console.error(
+                  `[useRealtimeMessages] Max retries (${RETRY_CONFIG.maxRetries}) exceeded. Giving up.`
+                );
+                return;
+              }
+
+              // Calculate delay with exponential backoff: baseDelay * 2^retryCount
+              const delay = Math.min(
+                RETRY_CONFIG.baseDelay * Math.pow(2, retryCountRef.current),
+                RETRY_CONFIG.maxDelay
+              );
+
+              retryCountRef.current++;
+
+              if (import.meta.env.DEV) {
+                console.log(
+                  `[useRealtimeMessages] Retry attempt ${retryCountRef.current}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
+                );
+              }
+
+              // Clear any existing retry timeout
+              if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current);
+              }
+
+              // Schedule retry with exponential backoff
+              retryTimeoutRef.current = setTimeout(() => {
                 if (subscriptionActive && channelRef.current) {
                   channelRef.current.subscribe();
                 }
-              }, 5000);
+              }, delay);
             }
           });
 
@@ -101,6 +144,13 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
     return () => {
       subscriptionActive = false;
+
+      // Clear any pending retry timeout
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+
       if (channelRef.current) {
         if (import.meta.env.DEV) {
           console.log('[useRealtimeMessages] Unsubscribing from channel');
@@ -108,6 +158,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+
+      // Reset retry count on cleanup
+      retryCountRef.current = 0;
     };
   }, [enabled, handleNewMessage]);
 
