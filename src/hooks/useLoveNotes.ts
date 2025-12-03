@@ -14,12 +14,10 @@
  * Story 2.3: Real-time message reception
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
-import { supabase } from '../api/supabaseClient';
-import { authService } from '../api/authService';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useRealtimeMessages } from './useRealtimeMessages';
 
 /**
  * Return type for useLoveNotes hook
@@ -114,86 +112,9 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     }
   }, [autoFetch, fetchNotes]);
 
-  // Story 2.3: Real-time subscription for new messages
-  // Subscribe to realtime updates for new messages
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const addNote = useAppStore((state) => state.addNote);
-
-  useEffect(() => {
-    let subscriptionActive = true;
-
-    const setupRealtimeSubscription = async () => {
-      try {
-        // Get current user ID
-        const userId = await authService.getCurrentUserId();
-        if (!userId) {
-          if (import.meta.env.DEV) {
-            console.log('[useLoveNotes] No user ID, skipping realtime subscription');
-          }
-          return;
-        }
-
-        if (import.meta.env.DEV) {
-          console.log('[useLoveNotes] Setting up realtime subscription for user:', userId);
-        }
-
-        // Create channel for love notes
-        const channel = supabase.channel('love-notes-realtime');
-
-        // Subscribe to INSERT events on love_notes table
-        // Filter for messages sent TO this user
-        channel
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'love_notes',
-              filter: `to_user_id=eq.${userId}`,
-            },
-            (payload) => {
-              if (!subscriptionActive) return;
-
-              if (import.meta.env.DEV) {
-                console.log('[useLoveNotes] New message received:', payload);
-              }
-
-              // Add new message to store
-              const newNote = payload.new as LoveNote;
-              addNote(newNote);
-
-              // Trigger vibration feedback (AC-2.3.3)
-              if (navigator.vibrate) {
-                navigator.vibrate([30]);
-              }
-            }
-          )
-          .subscribe((status) => {
-            if (import.meta.env.DEV) {
-              console.log('[useLoveNotes] Subscription status:', status);
-            }
-          });
-
-        channelRef.current = channel;
-      } catch (error) {
-        console.error('[useLoveNotes] Error setting up realtime subscription:', error);
-      }
-    };
-
-    setupRealtimeSubscription();
-
-    // Cleanup function
-    return () => {
-      subscriptionActive = false;
-      if (channelRef.current) {
-        if (import.meta.env.DEV) {
-          console.log('[useLoveNotes] Unsubscribing from realtime channel');
-        }
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, []); // Empty dependency array - set up once on mount
+  // Story 2.3: Real-time subscription via dedicated hook
+  // Using Broadcast API per useRealtimeMessages implementation
+  useRealtimeMessages({ enabled: autoFetch });
 
   return {
     notes,
