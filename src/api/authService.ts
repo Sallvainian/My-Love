@@ -272,24 +272,6 @@ export const getCurrentUserId = async (): Promise<string | null> => {
 };
 
 /**
- * Get current user ID (offline-safe version)
- *
- * Uses cached session instead of network-validated user.
- * This works offline because getSession() reads from local storage.
- *
- * Use this for operations that should work offline (e.g., saving to IndexedDB).
- * For operations requiring server validation, use getCurrentUserId() instead.
- *
- * @returns User ID or null if not authenticated
- *
- * Story 5.2: AC-5.2.6 - Offline indicator and local save support
- */
-export const getCurrentUserIdOfflineSafe = async (): Promise<string | null> => {
-  const session = await getSession();
-  return session?.user?.id ?? null;
-};
-
-/**
  * Check authentication status
  *
  * Returns comprehensive auth status including user and session info.
@@ -477,7 +459,6 @@ export const authService = {
   getSession,
   getUser,
   getCurrentUserId,
-  getCurrentUserIdOfflineSafe,
   getAuthStatus,
   onAuthStateChange,
   resetPassword,

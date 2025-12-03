@@ -67,22 +67,15 @@ self.addEventListener(
 
 /**
  * Transform local mood format to Supabase REST API format
- *
- * Handles both single-mood (legacy) and multi-mood entries:
- * - mood_type: Always the primary mood (first in array or single mood)
- * - mood_types: Array of all selected moods (includes primary)
  */
 function transformMoodForSupabase(
   mood: StoredMoodEntry,
   userId: string
 ): Record<string, unknown> {
-  // Determine mood_types array: use stored moods array, or create single-element array
-  const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
-
   return {
     user_id: userId,
     mood_type: mood.mood,
-    mood_types: moodTypes,
+    mood_types: mood.moods || [mood.mood],
     note: mood.note || null,
     created_at: mood.timestamp instanceof Date
       ? mood.timestamp.toISOString()

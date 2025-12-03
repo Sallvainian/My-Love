@@ -1,18 +1,17 @@
 /**
  * PokeKissInterface Component
  *
- * Expandable FAB (Floating Action Button) for sending interactions to partner.
- * Main button expands to reveal poke/kiss/fart actions with smooth animations.
+ * Main interface for sending pokes and kisses to partner.
+ * Displays notification badge for incoming interactions and plays animations.
  *
  * Features:
- * - Collapsible action menu with staggered animations
- * - Poke/Kiss/Fart send buttons with cooldowns
+ * - Poke/Kiss send buttons with animation feedback
  * - Notification badge showing unviewed interaction count
  * - Animation playback for received interactions
- * - History modal access
+ * - Real-time updates via Supabase Realtime
  *
  * AC Coverage:
- * - AC#1: Interaction buttons accessible via FAB
+ * - AC#1: Interaction buttons in top nav
  * - AC#2: Tapping sends interaction to Supabase
  * - AC#3: Recipient receives notification badge
  * - AC#4: Animation playback (kiss hearts, poke nudge)
@@ -21,7 +20,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
-import { Hand, History, Wind, Heart, X } from 'lucide-react';
+import { Hand, History, Wind } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { getPartnerId } from '../../api/supabaseClient';
 import { InteractionHistory } from '../InteractionHistory';
@@ -64,7 +63,6 @@ export function PokeKissInterface() {
     subscribeToInteractions,
   } = useAppStore();
 
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isPoking, setIsPoking] = useState(false);
   const [isKissing, setIsKissing] = useState(false);
   const [isFarting, setIsFarting] = useState(false);
@@ -78,27 +76,9 @@ export function PokeKissInterface() {
   const [kissCooldown, setKissCooldown] = useState(getCooldownRemaining('kiss'));
   const [fartCooldown, setFartCooldown] = useState(getCooldownRemaining('fart'));
 
-  // Refs
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Use ref to prevent duplicate subscriptions in React StrictMode
   const subscriptionRef = useRef<(() => void) | null>(null);
   const isSubscribingRef = useRef(false);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsExpanded(false);
-      }
-    };
-
-    if (isExpanded) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isExpanded]);
 
   // Update cooldowns every second
   useEffect(() => {
@@ -113,6 +93,7 @@ export function PokeKissInterface() {
 
   // Subscribe to real-time interactions on mount
   useEffect(() => {
+    // Prevent duplicate subscriptions
     if (isSubscribingRef.current || subscriptionRef.current) {
       if (import.meta.env.DEV) {
         console.log('[PokeKissInterface] Subscription already active, skipping');
@@ -136,6 +117,7 @@ export function PokeKissInterface() {
 
     setupSubscription();
 
+    // Cleanup subscription on unmount
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current();
@@ -143,10 +125,11 @@ export function PokeKissInterface() {
         console.log('[PokeKissInterface] Unsubscribed from interactions');
       }
     };
-  }, []);
+  }, []); // Empty deps - only subscribe once
 
   // Handle Poke button click
   const handlePoke = async () => {
+    // Check rate limit
     if (pokeCooldown > 0) {
       setShowToast(`Wait ${formatCooldown(pokeCooldown)} before poking again`);
       setTimeout(() => setShowToast(null), 3000);
@@ -162,10 +145,10 @@ export function PokeKissInterface() {
     }
 
     setIsPoking(true);
-    setIsExpanded(false);
 
     try {
       await sendPoke(partnerId);
+      // Save timestamp for rate limiting
       localStorage.setItem(RATE_LIMIT_KEYS.poke, Date.now().toString());
       setPokeCooldown(RATE_LIMIT_MS);
       setShowToast('Poke sent! 👆');
@@ -181,6 +164,7 @@ export function PokeKissInterface() {
 
   // Handle Kiss button click
   const handleKiss = async () => {
+    // Check rate limit
     if (kissCooldown > 0) {
       setShowToast(`Wait ${formatCooldown(kissCooldown)} before kissing again`);
       setTimeout(() => setShowToast(null), 3000);
@@ -196,10 +180,10 @@ export function PokeKissInterface() {
     }
 
     setIsKissing(true);
-    setIsExpanded(false);
 
     try {
       await sendKiss(partnerId);
+      // Save timestamp for rate limiting
       localStorage.setItem(RATE_LIMIT_KEYS.kiss, Date.now().toString());
       setKissCooldown(RATE_LIMIT_MS);
       setShowToast('Kiss sent! 💋');
@@ -215,16 +199,26 @@ export function PokeKissInterface() {
 
   // Handle Fart button click
   const handleFart = async () => {
+    // Check rate limit
     if (fartCooldown > 0) {
       setShowToast(`Wait ${formatCooldown(fartCooldown)} before farting again`);
       setTimeout(() => setShowToast(null), 3000);
       return;
     }
 
+    const partnerId = await getPartnerId();
+    if (!partnerId) {
+      console.error('[PokeKissInterface] No partner ID configured');
+      setShowToast('Error: Partner not configured');
+      setTimeout(() => setShowToast(null), 3000);
+      return;
+    }
+
     setIsFarting(true);
-    setIsExpanded(false);
 
     try {
+      // For now, just show animation locally (fart doesn't need server sync)
+      // Save timestamp for rate limiting
       localStorage.setItem(RATE_LIMIT_KEYS.fart, Date.now().toString());
       setFartCooldown(RATE_LIMIT_MS);
       setShowAnimation('fart');
@@ -235,17 +229,18 @@ export function PokeKissInterface() {
     }
   };
 
-  // Handle notification badge click
+  // Handle notification badge click - show oldest unviewed interaction
   const handleBadgeClick = () => {
     const unviewed = getUnviewedInteractions();
     if (unviewed.length === 0) return;
 
+    // Show animation for oldest unviewed interaction
     const interaction = unviewed[0];
     setCurrentInteraction(interaction);
     setShowAnimation(interaction.type);
   };
 
-  // Handle animation completion
+  // Handle animation completion - mark as viewed
   const handleAnimationComplete = async () => {
     if (!currentInteraction) return;
 
@@ -260,162 +255,138 @@ export function PokeKissInterface() {
     }
   };
 
-  // Action button config
-  const actionButtons = [
-    {
-      id: 'history',
-      icon: History,
-      label: 'History',
-      onClick: () => { setShowHistory(true); setIsExpanded(false); },
-      gradient: 'from-purple-400 to-purple-500',
-      disabled: false,
-      cooldown: 0,
-    },
-    {
-      id: 'poke',
-      icon: Hand,
-      label: 'Poke',
-      onClick: handlePoke,
-      gradient: 'from-pink-400 to-pink-500',
-      disabled: isPoking || pokeCooldown > 0,
-      cooldown: pokeCooldown,
-      isLoading: isPoking,
-    },
-    {
-      id: 'kiss',
-      icon: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 fill-current">
-          <path d="M12 8c-2.5-2-5-2-7 0-1 1-1 3-1 5s1 4 2 5c2 2 4 2 6 0 2 2 4 2 6 0 1-1 2-3 2-5s0-4-1-5c-2-2-4.5-2-7 0Z"/>
-        </svg>
-      ),
-      label: 'Kiss',
-      onClick: handleKiss,
-      gradient: 'from-red-400 to-pink-500',
-      disabled: isKissing || kissCooldown > 0,
-      cooldown: kissCooldown,
-      isLoading: isKissing,
-    },
-    {
-      id: 'fart',
-      icon: Wind,
-      label: 'Fart',
-      onClick: handleFart,
-      gradient: 'from-green-400 to-green-600',
-      disabled: isFarting || fartCooldown > 0,
-      cooldown: fartCooldown,
-      isLoading: isFarting,
-    },
-  ];
-
   return (
     <>
-      <div ref={containerRef} className="relative inline-flex items-center" data-testid="poke-kiss-interface">
-        {/* Action Buttons (expand upward) */}
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 flex flex-col-reverse items-center gap-2"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              {actionButtons.map((button, index) => {
-                const Icon = button.icon;
-                return (
-                  <motion.button
-                    key={button.id}
-                    onClick={button.onClick}
-                    disabled={button.disabled}
-                    initial={{ opacity: 0, y: 20, scale: 0.8 }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                      transition: { delay: index * 0.05 }
-                    }}
-                    exit={{
-                      opacity: 0,
-                      y: 10,
-                      scale: 0.8,
-                      transition: { delay: (actionButtons.length - index) * 0.03 }
-                    }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`
-                      relative flex items-center gap-2 px-4 py-2 rounded-full
-                      bg-gradient-to-br ${button.gradient}
-                      text-white text-sm font-medium shadow-lg
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-shadow hover:shadow-xl
-                    `}
-                    data-testid={`${button.id}-button`}
-                    aria-label={button.label}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{button.label}</span>
-                    {button.cooldown > 0 && (
-                      <span className="text-xs opacity-75">
-                        ({formatCooldown(button.cooldown)})
-                      </span>
-                    )}
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Main FAB Button */}
+      <div className="flex items-center gap-3" data-testid="poke-kiss-interface">
+        {/* History Button */}
         <motion.button
-          onClick={() => setIsExpanded(!isExpanded)}
-          whileHover={{ scale: 1.05 }}
+          onClick={() => setShowHistory(true)}
           whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+          className="
+            relative flex items-center justify-center w-10 h-10 rounded-full
+            bg-gradient-to-br from-purple-400 to-purple-500
+            text-white shadow-md hover:shadow-lg
+            transition-all duration-200
+          "
+          data-testid="history-button"
+          aria-label="View Interaction History"
+        >
+          <History className="w-5 h-5" />
+        </motion.button>
+
+        {/* Poke Button */}
+        <motion.button
+          onClick={handlePoke}
+          disabled={isPoking || pokeCooldown > 0}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
           className={`
-            relative flex items-center justify-center w-14 h-14 rounded-full
-            bg-gradient-to-br from-pink-500 to-rose-500
-            text-white shadow-lg hover:shadow-xl
-            transition-all duration-300
-          `}
-          data-testid="fab-main-button"
-          aria-label={isExpanded ? 'Close actions' : 'Open actions'}
-          aria-expanded={isExpanded}
+          relative flex items-center justify-center w-12 h-12 rounded-full
+          bg-gradient-to-br from-pink-400 to-pink-500
+          text-white shadow-md hover:shadow-lg
+          transition-all duration-200
+          disabled:opacity-50 disabled:cursor-not-allowed
+        `}
+          data-testid="poke-button"
+          aria-label="Send Poke"
         >
           <motion.div
-            animate={{ rotate: isExpanded ? 45 : 0 }}
-            transition={{ duration: 0.2 }}
+            animate={isPoking ? { rotate: [0, -15, 15, -15, 0] } : {}}
+            transition={{ duration: 0.5 }}
           >
-            {isExpanded ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Heart className="w-6 h-6 fill-current" />
-            )}
+            <Hand className="w-6 h-6" />
           </motion.div>
-
-          {/* Notification Badge */}
-          {unviewedCount > 0 && !isExpanded && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shadow-md"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleBadgeClick();
-              }}
-              data-testid="notification-badge"
-              aria-label={`${unviewedCount} unviewed interaction${unviewedCount === 1 ? '' : 's'}`}
-            >
-              {unviewedCount}
-              <motion.div
-                className="absolute inset-0 rounded-full bg-purple-400"
-                animate={{ scale: [1, 1.3, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                style={{ opacity: 0.4 }}
-              />
-            </motion.div>
+          {pokeCooldown > 0 && (
+            <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">
+              {formatCooldown(pokeCooldown)}
+            </span>
           )}
         </motion.button>
 
-        {/* Animation Overlays */}
+        {/* Kiss Button */}
+        <motion.button
+          onClick={handleKiss}
+          disabled={isKissing || kissCooldown > 0}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+          className={`
+          relative flex items-center justify-center w-12 h-12 rounded-full
+          bg-gradient-to-br from-red-400 to-pink-500
+          text-white shadow-md hover:shadow-lg
+          transition-all duration-200
+          disabled:opacity-50 disabled:cursor-not-allowed
+        `}
+          data-testid="kiss-button"
+          aria-label="Send Kiss"
+        >
+          <motion.div
+            animate={isKissing ? { scale: [1, 1.2, 1, 1.2, 1] } : {}}
+            transition={{ duration: 0.6 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 fill-current" aria-hidden="true">
+              <path d="M12 8c-2.5-2-5-2-7 0-1 1-1 3-1 5s1 4 2 5c2 2 4 2 6 0 2 2 4 2 6 0 1-1 2-3 2-5s0-4-1-5c-2-2-4.5-2-7 0Z"/>
+            </svg>
+          </motion.div>
+          {kissCooldown > 0 && (
+            <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">
+              {formatCooldown(kissCooldown)}
+            </span>
+          )}
+        </motion.button>
+
+        {/* Fart Button */}
+        <motion.button
+          onClick={handleFart}
+          disabled={isFarting || fartCooldown > 0}
+          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.05 }}
+          className={`
+          relative flex items-center justify-center w-12 h-12 rounded-full
+          bg-gradient-to-br from-green-400 to-green-600
+          text-white shadow-md hover:shadow-lg
+          transition-all duration-200
+          disabled:opacity-50 disabled:cursor-not-allowed
+        `}
+          data-testid="fart-button"
+          aria-label="Send Fart"
+        >
+          <motion.div
+            animate={isFarting ? { rotate: [0, 360] } : {}}
+            transition={{ duration: 0.5 }}
+          >
+            <Wind className="w-6 h-6" />
+          </motion.div>
+          {fartCooldown > 0 && (
+            <span className="absolute -bottom-5 text-xs text-gray-600 whitespace-nowrap">
+              {formatCooldown(fartCooldown)}
+            </span>
+          )}
+        </motion.button>
+
+        {/* Notification Badge */}
+        {unviewedCount > 0 && (
+          <motion.button
+            onClick={handleBadgeClick}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0 }}
+            whileTap={{ scale: 0.9 }}
+            className="relative flex items-center justify-center w-10 h-10 rounded-full bg-purple-500 text-white shadow-lg cursor-pointer"
+            data-testid="notification-badge"
+            aria-label={`${unviewedCount} unviewed interaction${unviewedCount > 1 ? 's' : ''}`}
+          >
+            <span className="text-sm font-bold">{unviewedCount}</span>
+            <motion.div
+              className="absolute inset-0 rounded-full bg-purple-400"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              style={{ opacity: 0.5 }}
+            />
+          </motion.button>
+        )}
+
+        {/* Animation Overlay */}
         <AnimatePresence>
           {showAnimation === 'poke' && <PokeAnimation onComplete={handleAnimationComplete} />}
           {showAnimation === 'kiss' && <KissAnimation onComplete={handleAnimationComplete} />}
@@ -446,6 +417,7 @@ export function PokeKissInterface() {
 
 /**
  * Poke Animation Component
+ * Displays playful nudge animation with shake effect
  */
 function PokeAnimation({ onComplete }: { onComplete: () => void }) {
   return (
@@ -465,8 +437,13 @@ function PokeAnimation({ onComplete }: { onComplete: () => void }) {
           rotate: [0, -15, 15, -15, 15, 0],
           x: [0, -20, 20, -20, 20, 0],
         }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
-        onAnimationComplete={() => setTimeout(onComplete, 500)}
+        transition={{
+          duration: 0.8,
+          ease: 'easeOut',
+        }}
+        onAnimationComplete={() => {
+          setTimeout(onComplete, 500);
+        }}
       >
         👆
       </motion.div>
@@ -476,6 +453,7 @@ function PokeAnimation({ onComplete }: { onComplete: () => void }) {
 
 /**
  * Kiss Animation Component
+ * Displays floating hearts animation
  */
 function KissAnimation({ onComplete }: { onComplete: () => void }) {
   const hearts = Array.from({ length: 7 }, (_, i) => i);
@@ -489,11 +467,15 @@ function KissAnimation({ onComplete }: { onComplete: () => void }) {
       onClick={onComplete}
       data-testid="kiss-animation"
     >
+      {/* Animated Hearts */}
       {hearts.map((i) => (
         <motion.div
           key={i}
           className="absolute text-6xl"
-          style={{ left: `${20 + i * 10}%`, bottom: '-10%' }}
+          style={{
+            left: `${20 + i * 10}%`,
+            bottom: '-10%',
+          }}
           initial={{ opacity: 0, y: 0, scale: 0 }}
           animate={{
             opacity: [0, 1, 1, 0],
@@ -501,9 +483,15 @@ function KissAnimation({ onComplete }: { onComplete: () => void }) {
             scale: [0, 1, 1.2, 1],
             x: [0, Math.sin(i) * 50, Math.sin(i) * 100],
           }}
-          transition={{ duration: 1.2, delay: i * 0.1, ease: 'easeOut' }}
+          transition={{
+            duration: 1.2,
+            delay: i * 0.1,
+            ease: 'easeOut',
+          }}
           onAnimationComplete={() => {
-            if (i === hearts.length - 1) setTimeout(onComplete, 300);
+            if (i === hearts.length - 1) {
+              setTimeout(onComplete, 300);
+            }
           }}
         >
           💗
@@ -515,6 +503,7 @@ function KissAnimation({ onComplete }: { onComplete: () => void }) {
 
 /**
  * Fart Animation Component
+ * Displays expanding cloud/wind animation with poop emoji
  */
 function FartAnimation({ onComplete }: { onComplete: () => void }) {
   const clouds = Array.from({ length: 5 }, (_, i) => i);
@@ -528,6 +517,7 @@ function FartAnimation({ onComplete }: { onComplete: () => void }) {
       onClick={onComplete}
       data-testid="fart-animation"
     >
+      {/* Main Poop Emoji */}
       <motion.div
         className="text-9xl"
         initial={{ scale: 0, rotate: 0 }}
@@ -535,16 +525,23 @@ function FartAnimation({ onComplete }: { onComplete: () => void }) {
           scale: [0, 1.5, 1.2, 1.3, 1],
           rotate: [0, -10, 10, -5, 0],
         }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
+        transition={{
+          duration: 0.8,
+          ease: 'easeOut',
+        }}
       >
         💩
       </motion.div>
 
+      {/* Expanding Gas Clouds */}
       {clouds.map((i) => (
         <motion.div
           key={i}
           className="absolute text-4xl"
-          style={{ top: '50%', left: '50%' }}
+          style={{
+            top: '50%',
+            left: '50%',
+          }}
           initial={{ opacity: 0, scale: 0, x: '-50%', y: '-50%' }}
           animate={{
             opacity: [0, 0.8, 0.6, 0],
@@ -552,20 +549,33 @@ function FartAnimation({ onComplete }: { onComplete: () => void }) {
             x: ['-50%', `${(i - 2) * 100}px`, `${(i - 2) * 200}px`],
             y: ['-50%', `${Math.sin(i) * 50}px`, `${Math.sin(i) * 100}px`],
           }}
-          transition={{ duration: 1.5, delay: i * 0.1, ease: 'easeOut' }}
+          transition={{
+            duration: 1.5,
+            delay: i * 0.1,
+            ease: 'easeOut',
+          }}
           onAnimationComplete={() => {
-            if (i === clouds.length - 1) setTimeout(onComplete, 300);
+            if (i === clouds.length - 1) {
+              setTimeout(onComplete, 300);
+            }
           }}
         >
           💨
         </motion.div>
       ))}
 
+      {/* Brown cloud effect */}
       <motion.div
         className="absolute w-64 h-64 rounded-full bg-gradient-to-r from-yellow-200/30 to-green-200/30"
         initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: [0, 2, 3], opacity: [0.5, 0.3, 0] }}
-        transition={{ duration: 1.2, ease: 'easeOut' }}
+        animate={{
+          scale: [0, 2, 3],
+          opacity: [0.5, 0.3, 0],
+        }}
+        transition={{
+          duration: 1.2,
+          ease: 'easeOut',
+        }}
       />
     </motion.div>
   );

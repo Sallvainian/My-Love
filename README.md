@@ -196,26 +196,22 @@ The app uses Supabase for real-time mood tracking and partner interactions. Foll
    - **Project URL**: `https://your-project-id.supabase.co`
    - **Anon/Public Key**: Long string starting with `eyJ...`
 
-### 3. Environment Variables (dotenvx Encrypted)
+### 3. Configure Environment Variables
 
-This project uses [dotenvx](https://dotenvx.com) for encrypted environment variables. The `.env` file is encrypted and safely committed to the repository.
-
-**For local development**, you need the decryption key:
-
-1. Get the `DOTENV_KEY` from a team member or your password manager
-2. Create a `.env.keys` file in the project root:
+1. Copy `.env.example` to `.env`:
 
 ```bash
-echo "DOTENV_KEY='your-decryption-key-here'" > .env.keys
+cp .env.example .env
 ```
 
-3. Run commands with dotenvx (automatically decrypts):
+2. Edit `.env` and add your Supabase credentials:
 
-```bash
-dotenvx run -- npm run dev
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key-from-dashboard
 ```
 
-**Note**: The `.env.keys` file is gitignored for security. Never share or commit this file.
+**Note**: The anon key is safe for client-side use. Supabase uses Row Level Security to protect your data.
 
 ### 4. Database Schema (✅ Already Executed)
 
@@ -261,10 +257,13 @@ The app uses email/password authentication. Create accounts for you and your par
 
 ### 6. Add Test Users for E2E Tests (Optional)
 
-Test user credentials are already included in the encrypted `.env` file. If you need to add or change them:
+If running end-to-end tests, add test user credentials to `.env`:
 
-1. Decrypt and edit the `.env` file
-2. Re-encrypt with `dotenvx encrypt`
+```env
+# Test user for E2E tests (optional)
+VITE_TEST_USER_EMAIL=test@example.com
+VITE_TEST_USER_PASSWORD=testpassword123
+```
 
 **Note**: Create this test user in Supabase Auth with the same credentials.
 
@@ -344,8 +343,7 @@ The app will now appear on your home screen like a native app!
 ```
 My-Love/
 ├── .env.example             # Template for environment variables
-├── .env                     # Encrypted env vars (safe to commit)
-├── .env.keys                # Decryption key (gitignored - keep secret!)
+├── .env                     # Your actual env vars (gitignored)
 ├── docs/
 │   └── migrations/          # SQL migration scripts for Supabase
 ├── public/

@@ -26,7 +26,6 @@ import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { PARTNER_NAME } from '../../config/constants';
 import { moodSyncService } from '../../api/moodSyncService';
-import { PokeKissInterface } from '../PokeKissInterface';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {
@@ -541,7 +540,6 @@ export function PartnerMoodView() {
               </button>
             </div>
 
-
             {/* Error Display */}
             {error && (
               <div
@@ -603,11 +601,6 @@ export function PartnerMoodView() {
             )}
           </>
         )}
-      </div>
-
-      {/* Story 6.5: Poke/Kiss Interaction FAB - Fixed bottom-right position */}
-      <div className="fixed bottom-24 right-4 z-40">
-        <PokeKissInterface />
       </div>
     </div>
   );

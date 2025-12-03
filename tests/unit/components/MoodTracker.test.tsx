@@ -15,32 +15,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock supabaseClient BEFORE any imports that use it
-vi.mock('../../../src/api/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({
-        data: { session: null },
-        error: null,
-      }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      upsert: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-    })),
-  },
-  getCurrentUserId: vi.fn(),
-  getPartnerId: vi.fn().mockResolvedValue('partner-123'),
-}));
-
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MoodTracker } from '../../../src/components/MoodTracker/MoodTracker';
@@ -457,9 +431,6 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
 
       fireEvent.click(screen.getByTestId('mood-button-loved'));
 
-      // Click toggle to expand note field (collapsed by default)
-      fireEvent.click(screen.getByTestId('mood-note-toggle'));
-
       const noteInput = screen.getByTestId('mood-note-input');
       fireEvent.change(noteInput, { target: { value: 'Feeling great today!' } });
 
@@ -470,29 +441,6 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
         ['loved'],
         'Feeling great today!'
       );
-    });
-  });
-
-  describe('Note field collapse behavior', () => {
-    it('should show toggle button instead of note input by default', () => {
-      render(<MoodTracker />);
-
-      // Note toggle should be visible
-      expect(screen.getByTestId('mood-note-toggle')).toBeInTheDocument();
-      // Note input should NOT be visible
-      expect(screen.queryByTestId('mood-note-input')).not.toBeInTheDocument();
-    });
-
-    it('should expand note field when toggle is clicked', () => {
-      render(<MoodTracker />);
-
-      // Click toggle
-      fireEvent.click(screen.getByTestId('mood-note-toggle'));
-
-      // Note input should now be visible
-      expect(screen.getByTestId('mood-note-input')).toBeInTheDocument();
-      // Toggle should be hidden
-      expect(screen.queryByTestId('mood-note-toggle')).not.toBeInTheDocument();
     });
   });
 

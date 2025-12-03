@@ -7,7 +7,6 @@
  * UPDATED: 2025-11-16 - Added partner_requests table and partner_id column
  * UPDATED: 2025-11-25 - Added photos table for Photo Gallery (Epic 6, Story 6.0)
  * UPDATED: 2025-11-30 - Added love_notes table for Love Notes (Epic 2, Story 2.0)
- * UPDATED: 2025-12-03 - Added mood_types TEXT[] column for multi-mood selection (migration 006)
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -70,7 +69,6 @@ export type Database = {
             | 'frustrated'
             | 'lonely'
             | 'tired';
-          mood_types: string[] | null; // Multi-mood selection array (migration 006)
           note: string | null;
           created_at: string | null;
           updated_at: string | null;
@@ -89,7 +87,6 @@ export type Database = {
             | 'frustrated'
             | 'lonely'
             | 'tired';
-          mood_types?: string[] | null; // Multi-mood selection array (migration 006)
           note?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
@@ -108,7 +105,6 @@ export type Database = {
             | 'frustrated'
             | 'lonely'
             | 'tired';
-          mood_types?: string[] | null; // Multi-mood selection array (migration 006)
           note?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
