@@ -50,7 +50,7 @@ development_status:
   epic-2: contexted # Tech spec created 2025-11-24
   2-0-love-notes-database-schema-setup: done # Completed 2025-11-26 - All 4 ACs met, migration file ready
   2-1-love-notes-chat-ui-foundation: done # Code review APPROVED 2025-12-02 - All 28 tasks done, 52 tests passing, AC 2.1.1-2.1.3 verified
-  2-2-send-love-note-with-optimistic-updates: review # Completed 2025-12-02 - All 9 tasks done, 45 tests passing (MessageInput 13, LoveNoteMessage 18, useLoveNotes 14), AC 2.2.1-2.2.4 verified
+  2-2-send-love-note-with-optimistic-updates: done # Code review APPROVED 2025-12-02 - All issues fixed: XSS sanitization, rate limiting on retry, E2E tests added
   2-3-real-time-message-reception: backlog
   2-4-message-history-scroll-performance: backlog
   epic-2-retrospective: optional
@@ -80,7 +80,7 @@ development_status:
   epic-5: contexted # Tech spec created 2025-11-25
   5-1-mood-emoji-picker-interface: done # Completed 2025-11-25 - All 6 ACs verified, 28 unit tests passing, 12-mood grid with multi-select
   5-2-quick-mood-logging-flow: done # Code review APPROVED 2025-12-02 - Implementation quality 8.5/10 EXCELLENT, 6/6 ACs verified, unit tests 10/10 passing, E2E tests 6/6 passing.
-  5-3-partner-mood-viewing-transparency: review # Implementation complete 2025-12-02 - All 6 tasks done, unit tests 21/21 passing (dateFormat 7/7, PartnerMoodDisplay 7/7, usePartnerMood 7/7), E2E tests created
+  5-3-partner-mood-viewing-transparency: done # Code review APPROVED 2025-12-02 - All issues fixed: error handling, accessibility labels, constants extracted
   5-4-mood-history-timeline: backlog
   epic-5-retrospective: optional
 
@@ -88,7 +88,7 @@ development_status:
   epic-6: contexted # Tech spec created 2025-11-25
   6-0-photo-storage-schema-buckets-setup: done # Code review APPROVED 2025-11-26 - All 10 ACs verified, all tasks verified complete, 33 tests passing
   6-1-photo-selection-compression: done # Code review APPROVED 2025-12-02 - All 6 tasks done, 39 tests passing (19 service + 15 component + 5 fallback), all 10 ACs satisfied.
-  6-2-photo-upload-with-progress-indicator: review # Implementation complete 2025-12-02 - Core functionality done: photoService upload (37 tests), photosSlice state (16 tests), usePhotos hook (19 tests), PhotoUploader UI with progress/caption/toasts. Integration & E2E tests pending but core ACs satisfied.
+  6-2-photo-upload-with-progress-indicator: done # Code review APPROVED 2025-12-02 - All issues fixed: pre-upload quota check restored, 100ms timing test added, constants extracted
   6-3-photo-gallery-grid-view: backlog
   6-4-full-screen-photo-viewer-with-gestures: backlog
   epic-6-retrospective: optional
