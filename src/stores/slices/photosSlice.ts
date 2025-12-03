@@ -37,7 +37,7 @@ export interface PhotosSlice {
   clearStorageWarning: () => void;
 }
 
-export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> = (set, get) => ({
+export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> = (set, _get) => ({
   // Initial state
   photos: [],
   isUploading: false,
