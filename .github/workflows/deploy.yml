@@ -41,7 +41,7 @@ jobs:
       - name: Build application
         env:
           DOTENV_KEY: ${{ secrets.DOTENV_KEY }}
-        run: dotenvx run -- npm run build
+        run: npx dotenvx run -- npm run build
 
       - name: Run smoke tests
         run: npm run test:smoke
