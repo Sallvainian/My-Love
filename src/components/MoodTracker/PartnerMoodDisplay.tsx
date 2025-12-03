@@ -13,7 +13,7 @@
  * - AC-5.3.5: Graceful empty state handling
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { m as motion } from 'framer-motion';
 import { usePartnerMood } from '../../hooks/usePartnerMood';
 import { NoMoodLoggedState } from './NoMoodLoggedState';
@@ -54,14 +54,20 @@ function LoadingState() {
 export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
   const { partnerMood, isLoading, error } = usePartnerMood(partnerId);
   const [justUpdated, setJustUpdated] = useState(false);
+  const prevMoodIdRef = useRef<string | undefined>(undefined);
 
-  // Visual feedback when mood updates in real-time
+  // Visual feedback when mood updates in real-time (not on initial load)
   useEffect(() => {
-    if (partnerMood) {
-      setJustUpdated(true);
+    const currentMoodId = partnerMood?.id;
+    // Only animate on actual updates, not initial load
+    if (currentMoodId && prevMoodIdRef.current !== undefined && currentMoodId !== prevMoodIdRef.current) {
+      // Use queueMicrotask to defer setState and avoid synchronous cascading renders
+      queueMicrotask(() => setJustUpdated(true));
       const timer = setTimeout(() => setJustUpdated(false), 3000);
+      prevMoodIdRef.current = currentMoodId;
       return () => clearTimeout(timer);
     }
+    prevMoodIdRef.current = currentMoodId;
   }, [partnerMood?.id]);
 
   // Show loading skeleton while fetching initial data

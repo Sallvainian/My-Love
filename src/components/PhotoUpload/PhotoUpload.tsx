@@ -206,7 +206,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     data-testid="storage-warning-banner"
                   >
                     <svg
-                      className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5"
+                      className="w-5 h-5 text-orange-600 shrink-0 mt-0.5"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
