@@ -14,6 +14,7 @@ export interface UsePartnerMoodResult {
   partnerMood: SupabaseMoodRecord | null;
   isLoading: boolean;
   connectionStatus: 'connecting' | 'connected' | 'disconnected';
+  error: string | null;
 }
 
 /**
@@ -37,6 +38,7 @@ export interface UsePartnerMoodResult {
 export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
   const [partnerMood, setPartnerMood] = useState<SupabaseMoodRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<
     'connecting' | 'connected' | 'disconnected'
   >('connecting');
@@ -52,11 +54,13 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     // Load initial partner mood
     async function loadPartnerMood() {
       try {
+        setError(null);
         const mood = await moodSyncService.getLatestPartnerMood(partnerId);
         setPartnerMood(mood);
         setIsLoading(false);
-      } catch (error) {
-        console.error('[usePartnerMood] Failed to load partner mood:', error);
+      } catch (err) {
+        console.error('[usePartnerMood] Failed to load partner mood:', err);
+        setError('Unable to load partner mood. Please try again later.');
         setIsLoading(false);
       }
     }
@@ -80,12 +84,14 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
               setConnectionStatus('connected');
             } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
               setConnectionStatus('disconnected');
+              setError('Real-time connection lost. Refresh to reconnect.');
             }
           }
         );
-      } catch (error) {
-        console.error('[usePartnerMood] Failed to subscribe to mood updates:', error);
+      } catch (err) {
+        console.error('[usePartnerMood] Failed to subscribe to mood updates:', err);
         setConnectionStatus('disconnected');
+        setError('Unable to connect to real-time updates.');
       }
     }
 
@@ -101,5 +107,5 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     };
   }, [partnerId]);
 
-  return { partnerMood, isLoading, connectionStatus };
+  return { partnerMood, isLoading, connectionStatus, error };
 }

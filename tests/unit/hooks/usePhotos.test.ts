@@ -293,7 +293,7 @@ describe('usePhotos', () => {
   });
 
   describe('automatic photo reload after upload', () => {
-    it('reloads photos after successful upload', async () => {
+    it('does not reload photos after successful upload (optimistic update handles it)', async () => {
       const { result } = renderHook(() => usePhotos(false));
 
       // Mock successful upload
@@ -310,9 +310,8 @@ describe('usePhotos', () => {
 
       await result.current.uploadPhoto(uploadInput);
 
-      await waitFor(() => {
-        expect(mockLoadPhotos).toHaveBeenCalledTimes(1);
-      });
+      // Photo is added via optimistic update in photosSlice, no reload needed
+      expect(mockLoadPhotos).not.toHaveBeenCalled();
     });
 
     it('does not reload photos if upload fails', async () => {

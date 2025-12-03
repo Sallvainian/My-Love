@@ -70,32 +70,32 @@ so that **I know the upload is working and can estimate completion time**.
   - [x] If quota > 80%, show warning toast after successful upload (AC 6.2.10)
   - [x] Display current storage usage in warning ("750MB of 1GB used")
 
-- [ ] **Task 6: Write unit tests for photoService** (AC: 6.2.6, 6.2.7)
-  - [ ] Create/extend `tests/unit/services/photoService.test.ts`
-  - [ ] Test upload path generation format: `{userId}/{uuid}.jpg`
-  - [ ] Test successful upload flow: storage + database
-  - [ ] Test rollback on DB insert failure (storage file cleanup)
-  - [ ] Test storage quota calculation
-  - [ ] Test progress callback invocation
-  - [ ] Test error handling for network failures
+- [x] **Task 6: Write unit tests for photoService** (AC: 6.2.6, 6.2.7)
+  - [x] Create/extend `tests/unit/services/photoService.test.ts`
+  - [x] Test upload path generation format: `{userId}/{uuid}.jpg`
+  - [x] Test successful upload flow: storage + database
+  - [x] Test rollback on DB insert failure (storage file cleanup)
+  - [x] Test storage quota calculation
+  - [x] Test progress callback invocation
+  - [x] Test error handling for network failures
 
-- [ ] **Task 7: Write integration tests for upload flow** (AC: All)
-  - [ ] Create `tests/integration/photoUpload.test.tsx`
-  - [ ] Test complete upload flow: compression → upload → metadata
-  - [ ] Test quota validation (80%/95% thresholds)
-  - [ ] Test optimistic update in Zustand store
-  - [ ] Test error recovery and retry logic
-  - [ ] Test caption validation (max 500 chars)
+- [x] **Task 7: Write integration tests for upload flow** (AC: All)
+  - [x] Create `tests/integration/photoUpload.test.tsx`
+  - [x] Test complete upload flow: compression → upload → metadata
+  - [x] Test quota validation (80%/95% thresholds)
+  - [x] Test optimistic update in Zustand store
+  - [x] Test error recovery and retry logic
+  - [x] Test caption validation (max 500 chars)
 
-- [ ] **Task 8: Write E2E tests for upload experience** (AC: All)
-  - [ ] Create `tests/e2e/photoUpload.spec.ts`
-  - [ ] Test full upload workflow with UI interactions
-  - [ ] Test progress bar visibility and updates
-  - [ ] Test success toast display
-  - [ ] Test error toast with retry button
-  - [ ] Test modal close on success
-  - [ ] Test storage quota warning display
-  - [ ] Test network error handling
+- [x] **Task 8: Write E2E tests for upload experience** (AC: All)
+  - [x] Create `tests/e2e/photoUpload.spec.ts`
+  - [x] Test full upload workflow with UI interactions
+  - [x] Test progress bar visibility and updates
+  - [x] Test success toast display
+  - [x] Test error toast with retry button
+  - [x] Test modal close on success
+  - [x] Test storage quota warning display
+  - [x] Test network error handling
 
 ## Dev Notes
 

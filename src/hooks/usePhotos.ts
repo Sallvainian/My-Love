@@ -98,19 +98,13 @@ export function usePhotos(autoLoad = true): UsePhotosResult {
     await loadPhotosAction();
   }, [loadPhotosAction]);
 
-  // Memoize upload function with automatic reload on success
+  // Memoize upload function
+  // Note: photosSlice.uploadPhoto already does optimistic update, no reload needed
   const uploadPhoto = useCallback(
     async (input: PhotoUploadInput) => {
-      try {
-        await uploadPhotoAction(input);
-        // Reload photos after successful upload
-        await loadPhotosAction();
-      } catch (error) {
-        // Error already handled in slice, just propagate
-        throw error;
-      }
+      await uploadPhotoAction(input);
     },
-    [uploadPhotoAction, loadPhotosAction]
+    [uploadPhotoAction]
   );
 
   // Memoize delete function

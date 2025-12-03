@@ -56,18 +56,24 @@ export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> =
    */
   uploadPhoto: async (input: PhotoUploadInput) => {
     try {
-      // Check storage quota before upload (AC 6.2.10, 6.2.11)
-      const quota = await photoService.checkStorageQuota();
-
-      // Reject if quota is critical (> 95%) - AC 6.2.11
-      if (quota.warning === 'critical' || quota.warning === 'exceeded') {
-        const errorMsg = `Storage nearly full (${quota.percent}%) - delete photos to continue`;
-        set({ error: errorMsg });
-        return;
-      }
-
       // Clear previous errors
       set({ error: null, storageWarning: null, isUploading: true, uploadProgress: 0 });
+
+      // Check quota BEFORE upload (AC 6.2.10, 6.2.11)
+      const quota = await photoService.checkStorageQuota();
+      if (quota.percent >= 95) {
+        // AC 6.2.11: Reject upload if storage nearly full
+        set({
+          error: `Storage nearly full (${quota.percent}%) - delete photos to continue`,
+          isUploading: false,
+          uploadProgress: 0,
+        });
+        return;
+      }
+      if (quota.percent >= 80) {
+        // AC 6.2.10: Warning if approaching limit
+        set({ storageWarning: `Storage ${quota.percent}% full - consider deleting old photos` });
+      }
 
       // Upload with progress callback (AC 6.2.2, 6.2.3)
       const photo = await photoService.uploadPhoto(input, (percent) => {
@@ -86,8 +92,9 @@ export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> =
       }));
 
       // Check quota after upload and warn if approaching limit (AC 6.2.10)
+      // Note: photoService.uploadPhoto() only logs warnings, doesn't expose them
       const newQuota = await photoService.checkStorageQuota();
-      if (newQuota.warning === 'approaching') {
+      if (newQuota.warning === 'approaching' || newQuota.warning === 'critical') {
         const warningMsg = `Storage ${newQuota.percent}% full - consider deleting old photos`;
         set({ storageWarning: warningMsg });
       }

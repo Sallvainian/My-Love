@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import {
   Heart,
@@ -93,7 +93,7 @@ export function MoodTracker() {
   const [offlineError, setOfflineError] = useState<boolean>(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
-  // Story 5.3: Partner mood viewing (AC-5.3.1)
+  // Story 5.3: Partner mood viewing (AC-5.3.1) - cached to avoid re-fetching
   const [partnerId, setPartnerId] = useState<string | null>(null);
 
   // Character counter
@@ -105,13 +105,22 @@ export function MoodTracker() {
     loadMoods();
   }, [loadMoods]);
 
-  // Load partner ID for partner mood display (Story 5.3)
+  // Load partner ID for partner mood display (Story 5.3) - only once on mount
   useEffect(() => {
+    let mounted = true;
+
     async function loadPartnerId() {
       const id = await getPartnerId();
-      setPartnerId(id);
+      if (mounted) {
+        setPartnerId(id);
+      }
     }
+
     loadPartnerId();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Check if mood already exists for today (AC-5)

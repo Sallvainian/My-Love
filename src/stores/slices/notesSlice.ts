@@ -37,6 +37,7 @@ export interface NotesSlice {
   setNotes: (notes: LoveNote[]) => void;
   setNotesError: (error: string | null) => void;
   clearNotesError: () => void;
+  checkRateLimit: () => { recentTimestamps: number[]; now: number };
   sendNote: (content: string) => Promise<void>;
   retryFailedMessage: (tempId: string) => Promise<void>;
 }
@@ -224,21 +225,31 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
   },
 
   /**
+   * Helper: Check rate limiting and return filtered timestamps
+   * Throws error if rate limit exceeded
+   */
+  checkRateLimit: () => {
+    const { sentMessageTimestamps } = get();
+    const now = Date.now();
+    const recentTimestamps = sentMessageTimestamps.filter(
+      (timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS
+    );
+
+    if (recentTimestamps.length >= RATE_LIMIT_MAX_MESSAGES) {
+      throw new Error('Rate limit exceeded: Maximum 10 messages per minute');
+    }
+
+    return { recentTimestamps, now };
+  },
+
+  /**
    * Send a new love note with optimistic updates
    * Story 2.2 - AC-2.2.2, AC-2.2.3
    */
   sendNote: async (content: string) => {
     try {
       // Check rate limiting
-      const { sentMessageTimestamps } = get();
-      const now = Date.now();
-      const recentTimestamps = sentMessageTimestamps.filter(
-        (timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS
-      );
-
-      if (recentTimestamps.length >= RATE_LIMIT_MAX_MESSAGES) {
-        throw new Error('Rate limit exceeded: Maximum 10 messages per minute');
-      }
+      const { recentTimestamps, now } = get().checkRateLimit();
 
       // Get authenticated user ID and partner ID
       const userId = await authService.getCurrentUserId();
@@ -333,6 +344,9 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
    */
   retryFailedMessage: async (tempId: string) => {
     try {
+      // Check rate limiting before retry
+      const { recentTimestamps, now } = get().checkRateLimit();
+
       const { notes } = get();
 
       // Find the failed message
@@ -387,13 +401,14 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
         return;
       }
 
-      // Success - replace with server response
+      // Success - replace with server response and update rate limit timestamps
       set((state) => ({
         notes: state.notes.map((note) =>
           note.tempId === tempId
             ? { ...data, sending: false, error: false }
             : note
         ),
+        sentMessageTimestamps: [...recentTimestamps, now],
       }));
 
       if (import.meta.env.DEV) {
@@ -402,6 +417,12 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to retry message';
       console.error('[NotesSlice] Error retrying message:', error);
+
+      // If it's a rate limit error, throw it up
+      if (errorMessage.includes('Rate limit')) {
+        throw error;
+      }
+
       throw error;
     }
   },
