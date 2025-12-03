@@ -101,20 +101,20 @@ so that **I can enjoy our visual memories together**.
 ## Tasks / Subtasks
 
 ### Task 1: Create PhotoGallery Page Component
-- [ ] Create `src/pages/PhotoGallery.tsx` page component
-- [ ] Implement responsive layout wrapper (max-width container, padding)
-- [ ] Add page title "Our Memories" with decorative heart icon
-- [ ] Create "Add Photo" floating action button (bottom-right)
-- [ ] Integrate PhotoUploader modal on FAB click
-- [ ] Add usePhotos hook to fetch photos on mount
-- [ ] Implement loading, error, and empty states
-- [ ] Add page navigation (back button, breadcrumbs)
+- [x] Create `src/pages/PhotoGallery.tsx` page component
+- [x] Implement responsive layout wrapper (max-width container, padding)
+- [x] Add page title "Our Memories" with decorative heart icon
+- [x] Create "Add Photo" floating action button (bottom-right)
+- [x] Integrate PhotoUploader modal on FAB click
+- [x] Add usePhotos hook to fetch photos on mount
+- [x] Implement loading, error, and empty states
+- [x] Add page navigation (back button, breadcrumbs)
 
 ### Task 2: Create PhotoGrid Component
-- [ ] Create `src/components/photos/PhotoGrid.tsx` grid component
-- [ ] Implement Tailwind responsive grid: `grid-cols-3 md:grid-cols-4`
-- [ ] Add gap spacing between items: `gap-2 md:gap-4`
-- [ ] Accept photos array prop with PhotoWithUrls type
+- [x] Create `src/components/photos/PhotoGrid.tsx` grid component
+- [x] Implement Tailwind responsive grid: `grid-cols-3 md:grid-cols-4`
+- [x] Add gap spacing between items: `gap-2 md:gap-4`
+- [x] Accept photos array prop with PhotoWithUrls type
 - [ ] Accept onPhotoClick callback for viewer integration
 - [ ] Implement grid container with proper aspect ratios
 - [ ] Add accessibility: role="grid", aria-label for grid
