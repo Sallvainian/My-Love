@@ -1,10 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
+const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
+
 test.describe('Photo Viewer - Story 6.4', () => {
   test.beforeEach(async ({ page }) => {
+    // CRITICAL 7 FIX: Add authentication before accessing photos
+    await page.goto('/');
+    await page.getByLabel(/email/i).fill(TEST_EMAIL);
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByRole('button', { name: /sign in|login/i }).click();
+
+    // Handle onboarding if needed
+    await page.waitForTimeout(2000);
+    const displayNameInput = page.getByLabel(/display name/i);
+    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await displayNameInput.fill('TestUser');
+      await page.getByRole('button', { name: /continue|save|submit/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Handle welcome/intro screen if needed
+    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
+    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await page.getByRole('button', { name: /continue/i }).click();
+      await page.waitForTimeout(1000);
+    }
+
+    // Wait for app navigation to load
+    await expect(
+      page.locator('nav, [data-testid="bottom-navigation"]').first()
+    ).toBeVisible({ timeout: 10000 });
+
     // Navigate to photos page
     await page.goto('/photos');
-    // Wait for photos to load
+
+    // Wait for photos gallery to load
     await page.waitForSelector('[data-testid="photo-gallery"]', { timeout: 10000 });
   });
 

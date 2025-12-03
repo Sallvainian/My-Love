@@ -102,7 +102,8 @@ describe('PhotoViewer - Task 1: Modal Component', () => {
     );
 
     // Should display second photo (index 1)
-    const photoIndexIndicator = screen.getByText(/2 of 2/i);
+    // Query the visible metadata, not the screen reader announcement
+    const photoIndexIndicator = screen.getByText(/Photo 2 of 2 •/i);
     expect(photoIndexIndicator).toBeInTheDocument();
   });
 
