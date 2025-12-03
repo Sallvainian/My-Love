@@ -196,11 +196,23 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
 
   /**
    * Add a single note to the list (for optimistic updates / realtime)
+   * Includes deduplication check (Story 2.3 Task 2.3.3)
    */
   addNote: (note) => {
-    set((state) => ({
-      notes: [...state.notes, note],
-    }));
+    set((state) => {
+      // Deduplication: check if message already exists by ID
+      const exists = state.notes.some((n) => n.id === note.id);
+      if (exists) {
+        if (import.meta.env.DEV) {
+          console.log('[NotesSlice] Duplicate message ignored:', note.id);
+        }
+        return state; // No change
+      }
+
+      return {
+        notes: [...state.notes, note],
+      };
+    });
   },
 
   /**
