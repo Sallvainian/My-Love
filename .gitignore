@@ -81,3 +81,7 @@ docs/technical-decisions.md
 
 # Test environment (contains secrets)
 .env.test
+
+# Additional env files without dot prefix
+env.keys
+env.test
