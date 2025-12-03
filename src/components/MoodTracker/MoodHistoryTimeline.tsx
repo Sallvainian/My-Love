@@ -7,9 +7,9 @@
  * @module components/MoodTracker/MoodHistoryTimeline
  */
 
-import { useMemo, useEffect } from 'react';
-import { List } from 'react-window';
-import { useInfiniteLoader } from 'react-window-infinite-loader';
+import { useMemo, useEffect, useRef } from 'react';
+import { VariableSizeList as List } from 'react-window';
+import InfiniteLoader from 'react-window-infinite-loader';
 import { useMoodHistory } from '../../hooks/useMoodHistory';
 import { MoodHistoryItem } from './MoodHistoryItem';
 import { groupMoodsByDate, type MoodGroup } from '../../utils/moodGrouping';
@@ -153,49 +153,62 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
     );
   }
 
-  // Fixed row height for better virtualization performance
-  const ROW_HEIGHT = 100;
-
-  // Use infinite loader hook
-  const onRowsRendered = useInfiniteLoader({
-    isRowLoaded,
-    loadMoreRows,
-    rowCount: timelineItems.length + (hasMore ? 1 : 0),
-  });
-
-  // Row component for react-window List
-  const RowComponent = ({
-    index,
-    style,
-  }: {
-    ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
-    index: number;
-    style: React.CSSProperties;
-  }) => {
+  // Variable sizing function per story spec
+  const getItemSize = (index: number): number => {
     const item = timelineItems[index];
+    if (!item) return 80; // Default for loading items
 
-    return (
-      <div style={style}>
-        {item.type === 'date-header' ? (
-          <DateHeader date={item.dateLabel} />
-        ) : (
-          <MoodHistoryItem mood={item.mood} isPartnerView={isPartnerView} />
-        )}
-      </div>
-    );
+    if (item.type === 'date-header') {
+      return 40; // Date headers are compact
+    }
+
+    // Mood items vary by note length
+    const noteLength = item.mood.note?.length || 0;
+    if (noteLength > 100) {
+      return 120; // Long notes need more space
+    }
+    return 80; // Standard mood item height
   };
+
+  // Create ref for VariableSizeList
+  const listRef = useRef<InstanceType<typeof List>>(null);
 
   return (
     <div className="w-full h-full" data-testid="mood-history-timeline">
-      <List
-        defaultHeight={600}
-        rowCount={timelineItems.length}
-        rowHeight={ROW_HEIGHT}
-        rowComponent={RowComponent}
-        rowProps={{}}
-        onRowsRendered={onRowsRendered}
-        style={{ width: '100%' }}
-      />
+      <InfiniteLoader
+        isItemLoaded={isRowLoaded}
+        itemCount={timelineItems.length + (hasMore ? 1 : 0)}
+        loadMoreItems={loadMoreRows}
+      >
+        {({ onItemsRendered, ref }) => (
+          <List
+            ref={(list) => {
+              // Assign to both refs
+              ref(list);
+              if (listRef) listRef.current = list;
+            }}
+            height={600}
+            itemCount={timelineItems.length}
+            itemSize={getItemSize}
+            width="100%"
+            onItemsRendered={onItemsRendered}
+          >
+            {({ index, style }) => {
+              const item = timelineItems[index];
+
+              return (
+                <div style={style}>
+                  {item.type === 'date-header' ? (
+                    <DateHeader date={item.dateLabel} />
+                  ) : (
+                    <MoodHistoryItem mood={item.mood} isPartnerView={isPartnerView} />
+                  )}
+                </div>
+              );
+            }}
+          </List>
+        )}
+      </InfiniteLoader>
 
       {isLoading && (
         <div className="text-center py-4">
