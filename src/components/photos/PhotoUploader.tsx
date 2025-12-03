@@ -435,9 +435,9 @@ export function PhotoUploader({
         >
           <div className="flex items-start gap-3">
             {toast.type === 'success' ? (
-              <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+              <CheckCircle size={20} className="shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+              <AlertCircle size={20} className="shrink-0 mt-0.5" />
             )}
             <div className="flex-1">
               <p className="text-sm font-medium">{toast.message}</p>

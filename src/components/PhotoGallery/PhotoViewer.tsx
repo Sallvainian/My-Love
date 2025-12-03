@@ -520,7 +520,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
         {/* AC 6.4.10: Delete confirmation dialog */}
         {showDeleteDialog && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
             <motion.div
               className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4"
               initial={{ scale: 0.9, opacity: 0 }}
