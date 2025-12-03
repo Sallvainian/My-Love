@@ -40,15 +40,15 @@ development_status:
 
   # Epic 1: PWA Foundation Audit & Stabilization
   epic-1: contexted
-  1-1-codebase-audit-dependency-validation: done # Code review APPROVED 2025-11-23 - All 8 ACs verified, all tasks verified complete
-  1-2-supabase-client-provider-configuration: done # Code review APPROVED 2025-11-24 - All 7 ACs verified, all 18 tasks verified complete
+  1-1-codebase-audit-dependency-validation: done # Code review APPROVED 2025-11-23 - All 8 ACs verified
+  1-2-supabase-client-provider-configuration: done # Code review APPROVED 2025-11-24 - All 7 ACs verified
   1-3-magic-link-authentication-flow: done # Code review APPROVED 2025-11-25
-  1-4-session-management-persistence: done # Code review APPROVED 2025-11-25 - All 7 ACs verified, all 18 tasks verified, E2E tests created
-  1-5-network-status-indicator-offline-resilience: done # Code review APPROVED 2025-11-25 - All 5 ACs verified, unit tests + E2E tests added, duplicate import fixed
+  1-4-session-management-persistence: done # Code review APPROVED 2025-11-25 - All 7 ACs verified
+  1-5-network-status-indicator-offline-resilience: done # Code review APPROVED 2025-11-25 - All 5 ACs verified
   epic-1-retrospective: done # Retrospective completed 2025-11-25
 
   # Epic 2: Love Notes Real-Time Messaging
-  epic-2: contexted # Tech spec created 2025-11-24
+  epic-2: backlog
   2-0-love-notes-database-schema-setup: backlog
   2-1-love-notes-chat-ui-foundation: backlog
   2-2-send-love-note-with-optimistic-updates: backlog

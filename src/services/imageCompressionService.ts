@@ -2,36 +2,34 @@ import type { CompressionOptions, CompressionResult } from '../types';
 
 /**
  * Image Compression Service - Client-side image compression using Canvas API
- * Story 6.1: AC-6.1.4-6.1.9 - Compress photos before upload to Supabase Storage
+ * Story 4.1: AC-4.1.6 - Compress photos before IndexedDB storage
  *
  * Uses native Canvas API (no external dependencies) to:
- * - Resize images to max 2048px dimensions (maintaining aspect ratio)
+ * - Resize images to max 1920px dimensions (maintaining aspect ratio)
  * - Convert to JPEG format with 80% quality
- * - Strip EXIF metadata for privacy (automatic via Canvas redraw)
  * - Achieve ~90% size reduction (3-5MB → 300-500KB)
- * - Complete compression in <3 seconds for 10MB input (AC-6.1.7)
+ * - Complete compression in <3 seconds on modern devices
  */
 class ImageCompressionService {
   private readonly DEFAULT_OPTIONS: CompressionOptions = {
-    maxWidth: 2048,
-    maxHeight: 2048,
-    quality: 0.8, // 80% JPEG quality (AC-6.1.5)
+    maxWidth: 1920,
+    maxHeight: 1920,
+    quality: 0.8, // 80% JPEG quality
   };
 
   /**
    * Compress image file using Canvas API
-   * AC-6.1.4-6.1.9: Max 2048px, 80% JPEG quality, EXIF stripping, <3s for 10MB
+   * AC-4.1.6: Max 1920px, 80% JPEG quality, log compression time
    *
    * @param file - Image file to compress
    * @param options - Optional compression settings (defaults applied)
    * @returns Compressed image blob with metadata
-   * @throws Error if compression fails (caller should handle AC-6.1.8 fallback)
    */
   async compressImage(
     file: File,
     options: Partial<CompressionOptions> = {}
   ): Promise<CompressionResult> {
-    const startTime = performance.now(); // AC-6.1.7: Use performance.now() for precise benchmarking
+    const startTime = Date.now();
     const opts = { ...this.DEFAULT_OPTIONS, ...options };
 
     try {
@@ -48,10 +46,6 @@ class ImageCompressionService {
         width = (width * opts.maxHeight) / height;
         height = opts.maxHeight;
       }
-
-      // Round dimensions to whole pixels
-      width = Math.floor(width);
-      height = Math.floor(height);
 
       // Create canvas and draw resized image
       const canvas = document.createElement('canvas');
@@ -80,22 +74,14 @@ class ImageCompressionService {
         );
       });
 
-      const duration = performance.now() - startTime; // AC-6.1.7: Measure compression timing
+      const duration = Date.now() - startTime;
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
       const compressedSizeKB = (blob.size / 1024).toFixed(0);
       const reductionPercent = (((file.size - blob.size) / file.size) * 100).toFixed(0);
 
-      // AC-6.1.7: Log compression performance (target: <3000ms for 10MB)
       console.log(
-        `[Compression] ${originalSizeMB}MB → ${compressedSizeKB}KB (${reductionPercent}% reduction) in ${duration.toFixed(0)}ms`
+        `[Compression] ${originalSizeMB}MB → ${compressedSizeKB}KB (${reductionPercent}% reduction) in ${duration}ms`
       );
-
-      // AC-6.1.7: Warn if compression exceeds performance target
-      if (duration > 3000 && file.size > 5 * 1024 * 1024) {
-        console.warn(
-          `[Compression] Performance target exceeded: ${duration.toFixed(0)}ms for ${originalSizeMB}MB file (target: <3000ms for 10MB)`
-        );
-      }
 
       return {
         blob,
@@ -112,14 +98,13 @@ class ImageCompressionService {
 
   /**
    * Validate image file before compression
-   * AC-6.1.1: Accept only JPEG, PNG, WebP
-   * AC-6.1.2: Reject files >25MB raw with error message
+   * AC-4.1.9: Error handling for unsupported formats and large files
    *
    * @param file - File to validate
    * @returns Validation result with error message if invalid
    */
   validateImageFile(file: File): { valid: boolean; error?: string; warning?: string } {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp']; // AC-6.1.1
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
     // Error: Unsupported format
     if (!validTypes.includes(file.type)) {
@@ -129,21 +114,12 @@ class ImageCompressionService {
       };
     }
 
-    // Error: File too large (>25MB) - AC-6.1.2
-    if (file.size > 25 * 1024 * 1024) {
-      const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-      return {
-        valid: false,
-        error: `File is too large (${sizeMB} MB). Maximum file size is 25 MB.`,
-      };
-    }
-
-    // Warning: Large file (>10MB) - AC-6.1.7 (may approach 3s limit)
+    // Warning: File too large (>10MB)
     if (file.size > 10 * 1024 * 1024) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(1);
       return {
         valid: true,
-        warning: `This file is large (${sizeMB} MB). Compression may take a few seconds.`,
+        warning: `This file is very large (${sizeMB} MB). Compression may take longer.`,
       };
     }
 

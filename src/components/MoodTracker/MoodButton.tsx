@@ -22,7 +22,6 @@ interface MoodButtonProps {
 export function MoodButton({ mood, icon: Icon, label, isSelected, onClick }: MoodButtonProps) {
   return (
     <motion.button
-      type="button"
       onClick={onClick}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}

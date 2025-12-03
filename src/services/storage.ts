@@ -17,7 +17,7 @@ interface MyLoveDB extends DBSchema {
 }
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 4; // v4: Match MoodService (sw-auth store for Background Sync)
+const DB_VERSION = 3; // Story 6.2: Increment to match MoodService (moods store)
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDB> | null = null;
@@ -84,17 +84,10 @@ class StorageService {
 
           // Migration: v2 → v3 (Story 6.2)
           // Moods store is handled by MoodService
+          // StorageService is aware of v3 but doesn't create moods store
           if (oldVersion < 3 && oldVersion >= 2) {
             console.log(
               '[StorageService] Acknowledged v2→v3 upgrade (moods store handled by MoodService)'
-            );
-          }
-
-          // Migration: v3 → v4 (Background Sync)
-          // sw-auth store is handled by MoodService
-          if (oldVersion < 4 && oldVersion >= 3) {
-            console.log(
-              '[StorageService] Acknowledged v3→v4 upgrade (sw-auth store handled by MoodService)'
             );
           }
         },

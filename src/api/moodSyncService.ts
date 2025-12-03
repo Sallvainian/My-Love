@@ -83,94 +83,15 @@ export class MoodSyncService {
     }
 
     // Transform local mood to Supabase insert format
-    // Include mood_types array for multi-mood support
-    const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
     const moodInsert: MoodEntryInsert = {
       user_id: mood.userId,
       mood_type: mood.mood,
-      mood_types: moodTypes,
       note: mood.note || null,
       created_at: mood.timestamp.toISOString(),
     };
 
     // Use validated moodApi.create() for insert with automatic validation
-    const syncedMood = await moodApi.create(moodInsert);
-
-    // Broadcast to partner after successful sync (fire-and-forget)
-    const partnerId = await getPartnerId();
-    if (partnerId) {
-      this.broadcastMoodToPartner(syncedMood, partnerId).catch((err) => {
-        console.error('[MoodSyncService] Background broadcast failed:', err);
-      });
-    }
-
-    return syncedMood;
-  }
-
-  /**
-   * Broadcast a mood update to partner's channel
-   *
-   * Uses Supabase Broadcast API (client-to-client messaging) which
-   * doesn't require RLS permissions. Called after successful mood sync.
-   *
-   * @param mood - The synced mood record from Supabase
-   * @param partnerId - Partner's user ID to broadcast to
-   * @returns void - Fire-and-forget, errors are logged but not thrown
-   */
-  private async broadcastMoodToPartner(
-    mood: SupabaseMoodRecord,
-    partnerId: string
-  ): Promise<void> {
-    try {
-      if (!isOnline()) {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Skipping broadcast - device is offline');
-        }
-        return;
-      }
-
-      // Create ephemeral channel to partner's mood-updates channel
-      const channel = supabase.channel(`mood-updates:${partnerId}`);
-
-      // Subscribe briefly to send the broadcast
-      await new Promise<void>((resolve, reject) => {
-        channel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            try {
-              // Send broadcast to partner (includes mood_types for multi-mood support)
-              const result = await channel.send({
-                type: 'broadcast',
-                event: 'new_mood',
-                payload: {
-                  id: mood.id,
-                  user_id: mood.user_id,
-                  mood_type: mood.mood_type,
-                  mood_types: mood.mood_types,
-                  note: mood.note,
-                  created_at: mood.created_at,
-                },
-              });
-
-              if (import.meta.env.DEV) {
-                console.log('[MoodSyncService] Broadcast sent to partner:', result);
-              }
-              resolve();
-            } catch (sendError) {
-              reject(sendError);
-            } finally {
-              // Always cleanup: unsubscribe and remove channel
-              await supabase.removeChannel(channel);
-            }
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            await supabase.removeChannel(channel);
-            reject(new Error(`Channel subscription failed: ${status}`));
-          }
-        });
-      });
-    } catch (error) {
-      // Fire-and-forget: log error but don't throw
-      console.error('[MoodSyncService] Failed to broadcast mood to partner:', error);
-    }
+    return await moodApi.create(moodInsert);
   }
 
   /**
@@ -337,14 +258,10 @@ export class MoodSyncService {
   }
 
   /**
-   * Subscribe to real-time partner mood updates via Broadcast API
+   * Subscribe to real-time partner mood updates
    *
-   * Listens for broadcast events on the current user's mood-updates channel.
-   * Partner sends broadcasts to this channel when they log new moods.
-   *
-   * NOTE: This uses Broadcast API instead of postgres_changes because
-   * RLS policies on moods table prevent postgres_changes from working
-   * (complex subquery for partner lookup cannot be evaluated by Realtime).
+   * Listens for INSERT events on the moods table filtered by partner ID.
+   * Calls the provided callback whenever partner logs a new mood.
    *
    * @param callback - Function called with new mood record
    * @param onStatusChange - Optional callback for connection status changes
@@ -369,50 +286,32 @@ export class MoodSyncService {
     callback: (mood: SupabaseMoodRecord) => void,
     onStatusChange?: (status: string) => void
   ): Promise<() => void> {
-    // Get current user ID - we subscribe to OUR OWN channel
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const currentUserId = session?.user?.id;
+    const partnerId = await getPartnerId();
 
-    if (!currentUserId) {
-      console.error('[MoodSyncService] Cannot subscribe: User not authenticated');
+    if (!partnerId) {
+      console.error('[MoodSyncService] Partner ID not found');
+      // Return no-op unsubscribe function if partner ID not found
       return () => {};
     }
 
-    if (import.meta.env.DEV) {
-      console.log(`[MoodSyncService] Subscribing to mood-updates:${currentUserId}`);
-    }
-
-    // Create Broadcast channel for receiving mood updates
-    // Each user subscribes to their OWN channel; partner broadcasts TO this channel
+    // Create Realtime channel for mood updates
     this.realtimeChannel = supabase
-      .channel(`mood-updates:${currentUserId}`, {
-        config: {
-          broadcast: { self: false }, // Don't receive own broadcasts
+      .channel('partner-moods')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'moods',
+          filter: `user_id=eq.${partnerId}`,
         },
-      })
-      .on('broadcast', { event: 'new_mood' }, (payload) => {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Received partner mood broadcast:', payload);
+        (payload) => {
+          console.log('[MoodSyncService] Received partner mood update:', payload);
+          callback(payload.new as SupabaseMoodRecord);
         }
-
-        // Transform broadcast payload to SupabaseMoodRecord format
-        const mood: SupabaseMoodRecord = {
-          id: payload.payload.id,
-          user_id: payload.payload.user_id,
-          mood_type: payload.payload.mood_type,
-          note: payload.payload.note,
-          created_at: payload.payload.created_at,
-          updated_at: payload.payload.created_at, // Use created_at as fallback
-        };
-
-        callback(mood);
-      })
+      )
       .subscribe((status) => {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Broadcast subscription status:', status);
-        }
+        console.log('[MoodSyncService] Realtime subscription status:', status);
         if (onStatusChange) {
           onStatusChange(status);
         }
@@ -423,9 +322,7 @@ export class MoodSyncService {
       if (this.realtimeChannel) {
         supabase.removeChannel(this.realtimeChannel);
         this.realtimeChannel = null;
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Unsubscribed from mood broadcasts');
-        }
+        console.log('[MoodSyncService] Unsubscribed from partner mood updates');
       }
     };
   }
@@ -449,33 +346,6 @@ export class MoodSyncService {
   async fetchMoods(userId: string, limit: number = 50): Promise<SupabaseMoodRecord[]> {
     // Use validated moodApi.fetchByUser() for query with automatic validation
     return await moodApi.fetchByUser(userId, limit);
-  }
-
-  /**
-   * Fetch the most recent mood for a specific user (typically partner)
-   *
-   * Used for displaying partner's current emotional state.
-   *
-   * @param userId - User ID to fetch mood for (partner ID)
-   * @returns Latest mood record or null if user has no moods logged
-   * @throws ApiValidationError if response validation fails
-   *
-   * @example
-   * ```typescript
-   * const latestMood = await moodSyncService.getLatestPartnerMood(partnerId);
-   * if (latestMood) {
-   *   console.log('Partner is feeling:', latestMood.mood_type);
-   * }
-   * ```
-   */
-  async getLatestPartnerMood(userId: string): Promise<SupabaseMoodRecord | null> {
-    try {
-      const moods = await this.fetchMoods(userId, 1);
-      return moods.length > 0 ? moods[0] : null;
-    } catch (error) {
-      console.error('[MoodSyncService] Failed to fetch latest partner mood:', error);
-      return null; // Graceful degradation for read operations
-    }
   }
 }
 
