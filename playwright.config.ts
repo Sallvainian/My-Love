@@ -4,6 +4,9 @@ import { config } from '@dotenvx/dotenvx';
 // Load environment variables from encrypted .env file
 config();
 
+// Also load test-specific env vars (unencrypted, gitignored)
+config({ path: '.env.test', override: true });
+
 /**
  * Playwright configuration for My-Love PWA E2E testing
  *

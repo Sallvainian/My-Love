@@ -69,3 +69,6 @@ docs/technical-decisions.md
 .mcp.json
 .playwright-mcp/
 .serena/
+
+# Test environment (contains secrets)
+.env.test

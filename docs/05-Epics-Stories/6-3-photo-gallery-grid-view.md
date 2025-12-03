@@ -1,6 +1,6 @@
 # Story 6.3: Photo Gallery Grid View
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

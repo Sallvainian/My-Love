@@ -1,6 +1,6 @@
 # Story 6.2: Photo Upload with Progress Indicator
 
-Status: drafted
+Status: done
 
 ## Story
 
