@@ -3,8 +3,8 @@ import { Camera, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoGridItem } from './PhotoGridItem';
 import { PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
-import { photoStorageService } from '../../services/photoStorageService';
-import type { Photo } from '../../types';
+import { photoService } from '../../services/photoService';
+import type { PhotoWithUrls } from '../../services/photoService';
 
 interface PhotoGalleryProps {
   onUploadClick?: () => void;
@@ -29,7 +29,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   const { selectPhoto, photos: storePhotos, loadPhotos } = useAppStore();
 
   // AC-4.2.4: Pagination state
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<PhotoWithUrls[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentOffset, setCurrentOffset] = useState(0);
@@ -61,8 +61,8 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       setIsLoading(true);
 
       try {
-        console.log('[PhotoGallery] loadInitialPhotos: Calling getPage...');
-        const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
+        console.log('[PhotoGallery] loadInitialPhotos: Calling getPhotos...');
+        const firstPage = await photoService.getPhotos(PHOTOS_PER_PAGE, 0);
         console.log(
           '[PhotoGallery] loadInitialPhotos: Got response, cancelled=',
           cancelled,
@@ -134,7 +134,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       // Refresh the gallery to show new photos
       const refreshGallery = async () => {
         try {
-          const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
+          const firstPage = await photoService.getPhotos(PHOTOS_PER_PAGE, 0);
 
           if (cancelled) {
             console.log('[PhotoGallery] Refresh cancelled, skipping state updates');
@@ -170,7 +170,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
     try {
       setIsLoadingMore(true);
-      const nextPage = await photoStorageService.getPage(currentOffset, PHOTOS_PER_PAGE);
+      const nextPage = await photoService.getPhotos(PHOTOS_PER_PAGE, currentOffset);
 
       if (nextPage.length > 0) {
         setPhotos((prev) => [...prev, ...nextPage]);
@@ -313,7 +313,17 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
         data-testid="photo-gallery-grid"
       >
         {photos.map((photo) => (
-          <PhotoGridItem key={photo.id} photo={photo} onPhotoClick={selectPhoto} />
+          <PhotoGridItem
+            key={photo.id}
+            photo={photo}
+            onPhotoClick={(photoId) => {
+              // TODO Story 6.4: Update PhotoCarousel to use Supabase photos
+              // For now, just log - PhotoCarousel will be updated in Story 6.4
+              console.log(`[PhotoGallery] Photo clicked: ${photoId}`);
+              // selectPhoto expects number but we have string UUID now
+              // This will be fixed in Story 6.4 when PhotoCarousel is updated
+            }}
+          />
         ))}
       </div>
 

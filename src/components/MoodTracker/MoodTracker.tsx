@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import {
   Heart,
@@ -18,10 +18,12 @@ import {
   WifiOff,
   RefreshCw,
   Zap,
+  List,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { MoodButton } from './MoodButton';
 import { MoodHistoryCalendar } from '../MoodHistory';
+import { MoodHistoryTimeline } from './MoodHistoryTimeline';
 import { PartnerMoodDisplay } from './PartnerMoodDisplay';
 import type { MoodType } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
@@ -29,6 +31,7 @@ import { registerBackgroundSync } from '../../utils/backgroundSync';
 import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
 import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
 import { getPartnerId } from '../../api/supabaseClient';
+import { useAuth } from '../../hooks/useAuth';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {
@@ -52,7 +55,7 @@ const CHALLENGING_MOODS = {
 const MOOD_CONFIG = { ...POSITIVE_MOODS, ...CHALLENGING_MOODS } as const;
 
 // Tab types for navigation
-type MoodTabType = 'tracker' | 'history';
+type MoodTabType = 'tracker' | 'history' | 'timeline';
 
 /**
  * MoodTracker Component
@@ -71,6 +74,7 @@ type MoodTabType = 'tracker' | 'history';
  */
 export function MoodTracker() {
   const { addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods } = useAppStore();
+  const { user } = useAuth();
 
   // Story 5.2: AC-5.2.1 - Performance timing for < 5 second flow validation
   const [mountTime] = useState(() => performance.now());
@@ -262,7 +266,7 @@ export function MoodTracker() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20" data-testid="mood-tracker">
-      {/* Tab Navigation - Story 6.3: Task 7 */}
+      {/* Tab Navigation - Story 5.4: Added Timeline tab */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4">
           <div className="flex gap-1">
@@ -283,6 +287,23 @@ export function MoodTracker() {
               )}
             </button>
             <button
+              onClick={() => setActiveTab('timeline')}
+              className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative flex items-center justify-center gap-2 ${
+                activeTab === 'timeline' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
+              }`}
+              data-testid="mood-tab-timeline"
+            >
+              <List className="w-4 h-4" />
+              Timeline
+              {activeTab === 'timeline' && (
+                <motion.div
+                  layoutId="active-tab"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600"
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('history')}
               className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative flex items-center justify-center gap-2 ${
                 activeTab === 'history' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
@@ -290,7 +311,7 @@ export function MoodTracker() {
               data-testid="mood-tab-history"
             >
               <Calendar className="w-4 h-4" />
-              History
+              Calendar
               {activeTab === 'history' && (
                 <motion.div
                   layoutId="active-tab"
@@ -303,7 +324,7 @@ export function MoodTracker() {
         </div>
       </div>
 
-      {/* Tab Content - Story 6.3: Task 7 - Preserve state when switching */}
+      {/* Tab Content - Story 5.4: Added Timeline tab content */}
       <AnimatePresence mode="wait">
         {activeTab === 'tracker' ? (
           <motion.div
@@ -496,6 +517,30 @@ export function MoodTracker() {
                 {isSubmitting ? 'Saving...' : isEditing ? 'Update Mood' : 'Log Mood'}
               </button>
             </form>
+          </motion.div>
+        ) : activeTab === 'timeline' ? (
+          <motion.div
+            key="timeline"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.2 }}
+            className="max-w-2xl mx-auto px-4 py-6"
+            data-testid="mood-history-section"
+          >
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Mood Timeline
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                View your mood history over time
+              </p>
+            </div>
+
+            {/* Timeline view - Story 5.4 */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {user && <MoodHistoryTimeline userId={user.id} />}
+            </div>
           </motion.div>
         ) : (
           <motion.div

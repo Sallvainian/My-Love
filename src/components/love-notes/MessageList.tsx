@@ -9,16 +9,18 @@
  * - Smooth scroll behavior
  * - Empty state when no messages
  * - Loading indicator
+ * - "New message" indicator when scrolled up (Story 2.3)
  *
  * Note: Virtualization can be added later if performance becomes an issue
  * with 50+ messages. For MVP, simple scrolling provides good UX.
  *
  * Story 2.1: AC-2.1.3 (message list display)
+ * Story 2.3: AC-2.3.4 (auto-scroll and new message indicator)
  */
 
-import { useRef, useEffect, type ReactNode } from 'react';
+import { useRef, useEffect, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Loader2 } from 'lucide-react';
+import { Heart, Loader2, ArrowDown } from 'lucide-react';
 import { LoveNoteMessage } from './LoveNoteMessage';
 import type { LoveNote } from '../../types/models';
 
@@ -61,36 +63,78 @@ export function MessageList({
   const hasScrolledToBottom = useRef(false);
   const prevNotesLength = useRef(notes.length);
 
+  // Story 2.3: Track if user is at bottom and show new message indicator
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+
+  // Check if user is scrolled to bottom
+  const checkIfAtBottom = () => {
+    if (!containerRef.current) return false;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    // Consider "at bottom" if within 50px of bottom
+    const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+    return atBottom;
+  };
+
   // Auto-scroll to bottom on initial load
   useEffect(() => {
     if (notes.length > 0 && containerRef.current && !hasScrolledToBottom.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
       hasScrolledToBottom.current = true;
+      setIsAtBottom(true);
     }
   }, [notes.length]);
 
-  // Scroll to bottom when new message is added
+  // Story 2.3: AC-2.3.4 - Handle new messages with conditional auto-scroll
   useEffect(() => {
-    if (
-      notes.length > prevNotesLength.current &&
-      containerRef.current &&
-      hasScrolledToBottom.current
-    ) {
+    if (notes.length > prevNotesLength.current && containerRef.current) {
+      const wasAtBottom = isAtBottom;
+
+      if (wasAtBottom) {
+        // Auto-scroll to new message if user was at bottom
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+        setIsAtBottom(true);
+        setShowNewMessageIndicator(false);
+      } else {
+        // Show "new message" indicator if user scrolled up
+        setShowNewMessageIndicator(true);
+      }
+    }
+    prevNotesLength.current = notes.length;
+  }, [notes.length, isAtBottom]);
+
+  // Handle scroll for infinite loading and bottom detection
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+
+    // Check if user is at bottom
+    const atBottom = checkIfAtBottom();
+    setIsAtBottom(atBottom);
+
+    // Hide new message indicator when user scrolls to bottom
+    if (atBottom && showNewMessageIndicator) {
+      setShowNewMessageIndicator(false);
+    }
+
+    // Load more when scrolled near top (100px threshold)
+    if (!hasMore || isLoading || !onLoadMore) return;
+    if (containerRef.current.scrollTop < 100) {
+      onLoadMore();
+    }
+  };
+
+  // Scroll to bottom when user clicks new message indicator
+  const scrollToBottom = () => {
+    if (containerRef.current) {
       containerRef.current.scrollTo({
         top: containerRef.current.scrollHeight,
         behavior: 'smooth',
       });
-    }
-    prevNotesLength.current = notes.length;
-  }, [notes.length]);
-
-  // Handle scroll for infinite loading
-  const handleScroll = () => {
-    if (!containerRef.current || !hasMore || isLoading || !onLoadMore) return;
-
-    // Load more when scrolled near top (100px threshold)
-    if (containerRef.current.scrollTop < 100) {
-      onLoadMore();
+      setShowNewMessageIndicator(false);
+      setIsAtBottom(true);
     }
   };
 
@@ -137,6 +181,23 @@ export function MessageList({
             <Loader2 className="w-4 h-4 animate-spin text-[#FF6B6B]" />
             <span className="text-sm text-gray-600">Loading...</span>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Story 2.3: AC-2.3.4 - New message indicator */}
+      <AnimatePresence>
+        {showNewMessageIndicator && (
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            onClick={scrollToBottom}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-[#FF6B6B] text-white rounded-full px-4 py-2 shadow-lg flex items-center gap-2 hover:bg-[#FF5252] transition-colors"
+            aria-label="Scroll to new message"
+          >
+            <span className="text-sm font-medium">New message</span>
+            <ArrowDown className="w-4 h-4" />
+          </motion.button>
         )}
       </AnimatePresence>
 
