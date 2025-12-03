@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config } from '@dotenvx/dotenvx';
+
+// Load environment variables from encrypted .env file
+config();
+
+// Also load test-specific env vars (unencrypted, gitignored)
+config({ path: '.env.test', override: true });
 
 /**
  * Playwright configuration for My-Love PWA E2E testing
@@ -56,9 +63,9 @@ export default defineConfig({
     },
   ],
 
-  // Dev server
+  // Dev server (using dotenvx to decrypt env vars)
   webServer: {
-    command: 'npm run dev',
+    command: 'dotenvx run -- npm run dev',
     url: 'http://localhost:5173/',
     reuseExistingServer: !process.env.CI,
     timeout: 60000, // 1 minute should be enough

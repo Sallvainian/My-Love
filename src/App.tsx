@@ -8,7 +8,7 @@ import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/Re
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
 import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
 import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
-import { PokeKissInterface } from './components/PokeKissInterface';
+// PokeKissInterface moved to PartnerMoodView
 import { LoginScreen } from './components/LoginScreen';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { applyTheme } from './utils/themes';
@@ -328,8 +328,8 @@ function App() {
   // Story 1.5: Enhanced to show sync completion feedback (AC-1.5.4)
   useEffect(() => {
     // Guard: Skip setup if service workers are not supported
-    // (e.g., Safari private mode, older browsers)
-    if (!isServiceWorkerSupported()) {
+    // (e.g., Safari private mode, older browsers, test environment)
+    if (!isServiceWorkerSupported() || !navigator.serviceWorker) {
       if (import.meta.env.DEV) {
         console.log('[App] Service Worker not supported, skipping background sync listener');
       }
@@ -476,10 +476,7 @@ function App() {
         {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
         <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
 
-        {/* Story 6.5: Poke/Kiss Interaction Interface - Fixed top-right position (AC#1) */}
-        <div className="fixed top-4 right-4 z-50">
-          <PokeKissInterface />
-        </div>
+        {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
         {/* Conditional view rendering */}
         {currentView === 'home' && (
