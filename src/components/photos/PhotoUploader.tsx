@@ -45,7 +45,7 @@ interface Toast {
 export function PhotoUploader({
   onUploadSuccess,
   onCancel,
-  maxFileSize = 25 * 1024 * 1024 // AC-6.1.2: Default 25MB
+  _maxFileSize = 25 * 1024 * 1024 // AC-6.1.2: Default 25MB (unused - component uses internal validation)
 }: PhotoUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -194,7 +194,7 @@ export function PhotoUploader({
           // AC-6.2.12: Close modal on success
           handleClear();
           onUploadSuccess?.();
-        } catch (dimensionError) {
+        } catch (_dimensionError) {
           setError('Unable to process this image file. The file may be corrupted or in an unsupported format. Please try a different photo.');
           // AC-6.2.9: Set retry function for error toast
           setRetryUpload(() => handleUpload);
