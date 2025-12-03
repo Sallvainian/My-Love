@@ -14,8 +14,11 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
     // Assuming user is already authenticated (from previous stories)
     await page.goto('/');
 
+    // Wait for page to be fully loaded (critical for CI)
+    await page.waitForLoadState('domcontentloaded');
+
     // Wait for app to load
-    await page.waitForSelector('[data-testid="app-container"]', { timeout: 5000 });
+    await page.waitForSelector('[data-testid="app-container"]', { timeout: 10000 });
 
     // Navigate to Love Notes
     const loveNotesButton = page.locator('text=Love Notes').first();

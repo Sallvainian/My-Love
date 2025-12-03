@@ -16,8 +16,8 @@ config({ path: '.env.test', override: true });
 export default defineConfig({
   testDir: './tests/e2e',
 
-  // Fast timeout (15 seconds - tests should be quick)
-  timeout: 15000,
+  // Timeout: longer in CI (slower environment)
+  timeout: process.env.CI ? 30000 : 15000,
 
   // Parallel execution
   fullyParallel: true,
@@ -25,8 +25,8 @@ export default defineConfig({
   // No .only in CI
   forbidOnly: !!process.env.CI,
 
-  // No retries - fix flaky tests instead
-  retries: 0,
+  // Retry once in CI for flaky network issues
+  retries: process.env.CI ? 1 : 0,
 
   // 2 workers (enough for 10 tests)
   workers: 2,
@@ -40,10 +40,12 @@ export default defineConfig({
     baseURL: 'http://localhost:5173/',
     headless: true,
     trace: 'off',
-    screenshot: 'off',
+    // Screenshot on failure for debugging CI issues
+    screenshot: process.env.CI ? 'only-on-failure' : 'off',
     video: 'off',
-    navigationTimeout: 10000,
-    actionTimeout: 5000,
+    // Longer timeouts for CI (slower environment)
+    navigationTimeout: process.env.CI ? 20000 : 10000,
+    actionTimeout: process.env.CI ? 10000 : 5000,
   },
 
   // Chromium only

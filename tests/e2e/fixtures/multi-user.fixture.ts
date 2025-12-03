@@ -56,6 +56,12 @@ async function loginAndCompleteOnboarding(
 ): Promise<void> {
   await page.goto('/');
 
+  // Wait for page to be fully loaded (critical for CI)
+  await page.waitForLoadState('domcontentloaded');
+
+  // Wait for login form to be ready
+  await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
+
   // Fill login form
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
