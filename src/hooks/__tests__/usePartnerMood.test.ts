@@ -94,7 +94,7 @@ describe('usePartnerMood', () => {
     let broadcastCallback: ((mood: any) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(initialMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(async (callback) => {
+    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(async (callback: any) => {
       broadcastCallback = callback;
       return () => {};
     });
@@ -108,8 +108,8 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toEqual(initialMood);
 
     // Simulate broadcast received
-    if (broadcastCallback) {
-      broadcastCallback(updatedMood);
+    if (broadcastCallback !== null) {
+      (broadcastCallback as any)(updatedMood);
     }
 
     await waitFor(() => {
@@ -139,7 +139,7 @@ describe('usePartnerMood', () => {
     let broadcastCallback: ((mood: any) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(initialMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(async (callback) => {
+    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(async (callback: any) => {
       broadcastCallback = callback;
       return () => {};
     });
@@ -153,8 +153,8 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toEqual(initialMood);
 
     // Simulate broadcast from different user
-    if (broadcastCallback) {
-      broadcastCallback(otherUserMood);
+    if (broadcastCallback !== null) {
+      (broadcastCallback as any)(otherUserMood);
     }
 
     // Wait a bit to ensure it doesn't update
@@ -186,7 +186,7 @@ describe('usePartnerMood', () => {
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (_, onStatusChange) => {
+      async (_: any, onStatusChange: any) => {
         if (onStatusChange) {
           statusCallback = onStatusChange;
         }
@@ -201,8 +201,8 @@ describe('usePartnerMood', () => {
     });
 
     // Simulate subscription success
-    if (statusCallback) {
-      statusCallback('SUBSCRIBED');
+    if (statusCallback !== null) {
+      (statusCallback as any)('SUBSCRIBED');
     }
 
     await waitFor(() => {
@@ -210,8 +210,8 @@ describe('usePartnerMood', () => {
     });
 
     // Simulate connection error
-    if (statusCallback) {
-      statusCallback('CHANNEL_ERROR');
+    if (statusCallback !== null) {
+      (statusCallback as any)('CHANNEL_ERROR');
     }
 
     await waitFor(() => {

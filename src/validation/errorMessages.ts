@@ -63,7 +63,8 @@ function formatIssue(issue: ZodIssue): { field: string; message: string } {
   // Special handling for common error types
   switch (issue.code) {
     case 'too_small':
-      if (issue.type === 'string') {
+      // In Zod v4, check the minimum value directly
+      if ('minimum' in issue) {
         if (issue.minimum === 1) {
           message = `${fieldName} cannot be empty`;
         } else {
@@ -72,11 +73,12 @@ function formatIssue(issue: ZodIssue): { field: string; message: string } {
       }
       break;
     case 'too_big':
-      if (issue.type === 'string') {
+      // In Zod v4, check the maximum value directly
+      if ('maximum' in issue) {
         message = `${fieldName} cannot exceed ${issue.maximum} characters`;
       }
       break;
-    case 'invalid_enum_value':
+    case 'invalid_value':
       message = `Invalid ${fieldName.toLowerCase()}. Please select a valid option.`;
       break;
     case 'invalid_type':
@@ -113,7 +115,7 @@ function formatIssue(issue: ZodIssue): { field: string; message: string } {
  * }
  */
 export function formatZodError(error: ZodError): string {
-  const fieldErrors = error.errors.map(formatIssue);
+  const fieldErrors = error.issues.map(formatIssue);
 
   if (fieldErrors.length === 0) {
     return 'Validation failed';
@@ -148,7 +150,7 @@ export function formatZodError(error: ZodError): string {
 export function getFieldErrors(error: ZodError): Map<string, string> {
   const fieldErrors = new Map<string, string>();
 
-  error.errors.forEach((issue) => {
+  error.issues.forEach((issue) => {
     const { field, message } = formatIssue(issue);
     // Only store first error for each field
     if (!fieldErrors.has(field)) {

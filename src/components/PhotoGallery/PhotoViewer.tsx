@@ -12,7 +12,7 @@ interface PhotoViewerProps {
 }
 
 // AC 6.4.12 & WCAG 2.4.3: Focus trap hook for accessibility
-const useFocusTrap = (containerRef: RefObject<HTMLDivElement>) => {
+const useFocusTrap = (containerRef: RefObject<HTMLDivElement | null>) => {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -92,8 +92,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
   // AC 6.4.6: Double-tap zoom state
   const [lastTap, setLastTap] = useState(0);
 
-  // AC 6.4.4: Pinch-to-zoom state
-  const [pinchStartScale, setPinchStartScale] = useState(MIN_ZOOM);
+  // AC 6.4.4: Pinch-to-zoom state (removed - not supported by framer-motion)
 
   // Motion values for smooth animations
   const x = useMotionValue(0);
@@ -268,7 +267,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.2: Swipe navigation
   const handleDragEnd = useCallback(
-    (_event: any, info: PanInfo) => {
+    (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       // Only allow swipe navigation when not zoomed in
       if (scale > MIN_ZOOM) return;
 
@@ -443,12 +442,6 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
             dragElastic={scale === MIN_ZOOM ? 0.2 : 0.1}
             onDragEnd={handleDragEnd}
             onClick={handleDoubleTap}
-            onPinchStart={() => setPinchStartScale(scale)}
-            onPinch={(_e, info) => {
-              // AC 6.4.4: Pinch-to-zoom (1x to 3x)
-              const newScale = Math.max(MIN_ZOOM, Math.min(3, pinchStartScale * info.scale));
-              setScale(newScale);
-            }}
             className="relative cursor-pointer"
             style={{
               x,

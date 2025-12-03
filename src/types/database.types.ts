@@ -63,11 +63,13 @@ export type Database = {
             | 'loved'
             | 'happy'
             | 'content'
+            | 'excited'
             | 'thoughtful'
             | 'grateful'
             | 'sad'
             | 'anxious'
             | 'frustrated'
+            | 'angry'
             | 'lonely'
             | 'tired';
           mood_types: string[] | null; // Multi-mood selection array (migration 006)
@@ -82,11 +84,13 @@ export type Database = {
             | 'loved'
             | 'happy'
             | 'content'
+            | 'excited'
             | 'thoughtful'
             | 'grateful'
             | 'sad'
             | 'anxious'
             | 'frustrated'
+            | 'angry'
             | 'lonely'
             | 'tired';
           mood_types?: string[] | null; // Multi-mood selection array (migration 006)
@@ -101,11 +105,13 @@ export type Database = {
             | 'loved'
             | 'happy'
             | 'content'
+            | 'excited'
             | 'thoughtful'
             | 'grateful'
             | 'sad'
             | 'anxious'
             | 'frustrated'
+            | 'angry'
             | 'lonely'
             | 'tired';
           mood_types?: string[] | null; // Multi-mood selection array (migration 006)
