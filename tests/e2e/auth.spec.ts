@@ -15,6 +15,13 @@ const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
  */
 async function loginAndCompleteOnboarding(page) {
   await page.goto('/');
+
+  // Wait for page to be fully loaded (critical for CI)
+  await page.waitForLoadState('domcontentloaded');
+
+  // Wait for login form to be ready
+  await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
+
   await page.getByLabel(/email/i).fill(TEST_EMAIL);
   await page.getByLabel(/password/i).fill(TEST_PASSWORD);
   await page.getByRole('button', { name: /sign in|login/i }).click();
@@ -46,6 +53,12 @@ async function loginAndCompleteOnboarding(page) {
 test.describe('Authentication', () => {
   test('user can login with valid credentials', async ({ page }) => {
     await page.goto('/');
+
+    // Wait for page to be fully loaded (critical for CI)
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for login form to be ready
+    await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
 
     // Should see login screen
     await expect(page.getByRole('heading', { name: /welcome back|sign in/i })).toBeVisible();

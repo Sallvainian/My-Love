@@ -10,6 +10,9 @@ import { test, expect } from '@playwright/test';
 test('app loads and shows login or main screen', async ({ page }) => {
   await page.goto('/');
 
+  // Wait for page to be fully loaded (critical for CI)
+  await page.waitForLoadState('domcontentloaded');
+
   // App should show either login screen (if not authenticated)
   // or main app content (if authenticated)
   const loginHeading = page.getByRole('heading', { name: /welcome back|sign in|login/i });

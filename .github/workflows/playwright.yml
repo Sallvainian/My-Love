@@ -13,7 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -35,11 +35,16 @@ jobs:
         env:
           CI: true
           DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_KEY }}
+          # Test credentials (fallback if not in encrypted .env)
+          VITE_TEST_USER_EMAIL: ${{ secrets.VITE_TEST_USER_EMAIL }}
+          VITE_TEST_USER_PASSWORD: ${{ secrets.VITE_TEST_USER_PASSWORD }}
 
-      - name: Upload test report
+      - name: Upload test report and screenshots
         uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
