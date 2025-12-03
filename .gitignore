@@ -41,7 +41,9 @@ coverage/
 
 # Dot Files
 .claude
+!.claude/commands/
 .bmad
+!.bmad/
 .code
 
 # Documentation files with exposed secrets
