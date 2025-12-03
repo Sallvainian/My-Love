@@ -115,102 +115,102 @@ so that **I can enjoy our visual memories together**.
 - [x] Implement Tailwind responsive grid: `grid-cols-3 md:grid-cols-4`
 - [x] Add gap spacing between items: `gap-2 md:gap-4`
 - [x] Accept photos array prop with PhotoWithUrls type
-- [ ] Accept onPhotoClick callback for viewer integration
-- [ ] Implement grid container with proper aspect ratios
-- [ ] Add accessibility: role="grid", aria-label for grid
+- [x] Accept onPhotoClick callback for viewer integration
+- [x] Implement grid container with proper aspect ratios
+- [x] Add accessibility: role="grid", aria-label for grid
 
 ### Task 3: Create PhotoThumbnail Component
-- [ ] Create `src/components/photos/PhotoThumbnail.tsx` thumbnail component
-- [ ] Accept photo prop (PhotoWithUrls)
-- [ ] Accept onClick callback for click handling
-- [ ] Implement lazy loading with IntersectionObserver
-- [ ] Show blur placeholder while loading (AC 6.3.2)
-- [ ] Apply Tailwind styling: rounded-lg, object-cover, hover:scale-105
-- [ ] Display image using signed URL from photo.signedUrl
-- [ ] Add loading error fallback (broken image icon)
-- [ ] Implement accessibility: alt text, role="gridcell"
+- [x] Create `src/components/photos/PhotoThumbnail.tsx` thumbnail component
+- [x] Accept photo prop (PhotoWithUrls)
+- [x] Accept onClick callback for click handling
+- [x] Implement lazy loading with IntersectionObserver
+- [x] Show blur placeholder while loading (AC 6.3.2)
+- [x] Apply Tailwind styling: rounded-lg, object-cover, hover:scale-105
+- [x] Display image using signed URL from photo.signedUrl
+- [x] Add loading error fallback (broken image icon)
+- [x] Implement accessibility: alt text, role="gridcell"
 
 ### Task 4: Implement Infinite Scroll Pagination
-- [ ] Create `src/hooks/useInfinitePhotos.ts` custom hook
-- [ ] Extend usePhotos to support pagination (offset, limit)
-- [ ] Implement IntersectionObserver on sentinel element
-- [ ] Load next page when user scrolls to bottom
-- [ ] Track loading state for "Load More" indicator
-- [ ] Prevent duplicate fetches during loading
-- [ ] Handle end of data (no more photos available)
-- [ ] Preserve scroll position during page loads
+- [x] Create `src/hooks/useInfinitePhotos.ts` custom hook
+- [x] Extend usePhotos to support pagination (offset, limit)
+- [x] Implement IntersectionObserver on sentinel element
+- [x] Load next page when user scrolls to bottom
+- [x] Track loading state for "Load More" indicator
+- [x] Prevent duplicate fetches during loading
+- [x] Handle end of data (no more photos available)
+- [x] Preserve scroll position during page loads
 
 ### Task 5: Add Photo Metadata Overlay (Optional)
-- [ ] Create `src/components/photos/PhotoMetadata.tsx` overlay component
-- [ ] Display caption if present (truncate long captions)
-- [ ] Show relative timestamp ("2 hours ago")
-- [ ] Show owner badge ("Your photo" vs partner name)
-- [ ] Implement hover/tap to reveal metadata
-- [ ] Add fade-in transition for overlay
-- [ ] Ensure accessibility: proper contrast, readable text
+- [x] Create `src/components/photos/PhotoMetadata.tsx` overlay component
+- [x] Display caption if present (truncate long captions)
+- [x] Show relative timestamp ("2 hours ago")
+- [x] Show owner badge ("Your photo" vs partner name)
+- [x] Implement hover/tap to reveal metadata
+- [x] Add fade-in transition for overlay
+- [x] Ensure accessibility: proper contrast, readable text
 
 ### Task 6: Implement Empty, Loading, Error States
-- [ ] Create `src/components/photos/EmptyGalleryState.tsx`
-- [ ] Create `src/components/photos/GalleryLoadingSkeleton.tsx`
-- [ ] Create `src/components/photos/GalleryErrorState.tsx`
-- [ ] EmptyGalleryState: message + "Add Photo" CTA + illustration
-- [ ] LoadingSkeleton: responsive grid of shimmer cards
-- [ ] ErrorState: error message + retry button + contact support link
-- [ ] All states use consistent Tailwind styling
+- [x] Create `src/components/photos/EmptyGalleryState.tsx`
+- [x] Create `src/components/photos/GalleryLoadingSkeleton.tsx`
+- [x] Create `src/components/photos/GalleryErrorState.tsx`
+- [x] EmptyGalleryState: message + "Add Photo" CTA + illustration
+- [x] LoadingSkeleton: responsive grid of shimmer cards
+- [x] ErrorState: error message + retry button + contact support link
+- [x] All states use consistent Tailwind styling
 
 ### Task 7: Add PhotoGallery Route
-- [ ] Add route to `src/App.tsx` or router config: `/photos`
-- [ ] Update navigation menu to include "Photos" link
-- [ ] Add route guard (require authentication)
-- [ ] Implement page metadata (title, description)
-- [ ] Add to bottom navigation bar if present
+- [x] Add route to `src/App.tsx` or router config: `/photos`
+- [x] Update navigation menu to include "Photos" link
+- [x] Add route guard (require authentication)
+- [x] Implement page metadata (title, description)
+- [x] Add to bottom navigation bar if present
 
 ### Task 8: Write Unit Tests for PhotoGrid
-- [ ] Create `tests/unit/components/PhotoGrid.test.tsx`
-- [ ] Test grid renders with photos array
-- [ ] Test responsive grid layout (3 cols mobile, 4 cols desktop)
-- [ ] Test onPhotoClick callback invoked correctly
-- [ ] Test empty photos array shows nothing
-- [ ] Test accessibility attributes present
+- [x] Create `tests/unit/components/PhotoGrid.test.tsx`
+- [x] Test grid renders with photos array
+- [x] Test responsive grid layout (3 cols mobile, 4 cols desktop)
+- [x] Test onPhotoClick callback invoked correctly
+- [x] Test empty photos array shows nothing
+- [x] Test accessibility attributes present
 
 ### Task 9: Write Unit Tests for PhotoThumbnail
-- [ ] Create `tests/unit/components/PhotoThumbnail.test.tsx`
-- [ ] Test thumbnail renders with photo data
-- [ ] Test lazy loading behavior (IntersectionObserver mock)
-- [ ] Test loading placeholder shown initially
-- [ ] Test hover effect styling applied
-- [ ] Test onClick callback invoked on click
-- [ ] Test broken image fallback
-- [ ] Test accessibility attributes
+- [x] Create `tests/unit/components/PhotoThumbnail.test.tsx`
+- [x] Test thumbnail renders with photo data
+- [x] Test lazy loading behavior (IntersectionObserver mock)
+- [x] Test loading placeholder shown initially
+- [x] Test hover effect styling applied
+- [x] Test onClick callback invoked on click
+- [x] Test broken image fallback
+- [x] Test accessibility attributes
 
 ### Task 10: Write Integration Tests for PhotoGallery
-- [ ] Create `tests/integration/photoGallery.test.tsx`
-- [ ] Test gallery fetches photos on mount
-- [ ] Test photos displayed in grid layout
-- [ ] Test infinite scroll loads more photos
-- [ ] Test empty state shown when no photos
-- [ ] Test loading skeleton shown during fetch
-- [ ] Test error state shown on fetch failure
-- [ ] Test "Add Photo" button opens PhotoUploader modal
+- [x] Create `tests/integration/photoGallery.test.tsx`
+- [x] Test gallery fetches photos on mount
+- [x] Test photos displayed in grid layout
+- [x] Test infinite scroll loads more photos
+- [x] Test empty state shown when no photos
+- [x] Test loading skeleton shown during fetch
+- [x] Test error state shown on fetch failure
+- [x] Test "Add Photo" button opens PhotoUploader modal
 
 ### Task 11: Write E2E Tests for Photo Gallery
-- [ ] Create `tests/e2e/photoGallery.spec.ts`
-- [ ] Test full gallery browsing workflow
-- [ ] Test photo grid renders correctly
-- [ ] Test infinite scroll loads more photos
-- [ ] Test clicking photo opens viewer (Story 6.4 integration)
-- [ ] Test "Add Photo" FAB opens uploader
-- [ ] Test gallery updates after new photo upload
-- [ ] Test responsive layouts (mobile and desktop)
+- [x] Create `tests/e2e/photoGallery.spec.ts`
+- [x] Test full gallery browsing workflow
+- [x] Test photo grid renders correctly
+- [x] Test infinite scroll loads more photos
+- [x] Test clicking photo opens viewer (Story 6.4 integration)
+- [x] Test "Add Photo" FAB opens uploader
+- [x] Test gallery updates after new photo upload
+- [x] Test responsive layouts (mobile and desktop)
 
 ### Task 12: Performance Optimization
-- [ ] Profile memory usage with 100+ photos
-- [ ] Implement virtual scrolling if needed (react-window)
-- [ ] Optimize image loading (preload next visible images)
-- [ ] Add cache headers for signed URLs
-- [ ] Measure and optimize LCP (Largest Contentful Paint)
-- [ ] Ensure 60fps scrolling on mobile devices
-- [ ] Test on low-end devices for performance
+- [x] Profile memory usage with 100+ photos
+- [x] Implement virtual scrolling if needed (react-window)
+- [x] Optimize image loading (preload next visible images)
+- [x] Add cache headers for signed URLs
+- [x] Measure and optimize LCP (Largest Contentful Paint)
+- [x] Ensure 60fps scrolling on mobile devices
+- [x] Test on low-end devices for performance
 
 ## Dev Notes
 

@@ -1,6 +1,6 @@
 # Story 6.4: Full-Screen Photo Viewer with Gestures
 
-Status: Ready for Review
+Status: done
 
 ## Story
 

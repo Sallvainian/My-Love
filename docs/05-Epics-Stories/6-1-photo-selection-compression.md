@@ -1,6 +1,6 @@
 # Story 6.1: Photo Selection & Compression
 
-Status: Ready for Review
+Status: done
 
 ## Story
 
