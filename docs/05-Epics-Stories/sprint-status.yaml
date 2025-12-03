@@ -18,6 +18,7 @@
 #
 # WORKFLOW NOTES:
 # ===============
+# - Epics should be contexted before stories can be drafted
 # - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', dev reviews, then Dev moves to 'done'
 
