@@ -136,8 +136,9 @@ describe('notesSlice - sendNote', () => {
 
       // Verify insert was called
       expect(mockInsert).toHaveBeenCalledWith({
-        content: 'Hello!',
+        from_user_id: 'user-123',
         to_user_id: 'partner-123',
+        content: 'Hello!',
       });
 
       // Verify final state has server note (not optimistic)

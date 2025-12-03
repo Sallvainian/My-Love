@@ -3,16 +3,75 @@
  *
  * Tests for the Love Notes custom hook that manages chat state.
  * Story 2.1: Hook for consuming Love Notes state
+ * Story 2.3: Real-time subscription tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useLoveNotes } from '../../../src/hooks/useLoveNotes';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { LoveNote } from '../../../src/types/models';
 
+// Use vi.hoisted to define mocks before they're used in vi.mock factories
+const {
+  mockUnsubscribe,
+  mockSubscribe,
+  mockOn,
+  mockChannel,
+  mockChannelFn,
+  mockRemoveChannel,
+  mockGetCurrentUserId,
+} = vi.hoisted(() => {
+  const mockUnsubscribe = vi.fn();
+  const mockSubscribe = vi.fn((callback: any) => {
+    if (callback) {
+      callback('SUBSCRIBED');
+    }
+    return mockUnsubscribe;
+  });
+  const mockOn = vi.fn();
+  const mockChannel = {
+    on: mockOn,
+    subscribe: mockSubscribe,
+    unsubscribe: mockUnsubscribe,
+  };
+  const mockChannelFn = vi.fn(() => mockChannel);
+  const mockRemoveChannel = vi.fn();
+  const mockGetCurrentUserId = vi.fn();
+
+  return {
+    mockUnsubscribe,
+    mockSubscribe,
+    mockOn,
+    mockChannel,
+    mockChannelFn,
+    mockRemoveChannel,
+    mockGetCurrentUserId,
+  };
+});
+
 // Mock the store
 vi.mock('../../../src/stores/useAppStore');
+
+// Mock photoService to avoid importing supabaseClient
+vi.mock('../../../src/services/photoService', () => ({
+  photoService: {
+    getPhotos: vi.fn().mockResolvedValue([]),
+    uploadPhoto: vi.fn().mockResolvedValue(null),
+    deletePhoto: vi.fn().mockResolvedValue(true),
+    getSignedUrl: vi.fn().mockResolvedValue('mock-url'),
+    checkStorageQuota: vi.fn().mockResolvedValue({ used: 0, quota: 1024, percent: 0, warning: 'none' }),
+  },
+}));
+
+// Mock moodSyncService to avoid importing supabaseClient
+vi.mock('../../../src/api/moodSyncService', () => ({
+  moodSyncService: {
+    getLatestPartnerMood: vi.fn().mockResolvedValue(null),
+    fetchMoods: vi.fn().mockResolvedValue([]),
+    subscribeToPartnerMood: vi.fn(),
+  },
+}));
 
 // Mock Supabase client before any imports that use it
 vi.mock('../../../src/api/supabaseClient', () => ({
@@ -30,17 +89,15 @@ vi.mock('../../../src/api/supabaseClient', () => ({
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
       onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
     },
-    channel: vi.fn(() => ({
-      on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn().mockReturnThis(),
-      unsubscribe: vi.fn(),
-    })),
+    channel: mockChannelFn,
+    removeChannel: mockRemoveChannel,
   },
 }));
 
 vi.mock('../../../src/api/authService', () => ({
   authService: {
     getCurrentUser: vi.fn().mockResolvedValue(null),
+    getCurrentUserId: mockGetCurrentUserId,
     signIn: vi.fn(),
     signOut: vi.fn(),
   },
@@ -67,9 +124,14 @@ describe('useLoveNotes', () => {
   const mockFetchNotes = vi.fn();
   const mockFetchOlderNotes = vi.fn();
   const mockClearNotesError = vi.fn();
+  const mockAddNote = vi.fn();
+  const mockSendNote = vi.fn();
+  const mockRetryFailedMessage = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOn.mockReturnValue(mockChannel);
+    mockGetCurrentUserId.mockResolvedValue('test-user-id');
 
     // Setup default mock implementation
     (useAppStore as any).mockImplementation((selector: any) => {
@@ -81,9 +143,16 @@ describe('useLoveNotes', () => {
         fetchNotes: mockFetchNotes,
         fetchOlderNotes: mockFetchOlderNotes,
         clearNotesError: mockClearNotesError,
+        addNote: mockAddNote,
+        sendNote: mockSendNote,
+        retryFailedMessage: mockRetryFailedMessage,
       };
       return selector(state);
     });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   describe('initialization', () => {
@@ -247,6 +316,132 @@ describe('useLoveNotes', () => {
       const { result } = renderHook(() => useLoveNotes(false));
 
       expect(result.current.hasMore).toBe(false);
+    });
+  });
+
+  // Story 2.3: Real-time subscription tests
+  describe('real-time subscription (Story 2.3)', () => {
+    it('sets up Supabase Realtime channel on mount', async () => {
+      renderHook(() => useLoveNotes(false));
+
+      await waitFor(() => {
+        expect(mockChannelFn).toHaveBeenCalledWith('love-notes-realtime');
+      });
+    });
+
+    it('subscribes to postgres_changes INSERT events with user filter', async () => {
+      renderHook(() => useLoveNotes(false));
+
+      await waitFor(() => {
+        expect(mockOn).toHaveBeenCalledWith(
+          'postgres_changes',
+          expect.objectContaining({
+            event: 'INSERT',
+            schema: 'public',
+            table: 'love_notes',
+            filter: 'to_user_id=eq.test-user-id',
+          }),
+          expect.any(Function)
+        );
+      });
+    });
+
+    it('calls subscribe on the channel', async () => {
+      renderHook(() => useLoveNotes(false));
+
+      await waitFor(() => {
+        expect(mockSubscribe).toHaveBeenCalled();
+      });
+    });
+
+    it('adds new message to store when INSERT event received', async () => {
+      let insertCallback: any;
+      mockOn.mockImplementation((event, config, callback) => {
+        if (event === 'postgres_changes') {
+          insertCallback = callback;
+        }
+        return mockChannel;
+      });
+
+      renderHook(() => useLoveNotes(false));
+
+      await waitFor(() => {
+        expect(mockOn).toHaveBeenCalled();
+      });
+
+      // Simulate receiving a new message
+      const newMessage: LoveNote = {
+        id: 'note-3',
+        from_user_id: 'user-2',
+        to_user_id: 'test-user-id',
+        content: 'New message!',
+        created_at: '2025-11-29T14:10:00Z',
+      };
+
+      insertCallback({ new: newMessage });
+
+      await waitFor(() => {
+        expect(mockAddNote).toHaveBeenCalledWith(newMessage);
+      });
+    });
+
+    it('cleans up subscription on unmount', async () => {
+      const { unmount } = renderHook(() => useLoveNotes(false));
+
+      await waitFor(() => {
+        expect(mockChannelFn).toHaveBeenCalled();
+      });
+
+      unmount();
+
+      await waitFor(() => {
+        expect(mockRemoveChannel).toHaveBeenCalledWith(mockChannel);
+      });
+    });
+
+    it('does not set up subscription if user ID is not available', async () => {
+      mockGetCurrentUserId.mockResolvedValueOnce(null);
+
+      renderHook(() => useLoveNotes(false));
+
+      await waitFor(() => {
+        // Should still try to get user ID
+        expect(mockGetCurrentUserId).toHaveBeenCalled();
+      });
+
+      // But should not create channel
+      expect(mockChannelFn).not.toHaveBeenCalled();
+    });
+  });
+
+  // Story 2.2: Message sending tests
+  describe('message sending (Story 2.2)', () => {
+    it('provides sendNote action', () => {
+      const { result } = renderHook(() => useLoveNotes(false));
+
+      expect(typeof result.current.sendNote).toBe('function');
+    });
+
+    it('calls sendNote action from store', async () => {
+      const { result } = renderHook(() => useLoveNotes(false));
+
+      await result.current.sendNote('Hello!');
+
+      expect(mockSendNote).toHaveBeenCalledWith('Hello!');
+    });
+
+    it('provides retryFailedMessage action', () => {
+      const { result } = renderHook(() => useLoveNotes(false));
+
+      expect(typeof result.current.retryFailedMessage).toBe('function');
+    });
+
+    it('calls retryFailedMessage action from store', async () => {
+      const { result } = renderHook(() => useLoveNotes(false));
+
+      await result.current.retryFailedMessage('temp-123');
+
+      expect(mockRetryFailedMessage).toHaveBeenCalledWith('temp-123');
     });
   });
 });

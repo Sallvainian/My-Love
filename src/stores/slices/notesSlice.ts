@@ -290,8 +290,9 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       const { data, error } = await supabase
         .from('love_notes')
         .insert({
-          content,
+          from_user_id: userId,
           to_user_id: partnerId,
+          content,
         })
         .select()
         .single();
@@ -374,12 +375,19 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
         console.log('[NotesSlice] Retrying failed message:', tempId);
       }
 
+      // Get user ID for retry
+      const userId = await authService.getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
       // Attempt to send again
       const { data, error } = await supabase
         .from('love_notes')
         .insert({
-          content: failedNote.content,
+          from_user_id: userId,
           to_user_id: partnerId,
+          content: failedNote.content,
         })
         .select()
         .single();
