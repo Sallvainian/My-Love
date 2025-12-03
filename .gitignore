@@ -65,6 +65,13 @@ docs/technical-decisions.md
 .gemini/
 .opencode/
 
+# Claude OS (auto-generated, user-specific)
+.claude-os/tree_sitter_cache.db
+.claude-os/project-profile/
+
+# AgentVibes (local TTS preferences)
+.agentvibes/
+
 # MCP server artifacts
 .mcp.json
 .playwright-mcp/
