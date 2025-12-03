@@ -83,9 +83,12 @@ export class MoodSyncService {
     }
 
     // Transform local mood to Supabase insert format
+    // Include mood_types array for multi-mood support
+    const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
     const moodInsert: MoodEntryInsert = {
       user_id: mood.userId,
       mood_type: mood.mood,
+      mood_types: moodTypes,
       note: mood.note || null,
       created_at: mood.timestamp.toISOString(),
     };
@@ -134,7 +137,7 @@ export class MoodSyncService {
         channel.subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
             try {
-              // Send broadcast to partner
+              // Send broadcast to partner (includes mood_types for multi-mood support)
               const result = await channel.send({
                 type: 'broadcast',
                 event: 'new_mood',
@@ -142,6 +145,7 @@ export class MoodSyncService {
                   id: mood.id,
                   user_id: mood.user_id,
                   mood_type: mood.mood_type,
+                  mood_types: mood.mood_types,
                   note: mood.note,
                   created_at: mood.created_at,
                 },
