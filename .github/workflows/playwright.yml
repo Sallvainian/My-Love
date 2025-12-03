@@ -31,10 +31,10 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: npx playwright test
+        run: npx dotenvx run -- npx playwright test
         env:
           CI: true
-          DOTENV_KEY: ${{ secrets.DOTENV_KEY }}
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_KEY }}
 
       - name: Upload test report
         uses: actions/upload-artifact@v5
