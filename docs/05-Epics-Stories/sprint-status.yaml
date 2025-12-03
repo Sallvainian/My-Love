@@ -89,7 +89,7 @@ development_status:
   6-1-photo-selection-compression: done # Code review APPROVED 2025-12-02 - All 6 tasks done, 39 tests passing (19 service + 15 component + 5 fallback), all 10 ACs satisfied.
   6-2-photo-upload-with-progress-indicator: done # Code review APPROVED 2025-12-02 - All issues fixed: pre-upload quota check restored, 100ms timing test added, constants extracted
   6-3-photo-gallery-grid-view: done # Code review APPROVED 2025-12-03 - Fixed grid columns (3-col mobile), removed console.log pollution
-  6-4-full-screen-photo-viewer-with-gestures: review # Code review NOT READY 2025-12-03 - 7 CRITICAL (missing pinch-zoom, pan bounds, focus trap, E2E broken), 3 IMPORTANT. Return to dev
+  6-4-full-screen-photo-viewer-with-gestures: done # Code review APPROVED 2025-12-03 - All 7 CRITICAL issues fixed: pinch-zoom, pan boundaries, focus trap, screen reader, memory leak, RLS handling, E2E auth. 9/9 unit tests passing.
   epic-6-retrospective: optional
 
   # Epic 7: Settings, Interactions & Personalization

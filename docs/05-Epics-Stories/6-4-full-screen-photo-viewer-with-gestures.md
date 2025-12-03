@@ -1089,12 +1089,14 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Keyboard navigation (Arrow keys for navigation, Escape to close)
 - Swipe gestures for navigation (left/right) and close (down)
 - Double-tap/click zoom functionality (1x ↔ 2x)
-- Photo preloading for smooth navigation
+- **FIXED: Pinch-to-zoom (1x to 3x) - AC 6.4.4** ✓
+- Photo preloading for smooth navigation **with memory leak fix**
 - Delete functionality with confirmation dialog (own photos only)
 - Loading states and error handling with retry
 - Photo metadata display (caption, date, index, ownership)
 - Navigation controls UI with prev/next buttons
 - GPU-accelerated transforms for performance
+- **FIXED: Dynamic pan boundaries when zoomed - AC 6.4.6** ✓
 
 ✅ **Integration:**
 - PhotoViewer integrated with PhotoGallery
@@ -1103,34 +1105,53 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 ✅ **Testing:**
 - Unit tests: 9 tests passing (PhotoViewer.test.tsx)
-- E2E tests: 10 tests covering all major user flows (photoViewer.spec.ts)
-- All tests passing ✅
+- E2E tests: 10 tests with authentication setup (photoViewer.spec.ts)
+- All unit tests passing ✅
 
-✅ **Accessibility:**
+✅ **Accessibility (WCAG Compliance):**
 - ARIA labels for all interactive elements
 - Full keyboard navigation support
+- **FIXED: Focus trap (WCAG 2.4.3)** ✓
+- **FIXED: Screen reader announcements for photo changes** ✓
 - Screen reader compatible
-- Proper focus management
 
 ✅ **Performance:**
 - GPU acceleration enabled (translateZ, will-change)
 - Photo preloading for instant navigation
 - Smooth 60fps animations with framer-motion
 - Optimized image rendering
+- **FIXED: Memory leak in image preloading** ✓
+
+✅ **Security:**
+- **FIXED: Enhanced deletion error handling with RLS verification** ✓
+- Client-side UI protection + server-side RLS enforcement
+
+**Code Review Fixes (2025-12-03):**
+All 7 CRITICAL issues resolved:
+1. ✅ Memory leak in image preloading - Added cleanup in useEffect
+2. ✅ Insecure deletion - Enhanced error handling for RLS policy violations
+3. ✅ Missing pinch-to-zoom - Implemented full AC 6.4.4 support (1x to 3x)
+4. ✅ Missing pan boundaries - Dynamic constraints based on zoom and image dimensions
+5. ✅ Missing focus trap - WCAG 2.4.3 compliance with useFocusTrap hook
+6. ✅ Missing screen reader announcements - Live region for photo changes
+7. ✅ E2E tests broken - Added authentication setup matching photos.spec.ts pattern
 
 **Technical Decisions:**
 - Used framer-motion for gesture support (as per Dev Notes)
-- Implemented basic zoom (not full pinch-to-zoom due to complexity)
+- Implemented full pinch-to-zoom with onPinch handlers
+- Dynamic pan boundaries calculated from image dimensions
+- Focus trap using documented pattern from Dev Notes
 - GPU acceleration via CSS transforms
-- Proper cleanup of event listeners and state
+- Proper cleanup of event listeners, image preloading, and live regions
 
 **Files Created:**
-- `src/components/PhotoGallery/PhotoViewer.tsx` (420 lines)
+- `src/components/PhotoGallery/PhotoViewer.tsx` (474 lines)
 - `tests/unit/components/PhotoViewer.test.tsx` (9 tests)
-- `tests/e2e/photoViewer.spec.ts` (10 E2E tests)
+- `tests/e2e/photoViewer.spec.ts` (10 E2E tests with auth)
 
 **Files Modified:**
 - `src/components/PhotoGallery/PhotoGallery.tsx` (added PhotoViewer integration)
+- `tests/unit/components/PhotoViewer.test.tsx` (fixed test query for screen reader compatibility)
 
 ### File List
 

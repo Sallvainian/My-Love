@@ -457,6 +457,9 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
 
       fireEvent.click(screen.getByTestId('mood-button-loved'));
 
+      // Click toggle to expand note field (collapsed by default)
+      fireEvent.click(screen.getByTestId('mood-note-toggle'));
+
       const noteInput = screen.getByTestId('mood-note-input');
       fireEvent.change(noteInput, { target: { value: 'Feeling great today!' } });
 
@@ -467,6 +470,29 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
         ['loved'],
         'Feeling great today!'
       );
+    });
+  });
+
+  describe('Note field collapse behavior', () => {
+    it('should show toggle button instead of note input by default', () => {
+      render(<MoodTracker />);
+
+      // Note toggle should be visible
+      expect(screen.getByTestId('mood-note-toggle')).toBeInTheDocument();
+      // Note input should NOT be visible
+      expect(screen.queryByTestId('mood-note-input')).not.toBeInTheDocument();
+    });
+
+    it('should expand note field when toggle is clicked', () => {
+      render(<MoodTracker />);
+
+      // Click toggle
+      fireEvent.click(screen.getByTestId('mood-note-toggle'));
+
+      // Note input should now be visible
+      expect(screen.getByTestId('mood-note-input')).toBeInTheDocument();
+      // Toggle should be hidden
+      expect(screen.queryByTestId('mood-note-toggle')).not.toBeInTheDocument();
     });
   });
 

@@ -92,6 +92,8 @@ export function MoodTracker() {
   const [noteError, setNoteError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Story 5.2: Note field collapsed by default (tech debt fix)
+  const [showNoteField, setShowNoteField] = useState(false);
 
   // Story 1.5: Offline error state with retry action (AC-1.5.3)
   const [offlineError, setOfflineError] = useState<boolean>(false);
@@ -141,6 +143,10 @@ export function MoodTracker() {
       }
       setNote(existingMood.note || '');
       setIsEditing(true);
+      // Auto-expand note field if existing mood has a note
+      if (existingMood.note) {
+        setShowNoteField(true);
+      }
     }
   }, [getMoodForDate]);
 
@@ -469,38 +475,51 @@ export function MoodTracker() {
                 )}
               </div>
 
-              {/* Note Input (AC-3) */}
+              {/* Note Input (AC-3) - Collapsed by default for faster flow */}
               <div>
-                <label htmlFor="mood-note" className="block text-sm font-medium text-gray-700 mb-2">
-                  Add a note (optional)
-                </label>
-                <textarea
-                  id="mood-note"
-                  value={note}
-                  onChange={handleNoteChange}
-                  placeholder="What made you feel this way?"
-                  rows={4}
-                  maxLength={200}
-                  className={`w-full px-4 py-3 border rounded-lg resize-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors ${
-                    noteError ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                  }`}
-                  data-testid="mood-note-input"
-                />
-                <div className="flex items-center justify-between mt-2">
-                  {noteError ? (
-                    <span className="text-sm text-red-600" data-testid="mood-note-error">
-                      {noteError}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-500">Share your thoughts</span>
-                  )}
-                  <span
-                    className={`text-sm ${remainingChars < 20 ? 'text-orange-600' : 'text-gray-500'}`}
-                    data-testid="mood-char-counter"
+                {showNoteField ? (
+                  <>
+                    <label htmlFor="mood-note" className="block text-sm font-medium text-gray-700 mb-2">
+                      Add a note (optional)
+                    </label>
+                    <textarea
+                      id="mood-note"
+                      value={note}
+                      onChange={handleNoteChange}
+                      placeholder="What made you feel this way?"
+                      rows={4}
+                      maxLength={200}
+                      className={`w-full px-4 py-3 border rounded-lg resize-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors ${
+                        noteError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                      data-testid="mood-note-input"
+                    />
+                    <div className="flex items-center justify-between mt-2">
+                      {noteError ? (
+                        <span className="text-sm text-red-600" data-testid="mood-note-error">
+                          {noteError}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-500">Share your thoughts</span>
+                      )}
+                      <span
+                        className={`text-sm ${remainingChars < 20 ? 'text-orange-600' : 'text-gray-500'}`}
+                        data-testid="mood-char-counter"
+                      >
+                        {remainingChars}/{maxNoteLength}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowNoteField(true)}
+                    className="text-sm text-gray-500 hover:text-pink-600 transition-colors"
+                    data-testid="mood-note-toggle"
                   >
-                    {remainingChars}/{maxNoteLength}
-                  </span>
-                </div>
+                    + Add note (optional)
+                  </button>
+                )}
               </div>
 
               {/* Submit Button (AC-4, AC-5) */}

@@ -2,7 +2,7 @@
 
 **Epic**: 5 - Mood Tracking & Transparency
 **Story ID**: 5.2
-**Status**: review
+**Status**: done
 **Created**: 2025-11-25
 
 **✅ BLOCKER RESOLVED (2025-12-02)**: E2E tests now passing after fixing authentication flow order (welcome screen handling before nav visibility wait).
