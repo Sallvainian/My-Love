@@ -133,18 +133,19 @@ export const isSupabaseServiceError = (error: unknown): error is SupabaseService
  * @param error - Error object (PostgrestError or generic)
  */
 export const logSupabaseError = (context: string, error: unknown): void => {
-  if (isPostgrestError(error)) {
+  // Check SupabaseServiceError FIRST (more specific - has isNetworkError)
+  if (isSupabaseServiceError(error)) {
+    console.error(`[Supabase] ${context}:`, {
+      message: error.message,
+      code: error.code,
+      isNetworkError: error.isNetworkError,
+    });
+  } else if (isPostgrestError(error)) {
     console.error(`[Supabase] ${context}:`, {
       code: error.code,
       message: error.message,
       details: error.details,
       hint: error.hint,
-    });
-  } else if (isSupabaseServiceError(error)) {
-    console.error(`[Supabase] ${context}:`, {
-      message: error.message,
-      code: error.code,
-      isNetworkError: error.isNetworkError,
     });
   } else if (error instanceof Error) {
     console.error(`[Supabase] ${context}:`, error.message);

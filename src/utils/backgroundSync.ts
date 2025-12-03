@@ -50,16 +50,16 @@ export async function registerBackgroundSync(tag: string): Promise<void> {
 /**
  * Setup service worker message listener
  *
- * Listens for messages from the service worker and triggers
- * appropriate actions (e.g., sync pending moods).
+ * Listens for messages from the service worker:
+ * - BACKGROUND_SYNC_COMPLETED: SW finished syncing, refresh local state
  *
- * @param onSyncRequest - Callback when service worker requests sync
+ * @param onSyncCompleted - Callback when service worker completed background sync
  * @returns Cleanup function to remove listener
  *
  * @example
  * ```typescript
  * const cleanup = setupServiceWorkerListener(async () => {
- *   await syncPendingMoods();
+ *   await updateSyncStatus(); // Refresh state after SW sync
  * });
  *
  * // Later, cleanup on unmount
@@ -67,7 +67,7 @@ export async function registerBackgroundSync(tag: string): Promise<void> {
  * ```
  */
 export function setupServiceWorkerListener(
-  onSyncRequest: () => Promise<void>
+  onSyncCompleted: () => Promise<void>
 ): () => void {
   // Guard: Check if service workers are supported (defense-in-depth)
   if (!isServiceWorkerSupported()) {
@@ -79,14 +79,18 @@ export function setupServiceWorkerListener(
   }
 
   const handleMessage = (event: MessageEvent) => {
-    if (event.data?.type === 'BACKGROUND_SYNC_REQUEST') {
+    // Handle sync completion notification from SW
+    if (event.data?.type === 'BACKGROUND_SYNC_COMPLETED') {
       if (import.meta.env.DEV) {
-        console.log('[BackgroundSync] Received sync request from service worker');
+        console.log('[BackgroundSync] Service Worker completed background sync:', {
+          successCount: event.data.successCount,
+          failCount: event.data.failCount,
+        });
       }
 
-      // Trigger sync
-      onSyncRequest().catch((error) => {
-        console.error('[BackgroundSync] Sync request failed:', error);
+      // Refresh local state after SW sync
+      onSyncCompleted().catch((error) => {
+        console.error('[BackgroundSync] Failed to refresh after sync:', error);
       });
     }
   };

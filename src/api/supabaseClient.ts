@@ -80,10 +80,10 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 
 /**
  * Get partner user ID
- * Queries the database to find the other user (partner) in the system.
- * For 2-user MVP: Returns the user ID that is not the current user.
+ * Queries the users table to get the partner_id for the current user.
+ * Uses the proper partner_id column that stores the established partner relationship.
  *
- * @returns Partner user ID or null if not found
+ * @returns Partner user ID or null if not found/not connected
  */
 export const getPartnerId = async (): Promise<string | null> => {
   try {
@@ -95,20 +95,24 @@ export const getPartnerId = async (): Promise<string | null> => {
       return null;
     }
 
-    // Query users table for the partner (the other user)
+    // Query current user's partner_id from users table
     const { data, error } = await supabase
       .from('users')
-      .select('id')
-      .neq('id', currentUserId)
-      .limit(1)
+      .select('partner_id')
+      .eq('id', currentUserId)
       .single();
 
     if (error) {
+      // PGRST116 = no rows found (user doesn't have users table record yet)
+      if (error.code === 'PGRST116') {
+        console.warn('[Supabase] User has no users table record yet');
+        return null;
+      }
       console.error('[Supabase] Failed to get partner ID:', error);
       return null;
     }
 
-    return data?.id ?? null;
+    return data?.partner_id ?? null;
   } catch (error) {
     console.error('[Supabase] Error getting partner ID:', error);
     return null;

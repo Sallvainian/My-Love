@@ -114,7 +114,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 
 **Recommendation for Epic 1**:
 - Apply same documentation rigor to authentication flows
-- Create user-facing guides for magic link authentication
+- Create user-facing guides for authentication flows
 - Document RLS policies as they're created
 
 ---
@@ -170,7 +170,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 **Recommendation for Epic 1**:
 - Apply same security rigor to authentication tokens
 - Document RLS policies for each table
-- Validate magic link security flow
+- Validate OAuth security flow
 
 ---
 
@@ -349,7 +349,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 - Estimation should account for validation-focused vs greenfield work
 
 **Impact on Epic 1**:
-- Check for existing authentication code before implementing magic link flow
+- Check for existing authentication code before implementing auth features
 - Validate existing React components before creating new ones
 - Story planning should include "Existing Implementation Check" step
 
@@ -368,7 +368,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 
 **Impact on Epic 1**:
 - Authentication flows need equal rigor (unit, integration, E2E tests)
-- Magic link flow requires testing across email delivery, token validation, session management
+- Auth flows require testing across login, token validation, session management
 - Consider Playwright for automated browser testing to reduce manual validation burden
 
 **Recommendation**:
@@ -388,7 +388,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 - False task completions caused workflow violations
 
 **Impact on Epic 1**:
-- Authentication stories will require extensive browser testing (magic link flow, session persistence)
+- Authentication stories will require extensive browser testing (OAuth flow, session persistence)
 - Need to anticipate manual steps in story planning
 - Consider Playwright automation to reduce manual burden
 
@@ -410,7 +410,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 
 **Impact on Epic 1**:
 - Authentication flows need similar documentation rigor
-- Magic link implementation requires user-facing guides
+- Authentication implementation requires user-facing guides
 - RLS policies should be documented as tables are created
 
 **Recommendation**:
@@ -480,7 +480,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 
 **2. Manual Validation Requirements Create Delays**
 - **Discovery**: Story 0.4 blocked 2 days for browser testing
-- **Impact on Epic 1**: Authentication flows require extensive browser testing (magic link, session persistence)
+- **Impact on Epic 1**: Authentication flows require extensive browser testing (OAuth, session persistence)
 - **Action**:
   - Anticipate manual steps in Epic 1 story planning (add to story files upfront)
   - Consider implementing Playwright test suite before Epic 1 starts
@@ -501,7 +501,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 - **Action**:
   - Create AUTHENTICATION_USER_GUIDE.md during Epic 1
   - Document RLS policies as tables are created
-  - Create AUTHENTICATION_ROLLBACK.md for magic link flow
+  - Create AUTHENTICATION_ROLLBACK.md for auth flows
 
 **5. Rollback Procedures Need Testing**
 - **Discovery**: Story 0.5 documented rollback procedures with test scenarios
@@ -542,7 +542,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 ### Medium Priority (Address During Epic 1) 🟡
 
 5. **Create AUTHENTICATION_USER_GUIDE.md** (create during Epic 1 stories)
-   - **Content**: How to use magic link authentication, session management, logout
+   - **Content**: How to use email/password and Google OAuth authentication, session management, logout
    - **Rationale**: Documentation as first-class citizen from Epic 0 pattern
 
 6. **Document RLS Policies** (create as policies are implemented)
@@ -550,7 +550,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
    - **Rationale**: Security documentation critical for authentication epic
 
 7. **Create AUTHENTICATION_ROLLBACK.md** (create during Epic 1)
-   - **Content**: Rollback procedures for magic link flow, token invalidation, policy changes
+   - **Content**: Rollback procedures for auth flows, token invalidation, policy changes
    - **Rationale**: Formalized rollback procedures from Epic 0 pattern
 
 8. **Test Coverage Target** (maintain during Epic 1)
@@ -647,7 +647,7 @@ Epic 0 successfully established the deployment pipeline and backend infrastructu
 - [ ] **MEDIUM**: Create AUTHENTICATION_USER_GUIDE.md
   - Owner: Dev Team
   - Timing: During Epic 1 implementation
-  - Success Criteria: User-facing guide for magic link authentication
+  - Success Criteria: User-facing guide for email/password and Google OAuth authentication
 
 - [ ] **MEDIUM**: Document RLS policies as created
   - Owner: Dev Team

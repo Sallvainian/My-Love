@@ -26,7 +26,7 @@ The epic delivers value to developers by providing confidence in the existing co
 - **Validate GitHub Pages deployment pipeline succeeds** (explicit deployment validation)
 - Validate Supabase client connection and configuration with environment variables
 - Verify Zustand store persistence via localStorage/IndexedDB
-- Test magic link authentication flow including URL redirect handling on production domain
+- Verify existing authentication flow works (email/password + Google OAuth)
 - Ensure session management persists across browser sessions
 - Validate existing network status detection OR document gap for future implementation
 - Verify Row Level Security (RLS) policies exist and are accessible (test query, not creation)
@@ -56,7 +56,7 @@ When validation reveals issues, apply this decision tree:
 1. All tests pass (Vitest + Playwright)
 2. Zero npm audit vulnerabilities (or documented exceptions with risk assessment)
 3. Zero TypeScript errors in strict mode
-4. Magic link auth completes end-to-end on production domain (GitHub Pages)
+4. Auth flow works end-to-end (email/password + Google OAuth)
 5. Sessions persist across browser close/reopen
 6. Network status detection validated OR gap documented with implementation plan
 7. PWA installable with valid manifest and service worker
@@ -77,7 +77,7 @@ This epic directly validates the core infrastructure defined in the Architecture
 | **Zustand 5.0.8**          | Client state + persistence     | Story 1.2: Stores hydrate on reload                  |
 | **localStorage/IndexedDB** | Preference persistence (FR62)  | Story 1.2 & 1.4: Preferences survive sessions        |
 | **PWA Manifest + SW**      | Installability (FR60)          | Story 1.1: Valid manifest, service worker registered |
-| **Magic Link Auth**        | Supabase Auth (FR1, FR4)       | Story 1.3: Full flow validates                       |
+| **Auth Flow**              | Supabase Auth (FR1, FR4)       | Existing implementation (email/password + OAuth)     |
 | **Session Management**     | Persistent sessions (FR2, FR3) | Story 1.4: Sessions survive browser restart          |
 | **Online-First Pattern**   | Service worker caching         | Story 1.5: Graceful degradation on network loss      |
 
@@ -91,7 +91,7 @@ This epic directly validates the core infrastructure defined in the Architecture
 
 **Integration Points Validated:**
 
-- Supabase Auth → Magic link redirect URL handling
+- Supabase Auth → OAuth redirect URL handling
 - Supabase Client → Environment variable configuration
 - Zustand → localStorage persistence middleware
 - Service Worker → vite-plugin-pwa configuration
@@ -101,7 +101,7 @@ This epic directly validates the core infrastructure defined in the Architecture
 
 | Risk                                          | Mitigation Strategy                                                                               | Validation Point                                         |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| **Magic link redirects fail on GitHub Pages** | Test with actual production domain (/My-Love/ base path), verify hash routing compatibility       | Story 1.3: End-to-end auth on deployed site              |
+| **OAuth redirects fail on GitHub Pages** | Test with actual production domain (/My-Love/ base path), verify hash routing compatibility       | Existing auth: End-to-end auth on deployed site          |
 | **Service worker caches stale auth tokens**   | Configure cache-first ONLY for static assets (JS/CSS/images), network-first for all API calls     | Story 1.1: Review vite-plugin-pwa config                 |
 | **RLS policies don't exist**                  | Test query with authenticated user, verify policies return expected data, NOT create new policies | Story 1.2: SELECT query against tables with auth context |
 | **Safari localStorage quota exceeded**        | Add quota check before storing, implement fallback strategy if quota < 5MB                        | Story 1.4: Test with Safari, check available quota       |
@@ -127,7 +127,7 @@ src/
 │   ├── useNetworkStatus.ts  # Story 1.5: Online/offline detection
 │   └── useSession.ts        # Story 1.4: Session management hook
 ├── pages/
-│   ├── Login.tsx            # Story 1.3: Magic link login page
+│   ├── Login.tsx            # Email/password + OAuth login page
 │   ├── AuthCallback.tsx     # Story 1.3: URL redirect handler
 │   └── Home.tsx             # Story 1.4: Authenticated home page
 ├── components/
@@ -143,7 +143,7 @@ src/
 | ---------------------------- | ----------------------------------------------------------- | ----- |
 | `src/lib/supabase.ts`        | Creates client with VITE\_ env vars, handles auth callbacks | 1.2   |
 | `src/stores/*`               | Zustand persist middleware configured, hydrates on reload   | 1.2   |
-| `src/hooks/useAuth.ts`       | Magic link flow works end-to-end                            | 1.3   |
+| `src/hooks/useAuth.ts`       | Auth flow works end-to-end                                  | 1.2   |
 | `src/pages/AuthCallback.tsx` | Handles redirect URLs without infinite loops                | 1.3   |
 | `vite.config.ts`             | Build passes, PWA plugin configured, base path set          | 1.1   |
 | `package.json`               | No security vulnerabilities, compatible versions            | 1.1   |
@@ -236,13 +236,14 @@ supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
     persistSession: true,
     storage: localStorage,
     autoRefreshToken: true,
-    detectSessionInUrl: true, // Critical for magic link handling
+    detectSessionInUrl: true, // Critical for OAuth callback handling
   },
 });
 
-// Story 1.3: Magic link authentication
-await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } });
-await supabase.auth.getSession(); // After redirect callback
+// Existing auth implementation (email/password + OAuth)
+await supabase.auth.signInWithPassword({ email, password });
+await supabase.auth.signInWithOAuth({ provider: 'google' });
+await supabase.auth.getSession(); // Check current session
 
 // Story 1.4: Session management
 supabase.auth.onAuthStateChange((event, session) => {
@@ -263,13 +264,11 @@ await supabase.from('profiles').select('*').single(); // Should respect RLS
 ```mermaid
 graph TD
     S1[Story 1.1: Codebase Audit] --> S2[Story 1.2: Supabase Config]
-    S2 --> S3[Story 1.3: Magic Link Auth]
-    S3 --> S4[Story 1.4: Session Management]
+    S2 --> S4[Story 1.4: Session Management]
     S2 --> S5[Story 1.5: Network Status]
 
     S1 -->|Build must pass| S2
-    S2 -->|Client must connect| S3
-    S3 -->|Auth must work| S4
+    S2 -->|Client must connect| S4
     S2 -->|Config must be valid| S5
 ```
 
@@ -290,21 +289,14 @@ graph TD
    - Query test table → RLS policies respond (403 or data, not connection error)
    - Check Zustand stores → `persist` middleware configured
 
-3. **Story 1.3** - Magic Link Flow
-   - Navigate to login page → Renders without error
-   - Submit email → Supabase sends magic link (check email)
-   - Click magic link → Redirects to app with token in URL
-   - App extracts token → Session established
-   - User lands on home → Authenticated state confirmed
-
-4. **Story 1.4** - Session Persistence
+3. **Story 1.4** - Session Persistence
    - Authenticated user → Close browser completely
    - Reopen browser → App auto-restores session (no login screen)
    - Click logout → Session cleared, redirect to login
    - Verify localStorage → Auth tokens removed on logout
    - Test quota → Safari localStorage has >1MB available
 
-5. **Story 1.5** - Network Resilience
+4. **Story 1.5** - Network Resilience
    - Online state → Status indicator shows green "Online"
    - Toggle network off → Status changes to red "Offline" within 2s
    - Toggle network on → Status returns to green "Online"
@@ -347,8 +339,8 @@ graph TD
    - ✅ `.env.example` exists with placeholder values
    - ✅ No hardcoded API keys in source code
 
-2. **Authentication Security (Story 1.3)**
-   - ✅ Magic link tokens single-use and time-limited (Supabase default: 1 hour)
+2. **Authentication Security (Existing Implementation)**
+   - ✅ Email/password and Google OAuth authentication implemented
    - ✅ Redirect URL validated against whitelist in Supabase dashboard
    - ✅ CSRF protection via `state` parameter in OAuth flow
    - ✅ Auth tokens stored in localStorage (acceptable for SPAs)
@@ -386,7 +378,7 @@ graph TD
 
 - GitHub Pages: ~100% uptime for static assets (CDN-backed)
 - Supabase Free Tier: 500MB database, 2 realtime connections (sufficient for 2-user app)
-- Magic link email delivery: Depends on Supabase email provider (may have delays)
+- Email delivery for password reset: Depends on Supabase email provider (may have delays)
 
 **Not Validated:** Long-term storage retention, database backup strategy (Supabase handles), DDoS protection (GitHub Pages handles).
 
@@ -439,7 +431,7 @@ Since Epic 1 is audit/validation work, full observability is deferred. However, 
 **1. Supabase Dashboard Configuration (Pre-requisites)**
 
 - ✅ Project exists at `VITE_SUPABASE_URL`
-- ✅ Magic link email template configured
+- ✅ Password reset email template configured
 - ✅ Redirect URL whitelist includes:
   - `http://localhost:5173/*` (dev)
   - `https://{username}.github.io/My-Love/*` (prod)
@@ -508,21 +500,6 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 - [ ] AC1.2.6: Zustand state survives page reload (store data in localStorage/IndexedDB)
 - [ ] AC1.2.7: Test query to Supabase table returns 403 (RLS enabled) or filtered data (policies exist)
 
-### Story 1.3: Magic Link Authentication Flow Validation
-
-**GIVEN** user is on login page
-**WHEN** user submits email for magic link
-**THEN**:
-
-- [ ] AC1.3.1: Login page renders without errors
-- [ ] AC1.3.2: Email input validates email format before submission
-- [ ] AC1.3.3: `supabase.auth.signInWithOtp()` called with correct `emailRedirectTo`
-- [ ] AC1.3.4: User receives magic link email (check inbox/spam)
-- [ ] AC1.3.5: Clicking magic link redirects to app with token in URL fragment
-- [ ] AC1.3.6: App extracts token via `detectSessionInUrl: true`
-- [ ] AC1.3.7: User lands on authenticated home page (no login screen)
-- [ ] AC1.3.8: Session object contains valid user data (email, id, created_at)
-
 ### Story 1.4: Session Management & Persistence Fixes
 
 **GIVEN** user is authenticated
@@ -561,10 +538,10 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 
 | Functional Requirement | Description                                      | Story | Acceptance Criteria        |
 | ---------------------- | ------------------------------------------------ | ----- | -------------------------- |
-| **FR1**                | Users shall authenticate via Supabase magic link | 1.3   | AC1.3.1-1.3.8              |
+| **FR1**                | Users shall authenticate via Supabase            | 1.2   | Existing auth implementation|
 | **FR2**                | Sessions shall persist across browser restarts   | 1.4   | AC1.4.1-1.4.2              |
 | **FR3**                | Logout shall clear session and redirect          | 1.4   | AC1.4.3-1.4.4              |
-| **FR4**                | Auth errors shall provide clear feedback         | 1.3   | AC1.3.2 (email validation) |
+| **FR4**                | Auth errors shall provide clear feedback         | 1.2   | Existing auth implementation|
 | **FR60**               | App shall be installable as PWA                  | 1.1   | AC1.1.5-1.1.6              |
 | **FR61**               | App shall be responsive 320px-1920px             | 1.1   | (Implicit in build pass)   |
 | **FR62**               | Preferences shall persist locally                | 1.2   | AC1.2.5-1.2.6              |
@@ -578,7 +555,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 | -------------------------- | -------------------------- | ----- | ---------------------------------- |
 | **NFR-P1**                 | Load time < 3s on 3G       | 1.1   | Lighthouse audit baseline          |
 | **NFR-P2**                 | Bundle size optimized      | 1.1   | AC1.1.8: < 500KB target            |
-| **NFR-S1**                 | Secure auth implementation | 1.3   | Magic link + CSRF protection       |
+| **NFR-S1**                 | Secure auth implementation | 1.2   | Email/password + OAuth + CSRF      |
 | **NFR-S2**                 | Data encrypted in transit  | 1.2   | Supabase HTTPS default             |
 | **NFR-I1**                 | Online-first architecture  | 1.5   | AC1.5.5-1.5.6 graceful degradation |
 | **NFR-I2**                 | Graceful reconnection      | 1.5   | AC1.5.4 recovery detection         |
@@ -600,7 +577,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 | Risk ID | Risk                                                                                                  | Probability | Impact   | Mitigation                                                                      | Owner |
 | ------- | ----------------------------------------------------------------------------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------- | ----- |
 | R1      | **React 19 instability** - Very new release (Dec 2024), may have undiscovered issues                  | Medium      | High     | Monitor React GitHub issues, have fallback to 18.x if critical bugs found       | Dev   |
-| R2      | **Magic link redirect fails on GitHub Pages** - Hash routing may conflict with Supabase token parsing | High        | Critical | Test on production domain BEFORE marking Story 1.3 done, verify BASE_URL config | Dev   |
+| R2      | **OAuth redirect fails on GitHub Pages** - Hash routing may conflict with Supabase token parsing | High        | Critical | Test on production domain, verify BASE_URL config for OAuth redirects | Dev   |
 | R3      | **RLS policies don't exist** - Database tables may not have policies configured                       | Medium      | High     | Test query first (Story 1.2), if missing, escalate to architecture review       | Dev   |
 | R4      | **Safari localStorage quota** - Safari has 5MB limit, may block session persistence                   | Medium      | Medium   | Implement quota check in Story 1.4, document fallback strategy                  | Dev   |
 | R5      | **Service worker caches auth tokens** - Stale tokens cause auth failures                              | Medium      | Critical | Configure network-first for API routes, cache-first ONLY for static assets      | Dev   |
@@ -616,7 +593,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 5. **A5: Modern browsers only** - Support limited to Chrome 90+, Firefox 90+, Safari 15+, Edge 90+
 6. **A6: Online-first architecture** - App requires network for most operations (not offline-first sync)
 7. **A7: Free tier sufficient** - Supabase and GitHub Pages free tiers meet performance needs
-8. **A8: Email delivery works** - Supabase sends magic link emails without significant delay
+8. **A8: OAuth provider configured** - Google OAuth is properly configured in Supabase project settings
 
 **If assumptions are invalid:**
 
@@ -624,7 +601,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 - A2 invalid → Story 1.1 blocked for deployment, need repo setup
 - A3 invalid → Story 1.1 scope expands significantly (major restructuring)
 - A5 invalid → Need polyfills, scope expansion
-- A8 invalid → Investigate Supabase email provider settings
+- A8 invalid → Configure Google OAuth in Supabase Authentication settings
 
 ### Open Questions
 
@@ -632,7 +609,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 | --- | ------------------------------------------------------ | -------------------- | ----------------------- | ------------------------------------------------------------ |
 | Q1  | Does the PWA already have a service worker configured? | Story 1.1 scope      | Before Story 1.1 starts | Assume NO, will create if missing                            |
 | Q2  | Are there existing Zustand stores with persistence?    | Story 1.2 validation | Before Story 1.2 starts | Assume NO, will configure if missing                         |
-| Q3  | Is there an existing login page?                       | Story 1.3 scope      | Before Story 1.3 starts | Assume NO, will create minimal login UI                      |
+| Q3  | Is there an existing login page?                       | Auth UX scope        | Before auth work starts | Assume YES, existing login UI uses email/password + Google OAuth |
 | Q4  | Does network status detection already exist?           | Story 1.5 scope      | Before Story 1.5 starts | Assume NO, document gap OR implement basic version           |
 | Q5  | What tables exist in Supabase for RLS testing?         | Story 1.2 validation | During Story 1.2        | Use any authenticated table, create test table if none exist |
 | Q6  | Is GitHub Actions or manual deploy used?               | Story 1.1 deployment | Before Story 1.1 starts | Assume manual branch push, verify in GitHub Settings         |
@@ -654,13 +631,6 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 - **Tools:** Manual browser testing, console inspection
 - **Automation:** Vitest unit tests for environment variable loading
 - **Manual:** Query Supabase table, verify RLS response
-
-**Story 1.3: Magic Link Auth**
-
-- **Type:** End-to-end testing
-- **Tools:** Playwright (if time permits), manual browser testing
-- **Automation:** Playwright script for auth flow (optional for Epic 1)
-- **Manual:** Complete magic link flow on production domain
 
 **Story 1.4: Session Management**
 
@@ -687,7 +657,7 @@ If RLS policies don't exist, Epic 2 will need to CREATE them first (scope expans
 **Ideal (if time permits):**
 
 - Vitest unit tests for utility functions (env vars, store persistence)
-- Playwright E2E test for magic link flow
+- Playwright E2E test for login flow (email/password + OAuth)
 - Automated Lighthouse CI in GitHub Actions
 
 ### Test Environment Setup
@@ -705,7 +675,7 @@ npm run typecheck    # TypeScript validation
 **Production Validation:**
 
 - Deploy to GitHub Pages
-- Test magic link with production redirect URL
+- Test OAuth redirect with production URL
 - Verify service worker activation in DevTools
 - Run Lighthouse audit on deployed site
 
@@ -726,7 +696,6 @@ npm run typecheck    # TypeScript validation
 | ----- | ------------------------------------------------------------------------- |
 | 1.1   | Screenshot of npm audit output, Lighthouse report PDF, bundle size report |
 | 1.2   | Console log of successful Supabase connection, localStorage inspection    |
-| 1.3   | Video or screenshot sequence of magic link flow completing                |
 | 1.4   | Screenshot of session persisting after browser restart                    |
 | 1.5   | Video of network toggle showing UI status change (or gap documentation)   |
 

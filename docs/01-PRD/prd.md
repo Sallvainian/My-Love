@@ -91,7 +91,7 @@ The MVP delivers a complete native mobile experience that replicates and enhance
 - React 19 + Vite 7 with TypeScript strict mode
 - React Router or file-based routing solution
 - Zustand for client state management + Supabase client
-- Supabase authentication with magic link flow
+- Supabase authentication with email/password and Google OAuth
 - IndexedDB/localStorage for preferences and cached data (idb package)
 
 **Essential Features:**
@@ -204,7 +204,7 @@ Ambitious capabilities that transform the app from utility to relationship compa
 5. **Web Authentication API** - Optional convenience unlock
    - Passkey/biometric authentication support
    - NOT replacing Supabase auth, just device-level convenience
-   - Falls back to magic link if not available
+   - Falls back to email/password if not available
 
 ### Offline Mode Strategy
 
@@ -395,10 +395,10 @@ This section defines WHAT capabilities the product must have. Each FR is a testa
 
 ### User Account & Authentication
 
-- **FR1:** Users can authenticate via Supabase magic link (email-based passwordless login)
+- **FR1:** Users can authenticate via Supabase (email/password or Google OAuth)
 - **FR2:** Users maintain authenticated sessions across app launches
 - **FR3:** Users can log out and re-authenticate as needed
-- **FR4:** App handles authentication redirect URLs for magic link flow
+- **FR4:** App handles authentication redirect URLs for OAuth flow
 - **FR5:** Users can optionally enable Web Authentication API (passkeys/biometrics) for convenience unlock
 - **FR6:** System stores Web Push subscription in user profile for notification delivery
 
@@ -573,7 +573,7 @@ Security matters because the app handles intimate personal data (moods, photos, 
 
 **NFR-S1: Authentication Security**
 
-- Supabase magic link tokens expire after 60 minutes
+- Supabase session tokens refresh automatically
 - Session tokens stored securely in browser storage (HttpOnly cookies where possible)
 - Web Authentication API uses platform secure enclave when available
 - No passwords stored in browser
@@ -666,7 +666,7 @@ Integration requirements focus on the Supabase ecosystem and third-party service
 - React Router or similar handles navigation
 - Authentication redirects route correctly
 - Handle invalid URLs gracefully with 404 fallback
-- Rationale: Magic link auth and notification clicks depend on URL routing
+- Rationale: OAuth redirects and notification clicks depend on URL routing
 - Validation: Route handling tests for all navigation scenarios
 
 **NFR-I6: Browser-Specific APIs**

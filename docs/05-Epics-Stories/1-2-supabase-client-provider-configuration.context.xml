@@ -57,7 +57,7 @@
   <artifacts>
     <docs>
       <doc path="docs/05-Epics-Stories/tech-spec-epic-1.md" title="Epic 1 Technical Specification" section="Detailed Design, Security" snippet="Contains comprehensive specs for Supabase configuration, Zustand persistence patterns, environment variable contracts, and RLS validation criteria." />
-      <doc path="docs/02-Architecture/architecture.md" title="PWA Architecture" section="Technology Stack, Implementation Patterns" snippet="Defines Supabase 2.81+ integration patterns, Zustand store patterns with persist middleware, and authentication flow (magic link via URL redirect)." />
+      <doc path="docs/02-Architecture/architecture.md" title="PWA Architecture" section="Technology Stack, Implementation Patterns" snippet="Defines Supabase 2.81+ integration patterns, Zustand store patterns with persist middleware, and authentication flow (email/password + Google OAuth)." />
       <doc path="docs/02-Architecture/state-management/store-architecture.md" title="Store Architecture" section="Main Store Composition" snippet="Shows exact pattern for useAppStore with persist middleware, createJSONStorage, and partialize configuration." />
       <doc path="docs/02-Architecture/state-management/persistence-strategy.md" title="Persistence Strategy" section="What Gets Persisted, Hydration Pattern" snippet="Documents which state persists to LocalStorage vs IndexedDB vs Supabase, and onRehydrateStorage callback pattern." />
       <doc path="docs/05-Epics-Stories/1-1-codebase-audit-dependency-validation.md" title="Story 1.1 Reference" section="Dev Notes" snippet="Story 1.1 completed: Build passes, TypeScript zero errors, ESLint warnings resolved. Foundation validated for Story 1.2." />
