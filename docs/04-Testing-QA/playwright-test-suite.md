@@ -421,7 +421,6 @@ The automated test suite prevents the following Epic 0 issues from recurring:
    ```
 
 2. **Add story-specific tests as you implement**:
-   - Story 1.3: Add magic link authentication flow test
    - Story 1.4: Add session persistence across browser restart test
    - Story 1.5: Add network status UI validation
 
@@ -438,7 +437,6 @@ The automated test suite prevents the following Epic 0 issues from recurring:
 
 - **Visual Regression Testing**: Add screenshot comparisons
 - **Performance Profiling**: Integrate Lighthouse CI
-- **Magic Link Testing**: Mock email service or use test tokens
 - **Accessibility Testing**: Add axe-core automated scans
 - **Mobile Testing**: Add mobile device emulation tests
 
@@ -449,7 +447,7 @@ The automated test suite prevents the following Epic 0 issues from recurring:
 - [Epic 0 Retrospective](../10-Retrospectives/epic-0-retrospective-2025-11-21.md) - Finding: Manual validation created 2-day delay
 - [Epic 1 Tech Spec](../05-Epics-Stories/tech-spec-epic-1.md) - Requirements and acceptance criteria
 - [Playwright Documentation](https://playwright.dev/) - Official Playwright docs
-- [Existing Authentication Test](../../tests/e2e/authentication.spec.ts) - Email/password auth test (template for magic link)
+- [Existing Authentication Test](../../tests/e2e/authentication.spec.ts) - Email/password and OAuth auth tests
 
 ---
 

@@ -368,27 +368,26 @@ graph TD
 
 ```mermaid
 graph TD
-    A[Download App] --> B[Open App]
-    B --> C[Welcome Screen]
-    C --> D[Enter Email]
-    D --> E[Tap 'Send Magic Link']
-    E --> F[Check Email]
-    F --> G[Tap Link in Email]
-    G --> H[Deep Link Opens App]
-    H --> I[Auto-Authenticate via Supabase]
-    I --> J[Redirect to Home Screen]
-    J --> K[Request Notification Permission]
-    K --> L[App Ready to Use]
+    A[Visit PWA] --> B[Welcome Screen]
+    B --> C[Choose Auth Method]
+    C --> D1[Enter Email/Password]
+    C --> D2[Tap 'Sign in with Google']
+    D1 --> E[Submit Credentials]
+    D2 --> F[Google OAuth Flow]
+    E --> G[Supabase Validates]
+    F --> G
+    G --> H[Redirect to Home Screen]
+    H --> I[Request Notification Permission]
+    I --> J[App Ready to Use]
 ```
 
 **Key UX Decisions:**
 
-- Magic link eliminates password friction
-- Clear email input with validation
-- "Check your email" instruction screen
-- Deep link handling via Expo Linking
-- Session persists via SecureStore
-- Graceful fallback if magic link expires (resend option)
+- Email/password and Google OAuth options available
+- Clear email/password input with validation
+- Google OAuth for single-tap convenience
+- Session persists via localStorage (Supabase manages)
+- Error messages for invalid credentials or network issues
 
 ---
 

@@ -3,6 +3,9 @@
  * Configures test environment with IndexedDB polyfill and other global settings
  */
 
+// Import jest-dom matchers for better testing assertions
+import '@testing-library/jest-dom';
+
 // Polyfill IndexedDB for testing
 import 'fake-indexeddb/auto';
 

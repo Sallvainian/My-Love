@@ -6,12 +6,23 @@ import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
 
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 3; // Story 6.2: Increment from 2 to 3 for moods store
+const DB_VERSION = 4; // v4: Added sw-auth store for Background Sync
 
 /**
  * IndexedDB Schema Definition
  * Defines the structure of all object stores in the database
  */
+/**
+ * Auth token stored for Background Sync SW access
+ */
+interface StoredAuthToken {
+  id: 'current';
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  userId: string;
+}
+
 interface MyLoveDBSchema extends DBSchema {
   messages: {
     key: number;
@@ -34,6 +45,10 @@ interface MyLoveDBSchema extends DBSchema {
     indexes: {
       'by-date': string;
     };
+  };
+  'sw-auth': {
+    key: 'current';
+    value: StoredAuthToken;
   };
 }
 
@@ -65,7 +80,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
   protected async _doInit(): Promise<void> {
     try {
       if (import.meta.env.DEV) {
-        console.log('[MoodService] Initializing IndexedDB (version 3)...');
+        console.log('[MoodService] Initializing IndexedDB (version 4)...');
       }
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
@@ -111,11 +126,21 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
               console.log('[MoodService] Created moods store with by-date unique index (v3)');
             }
           }
+
+          // Migration: v3 → v4 - Add sw-auth store for Background Sync
+          if (oldVersion < 4) {
+            if (!db.objectStoreNames.contains('sw-auth')) {
+              db.createObjectStore('sw-auth', { keyPath: 'id' });
+              if (import.meta.env.DEV) {
+                console.log('[MoodService] Created sw-auth store for Background Sync (v4)');
+              }
+            }
+          }
         },
       });
 
       if (import.meta.env.DEV) {
-        console.log('[MoodService] IndexedDB initialized successfully (v3)');
+        console.log('[MoodService] IndexedDB initialized successfully (v4)');
       }
     } catch (error) {
       this.handleError('initialize', error as Error);

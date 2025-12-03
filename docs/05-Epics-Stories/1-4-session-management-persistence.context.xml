@@ -1,0 +1,145 @@
+<story-context id="1-4-session-management-persistence" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.4</storyId>
+    <title>Session Management &amp; Persistence</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/05-Epics-Stories/1-4-session-management-persistence.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to stay logged in between browser sessions and have reliable logout</iWant>
+    <soThat>I don't need to re-authenticate constantly but can control my session</soThat>
+    <tasks>
+      <task id="1" title="Validate Session Auto-Restore" acs="AC-1.4.1, AC-1.4.2">
+        <subtask id="1.1">Close browser completely, reopen, navigate to app</subtask>
+        <subtask id="1.2">Verify automatic session restoration (no login prompt)</subtask>
+        <subtask id="1.3">Open DevTools Application > Local Storage</subtask>
+        <subtask id="1.4">Confirm supabase-auth-token key exists with valid session data</subtask>
+      </task>
+      <task id="2" title="Validate Logout Flow" acs="AC-1.4.3, AC-1.4.4">
+        <subtask id="2.1">Click logout in Settings or user menu</subtask>
+        <subtask id="2.2">Open DevTools Application > Local Storage</subtask>
+        <subtask id="2.3">Verify supabase-auth-token key is removed</subtask>
+        <subtask id="2.4">Verify sw-auth store in IndexedDB is cleared</subtask>
+        <subtask id="2.5">Verify redirect to login page occurs</subtask>
+      </task>
+      <task id="3" title="Validate Auth State Change Listener" acs="AC-1.4.5">
+        <subtask id="3.1">Add console.log probe to onAuthStateChange callback in App.tsx</subtask>
+        <subtask id="3.2">Perform login and verify callback fires with session</subtask>
+        <subtask id="3.3">Perform logout and verify callback fires with null</subtask>
+        <subtask id="3.4">Force token refresh (wait for expiry) and verify TOKEN_REFRESHED event</subtask>
+        <subtask id="3.5">Remove probe after validation</subtask>
+      </task>
+      <task id="4" title="Validate Session Edge Cases" acs="AC-1.4.6, AC-1.4.7">
+        <subtask id="4.1">Test in Safari: check localStorage quota (>1MB available)</subtask>
+        <subtask id="4.2">Verify Supabase client autoRefreshToken: true in supabaseClient.ts</subtask>
+        <subtask id="4.3">Monitor token refresh in Network tab (should happen automatically)</subtask>
+        <subtask id="4.4">Test session survival across long idle period (24+ hours if possible)</subtask>
+        <subtask id="4.5">Test session behavior when offline then coming back online</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1.4.1" validation="Browser Test">App auto-restores session without requiring login (close browser, reopen, navigate to app URL)</criterion>
+    <criterion id="AC-1.4.2" validation="DevTools Inspection">localStorage contains supabase-auth-token key with valid session data (JWT tokens present)</criterion>
+    <criterion id="AC-1.4.3" validation="DevTools Inspection">Logout clears session tokens from localStorage (supabase-auth-token removed) and IndexedDB (sw-auth store cleared)</criterion>
+    <criterion id="AC-1.4.4" validation="Browser Test">Logout redirects user to login page (LoginScreen component rendered)</criterion>
+    <criterion id="AC-1.4.5" validation="Code Inspection + Test">Auth state changes (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED) trigger onAuthStateChange callback in authService</criterion>
+    <criterion id="AC-1.4.6" validation="Browser Test (Safari)">Safari localStorage quota check passes (>1MB available for auth token storage)</criterion>
+    <criterion id="AC-1.4.7" validation="Code Inspection">Session refresh happens automatically before token expiry via Supabase client (autoRefreshToken: true configured)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/05-Epics-Stories/tech-spec-epic-1.md" title="Epic 1 Technical Specification" section="Story 1.4 Technical Requirements" snippet="Defines session persistence via localStorage, autoRefreshToken, logout token clearing, and auth state change listener requirements (NFR-S6)." />
+      <doc path="docs/02-Architecture/architecture.md" title="PWA Architecture" section="Authentication Flow, Security Architecture" snippet="Documents session management pattern: tokens stored in localStorage, Supabase handles auto-refresh, logout clears all local storage. Session timeout: 30 days inactivity (NFR-S6)." />
+      <doc path="docs/01-PRD/prd.md" title="Product Requirements Document" section="FR1-FR6, NFR-S1, NFR-S6" snippet="FR2: Users maintain authenticated sessions across app launches. FR3: Users can log out and re-authenticate. NFR-S6: Session timeout after 30 days inactivity, device-specific sessions." />
+      <doc path="docs/09-UX-Spec/ux-design-specification.md" title="UX Design Specification" section="Core Experience" snippet="Speed and reliability are critical - sub-second interactions. Trust through reliability: when you send, it arrives. Always." />
+      <doc path="docs/05-Epics-Stories/1-2-supabase-client-provider-configuration.context.xml" title="Story 1.2 Context" section="Interfaces, Constraints" snippet="Related context: Supabase client configuration with persistSession:true, Zustand persistence patterns, localStorage storage key 'my-love-storage'." />
+    </docs>
+    <code>
+      <file path="src/api/supabaseClient.ts" kind="service" symbol="supabase" lines="64-79" reason="CRITICAL: Supabase client singleton with auth config. persistSession: true stores in localStorage, autoRefreshToken: true enables automatic refresh, detectSessionInUrl: true for OAuth callbacks." />
+      <file path="src/api/authService.ts" kind="service" symbol="signOut" lines="154-181" reason="CRITICAL: Logout implementation - calls supabase.auth.signOut() then clearAuthToken() from IndexedDB. Must clear both localStorage (Supabase) and IndexedDB (Background Sync)." />
+      <file path="src/api/authService.ts" kind="service" symbol="onAuthStateChange" lines="325-365" reason="CRITICAL: Auth state change listener - handles SIGNED_IN, TOKEN_REFRESHED, SIGNED_OUT events. Updates/clears stored token in IndexedDB accordingly." />
+      <file path="src/api/authService.ts" kind="service" symbol="getSession" lines="202-216" reason="Session retrieval - wraps supabase.auth.getSession() with error handling. Returns Session or null." />
+      <file path="src/sw-db.ts" kind="utility" symbol="storeAuthToken" lines="184-207" reason="Token storage for Background Sync - stores auth token in IndexedDB sw-auth store for service worker access." />
+      <file path="src/sw-db.ts" kind="utility" symbol="clearAuthToken" lines="242-265" reason="Token clearing - removes auth token from IndexedDB sw-auth store on logout." />
+      <file path="src/App.tsx" kind="component" symbol="checkAuth" lines="142-200" reason="App initialization - checks session on mount with authService.getSession(), sets up onAuthStateChange listener for session state management." />
+      <file path="src/components/LoginScreen.tsx" kind="component" reason="Login UI component - rendered when session is null. Target for redirect after logout (AC-1.4.4)." />
+    </code>
+    <dependencies>
+      <ecosystem name="npm">
+        <package name="@supabase/supabase-js" version="^2.81.1" purpose="Auth, session management, token persistence" />
+        <package name="zustand" version="^5.0.8" purpose="Client state management with persist middleware" />
+        <package name="idb" version="^8.0.3" purpose="IndexedDB wrapper for sw-auth token storage" />
+        <package name="react" version="^19.1.1" purpose="UI framework" />
+        <package name="vite" version="^7.2.2" purpose="Build tool" />
+        <package name="vitest" version="^4.0.9" purpose="Unit testing framework" />
+        <package name="@playwright/test" version="^1.56.1" purpose="E2E testing framework" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="security">Session tokens stored in localStorage (acceptable for SPAs). Supabase auto-refreshes tokens - DO NOT implement manual refresh.</constraint>
+    <constraint type="security">Logout MUST clear both localStorage (Supabase auth) AND IndexedDB (sw-auth store for Background Sync).</constraint>
+    <constraint type="storage">Supabase client uses localStorage key pattern: sb-{project-ref}-auth-token. Do not modify this key directly.</constraint>
+    <constraint type="architecture">Online-first architecture - session restoration requires network to validate token. Graceful degradation shows cached UI while validating.</constraint>
+    <constraint type="pattern">Auth state changes flow: Supabase event -> authService.onAuthStateChange callback -> App.tsx session state update -> UI re-render.</constraint>
+    <constraint type="browser">Safari has stricter localStorage quotas. Token storage is small (~2KB) so should not hit quota, but verify >1MB available.</constraint>
+    <constraint type="testing">This story is VALIDATION-FOCUSED. Tasks involve inspecting existing behavior, not implementing new features. Tests confirm existing implementation works correctly.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Supabase Auth Session" kind="API">
+      <signature>supabase.auth.getSession(): Promise&lt;{ data: { session: Session | null }, error: AuthError | null }&gt;</signature>
+      <signature>supabase.auth.signOut(): Promise&lt;{ error: AuthError | null }&gt;</signature>
+      <signature>supabase.auth.onAuthStateChange(callback: (event, session) => void): { data: { subscription } }</signature>
+      <path>src/api/supabaseClient.ts, src/api/authService.ts</path>
+    </interface>
+    <interface name="AuthService Singleton" kind="service">
+      <signature>authService.getSession(): Promise&lt;Session | null&gt;</signature>
+      <signature>authService.signOut(): Promise&lt;void&gt;</signature>
+      <signature>authService.onAuthStateChange(callback: (session: Session | null) => void): () => void</signature>
+      <path>src/api/authService.ts</path>
+    </interface>
+    <interface name="IndexedDB Auth Token" kind="storage">
+      <signature>storeAuthToken(token: { accessToken, refreshToken, expiresAt, userId }): Promise&lt;void&gt;</signature>
+      <signature>getAuthToken(): Promise&lt;StoredAuthToken | null&gt;</signature>
+      <signature>clearAuthToken(): Promise&lt;void&gt;</signature>
+      <path>src/sw-db.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit tests with happy-dom environment. Tests in tests/ directory following tests/{unit,integration}/ structure.
+      Coverage thresholds: 80% lines, functions, branches, statements.
+      Use @testing-library/react for component tests.
+      Playwright for E2E tests at tests/e2e/.
+      fake-indexeddb package available for IndexedDB mocking.
+      Existing Supabase tests at tests/integration/supabase.test.ts, tests/unit/api/supabaseClient.test.ts.
+    </standards>
+    <locations>
+      <loc>tests/unit/api/supabaseClient.test.ts - existing client tests</loc>
+      <loc>tests/integration/supabase.test.ts - existing integration tests</loc>
+      <loc>tests/integration/environment.test.ts - env var validation</loc>
+      <loc>tests/unit/stores/settingsSlice.test.ts - persistence patterns</loc>
+      <loc>src/utils/__tests__/backgroundSync.test.ts - IndexedDB token storage tests</loc>
+    </locations>
+    <ideas>
+      <idea ac="AC-1.4.1">E2E: Authenticate, close browser (clear session storage but not localStorage), reopen, verify no login prompt appears</idea>
+      <idea ac="AC-1.4.2">E2E: After login, check localStorage for key matching sb-*-auth-token pattern, verify JWT structure present</idea>
+      <idea ac="AC-1.4.3">E2E: Perform logout via authService.signOut(), verify localStorage sb-*-auth-token removed, verify IndexedDB sw-auth store empty</idea>
+      <idea ac="AC-1.4.4">E2E: After logout, verify LoginScreen component is rendered (session state is null)</idea>
+      <idea ac="AC-1.4.5">Unit: Mock supabase.auth.onAuthStateChange, verify callback receives SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED events correctly</idea>
+      <idea ac="AC-1.4.6">E2E (Safari): navigator.storage.estimate() returns quota > 1MB, localStorage.setItem/getItem works for auth-sized payload</idea>
+      <idea ac="AC-1.4.7">Code inspection: Verify supabaseClient.ts line 70 has autoRefreshToken: true. Integration test: wait for token near expiry, verify refresh occurs</idea>
+    </ideas>
+  </tests>
+</story-context>

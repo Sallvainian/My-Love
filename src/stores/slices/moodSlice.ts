@@ -58,8 +58,9 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
   // Actions
   addMoodEntry: async (moods, note) => {
     try {
-      // Get authenticated user ID
-      const userId = await authService.getCurrentUserId();
+      // Get authenticated user ID (offline-safe - uses cached session)
+      // Story 5.2: AC-5.2.6 - Use offline-safe auth for local saves
+      const userId = await authService.getCurrentUserIdOfflineSafe();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -84,6 +85,19 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
 
       // Update sync status
       await get().updateSyncStatus();
+
+      // Immediate sync if online (standard pattern)
+      if (navigator.onLine) {
+        try {
+          await get().syncPendingMoods();
+          if (import.meta.env.DEV) {
+            console.log('[MoodSlice] Immediate sync completed for new mood');
+          }
+        } catch (syncError) {
+          // Don't fail the add if sync fails - background sync will retry
+          console.warn('[MoodSlice] Immediate sync failed, will retry via background sync:', syncError);
+        }
+      }
 
       if (import.meta.env.DEV) {
         console.log('[MoodSlice] Added mood entry:', created);
@@ -115,6 +129,19 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
 
       // Update sync status
       await get().updateSyncStatus();
+
+      // Immediate sync if online (standard pattern)
+      if (navigator.onLine) {
+        try {
+          await get().syncPendingMoods();
+          if (import.meta.env.DEV) {
+            console.log('[MoodSlice] Immediate sync completed for updated mood');
+          }
+        } catch (syncError) {
+          // Don't fail the update if sync fails - background sync will retry
+          console.warn('[MoodSlice] Immediate sync failed, will retry via background sync:', syncError);
+        }
+      }
 
       if (import.meta.env.DEV) {
         console.log('[MoodSlice] Updated mood entry:', updated);
@@ -274,10 +301,15 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       const transformedMoods: MoodEntry[] = partnerMoodRecords.map((record) => {
         // Handle nullable created_at (shouldn't be null in practice, but types say it can be)
         const createdAt = record.created_at || new Date().toISOString();
+        // Handle mood_types array (backward compat: use mood_type if mood_types is null)
+        const moods = record.mood_types && record.mood_types.length > 0
+          ? record.mood_types
+          : [record.mood_type];
         return {
           id: undefined, // Partner moods don't have local IDB id
           userId: record.user_id,
           mood: record.mood_type,
+          moods: moods, // Include all selected moods
           note: record.note || undefined,
           date: createdAt.split('T')[0], // Extract YYYY-MM-DD
           timestamp: new Date(createdAt),

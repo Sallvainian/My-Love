@@ -130,7 +130,7 @@ grep -q "VITE_SUPABASE_URL" .env && grep -q "VITE_SUPABASE_PUBLISHABLE_DEFAULT_K
 - Supabase client initializes successfully (no `Missing required env vars` error)
 - Network tab shows successful connection to Supabase domain (e.g., `https://[project-id].supabase.co`)
 - No CORS errors present in console
-- Auth service accessible (test magic link request - does not need to succeed, just respond)
+- Auth service accessible (test login request - does not need to succeed, just respond)
 
 **Validation:**
 ```javascript
@@ -410,7 +410,7 @@ describe('Supabase Connection Integration', () => {
 
 **Detect Session in URL:**
 - `detectSessionInUrl: true` - Enables OAuth callback detection
-- Required for magic link authentication (Epic 1)
+- Required for OAuth authentication (Epic 1)
 - Parses session tokens from URL hash/query parameters
 
 ### Security Considerations

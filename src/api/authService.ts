@@ -9,6 +9,7 @@
 
 import { supabase } from './supabaseClient';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
+import { storeAuthToken, clearAuthToken } from '../sw-db';
 
 export interface AuthCredentials {
   email: string;
@@ -61,6 +62,24 @@ export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> 
 
     if (import.meta.env.DEV) {
       console.log('[AuthService] Sign-in successful:', data.user?.email);
+    }
+
+    // Store auth token in IndexedDB for Background Sync access
+    if (data.session) {
+      try {
+        await storeAuthToken({
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+          expiresAt: data.session.expires_at ?? 0,
+          userId: data.user?.id ?? '',
+        });
+        if (import.meta.env.DEV) {
+          console.log('[AuthService] Stored auth token for Background Sync');
+        }
+      } catch (tokenError) {
+        console.error('[AuthService] Failed to store auth token:', tokenError);
+        // Don't fail login if token storage fails
+      }
     }
 
     return { user: data.user, session: data.session, error: null };
@@ -139,6 +158,17 @@ export const signOut = async (): Promise<void> => {
     if (error) {
       console.error('[AuthService] Sign-out failed:', error.message);
       throw error;
+    }
+
+    // Clear auth token from IndexedDB
+    try {
+      await clearAuthToken();
+      if (import.meta.env.DEV) {
+        console.log('[AuthService] Cleared auth token from IndexedDB');
+      }
+    } catch (tokenError) {
+      console.error('[AuthService] Failed to clear auth token:', tokenError);
+      // Don't fail logout if token clear fails
     }
 
     if (import.meta.env.DEV) {
@@ -242,6 +272,24 @@ export const getCurrentUserId = async (): Promise<string | null> => {
 };
 
 /**
+ * Get current user ID (offline-safe version)
+ *
+ * Uses cached session instead of network-validated user.
+ * This works offline because getSession() reads from local storage.
+ *
+ * Use this for operations that should work offline (e.g., saving to IndexedDB).
+ * For operations requiring server validation, use getCurrentUserId() instead.
+ *
+ * @returns User ID or null if not authenticated
+ *
+ * Story 5.2: AC-5.2.6 - Offline indicator and local save support
+ */
+export const getCurrentUserIdOfflineSafe = async (): Promise<string | null> => {
+  const session = await getSession();
+  return session?.user?.id ?? null;
+};
+
+/**
  * Check authentication status
  *
  * Returns comprehensive auth status including user and session info.
@@ -295,7 +343,36 @@ export const getAuthStatus = async (): Promise<AuthStatus> => {
 export const onAuthStateChange = (callback: (session: Session | null) => void): (() => void) => {
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
+  } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Update stored token on session changes (sign in, token refresh)
+    if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      try {
+        await storeAuthToken({
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at ?? 0,
+          userId: session.user?.id ?? '',
+        });
+        if (import.meta.env.DEV) {
+          console.log(`[AuthService] Updated stored auth token (${event})`);
+        }
+      } catch (tokenError) {
+        console.error('[AuthService] Failed to update stored auth token:', tokenError);
+      }
+    }
+
+    // Clear stored token on sign out
+    if (event === 'SIGNED_OUT') {
+      try {
+        await clearAuthToken();
+        if (import.meta.env.DEV) {
+          console.log('[AuthService] Cleared stored auth token (SIGNED_OUT)');
+        }
+      } catch (tokenError) {
+        console.error('[AuthService] Failed to clear stored auth token:', tokenError);
+      }
+    }
+
     callback(session);
   });
 
@@ -400,6 +477,7 @@ export const authService = {
   getSession,
   getUser,
   getCurrentUserId,
+  getCurrentUserIdOfflineSafe,
   getAuthStatus,
   onAuthStateChange,
   resetPassword,

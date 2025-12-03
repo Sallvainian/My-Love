@@ -101,10 +101,10 @@ This document provides the complete epic and story breakdown for My-Love PWA enh
 
 ### User Account & Authentication (6 FRs)
 
-- **FR1:** Users can authenticate via Supabase magic link (email-based passwordless login)
+- **FR1:** Users can authenticate via Supabase (email/password or Google OAuth)
 - **FR2:** Users maintain authenticated sessions across browser sessions
 - **FR3:** Users can log out and re-authenticate as needed
-- **FR4:** App handles authentication URL redirects for magic link callbacks
+- **FR4:** App handles authentication URL redirects for OAuth callbacks
 - **FR5:** Users can optionally enable biometric authentication (WebAuthn) for convenience unlock
 - **FR6:** System stores push notification subscriptions in user profile for notification delivery
 
@@ -317,7 +317,7 @@ This document provides the complete epic and story breakdown for My-Love PWA enh
 - Client uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
 - Deployed PWA successfully connects to Supabase (verify via network tab)
 - Console shows no Supabase connection errors
-- Auth service responds (test magic link can be requested)
+- Auth service responds (test login can be performed)
 
 **Technical Context:**
 
@@ -501,60 +501,6 @@ public/
 
 ---
 
-### Story 1.3: Magic Link Authentication Flow Validation
-
-**As a** user,
-**I want** to authenticate using magic link with proper URL redirect handling,
-**So that** I can securely access the app after clicking email link.
-
-**Acceptance Criteria:**
-
-**Given** existing authentication implementation
-**When** magic link flow is tested
-**Then**
-
-- Login page displays email input with validation (FR1)
-- Supabase magic link request sends email successfully
-- Success message displays after email sent
-- Error messages display for invalid email or network issues
-
-**Given** user clicks magic link in email
-**When** redirect URL is processed
-**Then**
-
-- App handles callback URL with hash parameters (FR4)
-- Token extracted from URL hash or query parameters
-- Session established and stored in localStorage (FR2)
-- User redirected to home page after successful auth
-- URL cleaned up (no tokens visible in address bar)
-
-**And** error handling verified:
-
-- Expired link shows clear message
-- Invalid link shows retry option
-- Network error shows connectivity message
-- No infinite redirect loops
-
-**Given** deployment to GitHub Pages
-**When** magic link redirect occurs
-**Then**
-
-- Redirect URL properly configured for production domain
-- Base path (/My-Love/) handled correctly in routing
-- No 404 errors on callback route
-
-**Prerequisites:** Story 1.2
-
-**Technical Notes:**
-
-- Verify redirectTo URL matches production domain
-- Test hash-based routing vs history-based routing
-- Ensure Supabase Auth configured for web redirects
-- Check for race conditions in session establishment
-- Validate proper cleanup of URL parameters post-auth
-
----
-
 ### Story 1.4: Session Management & Persistence Fixes
 
 **As a** user,
@@ -590,7 +536,7 @@ public/
 - Network loss during session: graceful degradation
 - Corrupted session data: automatic cleanup
 
-**Prerequisites:** Story 1.3
+**Prerequisites:** Story 1.2
 
 **Technical Notes:**
 
@@ -950,7 +896,7 @@ public/
 - Settings allows manual enable attempt
 - Handle "denied" vs "default" permission states
 
-**Prerequisites:** Story 1.3
+**Prerequisites:** Story 1.2
 
 **Technical Notes:**
 
@@ -2032,10 +1978,10 @@ const todaysMessage = messageLibrary[messageIndex];
 
 - Biometric prompt shown first
 - On success: auto re-authenticate or show cached content
-- On failure: falls back to magic link re-auth
+- On failure: falls back to email/password re-auth
 - Graceful degradation if biometric fails
 
-**Prerequisites:** Story 1.3
+**Prerequisites:** Story 1.2
 
 **Technical Notes:**
 
@@ -2144,10 +2090,10 @@ const todaysMessage = messageLibrary[messageIndex];
 
 | FR # | Description                                            | Epic      | Story          |
 | ---- | ------------------------------------------------------ | --------- | -------------- |
-| FR1  | Magic link authentication                              | Epic 1    | Story 1.3      |
+| FR1  | Email/password + OAuth authentication                  | Epic 1    | Story 1.2      |
 | FR2  | Persistent authenticated sessions                      | Epic 1    | Story 1.4      |
 | FR3  | Logout and re-authentication                           | Epic 1    | Story 1.4      |
-| FR4  | Authentication URL redirect handling                   | Epic 1    | Story 1.3      |
+| FR4  | Authentication URL redirect handling (OAuth)           | Epic 1    | Story 1.2      |
 | FR5  | Biometric authentication (WebAuthn)                    | Epic 7    | Story 7.3      |
 | FR6  | Push subscription storage                              | Epic 3    | Story 3.2      |
 | FR7  | Send text messages (Love Notes)                        | Epic 2    | Story 2.2      |
