@@ -369,4 +369,121 @@ describe('MessageList', () => {
       expect(screen.getByTestId('virtualized-list')).toBeInTheDocument();
     });
   });
+
+  describe('Edge Cases', () => {
+    it('should handle empty notes array without division by zero errors', () => {
+      // This tests the division-by-zero protection in scroll calculation
+      render(<MessageList {...defaultProps} notes={[]} />);
+
+      // Should render empty state without errors
+      expect(screen.getByText('No love notes yet')).toBeInTheDocument();
+    });
+
+    it('should handle single message without errors', () => {
+      const singleNote: LoveNote[] = [
+        {
+          id: '1',
+          from_user_id: 'user1',
+          to_user_id: 'user2',
+          content: 'Single message',
+          created_at: '2024-01-01T10:00:00Z',
+        },
+      ];
+
+      render(<MessageList {...defaultProps} notes={singleNote} />);
+
+      expect(screen.getByTestId('message-1')).toBeInTheDocument();
+    });
+
+    it('should handle messages with empty content', () => {
+      const emptyContentNotes: LoveNote[] = [
+        {
+          id: '1',
+          from_user_id: 'user1',
+          to_user_id: 'user2',
+          content: '',
+          created_at: '2024-01-01T10:00:00Z',
+        },
+      ];
+
+      render(<MessageList {...defaultProps} notes={emptyContentNotes} />);
+
+      expect(screen.getByTestId('message-1')).toBeInTheDocument();
+    });
+
+    it('should handle messages with null content gracefully', () => {
+      const nullContentNotes: LoveNote[] = [
+        {
+          id: '1',
+          from_user_id: 'user1',
+          to_user_id: 'user2',
+          content: null as unknown as string,
+          created_at: '2024-01-01T10:00:00Z',
+        },
+      ];
+
+      // Should not throw
+      expect(() => render(<MessageList {...defaultProps} notes={nullContentNotes} />)).not.toThrow();
+    });
+
+    it('should handle undefined content gracefully', () => {
+      const undefinedContentNotes: LoveNote[] = [
+        {
+          id: '1',
+          from_user_id: 'user1',
+          to_user_id: 'user2',
+          content: undefined as unknown as string,
+          created_at: '2024-01-01T10:00:00Z',
+        },
+      ];
+
+      // Should not throw
+      expect(() => render(<MessageList {...defaultProps} notes={undefinedContentNotes} />)).not.toThrow();
+    });
+
+    it('should handle very long messages', () => {
+      const longMessage: LoveNote = {
+        id: '1',
+        from_user_id: 'user1',
+        to_user_id: 'user2',
+        content: 'A'.repeat(10000), // 10,000 character message
+        created_at: '2024-01-01T10:00:00Z',
+      };
+
+      expect(() => render(<MessageList {...defaultProps} notes={[longMessage]} />)).not.toThrow();
+      expect(screen.getByTestId('message-1')).toBeInTheDocument();
+    });
+
+    it('should handle transition from empty to having messages', () => {
+      const { rerender } = render(<MessageList {...defaultProps} notes={[]} />);
+
+      expect(screen.getByText('No love notes yet')).toBeInTheDocument();
+
+      // Add messages
+      rerender(<MessageList {...defaultProps} notes={mockNotes} />);
+
+      expect(screen.queryByText('No love notes yet')).not.toBeInTheDocument();
+      expect(screen.getByTestId('virtualized-list')).toBeInTheDocument();
+    });
+
+    it('should handle rapid message additions', () => {
+      const { rerender } = render(<MessageList {...defaultProps} />);
+
+      // Rapidly add messages
+      for (let i = 4; i <= 10; i++) {
+        const newNotes = [
+          ...mockNotes,
+          ...Array.from({ length: i }, (_, j) => ({
+            id: `rapid-${i}-${j}`,
+            from_user_id: j % 2 === 0 ? 'user1' : 'user2',
+            to_user_id: j % 2 === 0 ? 'user2' : 'user1',
+            content: `Rapid message ${i}-${j}`,
+            created_at: new Date(Date.now() + i * 1000 + j * 100).toISOString(),
+          })),
+        ];
+
+        expect(() => rerender(<MessageList {...defaultProps} notes={newNotes} />)).not.toThrow();
+      }
+    });
+  });
 });

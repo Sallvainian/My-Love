@@ -38,6 +38,117 @@ vi.mock('../../../src/api/authService', () => ({
   },
 }));
 
+// Helper to create store for testing
+const createTestStore = () => {
+  let storeState: NotesSlice;
+  const set = vi.fn((updater: any) => {
+    if (typeof updater === 'function') {
+      const newState = updater(storeState);
+      Object.assign(storeState, newState);
+    } else {
+      Object.assign(storeState, updater);
+    }
+  });
+  const get = vi.fn(() => storeState);
+  storeState = createNotesSlice(set as any, get as any, {} as any);
+  return { store: storeState, set, get };
+};
+
+describe('notesSlice - addNote (deduplication)', () => {
+  it('should add a new note to the list', () => {
+    const { store } = createTestStore();
+
+    const note: LoveNote = {
+      id: 'note-1',
+      from_user_id: 'user-1',
+      to_user_id: 'user-2',
+      content: 'Hello!',
+      created_at: '2024-01-01T10:00:00Z',
+    };
+
+    store.addNote(note);
+
+    expect(store.notes).toHaveLength(1);
+    expect(store.notes[0]).toEqual(note);
+  });
+
+  it('should prevent duplicate notes with same ID', () => {
+    const { store } = createTestStore();
+
+    const note: LoveNote = {
+      id: 'note-1',
+      from_user_id: 'user-1',
+      to_user_id: 'user-2',
+      content: 'Original message',
+      created_at: '2024-01-01T10:00:00Z',
+    };
+
+    const duplicateNote: LoveNote = {
+      id: 'note-1', // Same ID
+      from_user_id: 'user-1',
+      to_user_id: 'user-2',
+      content: 'Duplicate message with different content',
+      created_at: '2024-01-01T10:01:00Z',
+    };
+
+    store.addNote(note);
+    store.addNote(duplicateNote);
+
+    // Should only have one note
+    expect(store.notes).toHaveLength(1);
+    // Should keep the original content
+    expect(store.notes[0].content).toBe('Original message');
+  });
+
+  it('should allow multiple notes with different IDs', () => {
+    const { store } = createTestStore();
+
+    const note1: LoveNote = {
+      id: 'note-1',
+      from_user_id: 'user-1',
+      to_user_id: 'user-2',
+      content: 'First message',
+      created_at: '2024-01-01T10:00:00Z',
+    };
+
+    const note2: LoveNote = {
+      id: 'note-2',
+      from_user_id: 'user-2',
+      to_user_id: 'user-1',
+      content: 'Second message',
+      created_at: '2024-01-01T10:01:00Z',
+    };
+
+    store.addNote(note1);
+    store.addNote(note2);
+
+    expect(store.notes).toHaveLength(2);
+    expect(store.notes[0].id).toBe('note-1');
+    expect(store.notes[1].id).toBe('note-2');
+  });
+
+  it('should handle rapid duplicate additions (race condition simulation)', () => {
+    const { store } = createTestStore();
+
+    const note: LoveNote = {
+      id: 'note-race',
+      from_user_id: 'user-1',
+      to_user_id: 'user-2',
+      content: 'Race condition test',
+      created_at: '2024-01-01T10:00:00Z',
+    };
+
+    // Simulate rapid additions (as might happen from realtime + optimistic updates)
+    store.addNote(note);
+    store.addNote(note);
+    store.addNote(note);
+    store.addNote(note);
+
+    // Should still only have one note
+    expect(store.notes).toHaveLength(1);
+  });
+});
+
 describe('notesSlice - sendNote', () => {
   let store: NotesSlice;
   let set: ReturnType<typeof vi.fn>;

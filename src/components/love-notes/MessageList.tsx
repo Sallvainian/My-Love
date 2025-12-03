@@ -212,16 +212,40 @@ export function MessageList({
     }
   });
 
+  // Calculate estimated total height for scroll calculations
+  // Uses actual row heights for more accurate estimation
+  const estimatedTotalHeight = useCallback((): number => {
+    if (totalRowCount === 0) return 0;
+
+    let height = 0;
+    for (let i = 0; i < totalRowCount; i++) {
+      height += getRowHeight(i);
+    }
+    return height;
+  }, [totalRowCount, getRowHeight]);
+
   // Handle scroll for bottom detection
   const handleScroll = useCallback(
     ({ scrollOffset, scrollUpdateWasRequested }: { scrollOffset: number; scrollUpdateWasRequested: boolean }) => {
       if (!listRef.current || scrollUpdateWasRequested) return;
 
-      // Approximate bottom detection
-      // react-window doesn't expose scrollHeight directly, so we estimate
-      const estimatedHeight = totalRowCount * 100; // Rough average
+      // Guard against division by zero / empty state
+      if (totalRowCount === 0) {
+        setIsAtBottom(true);
+        return;
+      }
+
+      // Use calculated total height for more accurate bottom detection
+      const totalHeight = estimatedTotalHeight();
       const visibleHeight = 600; // Default height from List component
-      const scrolledToBottom = scrollOffset + visibleHeight >= estimatedHeight - 50;
+
+      // Guard against edge case where totalHeight is 0
+      if (totalHeight === 0) {
+        setIsAtBottom(true);
+        return;
+      }
+
+      const scrolledToBottom = scrollOffset + visibleHeight >= totalHeight - 50;
 
       setIsAtBottom(scrolledToBottom);
 
@@ -230,7 +254,7 @@ export function MessageList({
         setShowNewMessageIndicator(false);
       }
     },
-    [totalRowCount, showNewMessageIndicator]
+    [totalRowCount, showNewMessageIndicator, estimatedTotalHeight]
   );
 
   // Scroll to bottom handler for new message indicator
