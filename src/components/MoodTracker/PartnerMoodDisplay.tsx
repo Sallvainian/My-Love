@@ -92,8 +92,8 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
   }
 
   const emoji = getMoodEmoji(partnerMood.mood_type);
-  const timestamp = getRelativeTime(partnerMood.created_at || new Date().toISOString());
-  const showJustNowBadge = isJustNow(partnerMood.created_at || new Date().toISOString());
+  const timestamp = getRelativeTime(partnerMood.created_at ?? new Date().toISOString());
+  const showJustNowBadge = isJustNow(partnerMood.created_at ?? new Date().toISOString());
 
   return (
     <motion.div
@@ -103,7 +103,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         borderColor: justUpdated ? ['#F9A8D4', '#EC4899', '#F9A8D4'] : '#F9A8D4',
       }}
       transition={{ duration: 0.6 }}
-      className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-2xl p-6 mb-6 border-2"
+      className="bg-linear-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-2xl p-6 mb-6 border-2"
       style={{ borderColor: '#F9A8D4' }}
       data-testid="partner-mood-display"
       role="region"
@@ -128,8 +128,11 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
           >
             {partnerMood.mood_type}
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400" data-testid="partner-mood-timestamp">
-            <time dateTime={partnerMood.created_at}>{timestamp}</time>
+          <p
+            className="text-sm text-gray-600 dark:text-gray-400"
+            data-testid="partner-mood-timestamp"
+          >
+            <time dateTime={partnerMood.created_at ?? undefined}>{timestamp}</time>
             {showJustNowBadge && (
               <span
                 className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"

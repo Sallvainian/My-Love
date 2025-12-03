@@ -312,19 +312,24 @@ class PhotoService {
       const uniqueId = crypto.randomUUID();
       const storagePath = `${userId}/${uniqueId}.${fileExt}`;
 
-      // Upload to Supabase Storage with progress tracking (AC 6.2.2, 6.2.3)
+      // Upload to Supabase Storage (AC 6.2.2, 6.2.3)
+      // Note: Supabase storage.upload() doesn't support native progress tracking
+      // Progress simulation handled at component level if needed
+      if (onProgress) {
+        // Simulate progress for UX (upload is fast for compressed images)
+        onProgress(25);
+      }
+
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(storagePath, input.file, {
           contentType: input.mimeType,
           upsert: false, // Don't overwrite existing
-          onUploadProgress: onProgress
-            ? (progress) => {
-                const percent = Math.round((progress.loaded / progress.total) * 100);
-                onProgress(percent);
-              }
-            : undefined,
         });
+
+      if (onProgress) {
+        onProgress(75);
+      }
 
       if (uploadError) {
         console.error('[PhotoService] Storage upload error:', uploadError);
@@ -364,6 +369,10 @@ class PhotoService {
       const newQuota = await this.checkStorageQuota();
       if (newQuota.warning === 'approaching' || newQuota.warning === 'critical') {
         console.warn(`[PhotoService] Storage warning: ${newQuota.percent}% used`);
+      }
+
+      if (onProgress) {
+        onProgress(100);
       }
 
       return photo;
@@ -473,6 +482,55 @@ class PhotoService {
     } catch (error) {
       console.error('[PhotoService] Error in getPhoto:', error);
       return null;
+    }
+  }
+
+  /**
+   * Update a photo's metadata (caption only - other fields are immutable)
+   *
+   * @param photoId - Photo ID to update
+   * @param updates - Partial photo update (only caption is mutable)
+   * @returns true if updated successfully
+   *
+   * AC 6.0.6: Users can UPDATE only their own photos
+   */
+  async updatePhoto(photoId: string, updates: Partial<SupabasePhoto>): Promise<boolean> {
+    try {
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (!currentUser?.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only allow updating caption - all other fields are immutable
+      const allowedUpdates: Partial<SupabasePhoto> = {};
+      if (updates.caption !== undefined) {
+        allowedUpdates.caption = updates.caption;
+      }
+
+      if (Object.keys(allowedUpdates).length === 0) {
+        console.warn('[PhotoService] No valid fields to update');
+        return false;
+      }
+
+      const { error } = await supabase
+        .from('photos')
+        .update(allowedUpdates)
+        .eq('id', photoId)
+        .eq('user_id', currentUser.user.id); // Ensure ownership
+
+      if (error) {
+        console.error('[PhotoService] Update error:', error);
+        return false;
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[PhotoService] Photo updated:', photoId);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[PhotoService] Error in updatePhoto:', error);
+      return false;
     }
   }
 }

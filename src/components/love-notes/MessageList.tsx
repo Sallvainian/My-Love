@@ -226,8 +226,11 @@ export function MessageList({
 
   // Handle scroll for bottom detection
   const handleScroll = useCallback(
-    ({ scrollOffset, scrollUpdateWasRequested }: { scrollOffset: number; scrollUpdateWasRequested: boolean }) => {
-      if (!listRef.current || scrollUpdateWasRequested) return;
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      if (!listRef.current) return;
+
+      const scrollOffset = target.scrollTop;
 
       // Guard against division by zero / empty state
       if (totalRowCount === 0) {
@@ -382,16 +385,16 @@ export function MessageList({
       </AnimatePresence>
 
       {/* Story 2.4 - Task 1.2: Virtualized List */}
-      <List
-        ref={listRef}
-        rowCount={totalRowCount}
-        rowHeight={getRowHeight}
-        onRowsRendered={onRowsRendered}
-        onScroll={handleScroll}
-        defaultHeight={600}
-        rowComponent={MessageRow}
-        rowProps={{}}
-      />
+      {(List as any)({
+        ref: listRef,
+        rowCount: totalRowCount,
+        rowHeight: getRowHeight,
+        onRowsRendered: onRowsRendered,
+        onScroll: handleScroll,
+        defaultHeight: 600,
+        rowComponent: MessageRow,
+        rowProps: {},
+      })}
     </div>
   );
 }

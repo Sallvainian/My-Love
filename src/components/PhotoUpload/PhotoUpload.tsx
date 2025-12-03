@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Camera, Loader } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import type { PhotoUploadInput } from '../../types';
 
 interface PhotoUploadProps {
   isOpen: boolean;
@@ -64,11 +63,26 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
       setStep('uploading');
       setError('');
 
-      const input: PhotoUploadInput = {
+      // Load the image to get dimensions
+      const img = new Image();
+      const imageUrl = URL.createObjectURL(selectedFile);
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = imageUrl;
+      });
+
+      const input = {
         file: selectedFile,
+        filename: selectedFile.name,
         caption: caption.trim() || undefined,
-        tags: tags.trim() || undefined,
+        mimeType: selectedFile.type as 'image/jpeg' | 'image/png' | 'image/webp',
+        width: img.naturalWidth,
+        height: img.naturalHeight,
       };
+
+      URL.revokeObjectURL(imageUrl);
 
       await uploadPhoto(input);
 

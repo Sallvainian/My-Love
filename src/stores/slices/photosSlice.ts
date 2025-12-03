@@ -19,11 +19,13 @@
 
 import type { StateCreator } from 'zustand';
 import { photoService } from '../../services/photoService';
-import type { SupabasePhoto, PhotoUploadInput } from '../../services/photoService';
+import type { PhotoWithUrls, PhotoUploadInput, SupabasePhoto } from '../../services/photoService';
+import { supabase } from '../../api/supabaseClient';
 
 export interface PhotosSlice {
   // State
-  photos: SupabasePhoto[];
+  photos: PhotoWithUrls[];
+  selectedPhotoId: string | null;
   isUploading: boolean;
   uploadProgress: number; // 0-100%
   error: string | null;
@@ -33,6 +35,9 @@ export interface PhotosSlice {
   uploadPhoto: (input: PhotoUploadInput) => Promise<void>;
   loadPhotos: () => Promise<void>;
   deletePhoto: (photoId: string) => Promise<void>;
+  updatePhoto: (photoId: string, updates: Partial<SupabasePhoto>) => Promise<void>;
+  selectPhoto: (photoId: string | null) => void;
+  clearPhotoSelection: () => void;
   clearError: () => void;
   clearStorageWarning: () => void;
 }
@@ -40,6 +45,7 @@ export interface PhotosSlice {
 export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> = (set, _get) => ({
   // Initial state
   photos: [],
+  selectedPhotoId: null,
   isUploading: false,
   uploadProgress: 0,
   error: null,
@@ -84,9 +90,20 @@ export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> =
         throw new Error('Upload failed - no photo returned');
       }
 
+      // Get signed URL for the uploaded photo
+      const signedUrl = await photoService.getSignedUrl(photo.storage_path);
+      const { data: currentUser } = await supabase.auth.getUser();
+
+      // Create PhotoWithUrls from SupabasePhoto
+      const photoWithUrl: PhotoWithUrls = {
+        ...photo,
+        signedUrl,
+        isOwn: currentUser?.user ? photo.user_id === currentUser.user.id : false,
+      };
+
       // Add uploaded photo to state (optimistic update)
       set((state) => ({
-        photos: [photo, ...state.photos],
+        photos: [photoWithUrl, ...state.photos],
         isUploading: false,
         uploadProgress: 0, // Reset progress after completion
       }));
@@ -157,5 +174,36 @@ export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> =
    */
   clearStorageWarning: () => {
     set({ storageWarning: null });
+  },
+
+  /**
+   * Update a photo's metadata (caption, tags)
+   */
+  updatePhoto: async (photoId: string, updates: Partial<SupabasePhoto>) => {
+    try {
+      await photoService.updatePhoto(photoId, updates);
+
+      // Update in state on successful update
+      set((state) => ({
+        photos: state.photos.map((p) => (p.id === photoId ? { ...p, ...updates } : p)),
+      }));
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Update failed';
+      set({ error: errorMsg });
+    }
+  },
+
+  /**
+   * Select a photo for viewing in carousel
+   */
+  selectPhoto: (photoId: string | null) => {
+    set({ selectedPhotoId: photoId });
+  },
+
+  /**
+   * Clear photo selection (close carousel)
+   */
+  clearPhotoSelection: () => {
+    set({ selectedPhotoId: null });
   },
 });

@@ -397,7 +397,7 @@ export function MoodTracker() {
                   data-testid="mood-offline-error"
                 >
                   <div className="flex items-center gap-2">
-                    <WifiOff className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                    <WifiOff className="w-5 h-5 text-yellow-600 shrink-0" />
                     <span className="text-sm text-yellow-800">
                       {OFFLINE_ERROR_MESSAGE}
                     </span>

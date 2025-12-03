@@ -91,7 +91,7 @@ export class MoodApi {
         return validatedMood;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on create:', validationError.errors);
+          console.error('[MoodApi] Validation error on create:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -150,7 +150,7 @@ export class MoodApi {
         return validatedMoods;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on fetchByUser:', validationError.errors);
+          console.error('[MoodApi] Validation error on fetchByUser:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -218,7 +218,7 @@ export class MoodApi {
         return validatedMoods;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on fetchByDateRange:', validationError.errors);
+          console.error('[MoodApi] Validation error on fetchByDateRange:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -281,7 +281,7 @@ export class MoodApi {
         return validatedMood;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on fetchById:', validationError.errors);
+          console.error('[MoodApi] Validation error on fetchById:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -348,7 +348,7 @@ export class MoodApi {
         return validatedMood;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on update:', validationError.errors);
+          console.error('[MoodApi] Validation error on update:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -449,7 +449,7 @@ export class MoodApi {
         return validatedMoods;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on getMoodHistory:', validationError.errors);
+          console.error('[MoodApi] Validation error on getMoodHistory:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;

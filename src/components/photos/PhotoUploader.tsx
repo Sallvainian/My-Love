@@ -45,7 +45,7 @@ interface Toast {
 export function PhotoUploader({
   onUploadSuccess,
   onCancel,
-  _maxFileSize = 25 * 1024 * 1024 // AC-6.1.2: Default 25MB (unused - component uses internal validation)
+  // maxFileSize parameter not used - component uses internal FALLBACK_SIZE_LIMIT validation
 }: PhotoUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

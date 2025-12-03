@@ -12,6 +12,7 @@ import {
   Angry,
   UserMinus,
   Battery,
+  Zap,
 } from 'lucide-react';
 import type { MoodEntry, MoodType } from '../../types';
 import { formatModalDate, formatModalTime } from '../../utils/calendarHelpers';
@@ -26,6 +27,7 @@ const MOOD_CONFIG = {
   loved: { icon: Heart, color: 'text-pink-500', bgColor: 'bg-pink-100', label: 'Loved' },
   happy: { icon: Smile, color: 'text-yellow-500', bgColor: 'bg-yellow-100', label: 'Happy' },
   content: { icon: Meh, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Content' },
+  excited: { icon: Zap, color: 'text-amber-500', bgColor: 'bg-amber-100', label: 'Excited' },
   thoughtful: {
     icon: MessageCircle,
     color: 'text-purple-500',
@@ -47,6 +49,7 @@ const MOOD_CONFIG = {
     label: 'Anxious',
   },
   frustrated: { icon: Angry, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Frustrated' },
+  angry: { icon: Angry, color: 'text-rose-600', bgColor: 'bg-rose-100', label: 'Angry' },
   lonely: { icon: UserMinus, color: 'text-indigo-500', bgColor: 'bg-indigo-100', label: 'Lonely' },
   tired: { icon: Battery, color: 'text-slate-500', bgColor: 'bg-slate-100', label: 'Tired' },
 } as const;
