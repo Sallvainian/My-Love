@@ -326,6 +326,23 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       if (import.meta.env.DEV) {
         console.log('[NotesSlice] Note sent successfully:', data.id);
       }
+
+      // Story 2.3: Broadcast message to partner's channel for realtime delivery
+      try {
+        const channel = supabase.channel(`love-notes:${partnerId}`);
+        await channel.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: { message: data },
+        });
+
+        if (import.meta.env.DEV) {
+          console.log('[NotesSlice] Broadcast sent to partner:', partnerId);
+        }
+      } catch (broadcastError) {
+        // Non-fatal - message is saved, just realtime failed
+        console.warn('[NotesSlice] Broadcast failed (non-fatal):', broadcastError);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send note';
       console.error('[NotesSlice] Error sending note:', error);

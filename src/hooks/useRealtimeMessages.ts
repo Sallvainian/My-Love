@@ -27,7 +27,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   const addNote = useAppStore((state) => state.addNote);
 
   const handleNewMessage = useCallback(
-    (payload: { payload: { message: LoveNote } }) => {
+    (payload: { type: string; event: string; payload: { message: LoveNote } }) => {
       const { message } = payload.payload;
 
       if (import.meta.env.DEV) {
@@ -72,7 +72,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           .channel(`love-notes:${userId}`)
           .on('broadcast', { event: 'new_message' }, (payload) => {
             if (!subscriptionActive) return;
-            handleNewMessage(payload as { payload: { message: LoveNote } });
+            handleNewMessage(payload as unknown as { type: string; event: string; payload: { message: LoveNote } });
           })
           .subscribe((status, err) => {
             if (import.meta.env.DEV) {
