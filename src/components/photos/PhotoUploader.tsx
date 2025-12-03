@@ -10,6 +10,9 @@ interface PhotoUploaderProps {
   maxFileSize?: number; // Default: 25MB
 }
 
+// AC-6.1.8: Maximum file size for fallback upload without compression
+const FALLBACK_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
+
 // Toast notification type
 type ToastType = 'success' | 'error' | 'warning';
 interface Toast {
@@ -164,8 +167,6 @@ export function PhotoUploader({
       onUploadSuccess?.();
     } catch (err) {
       // AC-6.1.8: Compression failure handling with fallback logic
-      const FALLBACK_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
-
       if (selectedFile.size <= FALLBACK_SIZE_LIMIT) {
         // Fallback: Use original file if under 10MB
         console.warn('[PhotoUploader] Compression failed, using original file as fallback:', (err as Error).message);

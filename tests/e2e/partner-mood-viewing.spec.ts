@@ -161,8 +161,32 @@ test.describe('Partner Mood Viewing & Transparency', () => {
 
 test.describe('Partner Mood Real-time Updates', () => {
   test.skip('Updates in real-time when partner logs mood (AC-5.3.3)', async ({ page, context }) => {
-    // This test requires multi-user setup and is skipped for now
-    // Manual testing required or implement with proper test user setup
+    /**
+     * SKIP REASON: Multi-user real-time testing requires complex setup
+     *
+     * This test validates AC-5.3.3 (real-time partner mood updates via Broadcast API)
+     * but is skipped because it requires:
+     *
+     * 1. Two authenticated user sessions with established partner relationship
+     * 2. Separate Playwright contexts/browsers to simulate independent users
+     * 3. Supabase Realtime Broadcast channel synchronization across sessions
+     * 4. Timing coordination to ensure broadcast propagation
+     *
+     * ALTERNATIVE VALIDATION:
+     * - Manual testing: Two devices/browsers logged in as partners
+     * - Integration tests: Unit tests for Broadcast subscription logic
+     * - Component tests: Mock Broadcast events in usePartnerMood tests
+     *
+     * IMPLEMENTATION APPROACH (if needed):
+     * 1. Create test user accounts with partner relationship in beforeAll
+     * 2. Open second browser context and authenticate as partner
+     * 3. Partner logs mood via API or UI
+     * 4. Original page waits for Broadcast event (with timeout)
+     * 5. Verify partner mood updates without page refresh
+     * 6. Clean up test users and data in afterAll
+     *
+     * See tests/integration/mood-rls.test.ts for multi-user setup reference
+     */
 
     // Would require:
     // 1. Open second tab/context as partner

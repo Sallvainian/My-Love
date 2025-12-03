@@ -52,7 +52,7 @@ function LoadingState() {
  * Includes visual animation feedback when partner updates their mood.
  */
 export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
-  const { partnerMood, isLoading } = usePartnerMood(partnerId);
+  const { partnerMood, isLoading, error } = usePartnerMood(partnerId);
   const [justUpdated, setJustUpdated] = useState(false);
 
   // Visual feedback when mood updates in real-time
@@ -67,6 +67,23 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
   // Show loading skeleton while fetching initial data
   if (isLoading) {
     return <LoadingState />;
+  }
+
+  // Show error state if loading failed
+  if (error) {
+    return (
+      <div
+        className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-6 mb-6"
+        data-testid="partner-mood-error"
+        role="alert"
+      >
+        <div className="text-6xl mb-3">⚠️</div>
+        <h3 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">
+          Unable to load partner mood
+        </h3>
+        <p className="text-red-700 dark:text-red-300">{error}</p>
+      </div>
+    );
   }
 
   // Show friendly empty state if partner hasn't logged any moods
@@ -89,12 +106,19 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
       className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-2xl p-6 mb-6 border-2"
       style={{ borderColor: '#F9A8D4' }}
       data-testid="partner-mood-display"
+      role="region"
+      aria-label="Partner's current mood"
     >
       <h2 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
         Your partner is feeling:
       </h2>
       <div className="flex items-center gap-4">
-        <span className="text-6xl" data-testid="partner-mood-emoji">
+        <span
+          className="text-6xl"
+          data-testid="partner-mood-emoji"
+          role="img"
+          aria-label={`${partnerMood.mood_type} mood emoji`}
+        >
           {emoji}
         </span>
         <div className="flex-1">
@@ -105,18 +129,23 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
             {partnerMood.mood_type}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400" data-testid="partner-mood-timestamp">
-            {timestamp}
+            <time dateTime={partnerMood.created_at}>{timestamp}</time>
             {showJustNowBadge && (
               <span
                 className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                 data-testid="partner-mood-just-now-badge"
+                aria-label="Logged just now"
               >
                 Just now
               </span>
             )}
           </p>
           {partnerMood.note && (
-            <p className="mt-2 text-gray-700 dark:text-gray-300 italic" data-testid="partner-mood-note">
+            <p
+              className="mt-2 text-gray-700 dark:text-gray-300 italic"
+              data-testid="partner-mood-note"
+              aria-label="Partner's note about their mood"
+            >
               "{partnerMood.note}"
             </p>
           )}

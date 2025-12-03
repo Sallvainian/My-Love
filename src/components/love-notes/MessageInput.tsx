@@ -17,10 +17,11 @@
 import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useVibration } from '../../hooks/useVibration';
-import { validateMessageContent } from '../../utils/messageValidation';
+import { validateMessageContent, sanitizeMessageContent } from '../../utils/messageValidation';
 
 const MAX_CHARACTERS = 1000;
 const SHOW_COUNTER_AT = 900;
+const WARN_AT = 950; // Show warning color when approaching limit
 
 /**
  * MessageInput - Text input with send button for Love Notes
@@ -55,8 +56,11 @@ export function MessageInput() {
     try {
       setIsSending(true);
 
+      // Sanitize content to prevent XSS attacks
+      const sanitizedContent = sanitizeMessageContent(content);
+
       // Send message (optimistic update handled in store)
-      await sendNote(content);
+      await sendNote(sanitizedContent);
 
       // Success vibration (single short pulse)
       vibrate(50);
@@ -99,10 +103,19 @@ export function MessageInput() {
     setContent(e.target.value);
   };
 
-  // Calculate character count
+  // Calculate character count and states
   const characterCount = content.length;
   const isOverLimit = characterCount > MAX_CHARACTERS;
+  const isNearLimit = characterCount >= WARN_AT && characterCount <= MAX_CHARACTERS;
   const showCounter = characterCount >= SHOW_COUNTER_AT;
+
+  // Determine counter color based on state
+  let counterColor = 'text-gray-500'; // Default (900-949)
+  if (isOverLimit) {
+    counterColor = 'text-red-500 font-semibold'; // Over limit (1001+)
+  } else if (isNearLimit) {
+    counterColor = 'text-yellow-600 font-medium'; // Warning (950-1000)
+  }
 
   // Determine if send button should be disabled
   const validation = validateMessageContent(content);
@@ -113,9 +126,7 @@ export function MessageInput() {
       {/* Character counter (visible at 900+ chars) */}
       {showCounter && (
         <div
-          className={`text-sm text-right ${
-            isOverLimit ? 'text-red-500 font-semibold' : 'text-gray-500'
-          }`}
+          className={`text-sm text-right ${counterColor}`}
           aria-live="polite"
         >
           {characterCount}/{MAX_CHARACTERS}

@@ -3,6 +3,11 @@
  */
 
 /**
+ * Threshold for considering a timestamp as "just now" (5 minutes in milliseconds)
+ */
+const JUST_NOW_THRESHOLD_MS = 5 * 60 * 1000;
+
+/**
  * Convert a timestamp to relative time display (e.g., "2h ago", "Yesterday")
  * @param timestamp - ISO timestamp string
  * @returns Formatted relative time string
@@ -27,12 +32,12 @@ export function getRelativeTime(timestamp: string): string {
 }
 
 /**
- * Check if a timestamp is within the last 5 minutes
+ * Check if a timestamp is within the JUST_NOW_THRESHOLD_MS
  * Used to display "Just now" badge for recent updates
  * @param timestamp - ISO timestamp string
- * @returns true if timestamp is < 5 minutes old
+ * @returns true if timestamp is < JUST_NOW_THRESHOLD_MS old
  */
 export function isJustNow(timestamp: string): boolean {
   const diffMs = Date.now() - new Date(timestamp).getTime();
-  return diffMs < 5 * 60 * 1000; // < 5 minutes
+  return diffMs < JUST_NOW_THRESHOLD_MS;
 }
