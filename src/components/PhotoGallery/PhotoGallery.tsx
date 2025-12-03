@@ -3,6 +3,7 @@ import { Camera, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoGridItem } from './PhotoGridItem';
 import { PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
+import { PhotoViewer } from './PhotoViewer';
 import { photoService } from '../../services/photoService';
 import type { PhotoWithUrls } from '../../services/photoService';
 
@@ -37,6 +38,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
+
+  // Story 6.4: Photo viewer state
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
 
   // Intersection Observer ref for infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -260,10 +264,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
           <PhotoGridItem
             key={photo.id}
             photo={photo}
-            onPhotoClick={() => {
-              // TODO Story 6.4: Implement photo selection for PhotoCarousel
-              // PhotoCarousel will be updated in Story 6.4 to use Supabase photos
-            }}
+            onPhotoClick={() => setSelectedPhotoId(photo.id)}
           />
         ))}
       </div>
@@ -303,6 +304,15 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       >
         <Camera className="w-6 h-6" />
       </button>
+
+      {/* Story 6.4: PhotoViewer modal */}
+      {selectedPhotoId && (
+        <PhotoViewer
+          photos={photos}
+          selectedPhotoId={selectedPhotoId}
+          onClose={() => setSelectedPhotoId(null)}
+        />
+      )}
     </div>
   );
 }

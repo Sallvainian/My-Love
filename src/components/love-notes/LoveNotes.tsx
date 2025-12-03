@@ -129,6 +129,7 @@ export function LoveNotes(): ReactElement {
         onLoadMore={fetchOlderNotes}
         hasMore={hasMore}
         onRetry={retryFailedMessage}
+        onRefresh={handleRefresh}
       />
 
       {/* Message input - Story 2.2 */}

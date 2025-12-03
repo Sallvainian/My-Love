@@ -2,7 +2,7 @@
 
 **Epic**: 5 - Mood Tracking & Transparency
 **Story ID**: 5.3
-**Status**: ready-for-review
+**Status**: done
 **Created**: 2025-12-02
 **Completed**: 2025-12-02
 

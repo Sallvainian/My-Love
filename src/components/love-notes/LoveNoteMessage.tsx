@@ -12,8 +12,9 @@
  * Story 2.1: AC-2.1.1 (message styling), AC-2.1.2 (timestamp display)
  */
 
-import { memo, type ReactElement } from 'react';
+import { memo, type ReactElement, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateFormatters';
 import type { LoveNote } from '../../types/models';
 
@@ -48,6 +49,12 @@ function LoveNoteMessageComponent({
   const formattedTime = formatMessageTimestamp(message.created_at);
   const fullTimestamp = formatFullTimestamp(message.created_at);
 
+  // Story 2.4 Code Review: XSS sanitization - strip all HTML tags, keep text only
+  const sanitizedContent = useMemo(
+    () => DOMPurify.sanitize(message.content, { ALLOWED_TAGS: [], KEEP_CONTENT: true }),
+    [message.content]
+  );
+
   // Determine sending/error states
   const isSending = message.sending ?? false;
   const hasError = message.error ?? false;
@@ -81,7 +88,7 @@ function LoveNoteMessageComponent({
           ${hasError ? 'border-2 border-red-500' : ''}
         `}
       >
-        <p className="text-base leading-relaxed break-words">{message.content}</p>
+        <p className="text-base leading-relaxed break-words">{sanitizedContent}</p>
       </div>
 
       {/* Status indicators */}
