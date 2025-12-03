@@ -31,6 +31,16 @@ interface ImportMetaEnv {
    * Test user password for E2E tests (optional - only needed for E2E testing)
    */
   readonly VITE_TEST_USER_PASSWORD?: string;
+
+  /**
+   * Partner test user email for multi-user E2E tests (optional)
+   */
+  readonly VITE_TEST_PARTNER_EMAIL?: string;
+
+  /**
+   * Partner test user password for multi-user E2E tests (optional)
+   */
+  readonly VITE_TEST_PARTNER_PASSWORD?: string;
 }
 
 interface ImportMeta {
