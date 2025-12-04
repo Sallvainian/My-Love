@@ -12,6 +12,9 @@ import { test, expect } from '@playwright/test';
 import { mockEmptyLoveNotes } from './utils/mock-helpers';
 
 test.describe('Love Notes - Message History & Scroll Performance', () => {
+  // Track if messages exist for conditional tests
+  let messagesExist = false;
+
   test.beforeEach(async ({ page }) => {
     // Navigate directly - authentication handled by storageState
     await page.goto('/');
@@ -22,24 +25,19 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
     ).toBeVisible({ timeout: 10000 });
 
     // Navigate to Love Notes via bottom navigation
-    const notesNav = page
-      .getByRole('button', { name: /notes|messages|chat/i })
-      .or(page.getByRole('tab', { name: /notes|messages|chat/i }));
+    const notesNav = page.getByTestId('nav-notes');
 
-    const notesNavVisible = await notesNav
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (notesNavVisible) {
-      await notesNav.first().click();
+    if (await notesNav.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await notesNav.click();
     }
 
-    // Wait for message list OR empty state to load (one or the other should appear)
-    await Promise.race([
-      page.waitForSelector('[data-testid="virtualized-list"]', { timeout: 5000 }),
-      page.waitForSelector('text=No love notes yet', { timeout: 5000 }),
-    ]);
+    // Wait for message list OR empty state to load using .or() pattern
+    await expect(
+      page.locator('[data-testid="virtualized-list"]').or(page.getByText('No love notes yet'))
+    ).toBeVisible({ timeout: 5000 });
+
+    // Check if messages exist
+    messagesExist = await hasMessages(page);
   });
 
   // Helper to check if messages actually exist (not just the list container)
@@ -52,11 +50,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   }
 
   test('AC-2.4.1: Scrolling up loads older messages with loading indicator', async ({ page }) => {
-    // Skip if no messages exist (these tests require seed data)
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Scroll to top of message list
     const messageList = page.locator('[data-testid="virtualized-list"]');
@@ -65,9 +59,8 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
     });
 
     // Loading indicator might appear briefly during pagination
-    // Note: This might be too fast to catch reliably in tests
     const loadingSpinner = page.locator('[data-testid="loading-spinner"]');
-    const hasSpinner = await loadingSpinner.isVisible().catch(() => false);
+    const hasSpinner = await loadingSpinner.isVisible();
 
     // If spinner appeared, wait for it to disappear
     if (hasSpinner) {
@@ -80,11 +73,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('AC-2.4.2: Scroll position maintained during data load', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Get initial scroll position
     const messageList = page.locator('[data-testid="virtualized-list"]');
@@ -104,11 +93,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('AC-2.4.3: "Beginning of conversation" indicator shows when all messages loaded', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Scroll to very top
     const messageList = page.locator('[data-testid="virtualized-list"]');
@@ -127,11 +112,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('AC-2.4.4: Scrolling maintains 60fps with many messages', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Measure frame rate during scroll
     // This is approximate - Playwright doesn't expose exact FPS
@@ -163,22 +144,11 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('AC-2.4.5: Pull-to-refresh triggers fresh data fetch', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Note: Refresh button may not exist in current implementation
-    // This test validates that the message list is functional
     const refreshButton = page.locator('[data-testid="refresh-button"]');
-    const hasRefresh = await refreshButton.isVisible().catch(() => false);
-
-    if (!hasRefresh) {
-      // Skip this test if refresh button doesn't exist
-      test.skip();
-      return;
-    }
+    test.skip(!(await refreshButton.isVisible().catch(() => false)), 'Refresh button not implemented');
 
     // Track network requests
     const requests: string[] = [];
@@ -192,8 +162,8 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
     await refreshButton.click();
 
     // Wait for API call
-    await page.waitForResponse((response) =>
-      response.url().includes('love_notes') && response.status() === 200,
+    await page.waitForResponse(
+      (response) => response.url().includes('love_notes') && response.status() === 200,
       { timeout: 5000 }
     );
 
@@ -206,11 +176,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('New message indicator appears when scrolled up and new message arrives', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Scroll up (not at bottom)
     const messageList = page.locator('[data-testid="virtualized-list"]');
@@ -222,8 +188,6 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
     // For now, just verify indicator can appear
 
     // Check for new message indicator element
-    const newMessageIndicator = page.locator('[data-testid="new-message-indicator"]');
-
     // Indicator should exist in DOM structure
     // (May not be visible without actual new message, but element should be defined)
     const indicatorExists = await page.locator('text=New message').count() >= 0;
@@ -231,11 +195,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('Clicking new message indicator scrolls to bottom', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // This test assumes a new message indicator is visible
     // In real scenario, would need to trigger new message arrival
@@ -275,17 +235,10 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
     ).toBeVisible({ timeout: 10000 });
 
     // Navigate to Love Notes
-    const notesNav = page
-      .getByRole('button', { name: /notes|messages|chat/i })
-      .or(page.getByRole('tab', { name: /notes|messages|chat/i }));
+    const notesNav = page.getByTestId('nav-notes');
 
-    const notesNavVisible = await notesNav
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (notesNavVisible) {
-      await notesNav.first().click();
+    if (await notesNav.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await notesNav.click();
     }
 
     // With mocked empty data, empty state should be visible
@@ -297,11 +250,7 @@ test.describe('Love Notes - Message History & Scroll Performance', () => {
   });
 
   test('Performance: Message list renders quickly with 100+ messages', async ({ page }) => {
-    // Skip if no messages exist
-    if (!(await hasMessages(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!messagesExist, 'Requires seed data with messages');
 
     // Measure initial render time
     const startTime = Date.now();

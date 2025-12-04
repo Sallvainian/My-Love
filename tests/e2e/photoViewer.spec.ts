@@ -12,33 +12,27 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Photo Viewer - Story 6.4', () => {
+  // Track if photos exist for conditional tests
+  let photosExist = false;
+
   test.beforeEach(async ({ page }) => {
     // Navigate directly to photos page - authentication handled by storageState
     await page.goto('/photos');
 
-    // Wait for photos gallery OR empty state to load
-    await Promise.race([
-      page.waitForSelector('[data-testid="photo-gallery-grid"]', {
-        timeout: 10000,
-      }),
-      page.waitForSelector('[data-testid="photo-gallery-empty-state"]', {
-        timeout: 10000,
-      }),
-      page.waitForSelector('[data-testid="photo-gallery"]', { timeout: 10000 }),
-    ]);
+    // Wait for photos gallery OR empty state to load using .or() pattern
+    await expect(
+      page
+        .locator('[data-testid="photo-gallery-grid"]')
+        .or(page.locator('[data-testid="photo-gallery-empty-state"]'))
+        .or(page.locator('[data-testid="photo-gallery"]'))
+    ).toBeVisible({ timeout: 10000 });
+
+    // Check if photos exist
+    photosExist = await page.locator('[data-testid="photo-gallery-grid"]').isVisible();
   });
 
-  // Helper to check if photos exist
-  async function hasPhotos(page: import('@playwright/test').Page) {
-    return page.locator('[data-testid="photo-gallery-grid"]').isVisible();
-  }
-
   test('AC 6.4.1: Opens viewer in full-screen with black background', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Click first photo thumbnail
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -59,11 +53,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.3: Keyboard navigation - Arrow keys and Escape', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Open viewer
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -90,11 +80,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.12: Navigation buttons work correctly', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Open viewer
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -119,11 +105,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.9: Photo metadata displays correctly', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Open viewer
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -136,17 +118,11 @@ test.describe('Photo Viewer - Story 6.4', () => {
     await expect(page.locator('text=/Photo \\d+ of \\d+/')).toBeVisible();
 
     // Owner indication should be visible
-    await expect(
-      page.locator('text=/Your photo|Partner photo/')
-    ).toBeVisible();
+    await expect(page.locator('text=/Your photo|Partner photo/')).toBeVisible();
   });
 
   test('AC 6.4.10: Delete button visible only for own photos', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Open first photo (assuming it's own photo for testing)
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -167,11 +143,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.12: Close viewer returns to gallery', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Get initial URL
     const initialUrl = page.url();
@@ -198,11 +170,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.5: Double-click zoom toggles', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Open viewer
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -227,11 +195,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.15: Loading state shows while image loads', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // This test verifies loading spinner appears
     // In real usage, spinner would show during slow network
@@ -249,11 +213,7 @@ test.describe('Photo Viewer - Story 6.4', () => {
   });
 
   test('AC 6.4.11: Can navigate through multiple photos', async ({ page }) => {
-    // Skip if no photos exist
-    if (!(await hasPhotos(page))) {
-      test.skip();
-      return;
-    }
+    test.skip(!photosExist, 'Requires photos in gallery');
 
     // Open viewer
     const firstPhoto = page.locator('[data-testid^="photo-grid-item"]').first();
@@ -275,7 +235,9 @@ test.describe('Photo Viewer - Story 6.4', () => {
         await expect(async () => {
           const newIndex = await photoIndex.textContent();
           expect(newIndex).not.toBe(currentIndex);
-        }).toPass({ timeout: 1000 }).catch(() => {});
+        })
+          .toPass({ timeout: 1000 })
+          .catch(() => {});
       }
     }
 
@@ -287,7 +249,9 @@ test.describe('Photo Viewer - Story 6.4', () => {
         await expect(async () => {
           const newIndex = await photoIndex.textContent();
           expect(newIndex).not.toBe(currentIndex);
-        }).toPass({ timeout: 1000 }).catch(() => {});
+        })
+          .toPass({ timeout: 1000 })
+          .catch(() => {});
       }
     }
 

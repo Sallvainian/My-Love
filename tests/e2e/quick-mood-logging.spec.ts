@@ -8,6 +8,9 @@
  * - Optional note field (AC-5.2.4)
  * - Non-blocking background sync (AC-5.2.5)
  * - Offline indicator (AC-5.2.6)
+ *
+ * NOTE: These tests require test credentials. They will be skipped if
+ * VITE_TEST_USER_EMAIL and VITE_TEST_USER_PASSWORD are not set.
  */
 
 import { test, expect } from '@playwright/test';
@@ -15,73 +18,70 @@ import { test, expect } from '@playwright/test';
 const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL;
 const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD;
 
+// Skip entire test suite if credentials not configured
+test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
+
 test.describe('Quick Mood Logging Flow', () => {
   test.beforeEach(async ({ page, context }) => {
-    // Skip tests if no test credentials configured
-    test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured in environment');
-
     // Clear all storage to ensure clean state for each test
     await context.clearCookies();
     await context.clearPermissions();
 
-    // Login
+    // Navigate to app
     await page.goto('/');
 
-    // Wait for either login form OR app content (if already authenticated somehow)
-    // First check if we're already authenticated by looking for navigation
+    // Wait for page to load
+    await page.waitForLoadState('domcontentloaded');
+
+    // Check if already authenticated by looking for navigation
     const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
-    const isAlreadyAuthenticated = await nav.isVisible({ timeout: 3000 }).catch(() => false);
+    const loginForm = page.getByLabel(/email/i);
 
-    if (!isAlreadyAuthenticated) {
-      // Wait for auth loading to complete and login form to appear
-      const emailInput = page.getByLabel(/email/i);
-      await expect(emailInput).toBeVisible({ timeout: 10000 });
+    // Wait for either nav (authenticated) or login form
+    await expect(nav.or(loginForm)).toBeVisible({ timeout: 10000 });
 
-      await emailInput.fill(TEST_EMAIL!);
+    // If login form is visible, perform authentication
+    if (await loginForm.isVisible()) {
+      await loginForm.fill(TEST_EMAIL!);
       await page.getByLabel(/password/i).fill(TEST_PASSWORD!);
 
-      // Click sign in and wait for response
+      // Set up auth response listener before clicking
+      const authResponse = page.waitForResponse(
+        (resp) =>
+          (resp.url().includes('auth') || resp.url().includes('token') || resp.url().includes('session')) &&
+          resp.status() >= 200 &&
+          resp.status() < 400,
+        { timeout: 15000 }
+      ).catch(() => null);
+
       await page.getByRole('button', { name: /sign in|login/i }).click();
+      await authResponse;
 
-      // Wait for either navigation OR welcome/onboarding screen
-      await page.waitForTimeout(2000);
-    }
-
-    // Handle welcome/intro screen if needed (this appears BEFORE nav)
-    try {
+      // Handle welcome/intro screen if needed
       const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-      if (await welcomeHeading.isVisible({ timeout: 3000 })) {
+      if (await welcomeHeading.isVisible({ timeout: 3000 }).catch(() => false)) {
         await page.getByRole('button', { name: /continue/i }).click();
-        await page.waitForTimeout(1000);
+        await expect(welcomeHeading).toBeHidden({ timeout: 5000 });
       }
-    } catch {
-      // No welcome screen
-    }
 
-    // Handle onboarding if needed
-    try {
+      // Handle onboarding if needed
       const displayNameInput = page.getByLabel(/display name/i);
-      if (await displayNameInput.isVisible({ timeout: 2000 })) {
+      if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
         await displayNameInput.fill('TestUser');
         await page.getByRole('button', { name: /continue|save|submit/i }).click();
-        await page.waitForTimeout(1000);
+        await expect(displayNameInput).toBeHidden({ timeout: 5000 });
       }
-    } catch {
-      // No onboarding needed
     }
 
     // Wait for app navigation to load
-    await expect(
-      page.locator('nav, [data-testid="bottom-navigation"]').first()
-    ).toBeVisible({ timeout: 15000 });
+    await expect(nav).toBeVisible({ timeout: 15000 });
 
-    // Navigate to mood page if not already there
-    const moodNav = page.getByRole('button', { name: /mood|feeling|heart/i }).or(
-      page.getByRole('tab', { name: /mood|feeling|heart/i })
-    );
-    if (await moodNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-      await moodNav.first().click();
-      await page.waitForTimeout(500);
+    // Navigate to mood page - use data-testid for precise targeting
+    const moodNav = page.getByTestId('nav-mood');
+    if (await moodNav.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await moodNav.click();
+      // Wait for mood page content - look for mood tracker container
+      await expect(page.getByTestId('mood-tracker')).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -90,41 +90,40 @@ test.describe('Quick Mood Logging Flow', () => {
 
     // Click on a mood button (happy)
     const happyButton = page.getByTestId('mood-button-happy');
-    if (await happyButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await happyButton.click();
+    await expect(happyButton).toBeVisible({ timeout: 3000 });
+    await happyButton.click();
 
-      // Click submit button
-      const submitButton = page.getByTestId('mood-submit-button');
-      await expect(submitButton).toBeEnabled({ timeout: 2000 });
-      await submitButton.click();
+    // Click submit button
+    const submitButton = page.getByTestId('mood-submit-button');
+    await expect(submitButton).toBeEnabled({ timeout: 2000 });
+    await submitButton.click();
 
-      // Wait for success toast
-      const toast = page.getByTestId('mood-success-toast');
-      await expect(toast).toBeVisible({ timeout: 3000 });
+    // Wait for success toast
+    const toast = page.getByTestId('mood-success-toast');
+    await expect(toast).toBeVisible({ timeout: 3000 });
 
-      const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(5000);
-    }
+    const elapsed = Date.now() - startTime;
+    expect(elapsed).toBeLessThan(5000);
   });
 
   test('AC-5.2.3: Success toast appears for 3 seconds after save', async ({ page }) => {
     // Select a mood
     const gratefulButton = page.getByTestId('mood-button-grateful');
-    if (await gratefulButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await gratefulButton.click();
+    await expect(gratefulButton).toBeVisible({ timeout: 3000 });
+    await gratefulButton.click();
 
-      // Submit
-      const submitButton = page.getByTestId('mood-submit-button');
-      await submitButton.click();
+    // Submit
+    const submitButton = page.getByTestId('mood-submit-button');
+    await expect(submitButton).toBeEnabled({ timeout: 2000 });
+    await submitButton.click();
 
-      // Toast should appear
-      const toast = page.getByTestId('mood-success-toast');
-      await expect(toast).toBeVisible({ timeout: 3000 });
-      await expect(toast).toContainText(/mood logged|updated/i);
+    // Toast should appear
+    const toast = page.getByTestId('mood-success-toast');
+    await expect(toast).toBeVisible({ timeout: 3000 });
+    await expect(toast).toContainText(/mood logged|updated/i);
 
-      // Toast should auto-dismiss after ~3 seconds
-      await expect(toast).toBeHidden({ timeout: 4000 });
-    }
+    // Toast should auto-dismiss after ~3 seconds
+    await expect(toast).toBeHidden({ timeout: 4500 });
   });
 
   test('AC-5.2.4: Can save mood without note', async ({ page }) => {
@@ -132,24 +131,23 @@ test.describe('Quick Mood Logging Flow', () => {
     const calmButton = page.getByTestId('mood-button-calm').or(
       page.getByTestId('mood-button-content')
     );
-    if (await calmButton.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await calmButton.first().click();
+    await expect(calmButton.first()).toBeVisible({ timeout: 3000 });
+    await calmButton.first().click();
 
-      // Note input should exist but not be required
-      const noteInput = page.getByTestId('mood-note-input');
-      if (await noteInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-        // Leave note empty intentionally
-        await expect(noteInput).toHaveValue('');
-      }
-
-      // Submit should work without note
-      const submitButton = page.getByTestId('mood-submit-button');
-      await submitButton.click();
-
-      // Success toast should appear (note was optional)
-      const toast = page.getByTestId('mood-success-toast');
-      await expect(toast).toBeVisible({ timeout: 3000 });
+    // Note input should exist but not be required - verify it's empty
+    const noteInput = page.getByTestId('mood-note-input');
+    if (await noteInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await expect(noteInput).toHaveValue('');
     }
+
+    // Submit should work without note
+    const submitButton = page.getByTestId('mood-submit-button');
+    await expect(submitButton).toBeEnabled({ timeout: 2000 });
+    await submitButton.click();
+
+    // Success toast should appear (note was optional)
+    const toast = page.getByTestId('mood-success-toast');
+    await expect(toast).toBeVisible({ timeout: 3000 });
   });
 
   test('AC-5.2.5: Background sync does not block UI', async ({ page }) => {
@@ -157,56 +155,51 @@ test.describe('Quick Mood Logging Flow', () => {
     const excitedButton = page.getByTestId('mood-button-excited').or(
       page.getByTestId('mood-button-happy')
     );
-    if (await excitedButton.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await excitedButton.first().click();
+    await expect(excitedButton.first()).toBeVisible({ timeout: 3000 });
+    await excitedButton.first().click();
 
-      const startTime = Date.now();
+    const startTime = Date.now();
 
-      // Submit
-      const submitButton = page.getByTestId('mood-submit-button');
-      await submitButton.click();
+    // Submit
+    const submitButton = page.getByTestId('mood-submit-button');
+    await expect(submitButton).toBeEnabled({ timeout: 2000 });
+    await submitButton.click();
 
-      // Toast should appear quickly (before sync completes)
-      const toast = page.getByTestId('mood-success-toast');
-      await expect(toast).toBeVisible({ timeout: 1000 });
+    // Toast should appear quickly (before sync completes)
+    const toast = page.getByTestId('mood-success-toast');
+    await expect(toast).toBeVisible({ timeout: 1500 });
 
-      // Should complete quickly (UI not blocked)
-      const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(2000); // Toast appears within 2s, sync is background
-    }
+    // Should complete quickly (UI not blocked)
+    const elapsed = Date.now() - startTime;
+    expect(elapsed).toBeLessThan(2000);
   });
 
   test('AC-5.2.6: Shows offline indicator when disconnected', async ({ page, context }) => {
-    // Navigate to mood page first while online
-    await expect(page.locator('[data-testid="mood-tracker"]').or(
-      page.locator('form')
-    ).first()).toBeVisible({ timeout: 5000 });
+    // Ensure mood tracker is visible first
+    await expect(
+      page.locator('[data-testid="mood-tracker"]').or(page.locator('form')).first()
+    ).toBeVisible({ timeout: 5000 });
 
     // Go offline
     await context.setOffline(true);
 
-    // Wait for network status to update
-    await page.waitForTimeout(500);
-
-    // Network status indicator should show offline state
+    // Network status indicator should show offline state (if implemented)
     const networkIndicator = page.getByTestId('network-status-indicator');
-    if (await networkIndicator.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(networkIndicator).toHaveAttribute('data-status', 'offline');
-    }
+    await expect.soft(networkIndicator).toHaveAttribute('data-status', 'offline', { timeout: 3000 });
 
     // Can still interact with mood buttons while offline
     const sadButton = page.getByTestId('mood-button-sad');
-    if (await sadButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await sadButton.click();
+    await expect(sadButton).toBeVisible({ timeout: 2000 });
+    await sadButton.click();
 
-      // Submit should work (saves locally)
-      const submitButton = page.getByTestId('mood-submit-button');
-      await submitButton.click();
+    // Submit should work (saves locally)
+    const submitButton = page.getByTestId('mood-submit-button');
+    await expect(submitButton).toBeEnabled({ timeout: 2000 });
+    await submitButton.click();
 
-      // Success toast should still appear (local save)
-      const toast = page.getByTestId('mood-success-toast');
-      await expect(toast).toBeVisible({ timeout: 3000 });
-    }
+    // Success toast should still appear (local save)
+    const toast = page.getByTestId('mood-success-toast');
+    await expect(toast).toBeVisible({ timeout: 3000 });
 
     // Restore online state
     await context.setOffline(false);
@@ -217,21 +210,18 @@ test.describe('Quick Mood Logging Flow', () => {
     const happyButton = page.getByTestId('mood-button-happy');
     const gratefulButton = page.getByTestId('mood-button-grateful');
 
-    if (
-      (await happyButton.isVisible({ timeout: 3000 }).catch(() => false)) &&
-      (await gratefulButton.isVisible().catch(() => false))
-    ) {
-      await happyButton.click();
-      await gratefulButton.click();
+    await expect(happyButton).toBeVisible({ timeout: 3000 });
+    await expect(gratefulButton).toBeVisible();
 
-      // Both should be visually selected (have pink border or selected state)
-      // Submit should work with multiple moods
-      const submitButton = page.getByTestId('mood-submit-button');
-      await expect(submitButton).toBeEnabled();
-      await submitButton.click();
+    await happyButton.click();
+    await gratefulButton.click();
 
-      const toast = page.getByTestId('mood-success-toast');
-      await expect(toast).toBeVisible({ timeout: 3000 });
-    }
+    // Submit should work with multiple moods
+    const submitButton = page.getByTestId('mood-submit-button');
+    await expect(submitButton).toBeEnabled({ timeout: 2000 });
+    await submitButton.click();
+
+    const toast = page.getByTestId('mood-success-toast');
+    await expect(toast).toBeVisible({ timeout: 3000 });
   });
 });

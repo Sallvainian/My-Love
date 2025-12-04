@@ -26,30 +26,19 @@ test.describe('Mood History Timeline', () => {
     const moodNav = page
       .getByRole('button', { name: /mood/i })
       .or(page.getByRole('tab', { name: /mood/i }));
-    const moodNavVisible = await moodNav
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (moodNavVisible) {
+
+    if (await moodNav.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await moodNav.first().click();
     }
 
     // Click on Timeline tab if it exists
     const timelineTab = page.getByRole('tab', { name: /timeline/i });
-    const timelineTabVisible = await timelineTab
-      .waitFor({ state: 'visible', timeout: 2000 })
-      .then(() => true)
-      .catch(() => false);
-    if (timelineTabVisible) {
+    if (await timelineTab.isVisible({ timeout: 2000 }).catch(() => false)) {
       await timelineTab.click();
       // Wait for timeline content to be ready
-      await page
-        .getByTestId('mood-history-timeline')
-        .or(page.getByTestId('empty-mood-history-state'))
-        .first()
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .catch(() => {});
+      await expect(
+        page.getByTestId('mood-history-timeline').or(page.getByTestId('empty-mood-history-state'))
+      ).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -57,11 +46,7 @@ test.describe('Mood History Timeline', () => {
     // Check if timeline component is visible
     const timeline = page.getByTestId('mood-history-timeline');
 
-    // Timeline might not exist if user hasn't logged moods yet
-    const timelineVisible = await timeline
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
+    const timelineVisible = await timeline.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (timelineVisible) {
       await expect(timeline).toBeVisible();
@@ -80,19 +65,13 @@ test.describe('Mood History Timeline', () => {
   test('shows date headers for mood groups', async ({ page }) => {
     const timeline = page.getByTestId('mood-history-timeline');
 
-    const timelineVisible = await timeline
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
+    const timelineVisible = await timeline.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (timelineVisible) {
       // Look for date headers
       const dateHeader = page.locator('[data-testid^="date-header-"]').first();
 
-      const headerVisible = await dateHeader
-        .waitFor({ state: 'visible', timeout: 2000 })
-        .then(() => true)
-        .catch(() => false);
+      const headerVisible = await dateHeader.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (headerVisible) {
         await expect(dateHeader).toBeVisible();
@@ -108,10 +87,7 @@ test.describe('Mood History Timeline', () => {
   test('displays mood emoji and timestamp', async ({ page }) => {
     const moodItem = page.getByTestId('mood-history-item').first();
 
-    const moodItemVisible = await moodItem
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
+    const moodItemVisible = await moodItem.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (moodItemVisible) {
       // Check for emoji
@@ -132,10 +108,7 @@ test.describe('Mood History Timeline', () => {
     // Look for a mood item with a note toggle button
     const noteToggle = page.getByTestId('mood-note-toggle').first();
 
-    const toggleVisible = await noteToggle
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
+    const toggleVisible = await noteToggle.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (toggleVisible) {
       // Initial state should show "Show more"
@@ -175,15 +148,24 @@ test.describe('Mood History Timeline', () => {
 
     // Wait for mood page to load, then click Timeline button
     const timelineButton = page.getByRole('button', { name: /timeline/i });
-    await timelineButton.waitFor({ state: 'visible', timeout: 5000 });
+    await expect(timelineButton).toBeVisible({ timeout: 5000 });
     await timelineButton.click();
 
     // Check what appears - mocking may or may not intercept
     const emptyState = page.getByTestId('empty-mood-history-state');
     const timelineWithData = page.locator('[data-testid="mood-history-timeline"], h3:has-text("Today")');
 
-    // Wait for page to settle
-    await page.waitForTimeout(2000);
+    // Use expect.poll to wait for page to settle instead of waitForTimeout
+    await expect
+      .poll(
+        async () => {
+          const emptyVisible = await emptyState.isVisible().catch(() => false);
+          const dataVisible = await timelineWithData.first().isVisible().catch(() => false);
+          return emptyVisible || dataVisible;
+        },
+        { timeout: 5000, intervals: [200, 500, 1000] }
+      )
+      .toBe(true);
 
     const emptyVisible = await emptyState.isVisible().catch(() => false);
     const dataVisible = await timelineWithData.first().isVisible().catch(() => false);
@@ -220,15 +202,24 @@ test.describe('Mood History Timeline', () => {
 
     // Wait for mood page to load, then click Timeline button
     const timelineButton = page.getByRole('button', { name: /timeline/i });
-    await timelineButton.waitFor({ state: 'visible', timeout: 5000 });
+    await expect(timelineButton).toBeVisible({ timeout: 5000 });
     await timelineButton.click();
 
     // Check what appears - mocking may or may not intercept
     const errorState = page.getByTestId('error-state');
     const timelineWithData = page.locator('[data-testid="mood-history-timeline"], h3:has-text("Today")');
 
-    // Wait for page to settle
-    await page.waitForTimeout(2000);
+    // Use expect.poll to wait for page to settle instead of waitForTimeout
+    await expect
+      .poll(
+        async () => {
+          const errorVisible = await errorState.isVisible().catch(() => false);
+          const dataVisible = await timelineWithData.first().isVisible().catch(() => false);
+          return errorVisible || dataVisible;
+        },
+        { timeout: 5000, intervals: [200, 500, 1000] }
+      )
+      .toBe(true);
 
     const errorVisible = await errorState.isVisible().catch(() => false);
     const dataVisible = await timelineWithData.first().isVisible().catch(() => false);
@@ -248,41 +239,33 @@ test.describe('Mood History Timeline', () => {
 
   test('loading spinner shows during data fetch', async ({ page }) => {
     // Find another nav button
-    const homeNav = page.getByRole('button', { name: /home/i }).or(
-      page.getByRole('tab', { name: /home/i })
-    );
+    const homeNav = page
+      .getByRole('button', { name: /home/i })
+      .or(page.getByRole('tab', { name: /home/i }));
 
-    const homeNavVisible = await homeNav.first()
-      .waitFor({ state: 'visible', timeout: 2000 })
-      .then(() => true)
-      .catch(() => false);
+    const homeNavVisible = await homeNav.first().isVisible({ timeout: 2000 }).catch(() => false);
 
     if (homeNavVisible) {
       await homeNav.first().click();
 
       // Wait for home content to load
-      await page.locator('nav, [data-testid="bottom-navigation"]').first()
-        .waitFor({ state: 'visible', timeout: 5000 });
+      await expect(page.locator('nav, [data-testid="bottom-navigation"]').first()).toBeVisible({
+        timeout: 5000,
+      });
 
       // Navigate back to mood tracker
-      const moodNav = page.getByRole('button', { name: /mood/i }).or(
-        page.getByRole('tab', { name: /mood/i })
-      );
+      const moodNav = page
+        .getByRole('button', { name: /mood/i })
+        .or(page.getByRole('tab', { name: /mood/i }));
 
-      const moodNavVisible = await moodNav.first()
-        .waitFor({ state: 'visible', timeout: 2000 })
-        .then(() => true)
-        .catch(() => false);
+      const moodNavVisible = await moodNav.first().isVisible({ timeout: 2000 }).catch(() => false);
 
       if (moodNavVisible) {
         await moodNav.first().click();
 
         // Click timeline tab
         const timelineTab = page.getByRole('tab', { name: /timeline/i });
-        const tabVisible = await timelineTab
-          .waitFor({ state: 'visible', timeout: 2000 })
-          .then(() => true)
-          .catch(() => false);
+        const tabVisible = await timelineTab.isVisible({ timeout: 2000 }).catch(() => false);
 
         if (tabVisible) {
           await timelineTab.click();

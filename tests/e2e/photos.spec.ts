@@ -24,8 +24,13 @@ test.describe('Photo Sharing', () => {
 
     if (await photosNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
       await photosNav.first().click();
-      // Wait for photos page to load
-      await page.waitForLoadState('networkidle');
+      // Wait for photos page content to load
+      await expect(
+        page
+          .getByTestId('photo-gallery')
+          .or(page.getByTestId('photo-gallery-empty-state'))
+          .or(page.getByText(/no photos|add photos|upload/i))
+      ).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -65,15 +70,20 @@ test.describe('Photo Sharing', () => {
   });
 
   test('photo gallery displays images or empty state', async ({ page }) => {
-    // Wait for content to load
-    await page.waitForLoadState('networkidle');
+    // Wait for content to load using proper locator assertions
+    await expect(
+      page
+        .locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]')
+        .first()
+        .or(page.getByText(/no photos|add your first|upload photos/i))
+    ).toBeVisible({ timeout: 5000 });
 
     // Look for either photos or empty state
     const photos = page.locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]');
     const emptyState = page.getByText(/no photos|add your first|upload photos/i);
 
     const photoCount = await photos.count();
-    const hasEmptyState = await emptyState.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasEmptyState = await emptyState.isVisible().catch(() => false);
 
     // Either has photos or shows empty state
     expect(photoCount > 0 || hasEmptyState).toBe(true);
@@ -81,7 +91,12 @@ test.describe('Photo Sharing', () => {
 
   test('photos can be viewed in full screen/modal', async ({ page }) => {
     // Wait for content to load
-    await page.waitForLoadState('networkidle');
+    await expect(
+      page
+        .locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]')
+        .first()
+        .or(page.getByText(/no photos|add your first|upload photos/i))
+    ).toBeVisible({ timeout: 5000 });
 
     // Find clickable photo items
     const photoItems = page.locator(

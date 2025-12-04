@@ -8,83 +8,53 @@
  * - AC-5.3.4: "Just now" badge for recent moods
  * - AC-5.3.5: Graceful empty state handling
  * - AC-5.3.6: Full transparency with RLS validation
+ *
+ * Note: Authentication is handled by global-setup.ts via storageState.
  */
 
 import { test, expect, Page } from '@playwright/test';
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'frank.cottone97@proton.me';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'test123';
-
 /**
- * Helper to login and navigate to mood tracker
+ * Helper to navigate to mood tracker.
+ * Authentication is handled by storageState from global-setup.
  */
-async function loginAndNavigateToMoods(page: Page) {
+async function navigateToMoods(page: Page) {
   await page.goto('/');
 
-  // Wait for page to be fully loaded (critical for CI)
+  // Wait for page to be fully loaded
   await page.waitForLoadState('domcontentloaded');
 
-  // Wait for login form to be ready
-  await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
-
-  // Fill credentials
-  await page.getByLabel(/email/i).fill(TEST_EMAIL);
-  await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-  await page.getByRole('button', { name: /sign in|login/i }).click();
-
-  // Wait for login to complete
-  await page.waitForTimeout(2000);
-
-  // Handle onboarding if needed
-  const displayNameInput = page.getByLabel(/display name/i);
-  if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await displayNameInput.fill('TestUser');
-    await page.getByRole('button', { name: /continue|save|submit/i }).click();
-    await page.waitForTimeout(1000);
-  }
-
-  // Handle welcome screen if needed
-  const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-  if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await page.getByRole('button', { name: /continue/i }).click();
-    await page.waitForTimeout(1000);
-  }
-
-  // Wait for navigation to appear (confirms we're in the main app)
+  // Wait for navigation to appear (confirms we're authenticated via storageState)
   await expect(
     page.locator('nav, [data-testid="bottom-navigation"], [role="navigation"]').first()
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible({ timeout: 15000 });
 
-  // The app should default to the mood view, or click the mood tab if available
-  const moodTab = page
-    .getByRole('tab', { name: /mood/i })
-    .or(page.getByRole('button', { name: /mood/i }));
-  if (await moodTab.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await moodTab.click();
-    await page.waitForTimeout(500);
+  // Navigate to mood tab if available - use web-first assertion for navigation result
+  const moodNav = page.getByTestId('nav-mood');
+  if (await moodNav.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await moodNav.click();
+    // Wait for mood tracker to confirm navigation completed
+    await expect(page.getByTestId('mood-tracker')).toBeVisible({ timeout: 5000 });
   }
 }
 
 test.describe('Partner Mood Viewing & Transparency', () => {
   test.beforeEach(async ({ page }) => {
-    // Login and navigate to mood tracker
-    await loginAndNavigateToMoods(page);
+    // Navigate to mood tracker (authentication via storageState)
+    await navigateToMoods(page);
 
-    // Wait for page to stabilize
-    await page.waitForLoadState('networkidle');
+    // Wait for mood section to be ready (either partner mood or no-mood state)
+    await expect(
+      page.getByTestId('partner-mood-display').or(page.getByTestId('no-mood-logged-state'))
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('Displays partner current mood prominently (AC-5.3.1, AC-5.3.2)', async ({ page }) => {
-    // Wait for partner mood section to load (either state) - fail if neither appears
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
     const partnerMoodDisplay = page.getByTestId('partner-mood-display');
+    const noMoodState = page.getByTestId('no-mood-logged-state');
 
-    // Check if partner has moods logged
-    const hasNoMood = await page.getByTestId('no-mood-logged-state').isVisible();
+    // Check which state is shown
+    const hasNoMood = await noMoodState.isVisible();
 
     if (!hasNoMood) {
       // Verify partner mood display is visible
@@ -102,13 +72,6 @@ test.describe('Partner Mood Viewing & Transparency', () => {
   });
 
   test('Shows "Just now" badge for recent moods (AC-5.3.4)', async ({ page }) => {
-    // Wait for mood section to load
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
-    // Check if partner mood exists
     const partnerMoodDisplay = page.getByTestId('partner-mood-display');
     const hasPartnerMood = await partnerMoodDisplay.isVisible();
 
@@ -126,12 +89,6 @@ test.describe('Partner Mood Viewing & Transparency', () => {
   });
 
   test('Handles partner with no moods gracefully (AC-5.3.5)', async ({ page }) => {
-    // Wait for partner mood section to load - fail if neither state appears
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
     const noMoodState = page.getByTestId('no-mood-logged-state');
     const partnerMoodDisplay = page.getByTestId('partner-mood-display');
 
@@ -151,14 +108,7 @@ test.describe('Partner Mood Viewing & Transparency', () => {
   });
 
   test('Displays loading state before mood loads', async ({ page }) => {
-    // This test is already on the mood page from beforeEach login
-    // Wait for partner mood section to finish loading - fail if neither appears
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
-    // Verify one of the final states is visible
+    // This test verifies the page reaches one of the final states (from beforeEach)
     const partnerMoodVisible = await page.getByTestId('partner-mood-display').isVisible();
     const noMoodVisible = await page.getByTestId('no-mood-logged-state').isVisible();
 
@@ -167,12 +117,6 @@ test.describe('Partner Mood Viewing & Transparency', () => {
   });
 
   test('Partner mood includes note when present', async ({ page }) => {
-    // Wait for mood section to load
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
     const partnerMoodDisplay = page.getByTestId('partner-mood-display');
     const hasPartnerMood = await partnerMoodDisplay.isVisible();
 
@@ -189,12 +133,6 @@ test.describe('Partner Mood Viewing & Transparency', () => {
   });
 
   test('Partner mood display is positioned prominently at top', async ({ page }) => {
-    // Wait for mood section to load
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
     const partnerMoodDisplay = page.getByTestId('partner-mood-display');
     const hasPartnerMood = await partnerMoodDisplay.isVisible();
 
@@ -214,12 +152,6 @@ test.describe('Partner Mood Viewing & Transparency', () => {
   });
 
   test('Mood emoji matches mood type', async ({ page }) => {
-    // Wait for mood section to load
-    await page.waitForSelector(
-      '[data-testid="partner-mood-display"], [data-testid="no-mood-logged-state"]',
-      { timeout: 15000 }
-    );
-
     const partnerMoodDisplay = page.getByTestId('partner-mood-display');
     const hasPartnerMood = await partnerMoodDisplay.isVisible();
 
@@ -271,31 +203,24 @@ multiUserTest.describe('Partner Mood Real-time Updates (Multi-User)', () => {
       await partnerPage.goto('/mood');
 
       // Wait for both pages to load
-      await primaryPage.waitForLoadState('networkidle');
-      await partnerPage.waitForLoadState('networkidle');
+      await primaryPage.waitForLoadState('domcontentloaded');
+      await partnerPage.waitForLoadState('domcontentloaded');
 
-      // CRITICAL: Wait for mood tracker form to be fully initialized on BOTH pages
-      // The form needs time for auth hydration and initial mood loading
-      // Wait for submit button to be in ready state (not "Saving...")
+      // Wait for mood tracker form to be fully initialized on BOTH pages
+      // Use web-first assertions instead of waitForFunction
+      const primarySubmitButton = primaryPage.getByTestId('mood-submit-button');
+      const partnerSubmitButton = partnerPage.getByTestId('mood-submit-button');
+
       await Promise.all([
-        partnerPage.waitForFunction(
-          () => {
-            const btn = document.querySelector('[data-testid="mood-submit-button"]');
-            return btn && btn.textContent?.includes('Log Mood');
-          },
-          { timeout: 15000 }
-        ),
-        primaryPage.waitForFunction(
-          () => {
-            const btn = document.querySelector('[data-testid="mood-submit-button"]');
-            return btn && btn.textContent?.includes('Log Mood');
-          },
-          { timeout: 15000 }
-        ),
+        multiExpect(partnerSubmitButton).toBeVisible({ timeout: 15000 }),
+        multiExpect(primarySubmitButton).toBeVisible({ timeout: 15000 }),
       ]);
 
-      // Give additional time for broadcast subscriptions to be established
-      await primaryPage.waitForTimeout(1000);
+      // Wait for submit buttons to show "Log Mood" (not "Saving...")
+      await Promise.all([
+        multiExpect(partnerSubmitButton).toContainText(/Log Mood/i, { timeout: 15000 }),
+        multiExpect(primarySubmitButton).toContainText(/Log Mood/i, { timeout: 15000 }),
+      ]);
 
       // Get initial partner mood state on primary page (may be empty)
       const partnerMoodDisplay = primaryPage.getByTestId('partner-mood-display');
@@ -307,7 +232,6 @@ multiUserTest.describe('Partner Mood Real-time Updates (Multi-User)', () => {
       }
 
       // Partner logs a NEW mood (use a distinctive mood to detect change)
-      // Use 'grateful' or 'happy' which are valid mood types in the schema
       const moodToLog = initialMoodLabel.toLowerCase().includes('grateful') ? 'happy' : 'grateful';
 
       const moodButton = partnerPage.getByTestId(`mood-button-${moodToLog}`);
@@ -315,16 +239,14 @@ multiUserTest.describe('Partner Mood Real-time Updates (Multi-User)', () => {
       await moodButton.click();
 
       // Submit the mood - wait for button to be enabled after mood selection
-      const submitButton = partnerPage.getByTestId('mood-submit-button');
-      await multiExpect(submitButton).toBeEnabled({ timeout: 5000 });
-      await submitButton.click();
+      await multiExpect(partnerSubmitButton).toBeEnabled({ timeout: 5000 });
+      await partnerSubmitButton.click();
 
       // Wait for success toast on partner's page
       const partnerToast = partnerPage.getByTestId('mood-success-toast');
       await multiExpect(partnerToast).toBeVisible({ timeout: 10000 });
 
       // Poll for partner mood to appear on primary page (real-time or after refresh)
-      // Use expect.poll instead of arbitrary waitForTimeout
       let moodDisplayVisible = false;
       await multiExpect
         .poll(
@@ -345,20 +267,14 @@ multiUserTest.describe('Partner Mood Real-time Updates (Multi-User)', () => {
       // If real-time update didn't work, refresh to force re-fetch
       if (!moodDisplayVisible) {
         await primaryPage.reload();
-        await primaryPage.waitForLoadState('networkidle');
-        await primaryPage.waitForFunction(
-          () => {
-            const btn = document.querySelector('[data-testid="mood-submit-button"]');
-            return btn && btn.textContent?.includes('Log Mood');
-          },
-          { timeout: 15000 }
-        );
+        await primaryPage.waitForLoadState('domcontentloaded');
+        // Wait for submit button to be ready again
+        await multiExpect(primarySubmitButton).toContainText(/Log Mood/i, { timeout: 15000 });
       }
 
       // Partner mood should now be visible
-      await primaryPage.waitForSelector('[data-testid="partner-mood-display"]', {
+      await multiExpect(primaryPage.getByTestId('partner-mood-display')).toBeVisible({
         timeout: 10000,
-        state: 'visible',
       });
 
       // Verify the mood label has updated
@@ -376,17 +292,13 @@ multiUserTest.describe('Partner Mood Real-time Updates (Multi-User)', () => {
     await primaryPage.goto('/mood');
     await partnerPage.goto('/mood');
 
-    await primaryPage.waitForLoadState('networkidle');
-    await partnerPage.waitForLoadState('networkidle');
+    await primaryPage.waitForLoadState('domcontentloaded');
+    await partnerPage.waitForLoadState('domcontentloaded');
 
-    // CRITICAL: Wait for mood tracker form to be fully initialized
-    await partnerPage.waitForFunction(
-      () => {
-        const btn = document.querySelector('[data-testid="mood-submit-button"]');
-        return btn && btn.textContent?.includes('Log Mood');
-      },
-      { timeout: 15000 }
-    );
+    // Wait for mood tracker form to be fully initialized using web-first assertions
+    const partnerSubmitButton = partnerPage.getByTestId('mood-submit-button');
+    await multiExpect(partnerSubmitButton).toBeVisible({ timeout: 15000 });
+    await multiExpect(partnerSubmitButton).toContainText(/Log Mood/i, { timeout: 15000 });
 
     // Partner logs mood with a distinctive note
     const testNote = `E2E test note ${Date.now()}`;
@@ -404,9 +316,8 @@ multiUserTest.describe('Partner Mood Real-time Updates (Multi-User)', () => {
     }
 
     // Submit - wait for button to be enabled first
-    const submitButton = partnerPage.getByTestId('mood-submit-button');
-    await multiExpect(submitButton).toBeEnabled({ timeout: 5000 });
-    await submitButton.click();
+    await multiExpect(partnerSubmitButton).toBeEnabled({ timeout: 5000 });
+    await partnerSubmitButton.click();
 
     // Wait for success toast to confirm submission
     const partnerToast = partnerPage.getByTestId('mood-success-toast');

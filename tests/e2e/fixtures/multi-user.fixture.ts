@@ -47,7 +47,8 @@ interface MultiUserFixtures {
 }
 
 /**
- * Helper to login and complete onboarding for a user
+ * Helper to login and complete onboarding for a user.
+ * Uses web-first assertions instead of arbitrary timeouts.
  */
 async function loginAndCompleteOnboarding(
   page: Page,
@@ -56,40 +57,76 @@ async function loginAndCompleteOnboarding(
 ): Promise<void> {
   await page.goto('/');
 
-  // Wait for page to be fully loaded (critical for CI)
+  // Wait for page to be fully loaded
   await page.waitForLoadState('domcontentloaded');
 
-  // Wait for login form to be ready
-  await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
+  // Wait for email input to be ready (login form visible)
+  const emailInput = page.getByLabel(/email/i);
+  await expect(emailInput).toBeVisible({ timeout: 15000 });
 
   // Fill login form
-  await page.getByLabel(/email/i).fill(email);
+  await emailInput.fill(email);
   await page.getByLabel(/password/i).fill(password);
+
+  // Set up auth response listener before clicking
+  const authResponse = page.waitForResponse(
+    (resp) =>
+      (resp.url().includes('auth') || resp.url().includes('token') || resp.url().includes('session')) &&
+      resp.status() >= 200 &&
+      resp.status() < 400,
+    { timeout: 15000 }
+  ).catch(() => null);
+
   await page.getByRole('button', { name: /sign in|login/i }).click();
+  await authResponse;
 
-  // Wait for response
-  await page.waitForTimeout(2000);
-
-  // Handle onboarding if needed
+  // Wait for either welcome screen, onboarding, or main app to appear
+  const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
   const displayNameInput = page.getByLabel(/display name/i);
-  if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const displayName = email.includes('testuser1') ? 'TestUser1' : 'TestUser2';
-    await displayNameInput.fill(displayName);
-    await page.getByRole('button', { name: /continue|save|submit/i }).click();
-    await page.waitForTimeout(1000);
-  }
+  const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+
+  // Poll until one of these is visible
+  let state: 'welcome' | 'onboarding' | 'ready' = 'ready';
+  await expect
+    .poll(
+      async () => {
+        if (await welcomeHeading.isVisible().catch(() => false)) {
+          state = 'welcome';
+          return true;
+        }
+        if (await displayNameInput.isVisible().catch(() => false)) {
+          state = 'onboarding';
+          return true;
+        }
+        if (await nav.isVisible().catch(() => false)) {
+          state = 'ready';
+          return true;
+        }
+        return false;
+      },
+      { timeout: 8000, intervals: [200, 500, 1000] }
+    )
+    .toBe(true);
 
   // Handle welcome screen if shown
-  const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-  if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (state === 'welcome') {
     await page.getByRole('button', { name: /continue/i }).click();
-    await page.waitForTimeout(1000);
+    await expect(welcomeHeading).toBeHidden({ timeout: 5000 });
+    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      state = 'onboarding';
+    }
+  }
+
+  // Handle onboarding if shown
+  if (state === 'onboarding') {
+    const displayName = email.includes('frank') ? 'Frank' : 'Partner';
+    await displayNameInput.fill(displayName);
+    await page.getByRole('button', { name: /continue|save|submit/i }).click();
+    await expect(displayNameInput).toBeHidden({ timeout: 5000 });
   }
 
   // Wait for main navigation to appear
-  await expect(
-    page.locator('nav, [data-testid="bottom-navigation"], [role="navigation"]').first()
-  ).toBeVisible({ timeout: 10000 });
+  await expect(nav).toBeVisible({ timeout: 10000 });
 }
 
 /**
@@ -128,15 +165,21 @@ export const multiUserTest = base.extend<MultiUserFixtures>({
   ],
 
   // Create separate browser context for primary user
+  // Must explicitly override storageState to start fresh (overrides global config)
   primaryContext: async ({ browser }, use) => {
-    const context = await browser.newContext();
+    const context = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     await use(context);
     await context.close();
   },
 
   // Create separate browser context for partner user
+  // Must explicitly override storageState to start fresh (overrides global config)
   partnerContext: async ({ browser }, use) => {
-    const context = await browser.newContext();
+    const context = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     await use(context);
     await context.close();
   },

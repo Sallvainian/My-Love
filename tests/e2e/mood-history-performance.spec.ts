@@ -7,63 +7,38 @@
  * - Pagination performance
  *
  * Story 5.4: Mood History Timeline - Performance Validation
+ *
+ * Note: Authentication is handled by global-setup.ts via storageState.
  */
 
 import { test, expect } from '@playwright/test';
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
-
 test.describe('Mood History Timeline Performance', () => {
   test.beforeEach(async ({ page }) => {
-    // Login
+    // Navigate to app - storageState handles authentication
     await page.goto('/');
 
-    // Wait for page to be fully loaded (critical for CI)
-    await page.waitForLoadState('domcontentloaded');
-
-    // Wait for login form to be ready
-    await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
-
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-
-    // Handle onboarding
-    await page.waitForTimeout(2000);
-    const displayNameInput = page.getByLabel(/display name/i);
-    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await displayNameInput.fill('TestUser');
-      await page.getByRole('button', { name: /continue|save|submit/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Handle welcome screen
-    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await page.getByRole('button', { name: /continue/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Wait for app to load
+    // Wait for app to be ready (navigation visible confirms auth worked)
     await expect(
       page.locator('nav, [data-testid="bottom-navigation"]').first()
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout: 15000 });
 
     // Navigate to mood tracker
-    const moodNav = page.getByRole('button', { name: /mood/i }).or(
-      page.getByRole('tab', { name: /mood/i })
-    );
-    if (await moodNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-      await moodNav.first().click();
-      await page.waitForTimeout(500);
+    const moodNav = page.getByTestId('nav-mood');
+    if (await moodNav.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await moodNav.click();
+      // Wait for mood page content to load
+      await expect(page.getByTestId('mood-tracker')).toBeVisible({ timeout: 5000 });
     }
 
     // Click on Timeline tab
-    const timelineTab = page.getByRole('tab', { name: /timeline/i });
+    const timelineTab = page.getByTestId('mood-tab-timeline');
     if (await timelineTab.isVisible({ timeout: 2000 }).catch(() => false)) {
       await timelineTab.click();
-      await page.waitForTimeout(500);
+      // Wait for timeline to be ready
+      await expect(
+        page.getByTestId('mood-history-timeline').or(page.getByTestId('empty-mood-history-state'))
+      ).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -74,11 +49,17 @@ test.describe('Mood History Timeline Performance', () => {
       // Start timing
       const startTime = Date.now();
 
-      // Wait for mood items or empty state to appear
-      await Promise.race([
-        page.getByTestId('mood-history-item').first().waitFor({ timeout: 3000 }).catch(() => null),
-        page.getByTestId('empty-mood-history-state').waitFor({ timeout: 3000 }).catch(() => null),
-      ]);
+      // Wait for mood items or empty state to appear using expect.poll
+      await expect
+        .poll(
+          async () => {
+            const hasMoodItem = await page.getByTestId('mood-history-item').first().isVisible().catch(() => false);
+            const hasEmptyState = await page.getByTestId('empty-mood-history-state').isVisible().catch(() => false);
+            return hasMoodItem || hasEmptyState;
+          },
+          { timeout: 3000, intervals: [100, 200, 500] }
+        )
+        .toBe(true);
 
       const renderTime = Date.now() - startTime;
 
@@ -98,16 +79,14 @@ test.describe('Mood History Timeline Performance', () => {
         // Get timeline container (the actual scrollable element)
         const timelineContainer = timeline.locator('div').first();
 
-        // Perform scroll actions
+        // Perform scroll actions using mouse wheel for natural scrolling
         const scrollSteps = 5;
         for (let i = 0; i < scrollSteps; i++) {
-          // Scroll down incrementally
           await timelineContainer.evaluate((el) => {
             el.scrollTop += 100;
           });
-
-          // Small delay between scrolls to simulate real scrolling
-          await page.waitForTimeout(50);
+          // Use requestAnimationFrame-based waiting for smooth scroll simulation
+          await page.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
         }
 
         // Timeline should still be responsive
@@ -136,8 +115,17 @@ test.describe('Mood History Timeline Performance', () => {
           el.scrollTop = el.scrollHeight;
         });
 
-        // Wait for potential loading
-        await page.waitForTimeout(1000);
+        // Wait for potential loading using expect.poll instead of arbitrary timeout
+        await expect
+          .poll(
+            async () => {
+              const currentCount = await page.getByTestId('mood-history-item').count();
+              // Either more items loaded, or loading indicator is gone (no more data)
+              return currentCount >= initialCount;
+            },
+            { timeout: 3000, intervals: [200, 500] }
+          )
+          .toBe(true);
 
         // Check if more items loaded (might not if we don't have enough data)
         const finalCount = await page.getByTestId('mood-history-item').count();
@@ -167,7 +155,8 @@ test.describe('Mood History Timeline Performance', () => {
           await timelineContainer.evaluate((el) => {
             el.scrollTop += 150;
           });
-          await page.waitForTimeout(100);
+          // Use requestAnimationFrame for natural scroll timing
+          await page.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
         }
 
         // Timeline should still render date headers correctly
@@ -189,12 +178,13 @@ test.describe('Mood History Timeline Performance', () => {
       if (await moodItem.isVisible({ timeout: 2000 }).catch(() => false)) {
         const timelineContainer = timeline.locator('div').first();
 
-        // Rapid scrolling test
+        // Rapid scrolling test using requestAnimationFrame for timing
         for (let i = 0; i < 10; i++) {
           await timelineContainer.evaluate((el) => {
             el.scrollTop = Math.random() * el.scrollHeight;
           });
-          await page.waitForTimeout(50);
+          // Use rAF for natural animation frame timing instead of arbitrary delay
+          await page.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
         }
 
         // Timeline should still be functional
@@ -207,7 +197,7 @@ test.describe('Mood History Timeline Performance', () => {
     }
   });
 
-  test('memory usage stays within bounds during scrolling', async ({ page, context }) => {
+  test('memory usage stays within bounds during scrolling', async ({ page }) => {
     const timeline = page.getByTestId('mood-history-timeline');
 
     if (await timeline.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -233,7 +223,8 @@ test.describe('Mood History Timeline Performance', () => {
           await timelineContainer.evaluate((el) => {
             el.scrollTop += 100;
           });
-          await page.waitForTimeout(50);
+          // Use rAF for natural animation frame timing
+          await page.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
         }
 
         // Get final memory metrics

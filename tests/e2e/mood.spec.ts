@@ -24,10 +24,8 @@ test.describe('Mood Tracking', () => {
 
     if (await moodNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
       await moodNav.first().click();
-      // Wait for mood page content to load
-      await expect(
-        page.getByTestId('mood-submit-button').or(page.getByRole('button', { name: /log mood/i }))
-      ).toBeVisible({ timeout: 5000 });
+      // Wait for mood page content to load - look for the mood tracker container
+      await expect(page.getByTestId('mood-tracker')).toBeVisible({ timeout: 5000 });
     }
   });
 

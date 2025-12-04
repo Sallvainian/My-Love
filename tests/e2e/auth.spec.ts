@@ -18,21 +18,49 @@ test.use({ storageState: { cookies: [], origins: [] } });
  * Uses proper Playwright assertions instead of arbitrary timeouts.
  */
 async function handlePostLoginOnboarding(page) {
-  // Step 1: Check if onboarding screen appears (asking for display name)
-  const displayNameInput = page.getByLabel(/display name/i);
-  if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await displayNameInput.fill('TestUser');
-    const continueButton = page.getByRole('button', { name: /continue|save|submit/i });
-    await continueButton.click();
-    // Wait for onboarding to process
-    await expect(displayNameInput).toBeHidden({ timeout: 5000 });
-  }
-
-  // Step 2: Check if welcome/intro screen appears
+  // Wait for either welcome screen, onboarding, or main app to appear
   const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-  if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
+  const displayNameInput = page.getByLabel(/display name/i);
+  const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+
+  // Poll until one of these is visible (max 8 seconds)
+  let state: 'welcome' | 'onboarding' | 'ready' = 'ready';
+  await expect
+    .poll(
+      async () => {
+        if (await welcomeHeading.isVisible().catch(() => false)) {
+          state = 'welcome';
+          return true;
+        }
+        if (await displayNameInput.isVisible().catch(() => false)) {
+          state = 'onboarding';
+          return true;
+        }
+        if (await nav.isVisible().catch(() => false)) {
+          state = 'ready';
+          return true;
+        }
+        return false;
+      },
+      { timeout: 8000, intervals: [200, 500, 1000] }
+    )
+    .toBe(true);
+
+  // Handle welcome screen if shown
+  if (state === 'welcome') {
     await page.getByRole('button', { name: /continue/i }).click();
     await expect(welcomeHeading).toBeHidden({ timeout: 5000 });
+    // Check if onboarding appears next
+    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      state = 'onboarding';
+    }
+  }
+
+  // Handle onboarding if shown
+  if (state === 'onboarding') {
+    await displayNameInput.fill('TestUser');
+    await page.getByRole('button', { name: /continue|save|submit/i }).click();
+    await expect(displayNameInput).toBeHidden({ timeout: 5000 });
   }
 }
 
@@ -136,19 +164,8 @@ test.describe('Authentication', () => {
     const nav = page.locator('nav, [data-testid="bottom-navigation"], [role="navigation"]').first();
     await expect(nav).toBeVisible({ timeout: 10000 });
 
-    // Find and click settings/profile to access logout
-    const settingsTab = page
-      .getByRole('tab', { name: /settings/i })
-      .or(page.getByRole('button', { name: /settings/i }))
-      .or(page.getByTestId('settings-tab'));
-
-    if (await settingsTab.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await settingsTab.first().click();
-      await page.waitForLoadState('networkidle');
-    }
-
-    // Click logout
-    const logoutButton = page.getByRole('button', { name: /log ?out|sign ?out/i });
+    // Click logout button in bottom navigation
+    const logoutButton = page.getByTestId('nav-logout');
     await expect(logoutButton).toBeVisible({ timeout: 5000 });
     await logoutButton.click();
 
