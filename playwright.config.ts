@@ -16,10 +16,16 @@ const BASE_URL = `http://localhost:${PORT}/`;
  *
  * Streamlined for fast CI execution with minimal test suite (10 tests).
  * Port is configurable via PORT or VITE_PORT environment variable.
+ *
+ * Uses globalSetup for one-time authentication - login happens once,
+ * then storageState is reused across all tests for faster execution.
  */
 
 export default defineConfig({
   testDir: './tests/e2e',
+
+  // Global setup: login once before all tests
+  globalSetup: './tests/e2e/global-setup.ts',
 
   // Timeout: longer in CI (slower environment)
   timeout: process.env.CI ? 30000 : 15000,
@@ -51,6 +57,8 @@ export default defineConfig({
     // Longer timeouts for CI (slower environment)
     navigationTimeout: process.env.CI ? 20000 : 10000,
     actionTimeout: process.env.CI ? 10000 : 5000,
+    // Use saved authentication state from global setup
+    storageState: 'tests/e2e/.auth/storageState.json',
   },
 
   // Chromium only
