@@ -24,6 +24,7 @@ import { MessageInput } from './MessageInput';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useAppStore } from '../../stores/useAppStore';
 import { authService } from '../../api/authService';
+import { getPartnerDisplayName } from '../../api/supabaseClient';
 
 /**
  * LoveNotes - Full chat page component
@@ -38,15 +39,13 @@ export function LoveNotes(): ReactElement {
   // Get navigation function
   const navigateHome = useAppStore((state) => state.navigateHome);
 
-  // Get user info for message display
-  const settings = useAppStore((state) => state.settings);
-  const partnerName = settings?.relationship?.partnerName || 'Partner';
-
   // State for current user info
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [userName, setUserName] = useState<string>('You');
+  // Partner name fetched from database (not local config)
+  const [partnerName, setPartnerName] = useState<string>('Partner');
 
-  // Fetch current user info on mount
+  // Fetch current user info and partner name on mount
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
@@ -62,6 +61,12 @@ export function LoveNotes(): ReactElement {
         } else if (user?.email) {
           // Fallback to email prefix
           setUserName(user.email.split('@')[0]);
+        }
+
+        // Fetch partner's display name from database (not local config)
+        const partnerDisplayName = await getPartnerDisplayName();
+        if (partnerDisplayName) {
+          setPartnerName(partnerDisplayName);
         }
       } catch (err) {
         console.error('[LoveNotes] Failed to fetch user info:', err);
