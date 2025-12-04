@@ -529,19 +529,25 @@ export function PartnerMoodView() {
                 <p className="text-gray-600">Connected with {partner.displayName}</p>
               </div>
 
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing || !syncStatus.isOnline}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  isRefreshing || !syncStatus.isOnline
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-pink-500 hover:bg-pink-600 text-white'
-                }`}
-                data-testid="partner-mood-refresh-button"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-              </button>
+              {/* Action buttons: Refresh + Interaction FAB */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || !syncStatus.isOnline}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isRefreshing || !syncStatus.isOnline
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-pink-500 hover:bg-pink-600 text-white'
+                  }`}
+                  data-testid="partner-mood-refresh-button"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                {/* Story 6.5: Poke/Kiss Interaction FAB - next to refresh, expands down */}
+                <PokeKissInterface expandDirection="down" />
+              </div>
             </div>
 
             {/* Error Display */}
@@ -607,10 +613,6 @@ export function PartnerMoodView() {
         )}
       </div>
 
-      {/* Story 6.5: Poke/Kiss Interaction FAB - Fixed bottom-right position */}
-      <div className="fixed bottom-24 right-4 z-40">
-        <PokeKissInterface />
-      </div>
     </div>
   );
 }
