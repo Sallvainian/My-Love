@@ -7,10 +7,15 @@ config();
 // Also load test-specific env vars (unencrypted, gitignored)
 config({ path: '.env.test', override: true });
 
+// Port configuration - use PORT env var or default to 5173
+const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
+const BASE_URL = `http://localhost:${PORT}/`;
+
 /**
  * Playwright configuration for My-Love PWA E2E testing
  *
  * Streamlined for fast CI execution with minimal test suite (10 tests).
+ * Port is configurable via PORT or VITE_PORT environment variable.
  */
 
 export default defineConfig({
@@ -37,7 +42,7 @@ export default defineConfig({
     : [['html', { outputFolder: 'playwright-report' }]],
 
   use: {
-    baseURL: 'http://localhost:5173/',
+    baseURL: BASE_URL,
     headless: true,
     trace: 'off',
     // Screenshot on failure for debugging CI issues
@@ -66,9 +71,10 @@ export default defineConfig({
   ],
 
   // Dev server (using dotenvx to decrypt env vars)
+  // Port configurable via PORT or VITE_PORT env var
   webServer: {
-    command: 'dotenvx run -- npm run dev',
-    url: 'http://localhost:5173/',
+    command: `dotenvx run -- npm run dev -- --port ${PORT}`,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60000, // 1 minute should be enough
   },
