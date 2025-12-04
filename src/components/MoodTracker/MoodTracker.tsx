@@ -548,10 +548,10 @@ export function MoodTracker() {
             data-testid="mood-history-section"
           >
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              <h2 className="text-2xl font-bold text-(--color-text) mb-2">
                 Mood Timeline
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-(--color-text) opacity-70">
                 View your mood history over time
               </p>
             </div>
