@@ -31,7 +31,7 @@ export interface SupabasePhoto {
   storage_path: string;
   filename: string;
   caption: string | null;
-  mime_type: 'image/jpeg' | 'image/png' | 'image/webp';
+  mime_type: string; // DB constraint enforces: 'image/jpeg' | 'image/png' | 'image/webp'
   file_size: number;
   width: number;
   height: number;
