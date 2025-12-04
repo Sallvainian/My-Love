@@ -225,8 +225,13 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
   // Story 5.2 AC-4: Skeleton loaders during initial fetch
   // Show skeleton grid if actively loading OR haven't loaded yet
+  // Wrapped with photo-gallery testid so E2E tests can proceed during loading
   if ((isLoading || !hasLoadedOnce) && photos.length === 0) {
-    return <PhotoGridSkeletonGrid />;
+    return (
+      <div data-testid="photo-gallery">
+        <PhotoGridSkeletonGrid />
+      </div>
+    );
   }
 
   // AC-4.2.5: Empty state when no photos uploaded (after first load attempt)

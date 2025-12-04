@@ -224,8 +224,13 @@ function App() {
     if (!hasInitialized.current && session) {
       hasInitialized.current = true;
 
-      // Story 3.5: Migrate custom messages from LocalStorage to IndexedDB before app initialization
-      (async () => {
+      // Performance fix: Initialize app immediately for fast first paint
+      // Migration runs in background after initial render
+      initializeApp();
+
+      // Story 3.5: Migrate custom messages from LocalStorage to IndexedDB
+      // Deferred to not block initial paint - runs after first render
+      const runMigration = async () => {
         try {
           const migrationResult = await migrateCustomMessagesFromLocalStorage();
           if (migrationResult.migratedCount > 0) {
@@ -242,12 +247,17 @@ function App() {
           console.error('[App] Migration failed:', error);
         }
 
-        // Initialize app after migration completes
-        initializeApp();
-
         // Monitor LocalStorage quota in development mode (Epic 2 technical debt)
         logStorageQuota();
-      })();
+      };
+
+      // Use requestIdleCallback if available, otherwise setTimeout
+      // This ensures migration doesn't block the main thread during initial render
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => runMigration(), { timeout: 2000 });
+      } else {
+        setTimeout(runMigration, 100);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]); // Initialize when session is established
@@ -479,7 +489,7 @@ function App() {
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen pb-16">
+      <div className="min-h-screen pb-16" data-testid="app-container">
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
         <NetworkStatusIndicator showOnlyWhenOffline />
 
