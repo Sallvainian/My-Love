@@ -16,7 +16,7 @@
  * Story 2.2: AC-2.2.1 (message input), AC-2.2.2 (send functionality)
  */
 
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { MessageList } from './MessageList';
@@ -32,7 +32,7 @@ import { authService } from '../../api/authService';
  * and eventually a message input (Story 2.2).
  */
 export function LoveNotes(): ReactElement {
-  const { notes, isLoading, error, hasMore, fetchOlderNotes, fetchNotes, clearError, retryFailedMessage } =
+  const { notes, isLoading, error, hasMore, fetchOlderNotes, clearError, retryFailedMessage } =
     useLoveNotes();
 
   // Get navigation function
