@@ -54,7 +54,11 @@ const formatCooldown = (ms: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-export function PokeKissInterface() {
+interface PokeKissInterfaceProps {
+  expandDirection?: 'up' | 'down';
+}
+
+export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceProps) {
   const {
     sendPoke,
     sendKiss,
@@ -310,23 +314,29 @@ export function PokeKissInterface() {
   return (
     <>
       <div ref={containerRef} className="relative inline-flex items-center" data-testid="poke-kiss-interface">
-        {/* Action Buttons (expand upward) */}
+        {/* Action Buttons (expand up or down based on prop) */}
         <AnimatePresence>
           {isExpanded && (
             <motion.div
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 flex flex-col-reverse items-center gap-2"
+              className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-2 z-50 ${
+                expandDirection === 'down'
+                  ? 'top-full mt-3 flex-col'
+                  : 'bottom-full mb-3 flex-col-reverse'
+              }`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               {actionButtons.map((button, index) => {
                 const Icon = button.icon;
+                const yOffset = expandDirection === 'down' ? -20 : 20;
+                const yExit = expandDirection === 'down' ? -10 : 10;
                 return (
                   <motion.button
                     key={button.id}
                     onClick={button.onClick}
                     disabled={button.disabled}
-                    initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                    initial={{ opacity: 0, y: yOffset, scale: 0.8 }}
                     animate={{
                       opacity: 1,
                       y: 0,
@@ -335,7 +345,7 @@ export function PokeKissInterface() {
                     }}
                     exit={{
                       opacity: 0,
-                      y: 10,
+                      y: yExit,
                       scale: 0.8,
                       transition: { delay: (actionButtons.length - index) * 0.03 }
                     }}
