@@ -18,9 +18,10 @@
  * Story 2.4: Message history with scroll performance
  */
 
-import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { List } from 'react-window';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
+import { useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Loader2, ArrowDown, RefreshCw } from 'lucide-react';
 import { LoveNoteMessage } from './LoveNoteMessage';
@@ -120,7 +121,8 @@ export function MessageList({
   onRetry,
   onRefresh,
 }: MessageListProps): ReactNode {
-  const listRef = useRef<any>(null);
+  // Use react-window v2's typed ref hook for proper API access
+  const listRef = useListRef(null);
   const hasScrolledToBottom = useRef(false);
   const prevNotesLength = useRef(notes.length);
   const scrollToBottomOnNextRender = useRef(false);
@@ -155,13 +157,33 @@ export function MessageList({
   );
 
   // Setup infinite loading hook - must be called before conditional returns
-  const onRowsRendered = useInfiniteLoader({
+  const infiniteLoaderCallback = useInfiniteLoader({
     isRowLoaded,
     loadMoreRows,
     rowCount: totalRowCount + (hasMore ? 1 : 0),
     threshold: 10,
     minimumBatchSize: 50,
   });
+
+  // Wrapper for onRowsRendered that also tracks scroll position (v2 API)
+  // In react-window v2, onRowsRendered receives { startIndex, stopIndex } for visible rows
+  const onRowsRendered = useCallback(
+    (visibleRows: { startIndex: number; stopIndex: number }) => {
+      // Call the infinite loader callback first
+      infiniteLoaderCallback(visibleRows);
+
+      // Track if user is at bottom (within last few rows)
+      // stopIndex is the last visible row index
+      const atBottom = visibleRows.stopIndex >= totalRowCount - 2;
+      setIsAtBottom(atBottom);
+
+      // Hide new message indicator when user scrolls to bottom
+      if (atBottom && showNewMessageIndicator) {
+        setShowNewMessageIndicator(false);
+      }
+    },
+    [infiniteLoaderCallback, totalRowCount, showNewMessageIndicator]
+  );
 
   // Variable row height function
   const getRowHeight = useCallback(
@@ -180,7 +202,8 @@ export function MessageList({
   // Auto-scroll to bottom on initial load
   useEffect(() => {
     if (notes.length > 0 && listRef.current && !hasScrolledToBottom.current) {
-      listRef.current.scrollToItem(totalRowCount - 1, 'end');
+      // Use react-window v2 API: scrollToRow({ align, behavior, index })
+      listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
       hasScrolledToBottom.current = true;
       setIsAtBottom(true);
     }
@@ -207,63 +230,17 @@ export function MessageList({
   // Execute scroll to bottom after render (when new message arrives)
   useEffect(() => {
     if (scrollToBottomOnNextRender.current && listRef.current) {
-      listRef.current.scrollToItem(totalRowCount - 1, 'end');
+      // Use react-window v2 API
+      listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
       scrollToBottomOnNextRender.current = false;
     }
   });
 
-  // Calculate estimated total height for scroll calculations
-  // Uses actual row heights for more accurate estimation
-  const estimatedTotalHeight = useCallback((): number => {
-    if (totalRowCount === 0) return 0;
-
-    let height = 0;
-    for (let i = 0; i < totalRowCount; i++) {
-      height += getRowHeight(i);
-    }
-    return height;
-  }, [totalRowCount, getRowHeight]);
-
-  // Handle scroll for bottom detection
-  const handleScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      const target = event.currentTarget;
-      if (!listRef.current) return;
-
-      const scrollOffset = target.scrollTop;
-
-      // Guard against division by zero / empty state
-      if (totalRowCount === 0) {
-        setIsAtBottom(true);
-        return;
-      }
-
-      // Use calculated total height for more accurate bottom detection
-      const totalHeight = estimatedTotalHeight();
-      const visibleHeight = 600; // Default height from List component
-
-      // Guard against edge case where totalHeight is 0
-      if (totalHeight === 0) {
-        setIsAtBottom(true);
-        return;
-      }
-
-      const scrolledToBottom = scrollOffset + visibleHeight >= totalHeight - 50;
-
-      setIsAtBottom(scrolledToBottom);
-
-      // Hide new message indicator when user scrolls to bottom
-      if (scrolledToBottom && showNewMessageIndicator) {
-        setShowNewMessageIndicator(false);
-      }
-    },
-    [totalRowCount, showNewMessageIndicator, estimatedTotalHeight]
-  );
-
   // Scroll to bottom handler for new message indicator
   const scrollToBottom = useCallback(() => {
     if (listRef.current) {
-      listRef.current.scrollToItem(totalRowCount - 1, 'end');
+      // Use react-window v2 API
+      listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
       setShowNewMessageIndicator(false);
       setIsAtBottom(true);
     }
@@ -385,16 +362,15 @@ export function MessageList({
       </AnimatePresence>
 
       {/* Story 2.4 - Task 1.2: Virtualized List */}
-      {(List as any)({
-        ref: listRef,
-        rowCount: totalRowCount,
-        rowHeight: getRowHeight,
-        onRowsRendered: onRowsRendered,
-        onScroll: handleScroll,
-        defaultHeight: 600,
-        rowComponent: MessageRow,
-        rowProps: {},
-      })}
+      <List
+        listRef={listRef}
+        rowCount={totalRowCount}
+        rowHeight={getRowHeight}
+        onRowsRendered={onRowsRendered}
+        defaultHeight={600}
+        rowComponent={MessageRow}
+        rowProps={{}}
+      />
     </div>
   );
 }
