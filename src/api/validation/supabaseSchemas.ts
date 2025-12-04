@@ -112,7 +112,7 @@ export const SupabaseMoodSchema = z.object({
   id: UUIDSchema,
   user_id: UUIDSchema,
   mood_type: MoodTypeSchema, // Legacy single mood (kept for backward compatibility)
-  mood_types: z.array(MoodTypeSchema).optional(), // New: multiple mood support
+  mood_types: z.array(MoodTypeSchema).nullable().optional(), // New: multiple mood support (nullable for legacy records)
   note: z.string().nullable(),
   created_at: TimestampSchema.nullable(),
   updated_at: TimestampSchema.nullable(),
