@@ -11,7 +11,7 @@
  * - Scroll position preservation during pagination
  * - "New message" indicator when scrolled up
  * - "Beginning of conversation" indicator
- * - Pull-to-refresh functionality
+ * - Auto-reconnect for realtime (handled by useRealtimeMessages)
  * - Loading indicators
  * - Empty state
  *
@@ -23,7 +23,7 @@ import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
 import { useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Loader2, ArrowDown, RefreshCw } from 'lucide-react';
+import { Heart, Loader2, ArrowDown } from 'lucide-react';
 import { LoveNoteMessage } from './LoveNoteMessage';
 import type { LoveNote } from '../../types/models';
 
@@ -44,8 +44,6 @@ export interface MessageListProps {
   hasMore?: boolean;
   /** Callback when user clicks retry on a failed message (Story 2.2) */
   onRetry?: (tempId: string) => void;
-  /** Callback for refresh action (Story 2.4 - AC-2.4.5) */
-  onRefresh?: () => void;
 }
 
 /**
@@ -119,7 +117,6 @@ export function MessageList({
   onLoadMore,
   hasMore = false,
   onRetry,
-  onRefresh,
 }: MessageListProps): ReactNode {
   // Use react-window v2's typed ref hook for proper API access
   const listRef = useListRef(null);
@@ -246,13 +243,6 @@ export function MessageList({
     }
   }, [totalRowCount]);
 
-  // Refresh handler (Story 2.4 - AC-2.4.5)
-  const handleRefresh = useCallback(() => {
-    if (onRefresh) {
-      onRefresh();
-    }
-  }, [onRefresh]);
-
   // Empty state
   if (!isLoading && notes.length === 0) {
     return (
@@ -331,18 +321,6 @@ export function MessageList({
 
   return (
     <div className="flex-1 relative overflow-hidden">
-      {/* Story 2.4 - AC-2.4.5: Refresh button */}
-      {onRefresh && (
-        <button
-          onClick={handleRefresh}
-          className="absolute top-2 right-2 z-20 bg-white/90 hover:bg-white rounded-full p-2 shadow-md transition-colors"
-          aria-label="Refresh messages"
-          data-testid="refresh-button"
-        >
-          <RefreshCw className="w-4 h-4 text-gray-600" />
-        </button>
-      )}
-
       {/* Story 2.3: AC-2.3.4 - New message indicator */}
       <AnimatePresence>
         {showNewMessageIndicator && (

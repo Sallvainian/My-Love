@@ -6,7 +6,7 @@
  *
  * Features:
  * - Full-screen chat layout
- * - Header with title and refresh
+ * - Header with title
  * - Scrollable message list
  * - Message input with send functionality
  * - Safe area handling for mobile
@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
@@ -71,12 +71,6 @@ export function LoveNotes(): ReactElement {
     fetchUserInfo();
   }, []);
 
-  // Handle refresh
-  const handleRefresh = useCallback(async () => {
-    clearError();
-    await fetchNotes();
-  }, [clearError, fetchNotes]);
-
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-[#FFF5F5]">
       {/* Header */}
@@ -91,14 +85,8 @@ export function LoveNotes(): ReactElement {
 
         <h1 className="text-lg font-semibold text-gray-800">Love Notes</h1>
 
-        <button
-          onClick={handleRefresh}
-          disabled={isLoading}
-          className="p-2 -mr-2 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
-          aria-label="Refresh messages"
-        >
-          <RefreshCw className={`w-5 h-5 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} />
-        </button>
+        {/* Spacer for symmetric header layout */}
+        <div className="w-9" />
       </header>
 
       {/* Error banner */}
@@ -129,7 +117,6 @@ export function LoveNotes(): ReactElement {
         onLoadMore={fetchOlderNotes}
         hasMore={hasMore}
         onRetry={retryFailedMessage}
-        onRefresh={handleRefresh}
       />
 
       {/* Message input - Story 2.2 */}

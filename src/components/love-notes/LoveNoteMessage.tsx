@@ -64,7 +64,7 @@ function LoveNoteMessageComponent({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className={`flex flex-col mb-3 ${isOwnMessage ? 'items-end' : 'items-start'}`}
+      className={`flex flex-col mb-3 px-4 ${isOwnMessage ? 'items-end' : 'items-start'}`}
       role="listitem"
       aria-label={`Message from ${senderName} at ${fullTimestamp}`}
     >
