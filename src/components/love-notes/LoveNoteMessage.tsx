@@ -67,6 +67,7 @@ function LoveNoteMessageComponent({
       className={`flex flex-col mb-3 px-4 ${isOwnMessage ? 'items-end' : 'items-start'}`}
       role="listitem"
       aria-label={`Message from ${senderName} at ${fullTimestamp}`}
+      data-testid="love-note-message"
     >
       {/* Sender name and timestamp caption */}
       <span

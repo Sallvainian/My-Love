@@ -515,7 +515,7 @@ export function MoodTracker() {
                     type="button"
                     onClick={() => setShowNoteField(true)}
                     className="text-sm text-gray-500 hover:text-pink-600 transition-colors"
-                    data-testid="mood-note-toggle"
+                    data-testid="mood-add-note-toggle"
                   >
                     + Add note (optional)
                   </button>

@@ -7,6 +7,7 @@
     "dev": "./scripts/dev-with-cleanup.sh",
     "dev:raw": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:unit": "vitest run",
