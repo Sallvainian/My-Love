@@ -8,12 +8,15 @@ A beautiful Progressive Web App (PWA) that sends daily love messages and reminde
 
 - **Daily Love Messages**: Rotating heartfelt messages (reasons, memories, affirmations, future dreams)
 - **100 Pre-written Messages**: Curated sweet messages ready to use or customize
+- **Love Notes Chat**: Real-time messaging with your partner - send love notes instantly
 - **Beautiful Animations**: Smooth, delightful animations with Framer Motion
 - **PWA Support**: Installable on mobile devices, works offline
 - **Photo Memories**: Store and view photos with captions in a beautiful gallery
 - **Anniversary Countdown Timers**: Real-time countdown to special dates with celebration animations
-- **Mood Tracker**: Daily mood logging with offline-first sync to Supabase backend
-- **Partner Interactions**: Send pokes and kisses with real-time delivery
+- **Mood Tracker**: Daily mood logging with emoji moods and optional notes
+- **Partner Mood View**: See your partner's current mood in real-time
+- **Partner Interactions**: Send pokes, kisses, and farts with fun animations and real-time delivery
+- **Mood History**: View your mood timeline and patterns over time
 - **Multiple Themes**: Sunset, Ocean, Lavender, and Rose themes
 - **Privacy First**: Row Level Security for data protection
 - **Super Clean UI**: Modern, romantic design with glassmorphism
@@ -285,9 +288,11 @@ You should see:
 
 Once set up, your app supports:
 
-- **Mood Tracking**: Log your daily mood (loved, happy, content, thoughtful, grateful)
-- **Real-time Sync**: See your partner's moods instantly
-- **Poke & Kiss**: Send playful interactions to your partner
+- **Love Notes**: Real-time chat with your partner - messages delivered instantly
+- **Mood Tracking**: Log your daily mood with 12 emoji options and optional notes
+- **Partner Mood View**: See your partner's current mood in real-time
+- **Poke, Kiss & Fart**: Send playful interactions with fun animations
+- **Photo Sharing**: Upload and share photos with captions
 - **Offline-first**: All features work offline, sync when online
 - **Privacy**: Row Level Security ensures only you and your partner can see your data
 
@@ -358,7 +363,11 @@ My-Love/
 │   │   └── errorHandlers.ts       # Error handling utilities
 │   ├── components/
 │   │   ├── DailyMessage/    # Main message card component
-│   │   ├── Onboarding/      # DEPRECATED (Story 1.4) - To be removed in Story 1.5
+│   │   ├── love-notes/      # Real-time chat messaging
+│   │   ├── MoodTracker/     # Mood logging with emoji selection
+│   │   ├── PartnerMoodView/ # View partner's mood in real-time
+│   │   ├── PokeKissInterface/ # Playful interactions (poke/kiss/fart)
+│   │   ├── PhotoGallery/    # Photo grid with lazy loading
 │   │   └── ...
 │   ├── config/
 │   │   └── constants.ts     # Environment configuration constants
@@ -400,11 +409,12 @@ My-Love/
 - [x] Theme system
 - [x] Photo gallery with upload, carousel, and lazy loading
 - [x] Anniversary countdown timers with celebration animations
-- [x] Mood tracker with offline-first sync
-- [x] Partner poke/kiss interactions with real-time delivery
+- [x] Mood tracker with emoji moods and notes
+- [x] Partner mood view with real-time sync
+- [x] Partner poke/kiss/fart interactions with animations
 - [x] Supabase backend integration with Row Level Security
-- [ ] Mood history calendar view
-- [ ] Custom notes section
+- [x] Mood history timeline view
+- [x] Love Notes real-time chat
 - [ ] Push notifications
 - [ ] Export/import data
 - [ ] More themes
@@ -495,4 +505,4 @@ If you run into issues:
 
 ---
 
-**Remember**: This app stores all data locally on the device. There's no server, no tracking, and complete privacy. Perfect for keeping your love notes personal and special! 💕
+**Remember**: This app uses Supabase for real-time sync between you and your partner. Row Level Security ensures only you two can see your data - complete privacy with real-time connection. Perfect for keeping your love notes personal and special! 💕
