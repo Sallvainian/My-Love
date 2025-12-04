@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => ({
           'vendor-state': ['zustand', 'idb', 'zod'],
           // Animations (optional, can be lazy loaded)
           'vendor-animation': ['framer-motion'],
+          // Icons - tree-shakeable, but benefit from caching as separate chunk
+          'vendor-icons': ['lucide-react'],
         },
       },
     },

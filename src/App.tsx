@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './stores/useAppStore';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
-import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/RelationshipTimers';
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
-import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
-import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
 // PokeKissInterface moved to PartnerMoodView
 import { LoginScreen } from './components/LoginScreen';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
@@ -34,6 +31,17 @@ const PartnerMoodView = lazy(() =>
 const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
 const LoveNotes = lazy(() =>
   import('./components/love-notes').then((m) => ({ default: m.LoveNotes }))
+);
+
+// Lazy load modal/conditional components to reduce initial bundle
+const WelcomeSplash = lazy(() =>
+  import('./components/WelcomeSplash/WelcomeSplash').then((m) => ({ default: m.WelcomeSplash }))
+);
+const PhotoUpload = lazy(() =>
+  import('./components/PhotoUpload/PhotoUpload').then((m) => ({ default: m.PhotoUpload }))
+);
+const PhotoCarousel = lazy(() =>
+  import('./components/PhotoCarousel/PhotoCarousel').then((m) => ({ default: m.PhotoCarousel }))
 );
 
 // Loading spinner component for Suspense fallback
@@ -450,7 +458,9 @@ function App() {
   if (showSplash) {
     return (
       <ErrorBoundary>
-        <WelcomeSplash onContinue={handleContinue} />
+        <Suspense fallback={<LoadingSpinner />}>
+          <WelcomeSplash onContinue={handleContinue} />
+        </Suspense>
       </ErrorBoundary>
     );
   }
@@ -532,11 +542,15 @@ function App() {
         {/* Bottom navigation */}
         <BottomNavigation currentView={currentView} onViewChange={setView} />
 
-        {/* Photo upload modal - Story 4.1 */}
-        <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+        {/* Photo upload modal - Story 4.1 (lazy loaded) */}
+        <Suspense fallback={null}>
+          <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+        </Suspense>
 
-        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected */}
-        <PhotoCarousel />
+        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
+        <Suspense fallback={null}>
+          <PhotoCarousel />
+        </Suspense>
 
         {/* Story 0.4: Deployment validation timestamp */}
         <footer className="fixed bottom-16 left-0 right-0 text-center py-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm">
