@@ -120,6 +120,43 @@ export const getPartnerId = async (): Promise<string | null> => {
 };
 
 /**
+ * Get partner's display name
+ * Fetches the partner's display_name from the users table.
+ * This provides the correct name for each user's partner (not a hardcoded config value).
+ *
+ * @returns Partner's display name or null if not found
+ */
+export const getPartnerDisplayName = async (): Promise<string | null> => {
+  try {
+    const partnerId = await getPartnerId();
+
+    if (!partnerId) {
+      if (import.meta.env.DEV) {
+        console.log('[Supabase] No partner ID found, cannot get partner display name');
+      }
+      return null;
+    }
+
+    // Query partner's display_name from users table
+    const { data, error } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', partnerId)
+      .single();
+
+    if (error) {
+      console.error('[Supabase] Failed to get partner display name:', error);
+      return null;
+    }
+
+    return data?.display_name ?? null;
+  } catch (error) {
+    console.error('[Supabase] Error getting partner display name:', error);
+    return null;
+  }
+};
+
+/**
  * Check if Supabase is properly configured
  */
 export const isSupabaseConfigured = (): boolean => {
