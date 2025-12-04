@@ -79,8 +79,8 @@ docs/technical-decisions.md
 .playwright-mcp/
 .serena/
 
-# Test environment (contains secrets)
-.env.test
+# Test environment - .env.test is encrypted with dotenvx and safe to commit
+# The decryption key (DOTENV_PRIVATE_KEY_TEST) is stored in .env.keys and GitHub Secrets
 
 # Additional env files without dot prefix
 env.keys
