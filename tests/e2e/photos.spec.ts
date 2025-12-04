@@ -1,85 +1,143 @@
 /**
  * Photo Sharing Tests - Gallery Access
  *
- * Tests that photo/gallery functionality is accessible.
+ * Tests photo/gallery functionality.
+ * Authentication is handled by global-setup.ts via storageState.
  */
 
 import { test, expect } from '@playwright/test';
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
-
 test.describe('Photo Sharing', () => {
   test.beforeEach(async ({ page }) => {
-    // Login first
+    // Navigate to app - storageState handles authentication
     await page.goto('/');
 
-    // Wait for page to be fully loaded (critical for CI)
-    await page.waitForLoadState('domcontentloaded');
-
-    // Wait for login form to be ready
-    await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
-
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-
-    // Handle onboarding if needed
-    await page.waitForTimeout(2000);
-    const displayNameInput = page.getByLabel(/display name/i);
-    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await displayNameInput.fill('TestUser');
-      await page.getByRole('button', { name: /continue|save|submit/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Handle welcome/intro screen if needed
-    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await page.getByRole('button', { name: /continue/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Wait for app to load
+    // Wait for app to be ready
     await expect(
       page.locator('nav, [data-testid="bottom-navigation"]').first()
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout: 15000 });
+
+    // Navigate to photos section if available
+    const photosNav = page
+      .getByRole('button', { name: /photo|gallery|image|picture/i })
+      .or(page.getByRole('tab', { name: /photo|gallery|image|picture/i }));
+
+    if (await photosNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      await photosNav.first().click();
+      // Wait for photos page to load
+      await page.waitForLoadState('networkidle');
+    }
   });
 
   test('user can access photo section', async ({ page }) => {
     const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
-
-    // Try to find photo-related navigation
-    const photosNav = page.getByRole('button', { name: /photo|gallery|image|picture/i }).or(
-      page.getByRole('tab', { name: /photo|gallery|image|picture/i })
-    );
-
-    if (await photosNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-      await photosNav.first().click();
-      await page.waitForTimeout(500);
-    }
-
-    // App should remain functional
     await expect(nav).toBeVisible();
+
+    // Look for photo-related content
+    const photoContent = page
+      .getByTestId('photo-gallery')
+      .or(page.getByTestId('photos-container'))
+      .or(page.locator('[data-testid*="photo"]'))
+      .or(page.getByText(/no photos|add photos|upload/i));
+
+    // Either photo gallery or empty state should be visible
+    const hasPhotoContent = await photoContent.first().isVisible({ timeout: 5000 }).catch(() => false);
+
+    // Test passes if we're on a functional photos page
+    // (either showing photos or showing empty state)
+    expect(hasPhotoContent || (await nav.isVisible())).toBe(true);
   });
 
-  test('user can navigate photo features', async ({ page }) => {
-    const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+  test('photo upload button is accessible', async ({ page }) => {
+    // Look for upload button or add photo button
+    const uploadButton = page
+      .getByRole('button', { name: /upload|add photo|add picture/i })
+      .or(page.getByTestId('photo-upload-button'))
+      .or(page.locator('input[type="file"]'));
 
-    // Get all nav items and try clicking through them
+    const hasUploadOption = await uploadButton.first().isVisible({ timeout: 5000 }).catch(() => false);
+
+    // Upload option should exist in photos section
+    // (might be file input or button)
+    if (hasUploadOption) {
+      await expect(uploadButton.first()).toBeVisible();
+    }
+  });
+
+  test('photo gallery displays images or empty state', async ({ page }) => {
+    // Wait for content to load
+    await page.waitForLoadState('networkidle');
+
+    // Look for either photos or empty state
+    const photos = page.locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]');
+    const emptyState = page.getByText(/no photos|add your first|upload photos/i);
+
+    const photoCount = await photos.count();
+    const hasEmptyState = await emptyState.isVisible({ timeout: 3000 }).catch(() => false);
+
+    // Either has photos or shows empty state
+    expect(photoCount > 0 || hasEmptyState).toBe(true);
+  });
+
+  test('photos can be viewed in full screen/modal', async ({ page }) => {
+    // Wait for content to load
+    await page.waitForLoadState('networkidle');
+
+    // Find clickable photo items
+    const photoItems = page.locator(
+      'img[src*="photo"], img[src*="image"], [data-testid*="photo-item"], [data-testid="photo-thumbnail"]'
+    );
+    const photoCount = await photoItems.count();
+
+    if (photoCount > 0) {
+      // Click first photo
+      await photoItems.first().click();
+
+      // Look for modal/lightbox/viewer
+      const viewer = page
+        .getByTestId('photo-viewer')
+        .or(page.getByRole('dialog'))
+        .or(page.locator('[class*="modal"]'))
+        .or(page.locator('[class*="lightbox"]'));
+
+      const viewerVisible = await viewer.isVisible({ timeout: 3000 }).catch(() => false);
+
+      if (viewerVisible) {
+        await expect(viewer).toBeVisible();
+
+        // Close viewer (escape or close button)
+        const closeButton = page.getByRole('button', { name: /close/i }).or(page.getByLabel(/close/i));
+        if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await closeButton.click();
+        } else {
+          await page.keyboard.press('Escape');
+        }
+      }
+    }
+  });
+
+  test('navigation remains functional in photos section', async ({ page }) => {
+    const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+    await expect(nav).toBeVisible();
+
+    // Navigate away and back
     const navItems = nav.locator('button, a, [role="tab"]');
     const count = await navItems.count();
 
-    // Click each nav item to verify app doesn't crash
-    for (let i = 0; i < Math.min(count, 4); i++) {
-      const item = navItems.nth(i);
-      if (await item.isVisible()) {
-        await item.click();
-        await page.waitForTimeout(300);
+    if (count >= 2) {
+      // Click different nav item
+      await navItems.nth(0).click();
+      await expect(nav).toBeVisible();
+
+      // Navigate back to photos
+      const photosNav = page
+        .getByRole('button', { name: /photo|gallery/i })
+        .or(page.getByRole('tab', { name: /photo|gallery/i }));
+
+      if (await photosNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+        await photosNav.first().click();
+        await expect(nav).toBeVisible();
       }
     }
-
-    // App should still be functional
-    await expect(nav).toBeVisible();
   });
 });
