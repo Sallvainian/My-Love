@@ -122,7 +122,7 @@ export function MessageInput() {
   const isDisabled = !validation.valid || isSending;
 
   return (
-    <div className="flex flex-col gap-2 p-4 bg-white border-t border-gray-200 relative z-10 flex-shrink-0">
+    <div className="flex flex-col gap-2 p-4 bg-white border-t border-gray-200 relative z-10 shrink-0">
       {/* Character counter (visible at 900+ chars) */}
       {showCounter && (
         <div

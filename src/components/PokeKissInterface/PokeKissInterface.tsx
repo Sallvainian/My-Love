@@ -353,7 +353,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
                     whileTap={{ scale: 0.95 }}
                     className={`
                       relative flex items-center gap-2 px-4 py-2 rounded-full
-                      bg-gradient-to-br ${button.gradient}
+                      bg-linear-to-br ${button.gradient}
                       text-white text-sm font-medium shadow-lg
                       disabled:opacity-50 disabled:cursor-not-allowed
                       transition-shadow hover:shadow-xl
@@ -382,7 +382,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
           whileTap={{ scale: 0.95 }}
           className={`
             relative flex items-center justify-center w-14 h-14 rounded-full
-            bg-gradient-to-br from-pink-500 to-rose-500
+            bg-linear-to-br from-pink-500 to-rose-500
             text-white shadow-lg hover:shadow-xl
             transition-all duration-300
           `}
@@ -572,7 +572,7 @@ function FartAnimation({ onComplete }: { onComplete: () => void }) {
       ))}
 
       <motion.div
-        className="absolute w-64 h-64 rounded-full bg-gradient-to-r from-yellow-200/30 to-green-200/30"
+        className="absolute w-64 h-64 rounded-full bg-linear-to-r from-yellow-200/30 to-green-200/30"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: [0, 2, 3], opacity: [0.5, 0.3, 0] }}
         transition={{ duration: 1.2, ease: 'easeOut' }}

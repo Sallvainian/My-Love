@@ -88,7 +88,7 @@ function LoveNoteMessageComponent({
           ${hasError ? 'border-2 border-red-500' : ''}
         `}
       >
-        <p className="text-base leading-relaxed break-words">{sanitizedContent}</p>
+        <p className="text-base leading-relaxed wrap-break-word">{sanitizedContent}</p>
       </div>
 
       {/* Status indicators */}

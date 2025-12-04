@@ -96,7 +96,7 @@ export function LoveNotes(): ReactElement {
           animate={{ opacity: 1, y: 0 }}
           className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3"
         >
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
           <p className="text-sm text-red-700 flex-1">{error}</p>
           <button
             onClick={clearError}
