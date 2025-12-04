@@ -73,7 +73,8 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         // Serve index.html for all navigation requests (SPA routing support)
-        navigateFallback: '/index.html',
+        // Use base path for GitHub Pages (/My-Love/) or root for development
+        navigateFallback: mode === 'production' ? '/My-Love/index.html' : '/index.html',
         navigateFallbackDenylist: [/^\/api/, /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/],
         // Don't cache any JS/CSS/HTML - always fetch fresh to prevent stale code
         globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
