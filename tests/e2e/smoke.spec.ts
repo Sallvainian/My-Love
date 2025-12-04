@@ -14,27 +14,38 @@ test('app loads and shows login or main screen', async ({ page }) => {
   await page.waitForLoadState('domcontentloaded');
 
   // App should show either login screen (if not authenticated)
-  // or main app content (if authenticated)
-  const loginHeading = page.getByRole('heading', { name: /welcome back|sign in|login/i });
-  const mainContent = page.locator('[data-testid="main-content"], main, [role="main"]');
+  // or main app content (if authenticated via storageState)
+  // Login has class "login-screen" with h1 "Welcome Back"
+  // Main app has data-testid="app-container" and "bottom-navigation"
+  const loginScreen = page.locator('.login-screen');
+  const mainApp = page.locator('[data-testid="bottom-navigation"]');
 
   // Wait for either to be visible (whichever appears first)
-  await expect(loginHeading.or(mainContent)).toBeVisible({ timeout: 10000 });
+  await expect(loginScreen.or(mainApp)).toBeVisible({ timeout: 10000 });
 
-  // No console errors should be present
+  // Set up console error listener
   const consoleErrors: string[] = [];
-  page.on('console', msg => {
+  page.on('console', (msg) => {
     if (msg.type() === 'error') {
       consoleErrors.push(msg.text());
     }
   });
 
-  // Give a moment for any async errors to surface
-  await page.waitForTimeout(1000);
+  // Wait for page to be fully interactive by polling for stable state
+  await expect
+    .poll(
+      async () => {
+        // Check that page is interactive and document is ready
+        const readyState = await page.evaluate(() => document.readyState);
+        return readyState === 'complete';
+      },
+      { timeout: 5000, intervals: [100, 200, 500] }
+    )
+    .toBe(true);
 
   // Filter out known non-critical errors (like favicon 404)
   const criticalErrors = consoleErrors.filter(
-    err => !err.includes('favicon') && !err.includes('404')
+    (err) => !err.includes('favicon') && !err.includes('404')
   );
 
   expect(criticalErrors).toHaveLength(0);

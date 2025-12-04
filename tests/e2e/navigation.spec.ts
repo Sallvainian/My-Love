@@ -70,17 +70,27 @@ test.describe('Navigation', () => {
       // Wait for page to stabilize
       await expect(nav).toBeVisible();
 
-      // Check for selected/active state
+      // Check for selected/active state - look for data-state attribute or color classes
       const isSelected = await secondItem.evaluate((el) => {
+        // Check for data-state="active" attribute used by app
+        if (el.getAttribute('data-state') === 'active') return true;
+        // Check parent/child elements for active state
+        const parent = el.closest('[data-state="active"]');
+        if (parent) return true;
+        // Check for common active indicator classes
         return (
           el.getAttribute('aria-selected') === 'true' ||
           el.getAttribute('aria-current') === 'page' ||
           el.getAttribute('data-active') === 'true' ||
           el.classList.contains('active') ||
           el.classList.contains('selected') ||
-          // Tailwind active states
+          // Tailwind color classes that indicate active state
           el.classList.contains('text-primary') ||
-          el.classList.contains('bg-primary')
+          el.classList.contains('text-pink-500') ||
+          el.classList.contains('text-rose-500') ||
+          // Check for different text color (active items typically have different color)
+          el.querySelector('.text-pink-500') !== null ||
+          el.querySelector('.text-rose-500') !== null
         );
       });
 
