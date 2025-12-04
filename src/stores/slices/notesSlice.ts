@@ -340,17 +340,36 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       }
 
       // Story 2.3: Broadcast message to partner's channel for realtime delivery
+      // Must subscribe before sending to avoid REST fallback deprecation warning
       try {
         const channel = supabase.channel(`love-notes:${partnerId}`);
-        await channel.send({
-          type: 'broadcast',
-          event: 'new_message',
-          payload: { message: data },
-        });
 
-        if (import.meta.env.DEV) {
-          console.log('[NotesSlice] Broadcast sent to partner:', partnerId);
-        }
+        await new Promise<void>((resolve, reject) => {
+          channel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              try {
+                await channel.send({
+                  type: 'broadcast',
+                  event: 'new_message',
+                  payload: { message: data },
+                });
+
+                if (import.meta.env.DEV) {
+                  console.log('[NotesSlice] Broadcast sent to partner:', partnerId);
+                }
+                resolve();
+              } catch (sendError) {
+                reject(sendError);
+              } finally {
+                // Cleanup: unsubscribe and remove channel
+                await supabase.removeChannel(channel);
+              }
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              await supabase.removeChannel(channel);
+              reject(new Error(`Channel subscription failed: ${status}`));
+            }
+          });
+        });
       } catch (broadcastError) {
         // Non-fatal - message is saved, just realtime failed
         console.warn('[NotesSlice] Broadcast failed (non-fatal):', broadcastError);
