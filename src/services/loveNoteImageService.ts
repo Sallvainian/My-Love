@@ -17,6 +17,7 @@ import { imageCompressionService } from './imageCompressionService';
 const BUCKET_NAME = 'love-notes-images';
 const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
 const URL_REFRESH_BUFFER = 5 * 60 * 1000; // Refresh 5 minutes before expiry
+const MAX_CACHE_SIZE = 100; // Maximum cached URLs to prevent memory growth
 
 /**
  * Cache for signed URLs with expiry tracking
@@ -25,9 +26,16 @@ const URL_REFRESH_BUFFER = 5 * 60 * 1000; // Refresh 5 minutes before expiry
 interface CachedUrl {
   url: string;
   expiresAt: number;
+  lastAccessed: number; // For LRU eviction
 }
 
 const signedUrlCache = new Map<string, CachedUrl>();
+
+/**
+ * In-flight request deduplication
+ * Prevents duplicate API calls when multiple components request same path
+ */
+const pendingRequests = new Map<string, Promise<SignedUrlResult>>();
 
 /**
  * Check if a cached URL is still valid (not expired or about to expire)
@@ -37,14 +45,31 @@ function isCacheValid(cached: CachedUrl): boolean {
 }
 
 /**
- * Clear expired entries from the cache periodically
- * Called internally to prevent memory growth
+ * Clear expired entries from the cache
+ * Also enforces max cache size with LRU eviction
  */
-function cleanExpiredCache(): void {
+function cleanCache(): void {
   const now = Date.now();
+
+  // First, remove expired entries
   for (const [path, cached] of signedUrlCache) {
     if (now >= cached.expiresAt) {
       signedUrlCache.delete(path);
+    }
+  }
+
+  // If still over limit, remove least recently accessed
+  if (signedUrlCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(signedUrlCache.entries())
+      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+
+    const toRemove = entries.slice(0, signedUrlCache.size - MAX_CACHE_SIZE);
+    for (const [path] of toRemove) {
+      signedUrlCache.delete(path);
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('[LoveNoteImageService] Cache LRU eviction:', toRemove.length, 'entries');
     }
   }
 }
@@ -150,7 +175,7 @@ export async function uploadCompressedBlob(
 
 /**
  * Get a signed URL for viewing a love note image
- * Uses caching with automatic expiry handling
+ * Uses caching with automatic expiry handling and request deduplication
  *
  * @param storagePath - Storage path from love_notes.image_url
  * @param forceRefresh - Force fetching a new URL even if cached
@@ -161,15 +186,14 @@ export async function getSignedImageUrl(
   storagePath: string,
   forceRefresh = false
 ): Promise<SignedUrlResult> {
-  // Clean expired entries periodically (every ~10 calls)
-  if (Math.random() < 0.1) {
-    cleanExpiredCache();
-  }
+  const now = Date.now();
 
   // Check cache first (unless force refresh requested)
   if (!forceRefresh) {
     const cached = signedUrlCache.get(storagePath);
     if (cached && isCacheValid(cached)) {
+      // Update last accessed time for LRU tracking
+      cached.lastAccessed = now;
       if (import.meta.env.DEV) {
         console.log('[LoveNoteImageService] Cache hit for:', storagePath);
       }
@@ -180,29 +204,58 @@ export async function getSignedImageUrl(
     }
   }
 
-  // Fetch new signed URL
-  const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
-
-  if (error) {
-    console.error('[LoveNoteImageService] Signed URL failed:', error);
-    throw new Error(`Failed to get image URL: ${error.message}`);
+  // Check for in-flight request to prevent duplicate API calls
+  const pending = pendingRequests.get(storagePath);
+  if (pending && !forceRefresh) {
+    if (import.meta.env.DEV) {
+      console.log('[LoveNoteImageService] Deduplicating request for:', storagePath);
+    }
+    return pending;
   }
 
-  const result: SignedUrlResult = {
-    url: data.signedUrl,
-    expiresAt: Date.now() + SIGNED_URL_EXPIRY * 1000,
-  };
+  // Create the fetch promise
+  const fetchPromise = (async (): Promise<SignedUrlResult> => {
+    try {
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
 
-  // Cache the result
-  signedUrlCache.set(storagePath, result);
+      if (error) {
+        console.error('[LoveNoteImageService] Signed URL failed:', error);
+        throw new Error(`Failed to get image URL: ${error.message}`);
+      }
 
-  if (import.meta.env.DEV) {
-    console.log('[LoveNoteImageService] Cached new URL for:', storagePath);
-  }
+      const result: SignedUrlResult = {
+        url: data.signedUrl,
+        expiresAt: Date.now() + SIGNED_URL_EXPIRY * 1000,
+      };
 
-  return result;
+      // Cache the result with LRU tracking
+      signedUrlCache.set(storagePath, {
+        ...result,
+        lastAccessed: Date.now(),
+      });
+
+      // Clean cache if needed (deterministic, on size threshold)
+      if (signedUrlCache.size > MAX_CACHE_SIZE) {
+        cleanCache();
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[LoveNoteImageService] Cached new URL for:', storagePath);
+      }
+
+      return result;
+    } finally {
+      // Remove from pending requests when complete
+      pendingRequests.delete(storagePath);
+    }
+  })();
+
+  // Track pending request for deduplication
+  pendingRequests.set(storagePath, fetchPromise);
+
+  return fetchPromise;
 }
 
 /**
@@ -224,6 +277,65 @@ export function needsUrlRefresh(storagePath: string): boolean {
  */
 export function clearSignedUrlCache(): void {
   signedUrlCache.clear();
+}
+
+/**
+ * Batch fetch signed URLs for multiple storage paths
+ * Uses parallel fetching with cache optimization and request deduplication
+ *
+ * @param storagePaths - Array of storage paths to fetch URLs for
+ * @returns Map of storage path to signed URL result (null if failed)
+ */
+export async function batchGetSignedUrls(
+  storagePaths: string[]
+): Promise<Map<string, SignedUrlResult | null>> {
+  const results = new Map<string, SignedUrlResult | null>();
+  const now = Date.now();
+
+  // Filter out paths that already have valid cached URLs
+  const pathsToFetch: string[] = [];
+  for (const path of storagePaths) {
+    const cached = signedUrlCache.get(path);
+    if (cached && isCacheValid(cached)) {
+      // Update last accessed for LRU tracking
+      cached.lastAccessed = now;
+      results.set(path, { url: cached.url, expiresAt: cached.expiresAt });
+    } else {
+      pathsToFetch.push(path);
+    }
+  }
+
+  if (pathsToFetch.length === 0) {
+    if (import.meta.env.DEV) {
+      console.log('[LoveNoteImageService] Batch: all URLs from cache');
+    }
+    return results;
+  }
+
+  // Fetch remaining URLs in parallel (uses deduplication internally)
+  const fetchPromises = pathsToFetch.map(async (path) => {
+    try {
+      const result = await getSignedImageUrl(path);
+      return { path, result };
+    } catch (error) {
+      console.error('[LoveNoteImageService] Batch fetch failed for:', path, error);
+      return { path, result: null };
+    }
+  });
+
+  const fetchResults = await Promise.all(fetchPromises);
+
+  for (const { path, result } of fetchResults) {
+    results.set(path, result);
+  }
+
+  if (import.meta.env.DEV) {
+    console.log(
+      `[LoveNoteImageService] Batch: ${storagePaths.length - pathsToFetch.length} cached, ${pathsToFetch.length} fetched`
+    );
+  }
+
+  return results;
 }
 
 /**
