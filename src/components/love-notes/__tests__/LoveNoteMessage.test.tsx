@@ -494,4 +494,161 @@ describe('LoveNoteMessage', () => {
       });
     });
   });
+
+  describe('Memory Leak Prevention', () => {
+    it('should not update state after unmount during signed URL fetch', async () => {
+      // Create a deferred promise we can control
+      let resolveSignedUrl: (value: { url: string; expiresAt: number }) => void;
+      const deferredPromise = new Promise<{ url: string; expiresAt: number }>((resolve) => {
+        resolveSignedUrl = resolve;
+      });
+      mockGetSignedImageUrl.mockReturnValue(deferredPromise);
+
+      // Spy on console.error to detect React warnings about unmounted state updates
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      const { unmount } = render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      // Verify the fetch was initiated
+      expect(mockGetSignedImageUrl).toHaveBeenCalledWith('user-123/image.jpg');
+
+      // Unmount BEFORE the promise resolves
+      unmount();
+
+      // Now resolve the promise after unmount
+      resolveSignedUrl!({
+        url: 'https://storage.example.com/signed.jpg',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      // Wait a tick to allow any potential state updates to occur
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Should NOT have any React warnings about state updates on unmounted component
+      const reactWarnings = consoleErrorSpy.mock.calls.filter(
+        (call) =>
+          call[0]?.includes?.('unmounted') ||
+          call[0]?.includes?.('memory leak') ||
+          call[0]?.includes?.("Can't perform a React state update")
+      );
+      expect(reactWarnings).toHaveLength(0);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should not update state after unmount during error retry', async () => {
+      // First call succeeds to load the image
+      mockGetSignedImageUrl.mockResolvedValueOnce({
+        url: 'https://storage.example.com/signed.jpg',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      const { unmount } = render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /image from you/i })).toBeInTheDocument();
+      });
+
+      // Set up a deferred promise for the retry attempt
+      let resolveRetry: (value: { url: string; expiresAt: number }) => void;
+      const retryPromise = new Promise<{ url: string; expiresAt: number }>((resolve) => {
+        resolveRetry = resolve;
+      });
+      mockGetSignedImageUrl.mockReturnValue(retryPromise);
+
+      // Trigger image error (simulating 403 expired URL)
+      const img = screen.getByRole('img', { name: /image from you/i });
+      fireEvent.error(img);
+
+      // Unmount during retry
+      unmount();
+
+      // Resolve retry after unmount
+      resolveRetry!({
+        url: 'https://storage.example.com/new-signed.jpg',
+        expiresAt: Date.now() + 3600000,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify no React warnings
+      const reactWarnings = consoleErrorSpy.mock.calls.filter(
+        (call) =>
+          call[0]?.includes?.('unmounted') ||
+          call[0]?.includes?.('memory leak') ||
+          call[0]?.includes?.("Can't perform a React state update")
+      );
+      expect(reactWarnings).toHaveLength(0);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should not update state after unmount when fetch fails', async () => {
+      // Create a deferred rejection
+      let rejectSignedUrl: (error: Error) => void;
+      const deferredPromise = new Promise<{ url: string; expiresAt: number }>((_, reject) => {
+        rejectSignedUrl = reject;
+      });
+      mockGetSignedImageUrl.mockReturnValue(deferredPromise);
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      const { unmount } = render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      // Unmount before rejection
+      unmount();
+
+      // Reject after unmount
+      rejectSignedUrl!(new Error('Network error'));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Filter for React state update warnings only
+      const reactWarnings = consoleErrorSpy.mock.calls.filter(
+        (call) =>
+          call[0]?.includes?.('unmounted') ||
+          call[0]?.includes?.('memory leak') ||
+          call[0]?.includes?.("Can't perform a React state update")
+      );
+      expect(reactWarnings).toHaveLength(0);
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
 });
