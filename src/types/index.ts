@@ -51,8 +51,8 @@ export interface PhotoUploadInput {
 }
 
 export interface CompressionOptions {
-  maxWidth: number; // Default: 1920px
-  maxHeight: number; // Default: 1920px
+  maxWidth: number; // Default: 2048px (Story 6.1)
+  maxHeight: number; // Default: 2048px (Story 6.1)
   quality: number; // Default: 0.8 (80%)
 }
 
@@ -62,6 +62,8 @@ export interface CompressionResult {
   height: number;
   originalSize: number;
   compressedSize: number;
+  /** True if compression failed and original file was returned as fallback */
+  fallbackUsed?: boolean;
 }
 
 export interface Anniversary {

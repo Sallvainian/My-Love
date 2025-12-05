@@ -18,17 +18,17 @@ dev-dist
 coverage/
 .nyc_output/
 
-# Prevent .env files from being tracked (app uses hardcoded constants)
-# Keep .env.test.example for Playwright tests
-.env
-.env.development
-.env.production
+# dotenvx: Keep .env.keys secret (contains decryption key)
+# Encrypted .env files are now safe to commit
+.env.keys
 .env.local
 
 # Playwright test artifacts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+tests/e2e/.auth/storageState.json
+tests/e2e/.auth/auth-failure.png
 
 # Editor directories and files
 .vscode/*
@@ -43,7 +43,9 @@ coverage/
 
 # Dot Files
 .claude
+!.claude/commands/
 .bmad
+!.bmad/
 .code
 
 # Documentation files with exposed secrets
@@ -67,7 +69,21 @@ docs/technical-decisions.md
 .gemini/
 .opencode/
 
+# Claude OS (auto-generated, user-specific)
+.claude-os/tree_sitter_cache.db
+.claude-os/project-profile/
+
+# AgentVibes (local TTS preferences)
+.agentvibes/
+
 # MCP server artifacts
 .mcp.json
 .playwright-mcp/
 .serena/
+
+# Test environment - .env.test is encrypted with dotenvx and safe to commit
+# The decryption key (DOTENV_PRIVATE_KEY_TEST) is stored in .env.keys and GitHub Secrets
+
+# Additional env files without dot prefix
+env.keys
+env.test

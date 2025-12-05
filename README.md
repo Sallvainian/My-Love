@@ -8,12 +8,15 @@ A beautiful Progressive Web App (PWA) that sends daily love messages and reminde
 
 - **Daily Love Messages**: Rotating heartfelt messages (reasons, memories, affirmations, future dreams)
 - **100 Pre-written Messages**: Curated sweet messages ready to use or customize
+- **Love Notes Chat**: Real-time messaging with your partner - send love notes instantly
 - **Beautiful Animations**: Smooth, delightful animations with Framer Motion
 - **PWA Support**: Installable on mobile devices, works offline
 - **Photo Memories**: Store and view photos with captions in a beautiful gallery
 - **Anniversary Countdown Timers**: Real-time countdown to special dates with celebration animations
-- **Mood Tracker**: Daily mood logging with offline-first sync to Supabase backend
-- **Partner Interactions**: Send pokes and kisses with real-time delivery
+- **Mood Tracker**: Daily mood logging with emoji moods and optional notes
+- **Partner Mood View**: See your partner's current mood in real-time
+- **Partner Interactions**: Send pokes, kisses, and farts with fun animations and real-time delivery
+- **Mood History**: View your mood timeline and patterns over time
 - **Multiple Themes**: Sunset, Ocean, Lavender, and Rose themes
 - **Privacy First**: Row Level Security for data protection
 - **Super Clean UI**: Modern, romantic design with glassmorphism
@@ -196,22 +199,26 @@ The app uses Supabase for real-time mood tracking and partner interactions. Foll
    - **Project URL**: `https://your-project-id.supabase.co`
    - **Anon/Public Key**: Long string starting with `eyJ...`
 
-### 3. Configure Environment Variables
+### 3. Environment Variables (dotenvx Encrypted)
 
-1. Copy `.env.example` to `.env`:
+This project uses [dotenvx](https://dotenvx.com) for encrypted environment variables. The `.env` file is encrypted and safely committed to the repository.
+
+**For local development**, you need the decryption key:
+
+1. Get the `DOTENV_KEY` from a team member or your password manager
+2. Create a `.env.keys` file in the project root:
 
 ```bash
-cp .env.example .env
+echo "DOTENV_KEY='your-decryption-key-here'" > .env.keys
 ```
 
-2. Edit `.env` and add your Supabase credentials:
+3. Run commands with dotenvx (automatically decrypts):
 
-```env
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-key-from-dashboard
+```bash
+dotenvx run -- npm run dev
 ```
 
-**Note**: The anon key is safe for client-side use. Supabase uses Row Level Security to protect your data.
+**Note**: The `.env.keys` file is gitignored for security. Never share or commit this file.
 
 ### 4. Database Schema (✅ Already Executed)
 
@@ -257,13 +264,10 @@ The app uses email/password authentication. Create accounts for you and your par
 
 ### 6. Add Test Users for E2E Tests (Optional)
 
-If running end-to-end tests, add test user credentials to `.env`:
+Test user credentials are already included in the encrypted `.env` file. If you need to add or change them:
 
-```env
-# Test user for E2E tests (optional)
-VITE_TEST_USER_EMAIL=test@example.com
-VITE_TEST_USER_PASSWORD=testpassword123
-```
+1. Decrypt and edit the `.env` file
+2. Re-encrypt with `dotenvx encrypt`
 
 **Note**: Create this test user in Supabase Auth with the same credentials.
 
@@ -284,9 +288,11 @@ You should see:
 
 Once set up, your app supports:
 
-- **Mood Tracking**: Log your daily mood (loved, happy, content, thoughtful, grateful)
-- **Real-time Sync**: See your partner's moods instantly
-- **Poke & Kiss**: Send playful interactions to your partner
+- **Love Notes**: Real-time chat with your partner - messages delivered instantly
+- **Mood Tracking**: Log your daily mood with 12 emoji options and optional notes
+- **Partner Mood View**: See your partner's current mood in real-time
+- **Poke, Kiss & Fart**: Send playful interactions with fun animations
+- **Photo Sharing**: Upload and share photos with captions
 - **Offline-first**: All features work offline, sync when online
 - **Privacy**: Row Level Security ensures only you and your partner can see your data
 
@@ -343,7 +349,8 @@ The app will now appear on your home screen like a native app!
 ```
 My-Love/
 ├── .env.example             # Template for environment variables
-├── .env                     # Your actual env vars (gitignored)
+├── .env                     # Encrypted env vars (safe to commit)
+├── .env.keys                # Decryption key (gitignored - keep secret!)
 ├── docs/
 │   └── migrations/          # SQL migration scripts for Supabase
 ├── public/
@@ -356,7 +363,11 @@ My-Love/
 │   │   └── errorHandlers.ts       # Error handling utilities
 │   ├── components/
 │   │   ├── DailyMessage/    # Main message card component
-│   │   ├── Onboarding/      # DEPRECATED (Story 1.4) - To be removed in Story 1.5
+│   │   ├── love-notes/      # Real-time chat messaging
+│   │   ├── MoodTracker/     # Mood logging with emoji selection
+│   │   ├── PartnerMoodView/ # View partner's mood in real-time
+│   │   ├── PokeKissInterface/ # Playful interactions (poke/kiss/fart)
+│   │   ├── PhotoGallery/    # Photo grid with lazy loading
 │   │   └── ...
 │   ├── config/
 │   │   └── constants.ts     # Environment configuration constants
@@ -398,11 +409,12 @@ My-Love/
 - [x] Theme system
 - [x] Photo gallery with upload, carousel, and lazy loading
 - [x] Anniversary countdown timers with celebration animations
-- [x] Mood tracker with offline-first sync
-- [x] Partner poke/kiss interactions with real-time delivery
+- [x] Mood tracker with emoji moods and notes
+- [x] Partner mood view with real-time sync
+- [x] Partner poke/kiss/fart interactions with animations
 - [x] Supabase backend integration with Row Level Security
-- [ ] Mood history calendar view
-- [ ] Custom notes section
+- [x] Mood history timeline view
+- [x] Love Notes real-time chat
 - [ ] Push notifications
 - [ ] Export/import data
 - [ ] More themes
@@ -493,4 +505,4 @@ If you run into issues:
 
 ---
 
-**Remember**: This app stores all data locally on the device. There's no server, no tracking, and complete privacy. Perfect for keeping your love notes personal and special! 💕
+**Remember**: This app uses Supabase for real-time sync between you and your partner. Row Level Security ensures only you two can see your data - complete privacy with real-time connection. Perfect for keeping your love notes personal and special! 💕

@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -39,10 +39,9 @@ jobs:
             > src/types/database.types.ts
 
       - name: Build application
+        run: npx dotenvx run -- npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
-        run: npm run build
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
 
       - name: Run smoke tests
         run: npm run test:smoke
@@ -66,12 +65,9 @@ jobs:
   health-check:
     runs-on: ubuntu-latest
     needs: deploy
-    env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -79,7 +75,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies for health check
-        run: npm install --no-save @supabase/supabase-js
+        run: npm install --no-save @supabase/supabase-js @dotenvx/dotenvx
 
       - name: Wait for GitHub Pages propagation
         run: |
@@ -155,12 +151,18 @@ jobs:
           exit 1
 
       - name: Health Check - Supabase Connection
+        env:
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
         run: |
           echo "🔍 Checking Supabase connection..."
 
-          # Create health check script
+          # Create health check script (dotenvx decrypts env vars at runtime)
           cat > health-check-supabase.mjs << 'EOF'
           import { createClient } from '@supabase/supabase-js';
+          import { config } from '@dotenvx/dotenvx';
+
+          // Load decrypted environment variables
+          config();
 
           // Validate environment variables
           const supabaseUrl = process.env.VITE_SUPABASE_URL;

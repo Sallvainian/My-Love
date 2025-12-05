@@ -1,0 +1,178 @@
+<story-context id="2-0-love-notes-database-schema-setup" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>0</storyId>
+    <title>Love Notes Database Schema Setup</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/05-Epics-Stories/2-0-love-notes-database-schema-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>the love_notes table and RLS policies created in Supabase</iWant>
+    <soThat>messaging features have the required backend storage</soThat>
+    <tasks>
+      <task id="1" title="Create love_notes Table" ac="AC-2.0.1">
+        <subtask id="1.1">Create migration file at docs/99-migrations/004_create_love_notes_table.sql</subtask>
+        <subtask id="1.2">Execute SQL to create love_notes table with id, from_user_id, to_user_id, content, created_at columns</subtask>
+        <subtask id="1.3">Verify table creation in Supabase Dashboard</subtask>
+      </task>
+      <task id="2" title="Create Performance Indexes" ac="AC-2.0.1">
+        <subtask id="2.1">Create idx_love_notes_to_user_created and idx_love_notes_from_user_created indexes</subtask>
+        <subtask id="2.2">Verify indexes via pg_indexes query</subtask>
+      </task>
+      <task id="3" title="Enable Row Level Security (RLS)" ac="AC-2.0.2,AC-2.0.3">
+        <subtask id="3.1">Enable RLS on love_notes table</subtask>
+        <subtask id="3.2">Create SELECT policy for message viewing (sender OR recipient)</subtask>
+        <subtask id="3.3">Create INSERT policy for sending messages (only as self)</subtask>
+        <subtask id="3.4">Test RLS policies with multiple users</subtask>
+      </task>
+      <task id="4" title="Enable Supabase Realtime" ac="AC-2.0.4">
+        <subtask id="4.1">Set REPLICA IDENTITY FULL for Realtime broadcasting</subtask>
+        <subtask id="4.2">Enable Realtime on table via ALTER PUBLICATION</subtask>
+        <subtask id="4.3">Verify Realtime configuration via pg_publication_tables</subtask>
+      </task>
+      <task id="5" title="Document Migration" ac="Documentation">
+        <subtask id="5.1">Save complete migration SQL to docs/99-migrations/004_create_love_notes_table.sql</subtask>
+        <subtask id="5.2">Verify existing TypeScript types (optional - may add LoveNote interface)</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-2.0.1">love_notes table exists in Supabase with id (uuid), from_user_id (uuid FK), to_user_id (uuid FK), content (text), created_at (timestamptz) columns</criterion>
+    <criterion id="AC-2.0.2">RLS policy allows users to SELECT only messages where they are sender OR recipient</criterion>
+    <criterion id="AC-2.0.3">RLS policy allows users to INSERT only messages where they are the sender</criterion>
+    <criterion id="AC-2.0.4">Supabase Realtime is enabled on the love_notes table (REPLICA IDENTITY FULL)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/05-Epics-Stories/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Data Models and Contracts</section>
+        <snippet>Defines complete love_notes table schema, RLS policies, Realtime configuration, and TypeScript types. Lines 80-162 contain the authoritative SQL schema.</snippet>
+      </doc>
+      <doc>
+        <path>docs/02-Architecture/architecture.md</path>
+        <title>My-Love PWA Architecture</title>
+        <section>Technology Stack, Supabase Integration</section>
+        <snippet>Defines online-first architecture, Supabase Realtime patterns, and Zustand store patterns for optimistic updates. Lines 186-364 contain integration patterns.</snippet>
+      </doc>
+      <doc>
+        <path>docs/05-Epics-Stories/2-0-love-notes-database-schema-setup.md</path>
+        <title>Story 2.0 Requirements</title>
+        <section>All sections</section>
+        <snippet>Complete story file with acceptance criteria, implementation tasks, and validation checklist for database-only story.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>src/api/supabaseClient.ts</path>
+        <kind>client</kind>
+        <symbol>supabase, getPartnerId</symbol>
+        <lines>64-79</lines>
+        <reason>Singleton Supabase client with typed Database schema and Realtime configuration. Reference for all database operations.</reason>
+      </file>
+      <file>
+        <path>src/types/database.types.ts</path>
+        <kind>types</kind>
+        <symbol>Database</symbol>
+        <reason>Auto-generated Supabase types. May need regeneration after adding love_notes table.</reason>
+      </file>
+      <file>
+        <path>docs/99-migrations/002_add_partner_relationship.sql</path>
+        <kind>migration</kind>
+        <symbol>partner_requests, RLS policies</symbol>
+        <reason>Reference migration showing established patterns: BEGIN/COMMIT blocks, RLS policy structure, index naming conventions, verification queries.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>@supabase/supabase-js</package>
+        <version>^2.81.1</version>
+        <purpose>Database operations, Auth, Realtime subscriptions</purpose>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+        <purpose>Client state management (future stories)</purpose>
+      </node>
+      <supabase>
+        <note>Requires Supabase project admin access to create tables and RLS policies</note>
+      </supabase>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Migration file naming: 00X_description.sql (next is 004)</constraint>
+    <constraint type="pattern">Tables: snake_case plural (love_notes)</constraint>
+    <constraint type="pattern">Columns: snake_case (from_user_id, created_at)</constraint>
+    <constraint type="pattern">Foreign keys: {relationship}_id pattern with CASCADE deletion</constraint>
+    <constraint type="pattern">RLS policies: Descriptive names ("Users can view their own messages")</constraint>
+    <constraint type="architecture">Online-first: No offline queue for Love Notes per ADR 001</constraint>
+    <constraint type="validation">Content: 1-1000 characters (DB constraint + client validation)</constraint>
+    <constraint type="validation">different_users constraint prevents self-messaging</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>love_notes table</name>
+      <kind>PostgreSQL table</kind>
+      <signature>
+CREATE TABLE love_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  to_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  content TEXT NOT NULL CHECK (char_length(content) &lt;= 1000 AND char_length(content) &gt;= 1),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  CONSTRAINT different_users CHECK (from_user_id != to_user_id)
+);
+      </signature>
+      <path>docs/99-migrations/004_create_love_notes_table.sql (to be created)</path>
+    </interface>
+    <interface>
+      <name>RLS SELECT Policy</name>
+      <kind>PostgreSQL policy</kind>
+      <signature>
+CREATE POLICY "Users can view their own messages"
+  ON love_notes FOR SELECT
+  USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
+      </signature>
+      <path>Supabase Dashboard / Migration file</path>
+    </interface>
+    <interface>
+      <name>RLS INSERT Policy</name>
+      <kind>PostgreSQL policy</kind>
+      <signature>
+CREATE POLICY "Users can insert their own messages"
+  ON love_notes FOR INSERT
+  WITH CHECK (auth.uid() = from_user_id);
+      </signature>
+      <path>Supabase Dashboard / Migration file</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+This is a database-only story - no automated tests in PWA codebase. Validation is via Supabase Dashboard inspection and SQL queries. Manual validation checklist provided in story file. Future stories (2.1+) will add Vitest unit tests for TypeScript types and Playwright E2E tests for chat functionality. Testing framework: Vitest (unit/integration), Playwright (E2E), both configured in project.
+    </standards>
+    <locations>
+      <location>tests/unit/ - Unit tests</location>
+      <location>tests/integration/ - Integration tests (supabase-schema.test.ts exists)</location>
+      <location>tests/e2e/ - Playwright E2E tests</location>
+      <location>Supabase Dashboard - Direct table/policy inspection</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-2.0.1">Verify table exists with correct columns via Supabase Dashboard > Table Editor</idea>
+      <idea ac="AC-2.0.1">Query: SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'love_notes'</idea>
+      <idea ac="AC-2.0.2">Test SELECT as sender (success), SELECT as receiver (success), SELECT as third user (empty)</idea>
+      <idea ac="AC-2.0.3">Test INSERT with from_user_id = auth.uid() (success), INSERT with different from_user_id (failure)</idea>
+      <idea ac="AC-2.0.4">Query: SELECT * FROM pg_publication_tables WHERE tablename = 'love_notes'</idea>
+      <idea ac="AC-2.0.4">Verify REPLICA IDENTITY: SELECT relreplident FROM pg_class WHERE relname = 'love_notes' (should be 'f' for FULL)</idea>
+    </ideas>
+  </tests>
+</story-context>

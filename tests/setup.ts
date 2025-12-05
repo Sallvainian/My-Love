@@ -3,6 +3,9 @@
  * Configures test environment with IndexedDB polyfill and other global settings
  */
 
+// Import jest-dom matchers for Vitest - this extends Vitest's expect with DOM matchers
+import '@testing-library/jest-dom/vitest';
+
 // Polyfill IndexedDB for testing
 import 'fake-indexeddb/auto';
 

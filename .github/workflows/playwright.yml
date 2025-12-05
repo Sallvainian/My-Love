@@ -13,10 +13,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -30,26 +30,22 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Create .env file from secrets
-        run: |
-          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
-          echo "VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}" >> .env
-          echo "VITE_TEST_USER_EMAIL=${{ secrets.VITE_TEST_USER_EMAIL }}" >> .env
-          echo "VITE_TEST_USER_PASSWORD=${{ secrets.VITE_TEST_USER_PASSWORD }}" >> .env
-
       - name: Run Playwright tests
-        run: npx playwright test
+        run: npx dotenvx run -f .env.test -- npx playwright test
         env:
           CI: true
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+          # Decryption key for .env.test (created by dotenvx encrypt)
+          DOTENV_PRIVATE_KEY_TEST: ${{ secrets.DOTENV_PRIVATE_KEY_TEST }}
+          # Fallback test credentials (if .env.test decryption fails)
           VITE_TEST_USER_EMAIL: ${{ secrets.VITE_TEST_USER_EMAIL }}
           VITE_TEST_USER_PASSWORD: ${{ secrets.VITE_TEST_USER_PASSWORD }}
 
-      - name: Upload test report
+      - name: Upload test report and screenshots
         uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7

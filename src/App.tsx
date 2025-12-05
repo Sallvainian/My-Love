@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './stores/useAppStore';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
-import { WelcomeSplash } from './components/WelcomeSplash/WelcomeSplash';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/RelationshipTimers';
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
-import { PhotoUpload } from './components/PhotoUpload/PhotoUpload';
-import { PhotoCarousel } from './components/PhotoCarousel/PhotoCarousel';
-import { PokeKissInterface } from './components/PokeKissInterface';
+// PokeKissInterface moved to PartnerMoodView
 import { LoginScreen } from './components/LoginScreen';
 import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { applyTheme } from './utils/themes';
@@ -34,6 +31,17 @@ const PartnerMoodView = lazy(() =>
 const AdminPanel = lazy(() => import('./components/AdminPanel/AdminPanel'));
 const LoveNotes = lazy(() =>
   import('./components/love-notes').then((m) => ({ default: m.LoveNotes }))
+);
+
+// Lazy load modal/conditional components to reduce initial bundle
+const WelcomeSplash = lazy(() =>
+  import('./components/WelcomeSplash/WelcomeSplash').then((m) => ({ default: m.WelcomeSplash }))
+);
+const PhotoUpload = lazy(() =>
+  import('./components/PhotoUpload/PhotoUpload').then((m) => ({ default: m.PhotoUpload }))
+);
+const PhotoCarousel = lazy(() =>
+  import('./components/PhotoCarousel/PhotoCarousel').then((m) => ({ default: m.PhotoCarousel }))
 );
 
 // Loading spinner component for Suspense fallback
@@ -216,8 +224,13 @@ function App() {
     if (!hasInitialized.current && session) {
       hasInitialized.current = true;
 
-      // Story 3.5: Migrate custom messages from LocalStorage to IndexedDB before app initialization
-      (async () => {
+      // Performance fix: Initialize app immediately for fast first paint
+      // Migration runs in background after initial render
+      initializeApp();
+
+      // Story 3.5: Migrate custom messages from LocalStorage to IndexedDB
+      // Deferred to not block initial paint - runs after first render
+      const runMigration = async () => {
         try {
           const migrationResult = await migrateCustomMessagesFromLocalStorage();
           if (migrationResult.migratedCount > 0) {
@@ -234,12 +247,17 @@ function App() {
           console.error('[App] Migration failed:', error);
         }
 
-        // Initialize app after migration completes
-        initializeApp();
-
         // Monitor LocalStorage quota in development mode (Epic 2 technical debt)
         logStorageQuota();
-      })();
+      };
+
+      // Use requestIdleCallback if available, otherwise setTimeout
+      // This ensures migration doesn't block the main thread during initial render
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => runMigration(), { timeout: 2000 });
+      } else {
+        setTimeout(runMigration, 100);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]); // Initialize when session is established
@@ -328,8 +346,8 @@ function App() {
   // Story 1.5: Enhanced to show sync completion feedback (AC-1.5.4)
   useEffect(() => {
     // Guard: Skip setup if service workers are not supported
-    // (e.g., Safari private mode, older browsers)
-    if (!isServiceWorkerSupported()) {
+    // (e.g., Safari private mode, older browsers, test environment)
+    if (!isServiceWorkerSupported() || !navigator.serviceWorker) {
       if (import.meta.env.DEV) {
         console.log('[App] Service Worker not supported, skipping background sync listener');
       }
@@ -450,7 +468,9 @@ function App() {
   if (showSplash) {
     return (
       <ErrorBoundary>
-        <WelcomeSplash onContinue={handleContinue} />
+        <Suspense fallback={<LoadingSpinner />}>
+          <WelcomeSplash onContinue={handleContinue} />
+        </Suspense>
       </ErrorBoundary>
     );
   }
@@ -469,17 +489,14 @@ function App() {
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
     <ErrorBoundary>
-      <div className="min-h-screen pb-16">
+      <div className="min-h-screen pb-16" data-testid="app-container">
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
         <NetworkStatusIndicator showOnlyWhenOffline />
 
         {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
         <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
 
-        {/* Story 6.5: Poke/Kiss Interaction Interface - Fixed top-right position (AC#1) */}
-        <div className="fixed top-4 right-4 z-50">
-          <PokeKissInterface />
-        </div>
+        {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
         {/* Conditional view rendering */}
         {currentView === 'home' && (
@@ -535,11 +552,15 @@ function App() {
         {/* Bottom navigation */}
         <BottomNavigation currentView={currentView} onViewChange={setView} />
 
-        {/* Photo upload modal - Story 4.1 */}
-        <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+        {/* Photo upload modal - Story 4.1 (lazy loaded) */}
+        <Suspense fallback={null}>
+          <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+        </Suspense>
 
-        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected */}
-        <PhotoCarousel />
+        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
+        <Suspense fallback={null}>
+          <PhotoCarousel />
+        </Suspense>
 
         {/* Story 0.4: Deployment validation timestamp */}
         <footer className="fixed bottom-16 left-0 right-0 text-center py-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm">

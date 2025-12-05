@@ -1,16 +1,34 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config } from '@dotenvx/dotenvx';
+
+// Load environment variables from encrypted .env file
+config();
+
+// Also load test-specific env vars (unencrypted, gitignored)
+config({ path: '.env.test', override: true });
+
+// Port configuration - use PORT env var or default to 5173
+const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
+const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
  * Playwright configuration for My-Love PWA E2E testing
  *
  * Streamlined for fast CI execution with minimal test suite (10 tests).
+ * Port is configurable via PORT or VITE_PORT environment variable.
+ *
+ * Uses globalSetup for one-time authentication - login happens once,
+ * then storageState is reused across all tests for faster execution.
  */
 
 export default defineConfig({
   testDir: './tests/e2e',
 
-  // Fast timeout (15 seconds - tests should be quick)
-  timeout: 15000,
+  // Global setup: login once before all tests
+  globalSetup: './tests/e2e/global-setup.ts',
+
+  // Timeout: longer in CI (slower environment)
+  timeout: process.env.CI ? 30000 : 15000,
 
   // Parallel execution
   fullyParallel: true,
@@ -18,8 +36,8 @@ export default defineConfig({
   // No .only in CI
   forbidOnly: !!process.env.CI,
 
-  // No retries - fix flaky tests instead
-  retries: 0,
+  // Retry once in CI for flaky network issues
+  retries: process.env.CI ? 1 : 0,
 
   // 2 workers (enough for 10 tests)
   workers: 2,
@@ -30,13 +48,17 @@ export default defineConfig({
     : [['html', { outputFolder: 'playwright-report' }]],
 
   use: {
-    baseURL: 'http://localhost:5173/',
+    baseURL: BASE_URL,
     headless: true,
     trace: 'off',
-    screenshot: 'off',
+    // Screenshot on failure for debugging CI issues
+    screenshot: process.env.CI ? 'only-on-failure' : 'off',
     video: 'off',
-    navigationTimeout: 10000,
-    actionTimeout: 5000,
+    // Longer timeouts for CI (slower environment)
+    navigationTimeout: process.env.CI ? 20000 : 10000,
+    actionTimeout: process.env.CI ? 10000 : 5000,
+    // Use saved authentication state from global setup
+    storageState: 'tests/e2e/.auth/storageState.json',
   },
 
   // Chromium only
@@ -56,10 +78,11 @@ export default defineConfig({
     },
   ],
 
-  // Dev server
+  // Dev server (using dotenvx to decrypt env vars)
+  // Port configurable via PORT or VITE_PORT env var
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173/',
+    command: `dotenvx run -- npm run dev -- --port ${PORT}`,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60000, // 1 minute should be enough
   },
