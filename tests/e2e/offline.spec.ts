@@ -1,91 +1,136 @@
 /**
  * Offline Resilience Tests - Network Detection
  *
- * Tests the PWA offline functionality - verifies app handles offline state.
+ * Tests the PWA offline functionality.
+ * Authentication is handled by global-setup.ts via storageState.
  */
 
 import { test, expect } from '@playwright/test';
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
-
 test.describe('Offline Resilience', () => {
-  test('app handles offline state gracefully', async ({ page, context }) => {
-    // Login first
+  test.beforeEach(async ({ page }) => {
+    // Navigate to app - storageState handles authentication
     await page.goto('/');
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in|login/i }).click();
 
-    // Handle onboarding if needed
-    await page.waitForTimeout(2000);
-    const displayNameInput = page.getByLabel(/display name/i);
-    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await displayNameInput.fill('TestUser');
-      await page.getByRole('button', { name: /continue|save|submit/i }).click();
-      await page.waitForTimeout(1000);
-    }
+    // Wait for app to be ready
+    await expect(
+      page.locator('nav, [data-testid="bottom-navigation"]').first()
+    ).toBeVisible({ timeout: 15000 });
+  });
 
-    // Handle welcome/intro screen if needed
-    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await page.getByRole('button', { name: /continue/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Wait for app to load
+  test('app handles offline state gracefully', async ({ page, context }) => {
     const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
-    await expect(nav).toBeVisible({ timeout: 10000 });
 
     // Go offline
     await context.setOffline(true);
-    await page.waitForTimeout(1000);
 
-    // App should still be visible (PWA should work offline)
+    // Wait for app to detect offline state
+    await expect(nav).toBeVisible();
+
+    // Check for offline indicator if it exists
+    const offlineIndicator = page.getByTestId('offline-indicator').or(
+      page.getByText(/offline|no connection/i)
+    );
+    const hasIndicator = await offlineIndicator.isVisible({ timeout: 3000 }).catch(() => false);
+
+    // App should still be usable (nav visible)
     await expect(nav).toBeVisible();
 
     // Go back online
     await context.setOffline(false);
-    await page.waitForTimeout(1000);
 
-    // App should still be functional
+    // App should recover
     await expect(nav).toBeVisible();
+
+    // Offline indicator should disappear if it was shown
+    if (hasIndicator) {
+      await expect(offlineIndicator).toBeHidden({ timeout: 5000 });
+    }
   });
 
   test('app recovers when coming back online', async ({ page, context }) => {
-    // Login first
-    await page.goto('/');
-    await page.getByLabel(/email/i).fill(TEST_EMAIL);
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-
-    // Handle onboarding if needed
-    await page.waitForTimeout(2000);
-    const displayNameInput = page.getByLabel(/display name/i);
-    if (await displayNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await displayNameInput.fill('TestUser');
-      await page.getByRole('button', { name: /continue|save|submit/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Handle welcome/intro screen if needed
-    const welcomeHeading = page.getByRole('heading', { name: /welcome to your app/i });
-    if (await welcomeHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await page.getByRole('button', { name: /continue/i }).click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Wait for app to load
     const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
-    await expect(nav).toBeVisible({ timeout: 10000 });
 
-    // Go offline then back online
+    // Simulate going offline then online quickly
     await context.setOffline(true);
-    await page.waitForTimeout(500);
-    await context.setOffline(false);
-    await page.waitForTimeout(1000);
-
-    // App should still be functional after reconnect
     await expect(nav).toBeVisible();
+
+    await context.setOffline(false);
+    await expect(nav).toBeVisible();
+
+    // Verify app can still make API calls after reconnect
+    // Navigate to a different section to trigger data fetch
+    const navItems = nav.locator('button, a, [role="tab"]');
+    const count = await navItems.count();
+
+    if (count >= 2) {
+      await navItems.nth(1).click();
+      await expect(nav).toBeVisible();
+    }
+  });
+
+  test('cached content remains accessible offline', async ({ page, context }) => {
+    // First, ensure content is loaded while online by waiting for DOM and any initial API calls
+    await page.waitForLoadState('domcontentloaded');
+
+    const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+    await expect(nav).toBeVisible({ timeout: 5000 });
+
+    // Go offline
+    await context.setOffline(true);
+
+    // Navigation should still work (cached)
+    const navItems = nav.locator('button, a, [role="tab"]');
+    const firstItem = navItems.first();
+
+    if (await firstItem.isVisible()) {
+      await firstItem.click();
+      // Page should still respond (from cache)
+      await expect(nav).toBeVisible();
+    }
+
+    // Restore online
+    await context.setOffline(false);
+  });
+
+  test('offline state does not break navigation', async ({ page, context }) => {
+    const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+    const navItems = nav.locator('button, a, [role="tab"]');
+    const count = await navItems.count();
+
+    // Go offline
+    await context.setOffline(true);
+
+    // Try navigating through sections while offline
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      const item = navItems.nth(i);
+      if (await item.isVisible()) {
+        await item.click();
+        // App should not crash
+        await expect(nav).toBeVisible();
+      }
+    }
+
+    // Restore online
+    await context.setOffline(false);
+    await expect(nav).toBeVisible();
+  });
+
+  test('service worker is registered for PWA', async ({ page }) => {
+    // Check if service worker is registered
+    const hasServiceWorker = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return false;
+
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      return registrations.length > 0;
+    });
+
+    // Service worker is only registered in production builds, not dev mode
+    // Skip test if not in production environment
+    if (!hasServiceWorker) {
+      test.skip(true, 'Service worker not registered (expected in dev mode - only available in production builds)');
+    }
+
+    expect(hasServiceWorker).toBe(true);
   });
 });

@@ -91,7 +91,7 @@ export class MoodApi {
         return validatedMood;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on create:', validationError.errors);
+          console.error('[MoodApi] Validation error on create:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -150,7 +150,7 @@ export class MoodApi {
         return validatedMoods;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on fetchByUser:', validationError.errors);
+          console.error('[MoodApi] Validation error on fetchByUser:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -218,7 +218,7 @@ export class MoodApi {
         return validatedMoods;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on fetchByDateRange:', validationError.errors);
+          console.error('[MoodApi] Validation error on fetchByDateRange:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -281,7 +281,7 @@ export class MoodApi {
         return validatedMood;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on fetchById:', validationError.errors);
+          console.error('[MoodApi] Validation error on fetchById:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -348,7 +348,7 @@ export class MoodApi {
         return validatedMood;
       } catch (validationError) {
         if (validationError instanceof ZodError) {
-          console.error('[MoodApi] Validation error on update:', validationError.errors);
+          console.error('[MoodApi] Validation error on update:', validationError.issues);
           throw new ApiValidationError('Invalid mood data received from server', validationError);
         }
         throw validationError;
@@ -400,6 +400,73 @@ export class MoodApi {
       }
 
       throw handleNetworkError(error, 'MoodApi.delete');
+    }
+  }
+
+  /**
+   * Fetch mood history with pagination
+   *
+   * @param userId - User ID to fetch moods for
+   * @param offset - Pagination offset (default: 0)
+   * @param limit - Number of moods to fetch (default: 50)
+   * @returns Validated array of mood records, sorted by created_at descending
+   * @throws {ApiValidationError} if response validation fails
+   * @throws {SupabaseServiceError} if database operation fails
+   *
+   * @example
+   * ```typescript
+   * // Fetch first page (0-49)
+   * const firstPage = await moodApi.getMoodHistory(userId, 0, 50);
+   *
+   * // Fetch second page (50-99)
+   * const secondPage = await moodApi.getMoodHistory(userId, 50, 50);
+   * ```
+   */
+  async getMoodHistory(
+    userId: string,
+    offset: number = 0,
+    limit: number = 50
+  ): Promise<SupabaseMood[]> {
+    if (!isOnline()) {
+      throw handleNetworkError(new Error('Device is offline'), 'MoodApi.getMoodHistory');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('moods')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        throw error;
+      }
+
+      // Validate response data
+      try {
+        const validatedMoods = MoodArraySchema.parse(data || []);
+        return validatedMoods;
+      } catch (validationError) {
+        if (validationError instanceof ZodError) {
+          console.error('[MoodApi] Validation error on getMoodHistory:', validationError.issues);
+          throw new ApiValidationError('Invalid mood data received from server', validationError);
+        }
+        throw validationError;
+      }
+    } catch (error) {
+      // Handle validation errors
+      if (error instanceof ApiValidationError) {
+        throw error;
+      }
+
+      logSupabaseError('MoodApi.getMoodHistory', error);
+
+      if (isPostgrestError(error)) {
+        throw handleSupabaseError(error, 'MoodApi.getMoodHistory');
+      }
+
+      throw handleNetworkError(error, 'MoodApi.getMoodHistory');
     }
   }
 }

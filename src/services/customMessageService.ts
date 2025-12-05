@@ -134,7 +134,7 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
-        console.error('[CustomMessageService] Validation failed:', error.errors);
+        console.error('[CustomMessageService] Validation failed:', error.issues);
         throw createValidationError(error);
       }
       console.error('[CustomMessageService] Failed to create custom message:', error);
@@ -169,7 +169,7 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
-        console.error('[CustomMessageService] Validation failed:', error.errors);
+        console.error('[CustomMessageService] Validation failed:', error.issues);
         throw createValidationError(error);
       }
       console.error('[CustomMessageService] Failed to update custom message:', error);
@@ -348,7 +348,7 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
-        console.error('[CustomMessageService] Import data validation failed:', error.errors);
+        console.error('[CustomMessageService] Import data validation failed:', error.issues);
         throw createValidationError(error);
       }
       console.error('[CustomMessageService] Failed to import messages:', error);

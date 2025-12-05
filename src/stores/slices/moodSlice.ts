@@ -58,8 +58,9 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
   // Actions
   addMoodEntry: async (moods, note) => {
     try {
-      // Get authenticated user ID
-      const userId = await authService.getCurrentUserId();
+      // Get authenticated user ID (offline-safe - uses cached session)
+      // Story 5.2: AC-5.2.6 - Use offline-safe auth for local saves
+      const userId = await authService.getCurrentUserIdOfflineSafe();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -223,6 +224,19 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       // Call moodSyncService to sync all pending moods
       const result = await moodSyncService.syncPendingMoods();
 
+      // Reload moods from IndexedDB to reflect synced status
+      // This ensures the UI shows the correct sync state after successful sync
+      await get().loadMoods();
+
+      // Also refresh partner moods to mimic realtime updates
+      // This ensures partner's latest moods are fetched when sync completes
+      if (navigator.onLine) {
+        get().fetchPartnerMoods(30).catch((err) => {
+          // Don't fail sync if partner fetch fails - it's a nice-to-have
+          console.warn('[MoodSlice] Failed to refresh partner moods after sync:', err);
+        });
+      }
+
       // Update sync status after completion
       await get().updateSyncStatus();
 
@@ -300,10 +314,15 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       const transformedMoods: MoodEntry[] = partnerMoodRecords.map((record) => {
         // Handle nullable created_at (shouldn't be null in practice, but types say it can be)
         const createdAt = record.created_at || new Date().toISOString();
+        // Handle mood_types array (backward compat: use mood_type if mood_types is null)
+        const moods = record.mood_types && record.mood_types.length > 0
+          ? record.mood_types
+          : [record.mood_type];
         return {
           id: undefined, // Partner moods don't have local IDB id
           userId: record.user_id,
           mood: record.mood_type,
+          moods: moods, // Include all selected moods
           note: record.note || undefined,
           date: createdAt.split('T')[0], // Extract YYYY-MM-DD
           timestamp: new Date(createdAt),

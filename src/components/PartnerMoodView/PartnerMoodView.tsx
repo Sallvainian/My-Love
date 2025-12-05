@@ -21,11 +21,13 @@ import {
   Angry,
   UserMinus,
   Battery,
+  Zap,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { PARTNER_NAME } from '../../config/constants';
 import { moodSyncService } from '../../api/moodSyncService';
+import { PokeKissInterface } from '../PokeKissInterface';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {
@@ -33,12 +35,14 @@ const MOOD_CONFIG = {
   loved: { icon: Heart, label: 'Loved', color: 'text-red-500' },
   happy: { icon: Smile, label: 'Happy', color: 'text-yellow-500' },
   content: { icon: Meh, label: 'Content', color: 'text-blue-500' },
+  excited: { icon: Zap, label: 'Excited', color: 'text-amber-500' },
   thoughtful: { icon: MessageCircle, label: 'Thoughtful', color: 'text-purple-500' },
   grateful: { icon: Sparkles, label: 'Grateful', color: 'text-pink-500' },
   // Negative emotions
   sad: { icon: Frown, label: 'Sad', color: 'text-gray-500' },
   anxious: { icon: AlertCircle, label: 'Anxious', color: 'text-orange-500' },
   frustrated: { icon: Angry, label: 'Frustrated', color: 'text-red-600' },
+  angry: { icon: Angry, label: 'Angry', color: 'text-rose-600' },
   lonely: { icon: UserMinus, label: 'Lonely', color: 'text-indigo-500' },
   tired: { icon: Battery, label: 'Tired', color: 'text-slate-500' },
 } as const;
@@ -312,7 +316,7 @@ export function PartnerMoodView() {
             data-testid="partner-mood-notification"
           >
             <div className="bg-pink-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
-              <Bell className="w-5 h-5 flex-shrink-0" />
+              <Bell className="w-5 h-5 shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold">
                   {PARTNER_NAME} just logged a mood: {notification.mood}
@@ -525,19 +529,25 @@ export function PartnerMoodView() {
                 <p className="text-gray-600">Connected with {partner.displayName}</p>
               </div>
 
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing || !syncStatus.isOnline}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  isRefreshing || !syncStatus.isOnline
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-pink-500 hover:bg-pink-600 text-white'
-                }`}
-                data-testid="partner-mood-refresh-button"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-              </button>
+              {/* Action buttons: Refresh + Interaction FAB */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || !syncStatus.isOnline}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isRefreshing || !syncStatus.isOnline
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-pink-500 hover:bg-pink-600 text-white'
+                  }`}
+                  data-testid="partner-mood-refresh-button"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                {/* Story 6.5: Poke/Kiss Interaction FAB - next to refresh, expands down */}
+                <PokeKissInterface expandDirection="down" />
+              </div>
             </div>
 
             {/* Error Display */}
@@ -602,6 +612,7 @@ export function PartnerMoodView() {
           </>
         )}
       </div>
+
     </div>
   );
 }

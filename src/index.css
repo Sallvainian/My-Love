@@ -1,8 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Dancing+Script:wght@400;500;600;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@config "../tailwind.config.js";
 
 @layer base {
   html {
@@ -11,11 +10,27 @@
   }
 
   body {
-    @apply bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 min-h-screen font-sans;
+    @apply bg-linear-to-br from-pink-50 via-rose-50 to-pink-100 min-h-screen font-sans;
   }
 
+  /* Custom scrollbar styling */
   * {
-    @apply scrollbar-thin scrollbar-thumb-pink-300 scrollbar-track-pink-50;
+    scrollbar-width: thin;
+    scrollbar-color: #f9a8d4 #fdf2f8;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #fdf2f8;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: #f9a8d4;
+    border-radius: 4px;
   }
 }
 
@@ -31,7 +46,7 @@
 
   /* Button styles */
   .btn-primary {
-    @apply bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium px-6 py-3 rounded-full shadow-lg;
+    @apply bg-linear-to-r from-pink-500 to-rose-500 text-white font-medium px-6 py-3 rounded-full shadow-lg;
     @apply transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95;
   }
 
@@ -55,7 +70,7 @@
 
   /* Text styles */
   .text-gradient {
-    @apply bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent;
+    @apply bg-linear-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent;
   }
 
   /* Animation utilities */

@@ -11,6 +11,7 @@ import {
   Angry,
   UserMinus,
   Battery,
+  Zap,
 } from 'lucide-react';
 import type { MoodEntry, MoodType } from '../../types';
 
@@ -24,12 +25,14 @@ const MOOD_CONFIG = {
   loved: { icon: Heart, color: 'text-pink-500', bgColor: 'bg-pink-100' },
   happy: { icon: Smile, color: 'text-yellow-500', bgColor: 'bg-yellow-100' },
   content: { icon: Meh, color: 'text-blue-500', bgColor: 'bg-blue-100' },
+  excited: { icon: Zap, color: 'text-amber-500', bgColor: 'bg-amber-100' },
   thoughtful: { icon: MessageCircle, color: 'text-purple-500', bgColor: 'bg-purple-100' },
   grateful: { icon: Sparkles, color: 'text-green-500', bgColor: 'bg-green-100' },
   // Negative emotions
   sad: { icon: Frown, color: 'text-gray-500', bgColor: 'bg-gray-100' },
   anxious: { icon: AlertCircle, color: 'text-orange-500', bgColor: 'bg-orange-100' },
   frustrated: { icon: Angry, color: 'text-red-500', bgColor: 'bg-red-100' },
+  angry: { icon: Angry, color: 'text-rose-600', bgColor: 'bg-rose-100' },
   lonely: { icon: UserMinus, color: 'text-indigo-500', bgColor: 'bg-indigo-100' },
   tired: { icon: Battery, color: 'text-slate-500', bgColor: 'bg-slate-100' },
 } as const;

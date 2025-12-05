@@ -38,21 +38,12 @@ export function PhotoCarousel() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  // AC-4.3.3 & Task 6: Blob URL management (cleanup to prevent memory leaks)
-   
+  // AC-4.3.3: Set image URL from Supabase signed URL
   useEffect(() => {
-    if (currentPhoto?.imageBlob) {
-      try {
-        const url = URL.createObjectURL(currentPhoto.imageBlob);
-        setImageUrl(url);
-
-        return () => {
-          URL.revokeObjectURL(url);
-        };
-      } catch (error) {
-        console.error('[PhotoCarousel] Failed to create blob URL:', error);
-        setImageUrl(''); // Fallback to empty string to prevent render errors
-      }
+    if (currentPhoto && 'signedUrl' in currentPhoto && currentPhoto.signedUrl) {
+      setImageUrl(currentPhoto.signedUrl);
+    } else {
+      setImageUrl('');
     }
   }, [currentPhoto]);
 
@@ -197,34 +188,15 @@ export function PhotoCarousel() {
             />
           </div>
 
-          {/* AC-4.3.4: Caption and tags below photo */}
-          {(currentPhoto.caption || currentPhoto.tags.length > 0) && (
+          {/* AC-4.3.4: Caption below photo */}
+          {currentPhoto.caption && (
             <div className="mt-6 text-center max-w-4xl" data-testid="photo-carousel-metadata">
-              {currentPhoto.caption && (
-                <h3
-                  className="text-white text-xl font-medium mb-3"
-                  data-testid="photo-carousel-caption"
-                >
-                  {currentPhoto.caption}
-                </h3>
-              )}
-
-              {currentPhoto.tags.length > 0 && (
-                <div
-                  className="flex flex-wrap gap-2 justify-center"
-                  data-testid="photo-carousel-tags"
-                >
-                  {currentPhoto.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-gray-700 text-gray-200 text-sm rounded-full"
-                      data-testid={`photo-carousel-tag-${index}`}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <h3
+                className="text-white text-xl font-medium mb-3"
+                data-testid="photo-carousel-caption"
+              >
+                {currentPhoto.caption}
+              </h3>
             </div>
           )}
         </motion.div>
@@ -236,16 +208,22 @@ export function PhotoCarousel() {
       </div>
 
       {/* Story 4.4: AC-4.4.1, AC-4.4.2, AC-4.4.3 - Photo Edit Modal */}
-      {isEditModalOpen && (
-        <PhotoEditModal photo={currentPhoto} onClose={handleCloseEditModal} onSave={updatePhoto} />
+      {/* TODO: Update PhotoEditModal to use PhotoWithUrls type */}
+      {isEditModalOpen && currentPhoto && (
+        <PhotoEditModal
+          photo={currentPhoto as any}
+          onClose={handleCloseEditModal}
+          onSave={((id: string, updates: any) => updatePhoto(id, updates)) as any}
+        />
       )}
 
       {/* Story 4.4: AC-4.4.4, AC-4.4.5 - Photo Delete Confirmation */}
-      {isDeleteConfirmOpen && (
+      {/* TODO: Update PhotoDeleteConfirmation to use PhotoWithUrls type */}
+      {isDeleteConfirmOpen && currentPhoto && (
         <PhotoDeleteConfirmation
-          photo={currentPhoto}
+          photo={currentPhoto as any}
           onClose={handleCloseDeleteConfirm}
-          onConfirmDelete={deletePhoto}
+          onConfirmDelete={((id: string) => deletePhoto(id)) as any}
         />
       )}
     </div>
