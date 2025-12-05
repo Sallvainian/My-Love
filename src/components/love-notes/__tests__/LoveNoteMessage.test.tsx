@@ -1,0 +1,492 @@
+/**
+ * LoveNoteMessage Component Tests
+ *
+ * Unit tests for the message bubble component with image display.
+ * Tests text rendering, image loading states, full-screen viewer, and retry behavior.
+ *
+ * Love Notes Images: Task 11 - Component tests (AC-7, AC-9)
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { LoveNoteMessage } from '../LoveNoteMessage';
+import type { LoveNote } from '../../../types/models';
+
+// Mock framer-motion
+vi.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  },
+  AnimatePresence: ({ children }: any) => <>{children}</>,
+}));
+
+// Mock loveNoteImageService
+const mockGetSignedImageUrl = vi.fn();
+vi.mock('../../../services/loveNoteImageService', () => ({
+  getSignedImageUrl: (path: string) => mockGetSignedImageUrl(path),
+}));
+
+// Mock FullScreenImageViewer
+vi.mock('../FullScreenImageViewer', () => ({
+  FullScreenImageViewer: ({ imageUrl, isOpen, onClose }: any) =>
+    isOpen ? (
+      <div data-testid="fullscreen-viewer" onClick={onClose}>
+        <img src={imageUrl} alt="Fullscreen" />
+      </div>
+    ) : null,
+}));
+
+describe('LoveNoteMessage', () => {
+  const baseMessage: LoveNote = {
+    id: 'msg-1',
+    from_user_id: 'user-123',
+    to_user_id: 'partner-456',
+    content: 'Hello love!',
+    created_at: '2024-01-15T10:30:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSignedImageUrl.mockResolvedValue({
+      url: 'https://storage.example.com/signed-image.jpg',
+      expiresAt: Date.now() + 3600000,
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('Text Message Rendering', () => {
+    it('should render message content', () => {
+      render(
+        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      expect(screen.getByText('Hello love!')).toBeInTheDocument();
+    });
+
+    it('should render sender name and timestamp', () => {
+      render(
+        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      expect(screen.getByText(/You/)).toBeInTheDocument();
+    });
+
+    it('should apply own message styling when isOwnMessage is true', () => {
+      render(
+        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      const messageContainer = screen.getByTestId('love-note-message');
+      expect(messageContainer).toHaveClass('items-end');
+    });
+
+    it('should apply partner message styling when isOwnMessage is false', () => {
+      render(
+        <LoveNoteMessage
+          message={baseMessage}
+          isOwnMessage={false}
+          senderName="Partner"
+        />
+      );
+
+      const messageContainer = screen.getByTestId('love-note-message');
+      expect(messageContainer).toHaveClass('items-start');
+    });
+
+    it('should sanitize content to prevent XSS', () => {
+      const maliciousMessage: LoveNote = {
+        ...baseMessage,
+        content: '<script>alert("xss")</script>Hello',
+      };
+
+      render(
+        <LoveNoteMessage message={maliciousMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      // Script tags should be stripped
+      expect(screen.queryByText('<script>')).not.toBeInTheDocument();
+      expect(screen.getByText('Hello')).toBeInTheDocument();
+    });
+  });
+
+  describe('Image Message Rendering', () => {
+    it('should fetch signed URL for server image', async () => {
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/1705315800000-uuid.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetSignedImageUrl).toHaveBeenCalledWith(
+          'user-123/1705315800000-uuid.jpg'
+        );
+      });
+    });
+
+    it('should display image after loading signed URL', async () => {
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        const img = screen.getByAltText('Attached image');
+        expect(img).toBeInTheDocument();
+        expect(img).toHaveAttribute(
+          'src',
+          'https://storage.example.com/signed-image.jpg'
+        );
+      });
+    });
+
+    it('should display optimistic preview URL directly', async () => {
+      const messageWithPreview: LoveNote = {
+        ...baseMessage,
+        imagePreviewUrl: 'blob:http://localhost/preview-123',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithPreview}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        const img = screen.getByAltText('Attached image');
+        expect(img).toHaveAttribute('src', 'blob:http://localhost/preview-123');
+      });
+
+      // Should NOT fetch signed URL when preview is available
+      expect(mockGetSignedImageUrl).not.toHaveBeenCalled();
+    });
+
+    it('should show loading spinner while fetching image URL', async () => {
+      // Make the signed URL promise never resolve immediately
+      mockGetSignedImageUrl.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ url: 'test' }), 100))
+      );
+
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      // Should show loading state (spinner with animate-spin class)
+      const loadingSpinner = document.querySelector('.animate-spin');
+      expect(loadingSpinner).toBeInTheDocument();
+    });
+
+    it('should show error state when image fails to load', async () => {
+      mockGetSignedImageUrl.mockRejectedValue(new Error('Not found'));
+
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/missing.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+      });
+    });
+
+    it('should show uploading overlay when imageUploading is true', () => {
+      const uploadingMessage: LoveNote = {
+        ...baseMessage,
+        imagePreviewUrl: 'blob:preview',
+        imageUploading: true,
+      };
+
+      render(
+        <LoveNoteMessage
+          message={uploadingMessage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      expect(screen.getByText('Uploading...')).toBeInTheDocument();
+    });
+  });
+
+  describe('Full Screen Image Viewer', () => {
+    it('should open full-screen viewer when image is clicked', async () => {
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+      });
+
+      const imageButton = screen.getByRole('button', { name: /view image full screen/i });
+      fireEvent.click(imageButton);
+
+      expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
+    });
+
+    it('should close full-screen viewer when clicked', async () => {
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+      });
+
+      // Open viewer
+      const imageButton = screen.getByRole('button', { name: /view image full screen/i });
+      fireEvent.click(imageButton);
+
+      expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
+
+      // Close viewer
+      fireEvent.click(screen.getByTestId('fullscreen-viewer'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('fullscreen-viewer')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should not open viewer when image has error', async () => {
+      mockGetSignedImageUrl.mockRejectedValue(new Error('Not found'));
+
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/missing.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to load image')).toBeInTheDocument();
+      });
+
+      // No image button should exist when there's an error
+      expect(
+        screen.queryByRole('button', { name: /view image full screen/i })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Message Status States', () => {
+    it('should show sending indicator', () => {
+      const sendingMessage: LoveNote = {
+        ...baseMessage,
+        sending: true,
+      };
+
+      render(
+        <LoveNoteMessage message={sendingMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      expect(screen.getByText('Sending...')).toBeInTheDocument();
+    });
+
+    it('should not show sending indicator when image is uploading', () => {
+      const uploadingMessage: LoveNote = {
+        ...baseMessage,
+        sending: true,
+        imageUploading: true,
+        imagePreviewUrl: 'blob:preview',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={uploadingMessage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      // Should show "Uploading..." not "Sending..."
+      expect(screen.getByText('Uploading...')).toBeInTheDocument();
+      expect(screen.queryByText('Sending...')).not.toBeInTheDocument();
+    });
+
+    it('should show error state with retry button', () => {
+      const failedMessage: LoveNote = {
+        ...baseMessage,
+        tempId: 'temp-123',
+        error: true,
+      };
+
+      render(
+        <LoveNoteMessage message={failedMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      expect(screen.getByText(/Failed to send/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    });
+
+    it('should call onRetry when retry button clicked', () => {
+      const onRetry = vi.fn();
+      const failedMessage: LoveNote = {
+        ...baseMessage,
+        tempId: 'temp-123',
+        error: true,
+      };
+
+      render(
+        <LoveNoteMessage
+          message={failedMessage}
+          isOwnMessage={true}
+          senderName="You"
+          onRetry={onRetry}
+        />
+      );
+
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      fireEvent.click(retryButton);
+
+      expect(onRetry).toHaveBeenCalledWith('temp-123');
+    });
+  });
+
+  describe('Message with Both Text and Image', () => {
+    it('should render both text and image', async () => {
+      const messageWithBoth: LoveNote = {
+        ...baseMessage,
+        content: 'Check out this photo!',
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithBoth}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      expect(screen.getByText('Check out this photo!')).toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+      });
+    });
+
+    it('should render image-only message without text bubble', async () => {
+      const imageOnlyMessage: LoveNote = {
+        ...baseMessage,
+        content: '',
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={imageOnlyMessage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+      });
+
+      // Should have no text content
+      const messageBubbles = screen.queryAllByText(/./);
+      // Filter to just content paragraphs, not controls/timestamp
+      const contentParagraphs = messageBubbles.filter(
+        (el) =>
+          el.tagName === 'P' && el.classList.contains('text-base') && el.textContent === ''
+      );
+      expect(contentParagraphs).toHaveLength(0);
+    });
+  });
+
+  describe('Accessibility', () => {
+    it('should have proper aria-label with sender and time', () => {
+      render(
+        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
+      );
+
+      const messageContainer = screen.getByRole('listitem');
+      expect(messageContainer).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('Message from You')
+      );
+    });
+
+    it('should have accessible image button', async () => {
+      const messageWithImage: LoveNote = {
+        ...baseMessage,
+        image_url: 'user-123/image.jpg',
+      };
+
+      render(
+        <LoveNoteMessage
+          message={messageWithImage}
+          isOwnMessage={true}
+          senderName="You"
+        />
+      );
+
+      await waitFor(() => {
+        const imageButton = screen.getByRole('button', { name: /view image full screen/i });
+        expect(imageButton).toBeInTheDocument();
+      });
+    });
+  });
+});
