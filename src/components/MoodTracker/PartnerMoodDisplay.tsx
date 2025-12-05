@@ -115,7 +115,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
       role="region"
       aria-label="Partner's current mood"
     >
-      <h2 className="text-sm font-medium text-pink-700 dark:text-pink-300 mb-2">
+      <h2 className="text-sm font-medium text-pink-900 dark:text-pink-200 mb-2">
         Your partner is feeling:
       </h2>
       <div className="flex items-center gap-4">
@@ -135,7 +135,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
             {partnerMood.mood_type}
           </h3>
           <p
-            className="text-sm text-pink-800 dark:text-pink-200"
+            className="text-sm text-pink-900 dark:text-pink-100"
             data-testid="partner-mood-timestamp"
           >
             <time dateTime={partnerMood.created_at ?? undefined}>{timestamp}</time>
