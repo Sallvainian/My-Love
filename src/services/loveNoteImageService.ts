@@ -2,12 +2,12 @@
  * Love Note Image Service
  *
  * Handles image uploads for love notes chat messages.
- * Uses Supabase Storage with signed URLs for private access.
+ * Uses Edge Function for server-side validation + Supabase Storage.
  *
  * Features:
- * - Image compression via imageCompressionService
- * - Upload to love-notes-images bucket
- * - Signed URL generation for viewing
+ * - Image compression via imageCompressionService (client-side, saves bandwidth)
+ * - Server-side validation via Edge Function (MIME, size, rate limiting)
+ * - Signed URL generation for viewing with caching
  * - Storage path format: {user_id}/{timestamp}-{uuid}.jpg
  */
 
@@ -15,13 +15,14 @@ import { supabase } from '../api/supabaseClient';
 import { imageCompressionService } from './imageCompressionService';
 import { IMAGE_STORAGE } from '../config/images';
 
+/** Edge Function URL for image upload with server-side validation */
+const UPLOAD_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-love-note-image`;
+
 const {
   BUCKET_NAME,
   SIGNED_URL_EXPIRY_SECONDS: SIGNED_URL_EXPIRY,
   URL_REFRESH_BUFFER_MS: URL_REFRESH_BUFFER,
   MAX_CACHE_SIZE,
-  CACHE_CONTROL,
-  CONTENT_TYPE,
 } = IMAGE_STORAGE;
 
 /**
@@ -90,90 +91,127 @@ export interface SignedUrlResult {
 }
 
 /**
- * Generate a unique storage path for a love note image
- * Format: {userId}/{timestamp}-{uuid}.jpg
+ * Edge Function response type
  */
-function generateStoragePath(userId: string): string {
-  const timestamp = Date.now();
-  const uuid = crypto.randomUUID();
-  return `${userId}/${timestamp}-${uuid}.jpg`;
+interface EdgeFunctionResponse {
+  success?: boolean;
+  storagePath?: string;
+  size?: number;
+  mimeType?: string;
+  rateLimitRemaining?: number;
+  error?: string;
+  message?: string;
 }
 
 /**
- * Upload a love note image to Supabase Storage
+ * Upload a love note image via Edge Function
+ *
+ * Flow:
+ * 1. Client-side validation and compression (saves bandwidth)
+ * 2. Upload to Edge Function for server-side validation
+ * 3. Edge Function validates MIME (magic bytes), size, rate limit
+ * 4. Edge Function uploads to Storage and returns path
  *
  * @param file - Image file to upload
- * @param userId - Current user's ID (for storage path)
+ * @param _userId - Current user's ID (unused - Edge Function gets from JWT)
  * @returns Storage path for database record
- * @throws Error if compression or upload fails
+ * @throws Error if validation, compression, or upload fails
  */
 export async function uploadLoveNoteImage(
   file: File,
-  userId: string
+  _userId: string
 ): Promise<UploadResult> {
-  // Validate file first
+  // Client-side validation first (fast feedback)
   const validation = imageCompressionService.validateImageFile(file);
   if (!validation.valid) {
     throw new Error(validation.error || 'Invalid image file');
   }
 
-  // Compress the image
+  // Compress the image client-side (saves bandwidth)
   const { blob, compressedSize } = await imageCompressionService.compressImage(file);
 
-  // Generate storage path
-  const storagePath = generateStoragePath(userId);
-
-  // Upload to Supabase Storage
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET_NAME)
-    .upload(storagePath, blob, {
-      contentType: CONTENT_TYPE,
-      cacheControl: CACHE_CONTROL,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error('[LoveNoteImageService] Upload failed:', uploadError);
-    throw new Error(`Upload failed: ${uploadError.message}`);
+  // Get current session for auth header
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated');
   }
 
-  console.log('[LoveNoteImageService] Image uploaded:', storagePath);
+  // Upload via Edge Function for server-side validation
+  const response = await fetch(UPLOAD_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: blob,
+  });
+
+  const result: EdgeFunctionResponse = await response.json();
+
+  if (!response.ok || !result.success) {
+    const errorMessage = result.message || result.error || 'Upload failed';
+    console.error('[LoveNoteImageService] Edge Function error:', result);
+
+    // Handle specific error codes
+    if (response.status === 429) {
+      throw new Error('Too many uploads. Please wait a minute and try again.');
+    }
+    if (response.status === 413) {
+      throw new Error('Image is too large. Please try a smaller image.');
+    }
+    if (response.status === 415) {
+      throw new Error('Invalid image type. Please use JPEG, PNG, WebP, or GIF.');
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  console.log('[LoveNoteImageService] Image uploaded via Edge Function:', result.storagePath);
 
   return {
-    storagePath,
+    storagePath: result.storagePath!,
     compressedSize,
   };
 }
 
 /**
- * Upload a pre-compressed blob (for retry flows)
+ * Upload a pre-compressed blob via Edge Function (for retry flows)
  * Avoids re-compression when retrying failed uploads
  *
  * @param blob - Already compressed image blob
- * @param userId - Current user's ID
+ * @param _userId - Current user's ID (unused - Edge Function gets from JWT)
  * @returns Storage path for database record
  */
 export async function uploadCompressedBlob(
   blob: Blob,
-  userId: string
+  _userId: string
 ): Promise<UploadResult> {
-  const storagePath = generateStoragePath(userId);
+  // Get current session for auth header
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated');
+  }
 
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET_NAME)
-    .upload(storagePath, blob, {
-      contentType: CONTENT_TYPE,
-      cacheControl: CACHE_CONTROL,
-      upsert: false,
-    });
+  // Upload via Edge Function for server-side validation
+  const response = await fetch(UPLOAD_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: blob,
+  });
 
-  if (uploadError) {
-    console.error('[LoveNoteImageService] Upload failed:', uploadError);
-    throw new Error(`Upload failed: ${uploadError.message}`);
+  const result: EdgeFunctionResponse = await response.json();
+
+  if (!response.ok || !result.success) {
+    const errorMessage = result.message || result.error || 'Upload failed';
+    console.error('[LoveNoteImageService] Edge Function error:', result);
+    throw new Error(errorMessage);
   }
 
   return {
-    storagePath,
+    storagePath: result.storagePath!,
     compressedSize: blob.size,
   };
 }
