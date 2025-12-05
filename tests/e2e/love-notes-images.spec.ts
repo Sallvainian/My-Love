@@ -251,7 +251,7 @@ test.describe('Love Notes Image Attachments', () => {
       ]);
 
       // Verify response was successful
-      expect(response.status()).toBeLessThanOrEqual(201);
+      expect([200, 201]).toContain(response.status());
     });
   });
 
