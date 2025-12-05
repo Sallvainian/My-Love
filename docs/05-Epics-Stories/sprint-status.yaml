@@ -57,7 +57,7 @@ development_status:
   epic-2-retrospective: done # Retrospective completed 2025-12-03 - docs/10-Retrospectives/epic-2-retrospective-2025-12-03.md
 
   # Epic 3: Push Notifications & Daily Engagement
-  epic-3: backlog
+  epic-3: contexted # Tech spec created 2025-12-04
   3-0-push-notification-daily-messages-schema-setup: backlog
   3-1-notification-permission-flow: backlog
   3-2-push-token-registration-storage: backlog

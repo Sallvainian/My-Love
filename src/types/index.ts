@@ -62,6 +62,8 @@ export interface CompressionResult {
   height: number;
   originalSize: number;
   compressedSize: number;
+  /** True if compression failed and original file was returned as fallback */
+  fallbackUsed?: boolean;
 }
 
 export interface Anniversary {
