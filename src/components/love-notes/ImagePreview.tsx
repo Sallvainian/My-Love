@@ -31,13 +31,21 @@ function formatFileSize(bytes: number): string {
 function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImagePreviewProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Create preview URL from file
+  // Create preview URL from file with error handling
   useEffect(() => {
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
+    let url: string | null = null;
+    try {
+      url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } catch (error) {
+      console.error('[ImagePreview] Failed to create preview URL:', error);
+      setPreviewUrl(null);
+    }
 
     return () => {
-      URL.revokeObjectURL(url);
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
     };
   }, [file]);
 
