@@ -42,11 +42,25 @@ export interface NotesSlice {
   checkRateLimit: () => { recentTimestamps: number[]; now: number };
   sendNote: (content: string, imageFile?: File) => Promise<void>;
   retryFailedMessage: (tempId: string) => Promise<void>;
+  cleanupPreviewUrls: () => void;
+  removeFailedMessage: (tempId: string) => void;
 }
 
 const NOTES_PAGE_SIZE = 50;
 const RATE_LIMIT_MAX_MESSAGES = 10;
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
+/**
+ * Helper: Revoke blob URLs from notes to prevent memory leaks
+ * Only revokes URLs that start with 'blob:' (not server URLs)
+ */
+function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
+  notes.forEach((note) => {
+    if (note.imagePreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(note.imagePreviewUrl);
+    }
+  });
+}
 
 export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (set, get) => ({
   // Initial state
@@ -67,6 +81,10 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
    */
   fetchNotes: async (limit = NOTES_PAGE_SIZE) => {
     try {
+      // Cleanup existing preview URLs before fetching new notes
+      const { notes: existingNotes } = get();
+      revokePreviewUrlsFromNotes(existingNotes);
+
       set({ notesIsLoading: true, notesError: null });
 
       // Get authenticated user ID
@@ -219,8 +237,12 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
 
   /**
    * Set the entire notes array (for bulk updates)
+   * Cleans up preview URLs from replaced notes to prevent memory leaks
    */
   setNotes: (notes) => {
+    // Cleanup preview URLs from existing notes before replacing
+    const { notes: existingNotes } = get();
+    revokePreviewUrlsFromNotes(existingNotes);
     set({ notes });
   },
 
@@ -574,6 +596,43 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       }
 
       throw error;
+    }
+  },
+
+  /**
+   * Cleanup all preview URLs from notes
+   * Call on component unmount to prevent memory leaks
+   */
+  cleanupPreviewUrls: () => {
+    const { notes } = get();
+    revokePreviewUrlsFromNotes(notes);
+
+    if (import.meta.env.DEV) {
+      const previewCount = notes.filter((n) => n.imagePreviewUrl?.startsWith('blob:')).length;
+      if (previewCount > 0) {
+        console.log('[NotesSlice] Cleaned up', previewCount, 'preview URLs');
+      }
+    }
+  },
+
+  /**
+   * Remove a failed message from the notes array
+   * Cleans up any associated preview URLs
+   */
+  removeFailedMessage: (tempId: string) => {
+    const { notes } = get();
+    const failedNote = notes.find((n) => n.tempId === tempId);
+
+    if (failedNote?.imagePreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(failedNote.imagePreviewUrl);
+    }
+
+    set((state) => ({
+      notes: state.notes.filter((n) => n.tempId !== tempId),
+    }));
+
+    if (import.meta.env.DEV) {
+      console.log('[NotesSlice] Removed failed message:', tempId);
     }
   },
 });
