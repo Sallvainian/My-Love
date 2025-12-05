@@ -14,7 +14,7 @@
  * Love Notes Images: AC-7 (inline display), AC-9 (full-screen view)
  */
 
-import { memo, type ReactElement, useMemo, useState, useEffect, useCallback } from 'react';
+import { memo, type ReactElement, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import { Loader2 } from 'lucide-react';
@@ -22,6 +22,9 @@ import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateFor
 import type { LoveNote } from '../../types/models';
 import { getSignedImageUrl } from '../../services/loveNoteImageService';
 import { FullScreenImageViewer } from './FullScreenImageViewer';
+
+/** Maximum number of URL refresh attempts before giving up */
+const MAX_IMAGE_RETRIES = 2;
 
 export interface LoveNoteMessageProps {
   /** The love note message data */
@@ -61,6 +64,18 @@ function LoveNoteMessageComponent({
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
+
+  // Ref to track mounted state for async operations
+  const isMountedRef = useRef(true);
+
+  // Track mounted state to prevent state updates after unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Story 2.4 Code Review: XSS sanitization - strip all HTML tags, keep text only
   const sanitizedContent = useMemo(
@@ -75,6 +90,16 @@ function LoveNoteMessageComponent({
 
   // Check if message has an image (either from server or optimistic preview)
   const hasImage = !!(message.image_url || message.imagePreviewUrl);
+
+  // Generate accessible alt text for images
+  const imageAltText = useMemo(() => {
+    if (sanitizedContent) {
+      // Truncate long captions to prevent overly verbose alt text
+      const truncated = sanitizedContent.slice(0, 50);
+      return `Image from ${senderName}: ${truncated}${sanitizedContent.length > 50 ? '...' : ''}`;
+    }
+    return `Photo shared by ${senderName}`;
+  }, [sanitizedContent, senderName]);
 
   // Fetch signed URL for server-stored images
   useEffect(() => {
@@ -112,21 +137,43 @@ function LoveNoteMessageComponent({
   }, [message.image_url, message.imagePreviewUrl]);
 
   // Retry fetching signed URL on 403 error (force refresh to bypass cache)
+  // Includes retry limit to prevent infinite loops and mounted check for cleanup
   const handleImageError = useCallback(async () => {
-    if (message.image_url && !message.imagePreviewUrl) {
-      console.log('[LoveNoteMessage] Image load failed, forcing URL refresh');
-      try {
-        // Force refresh to get a new URL (the cached one may have expired)
-        const { url } = await getSignedImageUrl(message.image_url, true);
-        setImageUrl(url);
-        setImageError(false);
-      } catch {
+    // Prevent infinite retry loops (e.g., if image was deleted from storage)
+    if (imageRetryCount >= MAX_IMAGE_RETRIES) {
+      if (import.meta.env.DEV) {
+        console.warn('[LoveNoteMessage] Max retries reached for image:', message.image_url);
+      }
+      if (isMountedRef.current) {
         setImageError(true);
       }
-    } else {
-      setImageError(true);
+      return;
     }
-  }, [message.image_url, message.imagePreviewUrl]);
+
+    if (message.image_url && !message.imagePreviewUrl) {
+      if (import.meta.env.DEV) {
+        console.log('[LoveNoteMessage] Image load failed, attempt', imageRetryCount + 1);
+      }
+      try {
+        setImageRetryCount((prev) => prev + 1);
+        // Force refresh to get a new URL (the cached one may have expired)
+        const { url } = await getSignedImageUrl(message.image_url, true);
+        // Check mounted before state update to prevent React warnings
+        if (isMountedRef.current) {
+          setImageUrl(url);
+          setImageError(false);
+        }
+      } catch {
+        if (isMountedRef.current) {
+          setImageError(true);
+        }
+      }
+    } else {
+      if (isMountedRef.current) {
+        setImageError(true);
+      }
+    }
+  }, [message.image_url, message.imagePreviewUrl, imageRetryCount]);
 
   // Open full-screen viewer
   const handleImageClick = () => {
@@ -186,11 +233,11 @@ function LoveNoteMessageComponent({
                   type="button"
                   onClick={handleImageClick}
                   className="block w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-coral-500 focus:ring-inset"
-                  aria-label="View image full screen"
+                  aria-label={`View full size: ${imageAltText}`}
                 >
                   <img
                     src={imageUrl}
-                    alt="Attached image"
+                    alt={imageAltText}
                     className="w-full max-h-64 object-cover"
                     onError={handleImageError}
                     loading="lazy"
@@ -241,7 +288,7 @@ function LoveNoteMessageComponent({
         imageUrl={imageUrl}
         isOpen={showFullScreen}
         onClose={() => setShowFullScreen(false)}
-        alt="Love note image"
+        alt={imageAltText}
       />
     </>
   );
