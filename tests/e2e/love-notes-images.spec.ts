@@ -322,7 +322,7 @@ test.describe('Love Notes Image Attachments', () => {
       ]);
 
       // Verify upload succeeded
-      expect(response.status()).toBeLessThanOrEqual(201);
+      expect([200, 201]).toContain(response.status());
 
       // Preview should disappear after successful send
       await expect(preview.first()).not.toBeVisible({ timeout: 10000 });
