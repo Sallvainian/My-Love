@@ -14,6 +14,7 @@ import { memo, useMemo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Loader2 } from 'lucide-react';
 import { imageCompressionService } from '../../services/imageCompressionService';
+import { IMAGE_VALIDATION } from '../../config/images';
 
 export interface ImagePreviewProps {
   file: File;
@@ -48,7 +49,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
   );
 
   // Determine if file is large enough to show compression indicator
-  const showCompressionIndicator = originalSize > 5 * 1024 * 1024; // >5MB
+  const showCompressionIndicator = originalSize > IMAGE_VALIDATION.COMPRESSION_INDICATOR_THRESHOLD_BYTES;
 
   return (
     <motion.div
