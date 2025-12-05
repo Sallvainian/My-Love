@@ -129,7 +129,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         </span>
         <div className="flex-1">
           <h3
-            className="text-2xl font-semibold text-pink-900 dark:text-pink-100 capitalize"
+            className="text-2xl font-semibold text-slate-800 dark:text-slate-100 capitalize"
             data-testid="partner-mood-label"
           >
             {partnerMood.mood_type}
@@ -151,7 +151,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
           </p>
           {partnerMood.note && (
             <p
-              className="mt-2 text-pink-900 dark:text-pink-200 italic"
+              className="mt-2 text-slate-700 dark:text-slate-200 italic"
               data-testid="partner-mood-note"
               aria-label="Partner's note about their mood"
             >
