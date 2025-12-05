@@ -340,6 +340,12 @@ export async function batchGetSignedUrls(
     );
   }
 
+  // Clean cache after batch to handle edge case where parallel fetches
+  // exceed max size before individual cleanup checks can trigger
+  if (signedUrlCache.size > MAX_CACHE_SIZE) {
+    cleanCache();
+  }
+
   return results;
 }
 
