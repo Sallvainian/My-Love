@@ -42,14 +42,14 @@ async function globalSetup(config: FullConfig) {
   const page = await context.newPage();
 
   try {
-    // Navigate to login page
-    await page.goto(baseURL);
+    // Navigate to login page with extended timeout for CI
+    await page.goto(baseURL, { waitUntil: 'networkidle', timeout: 30000 });
 
-    // Wait for page to load
+    // Wait for page to be fully interactive
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for login form
-    await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 15000 });
+    // Wait for login form with extended timeout for slow CI environments
+    await page.getByLabel(/email/i).waitFor({ state: 'visible', timeout: 30000 });
 
     console.log('   Filling login credentials...');
 
@@ -86,10 +86,11 @@ async function globalSetup(config: FullConfig) {
     }
 
     // Wait for app navigation to be visible (confirms successful login)
+    // Extended timeout for CI environments
     await page
       .locator('nav, [data-testid="bottom-navigation"]')
       .first()
-      .waitFor({ state: 'visible', timeout: 10000 });
+      .waitFor({ state: 'visible', timeout: 20000 });
 
     console.log('   Login successful!');
 

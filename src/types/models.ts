@@ -28,10 +28,17 @@ export interface LoveNote {
   to_user_id: string;
   content: string;
   created_at: string;
+  // Image attachment (nullable - text-only messages have no image)
+  image_url?: string | null;
   // Client-side only fields for optimistic updates
   sending?: boolean;
   error?: boolean;
   tempId?: string; // For optimistic messages before server ID
+  // Image upload state (client-side only)
+  imageUploading?: boolean;
+  // Cached image data for retry flows (avoids re-compression)
+  imageBlob?: Blob;
+  imagePreviewUrl?: string;
 }
 
 /**
@@ -51,6 +58,7 @@ export interface LoveNotesState {
 export interface SendMessageInput {
   content: string;
   timestamp: string;
+  imageFile?: File;
 }
 
 /**

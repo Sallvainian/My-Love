@@ -37,10 +37,12 @@ export interface UseLoveNotesResult {
   fetchOlderNotes: () => Promise<void>;
   /** Clear any error state */
   clearError: () => void;
-  /** Send a new love note (Story 2.2) */
-  sendNote: (content: string) => Promise<void>;
+  /** Send a new love note with optional image (Story 2.2 + Images) */
+  sendNote: (content: string, imageFile?: File) => Promise<void>;
   /** Retry sending a failed message (Story 2.2) */
   retryFailedMessage: (tempId: string) => Promise<void>;
+  /** Remove a failed message from the list */
+  removeFailedMessage: (tempId: string) => void;
 }
 
 /**
@@ -83,6 +85,8 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
   const clearNotesError = useAppStore((state) => state.clearNotesError);
   const sendNoteAction = useAppStore((state) => state.sendNote);
   const retryFailedMessageAction = useAppStore((state) => state.retryFailedMessage);
+  const removeFailedMessageAction = useAppStore((state) => state.removeFailedMessage);
+  const cleanupPreviewUrls = useAppStore((state) => state.cleanupPreviewUrls);
 
   // Memoize fetch functions
   const fetchNotes = useCallback(async () => {
@@ -97,13 +101,17 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     clearNotesError();
   }, [clearNotesError]);
 
-  const sendNote = useCallback(async (content: string) => {
-    await sendNoteAction(content);
+  const sendNote = useCallback(async (content: string, imageFile?: File) => {
+    await sendNoteAction(content, imageFile);
   }, [sendNoteAction]);
 
   const retryFailedMessage = useCallback(async (tempId: string) => {
     await retryFailedMessageAction(tempId);
   }, [retryFailedMessageAction]);
+
+  const removeFailedMessage = useCallback((tempId: string) => {
+    removeFailedMessageAction(tempId);
+  }, [removeFailedMessageAction]);
 
   // Auto-fetch notes on mount
   useEffect(() => {
@@ -111,6 +119,13 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
       fetchNotes();
     }
   }, [autoFetch, fetchNotes]);
+
+  // Cleanup preview URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      cleanupPreviewUrls();
+    };
+  }, [cleanupPreviewUrls]);
 
   // Story 2.3: Real-time subscription via dedicated hook
   // Using Broadcast API per useRealtimeMessages implementation
@@ -126,6 +141,7 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     clearError,
     sendNote,
     retryFailedMessage,
+    removeFailedMessage,
   };
 }
 
