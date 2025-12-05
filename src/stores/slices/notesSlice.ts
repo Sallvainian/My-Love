@@ -21,6 +21,8 @@ import type { LoveNote } from '../../types/models';
 import { supabase } from '../../api/supabaseClient';
 import { authService } from '../../api/authService';
 import { getPartnerId } from '../../api/supabaseClient';
+import { imageCompressionService } from '../../services/imageCompressionService';
+import { uploadCompressedBlob } from '../../services/loveNoteImageService';
 
 export interface NotesSlice {
   // State
@@ -38,7 +40,7 @@ export interface NotesSlice {
   setNotesError: (error: string | null) => void;
   clearNotesError: () => void;
   checkRateLimit: () => { recentTimestamps: number[]; now: number };
-  sendNote: (content: string) => Promise<void>;
+  sendNote: (content: string, imageFile?: File) => Promise<void>;
   retryFailedMessage: (tempId: string) => Promise<void>;
 }
 
@@ -257,8 +259,9 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
   /**
    * Send a new love note with optimistic updates
    * Story 2.2 - AC-2.2.2, AC-2.2.3
+   * Love Notes Images - Support optional image attachment
    */
-  sendNote: async (content: string) => {
+  sendNote: async (content: string, imageFile?: File) => {
     try {
       // Check rate limiting
       const { recentTimestamps, now } = get().checkRateLimit();
@@ -277,6 +280,20 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       // Generate temporary ID for optimistic update
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      // If image provided, validate and prepare preview
+      let imagePreviewUrl: string | undefined;
+      let imageBlob: Blob | undefined;
+
+      if (imageFile) {
+        // Validate image file
+        const validation = imageCompressionService.validateImageFile(imageFile);
+        if (!validation.valid) {
+          throw new Error(validation.error || 'Invalid image file');
+        }
+        // Create preview URL for optimistic display
+        imagePreviewUrl = URL.createObjectURL(imageFile);
+      }
+
       // Create optimistic note
       const optimisticNote: LoveNote = {
         id: tempId,
@@ -286,6 +303,8 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
         content,
         created_at: new Date().toISOString(),
         sending: true,
+        imageUploading: !!imageFile,
+        imagePreviewUrl,
       };
 
       // Optimistic update - add note immediately
@@ -295,7 +314,46 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       }));
 
       if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Sending note (optimistic):', { tempId, content });
+        console.log('[NotesSlice] Sending note (optimistic):', { tempId, content, hasImage: !!imageFile });
+      }
+
+      // Handle image compression and upload if provided
+      let storagePath: string | null = null;
+
+      if (imageFile) {
+        try {
+          // Compress the image
+          const compressionResult = await imageCompressionService.compressImage(imageFile);
+          imageBlob = compressionResult.blob;
+
+          // Cache the compressed blob for retry flows
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.tempId === tempId
+                ? { ...note, imageBlob }
+                : note
+            ),
+          }));
+
+          // Upload to storage
+          const uploadResult = await uploadCompressedBlob(imageBlob, userId);
+          storagePath = uploadResult.storagePath;
+
+          if (import.meta.env.DEV) {
+            console.log('[NotesSlice] Image uploaded:', storagePath);
+          }
+        } catch (imageError) {
+          console.error('[NotesSlice] Image upload failed:', imageError);
+          // Mark message as failed with image error
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.tempId === tempId
+                ? { ...note, sending: false, imageUploading: false, error: true, imageBlob }
+                : note
+            ),
+          }));
+          return;
+        }
       }
 
       // Background insert to Supabase
@@ -305,16 +363,17 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
           from_user_id: userId,
           to_user_id: partnerId,
           content,
+          image_url: storagePath,
         })
         .select()
         .single();
 
       if (error) {
-        // Mark message as failed
+        // Mark message as failed (preserve imageBlob for retry)
         set((state) => ({
           notes: state.notes.map((note) =>
             note.tempId === tempId
-              ? { ...note, sending: false, error: true }
+              ? { ...note, sending: false, imageUploading: false, error: true }
               : note
           ),
         }));
@@ -327,10 +386,15 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       }
 
       // Success - replace optimistic note with server response
+      // Clean up preview URL
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+
       set((state) => ({
         notes: state.notes.map((note) =>
           note.tempId === tempId
-            ? { ...data, sending: false, error: false }
+            ? { ...data, sending: false, imageUploading: false, error: false }
             : note
         ),
       }));
@@ -390,6 +454,7 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
   /**
    * Retry sending a failed message
    * Story 2.2 - AC-2.2.4
+   * Love Notes Images - Retry uses cached imageBlob to avoid re-compression
    */
   retryFailedMessage: async (tempId: string) => {
     try {
@@ -414,19 +479,42 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       set((state) => ({
         notes: state.notes.map((note) =>
           note.tempId === tempId
-            ? { ...note, sending: true, error: false }
+            ? { ...note, sending: true, error: false, imageUploading: !!note.imageBlob }
             : note
         ),
       }));
 
       if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Retrying failed message:', tempId);
+        console.log('[NotesSlice] Retrying failed message:', tempId, { hasImage: !!failedNote.imageBlob });
       }
 
       // Get user ID for retry
       const userId = await authService.getCurrentUserId();
       if (!userId) {
         throw new Error('User not authenticated');
+      }
+
+      // Handle image upload if cached blob exists (no re-compression needed)
+      let storagePath: string | null = null;
+      if (failedNote.imageBlob) {
+        try {
+          const uploadResult = await uploadCompressedBlob(failedNote.imageBlob, userId);
+          storagePath = uploadResult.storagePath;
+
+          if (import.meta.env.DEV) {
+            console.log('[NotesSlice] Retry image uploaded:', storagePath);
+          }
+        } catch (imageError) {
+          console.error('[NotesSlice] Retry image upload failed:', imageError);
+          set((state) => ({
+            notes: state.notes.map((note) =>
+              note.tempId === tempId
+                ? { ...note, sending: false, imageUploading: false, error: true }
+                : note
+            ),
+          }));
+          return;
+        }
       }
 
       // Attempt to send again
@@ -436,6 +524,7 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
           from_user_id: userId,
           to_user_id: partnerId,
           content: failedNote.content,
+          image_url: storagePath,
         })
         .select()
         .single();
@@ -445,7 +534,7 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
         set((state) => ({
           notes: state.notes.map((note) =>
             note.tempId === tempId
-              ? { ...note, sending: false, error: true }
+              ? { ...note, sending: false, imageUploading: false, error: true }
               : note
           ),
         }));
@@ -458,10 +547,15 @@ export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (s
       }
 
       // Success - replace with server response and update rate limit timestamps
+      // Clean up preview URL if exists
+      if (failedNote.imagePreviewUrl) {
+        URL.revokeObjectURL(failedNote.imagePreviewUrl);
+      }
+
       set((state) => ({
         notes: state.notes.map((note) =>
           note.tempId === tempId
-            ? { ...data, sending: false, error: false }
+            ? { ...data, sending: false, imageUploading: false, error: false }
             : note
         ),
         sentMessageTimestamps: [...recentTimestamps, now],

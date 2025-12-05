@@ -37,8 +37,8 @@ export interface UseLoveNotesResult {
   fetchOlderNotes: () => Promise<void>;
   /** Clear any error state */
   clearError: () => void;
-  /** Send a new love note (Story 2.2) */
-  sendNote: (content: string) => Promise<void>;
+  /** Send a new love note with optional image (Story 2.2 + Images) */
+  sendNote: (content: string, imageFile?: File) => Promise<void>;
   /** Retry sending a failed message (Story 2.2) */
   retryFailedMessage: (tempId: string) => Promise<void>;
 }
@@ -97,8 +97,8 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     clearNotesError();
   }, [clearNotesError]);
 
-  const sendNote = useCallback(async (content: string) => {
-    await sendNoteAction(content);
+  const sendNote = useCallback(async (content: string, imageFile?: File) => {
+    await sendNoteAction(content, imageFile);
   }, [sendNoteAction]);
 
   const retryFailedMessage = useCallback(async (tempId: string) => {
