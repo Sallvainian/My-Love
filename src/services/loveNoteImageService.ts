@@ -16,6 +16,38 @@ import { imageCompressionService } from './imageCompressionService';
 
 const BUCKET_NAME = 'love-notes-images';
 const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
+const URL_REFRESH_BUFFER = 5 * 60 * 1000; // Refresh 5 minutes before expiry
+
+/**
+ * Cache for signed URLs with expiry tracking
+ * Prevents unnecessary API calls and handles expiry proactively
+ */
+interface CachedUrl {
+  url: string;
+  expiresAt: number;
+}
+
+const signedUrlCache = new Map<string, CachedUrl>();
+
+/**
+ * Check if a cached URL is still valid (not expired or about to expire)
+ */
+function isCacheValid(cached: CachedUrl): boolean {
+  return Date.now() < cached.expiresAt - URL_REFRESH_BUFFER;
+}
+
+/**
+ * Clear expired entries from the cache periodically
+ * Called internally to prevent memory growth
+ */
+function cleanExpiredCache(): void {
+  const now = Date.now();
+  for (const [path, cached] of signedUrlCache) {
+    if (now >= cached.expiresAt) {
+      signedUrlCache.delete(path);
+    }
+  }
+}
 
 export interface UploadResult {
   storagePath: string;
@@ -118,12 +150,37 @@ export async function uploadCompressedBlob(
 
 /**
  * Get a signed URL for viewing a love note image
+ * Uses caching with automatic expiry handling
  *
  * @param storagePath - Storage path from love_notes.image_url
+ * @param forceRefresh - Force fetching a new URL even if cached
  * @returns Signed URL with expiry timestamp
  * @throws Error if URL generation fails
  */
-export async function getSignedImageUrl(storagePath: string): Promise<SignedUrlResult> {
+export async function getSignedImageUrl(
+  storagePath: string,
+  forceRefresh = false
+): Promise<SignedUrlResult> {
+  // Clean expired entries periodically (every ~10 calls)
+  if (Math.random() < 0.1) {
+    cleanExpiredCache();
+  }
+
+  // Check cache first (unless force refresh requested)
+  if (!forceRefresh) {
+    const cached = signedUrlCache.get(storagePath);
+    if (cached && isCacheValid(cached)) {
+      if (import.meta.env.DEV) {
+        console.log('[LoveNoteImageService] Cache hit for:', storagePath);
+      }
+      return {
+        url: cached.url,
+        expiresAt: cached.expiresAt,
+      };
+    }
+  }
+
+  // Fetch new signed URL
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)
     .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
@@ -133,10 +190,40 @@ export async function getSignedImageUrl(storagePath: string): Promise<SignedUrlR
     throw new Error(`Failed to get image URL: ${error.message}`);
   }
 
-  return {
+  const result: SignedUrlResult = {
     url: data.signedUrl,
     expiresAt: Date.now() + SIGNED_URL_EXPIRY * 1000,
   };
+
+  // Cache the result
+  signedUrlCache.set(storagePath, result);
+
+  if (import.meta.env.DEV) {
+    console.log('[LoveNoteImageService] Cached new URL for:', storagePath);
+  }
+
+  return result;
+}
+
+/**
+ * Check if a signed URL needs to be refreshed (expired or about to expire)
+ * Useful for components to proactively refresh URLs
+ *
+ * @param storagePath - Storage path to check
+ * @returns true if URL should be refreshed
+ */
+export function needsUrlRefresh(storagePath: string): boolean {
+  const cached = signedUrlCache.get(storagePath);
+  if (!cached) return true;
+  return !isCacheValid(cached);
+}
+
+/**
+ * Clear the signed URL cache
+ * Call on logout or when cleaning up
+ */
+export function clearSignedUrlCache(): void {
+  signedUrlCache.clear();
 }
 
 /**

@@ -111,12 +111,13 @@ function LoveNoteMessageComponent({
     }
   }, [message.image_url, message.imagePreviewUrl]);
 
-  // Retry fetching signed URL on 403 error
+  // Retry fetching signed URL on 403 error (force refresh to bypass cache)
   const handleImageError = useCallback(async () => {
     if (message.image_url && !message.imagePreviewUrl) {
-      console.log('[LoveNoteMessage] Image load failed, attempting URL refresh');
+      console.log('[LoveNoteMessage] Image load failed, forcing URL refresh');
       try {
-        const { url } = await getSignedImageUrl(message.image_url);
+        // Force refresh to get a new URL (the cached one may have expired)
+        const { url } = await getSignedImageUrl(message.image_url, true);
         setImageUrl(url);
         setImageError(false);
       } catch {
