@@ -23,6 +23,7 @@ import { authService } from '../../api/authService';
 import { getPartnerId } from '../../api/supabaseClient';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { uploadCompressedBlob } from '../../services/loveNoteImageService';
+import { NOTES_CONFIG } from '../../config/images';
 
 export interface NotesSlice {
   // State
@@ -46,9 +47,11 @@ export interface NotesSlice {
   removeFailedMessage: (tempId: string) => void;
 }
 
-const NOTES_PAGE_SIZE = 50;
-const RATE_LIMIT_MAX_MESSAGES = 10;
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const {
+  PAGE_SIZE: NOTES_PAGE_SIZE,
+  RATE_LIMIT_MAX_MESSAGES,
+  RATE_LIMIT_WINDOW_MS,
+} = NOTES_CONFIG;
 
 /**
  * Helper: Revoke blob URLs from notes to prevent memory leaks

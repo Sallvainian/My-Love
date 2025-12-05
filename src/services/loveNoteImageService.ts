@@ -13,11 +13,16 @@
 
 import { supabase } from '../api/supabaseClient';
 import { imageCompressionService } from './imageCompressionService';
+import { IMAGE_STORAGE } from '../config/images';
 
-const BUCKET_NAME = 'love-notes-images';
-const SIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
-const URL_REFRESH_BUFFER = 5 * 60 * 1000; // Refresh 5 minutes before expiry
-const MAX_CACHE_SIZE = 100; // Maximum cached URLs to prevent memory growth
+const {
+  BUCKET_NAME,
+  SIGNED_URL_EXPIRY_SECONDS: SIGNED_URL_EXPIRY,
+  URL_REFRESH_BUFFER_MS: URL_REFRESH_BUFFER,
+  MAX_CACHE_SIZE,
+  CACHE_CONTROL,
+  CONTENT_TYPE,
+} = IMAGE_STORAGE;
 
 /**
  * Cache for signed URLs with expiry tracking
@@ -122,8 +127,8 @@ export async function uploadLoveNoteImage(
   const { error: uploadError } = await supabase.storage
     .from(BUCKET_NAME)
     .upload(storagePath, blob, {
-      contentType: 'image/jpeg',
-      cacheControl: '3600',
+      contentType: CONTENT_TYPE,
+      cacheControl: CACHE_CONTROL,
       upsert: false,
     });
 
@@ -157,8 +162,8 @@ export async function uploadCompressedBlob(
   const { error: uploadError } = await supabase.storage
     .from(BUCKET_NAME)
     .upload(storagePath, blob, {
-      contentType: 'image/jpeg',
-      cacheControl: '3600',
+      contentType: CONTENT_TYPE,
+      cacheControl: CACHE_CONTROL,
       upsert: false,
     });
 

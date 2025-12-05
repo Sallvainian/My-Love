@@ -1,4 +1,5 @@
 import type { CompressionOptions, CompressionResult } from '../types';
+import { IMAGE_COMPRESSION, IMAGE_VALIDATION } from '../config/images';
 
 /**
  * Image Compression Service - Client-side image compression using Canvas API
@@ -13,9 +14,9 @@ import type { CompressionOptions, CompressionResult } from '../types';
  */
 class ImageCompressionService {
   private readonly DEFAULT_OPTIONS: CompressionOptions = {
-    maxWidth: 2048,
-    maxHeight: 2048,
-    quality: 0.8, // 80% JPEG quality (AC-6.1.5)
+    maxWidth: IMAGE_COMPRESSION.MAX_WIDTH,
+    maxHeight: IMAGE_COMPRESSION.MAX_HEIGHT,
+    quality: IMAGE_COMPRESSION.QUALITY,
   };
 
   /**
@@ -131,18 +132,16 @@ class ImageCompressionService {
    * @returns Validation result with error message if invalid
    */
   validateImageFile(file: File): { valid: boolean; error?: string; warning?: string } {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp']; // AC-6.1.1
-
-    // Error: Unsupported format
-    if (!validTypes.includes(file.type)) {
+    // Error: Unsupported format - AC-6.1.1
+    if (!IMAGE_VALIDATION.ALLOWED_MIME_TYPES.includes(file.type)) {
       return {
         valid: false,
         error: 'Unsupported file format. Please select a JPEG, PNG, or WebP image.',
       };
     }
 
-    // Error: File too large (>25MB) - AC-6.1.2
-    if (file.size > 25 * 1024 * 1024) {
+    // Error: File too large - AC-6.1.2
+    if (file.size > IMAGE_VALIDATION.MAX_FILE_SIZE_BYTES) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(1);
       return {
         valid: false,
@@ -150,8 +149,8 @@ class ImageCompressionService {
       };
     }
 
-    // Warning: Large file (>10MB) - AC-6.1.7 (may approach 3s limit)
-    if (file.size > 10 * 1024 * 1024) {
+    // Warning: Large file - AC-6.1.7 (may approach 3s limit)
+    if (file.size > IMAGE_VALIDATION.LARGE_FILE_WARNING_BYTES) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(1);
       return {
         valid: true,

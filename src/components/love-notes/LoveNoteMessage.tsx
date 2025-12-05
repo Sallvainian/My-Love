@@ -213,7 +213,7 @@ function LoveNoteMessageComponent({
           {/* Text content (only if not empty) */}
           {sanitizedContent && (
             <div className="px-4 py-3">
-              <p className="text-base leading-relaxed break-words">{sanitizedContent}</p>
+              <p className="text-base leading-relaxed wrap-break-word">{sanitizedContent}</p>
             </div>
           )}
         </div>
