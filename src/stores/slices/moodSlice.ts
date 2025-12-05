@@ -224,6 +224,19 @@ export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set,
       // Call moodSyncService to sync all pending moods
       const result = await moodSyncService.syncPendingMoods();
 
+      // Reload moods from IndexedDB to reflect synced status
+      // This ensures the UI shows the correct sync state after successful sync
+      await get().loadMoods();
+
+      // Also refresh partner moods to mimic realtime updates
+      // This ensures partner's latest moods are fetched when sync completes
+      if (navigator.onLine) {
+        get().fetchPartnerMoods(30).catch((err) => {
+          // Don't fail sync if partner fetch fails - it's a nice-to-have
+          console.warn('[MoodSlice] Failed to refresh partner moods after sync:', err);
+        });
+      }
+
       // Update sync status after completion
       await get().updateSyncStatus();
 
