@@ -24,16 +24,14 @@ export function MoodButton({ mood, icon: Icon, label, isSelected, onClick }: Moo
     <motion.button
       type="button"
       onClick={onClick}
-      whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       animate={{
-        scale: isSelected ? 1.1 : 1,
         backgroundColor: isSelected ? 'rgba(236, 72, 153, 0.1)' : 'rgba(243, 244, 246, 1)',
       }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className={`flex flex-col items-center justify-center gap-2 p-4 min-w-[48px] min-h-[48px] rounded-2xl border-2 transition-colors ${
+      className={`flex flex-col items-center justify-center gap-2 p-4 min-w-[48px] min-h-[48px] rounded-2xl border-2 transition-all ${
         isSelected
-          ? 'border-pink-500 text-pink-500'
+          ? 'border-pink-500 text-pink-500 shadow-md shadow-pink-200'
           : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
       }`}
       data-testid={`mood-button-${mood}`}
