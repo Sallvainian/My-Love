@@ -106,7 +106,19 @@ class ImageCompressionService {
       };
     } catch (error) {
       console.error('[Compression] Failed to compress image:', error);
-      throw new Error(`Compression failed: ${(error as Error).message}`);
+
+      // Fallback: Return original file as blob if compression fails
+      // This ensures upload can proceed even if Canvas API fails
+      console.warn('[Compression] Using fallback - returning original file');
+
+      return {
+        blob: file,
+        width: 0, // Unknown dimensions
+        height: 0,
+        originalSize: file.size,
+        compressedSize: file.size,
+        fallbackUsed: true, // Flag to indicate fallback was used
+      };
     }
   }
 
