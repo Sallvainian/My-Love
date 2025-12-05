@@ -21,12 +21,20 @@ const UUIDSchema = z.string().uuid('Invalid UUID format');
 
 /**
  * ISO timestamp schema for Supabase timestamps
- * Uses regex to accept various ISO 8601 formats including microseconds and timezone offsets
+ * Uses regex to accept various ISO 8601 formats including:
+ * - Microseconds: 2025-01-15T10:30:00.123456+00:00
+ * - No timezone: 2025-01-15T10:30:00 (PostgreSQL default)
+ * - UTC: 2025-01-15T10:30:00Z
+ * - Timezone without colon: 2025-01-15T10:30:00+00
+ * - Timezone with colon: 2025-01-15T10:30:00+00:00
  */
 const TimestampSchema = z.string().refine(
   (val) => {
-    // Accept ISO 8601 formats: 2025-01-15T10:30:00Z, 2025-01-15T10:30:00.123456+00:00, etc.
-    const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+    // Accept various PostgreSQL/ISO 8601 formats
+    // Required: YYYY-MM-DDTHH:MM:SS
+    // Optional: .fractional_seconds
+    // Optional: timezone (Z, +HH, -HH, +HH:MM, -HH:MM, +HHMM, -HHMM)
+    const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/;
     return isoRegex.test(val);
   },
   { message: 'Invalid timestamp format' }
@@ -85,11 +93,13 @@ const MoodTypeSchema = z.enum([
   'loved',
   'happy',
   'content',
+  'excited',
   'thoughtful',
   'grateful',
   'sad',
   'anxious',
   'frustrated',
+  'angry',
   'lonely',
   'tired',
 ]);
@@ -102,7 +112,7 @@ export const SupabaseMoodSchema = z.object({
   id: UUIDSchema,
   user_id: UUIDSchema,
   mood_type: MoodTypeSchema, // Legacy single mood (kept for backward compatibility)
-  mood_types: z.array(MoodTypeSchema).optional(), // New: multiple mood support
+  mood_types: z.array(MoodTypeSchema).nullable().optional(), // New: multiple mood support (nullable for legacy records)
   note: z.string().nullable(),
   created_at: TimestampSchema.nullable(),
   updated_at: TimestampSchema.nullable(),

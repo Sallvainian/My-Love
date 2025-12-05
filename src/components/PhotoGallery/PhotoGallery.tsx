@@ -3,8 +3,9 @@ import { Camera, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoGridItem } from './PhotoGridItem';
 import { PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
-import { photoStorageService } from '../../services/photoStorageService';
-import type { Photo } from '../../types';
+import { PhotoViewer } from './PhotoViewer';
+import { photoService } from '../../services/photoService';
+import type { PhotoWithUrls } from '../../services/photoService';
 
 interface PhotoGalleryProps {
   onUploadClick?: () => void;
@@ -26,10 +27,10 @@ const SCROLL_THRESHOLD = 200; // pixels from bottom to trigger load
  * - Lazy loading pagination with Intersection Observer
  */
 export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
-  const { selectPhoto, photos: storePhotos, loadPhotos } = useAppStore();
+  const { photos: storePhotos, loadPhotos } = useAppStore();
 
   // AC-4.2.4: Pagination state
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<PhotoWithUrls[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentOffset, setCurrentOffset] = useState(0);
@@ -37,6 +38,9 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
+
+  // Story 6.4: Photo viewer state
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
 
   // Intersection Observer ref for infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -57,26 +61,14 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     let cancelled = false;
 
     const loadInitialPhotos = async () => {
-      console.log('[PhotoGallery] loadInitialPhotos: Starting...');
       setIsLoading(true);
 
       try {
-        console.log('[PhotoGallery] loadInitialPhotos: Calling getPage...');
-        const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
-        console.log(
-          '[PhotoGallery] loadInitialPhotos: Got response, cancelled=',
-          cancelled,
-          'count=',
-          firstPage.length
-        );
+        const firstPage = await photoService.getPhotos(PHOTOS_PER_PAGE, 0);
 
-        if (cancelled) {
-          console.log('[PhotoGallery] loadInitialPhotos: Cancelled, skipping state updates');
-          return;
-        }
+        if (cancelled) return;
 
         // Batch all state updates together (React 18 automatic batching)
-        console.log('[PhotoGallery] loadInitialPhotos: Setting states...');
         setPhotos(firstPage);
         setCurrentOffset(firstPage.length);
         setHasMore(firstPage.length === PHOTOS_PER_PAGE);
@@ -85,35 +77,20 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
         // BUGFIX: Load photos into store so PhotoCarousel can access them
         await loadPhotos();
-
-        console.log(
-          `[PhotoGallery] Loaded initial ${firstPage.length} photos, hasLoadedOnce=true, isLoading=false`
-        );
       } catch (error) {
-        console.log('[PhotoGallery] loadInitialPhotos: Error, cancelled=', cancelled);
-        if (cancelled) {
-          console.log(
-            '[PhotoGallery] loadInitialPhotos: Cancelled in catch, skipping state updates'
-          );
-          return;
-        }
+        if (cancelled) return;
 
         console.error('[PhotoGallery] Failed to load initial photos:', error);
-        console.log('[PhotoGallery] loadInitialPhotos: Setting error states...');
         setPhotos([]);
         setHasLoadedOnce(true); // Mark as loaded even on error to show empty state
         setIsLoading(false);
         setError(error instanceof Error ? error.message : 'Failed to load photos');
-        console.log(
-          '[PhotoGallery] loadInitialPhotos: Error handled, hasLoadedOnce=true, isLoading=false'
-        );
       }
     };
 
     loadInitialPhotos();
 
     return () => {
-      console.log('[PhotoGallery] Cleanup: Setting cancelled=true');
       cancelled = true;
     };
   }, [loadPhotos, retryTrigger]); // Re-run on mount and when retry is clicked
@@ -127,29 +104,20 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
     // Check if store has more photos than local state (new upload detected)
     if (storePhotos.length > photos.length) {
-      console.log('[PhotoGallery] New photos detected in store, refreshing gallery...');
-
       let cancelled = false;
 
       // Refresh the gallery to show new photos
       const refreshGallery = async () => {
         try {
-          const firstPage = await photoStorageService.getPage(0, PHOTOS_PER_PAGE);
+          const firstPage = await photoService.getPhotos(PHOTOS_PER_PAGE, 0);
 
-          if (cancelled) {
-            console.log('[PhotoGallery] Refresh cancelled, skipping state updates');
-            return;
-          }
+          if (cancelled) return;
 
           setPhotos(firstPage);
           setCurrentOffset(firstPage.length);
           setHasMore(firstPage.length === PHOTOS_PER_PAGE);
-          console.log(`[PhotoGallery] Gallery refreshed with ${firstPage.length} photos`);
         } catch (error) {
-          if (cancelled) {
-            console.log('[PhotoGallery] Refresh cancelled in catch, skipping state updates');
-            return;
-          }
+          if (cancelled) return;
 
           console.error('[PhotoGallery] Failed to refresh gallery:', error);
         }
@@ -159,7 +127,6 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
       return () => {
         cancelled = true;
-        console.log('[PhotoGallery] Refresh cleanup: Setting cancelled=true');
       };
     }
   }, [storePhotos.length, photos.length, hasLoadedOnce]); // Watch store photo count
@@ -170,19 +137,14 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
     try {
       setIsLoadingMore(true);
-      const nextPage = await photoStorageService.getPage(currentOffset, PHOTOS_PER_PAGE);
+      const nextPage = await photoService.getPhotos(PHOTOS_PER_PAGE, currentOffset);
 
       if (nextPage.length > 0) {
         setPhotos((prev) => [...prev, ...nextPage]);
         setCurrentOffset((prev) => prev + nextPage.length);
         setHasMore(nextPage.length === PHOTOS_PER_PAGE);
-
-        console.log(
-          `[PhotoGallery] Loaded ${nextPage.length} more photos (total: ${currentOffset + nextPage.length})`
-        );
       } else {
         setHasMore(false);
-        console.log('[PhotoGallery] No more photos to load');
       }
     } catch (error) {
       console.error('[PhotoGallery] Failed to load more photos:', error);
@@ -224,7 +186,6 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
   // Error state - show error message with retry button
   if (error && photos.length === 0) {
-    console.log('[PhotoGallery] Render - Showing ERROR state');
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center px-4"
@@ -264,24 +225,18 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
 
   // Story 5.2 AC-4: Skeleton loaders during initial fetch
   // Show skeleton grid if actively loading OR haven't loaded yet
-  console.log(
-    '[PhotoGallery] Render - isLoading:',
-    isLoading,
-    'hasLoadedOnce:',
-    hasLoadedOnce,
-    'photos.length:',
-    photos.length
-  );
-
+  // Wrapped with photo-gallery testid so E2E tests can proceed during loading
   if ((isLoading || !hasLoadedOnce) && photos.length === 0) {
-    console.log('[PhotoGallery] Render - Showing SKELETON LOADING state');
-    return <PhotoGridSkeletonGrid />;
+    return (
+      <div data-testid="photo-gallery">
+        <PhotoGridSkeletonGrid />
+      </div>
+    );
   }
 
   // AC-4.2.5: Empty state when no photos uploaded (after first load attempt)
   // Only show empty state AFTER we've loaded once and confirmed no photos exist
   if (!isLoading && hasLoadedOnce && photos.length === 0) {
-    console.log('[PhotoGallery] Render - Showing EMPTY state');
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center px-4"
@@ -289,7 +244,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       >
         <div className="text-center max-w-md">
           <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg mb-6">No photos yet. Upload your first memory!</p>
+          <p className="text-gray-500 text-lg mb-6">No photos yet. Start building your memories!</p>
           <button
             onClick={onUploadClick}
             className="bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
@@ -302,18 +257,20 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
     );
   }
 
-  console.log('[PhotoGallery] Render - Showing GRID with', photos.length, 'photos');
-
   // AC-4.2.1: Responsive grid layout
-  // 2 columns (mobile), 3 columns (tablet sm:640px+), 4 columns (desktop lg:1024px+)
+  // 3 columns (mobile), 4 columns (desktop md:768px+)
   return (
     <div className="min-h-screen p-4" data-testid="photo-gallery">
       <div
-        className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 lg:gap-4 w-full"
+        className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-3 w-full"
         data-testid="photo-gallery-grid"
       >
         {photos.map((photo) => (
-          <PhotoGridItem key={photo.id} photo={photo} onPhotoClick={selectPhoto} />
+          <PhotoGridItem
+            key={photo.id}
+            photo={photo}
+            onPhotoClick={() => setSelectedPhotoId(photo.id)}
+          />
         ))}
       </div>
 
@@ -352,6 +309,15 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       >
         <Camera className="w-6 h-6" />
       </button>
+
+      {/* Story 6.4: PhotoViewer modal */}
+      {selectedPhotoId && (
+        <PhotoViewer
+          photos={photos}
+          selectedPhotoId={selectedPhotoId}
+          onClose={() => setSelectedPhotoId(null)}
+        />
+      )}
     </div>
   );
 }

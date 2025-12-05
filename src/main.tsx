@@ -36,7 +36,7 @@ if (import.meta.env.PROD) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LazyMotion features={domAnimation} strict>
+    <LazyMotion features={domAnimation}>
       <App />
     </LazyMotion>
   </StrictMode>

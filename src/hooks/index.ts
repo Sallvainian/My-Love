@@ -9,3 +9,8 @@
 
 export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
 export { useLoveNotes, type UseLoveNotesResult } from './useLoveNotes';
+export {
+  useVibration,
+  type UseVibrationReturn,
+  type VibrationPattern,
+} from './useVibration';

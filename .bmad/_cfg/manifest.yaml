@@ -1,0 +1,12 @@
+installation:
+  version: 6.0.0-alpha.13
+  installDate: '2025-12-05T03:28:42.512Z'
+  lastUpdated: '2025-12-05T03:28:42.512Z'
+modules:
+  - core
+  - bmm
+ides:
+  - claude-code
+  - codex
+  - github-copilot
+  - antigravity

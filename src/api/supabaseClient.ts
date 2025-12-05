@@ -80,10 +80,10 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 
 /**
  * Get partner user ID
- * Queries the database to find the other user (partner) in the system.
- * For 2-user MVP: Returns the user ID that is not the current user.
+ * Queries the users table to get the partner_id for the current user.
+ * Uses the proper partner_id column that stores the established partner relationship.
  *
- * @returns Partner user ID or null if not found
+ * @returns Partner user ID or null if not found/not connected
  */
 export const getPartnerId = async (): Promise<string | null> => {
   try {
@@ -95,22 +95,63 @@ export const getPartnerId = async (): Promise<string | null> => {
       return null;
     }
 
-    // Query users table for the partner (the other user)
+    // Query current user's partner_id from users table
     const { data, error } = await supabase
       .from('users')
-      .select('id')
-      .neq('id', currentUserId)
-      .limit(1)
+      .select('partner_id')
+      .eq('id', currentUserId)
       .single();
 
     if (error) {
+      // PGRST116 = no rows found (user doesn't have users table record yet)
+      if (error.code === 'PGRST116') {
+        console.warn('[Supabase] User has no users table record yet');
+        return null;
+      }
       console.error('[Supabase] Failed to get partner ID:', error);
       return null;
     }
 
-    return data?.id ?? null;
+    return data?.partner_id ?? null;
   } catch (error) {
     console.error('[Supabase] Error getting partner ID:', error);
+    return null;
+  }
+};
+
+/**
+ * Get partner's display name
+ * Fetches the partner's display_name from the users table.
+ * This provides the correct name for each user's partner (not a hardcoded config value).
+ *
+ * @returns Partner's display name or null if not found
+ */
+export const getPartnerDisplayName = async (): Promise<string | null> => {
+  try {
+    const partnerId = await getPartnerId();
+
+    if (!partnerId) {
+      if (import.meta.env.DEV) {
+        console.log('[Supabase] No partner ID found, cannot get partner display name');
+      }
+      return null;
+    }
+
+    // Query partner's display_name from users table
+    const { data, error } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', partnerId)
+      .single();
+
+    if (error) {
+      console.error('[Supabase] Failed to get partner display name:', error);
+      return null;
+    }
+
+    return data?.display_name ?? null;
+  } catch (error) {
+    console.error('[Supabase] Error getting partner display name:', error);
     return null;
   }
 };

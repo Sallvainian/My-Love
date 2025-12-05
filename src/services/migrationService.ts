@@ -112,7 +112,7 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
       } catch (error) {
         // Handle validation errors gracefully
         if (isZodError(error)) {
-          const errorMsg = `Invalid message data: ${message.text?.substring(0, LOG_TRUNCATE_LENGTH)} - ${(error as ZodError).errors[0]?.message}`;
+          const errorMsg = `Invalid message data: ${message.text?.substring(0, LOG_TRUNCATE_LENGTH)} - ${(error as ZodError).issues[0]?.message}`;
           console.warn('[MigrationService]', errorMsg);
           result.skippedCount++;
           continue;
