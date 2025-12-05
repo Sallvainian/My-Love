@@ -149,7 +149,8 @@ describe('LoveNoteMessage', () => {
       );
 
       await waitFor(() => {
-        const img = screen.getByAltText('Attached image');
+        // Dynamic alt text includes sender name and message content
+        const img = screen.getByRole('img', { name: /image from you/i });
         expect(img).toBeInTheDocument();
         expect(img).toHaveAttribute(
           'src',
@@ -173,7 +174,7 @@ describe('LoveNoteMessage', () => {
       );
 
       await waitFor(() => {
-        const img = screen.getByAltText('Attached image');
+        const img = screen.getByRole('img', { name: /image from you/i });
         expect(img).toHaveAttribute('src', 'blob:http://localhost/preview-123');
       });
 
@@ -261,10 +262,11 @@ describe('LoveNoteMessage', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: /image from you/i })).toBeInTheDocument();
       });
 
-      const imageButton = screen.getByRole('button', { name: /view image full screen/i });
+      // Dynamic aria-label includes "View full size:" prefix
+      const imageButton = screen.getByRole('button', { name: /view full size/i });
       fireEvent.click(imageButton);
 
       expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
@@ -285,11 +287,11 @@ describe('LoveNoteMessage', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: /image from you/i })).toBeInTheDocument();
       });
 
       // Open viewer
-      const imageButton = screen.getByRole('button', { name: /view image full screen/i });
+      const imageButton = screen.getByRole('button', { name: /view full size/i });
       fireEvent.click(imageButton);
 
       expect(screen.getByTestId('fullscreen-viewer')).toBeInTheDocument();
@@ -324,7 +326,7 @@ describe('LoveNoteMessage', () => {
 
       // No image button should exist when there's an error
       expect(
-        screen.queryByRole('button', { name: /view image full screen/i })
+        screen.queryByRole('button', { name: /view full size/i })
       ).not.toBeInTheDocument();
     });
   });
@@ -422,7 +424,8 @@ describe('LoveNoteMessage', () => {
       expect(screen.getByText('Check out this photo!')).toBeInTheDocument();
 
       await waitFor(() => {
-        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+        // Alt text includes the message caption
+        expect(screen.getByRole('img', { name: /image from you.*check out this photo/i })).toBeInTheDocument();
       });
     });
 
@@ -442,7 +445,8 @@ describe('LoveNoteMessage', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByAltText('Attached image')).toBeInTheDocument();
+        // Image-only messages use generic alt text with sender name
+        expect(screen.getByRole('img', { name: /photo shared by you/i })).toBeInTheDocument();
       });
 
       // Should have no text content
@@ -484,7 +488,8 @@ describe('LoveNoteMessage', () => {
       );
 
       await waitFor(() => {
-        const imageButton = screen.getByRole('button', { name: /view image full screen/i });
+        // Dynamic aria-label: "View full size: Image from [sender]: [caption]"
+        const imageButton = screen.getByRole('button', { name: /view full size/i });
         expect(imageButton).toBeInTheDocument();
       });
     });
