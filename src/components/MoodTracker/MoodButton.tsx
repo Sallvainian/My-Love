@@ -32,7 +32,7 @@ export function MoodButton({ mood, icon: Icon, label, isSelected, onClick }: Moo
       className={`flex flex-col items-center justify-center gap-2 p-4 min-w-[48px] min-h-[48px] rounded-2xl border-2 transition-all ${
         isSelected
           ? 'border-pink-500 text-pink-500 shadow-md shadow-pink-200'
-          : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
+          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
       }`}
       data-testid={`mood-button-${mood}`}
       aria-label={`${label} mood`}
