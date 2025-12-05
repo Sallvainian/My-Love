@@ -174,3 +174,47 @@
 .spinner-head {
   opacity: 0.75;
 }
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .display-name-setup-modal {
+    background: #1f2937;
+  }
+
+  .modal-title {
+    color: #f9fafb;
+  }
+
+  .modal-subtitle {
+    color: #9ca3af;
+  }
+
+  .form-label {
+    color: #d1d5db;
+  }
+
+  .form-input {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+  }
+
+  .form-input:focus {
+    border-color: #ff6b9d;
+    box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
+  }
+
+  .form-input:disabled {
+    background-color: #1f2937;
+  }
+
+  .form-hint {
+    color: #9ca3af;
+  }
+
+  .error-message {
+    background-color: #450a0a;
+    border-color: #7f1d1d;
+    color: #fca5a5;
+  }
+}
