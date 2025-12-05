@@ -7,18 +7,15 @@
   html {
     @apply antialiased;
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-linear-to-br from-pink-50 via-rose-50 to-pink-100 min-h-screen font-sans;
   }
 
-  /* Custom scrollbar styling */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #f9a8d4 #fdf2f8;
-  }
-
+  /* Custom scrollbar styling - webkit prefix for Safari/Chrome, standard for Firefox */
   *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -31,6 +28,14 @@
   *::-webkit-scrollbar-thumb {
     background: #f9a8d4;
     border-radius: 4px;
+  }
+
+  /* Firefox scrollbar - graceful degradation for unsupported browsers */
+  @supports (scrollbar-width: thin) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #f9a8d4 #fdf2f8;
+    }
   }
 }
 
@@ -100,9 +105,11 @@
     @apply bg-pink-50;
   }
 
-  /* Glass morphism effect */
+  /* Glass morphism effect - with webkit fallback for Safari */
   .glass {
     @apply bg-white/70 backdrop-blur-lg backdrop-saturate-150;
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
   }
 
   /* Gradient backgrounds */
