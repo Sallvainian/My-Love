@@ -2,7 +2,7 @@
  * loveNoteImageService Tests
  *
  * Unit tests for the Love Notes image upload service.
- * Tests image upload, signed URL generation, and error handling.
+ * Tests image upload via Edge Function, signed URL generation, and error handling.
  *
  * Love Notes Images: Task 11 - Unit tests
  */
@@ -18,6 +18,17 @@ import {
 // Mock Supabase client
 vi.mock('../../api/supabaseClient', () => ({
   supabase: {
+    auth: {
+      getSession: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            session: {
+              access_token: 'mock-token-123',
+            },
+          },
+        })
+      ),
+    },
     storage: {
       from: vi.fn(() => ({
         upload: vi.fn(),
@@ -41,10 +52,23 @@ vi.mock('../imageCompressionService', () => ({
   },
 }));
 
+// Mock fetch for Edge Function calls
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
 // Mock crypto.randomUUID
 const mockUUID = '12345678-1234-1234-1234-123456789012';
 vi.stubGlobal('crypto', {
   randomUUID: vi.fn(() => mockUUID),
+});
+
+// Mock import.meta.env
+vi.stubGlobal('import', {
+  meta: {
+    env: {
+      VITE_SUPABASE_URL: 'https://test-project.supabase.co',
+    },
+  },
 });
 
 describe('loveNoteImageService', () => {
@@ -59,16 +83,21 @@ describe('loveNoteImageService', () => {
   });
 
   describe('uploadLoveNoteImage', () => {
-    it('should compress and upload image successfully', async () => {
-      const { supabase } = await import('../../api/supabaseClient');
+    it('should compress and upload image via Edge Function successfully', async () => {
       const { imageCompressionService } = await import('../imageCompressionService');
 
-      const mockUpload = vi.fn().mockResolvedValue({ error: null });
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: mockUpload,
-        createSignedUrl: vi.fn(),
-        remove: vi.fn(),
-      } as any);
+      const mockStoragePath = 'user-123/1705315800000-uuid.jpg';
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            storagePath: mockStoragePath,
+            size: 1024,
+            mimeType: 'image/jpeg',
+            rateLimitRemaining: 9,
+          }),
+      });
 
       const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
       const userId = 'user-123';
@@ -81,21 +110,22 @@ describe('loveNoteImageService', () => {
       // Should compress image
       expect(imageCompressionService.compressImage).toHaveBeenCalledWith(mockFile);
 
-      // Should upload to correct bucket and path
-      expect(supabase.storage.from).toHaveBeenCalledWith('love-notes-images');
-      expect(mockUpload).toHaveBeenCalledWith(
-        `user-123/${Date.now()}-${mockUUID}.jpg`,
-        expect.any(Blob),
-        {
-          contentType: 'image/jpeg',
-          cacheControl: '3600',
-          upsert: false,
-        }
+      // Should call Edge Function
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/functions/v1/upload-love-note-image'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer mock-token-123',
+            'Content-Type': 'application/octet-stream',
+          }),
+          body: expect.any(Blob),
+        })
       );
 
-      // Should return storage path
+      // Should return storage path from Edge Function
       expect(result).toEqual({
-        storagePath: `user-123/${Date.now()}-${mockUUID}.jpg`,
+        storagePath: mockStoragePath,
         compressedSize: 1024,
       });
     });
@@ -113,62 +143,145 @@ describe('loveNoteImageService', () => {
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
         'Unsupported file format'
       );
+
+      // Should NOT call Edge Function for invalid files
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('should throw error on upload failure', async () => {
+    it('should throw error when not authenticated', async () => {
       const { supabase } = await import('../../api/supabaseClient');
       const { imageCompressionService } = await import('../imageCompressionService');
 
-      // Reset validation mock to return valid (previous test set it to invalid)
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-
-      const mockUpload = vi.fn().mockResolvedValue({
-        error: { message: 'Storage quota exceeded' },
-      });
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: mockUpload,
-        createSignedUrl: vi.fn(),
-        remove: vi.fn(),
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: null },
+        error: null,
       } as any);
 
       const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
 
       await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
-        'Upload failed: Storage quota exceeded'
+        'Not authenticated'
+      );
+    });
+
+    it('should throw error on rate limit exceeded (429)', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const { imageCompressionService } = await import('../imageCompressionService');
+
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+        error: null,
+      } as any);
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: () =>
+          Promise.resolve({
+            error: 'Rate limit exceeded',
+            message: 'Too many uploads. Please wait a minute.',
+          }),
+      });
+
+      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+
+      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
+        'Too many uploads. Please wait a minute and try again.'
+      );
+    });
+
+    it('should throw error on file too large (413)', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const { imageCompressionService } = await import('../imageCompressionService');
+
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+        error: null,
+      } as any);
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 413,
+        json: () =>
+          Promise.resolve({
+            error: 'File too large',
+            message: 'Maximum file size is 5MB',
+          }),
+      });
+
+      const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
+
+      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
+        'Image is too large. Please try a smaller image.'
+      );
+    });
+
+    it('should throw error on invalid file type (415)', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const { imageCompressionService } = await import('../imageCompressionService');
+
+      vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+        error: null,
+      } as any);
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 415,
+        json: () =>
+          Promise.resolve({
+            error: 'Invalid file type',
+            detectedType: 'application/pdf',
+          }),
+      });
+
+      const mockFile = new File(['test'], 'photo.jpg', { type: 'image/jpeg' });
+
+      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
+        'Invalid image type. Please use JPEG, PNG, WebP, or GIF.'
       );
     });
   });
 
   describe('uploadCompressedBlob', () => {
-    it('should upload pre-compressed blob without re-compression', async () => {
+    it('should upload pre-compressed blob via Edge Function', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
-      const mockUpload = vi.fn().mockResolvedValue({ error: null });
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: mockUpload,
-        createSignedUrl: vi.fn(),
-        remove: vi.fn(),
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+        error: null,
       } as any);
+
+      const mockStoragePath = 'user-456/1705315800000-uuid.jpg';
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            storagePath: mockStoragePath,
+          }),
+      });
 
       const mockBlob = new Blob(['compressed-data'], { type: 'image/jpeg' });
       const userId = 'user-456';
 
       const result = await uploadCompressedBlob(mockBlob, userId);
 
-      // Should upload directly without calling compression
-      expect(supabase.storage.from).toHaveBeenCalledWith('love-notes-images');
-      expect(mockUpload).toHaveBeenCalledWith(
-        `user-456/${Date.now()}-${mockUUID}.jpg`,
-        mockBlob,
-        {
-          contentType: 'image/jpeg',
-          cacheControl: '3600',
-          upsert: false,
-        }
+      // Should call Edge Function with blob
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/functions/v1/upload-love-note-image'),
+        expect.objectContaining({
+          method: 'POST',
+          body: mockBlob,
+        })
       );
 
       expect(result).toEqual({
-        storagePath: `user-456/${Date.now()}-${mockUUID}.jpg`,
+        storagePath: mockStoragePath,
         compressedSize: mockBlob.size,
       });
     });
@@ -176,19 +289,25 @@ describe('loveNoteImageService', () => {
     it('should throw error on blob upload failure', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
-      const mockUpload = vi.fn().mockResolvedValue({
-        error: { message: 'Network error' },
-      });
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: mockUpload,
-        createSignedUrl: vi.fn(),
-        remove: vi.fn(),
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+        error: null,
       } as any);
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () =>
+          Promise.resolve({
+            error: 'Upload failed',
+            message: 'Network error',
+          }),
+      });
 
       const mockBlob = new Blob(['data'], { type: 'image/jpeg' });
 
       await expect(uploadCompressedBlob(mockBlob, 'user-123')).rejects.toThrow(
-        'Upload failed: Network error'
+        'Network error'
       );
     });
   });
