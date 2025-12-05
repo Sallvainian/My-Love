@@ -11,7 +11,7 @@
  * - Centered image with max dimensions
  */
 
-import { memo, useEffect, useCallback } from 'react';
+import { memo, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
@@ -28,6 +28,9 @@ function FullScreenImageViewerComponent({
   onClose,
   alt = 'Full screen image',
 }: FullScreenImageViewerProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
   // Handle escape key to close
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -38,9 +41,17 @@ function FullScreenImageViewerComponent({
     [onClose]
   );
 
-  // Add/remove keyboard listener
+  // Focus management: trap focus in modal and restore on close
   useEffect(() => {
     if (isOpen) {
+      // Store currently focused element to restore later
+      previousFocusRef.current = document.activeElement as HTMLElement;
+
+      // Focus the close button when modal opens
+      setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 100);
+
       document.addEventListener('keydown', handleKeyDown);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
@@ -49,6 +60,11 @@ function FullScreenImageViewerComponent({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
+
+      // Restore focus to previously focused element
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+      }
     };
   }, [isOpen, handleKeyDown]);
 
@@ -64,6 +80,7 @@ function FullScreenImageViewerComponent({
           role="dialog"
           aria-modal="true"
           aria-label="Full screen image viewer"
+          data-testid="fullscreen-image-viewer"
         >
           {/* Dark overlay - click to close */}
           <motion.div
@@ -77,11 +94,12 @@ function FullScreenImageViewerComponent({
 
           {/* Close button */}
           <button
+            ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-            aria-label="Close"
+            className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+            aria-label="Close image viewer"
           >
-            <X size={24} />
+            <X size={24} aria-hidden="true" />
           </button>
 
           {/* Image container */}

@@ -57,6 +57,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
       exit={{ opacity: 0, y: 10, scale: 0.95 }}
       transition={{ duration: 0.2 }}
       className="relative inline-block"
+      data-testid="image-preview"
     >
       {/* Image thumbnail */}
       <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
@@ -74,16 +75,20 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
           onClick={onRemove}
           disabled={isCompressing}
           aria-label="Remove selected image"
-          className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors disabled:opacity-50"
+          className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white"
         >
-          <X size={16} />
+          <X size={16} aria-hidden="true" />
         </button>
 
         {/* Compression/uploading overlay */}
         {isCompressing && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 flex items-center justify-center"
+            role="status"
+            aria-live="polite"
+          >
             <div className="flex items-center gap-2 text-white text-sm">
-              <Loader2 className="animate-spin" size={16} />
+              <Loader2 className="animate-spin" size={16} aria-hidden="true" />
               <span>Compressing...</span>
             </div>
           </div>
