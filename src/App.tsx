@@ -498,7 +498,8 @@ function App() {
 
         {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
-        {/* Conditional view rendering */}
+        <main id="main-content">
+          {/* Conditional view rendering */}
         {currentView === 'home' && (
           <div className="max-w-4xl mx-auto px-4 py-4 space-y-6">
             {/* Time Together - replaces Day 37 Together header */}
@@ -548,6 +549,7 @@ function App() {
 
           {currentView === 'notes' && <LoveNotes />}
         </Suspense>
+        </main>
 
         {/* Bottom navigation */}
         <BottomNavigation currentView={currentView} onViewChange={setView} />
