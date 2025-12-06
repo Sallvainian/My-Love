@@ -10,8 +10,8 @@ config({ path: '.env.test', override: true });
 
 /**
  * Auto-detect port where My-Love app is running.
- * Checks common ports and verifies it's actually our app (not another project).
- * Uses Node.js http module instead of curl for cross-platform compatibility.
+ * Checks common ports in order of preference (4000 first for dev, then 5173).
+ * Simply checks if port responds - first responding port wins.
  */
 export function detectAppPort(): string {
   // If explicitly set, use that
@@ -19,30 +19,26 @@ export function detectAppPort(): string {
     return process.env.PORT || process.env.VITE_PORT || '5173';
   }
 
+  // Priority order: 4000 (common dev), 5173 (vite default), others
   const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
 
   for (const port of portsToCheck) {
     try {
-      // Use Node.js to check port - cross-platform compatible
-      const result = execSync(
-        `node -e "const http = require('http'); const req = http.get('http://localhost:${port}/', {timeout: 1000}, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => console.log(d.slice(0, 500))); }); req.on('error', () => process.exit(1)); req.on('timeout', () => { req.destroy(); process.exit(1); });"`,
-        { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }
-      ).trim();
-
-      // Case-insensitive title match
-      const titleMatch = result.match(/<title>([^<]*)<\/title>/i);
-      if (titleMatch?.[1]?.toLowerCase().includes('my-love') || titleMatch?.[1]?.toLowerCase().includes('my love')) {
-        console.log(`🔍 Auto-detected My-Love on port ${port}`);
-        return port;
-      }
+      // Simple check: does the port respond?
+      execSync(
+        `node -e "const http = require('http'); const req = http.get('http://localhost:${port}/', {timeout: 2000}, () => process.exit(0)); req.on('error', () => process.exit(1)); req.on('timeout', () => process.exit(1));"`,
+        { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      console.log(`🔍 Found dev server on port ${port}`);
+      return port;
     } catch {
-      // Port not responding or not our app, continue to next
+      // Port not responding, continue to next
       continue;
     }
   }
 
   // Fallback to default
-  console.log('⚠️ Could not auto-detect app port, using default 5173');
+  console.log('⚠️ No dev server found, using default port 5173');
   return '5173';
 }
 
@@ -78,8 +74,8 @@ export default defineConfig({
   // Retry once in CI for flaky network issues
   retries: process.env.CI ? 1 : 0,
 
-  // 2 workers (enough for 10 tests)
-  workers: 2,
+  // 1 worker to avoid storageState race conditions
+  workers: 1,
 
   // Simple HTML reporter
   reporter: process.env.CI
