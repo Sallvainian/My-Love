@@ -11,8 +11,9 @@ config({ path: '.env.test', override: true });
 /**
  * Auto-detect port where My-Love app is running.
  * Checks common ports and verifies it's actually our app (not another project).
+ * Uses Node.js http module instead of curl for cross-platform compatibility.
  */
-function detectAppPort(): string {
+export function detectAppPort(): string {
   // If explicitly set, use that
   if (process.env.PORT || process.env.VITE_PORT) {
     return process.env.PORT || process.env.VITE_PORT || '5173';
@@ -22,19 +23,21 @@ function detectAppPort(): string {
 
   for (const port of portsToCheck) {
     try {
-      // Check if port is in use and get the page title
+      // Use Node.js to check port - cross-platform compatible
       const result = execSync(
-        `curl -s --max-time 1 http://localhost:${port}/ 2>/dev/null | grep -o '<title>[^<]*</title>' | head -1`,
-        { encoding: 'utf-8', timeout: 2000 }
+        `node -e "const http = require('http'); const req = http.get('http://localhost:${port}/', {timeout: 1000}, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => console.log(d.slice(0, 500))); }); req.on('error', () => process.exit(1)); req.on('timeout', () => { req.destroy(); process.exit(1); });"`,
+        { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }
       ).trim();
 
-      // Check if it's My-Love app (look for our app name in title)
-      if (result.toLowerCase().includes('my-love') || result.toLowerCase().includes('my love')) {
+      // Case-insensitive title match
+      const titleMatch = result.match(/<title>([^<]*)<\/title>/i);
+      if (titleMatch?.[1]?.toLowerCase().includes('my-love') || titleMatch?.[1]?.toLowerCase().includes('my love')) {
         console.log(`🔍 Auto-detected My-Love on port ${port}`);
         return port;
       }
     } catch {
-      // Port not responding or not our app, try next
+      // Port not responding or not our app, continue to next
+      continue;
     }
   }
 
