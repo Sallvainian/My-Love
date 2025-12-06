@@ -59,6 +59,11 @@ CREATE POLICY "users_update_self"
     AND (
       -- Allow partner_id to remain unchanged OR be set to NULL (for unlinking)
       -- Partner linking should ONLY happen via accept_partner_request function
+      --
+      -- Note: NULL = NULL evaluates to NULL (not TRUE), but the OR condition catches it:
+      -- - If setting partner_id to NULL: "partner_id IS NULL" is TRUE
+      -- - If keeping existing value: "partner_id = (SELECT ...)" is TRUE
+      -- - Any other value is rejected (prevents arbitrary partner_id manipulation)
       partner_id IS NULL
       OR partner_id = (SELECT partner_id FROM public.users WHERE id = auth.uid())
     )
