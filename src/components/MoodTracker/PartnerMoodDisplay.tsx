@@ -115,7 +115,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
       role="region"
       aria-label="Partner's current mood"
     >
-      <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+      <h2 className="text-sm font-medium text-slate-700 mb-2">
         Your partner is feeling:
       </h2>
       <div className="flex items-center gap-4">
@@ -129,19 +129,19 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         </span>
         <div className="flex-1">
           <h3
-            className="text-2xl font-semibold text-slate-800 dark:text-slate-100 capitalize"
+            className="text-2xl font-semibold text-slate-800 capitalize"
             data-testid="partner-mood-label"
           >
             {partnerMood.mood_type}
           </h3>
           <p
-            className="text-sm text-slate-600 dark:text-slate-300"
+            className="text-sm text-slate-600"
             data-testid="partner-mood-timestamp"
           >
             <time dateTime={partnerMood.created_at ?? undefined}>{timestamp}</time>
             {showJustNowBadge && (
               <span
-                className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-200 text-pink-900 dark:bg-pink-800/50 dark:text-pink-100"
+                className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-200 text-pink-900"
                 data-testid="partner-mood-just-now-badge"
                 aria-label="Logged just now"
               >
@@ -151,7 +151,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
           </p>
           {partnerMood.note && (
             <p
-              className="mt-2 text-slate-700 dark:text-slate-200 italic"
+              className="mt-2 text-slate-700 italic"
               data-testid="partner-mood-note"
               aria-label="Partner's note about their mood"
             >
