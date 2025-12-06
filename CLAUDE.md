@@ -1,94 +1,79 @@
-# Testing Guidelines
+# My-Love Project Standards
 
-## Testing Framework
-- `vitest` is used for testing
-- Tests are colocated next to the tested file
-  - Example: `dir/format.ts` and `dir/format.test.ts`
+> Quick reference for coding standards. See extended docs for detailed patterns.
 
-## Common Mocks
+@docs/03-Development/typescript-patterns.md
+@docs/03-Development/react-19-guide.md
+@docs/04-Testing-QA/testing-guide.md
+@docs/03-Development/troubleshooting.md
 
-### Server-Only Mock
-```ts
-vi.mock("server-only", () => ({}));
+---
+
+## TypeScript - Strict Mode Required
+
+```json
+{ "strict": true, "noUncheckedIndexedAccess": true }
 ```
 
-### Prisma Mock
-```ts
-import { beforeEach } from "vitest";
-import prisma from "@/utils/__mocks__/prisma";
+**Rules:**
+- Use `unknown` over `any`
+- Prefer type guards over type assertions
+- Always handle null/undefined explicitly
 
-vi.mock("@/utils/prisma");
+📚 *Extended: [typescript-patterns.md](docs/03-Development/typescript-patterns.md)*
 
-describe("example", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+---
 
-  it("test", async () => {
-    prisma.group.findMany.mockResolvedValue([]);
-  });
-});
-```
+## React - Server-First
 
-## Best Practices
-- Each test should be independent
-- Use descriptive test names
-- Mock external dependencies
-- Clean up mocks between tests
-- Avoid testing implementation details
+- **Default:** Server Components (async, no hooks)
+- **Explicit:** `'use client'` for interactivity
+- **Patterns:** `useTransition`, `Suspense`, Server Actions
 
-# React rules
+📚 *Extended: [react-19-guide.md](docs/03-Development/react-19-guide.md)*
 
-- Use functional components with hooks instead of class components
-- Use custom hooks for reusable logic
-- Use the Context API for state management when needed
-- Use proper prop validation with PropTypes
-- Use React.memo for performance optimization when necessary
-- Use fragments to avoid unnecessary DOM elements
-- Use proper list rendering with keys
-- Prefer composition over inheritance
+---
 
-# Tailwind CSS rules
+## Testing - Dual Strategy
 
-- Use responsive prefixes for mobile-first design:
+**Unit (Vitest):**
+- Colocated: `file.ts` + `file.test.ts`
+- Mock server-only: `vi.mock("server-only", () => ({}))`
+
+**E2E (Playwright):**
+- Accessibility selectors: `getByRole`, `getByLabel`
+- Avoid CSS selectors: `.class`, `#id`
+
+📚 *Extended: [testing-guide.md](docs/04-Testing-QA/testing-guide.md)*
+
+---
+
+## Styling - Tailwind Mobile-First
 
 ```html
 <div class="w-full md:w-1/2 lg:w-1/3">
-  <!-- Full width on mobile, half on medium, one-third on large screens -->
-</div>
-```
-
-- Use state variants for interactive elements:
-
-```html
 <button class="bg-blue-500 hover:bg-blue-600 focus:ring-2">
-  Click me
-</button>
 ```
 
-- Use @apply for repeated patterns when necessary:
+---
 
-```css
-@layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600;
-  }
-}
-```
+## Decision Matrix
 
-- Use arbitrary values for specific requirements:
+| Question | Use CLAUDE.md | Use Extended Docs |
+|----------|---------------|-------------------|
+| TypeScript config? | ✅ | |
+| React 19 hook patterns? | | ✅ |
+| Why is test flaky? | | ✅ (troubleshooting) |
+| Server vs Client Component? | ✅ | |
 
-```html
-<div class="top-[117px] grid-cols-[1fr_2fr]">
-  <!-- Custom positioning and grid layout -->
-</div>
-```
+📚 *Troubleshooting: [troubleshooting.md](docs/03-Development/troubleshooting.md)*
 
-- Use spacing utilities for consistent layout:
+---
 
-```html
-<div class="space-y-4">
-  <div>Item 1</div>
-  <div>Item 2</div>
-</div>
-```
+## Core Principles
+
+1. **TypeScript strict mode is non-negotiable**
+2. **Server Components by default, Client Components when needed**
+3. **Test behavior, not implementation**
+4. **Accessibility selectors over CSS selectors**
+5. **Mobile-first responsive design**

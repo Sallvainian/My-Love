@@ -1,16 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'child_process';
 
-// Mock child_process before importing
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
+// Use vi.hoisted to ensure mock is available during hoisting
+const { mockExecSync } = vi.hoisted(() => ({
+  mockExecSync: vi.fn(),
 }));
 
-// Import after mocking - need to re-import the function
-// Since playwright.config.ts has side effects, we test the function logic directly
-describe('detectAppPort', () => {
-  const mockedExecSync = vi.mocked(execSync);
+// Mock both potential import paths for child_process
+vi.mock('child_process', () => ({
+  execSync: mockExecSync,
+  exec: vi.fn(),
+  spawn: vi.fn(),
+  spawnSync: vi.fn(),
+  fork: vi.fn(),
+  execFile: vi.fn(),
+  execFileSync: vi.fn(),
+  default: { execSync: mockExecSync },
+}));
 
+vi.mock('node:child_process', () => ({
+  execSync: mockExecSync,
+  exec: vi.fn(),
+  spawn: vi.fn(),
+  spawnSync: vi.fn(),
+  fork: vi.fn(),
+  execFile: vi.fn(),
+  execFileSync: vi.fn(),
+  default: { execSync: mockExecSync },
+}));
+
+// Import the actual function (VITEST env prevents side effects at module level)
+import { detectAppPort } from '../../playwright.config';
+
+describe('detectAppPort', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear env vars
@@ -22,46 +43,16 @@ describe('detectAppPort', () => {
     vi.unstubAllEnvs();
   });
 
-  // Helper to simulate detectAppPort logic (since importing has side effects)
-  function detectAppPort(): string {
-    if (process.env.PORT || process.env.VITE_PORT) {
-      return process.env.PORT || process.env.VITE_PORT || '5173';
-    }
-
-    const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
-
-    for (const port of portsToCheck) {
-      try {
-        const result = mockedExecSync(
-          `node -e "const http = require('http'); const req = http.get('http://localhost:${port}/', {timeout: 1000}, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => console.log(d.slice(0, 500))); }); req.on('error', () => process.exit(1)); req.on('timeout', () => { req.destroy(); process.exit(1); });"`,
-          { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }
-        );
-
-        const titleMatch = (result as string).match(/<title>([^<]*)<\/title>/i);
-        if (
-          titleMatch?.[1]?.toLowerCase().includes('my-love') ||
-          titleMatch?.[1]?.toLowerCase().includes('my love')
-        ) {
-          return port;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    return '5173';
-  }
-
   it('returns PORT env var when set', () => {
     process.env.PORT = '8080';
     expect(detectAppPort()).toBe('8080');
-    expect(mockedExecSync).not.toHaveBeenCalled();
+    expect(mockExecSync).not.toHaveBeenCalled();
   });
 
   it('returns VITE_PORT env var when PORT not set', () => {
     process.env.VITE_PORT = '4200';
     expect(detectAppPort()).toBe('4200');
-    expect(mockedExecSync).not.toHaveBeenCalled();
+    expect(mockExecSync).not.toHaveBeenCalled();
   });
 
   it('prefers PORT over VITE_PORT', () => {
@@ -71,45 +62,45 @@ describe('detectAppPort', () => {
   });
 
   it('detects app on first matching port by title', () => {
-    mockedExecSync.mockReturnValue('<html><title>My-Love App</title></html>');
-    expect(detectAppPort()).toBe('4000'); // First in portsToCheck list
-    expect(mockedExecSync).toHaveBeenCalledTimes(1);
+    mockExecSync.mockReturnValue('<html><title>My-Love App</title></html>');
+    expect(detectAppPort()).toBe('4000');
+    expect(mockExecSync).toHaveBeenCalledTimes(1);
   });
 
   it('skips ports without matching title and continues', () => {
-    mockedExecSync
+    mockExecSync
       .mockReturnValueOnce('<html><title>Other App</title></html>')
       .mockReturnValueOnce('<html><title>My-Love</title></html>');
-    expect(detectAppPort()).toBe('5173'); // Second in list
-    expect(mockedExecSync).toHaveBeenCalledTimes(2);
+    expect(detectAppPort()).toBe('5173');
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
   });
 
   it('returns default 5173 when no app found', () => {
-    mockedExecSync.mockImplementation(() => {
+    mockExecSync.mockImplementation(() => {
       throw new Error('ECONNREFUSED');
     });
     expect(detectAppPort()).toBe('5173');
   });
 
   it('handles case-insensitive title matching (MY-LOVE)', () => {
-    mockedExecSync.mockReturnValue('<title>MY-LOVE</title>');
+    mockExecSync.mockReturnValue('<title>MY-LOVE</title>');
     expect(detectAppPort()).toBe('4000');
   });
 
   it('handles "my love" with space in title', () => {
-    mockedExecSync.mockReturnValue('<title>My Love App</title>');
+    mockExecSync.mockReturnValue('<title>My Love App</title>');
     expect(detectAppPort()).toBe('4000');
   });
 
   it('skips port when response has no title tag', () => {
-    mockedExecSync
+    mockExecSync
       .mockReturnValueOnce('<html><body>No title here</body></html>')
       .mockReturnValueOnce('<title>My-Love</title>');
     expect(detectAppPort()).toBe('5173');
   });
 
   it('handles timeout errors gracefully', () => {
-    mockedExecSync.mockImplementation(() => {
+    mockExecSync.mockImplementation(() => {
       const error = new Error('ETIMEDOUT');
       (error as NodeJS.ErrnoException).code = 'ETIMEDOUT';
       throw error;

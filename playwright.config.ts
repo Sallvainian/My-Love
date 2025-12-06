@@ -46,7 +46,8 @@ export function detectAppPort(): string {
   return '5173';
 }
 
-const PORT = detectAppPort();
+// Skip port detection during unit tests (VITEST env is set)
+const PORT = process.env.VITEST ? '5173' : detectAppPort();
 const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
