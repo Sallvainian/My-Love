@@ -143,7 +143,7 @@ async function loginAndCompleteOnboarding(
 export const multiUserTest = base.extend<MultiUserFixtures>({
   // Set up partner relationship before all tests in the describe block
   primaryUserId: [
-    async ({}, use) => {
+    async (_fixtures, use) => {
       const { primaryUserId } = await ensurePartnerRelationship(
         PRIMARY_EMAIL,
         PARTNER_EMAIL
@@ -154,7 +154,7 @@ export const multiUserTest = base.extend<MultiUserFixtures>({
   ],
 
   partnerUserId: [
-    async ({}, use) => {
+    async (_fixtures, use) => {
       const { partnerUserId } = await ensurePartnerRelationship(
         PRIMARY_EMAIL,
         PARTNER_EMAIL
