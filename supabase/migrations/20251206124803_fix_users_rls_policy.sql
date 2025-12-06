@@ -2,6 +2,8 @@
 -- The previous policy "Authenticated users can read all users" with qual=true
 -- allowed ANY authenticated user to read ALL user profiles (security issue)
 
+BEGIN;
+
 -- Drop the permissive policy
 DROP POLICY IF EXISTS "Authenticated users can read all users" ON public.users;
 
@@ -19,3 +21,5 @@ CREATE POLICY "Users can view self and partner profiles"
     -- Partner can read your profile
     OR partner_id = auth.uid()
   );
+
+COMMIT;
