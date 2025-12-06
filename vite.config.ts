@@ -30,12 +30,24 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto', // Explicitly inject SW registration
+      injectRegister: 'auto',
       srcDir: 'src',
-      filename: 'sw.ts', // Renamed from sw-custom.ts to output sw.js
+      filename: 'sw.ts',
       strategies: 'injectManifest',
+      // With injectManifest, THIS is where precache config goes (not workbox section)
+      // All runtime caching is handled in sw.ts
+      injectManifest: {
+        // Only precache static assets - NO JS/CSS/HTML
+        // This ensures registerRoute(NetworkOnly) in sw.ts actually runs for code
+        globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
+        globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
+        // Force SW update on every build with timestamp revision
+        additionalManifestEntries: [
+          { url: 'index.html', revision: Date.now().toString() },
+        ],
+      },
       devOptions: {
-        enabled: false, // Disable in dev to prevent stale code caching
+        enabled: false,
         type: 'module',
       },
       includeAssets: ['icons/*.png', 'fonts/*.woff2'],
@@ -63,56 +75,10 @@ export default defineConfig(({ mode }) => ({
           },
         ],
       },
-      // IndexedDB operations are browser API calls (not HTTP requests),
-      // so service worker caching strategies do NOT intercept them.
-      // No navigateFallbackDenylist or exclusions needed for IndexedDB.
-      workbox: {
-        // Only cache static assets, not app code
-        globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
-        // Serve index.html for all navigation requests (SPA routing support)
-        // Use base path for GitHub Pages (/My-Love/) or root for development
-        navigateFallback: mode === 'production' ? '/My-Love/index.html' : '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/],
-        // Don't cache any JS/CSS/HTML - always fetch fresh to prevent stale code
-        globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
-        runtimeCaching: [
-          {
-            // JS/CSS/HTML - Always fetch from network (no caching)
-            urlPattern: /\.(js|css|html)$/,
-            handler: 'NetworkOnly',
-          },
-          {
-            // Static assets (images, fonts) - Cache First
-            urlPattern: /\.(png|jpg|jpeg|svg|woff2|ico)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'static-assets-v2',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
-          {
-            // Google Fonts
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-v2',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-        ],
-      },
+      // NOTE: workbox section is intentionally omitted
+      // With strategies: 'injectManifest', workbox options like runtimeCaching,
+      // navigateFallback, skipWaiting, etc. are IGNORED.
+      // All runtime caching behavior is controlled in sw.ts
     }),
     visualizer({
       filename: 'dist/stats.html',

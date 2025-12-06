@@ -146,7 +146,7 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
 }
 
 /**
- * Calculate row height based on message content length
+ * Calculate row height based on message content length and image presence
  * Story 2.4 - Task 1.3: Variable row height calculation
  */
 function calculateRowHeight(note: LoveNote | null, includeBeginning: boolean, index: number): number {
@@ -163,18 +163,27 @@ function calculateRowHeight(note: LoveNote | null, includeBeginning: boolean, in
   }
 
   const contentLength = note.content?.length || 0;
+  const hasImage = !!(note.image_url || note.imagePreviewUrl);
 
   // Base height: sender name (20px) + timestamp (20px) + padding (24px) + margin (12px) = 76px
   const baseHeight = 76;
 
-  // Content height varies by length
-  if (contentLength < 50) {
-    return baseHeight + 24; // ~60px content
-  } else if (contentLength < 200) {
-    return baseHeight + 40; // ~80px content
-  } else {
-    return baseHeight + 80; // ~120px content
+  // Image height: max-h-64 = 256px for images
+  const imageHeight = hasImage ? 256 : 0;
+
+  // Content height varies by length (only if there's text content)
+  let textHeight = 0;
+  if (contentLength > 0) {
+    if (contentLength < 50) {
+      textHeight = 48; // Short text with padding
+    } else if (contentLength < 200) {
+      textHeight = 64; // Medium text
+    } else {
+      textHeight = 100; // Long text
+    }
   }
+
+  return baseHeight + imageHeight + textHeight;
 }
 
 /**

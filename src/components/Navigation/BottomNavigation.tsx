@@ -18,7 +18,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('home')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'home' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+            currentView === 'home' ? 'text-pink-500' : 'text-gray-500 hover:text-gray-600'
           }`}
           data-testid="nav-home"
           aria-label="Home"
@@ -31,7 +31,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('mood')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'mood' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+            currentView === 'mood' ? 'text-pink-500' : 'text-gray-500 hover:text-gray-600'
           }`}
           data-testid="nav-mood"
           aria-label="Mood"
@@ -44,7 +44,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('notes')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'notes' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+            currentView === 'notes' ? 'text-pink-500' : 'text-gray-500 hover:text-gray-600'
           }`}
           data-testid="nav-notes"
           aria-label="Love Notes"
@@ -59,7 +59,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('partner')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'partner' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+            currentView === 'partner' ? 'text-pink-500' : 'text-gray-500 hover:text-gray-600'
           }`}
           data-testid="nav-partner"
           aria-label="Partner"
@@ -72,7 +72,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         <button
           onClick={() => onViewChange('photos')}
           className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-            currentView === 'photos' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-600'
+            currentView === 'photos' ? 'text-pink-500' : 'text-gray-500 hover:text-gray-600'
           }`}
           data-testid="nav-photos"
           aria-label="Photos"
@@ -84,7 +84,7 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         {/* Logout Button */}
         <button
           onClick={() => authService.signOut()}
-          className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-red-500"
+          className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-500 hover:text-red-500"
           data-testid="nav-logout"
           aria-label="Logout"
         >
