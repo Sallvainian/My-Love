@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from '@dotenvx/dotenvx';
+import { execSync } from 'child_process';
 
 // Load environment variables from encrypted .env file
 config();
@@ -7,8 +8,46 @@ config();
 // Also load test-specific env vars (unencrypted, gitignored)
 config({ path: '.env.test', override: true });
 
-// Port configuration - use PORT env var or default to 5173
-const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
+/**
+ * Auto-detect port where My-Love app is running.
+ * Checks common ports and verifies it's actually our app (not another project).
+ * Uses Node.js http module instead of curl for cross-platform compatibility.
+ */
+export function detectAppPort(): string {
+  // If explicitly set, use that
+  if (process.env.PORT || process.env.VITE_PORT) {
+    return process.env.PORT || process.env.VITE_PORT || '5173';
+  }
+
+  const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
+
+  for (const port of portsToCheck) {
+    try {
+      // Use Node.js to check port - cross-platform compatible
+      const result = execSync(
+        `node -e "const http = require('http'); const req = http.get('http://localhost:${port}/', {timeout: 1000}, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => console.log(d.slice(0, 500))); }); req.on('error', () => process.exit(1)); req.on('timeout', () => { req.destroy(); process.exit(1); });"`,
+        { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }
+      ).trim();
+
+      // Case-insensitive title match
+      const titleMatch = result.match(/<title>([^<]*)<\/title>/i);
+      if (titleMatch?.[1]?.toLowerCase().includes('my-love') || titleMatch?.[1]?.toLowerCase().includes('my love')) {
+        console.log(`🔍 Auto-detected My-Love on port ${port}`);
+        return port;
+      }
+    } catch {
+      // Port not responding or not our app, continue to next
+      continue;
+    }
+  }
+
+  // Fallback to default
+  console.log('⚠️ Could not auto-detect app port, using default 5173');
+  return '5173';
+}
+
+// Skip port detection during unit tests (VITEST env is set)
+const PORT = process.env.VITEST ? '5173' : detectAppPort();
 const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
