@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from '@dotenvx/dotenvx';
+import http from 'http';
 
 // Load environment variables from encrypted .env file
 config();
@@ -7,7 +8,62 @@ config();
 // Also load test-specific env vars (unencrypted, gitignored)
 config({ path: '.env.test', override: true });
 
-// Port configuration - use PORT env var or default to 5173
+/**
+ * Auto-detect port where My-Love app is running.
+ * Checks common ports and verifies it's actually our app (not another project).
+ * Uses Node.js HTTP client for cross-platform compatibility.
+ */
+async function detectAppPort(): Promise<string> {
+  // If explicitly set, use that
+  if (process.env.PORT || process.env.VITE_PORT) {
+    return process.env.PORT || process.env.VITE_PORT || '5173';
+  }
+
+  const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
+
+  for (const port of portsToCheck) {
+    try {
+      const title = await new Promise<string>((resolve, reject) => {
+        const req = http.get(`http://localhost:${port}/`, { timeout: 1000 }, (res) => {
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+            // Early exit if we find the title tag
+            if (data.includes('</title>')) {
+              req.destroy();
+            }
+          });
+          res.on('end', () => {
+            const match = data.match(/<title>([^<]*)<\/title>/i);
+            resolve(match ? match[1] : '');
+          });
+          res.on('error', reject);
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('Timeout'));
+        });
+      });
+
+      // Check if it's My-Love app (look for our app name in title)
+      if (title.toLowerCase().includes('my-love') || title.toLowerCase().includes('my love')) {
+        console.log(`🔍 Auto-detected My-Love on port ${port}`);
+        return port;
+      }
+    } catch {
+      // Port not responding or not our app, try next
+    }
+  }
+
+  // Fallback to default
+  console.log('⚠️ Could not auto-detect app port, using default 5173');
+  return '5173';
+}
+
+// Note: Playwright doesn't support top-level await in config, so we use sync fallback
+// If port detection is needed, set PORT or VITE_PORT environment variable
 const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
 const BASE_URL = `http://localhost:${PORT}/`;
 
