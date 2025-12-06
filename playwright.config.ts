@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from '@dotenvx/dotenvx';
+import { execSync } from 'child_process';
 
 // Load environment variables from encrypted .env file
 config();
@@ -7,8 +8,42 @@ config();
 // Also load test-specific env vars (unencrypted, gitignored)
 config({ path: '.env.test', override: true });
 
-// Port configuration - use PORT env var or default to 5173
-const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
+/**
+ * Auto-detect port where My-Love app is running.
+ * Checks common ports and verifies it's actually our app (not another project).
+ */
+function detectAppPort(): string {
+  // If explicitly set, use that
+  if (process.env.PORT || process.env.VITE_PORT) {
+    return process.env.PORT || process.env.VITE_PORT || '5173';
+  }
+
+  const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
+
+  for (const port of portsToCheck) {
+    try {
+      // Check if port is in use and get the page title
+      const result = execSync(
+        `curl -s --max-time 1 http://localhost:${port}/ 2>/dev/null | grep -o '<title>[^<]*</title>' | head -1`,
+        { encoding: 'utf-8', timeout: 2000 }
+      ).trim();
+
+      // Check if it's My-Love app (look for our app name in title)
+      if (result.toLowerCase().includes('my-love') || result.toLowerCase().includes('my love')) {
+        console.log(`🔍 Auto-detected My-Love on port ${port}`);
+        return port;
+      }
+    } catch {
+      // Port not responding or not our app, try next
+    }
+  }
+
+  // Fallback to default
+  console.log('⚠️ Could not auto-detect app port, using default 5173');
+  return '5173';
+}
+
+const PORT = detectAppPort();
 const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
