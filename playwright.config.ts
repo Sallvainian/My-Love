@@ -154,8 +154,11 @@ export default defineConfig({
 
   // Dev server (using dotenvx to decrypt env vars)
   // Port configurable via PORT or VITE_PORT env var
+  // In CI, env vars are passed directly; locally, decrypt from .env.test
   webServer: {
-    command: `dotenvx run -- npm run dev -- --port ${PORT}`,
+    command: process.env.CI
+      ? `npm run dev -- --port ${PORT}`
+      : `dotenvx run -f .env.test -- npm run dev -- --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60000, // 1 minute should be enough
