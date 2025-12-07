@@ -40,7 +40,7 @@ vi.mock('../../../src/api/authService', () => ({
 
 // Helper to create store for testing
 const createTestStore = () => {
-  const storeState: NotesSlice = {} as NotesSlice;
+  let storeState: NotesSlice = {} as NotesSlice;
   const set = vi.fn((updater: any) => {
     if (typeof updater === 'function') {
       const newState = updater(storeState);
@@ -250,6 +250,7 @@ describe('notesSlice - sendNote', () => {
         from_user_id: 'user-123',
         to_user_id: 'partner-123',
         content: 'Hello!',
+        image_url: null,
       });
 
       // Verify final state has server note (not optimistic)

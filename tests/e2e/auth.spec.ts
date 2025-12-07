@@ -10,8 +10,7 @@ import { test, expect } from '@playwright/test';
 const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
 const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
 
-// Override storageState for auth tests - start with no authentication
-test.use({ storageState: { cookies: [], origins: [] } });
+// Note: Auth tests run in 'auth' project which has no storageState (see playwright.config.ts)
 
 /**
  * Helper to handle any onboarding/intro steps after login.

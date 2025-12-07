@@ -1,0 +1,79 @@
+name: Supabase Migration Validation
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-migrations:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local
+        run: |
+          supabase init --workdir . || true
+          supabase start --ignore-health-check
+
+      - name: Apply migrations
+        id: migrate
+        run: |
+          echo "🔄 Applying migrations..."
+          supabase db reset --debug 2>&1 | tee migration-output.txt
+
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "❌ Migration failed"
+            echo "migration_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "✅ All migrations applied successfully"
+          echo "migration_status=success" >> $GITHUB_OUTPUT
+
+      - name: Validate RLS policies
+        run: |
+          echo "🔒 Validating RLS policies..."
+
+          # Check for overly permissive policies (qual = true without proper restrictions)
+          PERMISSIVE_POLICIES=$(supabase db lint --level warning 2>/dev/null | grep -i "rls" || true)
+
+          if [ -n "$PERMISSIVE_POLICIES" ]; then
+            echo "⚠️ RLS policy warnings detected:"
+            echo "$PERMISSIVE_POLICIES"
+          else
+            echo "✅ No RLS policy warnings"
+          fi
+
+      - name: Check for security advisories
+        run: |
+          echo "🛡️ Running security check..."
+          supabase db lint --level error || true
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
+
+      - name: Migration Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ "${{ steps.migrate.outputs.migration_status }}" = "success" ]; then
+            echo "✅ Migration validation passed"
+          else
+            echo "❌ Migration validation failed"
+            echo "Check migration-output.txt for details"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
