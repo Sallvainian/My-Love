@@ -3,21 +3,9 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,9 +15,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         id: claude-review
@@ -39,21 +27,73 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            You are reviewing PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            ## Review Mission
+            Primary goal: Catch bugs before production. Enforce patterns that prevent bugs.
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            ## Priority 1: MUST Flag (Bug Prevention)
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            **TypeScript Strict Mode Violations:**
+            - `any` usage (should be `unknown`)
+            - Missing null/undefined handling
+            - Unchecked array access without bounds check or `.at()`
+            - Type assertions (`as`) without type guards
 
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+            **React 19 Server/Client Boundary Errors:**
+            - Hooks in Server Components (missing `'use client'`)
+            - Async component without Suspense boundary
+            - Server Action without `'use server'` directive
+            - Missing Zod validation in Server Actions
 
+            **State Management Bugs:**
+            - Zustand: subscribing to entire store instead of selectors
+            - TanStack Query: missing `invalidateQueries` after mutations
+            - Optimistic updates without rollback handling
+
+            ## Priority 2: SHOULD Flag (Pattern Enforcement)
+
+            **E2E Test Anti-Patterns (CRITICAL):**
+            - Error swallowing: `.catch(() => false)`, `.catch(() => null)`
+            - Conditional flow: `if (await element.isVisible())`
+            - Hard waits: `waitForTimeout()`, `setTimeout`
+            - Runtime `test.skip()` inside test bodies
+            - CSS class selectors instead of `getByRole`, `getByLabel`
+
+            **Unit Test Issues:**
+            - Missing `vi.mock("server-only", () => ({}))`
+            - Implementation-coupled tests
+            - Missing `vi.clearAllMocks()` in `beforeEach`
+
+            **React Patterns:**
+            - Missing `useTransition` for expensive state updates
+            - Missing `useDeferredValue` for search/filter inputs
+
+            ## Priority 3: DO NOT Flag (Ignore)
+
+            - Formatting (Prettier handles it)
+            - Import ordering, naming preferences
+            - Comments and documentation suggestions
+            - Micro-optimizations without measurable impact
+            - Theoretical security issues without exploit vectors
+            - ESLint-covered issues
+
+            ## Review Style
+
+            - Be direct: "This will cause X bug"
+            - Explain why with consequences
+            - Suggest specific fixes with code
+            - Mention each issue once, reference other locations
+            - Use severity: CRITICAL / HIGH / MEDIUM / LOW
+
+            ## Instructions
+
+            1. Read the CLAUDE.md file for project standards
+            2. Use `gh pr diff ${{ github.event.pull_request.number }}` to get the changes
+            3. Review only the changed code, not the entire codebase
+            4. Focus on Priority 1 and Priority 2 issues only
+            5. Use `gh pr comment ${{ github.event.pull_request.number }} --body "YOUR_REVIEW"` to post review
+
+            If the code is clean with no Priority 1 or 2 issues, post a brief approval comment.
+
+          claude_args: '--max-turns 15 --allowed-tools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Read,Glob,Grep"'

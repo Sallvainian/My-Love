@@ -1,109 +1,307 @@
-# PR Code Review Guidelines
+# GitHub Copilot Code Review Instructions
 
-## Review Philosophy
+> Specialized for My-Love PWA: TypeScript 5.x strict mode, React 19 server-first, Vitest + Playwright
 
-Review priority order:
-1. **Code quality & consistency** - React patterns, functional style, PWA correctness
-2. **Testing coverage** - Adequate tests for new/changed behavior
-3. **Performance** - Meaningful issues that affect UX
-4. **Security** - Critical vulnerabilities only
+---
 
-**Adaptive detail level:**
-- Large architectural changes → strategic feedback on design decisions
-- Small targeted fixes → granular code-level suggestions
+## Review Mission
 
-## Strict vs Flexible Areas
+**Primary goal:** Catch bugs before production. Enforce patterns that prevent bugs.
 
-**Strict:** data sync logic, offline flows, Zustand store design, hooks correctness, new behaviors requiring tests
+**Priority order:**
+1. Bug prevention (will break)
+2. Pattern enforcement (causes future bugs)
+3. Everything else (ignore)
 
-**Flexible:** trivial UI changes, cosmetic refactors, minor formatting or naming differences
+---
 
-## Core Focus Areas
+## Priority 1: MUST Flag (Bug Prevention)
 
-**React Patterns:**
-- Hooks: correct dependency arrays, no conditional hooks, proper cleanup
-- Component boundaries: single responsibility, clear prop contracts
-- Zustand: minimize subscriptions, avoid unnecessary renders, proper selectors
-- Rendering logic: avoid heavy computation inside render paths
-- Prop drilling: prefer context or scoped stores over deep prop chains
+### TypeScript Strict Mode Violations
 
-**Functional Style:**
-- Pure functions: no hidden side effects
-- Immutability: avoid mutations, rely on map/filter/spread
-- Composition: small functions over monolithic logic
-- Separation of concerns: avoid mixing fetching, state updates, and rendering in one function/component
+```typescript
+// FLAG: `any` usage - should be `unknown`
+function process(data: any) { ... }  // BAD
+function process(data: unknown) { ... }  // GOOD
 
-**PWA/Offline Correctness:**
-- Service worker: registration, update flow, cache strategies
-- Offline data: IndexedDB usage, sync conflict resolution, stale data handling
-- Cache invalidation: appropriate lifetimes, version management, avoid over-caching
-- Background sync: ensure queued writes, retries, and deduping logic
+// FLAG: Missing null check
+const name = user.name;  // BAD if user can be null
+const name = user?.name ?? 'Anonymous';  // GOOD
 
-## Testing Requirements
+// FLAG: Unchecked array access
+const first = items[0];  // BAD - returns T | undefined with noUncheckedIndexedAccess
+const first = items.at(0) ?? defaultValue;  // GOOD
 
-**When tests are required:**
-- All new features and bug fixes, especially core flows (data sync, offline behavior, Zustand state, PWA logic)
-- Trivial changes (copy, styles, comments) may skip tests with explicit justification in PR
+// FLAG: Type assertion without guard
+const user = data as User;  // BAD
+if (isUser(data)) { const user = data; }  // GOOD
+```
 
-**What to flag:**
-- Missing tests for new or changed behavior
-- Brittle/flaky patterns: arbitrary timeouts, over-mocking, implementation-coupled tests, pointless snapshots
-- Coverage gaps: untested branches, missing error/edge cases, offline scenarios not validated
+### React 19 Server/Client Boundary Errors
 
-**Test quality over quantity:**
-- Focus on testing behavior, not implementation details
-- Ensure tests would catch real bugs, not just exercise code
+```typescript
+// FLAG: Hooks in Server Component (missing 'use client')
+// app/dashboard/page.tsx
+export default function Dashboard() {
+  const [count, setCount] = useState(0);  // BAD - hooks need 'use client'
+}
 
-## Performance Guidelines
+// FLAG: Async component without Suspense
+export default function Page() {
+  return <AsyncComponent />;  // BAD - needs Suspense boundary
+}
 
-Review performance across three areas, but only flag meaningful issues:
+// GOOD
+export default function Page() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <AsyncComponent />
+    </Suspense>
+  );
+}
 
-**Bundle size:**
-- Heavy imports (e.g., importing entire libraries instead of named exports)
-- Duplicate dependencies
-- Dead code or unused chunks
+// FLAG: Server Action without validation
+'use server';
+export async function createPost(formData: FormData) {
+  const title = formData.get('title');  // BAD - no validation
+  await db.post.create({ data: { title } });
+}
 
-**Runtime performance:**
-- Unnecessary re-renders: missing memoization, bad dependency arrays
-- Unstable props/functions causing avoidable child renders
-- Expensive computations inside render paths
-- Memory leaks: missing cleanup, abandoned subscriptions, retained references
+// GOOD
+'use server';
+import { z } from 'zod';
+const schema = z.object({ title: z.string().min(1).max(100) });
+export async function createPost(formData: FormData) {
+  const result = schema.safeParse({ title: formData.get('title') });
+  if (!result.success) return { error: result.error };
+  await db.post.create({ data: result.data });
+}
+```
 
-**PWA performance:**
-- Inefficient caching strategies
-- Stale service worker behavior, outdated cache versions
-- Offline data handling: slow IndexedDB usage, missing indexes, inefficient read/write patterns
+### State Management Bugs
 
-**Don't flag:**
-- Micro-optimizations that don't affect UX
-- Premature optimization in early-stage code
-- Theoretical complexity issues unless in a hot path
-- Minor performance nits without measurable or likely impact
+```typescript
+// FLAG: Subscribing to entire Zustand store
+const store = useAppStore();  // BAD - re-renders on any change
+const theme = useAppStore((state) => state.theme);  // GOOD - selective subscription
 
-## Security Considerations
+// FLAG: Missing query invalidation after mutation
+const mutation = useMutation({
+  mutationFn: updateUser,
+  // BAD - missing onSuccess invalidation
+});
 
-Focus on critical vulnerabilities only:
-- Exposed API keys, tokens, or credentials in code
-- XSS vulnerabilities: unsanitized user input in DOM
-- Unsafe data handling: missing input validation on user-supplied data
-- Authentication/authorization bypasses
-- Insecure direct object references (IDOR)
-- Dangerous eval-like patterns (new Function, dynamic script injection, untrusted HTML parsing)
+// GOOD
+const mutation = useMutation({
+  mutationFn: updateUser,
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['user'] }),
+});
 
-**Don't flag:** Theoretical security issues without exploitable vectors
+// FLAG: Optimistic update without rollback
+const [optimistic, addOptimistic] = useOptimistic(items, (state, newItem) => [...state, newItem]);
+await addItem(newItem);  // BAD - what if this fails?
 
-## Review Style
+// GOOD
+try {
+  addOptimistic(tempItem);
+  await addItem(newItem);
+} catch {
+  // Rollback handled by React's automatic rollback on error
+  throw error;  // Re-throw to trigger rollback
+}
+```
 
-**Communication approach:**
-- Be direct but constructive
-- Explain *why* something is problematic, not just *what* is wrong
-- Suggest specific fixes when possible
-- Acknowledge good patterns when you see them
-- If suggesting a major refactor, explain the trade-offs
-- If the code is acceptable, say so and move on - don't force optional changes
+---
 
-**Avoid:**
-- Pedantic corrections on subjective style choices
-- Suggesting changes without explaining the benefit
-- Flagging issues already handled by linters/tooling (ESLint, Prettier, TypeScript)
-- Repeating the same issue multiple times - mention it once and reference other locations
+## Priority 2: SHOULD Flag (Pattern Enforcement)
+
+### E2E Test Anti-Patterns (CRITICAL)
+
+These patterns create false confidence - tests pass but don't validate behavior.
+
+```typescript
+// FLAG: Error swallowing
+const isVisible = await element.isVisible().catch(() => false);  // BAD
+await expect(element).toBeVisible();  // GOOD
+
+// FLAG: Conditional flow control
+if (await button.isDisabled()) {
+  expect(true).toBe(true);  // BAD - different paths
+} else {
+  await button.click();
+}
+// GOOD - single deterministic path
+await expect(button).toBeDisabled();
+
+// FLAG: Hard waits
+await page.waitForTimeout(3000);  // BAD
+await page.waitForResponse('**/api/data');  // GOOD
+await expect(element).toBeVisible();  // GOOD
+
+// FLAG: Runtime test.skip()
+test('feature test', async ({ page }) => {
+  const hasFeature = await checkFeature();
+  if (!hasFeature) test.skip(true, 'Feature not available');  // BAD
+});
+// GOOD - skip at describe level
+test.describe('Feature Tests', () => {
+  test.skip(() => process.env.CI, 'Skip in CI');
+});
+
+// FLAG: CSS selectors
+await page.locator('.btn-primary').click();  // BAD
+await page.getByRole('button', { name: /submit/i }).click();  // GOOD
+```
+
+### Unit Test Issues
+
+```typescript
+// FLAG: Missing server-only mock
+import { serverFunction } from '@/lib/server';  // Will fail without mock
+
+// GOOD - add at top of test file
+vi.mock("server-only", () => ({}));
+
+// FLAG: Implementation-coupled test
+expect(component.state.internalValue).toBe(5);  // BAD
+expect(screen.getByText('5')).toBeInTheDocument();  // GOOD - test behavior
+
+// FLAG: Missing mock cleanup
+describe('Service', () => {
+  it('test 1', () => { ... });  // Mocks leak to next test
+});
+// GOOD
+describe('Service', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it('test 1', () => { ... });
+});
+```
+
+### React Patterns
+
+```typescript
+// FLAG: Expensive state update without useTransition
+const handleSearch = (query: string) => {
+  setQuery(query);  // BAD if this triggers expensive re-render
+  setResults(expensiveFilter(data, query));
+};
+
+// GOOD
+const [isPending, startTransition] = useTransition();
+const handleSearch = (query: string) => {
+  setQuery(query);
+  startTransition(() => setResults(expensiveFilter(data, query)));
+};
+
+// FLAG: Missing useDeferredValue for search
+function SearchResults({ query }) {
+  const results = expensiveSearch(query);  // BAD - blocks input
+}
+
+// GOOD
+function SearchResults({ query }) {
+  const deferredQuery = useDeferredValue(query);
+  const results = expensiveSearch(deferredQuery);
+}
+```
+
+### Accessibility
+
+```typescript
+// FLAG: Interactive element without label
+<button onClick={save}><SaveIcon /></button>  // BAD
+
+// GOOD
+<button onClick={save} aria-label="Save document"><SaveIcon /></button>
+
+// FLAG: Form input without label
+<input type="email" placeholder="Email" />  // BAD
+
+// GOOD
+<label>
+  Email
+  <input type="email" />
+</label>
+```
+
+---
+
+## Priority 3: DO NOT Flag (Ignore)
+
+**Explicitly ignore these - they add noise without value:**
+
+- Formatting (Prettier handles it)
+- Import ordering
+- Naming style preferences (camelCase vs snake_case debates)
+- Line length
+- Trailing commas
+- Comments and documentation suggestions
+- Micro-optimizations (unless in hot path with measurable impact)
+- Theoretical security issues without exploitable vectors
+- Suggestions already covered by ESLint rules
+- Minor refactoring that doesn't prevent bugs
+- Adding types to already-typed code
+- Suggesting alternative libraries
+- Code style preferences
+
+---
+
+## Review Communication Style
+
+### How to Comment
+
+- **Be direct:** "This will cause X bug" not "You might want to consider..."
+- **Explain why:** Include the consequence, not just the rule
+- **Suggest fix:** Provide code when possible
+- **One mention:** Flag pattern once, reference other locations
+- **Accept good code:** If it's fine, say nothing
+
+### Severity Markers
+
+Use these prefixes:
+- `CRITICAL:` Production bug or data loss risk
+- `HIGH:` Pattern violation likely to cause issues
+- `MEDIUM:` Should fix but won't break
+- `LOW:` Nice to have
+
+### Example Review Comment
+
+```
+CRITICAL: Missing null check - will throw at runtime
+
+The `user` parameter can be null based on the type signature, but line 45 accesses `user.email` without checking.
+
+Suggestion:
+```typescript
+const email = user?.email ?? 'unknown@example.com';
+```
+
+Also applies to lines 52, 67.
+```
+
+---
+
+## Project-Specific Context
+
+### Stack
+- TypeScript 5.x with strict mode (`noUncheckedIndexedAccess: true`)
+- React 19 with Server Components (default) and Client Components (`'use client'`)
+- Vite + TanStack Query + Zustand
+- Vitest for unit tests (colocated: `file.test.ts`)
+- Playwright for E2E tests (in `tests/e2e/`)
+- Tailwind CSS (mobile-first)
+- Supabase backend
+- PWA with offline support
+
+### Key Files Reference
+- `CLAUDE.md` - Project standards
+- `docs/03-Development/typescript-patterns.md` - TypeScript patterns
+- `docs/03-Development/react-19-guide.md` - React 19 patterns
+- `docs/04-Testing-QA/e2e-quality-standards.md` - E2E test requirements
+
+### Test Quality Standard
+E2E tests MUST score 80+ on quality metrics. Previous suite scored 52/100 and was archived. Key violations to flag:
+- Error swallowing (`.catch(() => false)`)
+- Conditional flow (`if/else` in tests)
+- Hard waits (`waitForTimeout`)
+- No-op assertion paths
