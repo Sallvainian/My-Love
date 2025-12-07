@@ -58,7 +58,7 @@ development_status:
 
   # Epic 3: Push Notifications & Daily Engagement
   epic-3: contexted # Tech spec created 2025-12-04
-  3-0-push-notification-daily-messages-schema-setup: backlog
+  3-0-push-notification-daily-messages-schema-setup: done # Code review APPROVED 2025-12-07 - All 10 ACs verified, schema fixes applied
   3-1-notification-permission-flow: backlog
   3-2-push-token-registration-storage: backlog
   3-3-love-note-push-notifications: backlog
@@ -78,7 +78,7 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Mood Tracking & Transparency
-  epic-5: contexted # Tech spec created 2025-11-25
+  epic-5: contexted # Tech spec created 2025-11-25/stor
   5-1-mood-emoji-picker-interface: done # Completed 2025-11-25 - All 6 ACs verified, 28 unit tests passing, 12-mood grid with multi-select
   5-2-quick-mood-logging-flow: done # Code review APPROVED 2025-12-02 - Implementation quality 8.5/10 EXCELLENT, 6/6 ACs verified, unit tests 10/10 passing, E2E tests 6/6 passing.
   5-3-partner-mood-viewing-transparency: done # Code review APPROVED 2025-12-02 - All issues fixed: error handling, accessibility labels, constants extracted
@@ -102,3 +102,16 @@ development_status:
   7-4-partner-poke-kiss-interactions: backlog
   7-5-profile-management: backlog
   epic-7-retrospective: optional
+
+  # Epic TD-1: Test Quality Remediation (Technical Debt)
+  # Priority: HIGH - E2E tests score 52/100, providing false confidence
+  # Created: 2025-12-07 by TEA test-review workflow
+  epic-td-1: contexted # Tech review completed, stories defined
+  td-1-0-archive-tests-establish-standards: backlog
+  td-1-1-auth-e2e-regeneration: backlog
+  td-1-2-love-notes-e2e-regeneration: backlog
+  td-1-3-mood-e2e-regeneration: backlog
+  td-1-4-photos-e2e-regeneration: backlog
+  td-1-5-integration-test-completion: backlog
+  td-1-6-ci-quality-gates-hooks: backlog
+  epic-td-1-retrospective: optional

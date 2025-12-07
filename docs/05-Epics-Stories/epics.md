@@ -95,6 +95,14 @@ This document provides the complete epic and story breakdown for My-Love PWA enh
 **FRs Covered:** FR5, FR40-44, FR48-54 (10 FRs)
 **Stories:** 5 (Theme toggle/dark mode, Biometric auth, Notification preferences, Partner pokes/kisses, Profile management)
 
+### Epic TD-1: Test Quality Remediation (Technical Debt)
+
+**Goal:** Regenerate E2E tests using TEA workflows to eliminate anti-patterns and establish reliable test coverage
+**User Value:** Confidence that shipped features actually work; faster, more reliable CI; reduced debugging time
+**FRs Covered:** None (cross-cutting quality concern)
+**Stories:** 7 (Archive existing tests, Auth E2E, Love Notes E2E, Mood E2E, Photos E2E, Integration tests, CI quality gates)
+**Priority:** HIGH - Current tests provide false confidence (52/100 E2E score)
+
 ---
 
 ## Functional Requirements Inventory
@@ -2219,6 +2227,240 @@ const todaysMessage = messageLibrary[messageIndex];
 ✅ **FR Traceability:** Every functional requirement mapped to specific stories
 ✅ **Web API Integration:** Stories use browser APIs (Vibration, File, Canvas, WebAuthn)
 ✅ **No Time Estimates:** Acknowledging AI-driven development paradigm shift
+
+---
+
+## Epic TD-1: Test Quality Remediation (Technical Debt)
+
+**Goal:** Regenerate E2E tests using TEA workflows to eliminate anti-patterns and establish reliable test coverage
+
+**User Value:** Confidence that shipped features actually work; faster, more reliable CI; reduced debugging time
+
+**Priority:** HIGH - Current E2E tests score 52/100, providing false confidence
+
+**Background:** TEA Test Review (2024-12-07) identified critical anti-patterns across 12/14 E2E spec files created outside TEA workflows. Tests pass incorrectly due to conditional logic, error swallowing, and no-op assertion paths.
+
+---
+
+### Story TD-1.0: Archive Existing E2E Tests & Establish Quality Standards
+
+**As a** development team,
+**I want** to archive existing E2E tests and document quality standards,
+**So that** we have a clean slate and clear criteria for new tests.
+
+**Acceptance Criteria:**
+
+**Given** existing E2E test directory
+**When** archiving is performed
+**Then**
+
+- All files from `tests/e2e/` moved to `tests/e2e-archive-2024-12/`
+- Archive README documents why tests were archived
+- No test files deleted (preserve for reference)
+
+**Given** quality standards need documentation
+**When** standards document is created
+**Then**
+
+- Quality gates documented (zero conditionals, zero error swallowing, guaranteed assertions)
+- Anti-pattern checklist created for future reviews
+- Pre-commit hook pattern defined for enforcement
+
+**Prerequisites:** None
+**Effort:** Small
+
+---
+
+### Story TD-1.1: Epic 1 (Auth) E2E Test Regeneration
+
+**As a** development team,
+**I want** authentication E2E tests regenerated using TEA `*atdd` workflow,
+**So that** auth flows are reliably tested.
+
+**Acceptance Criteria:**
+
+**Given** TEA `*atdd` workflow is executed for Story 1-3 (Magic Link), Story 1-4 (Session Management)
+**When** tests are generated
+**Then**
+
+- Zero instances of `.catch(() => false)`
+- Zero `if/else` conditionals in test bodies
+- All waits use `waitForResponse()` or `waitFor({ state })`
+- Network-first pattern (intercept before navigate)
+- Accessibility selectors (getByRole, getByLabel) preferred
+
+**Given** tests are executed
+**When** CI pipeline runs
+**Then**
+
+- All tests pass deterministically
+- Tests fail correctly when features break (verified by intentional breakage)
+
+**Prerequisites:** Story TD-1.0
+**Effort:** Medium
+
+---
+
+### Story TD-1.2: Epic 2 (Love Notes) E2E Test Regeneration
+
+**As a** development team,
+**I want** Love Notes E2E tests regenerated using TEA `*atdd` workflow,
+**So that** messaging features are reliably tested.
+
+**Acceptance Criteria:**
+
+**Given** TEA `*atdd` workflow is executed for Stories 2-1 through 2-4
+**When** tests are generated
+**Then**
+
+- Send note flow tested with deterministic waits
+- Real-time reception tested with proper subscription handling
+- Pagination tested without data-dependent skips
+- Image attachments tested with proper network mocking
+
+**Given** tests are executed
+**When** CI pipeline runs
+**Then**
+
+- All tests pass deterministically
+- Optimistic updates verified (message appears before server confirmation)
+- Error states properly asserted (not swallowed)
+
+**Prerequisites:** Story TD-1.0
+**Effort:** Large (5 stories to cover)
+
+---
+
+### Story TD-1.3: Epic 5 (Mood) E2E Test Regeneration
+
+**As a** development team,
+**I want** Mood tracking E2E tests regenerated using TEA `*atdd` workflow,
+**So that** mood features are reliably tested.
+
+**Acceptance Criteria:**
+
+**Given** TEA `*atdd` workflow is executed for Stories 5-1 through 5-4
+**When** tests are generated
+**Then**
+
+- Mood picker tested with guaranteed emoji selection
+- Quick logging flow tested within 5-second threshold
+- Partner mood viewing tested with proper RLS handling
+- Timeline virtualization tested without conditional scrolling
+
+**Given** tests are executed
+**When** CI pipeline runs
+**Then**
+
+- All tests pass deterministically
+- Mood history loads correctly with proper loading state waits
+
+**Prerequisites:** Story TD-1.0
+**Effort:** Medium
+
+---
+
+### Story TD-1.4: Epic 6 (Photos) E2E Test Regeneration
+
+**As a** development team,
+**I want** Photo gallery E2E tests regenerated using TEA `*atdd` workflow,
+**So that** photo features are reliably tested.
+
+**Acceptance Criteria:**
+
+**Given** TEA `*atdd` workflow is executed for Stories 6-1 through 6-4
+**When** tests are generated
+**Then**
+
+- Photo upload tested with proper progress tracking
+- Gallery grid tested without runtime skips
+- Full-screen viewer tested with gesture simulation
+- Compression tested with Canvas API mocking
+
+**Given** tests are executed
+**When** CI pipeline runs
+**Then**
+
+- All tests pass deterministically
+- Photo-dependent tests have proper data seeding (no skip when empty)
+
+**Prerequisites:** Story TD-1.0
+**Effort:** Medium
+
+---
+
+### Story TD-1.5: Integration Test Completion
+
+**As a** development team,
+**I want** incomplete integration tests completed or removed,
+**So that** integration test suite provides real value.
+
+**Acceptance Criteria:**
+
+**Given** mood-rls.test.ts has TODO placeholders
+**When** integration tests are reviewed
+**Then** EITHER:
+
+- Tests completed with real Supabase test users and RLS verification, OR
+- Tests removed and RLS validation moved to E2E suite
+
+**Given** supabase.test.ts exists
+**When** integration tests are reviewed
+**Then**
+
+- All TODO comments resolved
+- Tests use proper test isolation
+- Database state cleaned between tests
+
+**Prerequisites:** None (can run parallel to E2E work)
+**Effort:** Small
+
+---
+
+### Story TD-1.6: CI Quality Gates & Pre-Commit Hooks
+
+**As a** development team,
+**I want** automated quality gates preventing test anti-patterns,
+**So that** new tests maintain quality standards.
+
+**Acceptance Criteria:**
+
+**Given** pre-commit hook is configured
+**When** developer attempts to commit E2E test with anti-patterns
+**Then**
+
+- Commit blocked if `.catch(() => false)` pattern detected
+- Commit blocked if `if.*isVisible` pattern detected in test body
+- Warning issued for `test.skip` usage
+
+**Given** CI pipeline is configured
+**When** PR with E2E tests is submitted
+**Then**
+
+- E2E tests run with `--trace on` for debugging
+- Failed tests generate trace artifacts
+- Flaky test detection enabled (retry count tracked)
+
+**Given** quality dashboard is needed
+**When** test reports are generated
+**Then**
+
+- Test count per epic visible
+- Assertion coverage reported
+- Execution time tracked
+
+**Prerequisites:** Stories TD-1.1 through TD-1.4 complete
+**Effort:** Small
+
+---
+
+### Epic TD-1 Completion Criteria
+
+- [ ] E2E test suite score ≥ 85/100 on TEA re-review
+- [ ] Zero instances of anti-patterns in new tests
+- [ ] All E2E tests pass deterministically in CI (3 consecutive green runs)
+- [ ] Pre-commit hooks blocking anti-pattern introduction
+- [ ] Integration tests complete or removed (no TODOs)
 
 ### Success Validation
 
