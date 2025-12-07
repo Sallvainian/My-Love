@@ -608,7 +608,7 @@ describe('CustomMessageService', () => {
       };
 
       await expect(customMessageService.importMessages(exportData)).rejects.toThrow(
-        'expected "1.0"'
+        'Invalid version'
       );
     });
 
