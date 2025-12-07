@@ -142,6 +142,9 @@ export function MessageInput() {
     } catch (error) {
       console.error('Failed to send message:', error);
 
+      // Show error message to user
+      setImageError('Failed to send. Try again.');
+
       // Error vibration (double pulse pattern)
       vibrate([100, 50, 100]);
     } finally {

@@ -458,7 +458,7 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
       fireEvent.click(screen.getByTestId('mood-button-loved'));
 
       // Click toggle to expand note field (collapsed by default)
-      fireEvent.click(screen.getByTestId('mood-note-toggle'));
+      fireEvent.click(screen.getByTestId('mood-add-note-toggle'));
 
       const noteInput = screen.getByTestId('mood-note-input');
       fireEvent.change(noteInput, { target: { value: 'Feeling great today!' } });
@@ -478,7 +478,7 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
       render(<MoodTracker />);
 
       // Note toggle should be visible
-      expect(screen.getByTestId('mood-note-toggle')).toBeInTheDocument();
+      expect(screen.getByTestId('mood-add-note-toggle')).toBeInTheDocument();
       // Note input should NOT be visible
       expect(screen.queryByTestId('mood-note-input')).not.toBeInTheDocument();
     });
@@ -487,12 +487,12 @@ describe('MoodTracker - Story 5.1: Mood Emoji Picker Interface', () => {
       render(<MoodTracker />);
 
       // Click toggle
-      fireEvent.click(screen.getByTestId('mood-note-toggle'));
+      fireEvent.click(screen.getByTestId('mood-add-note-toggle'));
 
       // Note input should now be visible
       expect(screen.getByTestId('mood-note-input')).toBeInTheDocument();
       // Toggle should be hidden
-      expect(screen.queryByTestId('mood-note-toggle')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('mood-add-note-toggle')).not.toBeInTheDocument();
     });
   });
 

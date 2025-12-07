@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
+import checker from 'vite-plugin-checker';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -28,6 +29,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    checker({ typescript: true }),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',

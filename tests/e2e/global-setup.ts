@@ -2,10 +2,12 @@
  * Playwright Global Setup
  *
  * Performs one-time authentication before all tests run.
+ * Also ensures test users have a partner relationship configured.
  * Saves session state to storageState.json for reuse across tests.
  */
 
 import { chromium, FullConfig } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 import { config } from '@dotenvx/dotenvx';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -21,20 +23,99 @@ config({ path: '.env.test', override: true });
 
 const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
 const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
+const PARTNER_EMAIL = process.env.VITE_TEST_PARTNER_EMAIL;
 const STORAGE_STATE_PATH = path.join(__dirname, '.auth', 'storageState.json');
 
-async function globalSetup(config: FullConfig) {
+// Supabase credentials for partner setup
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+/**
+ * Ensure test users have a partner relationship configured.
+ * Uses Supabase admin client to link test user to partner user.
+ */
+async function ensurePartnerRelationship() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !PARTNER_EMAIL) {
+    console.log('   ⚠️ Partner setup skipped - missing env vars');
+    return;
+  }
+
+  console.log('   Setting up partner relationship...');
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  try {
+    // Get test user ID
+    const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+    const testUser = users?.users?.find((u) => u.email === TEST_EMAIL);
+    const partnerUser = users?.users?.find((u) => u.email === PARTNER_EMAIL);
+
+    if (!testUser || !partnerUser) {
+      console.log('   ⚠️ Could not find test users in auth');
+      return;
+    }
+
+    // Check if partner already configured
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('partner_id')
+      .eq('id', testUser.id)
+      .single();
+
+    if (existingUser?.partner_id === partnerUser.id) {
+      console.log('   Partner already configured ✓');
+      return;
+    }
+
+    // Update test user to have partner relationship
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({ partner_id: partnerUser.id })
+      .eq('id', testUser.id);
+
+    if (updateError) {
+      console.log(`   ⚠️ Could not set partner: ${updateError.message}`);
+      return;
+    }
+
+    // Also set partner's partner_id to test user (bidirectional)
+    await supabaseAdmin
+      .from('users')
+      .update({ partner_id: testUser.id })
+      .eq('id', partnerUser.id);
+
+    console.log('   Partner relationship configured ✓');
+  } catch (error) {
+    console.log(`   ⚠️ Partner setup error: ${error}`);
+  }
+}
+
+async function globalSetup(playwrightConfig: FullConfig) {
   // Ensure auth directory exists
   const authDir = path.dirname(STORAGE_STATE_PATH);
   if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true });
   }
 
-  // Get base URL from config
-  const baseURL =
-    config.projects[0]?.use?.baseURL || 'http://localhost:5173/';
-
   console.log('🔐 Global Setup: Starting authentication...');
+
+  // First, ensure partner relationship is configured
+  await ensurePartnerRelationship();
+
+  // Get baseURL from top-level config use (not project-level, which doesn't have baseURL)
+  // The top-level use.baseURL has the detected port from detectAppPort()
+  const baseURL =
+    playwrightConfig.use?.baseURL ||
+    playwrightConfig.projects[0]?.use?.baseURL ||
+    'http://localhost:5173/';
+
+  // Validate baseURL format to catch configuration errors early
+  if (!baseURL.startsWith('http://') && !baseURL.startsWith('https://')) {
+    throw new Error(
+      `Invalid baseURL: "${baseURL}". Must start with http:// or https://. ` +
+        'Check playwright.config.ts or PORT/VITE_PORT environment variables.'
+    );
+  }
   console.log(`   Base URL: ${baseURL}`);
 
   const browser = await chromium.launch();

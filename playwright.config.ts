@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from '@dotenvx/dotenvx';
+import { execSync } from 'child_process';
 
 // Load environment variables from encrypted .env file
 config();
@@ -7,8 +8,47 @@ config();
 // Also load test-specific env vars (unencrypted, gitignored)
 config({ path: '.env.test', override: true });
 
-// Port configuration - use PORT env var or default to 5173
-const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
+/**
+ * Auto-detect port where My-Love app is running.
+ * Checks common ports in order of preference (4000 first for dev, then 5173).
+ * Simply checks if port responds - first responding port wins.
+ */
+export function detectAppPort(): string {
+  // If explicitly set, use that
+  if (process.env.PORT || process.env.VITE_PORT) {
+    return process.env.PORT || process.env.VITE_PORT || '5173';
+  }
+
+  // Priority order for port detection:
+  // - 4000: Custom dev server port (npm run dev often uses this)
+  // - 5173: Vite default dev server port
+  // - 3000: Common alternative (Next.js, Create React App default)
+  // - 5174/5175: Vite auto-increments when 5173 is busy
+  // Override with PORT or VITE_PORT env vars if these don't match your setup
+  const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
+
+  for (const port of portsToCheck) {
+    try {
+      // Simple check: does the port respond?
+      execSync(
+        `node -e "const http = require('http'); const req = http.get('http://localhost:${port}/', {timeout: 2000}, () => process.exit(0)); req.on('error', () => process.exit(1)); req.on('timeout', () => process.exit(1));"`,
+        { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      console.log(`🔍 Found dev server on port ${port}`);
+      return port;
+    } catch {
+      // Port not responding, continue to next
+      continue;
+    }
+  }
+
+  // Fallback to default
+  console.log('⚠️ No dev server found, using default port 5173');
+  return '5173';
+}
+
+// Skip port detection during unit tests (VITEST env is set)
+const PORT = process.env.VITEST ? '5173' : detectAppPort();
 const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
@@ -39,8 +79,8 @@ export default defineConfig({
   // Retry once in CI for flaky network issues
   retries: process.env.CI ? 1 : 0,
 
-  // 2 workers (enough for 10 tests)
-  workers: 2,
+  // 1 worker to avoid storageState race conditions
+  workers: 1,
 
   // Simple HTML reporter
   reporter: process.env.CI
@@ -61,18 +101,31 @@ export default defineConfig({
     storageState: 'tests/e2e/.auth/storageState.json',
   },
 
-  // Chromium only
+  // Two projects: authenticated tests first, then auth tests (which clear state)
+  // Order matters! Auth tests must run LAST since they test login/logout flows
+  // and can pollute session state for other tests
   projects: [
     {
-      name: 'chromium',
+      // All authenticated tests run first with saved auth state
+      name: 'logged-in',
+      testIgnore: /auth\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
+        storageState: 'tests/e2e/.auth/storageState.json',
         launchOptions: {
-          args: [
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-sandbox',
-          ],
+          args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-sandbox'],
+        },
+      },
+    },
+    {
+      // Auth tests run last - they start logged out and test login/logout
+      name: 'auth',
+      testMatch: /auth\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: { cookies: [], origins: [] }, // No auth
+        launchOptions: {
+          args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-sandbox'],
         },
       },
     },

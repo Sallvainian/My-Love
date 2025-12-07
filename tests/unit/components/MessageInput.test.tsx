@@ -65,7 +65,7 @@ describe('MessageInput', () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(mockSendNote).toHaveBeenCalledWith('Hello, my love!');
+      expect(mockSendNote).toHaveBeenCalledWith('Hello, my love!', undefined);
     });
   });
 
@@ -93,7 +93,7 @@ describe('MessageInput', () => {
     await user.type(input, 'Test message{Enter}');
 
     await waitFor(() => {
-      expect(mockSendNote).toHaveBeenCalledWith('Test message');
+      expect(mockSendNote).toHaveBeenCalledWith('Test message', undefined);
     });
   });
 

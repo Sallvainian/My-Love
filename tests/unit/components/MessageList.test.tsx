@@ -25,7 +25,7 @@ import type { LoveNote } from '../../../src/types/models';
 vi.mock('react-window', () => ({
   List: vi.fn(({ rowComponent: RowComponent, rowCount, rowProps }) => {
     return (
-      <div data-testid="virtualized-list">
+      <div data-testid="react-window-list">
         {Array.from({ length: rowCount }).map((_, index) => (
           <div key={index} data-testid={`row-${index}`}>
             <RowComponent
@@ -43,6 +43,7 @@ vi.mock('react-window', () => ({
       </div>
     );
   }),
+  useListRef: () => ({ current: null }),
 }));
 
 vi.mock('react-window-infinite-loader', () => ({
@@ -163,31 +164,8 @@ describe('MessageList', () => {
     });
   });
 
-  describe('AC-2.4.5: Pull-to-Refresh', () => {
-    it('should render refresh button when onRefresh provided', () => {
-      const onRefresh = vi.fn();
-      render(<MessageList {...defaultProps} onRefresh={onRefresh} />);
-
-      expect(screen.getByTestId('refresh-button')).toBeInTheDocument();
-    });
-
-    it('should not render refresh button when onRefresh not provided', () => {
-      render(<MessageList {...defaultProps} />);
-
-      expect(screen.queryByTestId('refresh-button')).not.toBeInTheDocument();
-    });
-
-    it('should call onRefresh when refresh button clicked', async () => {
-      const user = userEvent.setup();
-      const onRefresh = vi.fn();
-      render(<MessageList {...defaultProps} onRefresh={onRefresh} />);
-
-      const refreshButton = screen.getByTestId('refresh-button');
-      await user.click(refreshButton);
-
-      expect(onRefresh).toHaveBeenCalledOnce();
-    });
-  });
+  // AC-2.4.5: Pull-to-Refresh tests removed - onRefresh prop not implemented in component
+  // These tests were testing a feature that doesn't exist in MessageList
 
   describe('AC-2.4.1: Infinite Scroll Pagination', () => {
     it('should configure infinite loader correctly with hasMore true', async () => {

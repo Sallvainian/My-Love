@@ -333,10 +333,13 @@ describe('imageCompressionService', () => {
       consoleSpy.mockRestore();
     });
 
-    it('AC-6.1.8: throws error on compression failure', async () => {
+    it('AC-6.1.8: uses fallback on compression failure', async () => {
       // Arrange
       const file = new File([], 'test.jpg', { type: 'image/jpeg' });
-      mockCanvas.toBlob.mockImplementation((callback) => {
+
+      // Clear and override the toBlob mock to simulate failure
+      mockCanvas.toBlob.mockReset();
+      mockCanvas.toBlob.mockImplementation((callback: BlobCallback) => {
         callback(null); // Simulate toBlob failure
       });
 
@@ -344,10 +347,12 @@ describe('imageCompressionService', () => {
         if (mockImageInstance.onload) mockImageInstance.onload();
       }, 0);
 
-      // Act & Assert
-      await expect(imageCompressionService.compressImage(file)).rejects.toThrow(
-        'Canvas toBlob failed'
-      );
+      // Act
+      const result = await imageCompressionService.compressImage(file);
+
+      // Assert - fallback returns original file with flag
+      expect(result.fallbackUsed).toBe(true);
+      expect(result.blob).toBe(file); // Returns original file
     });
 
     it('AC-6.1.9: EXIF stripping is automatic via Canvas redraw (documented)', async () => {

@@ -78,8 +78,12 @@ describe('FullScreenImageViewer', () => {
       <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
     );
 
-    const overlay = screen.getByLabelText('Close image viewer');
-    fireEvent.click(overlay);
+    // Get all elements with this label (overlay div and close button)
+    // The overlay div comes first in DOM order
+    const elements = screen.getAllByLabelText('Close image viewer');
+    const overlay = elements.find((el) => el.tagName !== 'BUTTON');
+    expect(overlay).toBeDefined();
+    fireEvent.click(overlay!);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
