@@ -5,8 +5,25 @@
 @docs/03-Development/typescript-patterns.md
 @docs/03-Development/react-19-guide.md
 @docs/03-Development/troubleshooting.md
+@docs/04-Testing-QA/e2e-quality-standards.md
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*
+
+---
+
+## E2E Quality Standards
+
+> **IMPORTANT:** All E2E tests MUST follow the quality standards in [e2e-quality-standards.md](./e2e-quality-standards.md).
+
+Key requirements:
+- No conditional flow control in tests
+- No error swallowing (`.catch(() => false)`)
+- No runtime `test.skip()` decisions
+- All test paths must have guaranteed assertions
+- Accessibility-first selector hierarchy
+- Deterministic waits only (no `waitForTimeout()`)
+
+The previous E2E test suite (December 2025) scored 52/100 and was archived to `tests/e2e-archive-2025-12/`. New tests must meet the 80+ quality threshold.
 
 ---
 

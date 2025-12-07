@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-TEA test-review workflow (2025-12-07) identified critical anti-patterns across 12/14 E2E spec files. Current E2E test suite scores 52/100, providing false confidence that features work when they may not. This epic addresses test quality through systematic regeneration using TEA's `*atdd` workflow.
+TEA test-review workflow (2025-12-07) identified critical anti-patterns across 12/14 E2E spec files. Current E2E test suite scores 52/100, providing false confidence that features work when they may not. This epic addresses test quality through systematic regeneration using `*dev-story` workflow with TEA expertise via Codex MCP.
 
 ### Quality Scores (Pre-Remediation)
 
@@ -56,9 +56,9 @@ TEA test-review workflow (2025-12-07) identified critical anti-patterns across 1
 
 ## Technical Approach
 
-### TEA `*atdd` Workflow
+### TEA Expertise via Codex MCP
 
-Each story uses TEA's `*atdd` (Acceptance Test Driven Development) workflow:
+Each story uses `*dev-story` workflow with TEA expertise invoked via Codex MCP:
 
 1. **Load story acceptance criteria** from story file
 2. **Generate test scenarios** from Given/When/Then criteria
@@ -102,12 +102,12 @@ TD-1 stories are **test-focused**, not feature-focused. The "development work" I
 ### TD-1 Test Story Workflow
 
 ```
-(stories defined in epics.md) → *story-ready → *atdd → *code-review → *story-done
-                                                 ↑
-                                          (generates tests)
+(stories defined in epics.md) → *dev-story → *code-review → *story-done
+                                     ↑
+                              (generates tests via Codex MCP + TEA)
 ```
 
-**Key Difference:** `*atdd` **replaces** `*dev-story` for TD-1 stories.
+**Key Difference:** TD-1 stories use `*dev-story` with TEA expertise via Codex MCP (see Execution Method in story files).
 
 ### Step-by-Step Execution for TD-1 Stories
 
@@ -115,35 +115,35 @@ For each TD-1 story (TD-1.1 through TD-1.4):
 
 | Step | Command | What Happens |
 |------|---------|--------------|
-| 1 | `*story-ready` | Loads story context, marks ready-for-dev |
-| 2 | `*atdd` | TEA generates E2E tests from acceptance criteria |
-| 3 | `*code-review` | TEA reviews generated tests against quality gates |
-| 4 | `*story-done` | Marks story complete, updates sprint-status |
+| 1 | `*dev-story` | Loads story, follows Execution Method (invokes Codex MCP with TEA) |
+| 2 | `*code-review` | Reviews generated tests against quality gates |
+| 3 | `*story-done` | Marks story complete, updates sprint-status |
 
-### Exception: TD-1.0 and TD-1.5
+### All Stories Use `*dev-story`
 
-- **TD-1.0 (Archive & Standards)**: Use `*dev-story` - this is manual work (moving files, writing docs), not test generation
-- **TD-1.5 (Integration Tests)**: Use `*dev-story` - this is completing/removing existing tests, not generating new E2E tests
-- **TD-1.6 (CI Quality Gates)**: Use `*dev-story` - this is CI configuration, not test generation
+- **TD-1.0 (Standards & Archive)**: Use `*dev-story` with Codex MCP + TEA persona (see Execution Method)
+- **TD-1.1 through TD-1.4**: Use `*dev-story` with Codex MCP + TEA persona for E2E test generation
+- **TD-1.5 (Integration Tests)**: Use `*dev-story` - completing/removing existing tests
+- **TD-1.6 (CI Quality Gates)**: Use `*dev-story` - CI configuration
 
 ### Summary Table
 
 | Story | Workflow | Reason |
 |-------|----------|--------|
-| TD-1.0 | `*story-ready` → `*dev-story` → `*code-review` | Manual file operations |
-| TD-1.1 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
-| TD-1.2 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
-| TD-1.3 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
-| TD-1.4 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
-| TD-1.5 | `*story-ready` → `*dev-story` → `*code-review` | Integration test completion |
-| TD-1.6 | `*story-ready` → `*dev-story` → `*code-review` | CI configuration |
+| TD-1.0 | `*dev-story` → `*code-review` | TEA via Codex MCP authors quality standards |
+| TD-1.1 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
+| TD-1.2 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
+| TD-1.3 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
+| TD-1.4 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
+| TD-1.5 | `*dev-story` → `*code-review` | Integration test completion |
+| TD-1.6 | `*dev-story` → `*code-review` | CI configuration |
 
 ---
 
 ## Story Dependencies
 
 ```
-TD-1.0 (Archive & Standards)
+TD-1.0 (Standards & Archive)
     │
     ├── TD-1.1 (Auth E2E) ────┐
     ├── TD-1.2 (Love Notes E2E) ──┼── TD-1.6 (CI Quality Gates)
@@ -163,13 +163,13 @@ TD-1.5 (Integration Tests) - Independent, can run parallel
 
 ## Implementation Details
 
-### Story TD-1.0: Archive & Standards
+### Story TD-1.0: Standards & Archive
 
 **Actions:**
-1. Create `tests/e2e-archive-2024-12/` directory
-2. Move all files from `tests/e2e/` to archive
-3. Create `tests/e2e-archive-2024-12/README.md` explaining archive reason
-4. Create `docs/04-Testing-QA/e2e-quality-standards.md`
+1. Create quality standards document `docs/04-Testing-QA/e2e-quality-standards.md`
+2. Create `tests/e2e-archive-2025-12/` directory
+3. Move all files from `tests/e2e/` to archive
+4. Create `tests/e2e-archive-2025-12/README.md` explaining archive reason
 
 **Deliverables:**
 - Archived tests with documentation
@@ -275,7 +275,7 @@ video: 'on-first-retry'
 
 ## References
 
-- TEA Test Review Report: `.bmad/output/test-quality-review-2024-12-07.md`
+- TEA Test Review Report: `.bmad/output/test-quality-review-2025-12-07.md`
 - TEA Knowledge Base: `.bmad/bmm/testarch/knowledge/`
 - Playwright Best Practices: TEA fragments `timing-debugging.md`, `selector-resilience.md`
 

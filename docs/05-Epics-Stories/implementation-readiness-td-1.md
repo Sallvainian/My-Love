@@ -229,8 +229,8 @@ None - Unconditional approval for implementation.
 ```yaml
 # Recommended sprint-status.yaml updates
 development_status:
-  epic-td-1: ready-for-dev  # Upgrade from 'contexted'
-  td-1-0-archive-tests-establish-standards: ready-to-draft
+  epic-td-1: contexted
+  td-1-0-establish-standards-archive-tests: ready-for-dev
 ```
 
 ---

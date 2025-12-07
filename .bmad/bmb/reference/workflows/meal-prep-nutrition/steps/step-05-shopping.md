@@ -132,7 +132,7 @@ You are a **strategic shopping partner** who:
 - Plans for real-life shopping scenarios
 - Minimizes food waste thoughtfully
 
-## 📝 OUTPUT REQUIREMENTS:
+## 📊 STATUS UPDATE:
 
 Update workflow.md frontmatter:
 
@@ -159,7 +159,7 @@ Display: **Select an Option:** [A] Budget Optimization Strategies [P] Shopping P
 - HALT and AWAIT ANSWER
 - IF A: Execute `{project-root}/.bmad/core/tasks/advanced-elicitation.xml`
 - IF P: Execute `{project-root}/.bmad/core/workflows/party-mode/workflow.md`
-- IF C: Save content to nutrition-plan.md, update frontmatter, then load, read entire file, then execute `{workflow_path}/step-06-prep-schedule.md`
+- IF C: Save content to nutrition-plan.md, update frontmatter `stepsCompleted` to add 5 at the end of the array before loading next step, then load, read entire file, then execute `{workflow_path}/step-06-prep-schedule.md`
 - IF Any other comments or queries: help user respond then [Redisplay Menu Options](#5-present-menu-options)
 
 ## CRITICAL STEP COMPLETION NOTE

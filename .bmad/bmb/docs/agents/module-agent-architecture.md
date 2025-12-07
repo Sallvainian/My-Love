@@ -203,7 +203,7 @@ Module agents use the same injection process as simple agents:
 2. **Activation block** with standard steps
 3. **Menu handlers** based on usage (workflow, exec, tmpl, data)
 4. **Rules section** for consistent behavior
-5. **Auto-injected** *help and *exit commands
+5. **Auto-injected** \*help and \*exit commands
 
 **Key difference:** Module agents load **module-specific config** instead of core config:
 
@@ -302,7 +302,7 @@ menu:
 
 ## Best Practices
 
-1. **Use .bmad paths** - Portable across installations
+1. **Use {_bmad_folder_} paths** - Portable across installations
 2. **Organize workflows by phase** - Clear progression for users
 3. **Include workflow-status** - Help users track progress
 4. **Reference module config** - Consistent behavior
@@ -342,14 +342,14 @@ menu:
 
 ## Module Agent vs Simple/Expert
 
-| Aspect        | Module Agent                     | Simple/Expert Agent             |
-| ------------- | -------------------------------- | ------------------------------- |
-| Location      | `.bmad/{module}/agents/` | `.bmad/custom/agents/`  |
-| Persona       | Fixed, professional              | Customizable via install_config |
-| Handlebars    | No templating                    | Yes, extensive                  |
-| Menu actions  | Workflows, tasks, templates      | Prompts, inline actions         |
-| Configuration | Module config.yaml               | Core config or none             |
-| Purpose       | Professional tooling             | Personal utilities              |
+| Aspect        | Module Agent                       | Simple/Expert Agent              |
+| ------------- | ---------------------------------- | -------------------------------- |
+| Location      | `.bmad/{module}/agents/` | `.bmad/custom/agents/` |
+| Persona       | Fixed, professional                | Customizable via install_config  |
+| Handlebars    | No templating                      | Yes, extensive                   |
+| Menu actions  | Workflows, tasks, templates        | Prompts, inline actions          |
+| Configuration | Module config.yaml                 | Core config or none              |
+| Purpose       | Professional tooling               | Personal utilities               |
 
 ## Validation Checklist
 

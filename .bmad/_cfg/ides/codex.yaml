@@ -1,5 +1,5 @@
 ide: codex
-configured_date: '2025-12-03T08:05:56.045Z'
-last_updated: '2025-12-05T03:28:42.543Z'
+configured_date: '2025-12-07T14:55:37.019Z'
+last_updated: '2025-12-07T14:55:37.019Z'
 configuration:
-  installLocation: global
+  installLocation: project

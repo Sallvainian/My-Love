@@ -2238,23 +2238,23 @@ const todaysMessage = messageLibrary[messageIndex];
 
 **Priority:** HIGH - Current E2E tests score 52/100, providing false confidence
 
-**Background:** TEA Test Review (2024-12-07) identified critical anti-patterns across 12/14 E2E spec files created outside TEA workflows. Tests pass incorrectly due to conditional logic, error swallowing, and no-op assertion paths.
+**Background:** TEA Test Review (2025-12-07) identified critical anti-patterns across 12/14 E2E spec files created outside TEA workflows. Tests pass incorrectly due to conditional logic, error swallowing, and no-op assertion paths.
 
 ---
 
-### Story TD-1.0: Archive Existing E2E Tests & Establish Quality Standards
+### Story TD-1.0: Establish Quality Standards & Archive E2E Tests
 
 **As a** development team,
-**I want** to archive existing E2E tests and document quality standards,
-**So that** we have a clean slate and clear criteria for new tests.
+**I want** to establish quality standards and archive existing E2E tests,
+**So that** we have clear criteria for new tests and a clean slate.
 
 **Acceptance Criteria:**
 
 **Given** existing E2E test directory
-**When** archiving is performed
+**When** standards are established and archiving is performed
 **Then**
 
-- All files from `tests/e2e/` moved to `tests/e2e-archive-2024-12/`
+- All files from `tests/e2e/` moved to `tests/e2e-archive-2025-12/`
 - Archive README documents why tests were archived
 - No test files deleted (preserve for reference)
 
@@ -2274,12 +2274,12 @@ const todaysMessage = messageLibrary[messageIndex];
 ### Story TD-1.1: Epic 1 (Auth) E2E Test Regeneration
 
 **As a** development team,
-**I want** authentication E2E tests regenerated using TEA `*atdd` workflow,
+**I want** authentication E2E tests regenerated using `*dev-story` workflow with TEA via Codex MCP,
 **So that** auth flows are reliably tested.
 
 **Acceptance Criteria:**
 
-**Given** TEA `*atdd` workflow is executed for Story 1-3 (Magic Link), Story 1-4 (Session Management)
+**Given** `*dev-story` workflow with TEA via Codex MCP is executed for Story 1-3 (Magic Link), Story 1-4 (Session Management)
 **When** tests are generated
 **Then**
 
@@ -2304,12 +2304,12 @@ const todaysMessage = messageLibrary[messageIndex];
 ### Story TD-1.2: Epic 2 (Love Notes) E2E Test Regeneration
 
 **As a** development team,
-**I want** Love Notes E2E tests regenerated using TEA `*atdd` workflow,
+**I want** Love Notes E2E tests regenerated using `*dev-story` workflow with TEA via Codex MCP,
 **So that** messaging features are reliably tested.
 
 **Acceptance Criteria:**
 
-**Given** TEA `*atdd` workflow is executed for Stories 2-1 through 2-4
+**Given** `*dev-story` workflow with TEA via Codex MCP is executed for Stories 2-1 through 2-4
 **When** tests are generated
 **Then**
 
@@ -2334,12 +2334,12 @@ const todaysMessage = messageLibrary[messageIndex];
 ### Story TD-1.3: Epic 5 (Mood) E2E Test Regeneration
 
 **As a** development team,
-**I want** Mood tracking E2E tests regenerated using TEA `*atdd` workflow,
+**I want** Mood tracking E2E tests regenerated using `*dev-story` workflow with TEA via Codex MCP,
 **So that** mood features are reliably tested.
 
 **Acceptance Criteria:**
 
-**Given** TEA `*atdd` workflow is executed for Stories 5-1 through 5-4
+**Given** `*dev-story` workflow with TEA via Codex MCP is executed for Stories 5-1 through 5-4
 **When** tests are generated
 **Then**
 
@@ -2363,12 +2363,12 @@ const todaysMessage = messageLibrary[messageIndex];
 ### Story TD-1.4: Epic 6 (Photos) E2E Test Regeneration
 
 **As a** development team,
-**I want** Photo gallery E2E tests regenerated using TEA `*atdd` workflow,
+**I want** Photo gallery E2E tests regenerated using `*dev-story` workflow with TEA via Codex MCP,
 **So that** photo features are reliably tested.
 
 **Acceptance Criteria:**
 
-**Given** TEA `*atdd` workflow is executed for Stories 6-1 through 6-4
+**Given** `*dev-story` workflow with TEA via Codex MCP is executed for Stories 6-1 through 6-4
 **When** tests are generated
 **Then**
 

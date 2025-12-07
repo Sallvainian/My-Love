@@ -15,8 +15,8 @@ complianceReportFile: '{output_folder}/workflow-compliance-report-{workflow_name
 complianceReportTemplate: '{workflow_path}/templates/compliance-report.md'
 
 # Documentation References
-stepTemplate: '{project-root}/.bmad/bmb/docs/workflows/step-template.md'
-workflowTemplate: '{project-root}/.bmad/bmb/docs/workflows/workflow-template.md'
+stepTemplate: '{project-root}/.bmad/bmb/docs/workflows/templates/step-template.md'
+workflowTemplate: '{project-root}/.bmad/bmb/docs/workflows/templates/workflow-template.md'
 ---
 
 # Step 1: Goal Confirmation and Workflow Target
