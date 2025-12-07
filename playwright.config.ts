@@ -96,18 +96,31 @@ export default defineConfig({
     storageState: 'tests/e2e/.auth/storageState.json',
   },
 
-  // Chromium only
+  // Two projects: authenticated tests first, then auth tests (which clear state)
+  // Order matters! Auth tests must run LAST since they test login/logout flows
+  // and can pollute session state for other tests
   projects: [
     {
-      name: 'chromium',
+      // All authenticated tests run first with saved auth state
+      name: 'logged-in',
+      testIgnore: /auth\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
+        storageState: 'tests/e2e/.auth/storageState.json',
         launchOptions: {
-          args: [
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-sandbox',
-          ],
+          args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-sandbox'],
+        },
+      },
+    },
+    {
+      // Auth tests run last - they start logged out and test login/logout
+      name: 'auth',
+      testMatch: /auth\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: { cookies: [], origins: [] }, // No auth
+        launchOptions: {
+          args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-sandbox'],
         },
       },
     },

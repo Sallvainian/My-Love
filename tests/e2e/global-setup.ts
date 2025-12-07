@@ -102,8 +102,12 @@ async function globalSetup(playwrightConfig: FullConfig) {
   // First, ensure partner relationship is configured
   await ensurePartnerRelationship();
 
-  // Use baseURL from playwright.config.ts (which handles port detection)
-  const baseURL = playwrightConfig.projects[0]?.use?.baseURL || 'http://localhost:5173/';
+  // Get baseURL from top-level config use (not project-level, which doesn't have baseURL)
+  // The top-level use.baseURL has the detected port from detectAppPort()
+  const baseURL =
+    playwrightConfig.use?.baseURL ||
+    playwrightConfig.projects[0]?.use?.baseURL ||
+    'http://localhost:5173/';
   console.log(`   Base URL: ${baseURL}`);
 
   const browser = await chromium.launch();
