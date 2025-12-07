@@ -78,7 +78,7 @@ test.describe("Love Notes Image Attachments", () => {
      * AC-6: Image attachment button should be visible in message input area
      */
     test("image attachment button is visible", async ({ page }) => {
-      dwa1; // Look for image/attachment button
+      // Look for image/attachment button
       const attachButton = page
         .getByRole("button", { name: /attach|image|photo|picture/i })
         .or(page.getByTestId("image-attach-button"))

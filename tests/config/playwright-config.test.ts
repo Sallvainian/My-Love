@@ -61,7 +61,7 @@ describe('detectAppPort', () => {
     expect(detectAppPort()).toBe('9000');
   });
 
-  it('detects app on first matching port by title', () => {
+  it('detects app on first responding port', () => {
     mockExecSync.mockReturnValue('<html><title>My-Love App</title></html>');
     expect(detectAppPort()).toBe('4000');
     expect(mockExecSync).toHaveBeenCalledTimes(1);
@@ -84,12 +84,14 @@ describe('detectAppPort', () => {
     expect(mockExecSync).toHaveBeenCalledTimes(5);
   });
 
-  it('handles case-insensitive title matching (MY-LOVE)', () => {
+  it('returns first port regardless of HTML content', () => {
+    // Port responds with some HTML content - we only care that it responds
     mockExecSync.mockReturnValue('<title>MY-LOVE</title>');
     expect(detectAppPort()).toBe('4000');
   });
 
-  it('handles "my love" with space in title', () => {
+  it('returns first port with any valid response', () => {
+    // Any response (no error thrown) means port is available
     mockExecSync.mockReturnValue('<title>My Love App</title>');
     expect(detectAppPort()).toBe('4000');
   });
