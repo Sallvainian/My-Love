@@ -67,19 +67,21 @@ describe('detectAppPort', () => {
     expect(mockExecSync).toHaveBeenCalledTimes(1);
   });
 
-  it('skips ports without matching title and continues', () => {
-    mockExecSync
-      .mockReturnValueOnce('<html><title>Other App</title></html>')
-      .mockReturnValueOnce('<html><title>My-Love</title></html>');
-    expect(detectAppPort()).toBe('5173');
-    expect(mockExecSync).toHaveBeenCalledTimes(2);
+  it('finds first responding port (no title check)', () => {
+    // First port responds (returns anything without throwing)
+    mockExecSync.mockReturnValueOnce('');
+    expect(detectAppPort()).toBe('4000');
+    expect(mockExecSync).toHaveBeenCalledTimes(1);
   });
 
   it('returns default 5173 when no app found', () => {
+    // All ports fail (throw errors)
     mockExecSync.mockImplementation(() => {
       throw new Error('ECONNREFUSED');
     });
     expect(detectAppPort()).toBe('5173');
+    // Should have tried all ports
+    expect(mockExecSync).toHaveBeenCalledTimes(5);
   });
 
   it('handles case-insensitive title matching (MY-LOVE)', () => {
@@ -92,19 +94,23 @@ describe('detectAppPort', () => {
     expect(detectAppPort()).toBe('4000');
   });
 
-  it('skips port when response has no title tag', () => {
+  it('skips non-responding ports and continues', () => {
+    // First port fails, second port responds
     mockExecSync
-      .mockReturnValueOnce('<html><body>No title here</body></html>')
-      .mockReturnValueOnce('<title>My-Love</title>');
+      .mockImplementationOnce(() => { throw new Error('ECONNREFUSED'); })
+      .mockReturnValueOnce('');
     expect(detectAppPort()).toBe('5173');
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
   });
 
   it('handles timeout errors gracefully', () => {
+    // All ports timeout
     mockExecSync.mockImplementation(() => {
       const error = new Error('ETIMEDOUT');
       (error as NodeJS.ErrnoException).code = 'ETIMEDOUT';
       throw error;
     });
     expect(detectAppPort()).toBe('5173');
+    expect(mockExecSync).toHaveBeenCalledTimes(5);
   });
 });
