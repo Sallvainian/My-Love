@@ -36,7 +36,6 @@ CREATE POLICY "users_update_self_safe"
 
 -- Add a comment explaining the security rationale
 COMMENT ON POLICY "users_update_self_safe" ON public.users IS
-  'Users can update their own profile (display_name, email, etc.) but cannot directly modify partner_id. ' ||
-  'Partner relationships must be established through accept_partner_request() function to prevent privilege escalation.';
+  'Users can update their own profile (display_name, email, etc.) but cannot directly modify partner_id. Partner relationships must be established through accept_partner_request() function to prevent privilege escalation.';
 
 COMMIT;

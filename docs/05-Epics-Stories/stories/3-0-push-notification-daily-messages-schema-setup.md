@@ -205,17 +205,33 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - RLS policies verified via SQL queries
 - TypeScript types regenerated, typecheck passes
 - Security advisor warning fixed (search_path on function)
+- 2025-12-07: Code review fixes applied (see Review Follow-ups below)
+
+### Review Follow-ups (AI Code Review - 2025-12-07)
+
+**Issues Fixed:**
+- [x] [MEDIUM] Added `updated_at` auto-update trigger on `push_subscriptions` using moddatetime extension
+- [x] [MEDIUM] Added missing index `idx_daily_love_messages_created_by` for RLS policy performance
+- [x] [MEDIUM] Fixed orphaned messages bug: Changed FK from `ON DELETE SET NULL` to `ON DELETE CASCADE`
+- [x] [LOW] Added documentation comment on `notifications` INSERT policy explaining server-only design
+
+**Also Fixed During Review:**
+- [x] Fixed broken migration `20251206024345_remote_schema.sql` (type vs default ordering)
+- [x] Fixed broken migration `20251206200000_fix_users_update_privilege_escalation.sql` (COMMENT syntax)
 
 ### File List
 
 **Files Created**:
 - `supabase/migrations/20251207010523_push_notifications_schema.sql`
+- `supabase/migrations/20251207015115_push_notifications_fixes.sql` (code review fixes)
 - `docs/02-Architecture/secrets.md`
 
 **Files Modified**:
 - `src/types/database.types.ts` (auto-regenerated)
 - `.env.example` (added VAPID placeholder)
 - `.env` (added VAPID public key)
+- `supabase/migrations/20251206024345_remote_schema.sql` (fixed migration ordering bug)
+- `supabase/migrations/20251206200000_fix_users_update_privilege_escalation.sql` (fixed COMMENT syntax)
 
 **Dependencies**:
 - `web-push` CLI (for VAPID generation only, not a project dependency)
