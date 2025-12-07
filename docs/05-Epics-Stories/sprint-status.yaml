@@ -107,7 +107,7 @@ development_status:
   # Priority: HIGH - E2E tests score 52/100, providing false confidence
   # Created: 2025-12-07 by TEA test-review workflow
   epic-td-1: contexted # Tech review completed, stories defined
-  td-1-0-archive-tests-establish-standards: backlog
+  td-1-0-archive-tests-establish-standards: ready-for-dev
   td-1-1-auth-e2e-regeneration: backlog
   td-1-2-love-notes-e2e-regeneration: backlog
   td-1-3-mood-e2e-regeneration: backlog

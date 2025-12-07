@@ -85,6 +85,61 @@ Every generated test must pass:
 
 ---
 
+## Workflow Integration
+
+### IMPORTANT: How TD-1 Stories Differ from Feature Stories
+
+TD-1 stories are **test-focused**, not feature-focused. The "development work" IS generating tests, not writing application code. This changes which BMAD workflow commands to use.
+
+### Standard Feature Story Workflow
+
+```
+*create-story → *story-ready → *dev-story → *code-review → *story-done
+                                    ↑
+                              (writes app code)
+```
+
+### TD-1 Test Story Workflow
+
+```
+(stories defined in epics.md) → *story-ready → *atdd → *code-review → *story-done
+                                                 ↑
+                                          (generates tests)
+```
+
+**Key Difference:** `*atdd` **replaces** `*dev-story` for TD-1 stories.
+
+### Step-by-Step Execution for TD-1 Stories
+
+For each TD-1 story (TD-1.1 through TD-1.4):
+
+| Step | Command | What Happens |
+|------|---------|--------------|
+| 1 | `*story-ready` | Loads story context, marks ready-for-dev |
+| 2 | `*atdd` | TEA generates E2E tests from acceptance criteria |
+| 3 | `*code-review` | TEA reviews generated tests against quality gates |
+| 4 | `*story-done` | Marks story complete, updates sprint-status |
+
+### Exception: TD-1.0 and TD-1.5
+
+- **TD-1.0 (Archive & Standards)**: Use `*dev-story` - this is manual work (moving files, writing docs), not test generation
+- **TD-1.5 (Integration Tests)**: Use `*dev-story` - this is completing/removing existing tests, not generating new E2E tests
+- **TD-1.6 (CI Quality Gates)**: Use `*dev-story` - this is CI configuration, not test generation
+
+### Summary Table
+
+| Story | Workflow | Reason |
+|-------|----------|--------|
+| TD-1.0 | `*story-ready` → `*dev-story` → `*code-review` | Manual file operations |
+| TD-1.1 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
+| TD-1.2 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
+| TD-1.3 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
+| TD-1.4 | `*story-ready` → `*atdd` → `*code-review` | E2E test generation |
+| TD-1.5 | `*story-ready` → `*dev-story` → `*code-review` | Integration test completion |
+| TD-1.6 | `*story-ready` → `*dev-story` → `*code-review` | CI configuration |
+
+---
+
 ## Story Dependencies
 
 ```
