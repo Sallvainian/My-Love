@@ -108,6 +108,14 @@ async function globalSetup(playwrightConfig: FullConfig) {
     playwrightConfig.use?.baseURL ||
     playwrightConfig.projects[0]?.use?.baseURL ||
     'http://localhost:5173/';
+
+  // Validate baseURL format to catch configuration errors early
+  if (!baseURL.startsWith('http://') && !baseURL.startsWith('https://')) {
+    throw new Error(
+      `Invalid baseURL: "${baseURL}". Must start with http:// or https://. ` +
+        'Check playwright.config.ts or PORT/VITE_PORT environment variables.'
+    );
+  }
   console.log(`   Base URL: ${baseURL}`);
 
   const browser = await chromium.launch();

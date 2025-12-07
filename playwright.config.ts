@@ -19,7 +19,12 @@ export function detectAppPort(): string {
     return process.env.PORT || process.env.VITE_PORT || '5173';
   }
 
-  // Priority order: 4000 (common dev), 5173 (vite default), others
+  // Priority order for port detection:
+  // - 4000: Custom dev server port (npm run dev often uses this)
+  // - 5173: Vite default dev server port
+  // - 3000: Common alternative (Next.js, Create React App default)
+  // - 5174/5175: Vite auto-increments when 5173 is busy
+  // Override with PORT or VITE_PORT env vars if these don't match your setup
   const portsToCheck = ['4000', '5173', '3000', '5174', '5175'];
 
   for (const port of portsToCheck) {
