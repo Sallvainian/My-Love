@@ -33,6 +33,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 /**
  * Ensure test users have a partner relationship configured.
  * Uses Supabase admin client to link test user to partner user.
+ * Implements transactional behavior with manual rollback on failure.
  */
 async function ensurePartnerRelationship() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !PARTNER_EMAIL) {
@@ -45,44 +46,88 @@ async function ensurePartnerRelationship() {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   try {
-    // Get test user ID
-    const { data: users } = await supabaseAdmin.auth.admin.listUsers();
-    const testUser = users?.users?.find((u) => u.email === TEST_EMAIL);
-    const partnerUser = users?.users?.find((u) => u.email === PARTNER_EMAIL);
+    // Get test user ID with proper error handling
+    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+
+    if (listError) {
+      console.log(`   ⚠️ Could not list users: ${listError.message}`);
+      return;
+    }
+
+    if (!users?.users?.length) {
+      console.log('   ⚠️ No users found in auth database');
+      return;
+    }
+
+    const testUser = users.users.find((u) => u.email === TEST_EMAIL);
+    const partnerUser = users.users.find((u) => u.email === PARTNER_EMAIL);
 
     if (!testUser || !partnerUser) {
       console.log('   ⚠️ Could not find test users in auth');
+      console.log(`      Test user (${TEST_EMAIL}): ${testUser ? 'found' : 'not found'}`);
+      console.log(`      Partner user (${PARTNER_EMAIL}): ${partnerUser ? 'found' : 'not found'}`);
       return;
     }
 
-    // Check if partner already configured
-    const { data: existingUser } = await supabaseAdmin
+    // Check if partner already configured (both directions)
+    const { data: existingUsers, error: selectError } = await supabaseAdmin
       .from('users')
-      .select('partner_id')
-      .eq('id', testUser.id)
-      .single();
+      .select('id, partner_id')
+      .in('id', [testUser.id, partnerUser.id]);
 
-    if (existingUser?.partner_id === partnerUser.id) {
-      console.log('   Partner already configured ✓');
+    if (selectError) {
+      console.log(`   ⚠️ Could not check existing relationships: ${selectError.message}`);
       return;
     }
+
+    const testUserData = existingUsers?.find((u) => u.id === testUser.id);
+    const partnerUserData = existingUsers?.find((u) => u.id === partnerUser.id);
+
+    // Check if bidirectional relationship already exists
+    if (testUserData?.partner_id === partnerUser.id && partnerUserData?.partner_id === testUser.id) {
+      console.log('   Partner relationship already configured ✓');
+      return;
+    }
+
+    // Store original values for rollback capability
+    const originalTestUserPartnerId = testUserData?.partner_id ?? null;
+    const originalPartnerUserPartnerId = partnerUserData?.partner_id ?? null;
 
     // Update test user to have partner relationship
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError1 } = await supabaseAdmin
       .from('users')
       .update({ partner_id: partnerUser.id })
       .eq('id', testUser.id);
 
-    if (updateError) {
-      console.log(`   ⚠️ Could not set partner: ${updateError.message}`);
+    if (updateError1) {
+      console.log(`   ⚠️ Could not set partner for test user: ${updateError1.message}`);
       return;
     }
 
-    // Also set partner's partner_id to test user (bidirectional)
-    await supabaseAdmin
+    // Update partner's partner_id to test user (bidirectional)
+    const { error: updateError2 } = await supabaseAdmin
       .from('users')
       .update({ partner_id: testUser.id })
       .eq('id', partnerUser.id);
+
+    if (updateError2) {
+      // Rollback first update to maintain consistency
+      console.log(`   ⚠️ Second update failed: ${updateError2.message}`);
+      console.log('   🔄 Rolling back first update...');
+
+      const { error: rollbackError } = await supabaseAdmin
+        .from('users')
+        .update({ partner_id: originalTestUserPartnerId })
+        .eq('id', testUser.id);
+
+      if (rollbackError) {
+        console.log(`   ❌ Rollback failed: ${rollbackError.message}`);
+        console.log('   ⚠️ Database may be in inconsistent state!');
+      } else {
+        console.log('   ✓ Rollback successful');
+      }
+      return;
+    }
 
     console.log('   Partner relationship configured ✓');
   } catch (error) {

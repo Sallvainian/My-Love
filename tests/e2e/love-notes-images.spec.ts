@@ -21,9 +21,11 @@ async function navigateToLoveNotes(page: Page) {
   await page.goto("/");
 
   // Wait for app navigation to be ready (confirms authenticated)
-  await expect(
-    page.locator('nav, [data-testid="bottom-navigation"]').first(),
-  ).toBeVisible({ timeout: 10000 });
+  // Prefer accessibility selector, fallback to data-testid
+  const navigation = page
+    .getByRole("navigation")
+    .or(page.getByTestId("bottom-navigation"));
+  await expect(navigation.first()).toBeVisible({ timeout: 10000 });
 
   // Navigate to Love Notes page
   const notesNav = page
@@ -37,7 +39,9 @@ async function navigateToLoveNotes(page: Page) {
     .catch(() => false);
 
   if (notesNavVisible) {
-    await notesNav.first().click({ force: true });
+    // Wait for element to be actionable (no force: true - masks real issues)
+    await notesNav.first().waitFor({ state: "visible" });
+    await notesNav.first().click();
     // Wait for message list to load
     await page
       .getByTestId("love-note-message-list")
@@ -118,11 +122,11 @@ test.describe("Love Notes Image Attachments", () => {
         buffer: testImage,
       });
 
-      // Preview should appear
+      // Preview should appear - use accessibility selector first
       const preview = page
         .getByTestId("image-preview")
-        .or(page.locator('[data-testid*="preview"]'))
-        .or(page.locator('img[alt*="preview"]'));
+        .or(page.getByRole("img", { name: /preview/i }))
+        .or(page.locator('[data-testid*="preview"]'));
 
       await expect(preview.first()).toBeVisible({ timeout: 5000 });
     });
@@ -141,10 +145,10 @@ test.describe("Love Notes Image Attachments", () => {
         buffer: testImage,
       });
 
-      // Wait for preview
+      // Wait for preview - use accessibility selector first
       const preview = page
         .getByTestId("image-preview")
-        .or(page.locator('[data-testid*="preview"]'));
+        .or(page.getByRole("img", { name: /preview/i }));
       await expect(preview.first()).toBeVisible({ timeout: 5000 });
 
       // Click cancel/remove button
@@ -185,10 +189,10 @@ test.describe("Love Notes Image Attachments", () => {
         buffer: testImage,
       });
 
-      // Wait for preview to appear
+      // Wait for preview to appear - use accessibility selector first
       const preview = page
         .getByTestId("image-preview")
-        .or(page.locator('[data-testid*="preview"]'));
+        .or(page.getByRole("img", { name: /preview/i }));
       await expect(preview.first()).toBeVisible({ timeout: 5000 });
 
       // Add text message
@@ -236,7 +240,7 @@ test.describe("Love Notes Image Attachments", () => {
       // Wait for image preview to appear (proves state update occurred)
       const preview = page
         .getByTestId("image-preview")
-        .or(page.locator('[data-testid*="preview"]'));
+        .or(page.getByRole("img", { name: /preview/i }));
       await expect(preview.first()).toBeVisible({ timeout: 5000 });
 
       // Now wait for send button to be enabled
@@ -283,7 +287,7 @@ test.describe("Love Notes Image Attachments", () => {
       // Wait for image preview to appear (proves state update occurred)
       const preview = page
         .getByTestId("image-preview")
-        .or(page.locator('[data-testid*="preview"]'));
+        .or(page.getByRole("img", { name: /preview/i }));
       await expect(preview.first()).toBeVisible({ timeout: 10000 });
 
       // Wait for send button to be enabled
@@ -315,9 +319,10 @@ test.describe("Love Notes Image Attachments", () => {
      */
     test("clicking image opens full-screen viewer", async ({ page }) => {
       // First, check if there are any images in the chat
+      // Use accessibility selectors: getByRole for images, getByRole for buttons
       const chatImages = page
-        .locator('[data-testid="love-note-message"] img[alt*="Attached"]')
-        .or(page.locator('button[aria-label*="View image full screen"] img'));
+        .getByRole("button", { name: /view image full screen/i })
+        .or(page.getByRole("img", { name: /attached/i }));
 
       const imageCount = await chatImages.count();
 
@@ -334,11 +339,10 @@ test.describe("Love Notes Image Attachments", () => {
       await imageButton.waitFor({ state: "visible", timeout: 2000 });
       await imageButton.click();
 
-      // Full-screen viewer should appear
+      // Full-screen viewer should appear - prefer dialog role
       const viewer = page
         .getByTestId("fullscreen-image-viewer")
-        .or(page.getByRole("dialog"))
-        .or(page.locator('[class*="fullscreen"]'));
+        .or(page.getByRole("dialog"));
 
       await expect(viewer.first()).toBeVisible({ timeout: 3000 });
 
@@ -351,9 +355,10 @@ test.describe("Love Notes Image Attachments", () => {
      * AC-9: Full-screen viewer has close button
      */
     test("full-screen viewer can be closed with button", async ({ page }) => {
+      // Use accessibility selectors for chat images
       const chatImages = page
-        .locator('[data-testid="love-note-message"] img[alt*="Attached"]')
-        .or(page.getByRole("button", { name: /view image full screen/i }));
+        .getByRole("button", { name: /view image full screen/i })
+        .or(page.getByRole("img", { name: /attached/i }));
 
       const imageCount = await chatImages.count();
 
@@ -442,10 +447,10 @@ test.describe("Love Notes Image Attachments", () => {
         buffer: testImage,
       });
 
-      // Preview should appear
+      // Preview should appear - use accessibility selector first
       const preview = page
         .getByTestId("image-preview")
-        .or(page.locator('[data-testid*="preview"]'));
+        .or(page.getByRole("img", { name: /preview/i }));
 
       await expect(preview.first()).toBeVisible({ timeout: 3000 });
 
