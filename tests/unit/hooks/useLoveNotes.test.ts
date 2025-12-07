@@ -127,6 +127,8 @@ describe('useLoveNotes', () => {
   const mockAddNote = vi.fn();
   const mockSendNote = vi.fn();
   const mockRetryFailedMessage = vi.fn();
+  const mockRemoveFailedMessage = vi.fn();
+  const mockCleanupPreviewUrls = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -146,6 +148,8 @@ describe('useLoveNotes', () => {
         addNote: mockAddNote,
         sendNote: mockSendNote,
         retryFailedMessage: mockRetryFailedMessage,
+        removeFailedMessage: mockRemoveFailedMessage,
+        cleanupPreviewUrls: mockCleanupPreviewUrls,
       };
       return selector(state);
     });
@@ -219,6 +223,10 @@ describe('useLoveNotes', () => {
           fetchNotes: mockFetchNotes,
           fetchOlderNotes: mockFetchOlderNotes,
           clearNotesError: mockClearNotesError,
+          sendNote: mockSendNote,
+          retryFailedMessage: mockRetryFailedMessage,
+          removeFailedMessage: mockRemoveFailedMessage,
+          cleanupPreviewUrls: mockCleanupPreviewUrls,
         };
         return selector(state);
       });
@@ -243,6 +251,10 @@ describe('useLoveNotes', () => {
           fetchNotes: mockFetchNotes,
           fetchOlderNotes: mockFetchOlderNotes,
           clearNotesError: mockClearNotesError,
+          sendNote: mockSendNote,
+          retryFailedMessage: mockRetryFailedMessage,
+          removeFailedMessage: mockRemoveFailedMessage,
+          cleanupPreviewUrls: mockCleanupPreviewUrls,
         };
         return selector(state);
       });
@@ -290,6 +302,10 @@ describe('useLoveNotes', () => {
           fetchNotes: mockFetchNotes,
           fetchOlderNotes: mockFetchOlderNotes,
           clearNotesError: mockClearNotesError,
+          sendNote: mockSendNote,
+          retryFailedMessage: mockRetryFailedMessage,
+          removeFailedMessage: mockRemoveFailedMessage,
+          cleanupPreviewUrls: mockCleanupPreviewUrls,
         };
         return selector(state);
       });
@@ -309,6 +325,10 @@ describe('useLoveNotes', () => {
           fetchNotes: mockFetchNotes,
           fetchOlderNotes: mockFetchOlderNotes,
           clearNotesError: mockClearNotesError,
+          sendNote: mockSendNote,
+          retryFailedMessage: mockRetryFailedMessage,
+          removeFailedMessage: mockRemoveFailedMessage,
+          cleanupPreviewUrls: mockCleanupPreviewUrls,
         };
         return selector(state);
       });
@@ -354,7 +374,7 @@ describe('useLoveNotes', () => {
 
       await result.current.sendNote('Hello!');
 
-      expect(mockSendNote).toHaveBeenCalledWith('Hello!');
+      expect(mockSendNote).toHaveBeenCalledWith('Hello!', undefined);
     });
 
     it('provides retryFailedMessage action', () => {
