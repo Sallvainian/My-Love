@@ -12,33 +12,35 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      daily_love_messages: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_default: boolean | null
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+        }
+        Relationships: []
+      }
       interactions: {
         Row: {
           created_at: string | null
@@ -87,6 +89,7 @@ export type Database = {
           created_at: string
           from_user_id: string
           id: string
+          image_url: string | null
           to_user_id: string
         }
         Insert: {
@@ -94,6 +97,7 @@ export type Database = {
           created_at?: string
           from_user_id: string
           id?: string
+          image_url?: string | null
           to_user_id: string
         }
         Update: {
@@ -101,6 +105,7 @@ export type Database = {
           created_at?: string
           from_user_id?: string
           id?: string
+          image_url?: string | null
           to_user_id?: string
         }
         Relationships: []
@@ -142,6 +147,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          data: Json | null
+          expires_at: string | null
+          id: string
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          data?: Json | null
+          expires_at?: string | null
+          id?: string
+          read?: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          data?: Json | null
+          expires_at?: string | null
+          id?: string
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       partner_requests: {
         Row: {
@@ -224,6 +265,42 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          device_info: Json | null
+          endpoint: string
+          id: string
+          last_used_at: string | null
+          p256dh: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          device_info?: Json | null
+          endpoint: string
+          id?: string
+          last_used_at?: string | null
+          p256dh: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          device_info?: Json | null
+          endpoint?: string
+          id?: string
+          last_used_at?: string | null
+          p256dh?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           created_at: string | null
@@ -277,6 +354,15 @@ export type Database = {
       decline_partner_request: {
         Args: { p_request_id: string }
         Returns: undefined
+      }
+      get_my_partner_id: { Args: never; Returns: string }
+      get_random_daily_message: {
+        Args: { p_category?: string }
+        Returns: {
+          category: string
+          content: string
+          id: string
+        }[]
       }
     }
     Enums: {
@@ -406,9 +492,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
