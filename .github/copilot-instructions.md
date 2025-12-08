@@ -4,6 +4,23 @@
 
 ---
 
+## AUTHORITATIVE SOURCE
+
+**The `docs/project_context.md` file is THE LAW of this codebase.**
+
+Before reviewing any code, read `docs/project_context.md`. It contains:
+- Technology stack versions and critical notes
+- TypeScript strict mode rules and patterns to avoid
+- React 19 concurrent features requirements
+- Testing rules (Vitest + Playwright anti-patterns)
+- Code quality and style rules
+- Development workflow requirements
+- Critical don't-miss rules (Tier 1: Instant Failure, Tier 2: Flaky CI)
+
+**All code MUST conform to the rules in `docs/project_context.md`. Flag violations as Priority 1 bugs.**
+
+---
+
 ## Review Mission
 
 **Primary goal:** Catch bugs before production. Enforce patterns that prevent bugs.
@@ -294,7 +311,8 @@ Also applies to lines 52, 67.
 - PWA with offline support
 
 ### Key Files Reference
-- `CLAUDE.md` - Project standards
+- **`docs/project_context.md`** - **THE LAW** - All project rules consolidated
+- `CLAUDE.md` - Project standards (quick reference)
 - `docs/03-Development/typescript-patterns.md` - TypeScript patterns
 - `docs/03-Development/react-19-guide.md` - React 19 patterns
 - `docs/04-Testing-QA/e2e-quality-standards.md` - E2E test requirements

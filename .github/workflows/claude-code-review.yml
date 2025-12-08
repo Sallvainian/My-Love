@@ -29,6 +29,19 @@ jobs:
           prompt: |
             You are reviewing PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
 
+            ## AUTHORITATIVE SOURCE - READ FIRST
+
+            **The `docs/project_context.md` file is THE LAW of this codebase.**
+
+            Before reviewing code, read `docs/project_context.md`. It contains all project rules:
+            - Technology stack versions and critical notes
+            - TypeScript strict mode rules
+            - React 19 requirements
+            - Testing rules (anti-patterns to flag)
+            - Critical don't-miss rules (Tier 1: Instant Failure, Tier 2: Flaky CI)
+
+            **All code MUST conform to `docs/project_context.md`. Flag violations as CRITICAL.**
+
             ## Review Mission
             Primary goal: Catch bugs before production. Enforce patterns that prevent bugs.
 
@@ -88,11 +101,13 @@ jobs:
 
             ## Instructions
 
-            1. Read the CLAUDE.md file for project standards
-            2. Use `gh pr diff ${{ github.event.pull_request.number }}` to get the changes
-            3. Review only the changed code, not the entire codebase
-            4. Focus on Priority 1 and Priority 2 issues only
-            5. Use `gh pr comment ${{ github.event.pull_request.number }} --body "YOUR_REVIEW"` to post review
+            1. Read `docs/project_context.md` FIRST - this is THE LAW of the codebase
+            2. Read `CLAUDE.md` for quick reference
+            3. Use `gh pr diff ${{ github.event.pull_request.number }}` to get the changes
+            4. Review only the changed code, not the entire codebase
+            5. Focus on Priority 1 and Priority 2 issues only
+            6. Flag any violations of `docs/project_context.md` as CRITICAL
+            7. Use `gh pr comment ${{ github.event.pull_request.number }} --body "YOUR_REVIEW"` to post review
 
             If the code is clean with no Priority 1 or 2 issues, post a brief approval comment.
 
