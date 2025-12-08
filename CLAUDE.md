@@ -2,6 +2,7 @@
 
 > Quick reference for coding standards. See extended docs for detailed patterns.
 
+@docs/project_context.md
 @docs/03-Development/typescript-patterns.md
 @docs/03-Development/react-19-guide.md
 @docs/04-Testing-QA/testing-guide.md
