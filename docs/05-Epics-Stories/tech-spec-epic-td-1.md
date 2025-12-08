@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-TEA test-review workflow (2025-12-07) identified critical anti-patterns across 12/14 E2E spec files. Current E2E test suite scores 52/100, providing false confidence that features work when they may not. This epic addresses test quality through systematic regeneration using `*dev-story` workflow with TEA expertise via Codex MCP.
+TEA test-review workflow (2025-12-07) identified critical anti-patterns across 12/14 E2E spec files. Current E2E test suite scores 52/100, providing false confidence that features work when they may not. This epic addresses test quality through systematic regeneration using `*dev-story` workflow with TEA expertise via Claude Code.
 
 ### Quality Scores (Pre-Remediation)
 
@@ -56,18 +56,19 @@ TEA test-review workflow (2025-12-07) identified critical anti-patterns across 1
 
 ## Technical Approach
 
-### TEA Expertise via Codex MCP
+### TEA Expertise via ATDD Workflow
 
-Each story uses `*dev-story` workflow with TEA expertise invoked via Codex MCP:
+Each story uses `*atdd` workflow which invokes TEA testarch workflows:
 
-1. **Load story acceptance criteria** from story file
-2. **Generate test scenarios** from Given/When/Then criteria
-3. **Apply TEA knowledge base patterns**:
-   - Network-first pattern (intercept before navigate)
-   - Deterministic waits (`waitForResponse`, `waitFor({ state })`)
-   - Accessibility-first selectors (`getByRole`, `getByLabel`)
-   - Guaranteed assertions (every test path asserts)
-4. **Validate against quality gates** before completion
+1. **Test Design**: Risk assessment and coverage planning
+2. **ATDD**: Generate failing acceptance tests before implementation
+3. **Quality Gates**: Validate tests against TEA standards
+
+These workflows apply TEA knowledge base patterns:
+- Network-first pattern (intercept before navigate)
+- Deterministic waits (`waitForResponse`, `waitFor({ state })`)
+- Accessibility-first selectors (`getByRole`, `getByLabel`)
+- Guaranteed assertions (every test path asserts)
 
 ### Quality Gates (Enforced)
 
@@ -102,12 +103,12 @@ TD-1 stories are **test-focused**, not feature-focused. The "development work" I
 ### TD-1 Test Story Workflow
 
 ```
-(stories defined in epics.md) → *dev-story → *code-review → *story-done
-                                     ↑
-                              (generates tests via Codex MCP + TEA)
+(stories defined in epics.md) → *atdd → *code-review → *story-done
+                                  ↑
+                           (generates tests via TEA testarch)
 ```
 
-**Key Difference:** TD-1 stories use `*dev-story` with TEA expertise via Codex MCP (see Execution Method in story files).
+**Key Difference:** TD-1 stories use `*atdd` workflow for test generation, not `*dev-story`.
 
 ### Step-by-Step Execution for TD-1 Stories
 
@@ -115,28 +116,21 @@ For each TD-1 story (TD-1.1 through TD-1.4):
 
 | Step | Command | What Happens |
 |------|---------|--------------|
-| 1 | `*dev-story` | Loads story, follows Execution Method (invokes Codex MCP with TEA) |
+| 1 | `*atdd` | Loads story, invokes TEA testarch-atdd workflow to generate tests |
 | 2 | `*code-review` | Reviews generated tests against quality gates |
 | 3 | `*story-done` | Marks story complete, updates sprint-status |
 
-### All Stories Use `*dev-story`
-
-- **TD-1.0 (Standards & Archive)**: Use `*dev-story` with Codex MCP + TEA persona (see Execution Method)
-- **TD-1.1 through TD-1.4**: Use `*dev-story` with Codex MCP + TEA persona for E2E test generation
-- **TD-1.5 (Integration Tests)**: Use `*dev-story` - completing/removing existing tests
-- **TD-1.6 (CI Quality Gates)**: Use `*dev-story` - CI configuration
-
-### Summary Table
+### Story Workflow Summary
 
 | Story | Workflow | Reason |
 |-------|----------|--------|
-| TD-1.0 | `*dev-story` → `*code-review` | TEA via Codex MCP authors quality standards |
-| TD-1.1 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
-| TD-1.2 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
-| TD-1.3 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
-| TD-1.4 | `*dev-story` → `*code-review` | TEA via Codex MCP generates E2E tests |
+| TD-1.0 | `*dev-story` → `*code-review` | Standards & archive (already completed) |
+| TD-1.1 | `*atdd` → `*code-review` | TEA generates auth E2E tests |
+| TD-1.2 | `*atdd` → `*code-review` | TEA generates love-notes E2E tests |
+| TD-1.3 | `*atdd` → `*code-review` | TEA generates mood E2E tests |
+| TD-1.4 | `*atdd` → `*code-review` | TEA generates photos E2E tests |
 | TD-1.5 | `*dev-story` → `*code-review` | Integration test completion |
-| TD-1.6 | `*dev-story` → `*code-review` | CI configuration |
+| TD-1.6 | `*dev-story` → `*code-review` | CI quality gates configuration |
 
 ---
 

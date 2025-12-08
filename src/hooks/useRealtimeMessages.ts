@@ -3,6 +3,7 @@
  *
  * Handles real-time message reception via Supabase Broadcast API.
  * Story 2.3 - AC-2.3.1 through AC-2.3.5
+ * Story TD-1.0.5 - Subscription Observability Infrastructure
  *
  * Uses Broadcast API instead of postgres_changes per commit 9a02e56 findings:
  * - postgres_changes doesn't work reliably for cross-user updates
@@ -13,12 +14,18 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { supabase } from '../api/supabaseClient';
 import { authService } from '../api/authService';
+import { useSubscriptionHealth, type SubscriptionHealth, type SubscriptionHealthWithNotify } from './useSubscriptionHealth';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { LoveNote } from '../types/models';
 
 export interface UseRealtimeMessagesOptions {
   onNewMessage?: (message: LoveNote) => void;
   enabled?: boolean;
+}
+
+export interface UseRealtimeMessagesResult {
+  /** Subscription health information for observability (TD-1.0.5) */
+  subscriptionHealth: SubscriptionHealth;
 }
 
 // Retry configuration for subscription failures
@@ -28,12 +35,24 @@ const RETRY_CONFIG = {
   maxDelay: 30000, // 30 seconds max
 };
 
-export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
+export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}): UseRealtimeMessagesResult {
   const { onNewMessage, enabled = true } = options;
   const channelRef = useRef<RealtimeChannel | null>(null);
   const retryCountRef = useRef(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addNote = useAppStore((state) => state.addNote);
+
+  // TD-1.0.5: Track subscription health for observability
+  // Pass null since we don't need the channel ref at render time - status updates come via notifyStatusChange
+  const subscriptionHealth = useSubscriptionHealth(null) as SubscriptionHealthWithNotify;
+
+  // Store notifyStatusChange in a ref to avoid dependency issues in useEffect
+  // eslint-disable-next-line react-hooks/refs -- Initial value from hook is intentional
+  const notifyStatusChangeRef = useRef(subscriptionHealth.notifyStatusChange);
+  // Update ref in effect to avoid lint warning about ref assignment during render
+  useEffect(() => {
+    notifyStatusChangeRef.current = subscriptionHealth.notifyStatusChange;
+  }, [subscriptionHealth.notifyStatusChange]);
 
   const handleNewMessage = useCallback(
     (payload: { type: string; event: string; payload: { message: LoveNote } }) => {
@@ -87,6 +106,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
             if (import.meta.env.DEV) {
               console.log('[useRealtimeMessages] Subscription status:', status, err || '');
             }
+
+            // TD-1.0.5: Notify subscription health of status changes
+            notifyStatusChangeRef.current(status);
 
             // Reset retry count on successful subscription
             if (status === 'SUBSCRIBED') {
@@ -164,9 +186,21 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     };
   }, [enabled, handleNewMessage]);
 
-  // Return empty object - subscription status can be checked via side effects
-  // Note: Accessing refs during render is not recommended
-  return {};
+  // TD-1.0.5: Return subscription health for observability
+  // Expose health state for E2E testing (development mode only)
+  useEffect(() => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      (window as unknown as { __subscriptionHealth?: SubscriptionHealth }).__subscriptionHealth = subscriptionHealth;
+    }
+
+    return () => {
+      if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+        delete (window as unknown as { __subscriptionHealth?: SubscriptionHealth }).__subscriptionHealth;
+      }
+    };
+  }, [subscriptionHealth]);
+
+  return { subscriptionHealth };
 }
 
 export default useRealtimeMessages;

@@ -153,12 +153,32 @@ export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> =
       }
 
       // Remove from state on successful deletion
-      set((state) => ({
-        photos: state.photos.filter((p) => p.id !== photoId),
-      }));
+      set((state) => {
+        const deletedIndex = state.photos.findIndex((p) => p.id === photoId);
+        const newPhotos = state.photos.filter((p) => p.id !== photoId);
+
+        // If deleted photo was selected, navigate to next/previous or close carousel
+        let newSelectedId = state.selectedPhotoId;
+        if (state.selectedPhotoId === photoId) {
+          if (newPhotos.length > 0) {
+            // Navigate to next photo, or previous if at end
+            const nextIndex = Math.min(deletedIndex, newPhotos.length - 1);
+            newSelectedId = newPhotos[nextIndex]?.id ?? null;
+          } else {
+            // No photos left, close carousel
+            newSelectedId = null;
+          }
+        }
+
+        return {
+          photos: newPhotos,
+          selectedPhotoId: newSelectedId,
+        };
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Delete failed';
       set({ error: errorMsg });
+      throw error; // Propagate to caller so UI can show error
     }
   },
 

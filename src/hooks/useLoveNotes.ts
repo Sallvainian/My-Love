@@ -18,6 +18,7 @@ import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { useRealtimeMessages } from './useRealtimeMessages';
+import type { SubscriptionHealth } from './useSubscriptionHealth';
 
 /**
  * Return type for useLoveNotes hook
@@ -43,6 +44,8 @@ export interface UseLoveNotesResult {
   retryFailedMessage: (tempId: string) => Promise<void>;
   /** Remove a failed message from the list */
   removeFailedMessage: (tempId: string) => void;
+  /** Subscription health information for observability (TD-1.0.5 AC2) */
+  subscriptionHealth: SubscriptionHealth;
 }
 
 /**
@@ -128,8 +131,9 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
   }, [cleanupPreviewUrls]);
 
   // Story 2.3: Real-time subscription via dedicated hook
+  // Story TD-1.0.5: Subscription health observability
   // Using Broadcast API per useRealtimeMessages implementation
-  useRealtimeMessages({ enabled: autoFetch });
+  const { subscriptionHealth } = useRealtimeMessages({ enabled: autoFetch });
 
   return {
     notes,
@@ -142,6 +146,7 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     sendNote,
     retryFailedMessage,
     removeFailedMessage,
+    subscriptionHealth,
   };
 }
 

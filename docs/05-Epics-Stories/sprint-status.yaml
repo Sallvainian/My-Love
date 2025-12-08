@@ -108,8 +108,9 @@ development_status:
   # Created: 2025-12-07 by TEA test-review workflow
   epic-td-1: contexted # Tech review completed, stories defined
   td-1-0-establish-standards-archive-tests: done # Code review APPROVED 2025-12-07 - 3 MEDIUM doc issues fixed
-  td-1-1-auth-e2e-regeneration: backlog
-  td-1-2-love-notes-e2e-regeneration: backlog
+  td-1-0.5-subscription-observability: done # Code review APPROVED 2025-12-07 - 7 issues fixed, 18 unit tests passing
+  td-1-1-auth-e2e-regeneration: done # Completed 2025-12-07 - All 11 tests passing, quality gates validated
+  td-1-2-love-notes-e2e-regeneration: ready-for-dev # Story created 2025-12-07 - TEA testarch workflow integration, BLOCKED BY TD-1.0.5
   td-1-3-mood-e2e-regeneration: backlog
   td-1-4-photos-e2e-regeneration: backlog
   td-1-5-integration-test-completion: backlog
