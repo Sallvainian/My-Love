@@ -16,10 +16,10 @@
  * Story 2.2: AC-2.2.1 (message input), AC-2.2.2 (send functionality)
  */
 
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useState, useRef, useCallback, type ReactElement } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
-import { MessageList } from './MessageList';
+import { MessageList, type MessageListHandle } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useAppStore } from '../../stores/useAppStore';
@@ -44,6 +44,14 @@ export function LoveNotes(): ReactElement {
   const [userName, setUserName] = useState<string>('You');
   // Partner name fetched from database (not local config)
   const [partnerName, setPartnerName] = useState<string>('Partner');
+
+  // Ref to control MessageList scroll programmatically
+  const messageListRef = useRef<MessageListHandle>(null);
+
+  // Callback to scroll to bottom when a message is sent
+  const handleMessageSent = useCallback(() => {
+    messageListRef.current?.scrollToBottom();
+  }, []);
 
   // Fetch current user info and partner name on mount
   useEffect(() => {
@@ -114,6 +122,7 @@ export function LoveNotes(): ReactElement {
 
       {/* Message list */}
       <MessageList
+        ref={messageListRef}
         notes={notes}
         currentUserId={currentUserId}
         partnerName={partnerName}
@@ -125,7 +134,7 @@ export function LoveNotes(): ReactElement {
       />
 
       {/* Message input - Story 2.2 */}
-      <MessageInput />
+      <MessageInput onMessageSent={handleMessageSent} />
     </div>
   );
 }

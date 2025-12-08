@@ -18,7 +18,14 @@
  * Story 2.4: Message history with scroll performance
  */
 
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+  type ReactNode,
+} from 'react';
 import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
 import { useRef } from 'react';
@@ -122,6 +129,14 @@ export interface MessageListProps {
 }
 
 /**
+ * Handle exposed via ref for imperative scroll control
+ */
+export interface MessageListHandle {
+  /** Scroll to the bottom of the message list */
+  scrollToBottom: () => void;
+}
+
+/**
  * Beginning of Conversation Component
  * Shows when all message history has been loaded
  */
@@ -192,16 +207,20 @@ function calculateRowHeight(note: LoveNote | null, includeBeginning: boolean, in
  * Renders love notes in a performant virtualized list.
  * Story 2.4: AC-2.4.1, AC-2.4.2, AC-2.4.3, AC-2.4.4, AC-2.4.5
  */
-export function MessageList({
-  notes,
-  currentUserId,
-  partnerName,
-  userName,
-  isLoading,
-  onLoadMore,
-  hasMore = false,
-  onRetry,
-}: MessageListProps): ReactNode {
+export const MessageList = forwardRef<MessageListHandle, MessageListProps>(
+  function MessageList(
+    {
+      notes,
+      currentUserId,
+      partnerName,
+      userName,
+      isLoading,
+      onLoadMore,
+      hasMore = false,
+      onRetry,
+    },
+    ref
+  ): ReactNode {
   // Use react-window v2's typed ref hook for proper API access
   const listRef = useListRef(null);
   const hasScrolledToBottom = useRef(false);
@@ -327,6 +346,15 @@ export function MessageList({
     }
   }, [totalRowCount]);
 
+  // Expose scrollToBottom via ref for external control (e.g., after sending a message)
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToBottom,
+    }),
+    [scrollToBottom]
+  );
+
   // Empty state
   if (!isLoading && notes.length === 0) {
     return (
@@ -400,6 +428,6 @@ export function MessageList({
       />
     </div>
   );
-}
+});
 
 export default MessageList;

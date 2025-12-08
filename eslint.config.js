@@ -89,6 +89,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
+      '@typescript-eslint/no-empty-object-type': 'off', // Playwright fixtures use empty object pattern ({}, use) => {}
+      'no-empty-pattern': 'off', // Playwright fixtures use empty object pattern ({}, use) => {}
     },
   }
 );

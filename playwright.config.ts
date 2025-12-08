@@ -133,8 +133,9 @@ export default defineConfig({
 
   // Dev server (using dotenvx to decrypt env vars)
   // Port configurable via PORT or VITE_PORT env var
+  // VITE_E2E_TESTING enables test infrastructure in the app (event listeners, etc.)
   webServer: {
-    command: `dotenvx run -- npm run dev -- --port ${PORT}`,
+    command: `VITE_E2E_TESTING=true dotenvx run -- npm run dev -- --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60000, // 1 minute should be enough

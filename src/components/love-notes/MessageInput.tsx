@@ -33,9 +33,17 @@ const WARN_AT = 950; // Show warning color when approaching limit
 const ACCEPTED_IMAGE_TYPES = 'image/jpeg,image/png,image/webp';
 
 /**
+ * Props for MessageInput component
+ */
+export interface MessageInputProps {
+  /** Callback fired after a message is successfully sent (for scroll handling) */
+  onMessageSent?: () => void;
+}
+
+/**
  * MessageInput - Text input with send button and image picker for Love Notes
  */
-export function MessageInput() {
+export function MessageInput({ onMessageSent }: MessageInputProps) {
   const [content, setContent] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -139,6 +147,9 @@ export function MessageInput() {
       setContent('');
       setSelectedImage(null);
       setImageError(null);
+
+      // Notify parent to scroll to bottom
+      onMessageSent?.();
     } catch (error) {
       console.error('Failed to send message:', error);
 
