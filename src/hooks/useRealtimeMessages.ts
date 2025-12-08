@@ -187,18 +187,56 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}): U
   }, [enabled, handleNewMessage]);
 
   // TD-1.0.5: Return subscription health for observability
-  // Expose health state for E2E testing (development mode only)
+  // Expose health state for E2E testing (development/test/playwright mode)
+  // Use VITE_E2E_TESTING env var or DEV mode
   useEffect(() => {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+    const isE2ETesting = import.meta.env.VITE_E2E_TESTING === 'true';
+    const isDevOrTest = import.meta.env.DEV || import.meta.env.MODE === 'test';
+
+    if (isDevOrTest || isE2ETesting) {
       (window as unknown as { __subscriptionHealth?: SubscriptionHealth }).__subscriptionHealth = subscriptionHealth;
     }
 
     return () => {
-      if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      if (isDevOrTest || isE2ETesting) {
         delete (window as unknown as { __subscriptionHealth?: SubscriptionHealth }).__subscriptionHealth;
       }
     };
   }, [subscriptionHealth]);
+
+  // E2E Testing: Listen for test events to simulate real-time message reception
+  // This allows E2E tests to trigger message arrival without actual WebSocket connection
+  useEffect(() => {
+    const isE2ETesting = import.meta.env.VITE_E2E_TESTING === 'true';
+    const isDevOrTest = import.meta.env.DEV || import.meta.env.MODE === 'test';
+
+    if (!isDevOrTest && !isE2ETesting) return;
+
+    const handleTestNewMessage = (event: CustomEvent<{ type: string; new: LoveNote; old: null }>) => {
+      const { new: message } = event.detail;
+
+      if (import.meta.env.DEV) {
+        console.log('[useRealtimeMessages] E2E test message received:', message.id);
+      }
+
+      // Add to store (with deduplication check in addNote)
+      addNote(message);
+
+      // Trigger vibration feedback (AC-2.3.3)
+      if (navigator.vibrate) {
+        navigator.vibrate([30]);
+      }
+
+      // Call optional callback
+      onNewMessage?.(message);
+    };
+
+    window.addEventListener('__test_new_message', handleTestNewMessage as EventListener);
+
+    return () => {
+      window.removeEventListener('__test_new_message', handleTestNewMessage as EventListener);
+    };
+  }, [addNote, onNewMessage]);
 
   return { subscriptionHealth };
 }

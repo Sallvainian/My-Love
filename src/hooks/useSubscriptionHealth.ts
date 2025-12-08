@@ -190,12 +190,23 @@ export function useSubscriptionHealth(
       }, 100);
     };
 
+    // E2E Test: Force healthy state (bypasses real subscription)
+    const handleTestSetHealthy = () => {
+      const newHeartbeat = new Date();
+      wasConnectedRef.current = true;
+      setConnectionState('connected');
+      setLastHeartbeat(newHeartbeat);
+      setIsHealthy(true);
+    };
+
     window.addEventListener('__test_subscription_drop', handleTestDrop);
     window.addEventListener('__test_subscription_reconnect', handleTestReconnect);
+    window.addEventListener('__test_subscription_set_healthy', handleTestSetHealthy);
 
     return () => {
       window.removeEventListener('__test_subscription_drop', handleTestDrop);
       window.removeEventListener('__test_subscription_reconnect', handleTestReconnect);
+      window.removeEventListener('__test_subscription_set_healthy', handleTestSetHealthy);
     };
   }, []);
 
