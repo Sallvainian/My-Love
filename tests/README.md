@@ -1067,6 +1067,104 @@ export const PhotoGallery: React.FC = () => {
 
 ---
 
+## Fixture Architecture (mergeTests Pattern)
+
+The test framework uses Playwright's `mergeTests` pattern to compose multiple focused fixtures into a single unified test function. This provides better maintainability than inheritance-based patterns.
+
+### Merged Fixtures Entry Point
+
+Import from `tests/support/fixtures` for all tests:
+
+```typescript
+import { test, expect } from '../support/fixtures';
+
+test('user flow with monitoring', async ({ page, cleanApp, consoleMonitor, networkMonitor, loveNoteFactory }) => {
+  // All fixtures available in one test
+});
+```
+
+### Available Fixture Groups
+
+| Fixture File | Fixtures Provided | Purpose |
+|--------------|-------------------|---------|
+| `baseFixture.ts` | `cleanApp`, `appWithMessages`, `appWithFavorites` | App state management |
+| `monitoredTest.ts` | `consoleMonitor`, `networkMonitor` | Automatic error detection |
+| `dataFixture.ts` | `loveNoteFactory` | Test data seeding with auto-cleanup |
+
+### Custom Matchers
+
+The monitored fixtures provide custom matchers:
+
+```typescript
+// Assert no console errors occurred
+expect(consoleMonitor).toHaveNoErrors();
+
+// Assert no failed network requests
+expect(networkMonitor).toHaveNoFailedRequests();
+
+// Assert Supabase connection healthy
+expect(networkMonitor).toHaveSupabaseConnection();
+```
+
+### Data Factories
+
+Use factories to seed test data with automatic cleanup:
+
+```typescript
+import { test, expect } from '../support/fixtures';
+
+test('displays sent message', async ({ page, loveNoteFactory }) => {
+  // Create test data - auto-deleted after test
+  const note = await loveNoteFactory.createNote({
+    content: 'I love you!',
+  });
+
+  await page.goto('/love-notes');
+  await expect(page.getByText('I love you!')).toBeVisible();
+  // No cleanup needed - factory handles it
+});
+```
+
+### Adding New Fixtures
+
+1. Create a new fixture file in `tests/support/fixtures/`:
+
+```typescript
+// newFeatureFixture.ts
+import { test as base, expect } from '@playwright/test';
+
+export const test = base.extend<{ myFixture: MyType }>({
+  myFixture: async ({}, use) => {
+    const resource = await setup();
+    await use(resource);
+    await cleanup(resource); // Auto-cleanup
+  },
+});
+
+export { expect };
+```
+
+2. Add to merged fixtures in `tests/support/fixtures/index.ts`:
+
+```typescript
+import { test as newFixture } from './newFeatureFixture';
+
+export const test = mergeTests(baseFixture, monitoredFixture, dataFixture, newFixture);
+```
+
+### Factory Pattern
+
+All factories follow this structure:
+
+- Track created resources in instance array
+- Provide `create*()` methods for seeding
+- Implement `cleanup()` for teardown
+- Called automatically by fixture after test
+
+See `tests/support/fixtures/factories/love-note-factory.ts` for reference implementation.
+
+---
+
 ## Test Organization Patterns
 
 ### Test Suite Structure

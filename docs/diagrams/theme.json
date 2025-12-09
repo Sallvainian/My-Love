@@ -1,0 +1,27 @@
+{
+  "name": "Coral Heart",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#FFF5F5",
+    "primary": "#FF6B6B",
+    "secondary": "#FFA8A8",
+    "dark": "#C92A2A",
+    "text": "#495057",
+    "textLight": "#868E96",
+    "success": "#51CF66",
+    "border": "#FFA8A8"
+  },
+  "typography": {
+    "heading": 24,
+    "subheading": 18,
+    "body": 16,
+    "caption": 12
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32
+  }
+}

@@ -1,0 +1,23 @@
+# Snyk Code IDE Exclusions
+# Uses gitignore syntax - excludes files from Snyk Code scanning in IDE
+# See: https://docs.snyk.io/developer-tools/snyk-ide-plugins-and-extensions/visual-studio-code-extension/create-a-.dcignore-file
+
+# Test files and directories (false positives for hardcoded credentials/secrets)
+tests/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
+
+# Test setup scripts
+scripts/setup-test-users.js
+
+# Node modules (already in .gitignore but explicit here)
+node_modules/
+
+# Build output
+dist/
+
+# Coverage reports
+coverage/

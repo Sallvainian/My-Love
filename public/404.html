@@ -18,25 +18,33 @@
       var pathSegmentsToKeep = 1; // Keep 1 path segment for GitHub Pages repos
 
       var l = window.location;
-      l.replace(
+      // Build same-origin URL for SPA routing (prevents open redirect)
+      // This constructs a URL using only the current page's origin components
+      var targetUrl =
         l.protocol +
-          '//' +
-          l.hostname +
-          (l.port ? ':' + l.port : '') +
-          l.pathname
-            .split('/')
-            .slice(0, 1 + pathSegmentsToKeep)
-            .join('/') +
-          '/?/' +
-          l.pathname
-            .slice(1)
-            .split('/')
-            .slice(pathSegmentsToKeep)
-            .join('/')
-            .replace(/&/g, '~and~') +
-          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-          l.hash
-      );
+        '//' +
+        l.hostname +
+        (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
+        '/?/' +
+        l.pathname
+          .slice(1)
+          .split('/')
+          .slice(pathSegmentsToKeep)
+          .join('/')
+          .replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash;
+
+      // Validate the constructed URL is same-origin before redirecting
+      try {
+        var parsed = new URL(targetUrl);
+        if (parsed.origin === l.origin) {
+          l.replace(targetUrl);
+        }
+      } catch (e) {
+        // Invalid URL - don't redirect
+      }
     </script>
   </head>
   <body>

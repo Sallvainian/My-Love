@@ -272,6 +272,25 @@ async function syncPendingMoods(): Promise<void> {
 self.addEventListener(
   'message',
   ((event: ExtendableMessageEvent) => {
+    // Validate origin to prevent malicious message injection
+    // In service worker context, verify the source is a Client from our origin
+    if (event.source) {
+      const source = event.source as Client;
+      if ('url' in source && source.url) {
+        try {
+          const sourceOrigin = new URL(source.url).origin;
+          if (sourceOrigin !== self.location.origin) {
+            console.warn('[ServiceWorker] Rejected message from untrusted origin:', sourceOrigin);
+            return;
+          }
+        } catch {
+          // Invalid URL - reject the message
+          console.warn('[ServiceWorker] Rejected message with invalid source URL');
+          return;
+        }
+      }
+    }
+
     if (event.data?.type === 'SKIP_WAITING') {
       self.skipWaiting();
     }
