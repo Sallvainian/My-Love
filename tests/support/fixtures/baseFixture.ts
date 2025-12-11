@@ -72,7 +72,8 @@ export const test = base.extend<TestFixtures>({
 
     // Handle welcome screen if it appears (appears on first visit)
     const continueButton = page.locator('button:has-text("Continue")');
-    if (await continueButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const continueCount = await continueButton.count();
+    if (continueCount > 0) {
       await continueButton.click();
       await page.waitForLoadState('networkidle');
     }
@@ -109,7 +110,8 @@ export const test = base.extend<TestFixtures>({
 
     // Handle welcome screen if it appears
     const continueButton = page.locator('button:has-text("Continue")');
-    if (await continueButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const continueCount = await continueButton.count();
+    if (continueCount > 0) {
       await continueButton.click();
       await page.waitForLoadState('networkidle');
     }
@@ -181,7 +183,8 @@ export const test = base.extend<TestFixtures>({
 
     // Handle welcome screen if it appears
     const continueButton = page.locator('button:has-text("Continue")');
-    if (await continueButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const continueCount = await continueButton.count();
+    if (continueCount > 0) {
       await continueButton.click();
       await page.waitForLoadState('networkidle');
     }

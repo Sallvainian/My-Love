@@ -15,11 +15,18 @@
  * - Deterministic waits (no waitForTimeout)
  * - No error swallowing (.catch(() => false))
  *
+ * MIGRATION NOTE: This file now extends from the centralized test infrastructure,
+ * which includes network-error-monitor and log fixtures from playwright-utils.
+ *
  * @see docs/04-Testing-QA/e2e-quality-standards.md
  */
 
-import { test as base, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ConnectionState } from '../../../src/hooks/useSubscriptionHealth';
+
+// Import base fixtures from centralized infrastructure (includes playwright-utils)
+import { test as base, expect } from '../../support/fixtures';
+export { expect };
 
 /**
  * API endpoint patterns for network interception
@@ -43,15 +50,15 @@ export const LOVE_NOTES_API_PATTERNS = {
  */
 export const LOVE_NOTES_SELECTORS = {
   // Navigation
-  navLoveNotes: (page: Page) => page.getByTestId('nav-love-notes'),
+  navLoveNotes: (page: Page) => page.getByTestId('nav-notes'),
 
-  // Message input area
-  messageInput: (page: Page) => page.getByRole('textbox', { name: /message|write|type/i }),
-  sendButton: (page: Page) => page.getByRole('button', { name: /send/i }),
-  characterCounter: (page: Page) => page.getByTestId('character-counter'),
+  // Message input area - aria-label based
+  messageInput: (page: Page) => page.getByLabel('Love note message input'),
+  sendButton: (page: Page) => page.getByRole('button', { name: /send message/i }),
+  characterCounter: (page: Page) => page.getByText(/\/1000$/), // e.g., "950/1000"
 
-  // Image attachment
-  attachImageButton: (page: Page) => page.getByRole('button', { name: /attach|image|photo/i }),
+  // Image attachment - aria-label based
+  attachImageButton: (page: Page) => page.getByRole('button', { name: /attach image/i }),
   imagePreview: (page: Page) => page.getByTestId('image-preview'),
   removeImageButton: (page: Page) => page.getByRole('button', { name: /remove|cancel/i }),
   fileInput: (page: Page) => page.locator('input[type="file"]'),
@@ -116,40 +123,16 @@ export function createMockMessages(
 }
 
 /**
- * Extended test with Love Notes fixtures
+ * Extended test with Love Notes fixtures.
+ *
+ * IMPORTANT: This extends base fixtures WITHOUT shadowing navigateToLoveNotes.
+ * The merged fixtures in tests/support/fixtures/index.ts provide navigateToLoveNotes
+ * through appFixtures. Any custom navigation for subscription testing should use
+ * a DIFFERENT fixture name to avoid shadowing conflicts.
+ *
+ * @see Task TD-1.2.5 for fixture shadowing root cause analysis
  */
-export const test = base.extend<{
-  navigateToLoveNotes: () => Promise<void>;
-}>({
-  /**
-   * Navigate to Love Notes page with network-first pattern
-   */
-  navigateToLoveNotes: async ({ page }, use) => {
-    const navigateToLoveNotes = async () => {
-      // Step 1: Set up response listener BEFORE navigation
-      const messagesPromise = page.waitForResponse(
-        (resp) => resp.url().includes('love_notes') && resp.status() >= 200 && resp.status() < 400
-      );
-
-      // Step 2: Navigate to Love Notes section
-      const navButton = LOVE_NOTES_SELECTORS.navLoveNotes(page);
-      await expect(navButton).toBeVisible({ timeout: 10000 });
-      await navButton.click();
-
-      // Step 3: Wait for API response
-      await messagesPromise;
-
-      // Step 4: Verify page loaded (deterministic wait)
-      await expect(
-        LOVE_NOTES_SELECTORS.messageInput(page).or(LOVE_NOTES_SELECTORS.emptyState(page))
-      ).toBeVisible({ timeout: 10000 });
-    };
-
-    await use(navigateToLoveNotes);
-  },
-});
-
-export { expect };
+export const test = base;
 
 /**
  * Subscription health state exposed via window.__subscriptionHealth
