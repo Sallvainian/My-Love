@@ -27,19 +27,19 @@
     "lint:fix": "eslint . --fix && prettier --write ."
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.86.2",
-    "dompurify": "^3.3.0",
+    "@supabase/supabase-js": "^2.90.1",
+    "dompurify": "^3.3.1",
     "eventsource": "^4.1.0",
-    "framer-motion": "^12.23.25",
+    "framer-motion": "^12.26.1",
     "idb": "^8.0.3",
-    "lucide-react": "^0.556.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "react-window": "^2.2.3",
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-window": "^2.2.5",
     "react-window-infinite-loader": "^2.0.0",
     "workbox-window": "^7.4.0",
-    "zod": "^4.1.13",
-    "zustand": "^5.0.9"
+    "zod": "^4.3.5",
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.51.1",
@@ -52,7 +52,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/dompurify": "^3.2.0",
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "@types/react-window": "^2.0.0",
     "@vitejs/plugin-react": "^5.1.1",
