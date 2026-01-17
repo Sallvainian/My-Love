@@ -71,7 +71,7 @@
     "prettier": "^3.7.4",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "rollup-plugin-visualizer": "^6.0.5",
-    "supabase": "^2.65.6",
+    "supabase": "^2.72.8",
     "tailwindcss": "^4.1.17",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
