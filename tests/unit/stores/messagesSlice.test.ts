@@ -432,6 +432,54 @@ describe('MessagesSlice', () => {
         expect(store.getState().messageHistory.currentIndex).toBe(1);
       });
     });
+
+    describe('edge cases', () => {
+      it('should handle maxHistoryDays of 0 gracefully', () => {
+        mockGetAvailableHistoryDays.mockReturnValue(0);
+        store.setState({
+          messageHistory: { ...store.getState().messageHistory, currentIndex: 0 },
+        });
+
+        // Cannot navigate back when maxHistoryDays is 0
+        expect(store.getState().canNavigateBack()).toBe(false);
+
+        // Attempting to navigate should not change index
+        store.getState().navigateToPreviousMessage();
+        expect(store.getState().messageHistory.currentIndex).toBe(0);
+      });
+
+      it('should handle negative currentIndex defensively', () => {
+        // Force a negative index (should not happen in normal use)
+        store.setState({
+          messageHistory: { ...store.getState().messageHistory, currentIndex: -1 },
+        });
+
+        // canNavigateForward should still work (negative is "before today")
+        // The function checks currentIndex > 0, so -1 would return false
+        expect(store.getState().canNavigateForward()).toBe(false);
+
+        // Navigating forward from negative should not make things worse
+        store.getState().navigateToNextMessage();
+        // currentIndex stays at -1 because canNavigateForward returns false
+        expect(store.getState().messageHistory.currentIndex).toBe(-1);
+      });
+
+      it('should handle maxHistoryDays of 1 (only today)', () => {
+        mockGetAvailableHistoryDays.mockReturnValue(1);
+        store.setState({
+          messageHistory: { ...store.getState().messageHistory, currentIndex: 0 },
+        });
+
+        // Can navigate back one day
+        expect(store.getState().canNavigateBack()).toBe(true);
+
+        store.getState().navigateToPreviousMessage();
+        expect(store.getState().messageHistory.currentIndex).toBe(1);
+
+        // Now at limit, cannot go further back
+        expect(store.getState().canNavigateBack()).toBe(false);
+      });
+    });
   });
 
   describe('custom messages', () => {
