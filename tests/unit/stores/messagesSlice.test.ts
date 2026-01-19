@@ -103,8 +103,8 @@ describe('MessagesSlice', () => {
     vi.clearAllMocks();
 
     // Create store with settings (messagesSlice depends on settings)
-    store = createStore<TestStoreState>()((set, get, api) => ({
-      ...createMessagesSlice(set as never, get as never, api as never),
+    store = createStore<TestStoreState>()((set, get) => ({
+      ...createMessagesSlice(set as never, get as never),
       settings: createMockSettings(),
     }));
 
