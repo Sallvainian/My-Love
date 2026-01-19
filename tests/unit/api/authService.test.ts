@@ -23,7 +23,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import type { User, Session, AuthError } from '@supabase/supabase-js';
+import type { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 
 // Mock supabase client BEFORE importing authService
 const mockSignInWithPassword = vi.fn();
@@ -492,7 +492,7 @@ describe('AuthService', () => {
     });
 
     it('should call callback when auth state changes', async () => {
-      let capturedCallback: ((event: string, session: Session | null) => Promise<void>) | null = null;
+      let capturedCallback: ((event: AuthChangeEvent, session: Session | null) => Promise<void>) | null = null;
 
       mockOnAuthStateChange.mockImplementation((cb) => {
         capturedCallback = cb;
@@ -510,7 +510,7 @@ describe('AuthService', () => {
     });
 
     it('should store token on SIGNED_IN event', async () => {
-      let capturedCallback: ((event: string, session: Session | null) => Promise<void>) | null =
+      let capturedCallback: ((event: AuthChangeEvent, session: Session | null) => Promise<void>) | null =
         null;
 
       mockOnAuthStateChange.mockImplementation((cb) => {
@@ -537,7 +537,7 @@ describe('AuthService', () => {
     });
 
     it('should clear token on SIGNED_OUT event', async () => {
-      let capturedCallback: ((event: string, session: Session | null) => Promise<void>) | null =
+      let capturedCallback: ((event: AuthChangeEvent, session: Session | null) => Promise<void>) | null =
         null;
 
       mockOnAuthStateChange.mockImplementation((cb) => {
