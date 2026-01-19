@@ -23,7 +23,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import type { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
+import type { AuthChangeEvent } from '@supabase/supabase-js';
+import {
+  createMockUser,
+  createMockSession,
+  createMockAuthError,
+} from '../utils/testHelpers';
 
 // Mock supabase client BEFORE importing authService
 const mockSignInWithPassword = vi.fn();
@@ -73,40 +78,6 @@ import {
   resetPassword,
   signInWithGoogle,
 } from '../../../src/api/authService';
-
-// Test data factories
-function createMockUser(overrides: Partial<User> = {}): User {
-  return {
-    id: 'user-uuid-123',
-    email: 'test@example.com',
-    app_metadata: {},
-    user_metadata: {},
-    aud: 'authenticated',
-    created_at: '2024-01-01T00:00:00.000Z',
-    ...overrides,
-  } as User;
-}
-
-function createMockSession(overrides: Partial<Session> = {}): Session {
-  const user = createMockUser();
-  return {
-    access_token: 'mock-access-token',
-    refresh_token: 'mock-refresh-token',
-    expires_in: 3600,
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-    token_type: 'bearer',
-    user,
-    ...overrides,
-  } as Session;
-}
-
-function createMockAuthError(message: string): AuthError {
-  return {
-    message,
-    status: 400,
-    name: 'AuthError',
-  } as AuthError;
-}
 
 describe('AuthService', () => {
   beforeEach(() => {

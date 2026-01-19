@@ -23,7 +23,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createStore } from 'zustand';
 import type { MessagesSlice } from '../../../src/stores/slices/messagesSlice';
 import { createMessagesSlice } from '../../../src/stores/slices/messagesSlice';
-import type { Message, CustomMessage, Settings } from '../../../src/types';
+import type { Settings } from '../../../src/types';
+import { createMockMessage } from '../utils/testHelpers';
 
 // Mock storage service
 const mockGetAllMessages = vi.fn();
@@ -68,18 +69,7 @@ vi.mock('../../../src/utils/messageRotation', () => ({
   getAvailableHistoryDays: (...args: unknown[]) => mockGetAvailableHistoryDays(...args),
 }));
 
-// Test data factories
-function createMockMessage(overrides: Partial<Message> = {}): Message {
-  return {
-    id: 1,
-    text: 'Test message',
-    category: 'reasons',
-    isFavorite: false,
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    ...overrides,
-  };
-}
-
+// Local test-specific settings factory (different structure from actual Settings type)
 function createMockSettings(): Settings {
   return {
     relationship: {
