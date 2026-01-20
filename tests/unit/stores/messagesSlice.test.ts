@@ -23,7 +23,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createStore } from 'zustand';
 import type { MessagesSlice } from '../../../src/stores/slices/messagesSlice';
 import { createMessagesSlice } from '../../../src/stores/slices/messagesSlice';
-import type { Settings } from '../../../src/types';
+import type { Settings, CustomMessage } from '../../../src/types';
 import { createMockMessage } from '../utils/testHelpers';
 
 // Mock storage service

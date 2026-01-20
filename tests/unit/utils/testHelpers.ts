@@ -37,7 +37,8 @@ export function createMockUser(overrides: Partial<User> = {}): User {
  * Create a mock Supabase Session object
  */
 export function createMockSession(overrides: Partial<Session> = {}): Session {
-  const user = createMockUser(overrides.user);
+  const { user: userOverrides, ...restOverrides } = overrides;
+  const user = createMockUser(userOverrides);
   return {
     access_token: 'mock-access-token',
     refresh_token: 'mock-refresh-token',
@@ -45,7 +46,7 @@ export function createMockSession(overrides: Partial<Session> = {}): Session {
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     token_type: 'bearer',
     user,
-    ...overrides,
+    ...restOverrides,
   } as Session;
 }
 
@@ -82,11 +83,11 @@ export function createMockMessage(overrides: Partial<Message> = {}): Message {
   return {
     id: 1,
     text: 'Test message',
-    category: 'reasons',
+    category: 'reason',
+    isCustom: false,
     isFavorite: false,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     tags: [],
-    source: 'preset',
     ...overrides,
   };
 }
@@ -98,10 +99,11 @@ export function createMockCustomMessage(overrides: Partial<CustomMessage> = {}):
   return {
     id: 1,
     text: 'Custom test message',
-    category: 'reasons',
-    isActive: true,
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-01T00:00:00Z'),
+    category: 'reason',
+    isCustom: true,
+    active: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
     tags: [],
     ...overrides,
   };
@@ -152,7 +154,7 @@ export function createMockSupabaseMood(id: string = 'supabase-mood-1') {
     mood_types: ['happy'],
     note: 'Test note',
     created_at: '2024-01-15T10:30:00.000Z',
-    date: '2024-01-15',
+    updated_at: '2024-01-15T10:30:00.000Z',
   };
 }
 
@@ -176,11 +178,23 @@ export function createMockInteraction(overrides: Partial<Interaction> = {}): Int
 }
 
 /**
+ * Supabase interaction record type for mock factories
+ */
+type MockSupabaseInteractionRecord = {
+  id: string;
+  type: string;
+  from_user_id: string;
+  to_user_id: string;
+  viewed: boolean;
+  created_at: string;
+};
+
+/**
  * Create a mock Supabase interaction record (database format)
  */
 export function createMockSupabaseInteractionRecord(
-  overrides: Record<string, unknown> = {}
-) {
+  overrides: Partial<MockSupabaseInteractionRecord> = {}
+): MockSupabaseInteractionRecord {
   return {
     id: 'interaction-uuid-1',
     type: 'poke',
@@ -230,11 +244,15 @@ export function createMockSettings(overrides: Partial<Settings> = {}): Settings 
 export function createMockPhoto(overrides: Partial<Photo> = {}): Photo {
   return {
     id: 1,
-    file: new Blob(['test image data'], { type: 'image/png' }),
+    imageBlob: new Blob(['test image data'], { type: 'image/png' }),
     caption: 'Test photo',
     tags: ['test'],
     uploadDate: new Date('2024-01-01T00:00:00Z'),
-    isFavorite: false,
+    originalSize: 1024,
+    compressedSize: 512,
+    width: 800,
+    height: 600,
+    mimeType: 'image/png',
     ...overrides,
   };
 }
