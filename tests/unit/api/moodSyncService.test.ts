@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { createMockMoodEntry, createMockSupabaseMood } from '../utils/testHelpers';
+import type { MoodEntry } from '../../../src/types';
 
 // Mock dependencies BEFORE imports
 const mockMoodApiCreate = vi.fn();
@@ -68,6 +68,33 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 
 // Import after mocks
 import { MoodSyncService } from '../../../src/api/moodSyncService';
+
+// Test data factory
+function createMockMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
+  return {
+    id: 1,
+    userId: 'user-123',
+    mood: 'happy',
+    moods: ['happy'],
+    note: 'Test note',
+    date: '2024-01-15',
+    timestamp: new Date('2024-01-15T10:30:00.000Z'),
+    synced: false,
+    ...overrides,
+  };
+}
+
+function createMockSupabaseMood(id: string = 'supabase-mood-1') {
+  return {
+    id,
+    user_id: 'user-123',
+    mood_type: 'happy',
+    mood_types: ['happy'],
+    note: 'Test note',
+    created_at: '2024-01-15T10:30:00.000Z',
+    updated_at: '2024-01-15T10:30:00.000Z',
+  };
+}
 
 describe('MoodSyncService', () => {
   let service: MoodSyncService;

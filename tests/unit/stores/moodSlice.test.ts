@@ -25,7 +25,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createStore } from 'zustand';
 import type { MoodSlice } from '../../../src/stores/slices/moodSlice';
 import { createMoodSlice } from '../../../src/stores/slices/moodSlice';
-import { createMockMoodEntry } from '../utils/testHelpers';
+import type { MoodEntry } from '../../../src/types';
 
 // Mock all external dependencies BEFORE imports
 const mockCreate = vi.fn();
@@ -67,6 +67,21 @@ const mockGetPartnerId = vi.fn();
 vi.mock('../../../src/api/supabaseClient', () => ({
   getPartnerId: () => mockGetPartnerId(),
 }));
+
+// Test data factory
+function createMockMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
+  return {
+    id: 1,
+    userId: 'user-123',
+    mood: 'happy',
+    moods: ['happy'],
+    note: 'Test note',
+    date: new Date().toISOString().split('T')[0],
+    timestamp: new Date(),
+    synced: false,
+    ...overrides,
+  };
+}
 
 describe('MoodSlice', () => {
   let store: ReturnType<typeof createStore<MoodSlice>>;

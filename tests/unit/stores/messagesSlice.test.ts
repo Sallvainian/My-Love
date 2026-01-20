@@ -23,8 +23,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createStore } from 'zustand';
 import type { MessagesSlice } from '../../../src/stores/slices/messagesSlice';
 import { createMessagesSlice } from '../../../src/stores/slices/messagesSlice';
-import type { Settings, CustomMessage } from '../../../src/types';
-import { createMockMessage, createMockSettings } from '../utils/testHelpers';
+import type { Message, CustomMessage, Settings } from '../../../src/types';
 
 // Mock storage service
 const mockGetAllMessages = vi.fn();
@@ -68,6 +67,31 @@ vi.mock('../../../src/utils/messageRotation', () => ({
   formatDate: (...args: unknown[]) => mockFormatDate(...args),
   getAvailableHistoryDays: (...args: unknown[]) => mockGetAvailableHistoryDays(...args),
 }));
+
+// Test data factories
+function createMockMessage(overrides: Partial<Message> = {}): Message {
+  return {
+    id: 1,
+    text: 'Test message',
+    category: 'reasons',
+    isFavorite: false,
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    ...overrides,
+  };
+}
+
+function createMockSettings(): Settings {
+  return {
+    relationship: {
+      startDate: new Date('2023-01-01'),
+      anniversaryDate: new Date('2023-06-15'),
+      partner1Birthday: new Date('1990-05-10'),
+      partner2Birthday: new Date('1992-08-20'),
+    },
+    theme: 'light',
+    notifications: true,
+  };
+}
 
 // Extended store type to include settings (cross-slice dependency)
 type TestStoreState = MessagesSlice & { settings: Settings | null };
