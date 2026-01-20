@@ -88,62 +88,50 @@ When you set `defaultPartnerName` and `defaultStartDate` in `constants.ts`:
 - Settings are initialized on first app load
 - Users can still edit these values later if needed (via Settings panel, when available)
 
-## 📱 Deploying to GitHub Pages
+## 📱 Deployment
 
-### First Time Setup
+**Live URL**: https://sallvainian.github.io/My-Love/
 
-1. **Configure environment variables** (see Environment Configuration section above)
+### Automatic Deployment (CI/CD)
 
-2. Initialize git repository (if not already done):
+Every push to `main` triggers the GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
-```bash
-git init
-git add .
-git commit -m "Initial commit: My Love app"
-```
+1. **Build** - `npm ci && npm run build`
+2. **Supabase Types** - Generates TypeScript types from database
+3. **Smoke Tests** - Runs `npm run test:smoke`
+4. **Deploy** - Uploads `dist/` to GitHub Pages
+5. **Health Check** - Verifies site is live and Supabase connects
 
-3. Create a new repository on GitHub named `My-Love`
+**Timeline**: ~2-3 minutes from push to live.
 
-4. Connect your local repository to GitHub:
+### Required GitHub Secrets
 
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/My-Love.git
-git branch -M main
-git push -u origin main
-```
+Configure in **Settings** → **Secrets and variables** → **Actions**:
 
-### Deploy
+| Secret | Description |
+|--------|-------------|
+| `DOTENV_KEY` | Decryption key for `.env` file |
+| `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types |
 
-Before deploying, make sure you've edited `src/config/constants.ts` with your relationship data. Then run:
+### GitHub Pages Setup
+
+1. Go to **Settings** → **Pages**
+2. Under **Source**, select "GitHub Actions"
+3. Click **Save**
+
+### Manual Deploy
 
 ```bash
 npm run deploy
 ```
 
-This will:
+### Post-Deploy Verification
 
-- Build the production version with your configured constants
-- Run automated smoke tests to verify everything is correct
-- Deploy to GitHub Pages
-- Make your app available at: `https://YOUR_USERNAME.github.io/My-Love/`
-
-### Enable GitHub Pages
-
-1. Go to your repository on GitHub
-2. Click **Settings** → **Pages**
-3. Under **Source**, select `gh-pages` branch
-4. Click **Save**
-5. Your app will be live in a few minutes!
-
-### Deployment Checklist
-
-- [ ] Edited `src/config/constants.ts` with your partner name and relationship start date
-- [ ] Ran `npm run build` successfully locally
-- [ ] Tested with `npm run preview` before deploying
-- [ ] Committed all code changes
-- [ ] Ran `npm run deploy`
-- [ ] Verified app works on GitHub Pages URL
-- [ ] Checked that partner name and relationship duration display correctly
+- [ ] Site loads at https://sallvainian.github.io/My-Love/
+- [ ] No console errors
+- [ ] Service worker registered (DevTools → Application → Service Workers)
+- [ ] Offline mode works
+- [ ] Supabase connection works (login/data loads)
 
 ## 📝 Customizing Messages
 
