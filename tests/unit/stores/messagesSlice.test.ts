@@ -24,7 +24,7 @@ import { createStore } from 'zustand';
 import type { MessagesSlice } from '../../../src/stores/slices/messagesSlice';
 import { createMessagesSlice } from '../../../src/stores/slices/messagesSlice';
 import type { Settings, CustomMessage } from '../../../src/types';
-import { createMockMessage } from '../utils/testHelpers';
+import { createMockMessage, createMockSettings } from '../utils/testHelpers';
 
 // Mock storage service
 const mockGetAllMessages = vi.fn();
@@ -68,20 +68,6 @@ vi.mock('../../../src/utils/messageRotation', () => ({
   formatDate: (...args: unknown[]) => mockFormatDate(...args),
   getAvailableHistoryDays: (...args: unknown[]) => mockGetAvailableHistoryDays(...args),
 }));
-
-// Local test-specific settings factory (different structure from actual Settings type)
-function createMockSettings(): Settings {
-  return {
-    relationship: {
-      startDate: new Date('2023-01-01'),
-      anniversaryDate: new Date('2023-06-15'),
-      partner1Birthday: new Date('1990-05-10'),
-      partner2Birthday: new Date('1992-08-20'),
-    },
-    theme: 'light',
-    notifications: true,
-  };
-}
 
 // Extended store type to include settings (cross-slice dependency)
 type TestStoreState = MessagesSlice & { settings: Settings | null };

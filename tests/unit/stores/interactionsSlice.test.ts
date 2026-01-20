@@ -83,7 +83,7 @@ vi.mock('../../../src/utils/interactionValidation', () => ({
 const createMockSupabaseRecord = (
   overrides: Partial<SupabaseInteractionRecord> = {}
 ): SupabaseInteractionRecord =>
-  createMockSupabaseInteractionRecord(overrides) as SupabaseInteractionRecord;
+  createMockSupabaseInteractionRecord(overrides);
 
 describe('InteractionsSlice', () => {
   let store: ReturnType<typeof createStore<InteractionsSlice>>;

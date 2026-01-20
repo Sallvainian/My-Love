@@ -11,7 +11,15 @@
  * ```
  */
 
-import type { Message, Photo, CustomMessage, MoodEntry, Settings, Interaction } from '@/types';
+import type {
+  Message,
+  Photo,
+  CustomMessage,
+  MoodEntry,
+  Settings,
+  Interaction,
+  SupabaseInteractionRecord,
+} from '@/types';
 import type { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 
 // ============================================================================
@@ -178,23 +186,11 @@ export function createMockInteraction(overrides: Partial<Interaction> = {}): Int
 }
 
 /**
- * Supabase interaction record type for mock factories
- */
-type MockSupabaseInteractionRecord = {
-  id: string;
-  type: string;
-  from_user_id: string;
-  to_user_id: string;
-  viewed: boolean;
-  created_at: string;
-};
-
-/**
  * Create a mock Supabase interaction record (database format)
  */
 export function createMockSupabaseInteractionRecord(
-  overrides: Partial<MockSupabaseInteractionRecord> = {}
-): MockSupabaseInteractionRecord {
+  overrides: Partial<SupabaseInteractionRecord> = {}
+): SupabaseInteractionRecord {
   return {
     id: 'interaction-uuid-1',
     type: 'poke',
