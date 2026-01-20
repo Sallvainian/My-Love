@@ -87,3 +87,4 @@ docs/technical-decisions.md
 # Additional env files without dot prefix
 env.keys
 env.test
+_bmad/
