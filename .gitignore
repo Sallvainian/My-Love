@@ -47,7 +47,6 @@ tests/e2e/.auth/auth-failure.png
 .bmad
 !.bmad/
 .code
-_bmad/
 
 # Documentation files with exposed secrets
 # Keep: architecture.md, index.md, state-management.md

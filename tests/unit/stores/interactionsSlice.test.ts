@@ -23,11 +23,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createStore } from 'zustand';
 import type { InteractionsSlice } from '../../../src/stores/slices/interactionsSlice';
 import { createInteractionsSlice } from '../../../src/stores/slices/interactionsSlice';
-import type { SupabaseInteractionRecord } from '../../../src/types';
-import {
-  createMockInteraction,
-  createMockSupabaseInteractionRecord,
-} from '../utils/testHelpers';
+import type { Interaction, SupabaseInteractionRecord } from '../../../src/types';
 
 // Mock interactionService - functions defined outside vi.mock to be accessible in tests
 const mockSendPoke = vi.fn();
@@ -79,11 +75,32 @@ vi.mock('../../../src/utils/interactionValidation', () => ({
   },
 }));
 
-// Alias for backward compatibility with tests using createMockSupabaseRecord
-const createMockSupabaseRecord = (
+// Test data factories
+function createMockSupabaseRecord(
   overrides: Partial<SupabaseInteractionRecord> = {}
-): SupabaseInteractionRecord =>
-  createMockSupabaseInteractionRecord(overrides);
+): SupabaseInteractionRecord {
+  return {
+    id: 'interaction-uuid-1',
+    type: 'poke',
+    from_user_id: 'user-123',
+    to_user_id: 'partner-456',
+    viewed: false,
+    created_at: '2024-01-15T10:30:00.000Z',
+    ...overrides,
+  };
+}
+
+function createMockInteraction(overrides: Partial<Interaction> = {}): Interaction {
+  return {
+    id: 'interaction-uuid-1',
+    type: 'poke',
+    fromUserId: 'user-123',
+    toUserId: 'partner-456',
+    viewed: false,
+    createdAt: new Date('2024-01-15T10:30:00.000Z'),
+    ...overrides,
+  };
+}
 
 describe('InteractionsSlice', () => {
   let store: ReturnType<typeof createStore<InteractionsSlice>>;
