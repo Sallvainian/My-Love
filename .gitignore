@@ -88,3 +88,5 @@ docs/technical-decisions.md
 env.keys
 env.test
 _bmad/
+.agentvibes/
+.vscode/
