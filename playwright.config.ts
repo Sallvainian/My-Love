@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config } from '@dotenvx/dotenvx';
+import { STORAGE_STATE_PATH } from './e2e/constants';
 
 // Load environment variables
 config();
@@ -7,8 +8,6 @@ config({ path: '.env.test', override: true });
 
 const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
 const BASE_URL = `http://localhost:${PORT}/`;
-
-const STORAGE_STATE_PATH = './e2e/.auth/storageState.json';
 
 /**
  * Playwright configuration for My-Love PWA E2E testing
@@ -79,7 +78,12 @@ export default defineConfig({
     },
   ],
 
-  /* Run local dev server before starting tests */
+  /* Run local dev server before starting tests
+   * Note: 'preview' serves production build. Run 'npm run build' first.
+   * CI workflow handles this automatically. For local dev, either:
+   * 1. Run: npm run build && npx playwright test
+   * 2. Change to 'npm run dev' for development testing
+   */
   webServer: {
     command: 'npm run preview',
     url: BASE_URL,

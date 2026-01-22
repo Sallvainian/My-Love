@@ -12,6 +12,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { config } from '@dotenvx/dotenvx';
+import { STORAGE_STATE_PATH } from './constants';
 
 // Load environment variables
 config();
@@ -20,13 +21,7 @@ config({ path: '.env.test', override: true });
 const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL;
 const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD;
 const PARTNER_EMAIL = process.env.VITE_TEST_PARTNER_EMAIL;
-
-if (!TEST_EMAIL || !TEST_PASSWORD) {
-  throw new Error(
-    'Missing test credentials: VITE_TEST_USER_EMAIL and VITE_TEST_USER_PASSWORD must be set in environment'
-  );
-}
-const STORAGE_STATE_PATH = './e2e/.auth/storageState.json';
+// Note: Credential validation moved inside setup() for proper test reporting
 
 // Supabase credentials for partner setup
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
@@ -93,6 +88,13 @@ async function ensurePartnerRelationship() {
 }
 
 setup('authenticate', async ({ page }) => {
+  // Validate credentials inside setup for proper test reporting
+  if (!TEST_EMAIL || !TEST_PASSWORD) {
+    throw new Error(
+      'Missing test credentials: VITE_TEST_USER_EMAIL and VITE_TEST_USER_PASSWORD must be set in environment'
+    );
+  }
+
   // First, ensure partner relationship is configured
   await ensurePartnerRelationship();
 
