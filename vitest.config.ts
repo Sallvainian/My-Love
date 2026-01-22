@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { VitestReporter } from 'tdd-guard-vitest';
 
 export default defineConfig({
   plugins: [react()],
@@ -17,6 +18,10 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
+    reporters: [
+      'default',
+      new VitestReporter('/home/salvain/Projects/Personal/My-Love'),
+    ],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
