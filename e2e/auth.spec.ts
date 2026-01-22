@@ -7,8 +7,8 @@
 
 import { test, expect } from '@playwright/test';
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
+const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL ?? '';
+const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD ?? '';
 
 // Note: Auth tests run in 'auth' project which has no storageState (see playwright.config.ts)
 
@@ -64,6 +64,14 @@ async function handlePostLoginOnboarding(page) {
 }
 
 test.describe('Authentication', () => {
+  test.beforeAll(() => {
+    if (!TEST_EMAIL || !TEST_PASSWORD) {
+      throw new Error(
+        'Missing test credentials: VITE_TEST_USER_EMAIL and VITE_TEST_USER_PASSWORD must be set in environment'
+      );
+    }
+  });
+
   test('user can login with valid credentials', async ({ page }) => {
     await page.goto('/');
 
