@@ -5,7 +5,21 @@
  * Authentication is handled by global-setup.ts via storageState.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+/**
+ * Helper to recover from offline state by reloading if needed.
+ * Some PWA states require a full reload to recover properly.
+ */
+async function recoverFromOffline(page: Page) {
+  const nav = page.locator('nav, [data-testid="bottom-navigation"]').first();
+  const navVisible = await nav.isVisible({ timeout: 5000 }).catch(() => false);
+  if (!navVisible) {
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+  }
+  await expect(nav).toBeVisible({ timeout: 10000 });
+}
 
 test.describe('Offline Resilience', () => {
   test.beforeEach(async ({ page }) => {
@@ -69,13 +83,7 @@ test.describe('Offline Resilience', () => {
     await context.setOffline(false);
 
     // Wait for app to recover - may need page reload if in bad state
-    const navVisible = await nav.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!navVisible) {
-      await page.reload();
-      await page.waitForLoadState('domcontentloaded');
-    }
-
-    await expect(nav).toBeVisible({ timeout: 10000 });
+    await recoverFromOffline(page);
 
     // Verify app can still make API calls after reconnect
     // Navigate to a different section to trigger data fetch
@@ -156,14 +164,7 @@ test.describe('Offline Resilience', () => {
     await context.setOffline(false);
 
     // Wait for app to recover - may need page reload if in bad state
-    const navVisible = await nav.isVisible({ timeout: 3000 }).catch(() => false);
-    if (!navVisible) {
-      // App may need a reload to recover from offline state
-      await page.reload();
-      await page.waitForLoadState('domcontentloaded');
-    }
-
-    await expect(nav).toBeVisible({ timeout: 10000 });
+    await recoverFromOffline(page);
   });
 
   test('service worker is registered for PWA', async ({ page }) => {

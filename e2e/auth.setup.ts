@@ -17,9 +17,15 @@ import { config } from '@dotenvx/dotenvx';
 config();
 config({ path: '.env.test', override: true });
 
-const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL || 'test@example.com';
-const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD || 'testpassword123';
+const TEST_EMAIL = process.env.VITE_TEST_USER_EMAIL;
+const TEST_PASSWORD = process.env.VITE_TEST_USER_PASSWORD;
 const PARTNER_EMAIL = process.env.VITE_TEST_PARTNER_EMAIL;
+
+if (!TEST_EMAIL || !TEST_PASSWORD) {
+  throw new Error(
+    'Missing test credentials: VITE_TEST_USER_EMAIL and VITE_TEST_USER_PASSWORD must be set in environment'
+  );
+}
 const STORAGE_STATE_PATH = './e2e/.auth/storageState.json';
 
 // Supabase credentials for partner setup

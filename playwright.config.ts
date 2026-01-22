@@ -37,8 +37,10 @@ export default defineConfig({
   /* 1 worker in CI for stability, parallel locally for speed */
   workers: process.env.CI ? 1 : undefined,
 
-  /* Reporter configuration */
-  reporter: process.env.CI ? 'github' : 'html',
+  /* Reporter configuration - keep HTML reports in CI for debugging */
+  reporter: process.env.CI
+    ? [['html', { outputFolder: 'playwright-report' }], ['github']]
+    : 'html',
 
   /* Shared settings for all projects */
   use: {
@@ -55,9 +57,20 @@ export default defineConfig({
       testMatch: /auth\.setup\.ts/,
     },
 
-    // Main test project - depends on setup
+    // Auth tests - run with empty storage (tests login/logout flows)
+    {
+      name: 'auth',
+      testMatch: /auth\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: { cookies: [], origins: [] },
+      },
+    },
+
+    // Main test project - depends on setup, excludes auth tests
     {
       name: 'chromium',
+      testIgnore: /auth\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: STORAGE_STATE_PATH,
