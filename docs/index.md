@@ -1,16 +1,17 @@
 # My Love - Project Documentation Index
 
 > **Primary AI Retrieval Source**: This index is the starting point for understanding the My Love PWA codebase.
-> **Last Updated**: 2025-11-21
+> **Last Updated**: 2026-01-21
 > **Structure**: Phase-based numbered organization for clarity and navigation
+> **Scan Level**: Exhaustive (full source code analysis)
 
 ## Project Overview
 
 - **Type**: Monolith (Single Part)
 - **Primary Language**: TypeScript 5.9.3
-- **Framework**: React 19.1.1
+- **Framework**: React 19.2.3
 - **Architecture**: Component-based SPA with Offline-First PWA + Supabase Backend
-- **Documentation Version**: 4.0.0 (Phase-Based Organization)
+- **Documentation Version**: 5.0.0 (Exhaustive Rescan)
 - **Status**: Feature Complete (v1.0.0)
 
 ## Documentation Organization
@@ -37,27 +38,29 @@ Documentation is organized in numbered phases following the development lifecycl
 
 ### Technology Stack
 
-- **Frontend**: React 19.1.1 + TypeScript 5.9.3
-- **Build Tool**: Vite 7.1.7
-- **State Management**: Zustand 5.0.8 (7 slices, 59 actions)
-- **Backend**: Supabase 2.81.1 (Auth, Database, Realtime)
-- **Styling**: Tailwind CSS 3.4.18 + Framer Motion 12.23.24
-- **Validation**: Zod 3.23.8
+- **Frontend**: React 19.2.3 + TypeScript 5.9.3
+- **Build Tool**: Vite 7.3.1
+- **State Management**: Zustand 5.0.10 (8 slices, 60+ actions)
+- **Backend**: Supabase 2.90.1 (Auth, Database, Realtime, Storage)
+- **Styling**: Tailwind CSS 4.1.17 + Framer Motion 12.27.1
+- **Validation**: Zod 4.3.5
 - **Data Persistence**: IndexedDB (IDB 8.0.3) + LocalStorage + Supabase
-- **PWA**: Vite PWA Plugin 0.21.3 + Workbox
-- **Testing**: Vitest 1.6.1 + Playwright 1.52.0
-- **Icons**: Lucide React 0.475.0
+- **PWA**: Vite PWA Plugin 1.2.0 + Workbox
+- **Testing**: Vitest 4.0.17 + Playwright 1.57.0
+- **Icons**: Lucide React 0.562.0
 
 ### Codebase Statistics
 
-- **Source Files**: 90 TypeScript files
-- **Directories**: 38
-- **Components**: 20 implemented (48 TSX files)
-- **Store Slices**: 7 (59 total actions)
+- **Source Files**: 146 TypeScript files
+- **Directories**: 44
+- **Components**: 30+ implemented (28 component directories)
+- **Store Slices**: 8 (60+ total actions)
 - **API Services**: 8 modules
 - **Business Services**: 10 classes
-- **TypeScript Interfaces**: 35+
-- **Zod Validation Schemas**: 12+
+- **Custom Hooks**: 10
+- **Utility Modules**: 15+
+- **TypeScript Interfaces**: 50+
+- **Zod Validation Schemas**: 20+
 
 ---
 
@@ -116,9 +119,9 @@ Development procedures, guides, and operational documentation.
 
 ---
 
-### 📁 [Component Inventory](./component-inventory/index.md)
+### 📁 [Component Inventory](./02-Architecture/component-inventory/index.md)
 
-Catalog of all 20 UI components organized by feature domain (48 TSX files).
+Catalog of all 30+ UI components organized by feature domain (28 component directories).
 
 **Key Sections**:
 
@@ -150,9 +153,9 @@ TypeScript interfaces, database schemas, and validation patterns (35+ interfaces
 
 ---
 
-### 📁 [State Management](./state-management/index.md)
+### 📁 [State Management](./02-Architecture/state-management/index.md)
 
-Zustand store architecture with 7 slices and 59 actions.
+Zustand store architecture with 8 slices and 60+ actions.
 
 **Key Sections**:
 
@@ -283,11 +286,13 @@ Located in [./plans/](./plans/):
    - **Zustand Slice Details** → [Zustand Architecture](./ZUSTAND_STATE_MANAGEMENT_ARCHITECTURE/index.md) (21 sharded files)
 
 3. **Key Facts**:
-   - 20 components, 7 slices, 59 actions
+   - 30+ components, 8 slices, 60+ actions
    - 365 messages with deterministic rotation
-   - Supabase backend with real-time sync
-   - IndexedDB for photos (local-only)
+   - Supabase backend with real-time sync (Auth, DB, Realtime, Storage)
+   - IndexedDB for local data (moods, messages) + Supabase Storage for photos
    - Multi-emotion mood tracking (12 options)
+   - Love Notes real-time chat with image support
+   - Partner connection system with requests
 
 ### For Human Developers
 
@@ -345,6 +350,7 @@ Files that have been sharded or superseded are stored in [./.archive/](./.archiv
 
 ---
 
-**Documentation Structure**: Sharded for modularity (v3.0.0)
-**Last Updated**: 2025-11-16
-**Generated with**: BMAD document workflows
+**Documentation Structure**: Sharded for modularity (v5.0.0)
+**Last Updated**: 2026-01-21
+**Scan Level**: Exhaustive (146 source files analyzed)
+**Generated with**: BMAD document-project workflow
