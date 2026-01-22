@@ -9,6 +9,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  define: {
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://xojempkrugifnaveqtqc.supabase.co'),
+    'import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY': JSON.stringify('test-anon-key-for-unit-tests'),
+  },
   test: {
     globals: true,
     environment: 'happy-dom',

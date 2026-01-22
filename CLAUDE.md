@@ -1,11 +1,11 @@
 # My-Love Project Standards
 
-> Quick reference for coding standards. See extended docs for detailed patterns.
+> Quick reference for coding standards. See magic docs for architecture details.
 
 @docs/03-Development/typescript-patterns.md
-@docs/03-Development/react-19-guide.md
-@docs/04-Testing-QA/testing-guide.md
-@docs/03-Development/troubleshooting.md
+@docs/magic/component-architecture.md
+@docs/magic/state-management.md
+@docs/magic/api-services.md
 
 ---
 
@@ -20,31 +20,33 @@
 - Prefer type guards over type assertions
 - Always handle null/undefined explicitly
 
-📚 *Extended: [typescript-patterns.md](docs/03-Development/typescript-patterns.md)*
-
 ---
 
-## React - Server-First
+## React - Client-Side SPA (Vite)
 
-- **Default:** Server Components (async, no hooks)
-- **Explicit:** `'use client'` for interactivity
-- **Patterns:** `useTransition`, `Suspense`, Server Actions
+- **Architecture:** Pure client-side SPA - no Server Components
+- **State:** Zustand with slice composition pattern
+- **Routing:** Manual URL-based (no React Router library)
+- **Lazy loading:** Route-level code splitting with `React.lazy()`
 
-📚 *Extended: [react-19-guide.md](docs/03-Development/react-19-guide.md)*
+**Patterns:**
+- `useTransition` for non-urgent updates
+- Selector pattern: `useAppStore(state => state.value)`
+- Custom hooks in `src/hooks/` for reusable logic
 
 ---
 
 ## Testing - Dual Strategy
 
 **Unit (Vitest):**
-- Colocated: `file.ts` + `file.test.ts`
-- Mock server-only: `vi.mock("server-only", () => ({}))`
+- Colocated: `src/**/__tests__/` or `tests/unit/`
+- Environment: `happy-dom` with `fake-indexeddb/auto`
+- Mock Supabase client module, not individual functions
 
 **E2E (Playwright):**
 - Accessibility selectors: `getByRole`, `getByLabel`
 - Avoid CSS selectors: `.class`, `#id`
-
-📚 *Extended: [testing-guide.md](docs/04-Testing-QA/testing-guide.md)*
+- Global auth setup with `storageState.json`
 
 ---
 
@@ -59,21 +61,21 @@
 
 ## Decision Matrix
 
-| Question | Use CLAUDE.md | Use Extended Docs |
-|----------|---------------|-------------------|
-| TypeScript config? | ✅ | |
-| React 19 hook patterns? | | ✅ |
-| Why is test flaky? | | ✅ (troubleshooting) |
-| Server vs Client Component? | ✅ | |
-
-📚 *Troubleshooting: [troubleshooting.md](docs/03-Development/troubleshooting.md)*
+| Question | Use CLAUDE.md | Use Magic Docs |
+|----------|---------------|----------------|
+| TypeScript config? | Yes | |
+| Component patterns? | | `component-architecture.md` |
+| Zustand slice pattern? | | `state-management.md` |
+| API/service layer? | | `api-services.md` |
+| Testing setup? | Yes | |
 
 ---
 
 ## Core Principles
 
 1. **TypeScript strict mode is non-negotiable**
-2. **Server Components by default, Client Components when needed**
+2. **Zustand selectors to prevent unnecessary re-renders**
 3. **Test behavior, not implementation**
 4. **Accessibility selectors over CSS selectors**
 5. **Mobile-first responsive design**
+6. **Offline-first with IndexedDB + Supabase sync**
