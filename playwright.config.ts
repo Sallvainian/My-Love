@@ -28,11 +28,14 @@ export default defineConfig({
   /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: !!process.env.CI,
 
+  /* Prevent runaway CI jobs (1 hour max) */
+  globalTimeout: process.env.CI ? 60 * 60 * 1000 : undefined,
+
   /* Retry on CI only */
   retries: process.env.CI ? 1 : 0,
 
-  /* Single worker to avoid storageState race conditions */
-  workers: 1,
+  /* 1 worker in CI for stability, parallel locally for speed */
+  workers: process.env.CI ? 1 : undefined,
 
   /* Reporter configuration */
   reporter: process.env.CI ? 'github' : 'html',
@@ -69,5 +72,7 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    stdout: 'ignore',
+    stderr: 'pipe',
   },
 });
