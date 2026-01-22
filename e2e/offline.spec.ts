@@ -2,7 +2,7 @@
  * Offline Resilience Tests - Network Detection
  *
  * Tests the PWA offline functionality.
- * Authentication is handled by global-setup.ts via storageState.
+ * Authentication is handled by auth.setup.ts project dependency (see playwright.config.ts).
  */
 
 import { test, expect, Page } from '@playwright/test';
