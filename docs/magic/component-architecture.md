@@ -68,3 +68,7 @@ const { moods, saveMoodEntry } = useAppStore(state => ({
 - Intersection Observer used for infinite scroll (photos)
 - PWA: Service worker handles background sync, not component logic
 - Mobile-first: Tailwind responsive classes (`w-full md:w-1/2`)
+
+## See Also
+- [State Management](./state-management.md) - Zustand store architecture
+- [API & Services](./api-services.md) - Data layer patterns

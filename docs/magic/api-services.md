@@ -61,3 +61,7 @@ User B subscribed to `mood-updates:{userId}` ← receives update
 - Mood real-time uses Broadcast, not postgres_changes (RLS limitation)
 - Photo URLs expire - always fetch fresh signed URLs before display
 - `getCurrentUserIdOfflineSafe()` for offline-compatible user ID retrieval
+
+## See Also
+- [State Management](./state-management.md) - Zustand store and persistence
+- [Component Architecture](./component-architecture.md) - How components consume services

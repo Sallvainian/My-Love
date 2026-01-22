@@ -50,3 +50,7 @@ Pre-hydration validation prevents corrupted state from loading. `__isHydrated` f
 - Don't persist Maps directly - use partialize/onRehydrateStorage conversion
 - `__isHydrated` is internal - don't expose to components
 - Slices can't import each other - use `get()` for cross-slice reads
+
+## See Also
+- [Component Architecture](./component-architecture.md) - React patterns and state access
+- [API & Services](./api-services.md) - Data layer and sync services
