@@ -90,6 +90,11 @@ docs/technical-decisions.md
 env.keys
 env.test
 _bmad/
+_bmad-output/
 .agentvibes/
 .vscode/
 docs/99-Archive/
+
+# Playwright
+/blob-report/
+/playwright/.auth/
