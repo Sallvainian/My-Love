@@ -13,6 +13,7 @@ dist-ssr
 dev-dist
 .code
 *.local
+!.env.local
 
 # Test coverage reports (auto-generated)
 coverage/
@@ -21,7 +22,6 @@ coverage/
 # dotenvx: Keep .env.keys secret (contains decryption key)
 # Encrypted .env files are now safe to commit
 .env.keys
-.env.local
 .envrc
 
 # Playwright test artifacts
