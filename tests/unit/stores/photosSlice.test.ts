@@ -17,6 +17,7 @@ const mockUploadPhoto = vi.fn();
 const mockGetPhotos = vi.fn();
 const mockDeletePhoto = vi.fn();
 const mockCheckStorageQuota = vi.fn();
+const mockGetSignedUrl = vi.fn();
 
 vi.mock('../../../src/services/photoService', () => ({
   photoService: {
@@ -24,6 +25,19 @@ vi.mock('../../../src/services/photoService', () => ({
     getPhotos: (...args: unknown[]) => mockGetPhotos(...args),
     deletePhoto: (...args: unknown[]) => mockDeletePhoto(...args),
     checkStorageQuota: () => mockCheckStorageQuota(),
+    getSignedUrl: (...args: unknown[]) => mockGetSignedUrl(...args),
+  },
+}));
+
+// Mock supabase client
+vi.mock('../../../src/api/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: 'user-1' } },
+        error: null,
+      }),
+    },
   },
 }));
 
@@ -46,6 +60,8 @@ describe('PhotosSlice', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock for getSignedUrl
+    mockGetSignedUrl.mockResolvedValue('https://example.com/signed-url');
     store = createStore<PhotosSlice>()(createPhotosSlice);
   });
 
@@ -116,7 +132,12 @@ describe('PhotosSlice', () => {
       expect(store.getState().isUploading).toBe(false);
       expect(store.getState().uploadProgress).toBe(0); // Reset after upload
       expect(store.getState().photos).toHaveLength(1);
-      expect(store.getState().photos[0]).toEqual(mockPhoto);
+      // Photo includes additional properties from processing
+      expect(store.getState().photos[0]).toMatchObject({
+        ...mockPhoto,
+        signedUrl: 'https://example.com/signed-url',
+        isOwn: true,
+      });
       expect(store.getState().error).toBeNull();
     });
 
