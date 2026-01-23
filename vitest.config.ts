@@ -20,7 +20,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     reporters: [
       'default',
-      new VitestReporter('/home/salvain/Projects/Personal/My-Love'),
+      new VitestReporter(process.cwd()),
     ],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
