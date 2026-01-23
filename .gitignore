@@ -45,6 +45,7 @@ tests/e2e/.auth/auth-failure.png
 # Dot Files
 .claude
 !.claude/commands/
+!.claude/rules/
 .bmad
 !.bmad/
 .code
