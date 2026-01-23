@@ -41,15 +41,28 @@ test.describe('Navigation', () => {
     // Click through each nav item
     for (let i = 0; i < Math.min(count, 5); i++) {
       const navItem = navItems.nth(i);
-
       if (!(await navItem.isVisible())) continue;
 
+      // Skip disabled items explicitly
+      if (!(await navItem.isEnabled())) continue;
+
+      // Capture URL BEFORE click
+      const urlBefore = page.url();
+
+      // Click the nav item
       await navItem.click();
 
-      // Wait for navigation to complete using proper assertion
-      await expect(nav).toBeVisible();
+      // Wait for either URL change or page to stabilize
+      // Use a short timeout since some nav items may not change URL (already on that page)
+      await page
+        .waitForURL((u) => u.toString() !== urlBefore, { timeout: 2000 })
+        .catch(() => {
+          // URL didn't change - that's OK if clicking already-active item or SPA nav
+        });
 
-      // Record current URL
+      // Verify nav is still visible (app didn't crash)
+      await expect(nav).toBeVisible({ timeout: 3000 });
+
       visitedUrls.push(page.url());
     }
 

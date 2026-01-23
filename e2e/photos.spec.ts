@@ -24,13 +24,20 @@ test.describe('Photo Sharing', () => {
 
     if (await photosNav.first().isVisible({ timeout: 2000 }).catch(() => false)) {
       await photosNav.first().click();
-      // Wait for photos page content to load
-      await expect(
-        page
-          .getByTestId('photo-gallery')
-          .or(page.getByTestId('photo-gallery-empty-state'))
-          .or(page.getByText(/no photos|add photos|upload/i))
-      ).toBeVisible({ timeout: 5000 });
+      // Wait for photos page content to load (strict-mode safe polling)
+      const gallery = page.getByTestId('photo-gallery');
+      const emptyState = page.getByTestId('photo-gallery-empty-state');
+      const emptyText = page.getByText(/no photos|add photos|upload/i);
+
+      await expect
+        .poll(
+          async () =>
+            (await gallery.isVisible()) ||
+            (await emptyState.isVisible()) ||
+            (await emptyText.first().isVisible()),
+          { timeout: 5000, intervals: [100, 250, 500] }
+        )
+        .toBeTruthy();
     }
   });
 
@@ -70,38 +77,43 @@ test.describe('Photo Sharing', () => {
   });
 
   test('photo gallery displays images or empty state', async ({ page }) => {
-    // Wait for content to load using proper locator assertions
-    await expect(
-      page
-        .locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]')
-        .first()
-        .or(page.getByText(/no photos|add your first|upload photos/i))
-    ).toBeVisible({ timeout: 5000 });
-
-    // Look for either photos or empty state
-    const photos = page.locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]');
+    // Wait for content to load (strict-mode safe polling)
+    const photos = page.locator('[data-testid*="photo-item"], img[src*="photo"], img[src*="image"]');
     const emptyState = page.getByText(/no photos|add your first|upload photos/i);
 
+    await expect
+      .poll(
+        async () =>
+          (await photos.count()) > 0 || (await emptyState.first().isVisible()),
+        { timeout: 5000, intervals: [100, 250, 500] }
+      )
+      .toBeTruthy();
+
     const photoCount = await photos.count();
-    const hasEmptyState = await emptyState.isVisible().catch(() => false);
+    const hasEmptyState = await emptyState.first().isVisible().catch(() => false);
 
     // Either has photos or shows empty state
     expect(photoCount > 0 || hasEmptyState).toBe(true);
   });
 
   test('photos can be viewed in full screen/modal', async ({ page }) => {
-    // Wait for content to load
-    await expect(
-      page
-        .locator('img[src*="photo"], img[src*="image"], [data-testid*="photo-item"]')
-        .first()
-        .or(page.getByText(/no photos|add your first|upload photos/i))
-    ).toBeVisible({ timeout: 5000 });
-
-    // Find clickable photo items
+    // Wait for content to load (strict-mode safe polling)
     const photoItems = page.locator(
-      'img[src*="photo"], img[src*="image"], [data-testid*="photo-item"], [data-testid="photo-thumbnail"]'
+      '[data-testid*="photo-item"], [data-testid="photo-thumbnail"], img[src*="photo"], img[src*="image"]'
     );
+    const emptyState = page.getByTestId('photo-gallery-empty-state');
+    const emptyText = page.getByText(/no photos|add your first|upload photos/i);
+
+    await expect
+      .poll(
+        async () =>
+          (await photoItems.count()) > 0 ||
+          (await emptyState.isVisible()) ||
+          (await emptyText.first().isVisible()),
+        { timeout: 5000, intervals: [100, 250, 500] }
+      )
+      .toBeTruthy();
+
     const photoCount = await photoItems.count();
 
     if (photoCount > 0) {

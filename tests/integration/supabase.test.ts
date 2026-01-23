@@ -54,15 +54,41 @@ vi.mock('../../src/api/authService', () => ({
 
 vi.mock('../../src/api/moodSyncService', () => ({
   moodSyncService: {
-    syncMood: vi.fn(),
-    fetchMoodsFromSupabase: vi.fn(),
+    syncMood: vi.fn().mockImplementation(() => {
+      // Simulate offline check - reject if navigator.onLine is false
+      if (!navigator.onLine) {
+        return Promise.reject(new Error('Device is offline'));
+      }
+      return Promise.resolve({ id: 'mock-mood-id', moodType: 'loved', timestamp: new Date() });
+    }),
+    fetchMoods: vi.fn().mockResolvedValue([]),
+    fetchMoodsFromSupabase: vi.fn().mockResolvedValue([]),
+    subscribeMoods: vi.fn().mockResolvedValue(() => {}),
+    subscribeMoodUpdates: vi.fn().mockResolvedValue(() => {}),
   },
 }));
 
 vi.mock('../../src/api/interactionService', () => ({
   interactionService: {
     sendInteraction: vi.fn(),
-    fetchInteractions: vi.fn(),
+    fetchInteractions: vi.fn().mockResolvedValue([]),
+    sendPoke: vi.fn().mockImplementation(() => {
+      // Simulate offline check - reject if navigator.onLine is false
+      if (!navigator.onLine) {
+        return Promise.reject(new Error('Device is offline'));
+      }
+      return Promise.resolve({ id: 'mock-poke-id', type: 'poke' });
+    }),
+    sendKiss: vi.fn().mockImplementation(() => {
+      if (!navigator.onLine) {
+        return Promise.reject(new Error('Device is offline'));
+      }
+      return Promise.resolve({ id: 'mock-kiss-id', type: 'kiss' });
+    }),
+    getInteractionHistory: vi.fn().mockResolvedValue([]),
+    getUnviewedInteractions: vi.fn().mockResolvedValue([]),
+    markAsViewed: vi.fn().mockResolvedValue(undefined),
+    subscribeInteractions: vi.fn().mockResolvedValue(() => {}),
   },
 }));
 
