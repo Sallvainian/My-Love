@@ -2,11 +2,7 @@
 
 > Extended TypeScript 5.x patterns for the My-Love project
 
-@docs/03-Development/react-19-guide.md
-@docs/04-Testing-QA/testing-guide.md
-@docs/03-Development/troubleshooting.md
-
-*Last Updated: December 2024*
+*Last Updated: January 2026*
 
 ---
 
@@ -192,4 +188,4 @@ const response: ApiResponse = { data: {}, status: 200, timestamp: new Date() };
 
 ---
 
-*See also: [CLAUDE.md](../../CLAUDE.md) for quick reference*
+*See also: [CLAUDE.md](../CLAUDE.md) for quick reference*

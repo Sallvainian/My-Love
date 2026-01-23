@@ -318,14 +318,15 @@ export function MessageList({
   });
 
   // Scroll to bottom handler for new message indicator
-  const scrollToBottom = useCallback(() => {
+  // Note: React Compiler handles memoization automatically
+  const scrollToBottom = () => {
     if (listRef.current) {
       // Use react-window v2 API
       listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
       setShowNewMessageIndicator(false);
       setIsAtBottom(true);
     }
-  }, [totalRowCount]);
+  };
 
   // Empty state
   if (!isLoading && notes.length === 0) {

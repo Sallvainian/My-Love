@@ -74,9 +74,9 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
-  // Special config for test files
+  // Special config for test files (unit tests and E2E)
   {
-    files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
+    files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'e2e/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -85,6 +85,7 @@ export default tseslint.config(
     },
     rules: {
       'react-hooks/rules-of-hooks': 'off', // Test fixtures may use hooks in non-standard ways
+      'no-empty-pattern': 'off', // Playwright fixtures use empty destructuring for deps
       '@typescript-eslint/ban-ts-comment': 'off', // Tests may need to use @ts-ignore for mocking
       '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
       'no-global-assign': 'off', // Tests may mock global objects like Date
