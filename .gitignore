@@ -98,3 +98,4 @@ docs/99-Archive/
 # Playwright
 /blob-report/
 /playwright/.auth/
+supabase/.temp/
