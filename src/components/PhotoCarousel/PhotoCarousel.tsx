@@ -65,7 +65,7 @@ export function PhotoCarousel() {
   }, [currentIndex, photos, selectPhoto]);
 
   // AC-4.3.2: Swipe gesture handler (50px threshold)
-  const handleDragEnd = (_event: any, info: PanInfo) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const swipeThreshold = 50;
 
     // Swipe left (offset.x < -50) → next photo
@@ -208,22 +208,20 @@ export function PhotoCarousel() {
       </div>
 
       {/* Story 4.4: AC-4.4.1, AC-4.4.2, AC-4.4.3 - Photo Edit Modal */}
-      {/* TODO: Update PhotoEditModal to use PhotoWithUrls type */}
       {isEditModalOpen && currentPhoto && (
         <PhotoEditModal
-          photo={currentPhoto as any}
+          photo={currentPhoto}
           onClose={handleCloseEditModal}
-          onSave={((id: string, updates: any) => updatePhoto(id, updates)) as any}
+          onSave={(id, updates) => updatePhoto(String(id), updates)}
         />
       )}
 
       {/* Story 4.4: AC-4.4.4, AC-4.4.5 - Photo Delete Confirmation */}
-      {/* TODO: Update PhotoDeleteConfirmation to use PhotoWithUrls type */}
       {isDeleteConfirmOpen && currentPhoto && (
         <PhotoDeleteConfirmation
-          photo={currentPhoto as any}
+          photo={currentPhoto}
           onClose={handleCloseDeleteConfirm}
-          onConfirmDelete={((id: string) => deletePhoto(id)) as any}
+          onConfirmDelete={(id) => deletePhoto(String(id))}
         />
       )}
     </div>

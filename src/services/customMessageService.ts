@@ -7,6 +7,7 @@ import type {
   CustomMessagesExport,
 } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 import {
   CreateMessageInputSchema,
   UpdateMessageInputSchema,
@@ -15,9 +16,6 @@ import {
   isZodError,
 } from '../validation';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
-
-const DB_NAME = 'my-love-db';
-const DB_VERSION = 3; // Story 6.2: Updated to 3 to match moodService for version compatibility
 
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages
@@ -30,25 +28,25 @@ const DB_VERSION = 3; // Story 6.2: Updated to 3 to match moodService for versio
  * - Implements: getStoreName(), _doInit()
  * - Preserves: Service-specific methods (getActiveCustomMessages, exportMessages, importMessages)
  */
-class CustomMessageService extends BaseIndexedDBService<Message> {
+class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'> {
   /**
    * Get the object store name for messages
    */
-  protected getStoreName(): string {
+  protected getStoreName(): 'messages' {
     return 'messages';
   }
 
   /**
-   * Initialize IndexedDB connection (DB v3 for version compatibility)
-   * Story 6.2: Updated to v3 to match moodService and photoStorageService
+   * Initialize IndexedDB connection (DB v4 for version compatibility)
+   * Story 6.2: Updated to v4 to match shared schema
    */
   protected async _doInit(): Promise<void> {
     try {
       if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Initializing IndexedDB (version 3)...');
+        console.log(`[CustomMessageService] Initializing IndexedDB (version ${DB_VERSION})...`);
       }
 
-      this.db = await openDB<any>(DB_NAME, DB_VERSION, {
+      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, _transaction) {
           if (import.meta.env.DEV) {
             console.log(
@@ -92,11 +90,19 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
               console.log('[CustomMessageService] Created moods store (fallback)');
             }
           }
+
+          // Ensure sw-auth store exists (added in v4)
+          if (!db.objectStoreNames.contains('sw-auth')) {
+            db.createObjectStore('sw-auth', { keyPath: 'id' });
+            if (import.meta.env.DEV) {
+              console.log('[CustomMessageService] Created sw-auth store (fallback)');
+            }
+          }
         },
       });
 
       if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] IndexedDB initialized successfully (v3)');
+        console.log(`[CustomMessageService] IndexedDB initialized successfully (v${DB_VERSION})`);
       }
     } catch (error) {
       this.handleError('initialize', error as Error);
@@ -186,17 +192,14 @@ class CustomMessageService extends BaseIndexedDBService<Message> {
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       let messages: Message[];
 
       // Use index if filtering by category
       if (filter?.category && filter.category !== 'all') {
-        messages = await (this.db! as any).getAllFromIndex(
-          'messages',
-          'by-category',
-          filter.category
-        );
+        messages = await db.getAllFromIndex('messages', 'by-category', filter.category);
       } else {
-        messages = await (this.db! as any).getAll('messages');
+        messages = await db.getAll('messages');
       }
 
       // Filter by isCustom

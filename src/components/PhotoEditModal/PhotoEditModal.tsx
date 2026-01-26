@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Photo } from '../../types';
+import type { PhotoWithUrls } from '../../services/photoService';
 import { isValidationError } from '../../validation/errorMessages';
 
+// Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
+type PhotoLike = Photo | PhotoWithUrls;
+
 interface PhotoEditModalProps {
-  photo: Photo;
+  photo: PhotoLike;
   onClose: () => void;
-  onSave: (photoId: number, updates: { caption?: string; tags: string[] }) => Promise<void>;
+  onSave: (photoId: string | number, updates: { caption?: string; tags: string[] }) => Promise<void>;
 }
 
 /**
@@ -23,9 +27,9 @@ interface PhotoEditModalProps {
  * - Backdrop click or X button closes modal without saving
  */
 export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) {
-  // Form state
+  // Form state - handle both Photo (tags array) and PhotoWithUrls (no tags)
   const [caption, setCaption] = useState(photo.caption || '');
-  const [tagsInput, setTagsInput] = useState(photo.tags.join(', '));
+  const [tagsInput, setTagsInput] = useState('tags' in photo ? photo.tags.join(', ') : '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,20 +37,24 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   const [captionError, setCaptionError] = useState<string | null>(null);
   const [tagsError, setTagsError] = useState<string | null>(null);
 
-  // Create blob URL for photo preview
+  // Photo preview URL - handles both Photo (imageBlob) and PhotoWithUrls (signedUrl)
   const [imageUrl, setImageUrl] = useState('');
 
-   
   useEffect(() => {
-    if (photo.imageBlob) {
+    // PhotoWithUrls has signedUrl
+    if ('signedUrl' in photo && photo.signedUrl) {
+      setImageUrl(photo.signedUrl);
+      return;
+    }
+    // Photo has imageBlob
+    if ('imageBlob' in photo && photo.imageBlob) {
       const url = URL.createObjectURL(photo.imageBlob);
       setImageUrl(url);
-
       return () => {
         URL.revokeObjectURL(url);
       };
     }
-  }, [photo.imageBlob]);
+  }, [photo]);
 
   // Validate caption (max 500 characters)
    
@@ -93,7 +101,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       .split(',')
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
-    const originalTags = photo.tags;
+    const originalTags = 'tags' in photo ? photo.tags : [];
 
     const captionChanged = caption !== (photo.caption || '');
     const tagsChanged = JSON.stringify(currentTags) !== JSON.stringify(originalTags);

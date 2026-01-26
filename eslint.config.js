@@ -49,7 +49,7 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
       // Relax some overly strict TypeScript rules
-      '@typescript-eslint/no-explicit-any': 'off', // Too many instances to fix immediately
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -90,6 +90,18 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
+    },
+  },
+  // Scripture Reading feature - strict no-explicit-any enforcement
+  {
+    files: [
+      'src/services/scriptureReadingService.ts',
+      'src/stores/slices/scriptureReadingSlice.ts',
+      'src/hooks/useScriptureBroadcast.ts',
+      'src/components/scripture-reading/**/*.{ts,tsx}',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   }
 );
