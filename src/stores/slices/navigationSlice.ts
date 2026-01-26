@@ -12,7 +12,7 @@
  * - NOT persisted (currentView is restored from URL on mount)
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 
 export type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes';
 
@@ -29,10 +29,7 @@ export interface NavigationSlice {
   navigateNotes: () => void;
 }
 
-export const createNavigationSlice: StateCreator<NavigationSlice, [], [], NavigationSlice> = (
-  set,
-  get
-) => ({
+export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get, _api) => ({
   // Initial state
   currentView: 'home',
 

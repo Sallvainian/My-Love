@@ -10,8 +10,11 @@
  * - Used by sw.ts to sync data when app is closed
  */
 
+// SYNC WARNING: These constants must match src/services/dbSchema.ts
+// Service Worker cannot import from dbSchema.ts (no idb library in SW context)
+// When changing DB_VERSION, update BOTH files!
 const DB_NAME = 'my-love-db';
-const DB_VERSION = 4; // Bump to add sw-auth store
+const DB_VERSION = 4; // Must match DB_VERSION in src/services/dbSchema.ts
 const AUTH_STORE = 'sw-auth';
 const MOODS_STORE = 'moods';
 

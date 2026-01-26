@@ -16,8 +16,8 @@
  * - isOnboarded: Persisted to LocalStorage
  */
 
-import type { StateCreator } from 'zustand';
-import type { Settings, ThemeName, Anniversary, Message } from '../../types';
+import type { AppStateCreator } from '../types';
+import type { Settings, ThemeName, Anniversary } from '../../types';
 import { storageService } from '../../services/storage';
 import defaultMessages from '../../data/defaultMessages';
 import { APP_CONFIG } from '../../config/constants';
@@ -48,18 +48,7 @@ export interface SettingsSlice {
 let isInitializing = false;
 let isInitialized = false;
 
-export const createSettingsSlice: StateCreator<
-  SettingsSlice & {
-    messages?: Message[];
-    updateCurrentMessage?: () => void;
-    isLoading?: boolean;
-    error?: string | null;
-    __isHydrated?: boolean;
-  },
-  [],
-  [],
-  SettingsSlice
-> = (set, get) => ({
+export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _api) => ({
   // Initial state - use defaults that will be overridden by persist if data exists
   // Story 1.4: Pre-configured settings for single-user deployment
   settings: {
@@ -95,29 +84,22 @@ export const createSettingsSlice: StateCreator<
 
     isInitializing = true;
 
-    const state = get();
-
-    // Set loading state in parent store (if available)
-    if (state.isLoading !== undefined) {
-      set({ isLoading: true, error: null } as any);
-    }
+    // AppSlice owns loading/error - no more "if exists" guards
+    get().setLoading(true);
+    get().setError(null);
 
     try {
       // CRITICAL: Check Zustand persist hydration status
       // Hydration completes synchronously during store creation (before initializeApp is called)
-      // Access isHydrated from parent context
-      const isHydrated = state.__isHydrated !== false;
+      // __isHydrated is now a required boolean on AppSlice
+      const isHydrated = get().__isHydrated;
 
       if (!isHydrated) {
         console.error('[App Init] CRITICAL: Hydration failed or did not complete');
         console.error('[App Init] This indicates corrupted localStorage data');
 
-        if (state.error !== undefined) {
-          set({
-            error: 'Failed to load saved settings. App will reinitialize with defaults.',
-            isLoading: false,
-          } as any);
-        }
+        get().setError('Failed to load saved settings. App will reinitialize with defaults.');
+        get().setLoading(false);
 
         // Clear corrupted state to prevent repeated failures
         try {
@@ -153,35 +135,25 @@ export const createSettingsSlice: StateCreator<
         // Reload messages from IndexedDB to get auto-generated IDs
         const messagesWithIds = await storageService.getAllMessages();
 
-        // Update messages in parent store
-        if (state.messages !== undefined) {
-          set({ messages: messagesWithIds } as any);
-        }
+        // MessagesSlice state - no cast needed
+        set({ messages: messagesWithIds });
       } else {
-        // Update messages in parent store
-        if (state.messages !== undefined) {
-          set({ messages: storedMessages } as any);
-        }
+        // MessagesSlice state - no cast needed
+        set({ messages: storedMessages });
       }
 
-      // Update current message if needed (call parent store's method)
-      if (state.updateCurrentMessage) {
-        state.updateCurrentMessage();
-      }
+      // MessagesSlice action - no "if exists" guard needed
+      get().updateCurrentMessage();
 
-      if (state.isLoading !== undefined) {
-        set({ isLoading: false } as any);
-      }
+      get().setLoading(false);
 
       isInitialized = true;
       console.log('[App Init] Initialization completed successfully');
     } catch (error) {
       console.error('Error initializing app:', error);
 
-      const currentState = get();
-      if (currentState.error !== undefined) {
-        set({ error: 'Failed to initialize app', isLoading: false } as any);
-      }
+      get().setError('Failed to initialize app');
+      get().setLoading(false);
     } finally {
       isInitializing = false;
     }

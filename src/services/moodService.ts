@@ -1,56 +1,10 @@
-import { openDB, type DBSchema } from 'idb';
-import type { MoodEntry, Message, Photo } from '../types';
+import { openDB } from 'idb';
+import type { MoodEntry } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 import { MoodEntrySchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
-
-const DB_NAME = 'my-love-db';
-const DB_VERSION = 4; // v4: Added sw-auth store for Background Sync
-
-/**
- * IndexedDB Schema Definition
- * Defines the structure of all object stores in the database
- */
-/**
- * Auth token stored for Background Sync SW access
- */
-interface StoredAuthToken {
-  id: 'current';
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-  userId: string;
-}
-
-interface MyLoveDBSchema extends DBSchema {
-  messages: {
-    key: number;
-    value: Message;
-    indexes: {
-      'by-category': string;
-      'by-date': Date;
-    };
-  };
-  photos: {
-    key: number;
-    value: Photo;
-    indexes: {
-      'by-date': Date;
-    };
-  };
-  moods: {
-    key: number;
-    value: MoodEntry;
-    indexes: {
-      'by-date': string;
-    };
-  };
-  'sw-auth': {
-    key: 'current';
-    value: StoredAuthToken;
-  };
-}
 
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking
@@ -80,7 +34,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
   protected async _doInit(): Promise<void> {
     try {
       if (import.meta.env.DEV) {
-        console.log('[MoodService] Initializing IndexedDB (version 4)...');
+        console.log(`[MoodService] Initializing IndexedDB (version ${DB_VERSION})...`);
       }
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {

@@ -1,26 +1,10 @@
 import { openDB } from 'idb';
-import type { DBSchema, IDBPDatabase } from 'idb';
+import type { IDBPDatabase } from 'idb';
 import type { Photo, Message } from '../types';
-
-// IndexedDB schema definition
-interface MyLoveDB extends DBSchema {
-  photos: {
-    key: number;
-    value: Photo;
-    indexes: { 'by-date': Date };
-  };
-  messages: {
-    key: number;
-    value: Message;
-    indexes: { 'by-category': string; 'by-date': Date };
-  };
-}
-
-const DB_NAME = 'my-love-db';
-const DB_VERSION = 4; // v4: Match MoodService (sw-auth store for Background Sync)
+import { MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 
 class StorageService {
-  private db: IDBPDatabase<MyLoveDB> | null = null;
+  private db: IDBPDatabase<MyLoveDBSchema> | null = null;
   private initPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
@@ -49,7 +33,7 @@ class StorageService {
   private async _doInit(): Promise<void> {
     try {
       console.log('[StorageService] Initializing IndexedDB...');
-      this.db = await openDB<MyLoveDB>(DB_NAME, DB_VERSION, {
+      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion) {
           console.log(`[StorageService] Upgrading database from v${oldVersion} to v${newVersion}`);
 

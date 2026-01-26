@@ -1,31 +1,18 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { createMessagesSlice, type MessagesSlice } from './slices/messagesSlice';
-import { createPhotosSlice, type PhotosSlice } from './slices/photosSlice';
-import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice';
-import { createNavigationSlice, type NavigationSlice } from './slices/navigationSlice';
-import { createMoodSlice, type MoodSlice } from './slices/moodSlice';
-import { createInteractionsSlice, type InteractionsSlice } from './slices/interactionsSlice';
-import { createPartnerSlice, type PartnerSlice } from './slices/partnerSlice';
-import { createNotesSlice, type NotesSlice } from './slices/notesSlice';
+import type { AppState } from './types';
+import { createAppSlice } from './slices/appSlice';
+import { createMessagesSlice } from './slices/messagesSlice';
+import { createPhotosSlice } from './slices/photosSlice';
+import { createSettingsSlice } from './slices/settingsSlice';
+import { createNavigationSlice } from './slices/navigationSlice';
+import { createMoodSlice } from './slices/moodSlice';
+import { createInteractionsSlice } from './slices/interactionsSlice';
+import { createPartnerSlice } from './slices/partnerSlice';
+import { createNotesSlice } from './slices/notesSlice';
 
-// Composed AppState from all slices
-export interface AppState
-  extends MessagesSlice,
-    PhotosSlice,
-    SettingsSlice,
-    NavigationSlice,
-    MoodSlice,
-    InteractionsSlice,
-    PartnerSlice,
-    NotesSlice {
-  // Shared/Core state
-  isLoading: boolean;
-  error: string | null;
-
-  // Internal flag for hydration tracking (not exposed to components)
-  __isHydrated?: boolean;
-}
+// Re-export AppState for consumers
+export type { AppState } from './types';
 
 // State validation helper
 function validateHydratedState(state: Partial<AppState> | undefined): {
@@ -77,20 +64,17 @@ function validateHydratedState(state: Partial<AppState> | undefined): {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get, api) => ({
-      // Compose all slices using spread operator
-      ...createMessagesSlice(set as any, get as any, api as any),
-      ...createPhotosSlice(set as any, get as any, api as any),
-      ...createSettingsSlice(set as any, get as any, api as any),
-      ...createNavigationSlice(set as any, get as any, api as any),
-      ...createMoodSlice(set as any, get as any, api as any),
-      ...createInteractionsSlice(set as any, get as any, api as any),
-      ...createPartnerSlice(set as any, get as any, api as any),
-      ...createNotesSlice(set as any, get as any, api as any),
-
-      // Shared/Core state (minimal - initialization, loading, error)
-      isLoading: false,
-      error: null,
-      __isHydrated: false,
+      // AppSlice FIRST - owns core state (isLoading, error, __isHydrated)
+      ...createAppSlice(set, get, api),
+      // Compose all other slices
+      ...createMessagesSlice(set, get, api),
+      ...createPhotosSlice(set, get, api),
+      ...createSettingsSlice(set, get, api),
+      ...createNavigationSlice(set, get, api),
+      ...createMoodSlice(set, get, api),
+      ...createInteractionsSlice(set, get, api),
+      ...createPartnerSlice(set, get, api),
+      ...createNotesSlice(set, get, api),
     }),
     {
       name: 'my-love-storage',
@@ -174,25 +158,30 @@ export const useAppStore = create<AppState>()(
         // Handle null/undefined messageHistory gracefully
         if (state?.messageHistory) {
           try {
-            const shownMessagesArray = state.messageHistory.shownMessages as any;
+            // Use unknown + type guards instead of any for proper narrowing
+            const raw = state.messageHistory.shownMessages as unknown;
 
             // If shownMessages is null or undefined, create empty Map
-            if (!shownMessagesArray) {
+            if (!raw) {
               console.warn(
                 '[Zustand Persist] shownMessages is null/undefined - creating empty Map'
               );
               state.messageHistory.shownMessages = new Map();
-            } else if (Array.isArray(shownMessagesArray)) {
+            } else if (raw instanceof Map) {
+              // Already a Map, OK (shouldn't happen but handle gracefully)
+              console.log('[Zustand Persist] shownMessages is already a Map');
+            } else if (Array.isArray(raw)) {
               // Validate array structure before converting to Map
-              const isValidArray = shownMessagesArray.every(
-                (item) => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string'
+              const isValidArray = raw.every(
+                (item): item is [string, unknown] =>
+                  Array.isArray(item) && item.length === 2 && typeof item[0] === 'string'
               );
 
               if (isValidArray) {
-                state.messageHistory.shownMessages = new Map(shownMessagesArray);
+                state.messageHistory.shownMessages = new Map(raw);
                 console.log(
                   '[Zustand Persist] Message history Map deserialized successfully:',
-                  `${shownMessagesArray.length} entries`
+                  `${raw.length} entries`
                 );
               } else {
                 console.error(
@@ -272,6 +261,8 @@ export const useAppStore = create<AppState>()(
         }
 
         // Set internal hydration flag in state
+        // NOTE: In onRehydrateStorage, `state` is the raw state object, not the store.
+        // Actions don't exist here, so we must use direct property assignment.
         if (state) {
           state.__isHydrated = true;
         }
@@ -280,7 +271,14 @@ export const useAppStore = create<AppState>()(
   )
 );
 
+// Declare global window interface for E2E testing
+declare global {
+  interface Window {
+    __APP_STORE__?: typeof useAppStore;
+  }
+}
+
 // Expose store to window object for E2E testing
 if (typeof window !== 'undefined') {
-  (window as any).__APP_STORE__ = useAppStore;
+  window.__APP_STORE__ = useAppStore;
 }
