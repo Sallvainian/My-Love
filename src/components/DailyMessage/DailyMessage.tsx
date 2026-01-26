@@ -32,7 +32,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const isFavorited = currentMessage && messageHistory.favoriteIds.includes(currentMessage.id);
 
   // Story 3.2: Swipe gesture handler
-  const handleDragEnd = (_event: any, info: PanInfo) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 50; // 50px swipe threshold
 
     if (info.offset.x < -threshold && canNavigateBack()) {

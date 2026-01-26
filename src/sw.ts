@@ -37,8 +37,14 @@ interface SyncEvent extends ExtendableEvent {
 }
 
 // Service Worker type definitions
+// PrecacheEntry defined in sw-types.d.ts
+interface PrecacheEntry {
+  url: string;
+  revision?: string | null;
+}
+
 declare const self: ServiceWorkerGlobalScope & {
-  __WB_MANIFEST: any[];
+  __WB_MANIFEST: Array<PrecacheEntry | string>;
 };
 
 // Supabase configuration from environment variables
