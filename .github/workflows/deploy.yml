@@ -39,7 +39,7 @@ jobs:
             > src/types/database.types.ts
 
       - name: Build application
-        run: npx dotenvx run -- npm run build
+        run: npm run build
         env:
           DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
 
