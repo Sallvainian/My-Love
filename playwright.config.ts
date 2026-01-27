@@ -1,95 +1,58 @@
 import { defineConfig, devices } from '@playwright/test';
-import { config } from '@dotenvx/dotenvx';
-import { STORAGE_STATE_PATH } from './e2e/constants';
-
-// Load environment variables
-config();
-config({ path: '.env.test', override: true });
-
-const PORT = process.env.PORT || process.env.VITE_PORT || '5173';
-const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
- * Playwright configuration for My-Love PWA E2E testing
+ * Playwright Test Configuration
+ * @see https://playwright.dev/docs/test-configuration
  *
- * Uses project dependencies for setup (recommended approach).
- * @see https://playwright.dev/docs/test-global-setup-teardown#option-1-project-dependencies
+ * Uses @seontechnologies/playwright-utils for enhanced fixtures.
+ * See tests/support/merged-fixtures.ts for fixture composition.
  */
 export default defineConfig({
-  testDir: './e2e',
-
-  /* Timeout configuration */
-  timeout: process.env.CI ? 30000 : 15000,
-
-  /* Run tests in files in parallel */
+  testDir: './tests/e2e',
   fullyParallel: true,
-
-  /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: !!process.env.CI,
-
-  /* Prevent runaway CI jobs (1 hour max) */
-  globalTimeout: process.env.CI ? 60 * 60 * 1000 : undefined,
-
-  /* Retry on CI only */
-  retries: process.env.CI ? 1 : 0,
-
-  /* 1 worker in CI for stability, parallel locally for speed */
+  retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
 
-  /* Reporter configuration - keep HTML reports in CI for debugging */
-  reporter: process.env.CI
-    ? [['html', { outputFolder: 'playwright-report' }], ['github']]
-    : 'html',
-
-  /* Shared settings for all projects */
-  use: {
-    baseURL: BASE_URL,
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+  // Timeouts
+  timeout: 60 * 1000, // Test timeout: 60s
+  expect: {
+    timeout: 15 * 1000, // Assertion timeout: 15s
   },
 
-  /* Configure projects with dependencies */
-  projects: [
-    // Setup project - runs first to authenticate
-    {
-      name: 'setup',
-      testMatch: /auth\.setup\.ts/,
-    },
+  use: {
+    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    actionTimeout: 15 * 1000, // Action timeout: 15s
+    navigationTimeout: 30 * 1000, // Navigation timeout: 30s
+  },
 
-    // Auth tests - run with empty storage (tests login/logout flows)
-    {
-      name: 'auth',
-      testMatch: /auth\.spec\.ts/,
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: { cookies: [], origins: [] },
-      },
-    },
-
-    // Main test project - depends on setup, excludes auth tests
-    {
-      name: 'chromium',
-      testIgnore: /auth\.spec\.ts/,
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: STORAGE_STATE_PATH,
-      },
-      dependencies: ['setup'],
-    },
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['junit', { outputFile: 'test-results/junit.xml' }],
+    ['list'],
   ],
 
-  /* Run local dev server before starting tests
-   * Note: 'preview' serves production build. Run 'npm run build' first.
-   * CI workflow handles this automatically. For local dev, either:
-   * 1. Run: npm run build && npx playwright test
-   * 2. Change to 'npm run dev' for development testing
-   */
+  outputDir: 'test-results',
+
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    // Uncomment for cross-browser testing
+    // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    // { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
+
+  // Run local dev server before tests
+  // Uses dotenvx to decrypt encrypted .env values (Supabase credentials)
   webServer: {
-    command: 'npm run preview',
-    url: BASE_URL,
+    command: 'dotenvx run -- npx vite',
+    url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-    stdout: 'ignore',
-    stderr: 'pipe',
+    timeout: 120 * 1000,
   },
 });
