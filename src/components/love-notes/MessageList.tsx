@@ -281,6 +281,7 @@ export function MessageList({
   );
 
   // Auto-scroll to bottom on initial load
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- listRef is stable; setIsAtBottom syncs scroll position state on initial load
   useEffect(() => {
     if (notes.length > 0 && listRef.current && !hasScrolledToBottom.current) {
       // Use react-window v2 API: scrollToRow({ align, behavior, index })
@@ -291,6 +292,7 @@ export function MessageList({
   }, [notes.length, totalRowCount]);
 
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional auto-scroll
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- Refs are stable; state updates respond to new messages arriving
   useEffect(() => {
     if (notes.length > prevNotesLength.current && listRef.current) {
       const wasAtBottom = isAtBottom;
@@ -318,14 +320,15 @@ export function MessageList({
   });
 
   // Scroll to bottom handler for new message indicator
-  const scrollToBottom = useCallback(() => {
+  // Note: React Compiler handles memoization automatically
+  const scrollToBottom = () => {
     if (listRef.current) {
       // Use react-window v2 API
       listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
       setShowNewMessageIndicator(false);
       setIsAtBottom(true);
     }
-  }, [totalRowCount]);
+  };
 
   // Empty state
   if (!isLoading && notes.length === 0) {

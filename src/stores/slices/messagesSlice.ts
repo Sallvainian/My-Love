@@ -11,7 +11,7 @@
  * - Depends on Settings (uses settings.relationship.startDate for message rotation)
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 import type {
   Message,
   MessageHistory,
@@ -19,7 +19,6 @@ import type {
   CreateMessageInput,
   UpdateMessageInput,
   MessageFilter,
-  Settings,
 } from '../../types';
 import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
@@ -56,12 +55,7 @@ export interface MessagesSlice {
   importCustomMessages: (file: File) => Promise<{ imported: number; skipped: number }>;
 }
 
-export const createMessagesSlice: StateCreator<
-  MessagesSlice & { settings: Settings | null },
-  [],
-  [],
-  MessagesSlice
-> = (set, get) => ({
+export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _api) => ({
   // Initial state
   messages: [],
   messageHistory: {

@@ -100,6 +100,7 @@ export function useNetworkStatus(): NetworkStatus {
     if (typeof navigator !== 'undefined') {
       const currentlyOnline = navigator.onLine;
       if (currentlyOnline !== isOnline) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with navigator.onLine on mount if value diverged during SSR/initial render
         setIsOnline(currentlyOnline);
       }
     }

@@ -1,0 +1,74 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-01-25T00:00:00Z",
+    "completed": "2026-01-25T03:45:00Z"
+  },
+  "mode": "initial_scan",
+  "scan_level": "exhaustive",
+  "project_root": "/home/salvain/Projects/Personal/My-Love",
+  "output_folder": "/home/salvain/Projects/Personal/My-Love/_bmad-output/project-knowledge",
+  "status": "completed",
+  "completed_steps": [
+    {
+      "step": "step_1",
+      "status": "completed",
+      "summary": "Classified as monolith with 1 part, project_type: web (React 19 + Vite SPA with PWA)"
+    },
+    {
+      "step": "step_2",
+      "status": "completed",
+      "summary": "Found 14 existing docs in docs/ folder + 5 CI/CD workflows"
+    },
+    {
+      "step": "step_3",
+      "status": "completed",
+      "summary": "Tech stack: React 19 + Vite + TypeScript + Zustand + Supabase, 17 key technologies"
+    },
+    {
+      "step": "step_4",
+      "status": "completed",
+      "summary": "Exhaustive scan of API layer (8 files, 45+ functions) and state management (8 slices)"
+    },
+    {
+      "step": "step_10",
+      "status": "completed",
+      "summary": "Generated unified BMM index referencing existing Magic Docs"
+    }
+  ],
+  "findings": {
+    "project_classification": "monolith, 1 part, React 19 + Vite + TypeScript + Zustand + Supabase",
+    "existing_docs_count": 14,
+    "api_services_count": 6,
+    "zustand_slices_count": 8,
+    "components_count": 56,
+    "source_files_count": 145
+  },
+  "outputs_generated": [
+    "project-scan-report.json",
+    "index.md"
+  ],
+  "project_types": [
+    {
+      "part_id": "main",
+      "project_type_id": "web",
+      "display_name": "Web SPA (React 19 + Vite + PWA)"
+    }
+  ],
+  "project_parts": [
+    {
+      "part_id": "main",
+      "root_path": "/home/salvain/Projects/Personal/My-Love",
+      "project_type_id": "web",
+      "primary_framework": "React 19",
+      "bundler": "Vite",
+      "language": "TypeScript",
+      "styling": "Tailwind CSS 4",
+      "state_management": "Zustand",
+      "backend": "Supabase",
+      "local_storage": "IndexedDB",
+      "testing": "Vitest + Playwright",
+      "pwa": true
+    }
+  ]
+}

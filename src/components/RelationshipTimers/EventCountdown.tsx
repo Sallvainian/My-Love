@@ -83,11 +83,10 @@ export function EventCountdown({
     setIsEventToday(isToday);
   }, [date]);
 
-  // Initial calculation on mount
+  // Initial calculation on mount and when date changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateCountdown();
-  }, []);
+  }, [updateCountdown]);
 
   // Update every second for real-time countdown
   useEffect(() => {

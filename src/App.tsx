@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './stores/useAppStore';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
 import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/RelationshipTimers';
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
@@ -488,18 +489,17 @@ function App() {
 
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen pb-16" data-testid="app-container">
-        {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
-        <NetworkStatusIndicator showOnlyWhenOffline />
+    <div className="min-h-screen pb-16" data-testid="app-container">
+      {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
+      <NetworkStatusIndicator showOnlyWhenOffline />
 
-        {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
-        <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
+      {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
+      <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
 
-        {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
+      {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
 
-        <main id="main-content">
-          {/* Conditional view rendering */}
+      <main id="main-content">
+        {/* Home view - inline, not lazy-loaded, always works offline */}
         {currentView === 'home' && (
           <div className="max-w-4xl mx-auto px-4 py-4 space-y-6">
             {/* Time Together - replaces Day 37 Together header */}
@@ -538,38 +538,42 @@ function App() {
           </div>
         )}
 
-        <Suspense fallback={<LoadingSpinner />}>
-          {currentView === 'photos' && (
-            <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
-          )}
+        {/* Lazy-loaded views wrapped in ViewErrorBoundary to keep navigation visible on errors */}
+        {currentView !== 'home' && (
+          <ViewErrorBoundary viewName={currentView} onNavigateHome={() => setView('home')}>
+            <Suspense fallback={<LoadingSpinner />}>
+              {currentView === 'photos' && (
+                <PhotoGallery onUploadClick={() => setIsPhotoUploadOpen(true)} />
+              )}
 
-          {currentView === 'mood' && <MoodTracker />}
+              {currentView === 'mood' && <MoodTracker />}
 
-          {currentView === 'partner' && <PartnerMoodView />}
+              {currentView === 'partner' && <PartnerMoodView />}
 
-          {currentView === 'notes' && <LoveNotes />}
-        </Suspense>
-        </main>
+              {currentView === 'notes' && <LoveNotes />}
+            </Suspense>
+          </ViewErrorBoundary>
+        )}
+      </main>
 
-        {/* Bottom navigation */}
-        <BottomNavigation currentView={currentView} onViewChange={setView} />
+      {/* Bottom navigation - always visible, outside error boundary */}
+      <BottomNavigation currentView={currentView} onViewChange={setView} />
 
-        {/* Photo upload modal - Story 4.1 (lazy loaded) */}
-        <Suspense fallback={null}>
-          <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
-        </Suspense>
+      {/* Photo upload modal - Story 4.1 (lazy loaded) */}
+      <Suspense fallback={null}>
+        <PhotoUpload isOpen={isPhotoUploadOpen} onClose={() => setIsPhotoUploadOpen(false)} />
+      </Suspense>
 
-        {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
-        <Suspense fallback={null}>
-          <PhotoCarousel />
-        </Suspense>
+      {/* Photo carousel - Story 4.3: AC-4.3.1 - Render when photo selected (lazy loaded) */}
+      <Suspense fallback={null}>
+        <PhotoCarousel />
+      </Suspense>
 
-        {/* Story 0.4: Deployment validation timestamp */}
-        <footer className="fixed bottom-16 left-0 right-0 text-center py-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm">
-          <p>Last validated: 2025-11-18</p>
-        </footer>
-      </div>
-    </ErrorBoundary>
+      {/* Story 0.4: Deployment validation timestamp */}
+      <footer className="fixed bottom-16 left-0 right-0 text-center py-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm">
+        <p>Last validated: 2025-11-18</p>
+      </footer>
+    </div>
   );
 }
 

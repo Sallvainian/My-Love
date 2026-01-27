@@ -13,6 +13,7 @@ dist-ssr
 dev-dist
 .code
 *.local
+!.env.local
 
 # Test coverage reports (auto-generated)
 coverage/
@@ -21,7 +22,6 @@ coverage/
 # dotenvx: Keep .env.keys secret (contains decryption key)
 # Encrypted .env files are now safe to commit
 .env.keys
-.env.local
 .envrc
 
 # Playwright test artifacts
@@ -45,25 +45,11 @@ tests/e2e/.auth/auth-failure.png
 # Dot Files
 .claude
 !.claude/commands/
+!.claude/rules/
 .bmad
 !.bmad/
 .code
 _bmad/
-
-# Documentation files with exposed secrets
-# Keep: architecture.md, index.md, state-management.md
-# NOTE: epics.md, prd.md restored after full rewrite (2025-11-17 PWA pivot - secrets removed)
-docs/bug-tracker.md
-docs/component-inventory.md
-docs/data-models.md
-docs/development-guide.md
-docs/overnight-dev.md
-docs/partner-connection-system-design.md
-docs/project-overview.md
-docs/project-scan-report.json
-docs/source-tree-analysis.md
-docs/sprint-change-proposal-2025-11-15.md
-docs/technical-decisions.md
 
 
 # IDE and AI tool configs
@@ -90,7 +76,6 @@ docs/technical-decisions.md
 env.keys
 env.test
 _bmad/
-_bmad-output/
 .agentvibes/
 .vscode/
 docs/99-Archive/
@@ -98,3 +83,4 @@ docs/99-Archive/
 # Playwright
 /blob-report/
 /playwright/.auth/
+supabase/.temp/

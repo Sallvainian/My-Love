@@ -211,6 +211,7 @@ export function PhotoUploader({
   };
 
   // AC-6.2.9, AC-6.2.13: Show error toast when upload error occurs
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing toast state in response to uploadError from external hook
   useEffect(() => {
     if (uploadError) {
       setToast({
@@ -232,6 +233,7 @@ export function PhotoUploader({
   }, [uploadError, retryUpload, clearError]);
 
   // AC-6.2.10: Show storage warning toast
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing toast state in response to storageWarning from external hook
   useEffect(() => {
     if (storageWarning) {
       setToast({

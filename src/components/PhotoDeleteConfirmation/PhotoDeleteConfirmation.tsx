@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import type { Photo } from '../../types';
+import type { PhotoWithUrls } from '../../services/photoService';
+
+// Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
+type PhotoLike = Photo | PhotoWithUrls;
 
 interface PhotoDeleteConfirmationProps {
-  photo: Photo;
+  photo: PhotoLike;
   onClose: () => void;
-  onConfirmDelete: (photoId: number) => Promise<void>;
+  onConfirmDelete: (photoId: string | number) => Promise<void>;
 }
 
 /**

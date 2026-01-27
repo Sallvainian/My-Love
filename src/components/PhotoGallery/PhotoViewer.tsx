@@ -337,7 +337,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
       // CRITICAL 2: Better error handling for RLS policy violations
       const errorMessage = (error as Error)?.message || '';
-      const errorCode = (error as any)?.code || '';
+      // PostgreSQL/Supabase errors may have a code property
+      const errorCode = (error as { code?: string })?.code || '';
 
       if (
         errorMessage.toLowerCase().includes('permission') ||

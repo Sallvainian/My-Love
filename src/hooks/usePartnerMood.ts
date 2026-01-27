@@ -43,6 +43,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     'connecting' | 'connected' | 'disconnected'
   >('connecting');
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Early bailout when partnerId is empty; setting loading false is necessary for correct UI state
   useEffect(() => {
     if (!partnerId) {
       setIsLoading(false);

@@ -17,11 +17,11 @@ interface SyncEvent extends ExtendableEvent {
 }
 
 interface ExtendableEvent extends Event {
-  waitUntil(f: Promise<any>): void;
+  waitUntil(f: Promise<unknown>): void;
 }
 
 interface ExtendableMessageEvent extends ExtendableEvent {
-  data: any;
+  data: unknown;
   origin: string;
   lastEventId: string;
   source: Client | ServiceWorker | MessagePort | null;
@@ -50,18 +50,23 @@ interface ServiceWorkerGlobalScope {
 }
 
 // Workbox precaching types
+interface PrecacheEntry {
+  url: string;
+  revision?: string | null;
+}
+
 declare module 'workbox-precaching' {
-  export function precacheAndRoute(entries: any[]): void;
+  export function precacheAndRoute(entries: Array<PrecacheEntry | string>): void;
   export function cleanupOutdatedCaches(): void;
 }
 
 declare global {
   interface ServiceWorkerGlobalScope {
-    __WB_MANIFEST: any[];
+    __WB_MANIFEST: Array<PrecacheEntry | string>;
   }
 
   interface Window {
-    SyncManager: any;
+    SyncManager: typeof SyncManager | undefined;
   }
 
   interface ServiceWorkerRegistration {

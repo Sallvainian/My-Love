@@ -7,20 +7,13 @@ import { moodService } from '../../../src/services/moodService';
  * IndexedDB Version Compatibility Tests
  *
  * ISSUE: Multiple services accessing the same database ('my-love-db') with different versions
- * - customMessageService: DB_VERSION = 1
- * - photoStorageService: DB_VERSION = 2
- * - moodService: DB_VERSION = 3
  *
- * PROBLEM: When one service opens at v3, others fail to open at v2 or v1
- * Error: "VersionError: The requested version (2) is less than the existing version (3)"
+ * SOLUTION: All services now import DB_NAME and DB_VERSION from centralized dbSchema.ts
+ * Each service's upgrade callback handles all stores with fallback creation
  *
- * SOLUTION: All services must use the same DB_VERSION (highest: 3)
- * Each service's upgrade callback must handle all stores with fallback creation
- *
- * NOTE: Skipped in unit tests - these require real IndexedDB which times out in happy-dom.
- * Run manually for integration testing.
+ * These tests verify that services can initialize in any order without version conflicts.
  */
-describe.skip('IndexedDB Version Compatibility', () => {
+describe('IndexedDB Version Compatibility', () => {
   beforeEach(async () => {
     // Clear all services before each test
     await customMessageService.init();
