@@ -182,6 +182,10 @@ export function MoodHistoryCalendar() {
     };
   }, []);
 
+  // Generate calendar grid days (moved before effect that uses it)
+  const calendarDays = generateCalendarDays(currentYear, currentMonth);
+  const monthName = getMonthName(currentMonth);
+
   /**
    * Measure render performance (Task 9: Performance optimization)
    * Target: <200ms for 30-day calendar
@@ -195,11 +199,7 @@ export function MoodHistoryCalendar() {
         );
       }
     }
-  }, [isLoading]);
-
-  // Generate calendar grid days
-  const calendarDays = generateCalendarDays(currentYear, currentMonth);
-  const monthName = getMonthName(currentMonth);
+  }, [isLoading, calendarDays.length]);
 
   // Track render start time (Task 9: Performance measurement)
   useEffect(() => {

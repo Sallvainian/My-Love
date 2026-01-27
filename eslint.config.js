@@ -49,7 +49,7 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
       // Relax some overly strict TypeScript rules
-      '@typescript-eslint/no-explicit-any': 'off', // Too many instances to fix immediately
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -74,9 +74,9 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
-  // Special config for test files
+  // Special config for test files (unit tests and E2E)
   {
-    files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
+    files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'e2e/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -85,10 +85,23 @@ export default tseslint.config(
     },
     rules: {
       'react-hooks/rules-of-hooks': 'off', // Test fixtures may use hooks in non-standard ways
+      'no-empty-pattern': 'off', // Playwright fixtures use empty destructuring for deps
       '@typescript-eslint/ban-ts-comment': 'off', // Tests may need to use @ts-ignore for mocking
       '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
+    },
+  },
+  // Scripture Reading feature - strict no-explicit-any enforcement
+  {
+    files: [
+      'src/services/scriptureReadingService.ts',
+      'src/stores/slices/scriptureReadingSlice.ts',
+      'src/hooks/useScriptureBroadcast.ts',
+      'src/components/scripture-reading/**/*.{ts,tsx}',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   }
 );

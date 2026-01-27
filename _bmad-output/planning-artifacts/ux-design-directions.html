@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scripture Reading - UX Design Directions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500&family=Dancing+Script:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Lavender Dreams Theme */
+      --primary: #A855F7;
+      --primary-light: #C084FC;
+      --background: #F3E5F5;
+      --background-gradient: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 50%, #CE93D8 100%);
+      --text-primary: #4A1F6F;
+      --text-secondary: #6B4D8A;
+      --text-muted: #9B7DB8;
+      --accent: #D8B4FE;
+      --bookmark-active: #F59E0B;
+      --card-bg: rgba(255, 255, 255, 0.8);
+      --card-shadow: 0 10px 40px rgba(168, 85, 247, 0.15);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--background);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      z-index: 100;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      padding: 8px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 20px;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: rgba(168, 85, 247, 0.1);
+    }
+
+    .nav-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Screen Container */
+    .screens {
+      padding-top: 80px;
+    }
+
+    .screen {
+      display: none;
+      min-height: calc(100vh - 80px);
+      padding: 24px;
+      background: var(--background-gradient);
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    /* Phone Frame */
+    .phone-frame {
+      max-width: 390px;
+      margin: 0 auto;
+      background: var(--background-gradient);
+      border-radius: 40px;
+      padding: 20px;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
+      border: 8px solid #1a1a1a;
+      position: relative;
+    }
+
+    .phone-frame::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 24px;
+      background: #1a1a1a;
+      border-radius: 20px;
+    }
+
+    .phone-content {
+      background: var(--background-gradient);
+      border-radius: 28px;
+      min-height: 700px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--card-shadow);
+      margin-bottom: 16px;
+    }
+
+    /* Screen Header */
+    .screen-header {
+      text-align: center;
+      padding: 40px 20px 20px;
+    }
+
+    .screen-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .step-indicator {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Role Indicator */
+    .role-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    .role-indicator.reader {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--primary);
+    }
+
+    .role-indicator.responder {
+      background: rgba(192, 132, 252, 0.15);
+      color: var(--primary-light);
+    }
+
+    .role-indicator svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Verse Display */
+    .verse-reference {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .verse-text {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      line-height: 1.75;
+      color: var(--text-primary);
+    }
+
+    .response-text {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* Bookmark Flag */
+    .bookmark-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 44px;
+      height: 44px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .bookmark-btn:hover {
+      background: rgba(168, 85, 247, 0.1);
+    }
+
+    .bookmark-btn svg {
+      width: 24px;
+      height: 24px;
+      color: var(--accent);
+      transition: all 0.2s;
+    }
+
+    .bookmark-btn.active svg {
+      color: var(--bookmark-active);
+      fill: var(--bookmark-active);
+    }
+
+    /* Partner Position */
+    .partner-position {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .partner-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Navigation Buttons */
+    .nav-arrows {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px 20px;
+    }
+
+    .nav-arrow {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 16px;
+      border: none;
+      background: rgba(168, 85, 247, 0.1);
+      color: var(--primary);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 20px;
+      transition: all 0.2s;
+    }
+
+    .nav-arrow:hover {
+      background: rgba(168, 85, 247, 0.2);
+    }
+
+    .nav-arrow svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Lock-in Button */
+    .lock-in-btn {
+      width: 100%;
+      padding: 18px 24px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 28px;
+      transition: all 0.2s;
+      box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+    }
+
+    .lock-in-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
+    }
+
+    .lock-in-btn.waiting {
+      background: var(--accent);
+      color: var(--text-primary);
+      box-shadow: none;
+    }
+
+    .lock-in-btn.waiting::after {
+      content: '';
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--text-muted);
+      border-top-color: transparent;
+      border-radius: 50%;
+      margin-left: 8px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Bottom Actions */
+    .bottom-actions {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      background: linear-gradient(transparent, var(--background));
+    }
+
+    /* Countdown */
+    .countdown-overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--background-gradient);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .countdown-number {
+      font-family: 'Playfair Display', serif;
+      font-size: 120px;
+      font-weight: 500;
+      color: var(--primary);
+      animation: countPulse 1s ease-in-out infinite;
+    }
+
+    @keyframes countPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .countdown-text {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-top: 16px;
+    }
+
+    /* Lobby */
+    .lobby-status {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .partner-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 32px;
+      color: white;
+    }
+
+    .partner-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .partner-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10B981;
+    }
+
+    .status-dot.waiting {
+      background: var(--bookmark-active);
+      animation: pulse 1.5s infinite;
+    }
+
+    .ready-btn {
+      width: 100%;
+      padding: 18px 24px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 28px;
+      margin-top: 32px;
+      transition: all 0.2s;
+    }
+
+    .ready-btn.checked {
+      background: #10B981;
+    }
+
+    /* Reflection */
+    .reflection-section {
+      padding: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .verse-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .verse-chip {
+      padding: 8px 14px;
+      border: 2px solid var(--accent);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 20px;
+      transition: all 0.2s;
+    }
+
+    .verse-chip.bookmarked {
+      border-color: var(--bookmark-active);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .verse-chip.selected {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    /* Rating */
+    .rating-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .rating-btn {
+      flex: 1;
+      padding: 16px 8px;
+      border: 2px solid var(--accent);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 16px;
+      transition: all 0.2s;
+    }
+
+    .rating-btn.selected {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    /* Text Input */
+    .text-input {
+      width: 100%;
+      padding: 16px;
+      border: 2px solid var(--accent);
+      background: var(--card-bg);
+      color: var(--text-primary);
+      font-size: 15px;
+      font-family: inherit;
+      border-radius: 16px;
+      resize: none;
+      min-height: 100px;
+      margin-bottom: 16px;
+    }
+
+    .text-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .text-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Daily Prayer Report */
+    .report-header {
+      text-align: center;
+      padding: 40px 20px 20px;
+    }
+
+    .report-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .report-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .message-reveal {
+      text-align: center;
+      padding: 32px 20px;
+    }
+
+    .message-from {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .message-content {
+      font-family: 'Dancing Script', cursive;
+      font-size: 22px;
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 20px;
+    }
+
+    .comparison-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .comparison-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .comparison-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .comparison-value.highlight {
+      color: var(--primary);
+    }
+
+    /* Description Panel */
+    .description-panel {
+      max-width: 600px;
+      margin: 40px auto 0;
+      padding: 24px;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+    }
+
+    .description-panel h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    .description-panel p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    .description-panel ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .description-panel li {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .description-panel li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Interactive states */
+    .interactive-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 16px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <button class="nav-btn active" data-screen="lobby">Lobby</button>
+    <button class="nav-btn" data-screen="countdown">Countdown</button>
+    <button class="nav-btn" data-screen="verse">Verse (Reader)</button>
+    <button class="nav-btn" data-screen="response">Response</button>
+    <button class="nav-btn" data-screen="waiting">Lock-in Wait</button>
+    <button class="nav-btn" data-screen="reflection">Reflection</button>
+    <button class="nav-btn" data-screen="report">Prayer Report</button>
+  </nav>
+
+  <div class="screens">
+    <!-- Screen 1: Lobby -->
+    <section class="screen active" id="lobby">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="screen-title">Scripture Reading</div>
+            <div class="step-indicator">Together Mode</div>
+          </div>
+
+          <div class="lobby-status">
+            <div class="partner-avatar">J</div>
+            <div class="partner-name">Jordan</div>
+            <div class="partner-status">
+              <span class="status-dot"></span>
+              <span>Online</span>
+            </div>
+          </div>
+
+          <div style="padding: 20px;">
+            <div class="card">
+              <div style="text-align: center;">
+                <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">Your status</div>
+                <div class="partner-status">
+                  <span class="status-dot waiting"></span>
+                  <span style="color: var(--bookmark-active);">Waiting for you to ready up</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="ready-btn" onclick="this.classList.toggle('checked'); this.textContent = this.classList.contains('checked') ? '✓ Ready' : 'I\'m Ready'">I'm Ready</button>
+
+            <p class="interactive-note">Tap "I'm Ready" to see the ready state</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Lobby Screen</h3>
+        <p>Both partners see each other's online status and tap "Ready" when prepared to begin.</p>
+        <ul>
+          <li>Partner presence with avatar and name</li>
+          <li>Clear ready/waiting status indicators</li>
+          <li>Both must be ready before countdown starts</li>
+          <li>Calm, unhurried entry point</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screen 2: Countdown -->
+    <section class="screen" id="countdown">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="countdown-overlay">
+            <div class="countdown-number">3</div>
+            <div class="countdown-text">Starting together...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Countdown Screen</h3>
+        <p>The 3-2-1 countdown creates shared anticipation before the session begins.</p>
+        <ul>
+          <li>Large, elegant number display</li>
+          <li>Gentle pulse animation (respects reduced motion)</li>
+          <li>Same countdown appears on both devices simultaneously</li>
+          <li>Builds the "together" feeling before reading</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screen 3: Verse (Reader) -->
+    <section class="screen" id="verse">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="screen-title">Verse 1 of 17</div>
+          </div>
+
+          <div style="padding: 0 20px;">
+            <div class="card" style="position: relative;">
+              <button class="bookmark-btn" onclick="this.classList.toggle('active')" title="Bookmark this verse">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </button>
+
+              <span class="role-indicator reader">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                You read this
+              </span>
+
+              <div class="verse-reference">Proverbs 15:1</div>
+              <p class="verse-text">A soft answer turns away wrath, but a harsh word stirs up anger.</p>
+            </div>
+
+            <div class="partner-position">
+              <span class="partner-dot"></span>
+              <span>Jordan is viewing the verse</span>
+            </div>
+
+            <div class="nav-arrows">
+              <div></div>
+              <button class="nav-arrow">
+                View Response
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <p class="interactive-note">Tap the bookmark icon to see the active state</p>
+          </div>
+
+          <div class="bottom-actions">
+            <button class="lock-in-btn">Ready for next verse</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Verse Screen (Reader Role)</h3>
+        <p>The reader sees the verse with a clear indicator that it's their turn to read aloud.</p>
+        <ul>
+          <li>Role indicator badge: "You read this"</li>
+          <li>Playfair Display for elegant scripture typography</li>
+          <li>Bookmark flag to mark meaningful verses</li>
+          <li>Partner position shows where they are</li>
+          <li>Free navigation to response screen</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screen 4: Response -->
+    <section class="screen" id="response">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="screen-title">Verse 1 of 17</div>
+          </div>
+
+          <div style="padding: 0 20px;">
+            <div class="card">
+              <span class="role-indicator responder">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                Jordan responds
+              </span>
+
+              <div class="verse-reference">Response Prayer</div>
+              <p class="response-text">Lord, help us to speak gently to one another, especially when tensions rise. Soften our hearts so that our words bring peace, not pain. Give us patience to pause before we react, and wisdom to choose kindness over being right.</p>
+            </div>
+
+            <div class="partner-position">
+              <span class="partner-dot"></span>
+              <span>Jordan is viewing the response</span>
+            </div>
+
+            <div class="nav-arrows">
+              <button class="nav-arrow">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Back to Verse
+              </button>
+              <div></div>
+            </div>
+          </div>
+
+          <div class="bottom-actions">
+            <button class="lock-in-btn">Ready for next verse</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Response Screen</h3>
+        <p>The response prayer follows the verse. The responder role is indicated clearly.</p>
+        <ul>
+          <li>Role indicator shows partner responds</li>
+          <li>Inter font for response text (distinct from verse)</li>
+          <li>Back navigation to verse for re-reading</li>
+          <li>Same lock-in button available here</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screen 5: Waiting for Lock-in -->
+    <section class="screen" id="waiting">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="screen-title">Verse 1 of 17</div>
+          </div>
+
+          <div style="padding: 0 20px;">
+            <div class="card">
+              <span class="role-indicator reader">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                </svg>
+                You read this
+              </span>
+
+              <div class="verse-reference">Proverbs 15:1</div>
+              <p class="verse-text">A soft answer turns away wrath, but a harsh word stirs up anger.</p>
+            </div>
+
+            <div class="partner-position">
+              <span class="partner-dot"></span>
+              <span>Jordan is viewing the response</span>
+            </div>
+          </div>
+
+          <div class="bottom-actions">
+            <button class="lock-in-btn waiting">Waiting for Jordan...</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Lock-in Waiting State</h3>
+        <p>After you tap "Ready for next verse", the button shows a waiting state until your partner also locks in.</p>
+        <ul>
+          <li>Clear waiting indicator with partner's name</li>
+          <li>Subtle loading animation</li>
+          <li>Partner can continue navigating freely</li>
+          <li>Auto-advances when both lock in</li>
+          <li>No pressure — waiting feels purposeful</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screen 6: Reflection -->
+    <section class="screen" id="reflection">
+      <div class="phone-frame">
+        <div class="phone-content" style="overflow-y: auto;">
+          <div class="screen-header">
+            <div class="screen-title">Session Reflection</div>
+            <div class="step-indicator">17 verses complete</div>
+          </div>
+
+          <div class="reflection-section">
+            <div class="section-title">Verses you marked</div>
+            <div class="verse-chips">
+              <button class="verse-chip bookmarked selected">Proverbs 15:1</button>
+              <button class="verse-chip bookmarked">Ephesians 4:26</button>
+              <button class="verse-chip">Col 3:13</button>
+            </div>
+
+            <div class="section-title">How meaningful was this session?</div>
+            <div class="rating-row">
+              <button class="rating-btn">1</button>
+              <button class="rating-btn">2</button>
+              <button class="rating-btn">3</button>
+              <button class="rating-btn selected">4</button>
+              <button class="rating-btn">5</button>
+            </div>
+
+            <div class="section-title">Reflection note (optional)</div>
+            <textarea class="text-input" placeholder="What stood out to you today?"></textarea>
+
+            <div class="section-title">Message for Jordan</div>
+            <textarea class="text-input" placeholder="Write something for your partner..."></textarea>
+
+            <button class="lock-in-btn" style="margin-top: 8px;">Share reflection</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>End-of-Session Reflection</h3>
+        <p>After completing all 17 verses, users enter a reflection phase to capture their thoughts.</p>
+        <ul>
+          <li>Bookmarked verses highlighted for easy selection</li>
+          <li>Simple 1-5 rating for session meaningfulness</li>
+          <li>Optional reflection note (no pressure)</li>
+          <li>Message field for partner</li>
+          <li>Both submit to reveal Daily Prayer Report</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screen 7: Daily Prayer Report -->
+    <section class="screen" id="report">
+      <div class="phone-frame">
+        <div class="phone-content" style="overflow-y: auto;">
+          <div class="report-header">
+            <div class="report-title">Daily Prayer Report</div>
+            <div class="report-subtitle">January 25, 2026</div>
+          </div>
+
+          <div class="message-reveal">
+            <div class="message-from">A message from Jordan</div>
+            <div class="card">
+              <p class="message-content">"Thank you for doing this with me tonight. I know we've been tense lately, but reading together helped me feel closer to you. I love you."</p>
+            </div>
+          </div>
+
+          <div class="comparison-grid">
+            <div class="comparison-card">
+              <div class="comparison-label">Stood out to you</div>
+              <div class="comparison-value highlight">Proverbs 15:1</div>
+            </div>
+            <div class="comparison-card">
+              <div class="comparison-label">Stood out to Jordan</div>
+              <div class="comparison-value highlight">Ephesians 4:26</div>
+            </div>
+            <div class="comparison-card">
+              <div class="comparison-label">Your rating</div>
+              <div class="comparison-value">4 / 5</div>
+            </div>
+            <div class="comparison-card">
+              <div class="comparison-label">Jordan's rating</div>
+              <div class="comparison-value">5 / 5</div>
+            </div>
+          </div>
+
+          <div style="padding: 20px;">
+            <button class="lock-in-btn" style="background: var(--text-secondary);">Close for today</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Daily Prayer Report</h3>
+        <p>The emotional payoff — partner's message is revealed like receiving a gift.</p>
+        <ul>
+          <li>Partner message displayed in Dancing Script</li>
+          <li>Side-by-side verse and rating comparison</li>
+          <li>Intimate reveal without exposure</li>
+          <li>Gentle "Close for today" (not "Done")</li>
+          <li>Creates tender, relieved feeling</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Screen navigation
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Update nav buttons
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Update screens
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(btn.dataset.screen).classList.add('active');
+      });
+    });
+
+    // Interactive rating buttons
+    document.querySelectorAll('.rating-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
+    // Interactive verse chips
+    document.querySelectorAll('.verse-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.verse-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      });
+    });
+  </script>
+</body>
+</html>

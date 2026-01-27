@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
 import type { Photo } from '../../types';
+import type { PhotoWithUrls } from '../../services/photoService';
 import { isValidationError } from '../../validation/errorMessages';
 
+// Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
+type PhotoLike = Photo | PhotoWithUrls;
+
 interface PhotoEditModalProps {
-  photo: Photo;
+  photo: PhotoLike;
   onClose: () => void;
-  onSave: (photoId: number, updates: { caption?: string; tags: string[] }) => Promise<void>;
+  onSave: (photoId: string | number, updates: { caption?: string; tags: string[] }) => Promise<void>;
 }
 
 /**
@@ -23,47 +27,27 @@ interface PhotoEditModalProps {
  * - Backdrop click or X button closes modal without saving
  */
 export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) {
-  // Form state
+  // Form state - handle both Photo (tags array) and PhotoWithUrls (no tags)
   const [caption, setCaption] = useState(photo.caption || '');
-  const [tagsInput, setTagsInput] = useState(photo.tags.join(', '));
+  const [tagsInput, setTagsInput] = useState('tags' in photo ? photo.tags.join(', ') : '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validation state
-  const [captionError, setCaptionError] = useState<string | null>(null);
-  const [tagsError, setTagsError] = useState<string | null>(null);
+  // Server-side validation errors (from API responses)
+  const [serverCaptionError, setServerCaptionError] = useState<string | null>(null);
+  const [serverTagsError, setServerTagsError] = useState<string | null>(null);
 
-  // Create blob URL for photo preview
-  const [imageUrl, setImageUrl] = useState('');
-
-   
-  useEffect(() => {
-    if (photo.imageBlob) {
-      const url = URL.createObjectURL(photo.imageBlob);
-      setImageUrl(url);
-
-      return () => {
-        URL.revokeObjectURL(url);
-      };
-    }
-  }, [photo.imageBlob]);
-
-  // Validate caption (max 500 characters)
-   
-  useEffect(() => {
+  // Compute client-side validation during render (derived state)
+  const clientCaptionError = useMemo(() => {
     if (caption.length > 500) {
-      setCaptionError(`Caption is too long (${caption.length}/500 characters)`);
-    } else {
-      setCaptionError(null);
+      return `Caption is too long (${caption.length}/500 characters)`;
     }
+    return null;
   }, [caption]);
 
-  // Validate tags (max 10 tags, max 50 chars per tag)
-   
-  useEffect(() => {
+  const clientTagsError = useMemo(() => {
     if (!tagsInput.trim()) {
-      setTagsError(null);
-      return;
+      return null;
     }
 
     const tags = tagsInput
@@ -72,20 +56,40 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       .filter((tag) => tag.length > 0);
 
     if (tags.length > 10) {
-      setTagsError(`Too many tags (${tags.length}/10 max)`);
-      return;
+      return `Too many tags (${tags.length}/10 max)`;
     }
 
     const longTags = tags.filter((tag) => tag.length > 50);
     if (longTags.length > 0) {
-      setTagsError(
-        `Some tags are too long (max 50 characters): ${longTags[0].substring(0, 20)}...`
-      );
-      return;
+      return `Some tags are too long (max 50 characters): ${longTags[0].substring(0, 20)}...`;
     }
 
-    setTagsError(null);
+    return null;
   }, [tagsInput]);
+
+  // Combine client and server errors (client takes precedence for immediate feedback)
+  const captionError = clientCaptionError || serverCaptionError;
+  const tagsError = clientTagsError || serverTagsError;
+
+  // Photo preview URL - handles both Photo (imageBlob) and PhotoWithUrls (signedUrl)
+  const [imageUrl, setImageUrl] = useState('');
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing preview URL from photo prop with side effects (object URL creation/revocation)
+  useEffect(() => {
+    // PhotoWithUrls has signedUrl
+    if ('signedUrl' in photo && photo.signedUrl) {
+      setImageUrl(photo.signedUrl);
+      return;
+    }
+    // Photo has imageBlob
+    if ('imageBlob' in photo && photo.imageBlob) {
+      const url = URL.createObjectURL(photo.imageBlob);
+      setImageUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+  }, [photo]);
 
   // Check if form has changes
   const hasChanges = () => {
@@ -93,7 +97,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       .split(',')
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
-    const originalTags = photo.tags;
+    const originalTags = 'tags' in photo ? photo.tags : [];
 
     const captionChanged = caption !== (photo.caption || '');
     const tagsChanged = JSON.stringify(currentTags) !== JSON.stringify(originalTags);
@@ -113,6 +117,9 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
     try {
       setIsSaving(true);
       setError(null);
+      // Clear server-side errors before new submission
+      setServerCaptionError(null);
+      setServerTagsError(null);
 
       // Parse tags
       const parsedTags = tagsInput
@@ -140,12 +147,12 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       if (isValidationError(err)) {
         const fieldErrors = err.fieldErrors;
 
-        // Set field-specific errors
+        // Set field-specific server errors
         if (fieldErrors.has('caption')) {
-          setCaptionError(fieldErrors.get('caption') || null);
+          setServerCaptionError(fieldErrors.get('caption') || null);
         }
         if (fieldErrors.has('tags')) {
-          setTagsError(fieldErrors.get('tags') || null);
+          setServerTagsError(fieldErrors.get('tags') || null);
         }
 
         // Set general error message

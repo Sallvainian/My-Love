@@ -102,6 +102,7 @@ function LoveNoteMessageComponent({
   }, [sanitizedContent, senderName]);
 
   // Fetch signed URL for server-stored images
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Async fetch of signed URL from message prop; state updates happen in async callback
   useEffect(() => {
     // Use preview URL for optimistic display
     if (message.imagePreviewUrl) {

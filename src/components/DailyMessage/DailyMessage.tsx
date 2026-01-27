@@ -1,5 +1,5 @@
 import { m as motion, AnimatePresence, type PanInfo } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Heart, Share2, RefreshCw, AlertCircle } from 'lucide-react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
@@ -28,11 +28,22 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [direction, setDirection] = useState<'left' | 'right'>('left'); // Story 3.2: Track swipe direction
 
+  // Memoize random positions once on mount (empty deps). Positions remain
+  // fixed for entire session to provide consistent floating hearts animation.
+  const heartPositions = useMemo(
+    () =>
+      Array.from({ length: ANIMATION_VALUES.FLOATING_HEARTS_COUNT }, () => ({
+        initialX: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400),
+        animateX: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400),
+      })),
+    []
+  );
+
   // Check if current message is favorited (source of truth: messageHistory.favoriteIds)
   const isFavorited = currentMessage && messageHistory.favoriteIds.includes(currentMessage.id);
 
   // Story 3.2: Swipe gesture handler
-  const handleDragEnd = (_event: any, info: PanInfo) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 50; // 50px swipe threshold
 
     if (info.offset.x < -threshold && canNavigateBack()) {
@@ -155,21 +166,19 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
       <AnimatePresence>
         {showHearts && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            {[...Array(ANIMATION_VALUES.FLOATING_HEARTS_COUNT)].map((_, i) => (
+            {heartPositions.map((pos, i) => (
               <motion.div
                 key={i}
                 className="absolute text-4xl"
-                 
                 initial={{
-                  x: Math.random() * window.innerWidth,
+                  x: pos.initialX,
                   y: window.innerHeight,
                   opacity: 0,
                 }}
                 animate={{
                   y: ANIMATION_VALUES.FLOATING_HEARTS_TARGET_Y,
                   opacity: [0, 1, 1, 0],
-                  // eslint-disable-next-line react-hooks/purity -- Animation randomization is intentional for visual variety
-                  x: Math.random() * window.innerWidth,
+                  x: pos.animateX,
                 }}
                 exit={{ opacity: 0 }}
                 transition={{
