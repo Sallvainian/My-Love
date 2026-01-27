@@ -48,8 +48,9 @@ export default defineConfig({
   ],
 
   // Run local dev server before tests
+  // Uses dotenvx to decrypt encrypted .env values (Supabase credentials)
   webServer: {
-    command: 'npm run dev:raw',
+    command: 'dotenvx run -- npx vite',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
