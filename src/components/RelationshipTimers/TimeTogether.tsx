@@ -27,9 +27,8 @@ export function TimeTogether() {
 
   // Initial calculation on mount
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateTime();
-  }, []);
+  }, [updateTime]);
 
   // Update every second for real-time feel
   useEffect(() => {

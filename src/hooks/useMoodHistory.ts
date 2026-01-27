@@ -48,28 +48,28 @@ export function useMoodHistory(userId: string): UseMoodHistoryReturn {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Initial load
+  // Initial load - function moved inside effect to avoid exhaustive-deps warning
   useEffect(() => {
+    async function loadInitialMoods() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const data = await moodApi.getMoodHistory(userId, 0, PAGE_SIZE);
+
+        setMoods(data);
+        setHasMore(data.length === PAGE_SIZE);
+        setOffset(PAGE_SIZE);
+      } catch (err) {
+        console.error('[useMoodHistory] Failed to load initial moods:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load mood history');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
     loadInitialMoods();
   }, [userId]);
-
-  async function loadInitialMoods() {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const data = await moodApi.getMoodHistory(userId, 0, PAGE_SIZE);
-
-      setMoods(data);
-      setHasMore(data.length === PAGE_SIZE);
-      setOffset(PAGE_SIZE);
-    } catch (err) {
-      console.error('[useMoodHistory] Failed to load initial moods:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load mood history');
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   const loadMore = useCallback(async () => {
     if (isLoading || !hasMore) return;

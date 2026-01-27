@@ -15,7 +15,7 @@
  * - Will sync to Supabase backend in Story 6.4
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 import type { MoodEntry } from '../../types';
 import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
@@ -44,7 +44,7 @@ export interface MoodSlice {
   getPartnerMoodForDate: (date: string) => MoodEntry | undefined;
 }
 
-export const createMoodSlice: StateCreator<MoodSlice, [], [], MoodSlice> = (set, get) => ({
+export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => ({
   // Initial state
   moods: [],
   partnerMoods: [],

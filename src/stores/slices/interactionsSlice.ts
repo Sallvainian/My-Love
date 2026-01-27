@@ -16,7 +16,7 @@
  * - Marked as viewed via Supabase API
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { InteractionService } from '../../api/interactionService';
 import { authService } from '../../api/authService';
@@ -56,10 +56,7 @@ function toLocalInteraction(record: SupabaseInteractionRecord): Interaction {
   };
 }
 
-export const createInteractionsSlice: StateCreator<InteractionsSlice, [], [], InteractionsSlice> = (
-  set,
-  get
-) => ({
+export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set, get, _api) => ({
   // Initial state
   interactions: [],
   unviewedCount: 0,

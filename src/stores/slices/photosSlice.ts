@@ -17,7 +17,7 @@
  * - No local persistence (photos loaded on demand)
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 import { photoService } from '../../services/photoService';
 import type { PhotoWithUrls, PhotoUploadInput, SupabasePhoto } from '../../services/photoService';
 import { supabase } from '../../api/supabaseClient';
@@ -42,7 +42,7 @@ export interface PhotosSlice {
   clearStorageWarning: () => void;
 }
 
-export const createPhotosSlice: StateCreator<PhotosSlice, [], [], PhotosSlice> = (set, _get) => ({
+export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, _get, _api) => ({
   // Initial state
   photos: [],
   selectedPhotoId: null,

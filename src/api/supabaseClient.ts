@@ -14,8 +14,9 @@ import type { Database } from '../types/database.types';
 export type { Database } from '../types/database.types';
 
 // Import authService dynamically to avoid circular dependency
+type AuthServiceModule = typeof import('./authService');
 
-let authServiceModule: any = null;
+let authServiceModule: AuthServiceModule | null = null;
 const getAuthService = async () => {
   if (!authServiceModule) {
     authServiceModule = await import('./authService');

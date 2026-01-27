@@ -1,12 +1,13 @@
-import type { IDBPDatabase, DBSchema } from 'idb';
+import type { IDBPDatabase, DBSchema, StoreNames, StoreValue, StoreKey } from 'idb';
 
 /**
  * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores
  * Story 5.3: Extract shared service logic to reduce ~80% code duplication
  *
  * Generic Type Constraints:
- * - T extends { id?: number }: Entity type with optional id field for IndexedDB auto-increment keys
+ * - T extends { id?: number | string }: Entity type with optional id field for IndexedDB keys
  * - DBTypes extends DBSchema: Database schema type for type-safe IndexedDB operations
+ * - StoreName extends StoreNames<DBTypes>: Literal store name for type-safe store access
  * - Services provide concrete types: Message, Photo, MoodEntry
  *
  * Abstract Methods (services must implement):
@@ -29,8 +30,9 @@ import type { IDBPDatabase, DBSchema } from 'idb';
  *   - Allows callers to handle failures with proper user feedback
  */
 export abstract class BaseIndexedDBService<
-  T extends { id?: number },
+  T extends { id?: number | string },
   DBTypes extends DBSchema = DBSchema,
+  StoreName extends StoreNames<DBTypes> = StoreNames<DBTypes>,
 > {
   protected db: IDBPDatabase<DBTypes> | null = null;
   protected initPromise: Promise<void> | null = null;
@@ -78,7 +80,19 @@ export abstract class BaseIndexedDBService<
    * Abstract method: Get the object store name
    * Each service returns its store name: 'messages', 'photos', 'moods'
    */
-  protected abstract getStoreName(): string;
+  protected abstract getStoreName(): StoreName;
+
+  /**
+   * Get typed database reference
+   * Centralizes the type assertion to a single location
+   * The DBTypes generic ensures type safety at the class level
+   */
+  protected getTypedDB(): IDBPDatabase<DBTypes> {
+    if (!this.db) {
+      throw new Error(`[${this.constructor.name}] Database not initialized`);
+    }
+    return this.db;
+  }
 
   /**
    * Add a new item to the store
@@ -91,13 +105,15 @@ export abstract class BaseIndexedDBService<
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      const id = await (this.db! as any).add(storeName, item as T);
+      // Type assertion needed: idb can't infer T matches DBTypes[StoreName]['value']
+      const id = await db.add(storeName, item as unknown as StoreValue<DBTypes, StoreName>);
       if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Added item to ${storeName}, id: ${id}`);
+        console.log(`[${this.constructor.name}] Added item to ${String(storeName)}, id: ${id}`);
       }
 
-      return { ...item, id: id as number } as T;
+      return { ...item, id: id as T['id'] } as T;
     } catch (error) {
       this.handleError('add', error as Error);
     }
@@ -108,22 +124,24 @@ export abstract class BaseIndexedDBService<
    * @param id - Item ID
    * @returns Item or null if not found
    */
-  async get(id: number): Promise<T | null> {
+  async get(id: number | string): Promise<T | null> {
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      const item = await (this.db! as any).get(storeName, id);
+      // Type assertion needed: idb can't verify id type matches DBTypes[StoreName]['key']
+      const item = await db.get(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (item) {
         if (import.meta.env.DEV) {
-          console.log(`[${this.constructor.name}] Retrieved item from ${storeName}, id: ${id}`);
+          console.log(`[${this.constructor.name}] Retrieved item from ${String(storeName)}, id: ${id}`);
         }
       } else {
-        console.warn(`[${this.constructor.name}] Item not found in ${storeName}, id: ${id}`);
+        console.warn(`[${this.constructor.name}] Item not found in ${String(storeName)}, id: ${id}`);
       }
 
-      return item || null;
+      return (item as T) || null;
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to get item ${id}:`, error);
       return null; // Graceful fallback
@@ -138,13 +156,14 @@ export abstract class BaseIndexedDBService<
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      const items = await (this.db! as any).getAll(storeName);
+      const items = await db.getAll(storeName);
 
       if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${storeName}`);
+        console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${String(storeName)}`);
       }
-      return items;
+      return items as T[];
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to get all items:`, error);
       return []; // Graceful fallback: return empty array
@@ -156,22 +175,23 @@ export abstract class BaseIndexedDBService<
    * @param id - Item ID to update
    * @param updates - Partial item data to merge
    */
-  async update(id: number, updates: Partial<T>): Promise<void> {
+  async update(id: number | string, updates: Partial<T>): Promise<void> {
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      const item = await (this.db! as any).get(storeName, id);
+      const item = await db.get(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (!item) {
-        throw new Error(`Item ${id} not found in ${storeName}`);
+        throw new Error(`Item ${id} not found in ${String(storeName)}`);
       }
 
-      const updated: T = { ...item, ...updates };
-      await (this.db! as any).put(storeName, updated);
+      const updated = { ...item, ...updates } as unknown as StoreValue<DBTypes, StoreName>;
+      await db.put(storeName, updated);
 
       if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Updated item in ${storeName}, id: ${id}`);
+        console.log(`[${this.constructor.name}] Updated item in ${String(storeName)}, id: ${id}`);
       }
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to update item ${id}:`, error);
@@ -183,15 +203,16 @@ export abstract class BaseIndexedDBService<
    * Delete an item by ID
    * @param id - Item ID to delete
    */
-  async delete(id: number): Promise<void> {
+  async delete(id: number | string): Promise<void> {
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      await (this.db! as any).delete(storeName, id);
+      await db.delete(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Deleted item from ${storeName}, id: ${id}`);
+        console.log(`[${this.constructor.name}] Deleted item from ${String(storeName)}, id: ${id}`);
       }
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to delete item ${id}:`, error);
@@ -206,11 +227,12 @@ export abstract class BaseIndexedDBService<
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      await (this.db! as any).clear(storeName);
+      await db.clear(storeName);
 
       if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Cleared all items from ${storeName}`);
+        console.log(`[${this.constructor.name}] Cleared all items from ${String(storeName)}`);
       }
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to clear store:`, error);
@@ -234,8 +256,9 @@ export abstract class BaseIndexedDBService<
     try {
       await this.init();
 
+      const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      const transaction = (this.db! as any).transaction(storeName, 'readonly');
+      const transaction = db.transaction(storeName, 'readonly');
       const store = transaction.objectStore(storeName);
 
       const results: T[] = [];

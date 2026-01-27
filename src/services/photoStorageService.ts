@@ -1,14 +1,12 @@
 import { openDB } from 'idb';
 import type { Photo } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 import { PhotoSchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
 import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../config/performance';
 import { performanceMonitor } from './performanceMonitor';
-
-const DB_NAME = 'my-love-db';
-const DB_VERSION = 3; // Story 6.2: Updated to 3 to match moodService for version compatibility
 
 /**
  * Photo Storage Service - IndexedDB CRUD operations for photos
@@ -25,11 +23,11 @@ const DB_VERSION = 3; // Story 6.2: Updated to 3 to match moodService for versio
  * - Version 1: Basic photos store existed but wasn't actively used
  * - Version 2: Enhanced Photo schema with compression metadata
  */
-class PhotoStorageService extends BaseIndexedDBService<Photo> {
+class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'> {
   /**
    * Get the object store name for photos
    */
-  protected getStoreName(): string {
+  protected getStoreName(): 'photos' {
     return 'photos';
   }
 
@@ -41,10 +39,10 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
   protected async _doInit(): Promise<void> {
     try {
       if (import.meta.env.DEV) {
-        console.log('[PhotoStorage] Initializing IndexedDB (version 3)...');
+        console.log(`[PhotoStorage] Initializing IndexedDB (version ${DB_VERSION})...`);
       }
 
-      this.db = await openDB<any>(DB_NAME, DB_VERSION, {
+      this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         async upgrade(db, oldVersion, newVersion, transaction) {
           if (import.meta.env.DEV) {
             console.log(`[PhotoStorage] Upgrading database from v${oldVersion} to v${newVersion}`);
@@ -53,23 +51,36 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
           // Migration: v1 → v2 with data preservation
           // v1 had photos store but with old schema (blob instead of imageBlob)
           if (oldVersion < 2) {
-            let migratedPhotos: any[] = [];
+            // Type for v1 photos (had 'blob' instead of 'imageBlob')
+            interface V1Photo {
+              id?: number;
+              blob?: Blob;
+              caption?: string;
+              tags: string[];
+              uploadDate: Date;
+              originalSize: number;
+              compressedSize: number;
+              width: number;
+              height: number;
+              mimeType: string;
+            }
+
+            let migratedPhotos: Photo[] = [];
 
             // Step 1: Preserve existing v1 photos before deleting store
             if (db.objectStoreNames.contains('photos')) {
               const oldPhotosStore = transaction.objectStore('photos');
-              const allV1Photos = await oldPhotosStore.getAll();
+              const allV1Photos = (await oldPhotosStore.getAll()) as unknown as V1Photo[];
 
               if (import.meta.env.DEV) {
                 console.log(`[PhotoStorage] Found ${allV1Photos.length} photos to migrate from v1`);
               }
 
               // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
-              migratedPhotos = allV1Photos.map((photo: any) => ({
+              migratedPhotos = allV1Photos.map((photo) => ({
                 ...photo,
-                imageBlob: photo.blob, // Rename blob → imageBlob
-                // Remove old 'blob' field to avoid duplication
-                blob: undefined,
+                id: photo.id!, // autoIncrement guarantees id exists for stored records
+                imageBlob: photo.blob as Blob, // Rename blob → imageBlob
               }));
 
               // Step 3: Delete old v1 store
@@ -92,9 +103,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
             // Step 5: Re-insert migrated photos into new v2 store
             if (migratedPhotos.length > 0) {
               for (const photo of migratedPhotos) {
-                // Remove undefined blob field before inserting
-                const { blob: _blob, ...cleanPhoto } = photo;
-                await photosStore.add(cleanPhoto);
+                await photosStore.add(photo);
               }
               if (import.meta.env.DEV) {
                 console.log(
@@ -128,11 +137,19 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
               console.log('[PhotoStorage] Created moods store (fallback)');
             }
           }
+
+          // Ensure sw-auth store exists (added in v4)
+          if (!db.objectStoreNames.contains('sw-auth')) {
+            db.createObjectStore('sw-auth', { keyPath: 'id' });
+            if (import.meta.env.DEV) {
+              console.log('[PhotoStorage] Created sw-auth store (fallback)');
+            }
+          }
         },
       });
 
       if (import.meta.env.DEV) {
-        console.log('[PhotoStorage] IndexedDB initialized successfully (v3)');
+        console.log(`[PhotoStorage] IndexedDB initialized successfully (v${DB_VERSION})`);
       }
     } catch (error) {
       this.handleError('initialize', error as Error);
@@ -196,8 +213,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
       try {
         await this.init();
 
+        const db = this.getTypedDB();
         // Use by-date index for sorted retrieval
-        const photos = await (this.db! as any).getAllFromIndex('photos', 'by-date');
+        const photos = await db.getAllFromIndex('photos', 'by-date');
         // Reverse to get newest first
         const sortedPhotos = photos.reverse();
 
@@ -231,7 +249,8 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
       try {
         await this.init();
 
-        const transaction = (this.db! as any).transaction('photos', 'readonly');
+        const db = this.getTypedDB();
+        const transaction = db.transaction('photos', 'readonly');
         const index = transaction.objectStore('photos').index('by-date');
 
         const results: Photo[] = [];
@@ -247,7 +266,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo> {
 
         // Collect photos up to limit
         while (cursor && collected < limit) {
-          results.push(cursor.value as Photo);
+          results.push(cursor.value);
           collected++;
           cursor = await cursor.continue();
         }

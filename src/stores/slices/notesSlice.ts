@@ -16,7 +16,7 @@
  * Story 2.1: Foundation - UI and state management only
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 import type { LoveNote } from '../../types/models';
 import { supabase } from '../../api/supabaseClient';
 import { authService } from '../../api/authService';
@@ -65,7 +65,7 @@ function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
   });
 }
 
-export const createNotesSlice: StateCreator<NotesSlice, [], [], NotesSlice> = (set, get) => ({
+export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) => ({
   // Initial state
   notes: [],
   notesIsLoading: false,

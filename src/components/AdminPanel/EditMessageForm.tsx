@@ -23,7 +23,7 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   // Reset form when message changes
-   
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Resetting form state when message prop changes (controlled form reset pattern)
   useEffect(() => {
     setText(message.text);
     setCategory(message.category);
