@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
 import type { Photo } from '../../types';
 import type { PhotoWithUrls } from '../../services/photoService';
@@ -33,13 +33,48 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validation state
-  const [captionError, setCaptionError] = useState<string | null>(null);
-  const [tagsError, setTagsError] = useState<string | null>(null);
+  // Server-side validation errors (from API responses)
+  const [serverCaptionError, setServerCaptionError] = useState<string | null>(null);
+  const [serverTagsError, setServerTagsError] = useState<string | null>(null);
+
+  // Compute client-side validation during render (derived state)
+  const clientCaptionError = useMemo(() => {
+    if (caption.length > 500) {
+      return `Caption is too long (${caption.length}/500 characters)`;
+    }
+    return null;
+  }, [caption]);
+
+  const clientTagsError = useMemo(() => {
+    if (!tagsInput.trim()) {
+      return null;
+    }
+
+    const tags = tagsInput
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
+
+    if (tags.length > 10) {
+      return `Too many tags (${tags.length}/10 max)`;
+    }
+
+    const longTags = tags.filter((tag) => tag.length > 50);
+    if (longTags.length > 0) {
+      return `Some tags are too long (max 50 characters): ${longTags[0].substring(0, 20)}...`;
+    }
+
+    return null;
+  }, [tagsInput]);
+
+  // Combine client and server errors (client takes precedence for immediate feedback)
+  const captionError = clientCaptionError || serverCaptionError;
+  const tagsError = clientTagsError || serverTagsError;
 
   // Photo preview URL - handles both Photo (imageBlob) and PhotoWithUrls (signedUrl)
   const [imageUrl, setImageUrl] = useState('');
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing preview URL from photo prop with side effects (object URL creation/revocation)
   useEffect(() => {
     // PhotoWithUrls has signedUrl
     if ('signedUrl' in photo && photo.signedUrl) {
@@ -55,45 +90,6 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       };
     }
   }, [photo]);
-
-  // Validate caption (max 500 characters)
-   
-  useEffect(() => {
-    if (caption.length > 500) {
-      setCaptionError(`Caption is too long (${caption.length}/500 characters)`);
-    } else {
-      setCaptionError(null);
-    }
-  }, [caption]);
-
-  // Validate tags (max 10 tags, max 50 chars per tag)
-   
-  useEffect(() => {
-    if (!tagsInput.trim()) {
-      setTagsError(null);
-      return;
-    }
-
-    const tags = tagsInput
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0);
-
-    if (tags.length > 10) {
-      setTagsError(`Too many tags (${tags.length}/10 max)`);
-      return;
-    }
-
-    const longTags = tags.filter((tag) => tag.length > 50);
-    if (longTags.length > 0) {
-      setTagsError(
-        `Some tags are too long (max 50 characters): ${longTags[0].substring(0, 20)}...`
-      );
-      return;
-    }
-
-    setTagsError(null);
-  }, [tagsInput]);
 
   // Check if form has changes
   const hasChanges = () => {
@@ -121,6 +117,9 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
     try {
       setIsSaving(true);
       setError(null);
+      // Clear server-side errors before new submission
+      setServerCaptionError(null);
+      setServerTagsError(null);
 
       // Parse tags
       const parsedTags = tagsInput
@@ -148,12 +147,12 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       if (isValidationError(err)) {
         const fieldErrors = err.fieldErrors;
 
-        // Set field-specific errors
+        // Set field-specific server errors
         if (fieldErrors.has('caption')) {
-          setCaptionError(fieldErrors.get('caption') || null);
+          setServerCaptionError(fieldErrors.get('caption') || null);
         }
         if (fieldErrors.has('tags')) {
-          setTagsError(fieldErrors.get('tags') || null);
+          setServerTagsError(fieldErrors.get('tags') || null);
         }
 
         // Set general error message

@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { Photo } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 import { PhotoSchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
@@ -79,6 +79,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
               // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
               migratedPhotos = allV1Photos.map((photo) => ({
                 ...photo,
+                id: photo.id!, // autoIncrement guarantees id exists for stored records
                 imageBlob: photo.blob as Blob, // Rename blob → imageBlob
               }));
 

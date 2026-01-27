@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { MoodEntry } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 import { MoodEntrySchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
@@ -19,11 +19,11 @@ import { ZodError } from 'zod';
  * - Version 2: photos and messages stores
  * - Version 3: Add moods store with by-date unique index
  */
-class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema> {
+class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods'> {
   /**
    * Get the object store name for moods
    */
-  protected getStoreName(): string {
+  protected getStoreName(): 'moods' {
     return 'moods';
   }
 

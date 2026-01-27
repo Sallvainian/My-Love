@@ -79,7 +79,7 @@ export function CountdownTimer({
   }, [upcomingAnniversaries, celebratingId]);
 
   // Update countdowns every 1 minute (60000ms) - Story requirement
-   
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Initial calculation and periodic updates; interval callback handles state updates
   useEffect(() => {
     updateCountdowns(); // Initial calculation
 
@@ -234,15 +234,20 @@ function CelebrationAnimation() {
   const heartCount = ANIMATION_VALUES.FLOATING_HEARTS_COUNT;
   const hearts = Array.from({ length: heartCount }, (_, i) => i);
 
+  // Memoize random X positions to maintain stable values across re-renders
+  const randomXPositions = useMemo(
+    () => Array.from({ length: heartCount }, () => Math.random() * 100),
+    [heartCount]
+  );
+
   return (
     <div className="absolute inset-0 pointer-events-none z-10" data-testid="celebration-animation">
       {hearts.map((i) => (
         <motion.div
           key={i}
           className="absolute"
-           
           initial={{
-            x: `${Math.random() * 100}%`,
+            x: `${randomXPositions[i]}%`,
             y: '100%',
             scale: 0,
             rotate: 0,

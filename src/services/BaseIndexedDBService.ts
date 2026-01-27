@@ -1,4 +1,4 @@
-import type { IDBPDatabase, DBSchema, StoreNames } from 'idb';
+import type { IDBPDatabase, DBSchema, StoreNames, StoreValue, StoreKey } from 'idb';
 
 /**
  * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores
@@ -108,7 +108,7 @@ export abstract class BaseIndexedDBService<
       const db = this.getTypedDB();
       const storeName = this.getStoreName();
       // Type assertion needed: idb can't infer T matches DBTypes[StoreName]['value']
-      const id = await db.add(storeName, item as DBTypes[StoreName]['value']);
+      const id = await db.add(storeName, item as unknown as StoreValue<DBTypes, StoreName>);
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Added item to ${String(storeName)}, id: ${id}`);
       }
@@ -131,7 +131,7 @@ export abstract class BaseIndexedDBService<
       const db = this.getTypedDB();
       const storeName = this.getStoreName();
       // Type assertion needed: idb can't verify id type matches DBTypes[StoreName]['key']
-      const item = await db.get(storeName, id as DBTypes[StoreName]['key']);
+      const item = await db.get(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (item) {
         if (import.meta.env.DEV) {
@@ -181,13 +181,13 @@ export abstract class BaseIndexedDBService<
 
       const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      const item = await db.get(storeName, id as DBTypes[StoreName]['key']);
+      const item = await db.get(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (!item) {
         throw new Error(`Item ${id} not found in ${String(storeName)}`);
       }
 
-      const updated = { ...item, ...updates } as DBTypes[StoreName]['value'];
+      const updated = { ...item, ...updates } as unknown as StoreValue<DBTypes, StoreName>;
       await db.put(storeName, updated);
 
       if (import.meta.env.DEV) {
@@ -209,7 +209,7 @@ export abstract class BaseIndexedDBService<
 
       const db = this.getTypedDB();
       const storeName = this.getStoreName();
-      await db.delete(storeName, id as DBTypes[StoreName]['key']);
+      await db.delete(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (import.meta.env.DEV) {
         console.log(`[${this.constructor.name}] Deleted item from ${String(storeName)}, id: ${id}`);

@@ -26,7 +26,8 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
 
   // AC-6.3.5: Lazy loading with IntersectionObserver
   useEffect(() => {
-    if (!imgRef.current) return;
+    const img = imgRef.current;
+    if (!img) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -40,12 +41,10 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
       }
     );
 
-    observer.observe(imgRef.current);
+    observer.observe(img);
 
     return () => {
-      if (imgRef.current) {
-        observer.unobserve(imgRef.current);
-      }
+      observer.unobserve(img);
       observer.disconnect();
     };
   }, [isVisible]);

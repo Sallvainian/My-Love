@@ -13,6 +13,12 @@ export interface StoredAuthToken {
 }
 
 /**
+ * Semantic type alias for mood entries in IndexedDB
+ * MoodEntry already has synced/supabaseId fields for persistence
+ */
+export type StoredMoodEntry = MoodEntry;
+
+/**
  * Shared IndexedDB Schema Definition
  * Defines the structure of all object stores in the my-love-db database
  *
@@ -62,6 +68,16 @@ export interface MyLoveDBSchema extends DBSchema {
  */
 export const DB_NAME = 'my-love-db';
 export const DB_VERSION = 4; // v4: Added sw-auth store for Background Sync
+
+/**
+ * Store name constants for consistent access across services
+ */
+export const STORE_NAMES = {
+  MESSAGES: 'messages',
+  PHOTOS: 'photos',
+  MOODS: 'moods',
+  SW_AUTH: 'sw-auth',
+} as const;
 
 /**
  * Store name literal types for type-safe store access

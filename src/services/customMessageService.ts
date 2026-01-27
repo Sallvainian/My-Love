@@ -7,7 +7,7 @@ import type {
   CustomMessagesExport,
 } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 import {
   CreateMessageInputSchema,
   UpdateMessageInputSchema,

@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "./scripts/dev-with-cleanup.sh",
     "dev:raw": "vite",
-    "build": "tsc -b && vite build",
+    "build": "dotenvx run --overload -- bash -c 'tsc -b && vite build'",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "dotenvx run --overload -- npx vite preview",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:unit:ui": "vitest --ui",

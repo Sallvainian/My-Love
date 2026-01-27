@@ -178,7 +178,7 @@ export const useAppStore = create<AppState>()(
               );
 
               if (isValidArray) {
-                state.messageHistory.shownMessages = new Map(raw);
+                state.messageHistory.shownMessages = new Map(raw) as Map<string, number>;
                 console.log(
                   '[Zustand Persist] Message history Map deserialized successfully:',
                   `${raw.length} entries`

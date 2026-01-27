@@ -32,20 +32,15 @@ export function PhotoCarousel() {
 
   // Navigation state
   const [direction, setDirection] = useState<'left' | 'right'>('left');
-  const [imageUrl, setImageUrl] = useState<string>('');
 
   // Story 4.4: Modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  // AC-4.3.3: Set image URL from Supabase signed URL
-  useEffect(() => {
-    if (currentPhoto && 'signedUrl' in currentPhoto && currentPhoto.signedUrl) {
-      setImageUrl(currentPhoto.signedUrl);
-    } else {
-      setImageUrl('');
-    }
-  }, [currentPhoto]);
+  // AC-4.3.3: Derive image URL from current photo (no state needed - pure computation)
+  const imageUrl = (currentPhoto && 'signedUrl' in currentPhoto && currentPhoto.signedUrl)
+    ? currentPhoto.signedUrl
+    : '';
 
   // AC-4.3.2: Navigation functions (with boundary checking)
   const navigateToNext = useCallback(() => {

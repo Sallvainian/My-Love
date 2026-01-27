@@ -275,9 +275,11 @@ SOLO:     reading (×17) → reflection → report → complete
 **New Components:**
 | Component | Purpose |
 |-----------|---------|
-| `src/services/db/dbConfig.ts` | Centralized DB version + upgrade logic |
+| `src/services/dbSchema.ts` | Centralized DB version + upgrade logic |
 | `ScriptureReadingService` | IndexedDB CRUD with `synced: false` pattern |
 | `SyncService` extension | `syncScriptureReadingData()` method |
+
+**⚠️ Service Worker Constraint:** `sw-db.ts` must be manually kept in sync with `dbSchema.ts` (Service Workers cannot import idb library).
 
 **IndexedDB Stores:**
 ```typescript
@@ -694,7 +696,7 @@ src/
 │       └── scriptureReadingSlice.ts    # NEW FILE (types co-located)
 │
 ├── services/
-│   ├── dbConfig.ts                     # NEW FILE (centralized IndexedDB version)
+│   ├── dbSchema.ts                     # NEW FILE (centralized IndexedDB version)
 │   └── scriptureReadingService.ts      # NEW FILE (IndexedDB CRUD)
 │
 ├── hooks/
@@ -750,9 +752,10 @@ tests/
 | `src/App.tsx` | Add scripture reading route/view |
 | `src/components/Navigation/BottomNavigation.tsx` | Add scripture tab |
 | `src/services/syncService.ts` | Add `syncScriptureReadingData()` method |
-| `src/services/moodService.ts` | Import shared `dbConfig.ts` (tech debt fix) |
-| `src/services/customMessageService.ts` | Import shared `dbConfig.ts` (tech debt fix) |
-| `src/services/photoStorageService.ts` | Import shared `dbConfig.ts` (tech debt fix) |
+| `src/services/moodService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
+| `src/services/customMessageService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
+| `src/services/photoStorageService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
+| `src/sw-db.ts` | **⚠️ Manual sync:** Update DB_VERSION to 5, add scripture stores if Background Sync needed |
 | `src/types/database.types.ts` | Add scripture table type definitions |
 | `src/types/models.ts` | Add scripture app model interfaces |
 | `src/hooks/index.ts` | Export `useMotionConfig`, `useScriptureBroadcast` |
@@ -795,7 +798,7 @@ tests/
 | FR Category | Primary Files |
 |-------------|---------------|
 | **Session Management (FR1-7)** | `scriptureReadingSlice.ts`, `scriptureReadingService.ts`, `ScriptureReadingView.tsx` |
-| **Solo Mode Flow (FR8-13)** | `ReadingContainer.tsx`, `scriptureReadingService.ts`, `dbConfig.ts` |
+| **Solo Mode Flow (FR8-13)** | `ReadingContainer.tsx`, `scriptureReadingService.ts`, `dbSchema.ts` |
 | **Together Mode Flow (FR14-29)** | `useScriptureBroadcast.ts`, `LobbyContainer.tsx`, `LockInButton.tsx`, `Countdown.tsx` |
 | **Reflection System (FR30-33)** | `ReflectionSummary.tsx`, `BookmarkFlag.tsx`, `ReflectionContainer.tsx` |
 | **Daily Prayer Report (FR34-41)** | `DailyPrayerReport.tsx`, `ReflectionContainer.tsx` |
@@ -807,7 +810,7 @@ tests/
 | Concern | Files |
 |---------|-------|
 | **Real-time sync** | `useScriptureBroadcast.ts`, `scriptureReadingSlice.ts` |
-| **Offline persistence** | `dbConfig.ts`, `scriptureReadingService.ts`, `syncService.ts` |
+| **Offline persistence** | `dbSchema.ts`, `scriptureReadingService.ts`, `syncService.ts` |
 | **Reduced motion** | `useMotionConfig.ts` (global, used by all animated components) |
 | **RLS policies** | `20260125_scripture_reading.sql` |
 
@@ -849,7 +852,7 @@ tests/
 │        │                                                    │
 │        ▼                                                    │
 │  ┌────────────┐                                            │
-│  │  IndexedDB │◄──── dbConfig.ts (shared version)         │
+│  │  IndexedDB │◄──── dbSchema.ts (shared version)         │
 │  └────────────┘                                            │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -861,7 +864,7 @@ tests/
 | Supabase Auth | Existing | `authService.ts` (no changes) |
 | Supabase Database | PostgreSQL | `database.types.ts`, migration |
 | Supabase Realtime | Broadcast | `useScriptureBroadcast.ts` |
-| IndexedDB | idb wrapper | `dbConfig.ts`, `scriptureReadingService.ts` |
+| IndexedDB | idb wrapper | `dbSchema.ts`, `scriptureReadingService.ts` |
 
 ### File Organization Patterns
 
@@ -881,12 +884,12 @@ tests/
 
 **Problem:** Existing services use different IndexedDB versions causing `VersionError`.
 
-**Solution:** `src/services/dbConfig.ts`
+**Solution:** `src/services/dbSchema.ts` (centralized schema)
 
 ```typescript
-// dbConfig.ts
+// dbSchema.ts
 export const DB_NAME = 'my-love-db';
-export const DB_VERSION = 4; // Increment from current max
+export const DB_VERSION = 5; // Bumped for Scripture Reading stores
 
 export const STORES = {
   moods: { keyPath: 'id', indexes: ['synced', 'user_id'] },
@@ -911,11 +914,28 @@ export function upgradeDb(db: IDBPDatabase, oldVersion: number) {
 }
 ```
 
+**⚠️ Service Worker Sync Constraint:**
+
+The `sw-db.ts` file **must be kept in sync manually** with `dbSchema.ts`. Service Workers cannot import from the `idb` library, so constants are duplicated:
+
+```typescript
+// sw-db.ts
+// SYNC WARNING: These constants must match src/services/dbSchema.ts
+const DB_VERSION = 5; // Must match DB_VERSION in src/services/dbSchema.ts
+```
+
+**Scripture Reading Implementation Checklist:**
+1. ✅ Bump `DB_VERSION` to 5 in `dbSchema.ts`
+2. ✅ Add 5 new stores to `MyLoveDBSchema` interface
+3. ✅ Add upgrade logic in `scriptureReadingService.ts`
+4. ⚠️ Update `sw-db.ts` if Background Sync needs access to scripture data
+
 **Services to Update:**
 - `moodService.ts` → import `DB_NAME`, `DB_VERSION`, `upgradeDb`
 - `customMessageService.ts` → import shared config
 - `photoStorageService.ts` → import shared config
 - `scriptureReadingService.ts` → import shared config (new)
+- `sw-db.ts` → **manually sync** DB_VERSION constant
 
 ## Architecture Validation Results
 
@@ -971,7 +991,7 @@ All 24 NFRs have architectural support:
 
 **Structure Completeness:**
 - 15 new files specified with exact paths
-- 11 existing files identified for modification
+- 12 existing files identified for modification
 - Test structure mirrors src organization
 - Integration diagram shows data flow
 
@@ -1019,7 +1039,7 @@ All 24 NFRs have architectural support:
 - [x] Process patterns documented (error handling, offline sync)
 
 **✅ Project Structure**
-- [x] Complete directory structure defined (15 new, 11 modified)
+- [x] Complete directory structure defined (15 new, 12 modified)
 - [x] Component boundaries established (container/presentational)
 - [x] Integration points mapped (diagram included)
 - [x] Requirements to structure mapping complete (FR → files table)
@@ -1053,7 +1073,7 @@ All 24 NFRs have architectural support:
 - When in doubt, match existing app patterns (moodSlice, MoodService)
 
 **First Implementation Priority:**
-1. Create `src/services/dbConfig.ts` (tech debt fix — unblocks all services)
+1. Create `src/services/dbSchema.ts` (tech debt fix — unblocks all services)
 2. Create Supabase migration with tables + RPCs + RLS
 3. Generate TypeScript types from Supabase
 4. Create `scriptureReadingSlice.ts` with types
@@ -1080,7 +1100,7 @@ All 24 NFRs have architectural support:
 **Implementation Ready Foundation**
 - 6 architectural decisions made
 - 7 implementation patterns defined
-- 26 new/modified files specified
+- 27 new/modified files specified
 - 78 requirements (54 FRs + 24 NFRs) fully supported
 
 **AI Agent Implementation Guide**
