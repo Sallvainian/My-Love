@@ -40,11 +40,10 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
     setIsBirthdayToday(isToday);
   }, [birthday]);
 
-  // Initial calculation on mount
+  // Initial calculation on mount and when birthday changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateCountdown();
-  }, []);
+  }, [updateCountdown]);
 
   // Update every second for real-time countdown
   useEffect(() => {

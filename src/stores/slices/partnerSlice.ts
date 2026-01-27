@@ -14,7 +14,7 @@
  * - NOT persisted (loaded fresh on mount from Supabase)
  */
 
-import type { StateCreator } from 'zustand';
+import type { AppStateCreator } from '../types';
 import { partnerService } from '../../api/partnerService';
 import type { PartnerInfo, PartnerRequest, UserSearchResult } from '../../api/partnerService';
 
@@ -39,7 +39,7 @@ export interface PartnerSlice {
   hasPartner: () => boolean;
 }
 
-export const createPartnerSlice: StateCreator<PartnerSlice, [], [], PartnerSlice> = (set, get) => ({
+export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api) => ({
   // Initial state
   partner: null,
   isLoadingPartner: false,
