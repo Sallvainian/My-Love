@@ -2,6 +2,7 @@
 title: 'Refactor sw-db.ts to use idb library and centralized schema'
 slug: 'sw-db-idb-refactor'
 created: '2026-01-26'
+completed: '2026-01-26'
 status: 'completed'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack:
