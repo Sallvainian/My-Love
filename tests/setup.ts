@@ -1,34 +1,53 @@
 /**
- * Vitest global setup file
- * Configures test environment with IndexedDB polyfill and other global settings
+ * Vitest Test Setup
+ *
+ * This file runs before each unit test.
+ * Configure global mocks and setup here.
  */
+import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
-// Import jest-dom matchers for Vitest - this extends Vitest's expect with DOM matchers
-import '@testing-library/jest-dom/vitest';
-
-// Polyfill IndexedDB for testing
+// Mock IndexedDB for unit tests
 import 'fake-indexeddb/auto';
 
-// Reset IndexedDB between tests
-import { afterEach, beforeEach } from 'vitest';
-import { IDBFactory } from 'fake-indexeddb';
-
-beforeEach(() => {
-  // Reset the indexedDB instance to a fresh state
-  // @ts-expect-error - fake-indexeddb polyfills global indexedDB
-  globalThis.indexedDB = new IDBFactory();
+// Mock window.matchMedia (for responsive components)
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
 });
 
-afterEach(() => {
-  // Clean up any remaining databases
-  // @ts-expect-error - fake-indexeddb polyfills global indexedDB
-  const databases = globalThis.indexedDB.databases?.();
-  if (databases) {
-    databases.then((dbs: Array<{ name: string }>) => {
-      dbs.forEach((db) => {
-        // @ts-expect-error - fake-indexeddb polyfills global indexedDB
-        globalThis.indexedDB.deleteDatabase(db.name);
-      });
-    });
-  }
+// Mock IntersectionObserver (for virtualized lists)
+class MockIntersectionObserver {
+  observe = vi.fn();
+  disconnect = vi.fn();
+  unobserve = vi.fn();
+}
+
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: MockIntersectionObserver,
 });
+
+// Mock ResizeObserver (for responsive components)
+class MockResizeObserver {
+  observe = vi.fn();
+  disconnect = vi.fn();
+  unobserve = vi.fn();
+}
+
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: MockResizeObserver,
+});
+
+// Suppress console.error in tests (optional - remove if you want to see errors)
+// vi.spyOn(console, 'error').mockImplementation(() => {});

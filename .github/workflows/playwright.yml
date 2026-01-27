@@ -31,17 +31,16 @@ jobs:
       - name: Build app
         run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: npx dotenvx run -f .env.test -- npx playwright test
+        run: npx playwright test
         env:
           CI: true
-          DOTENV_PRIVATE_KEY_TEST: ${{ secrets.DOTENV_PRIVATE_KEY_TEST }}
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
           VITE_TEST_USER_EMAIL: ${{ secrets.VITE_TEST_USER_EMAIL }}
           VITE_TEST_USER_PASSWORD: ${{ secrets.VITE_TEST_USER_PASSWORD }}
 

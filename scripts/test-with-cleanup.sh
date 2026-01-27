@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
-# Playwright tests with proper cleanup
-# Ensures browser processes are killed after tests
+# E2E test runner with proper cleanup
+# This ensures child processes (dev server, browser) are killed on exit
 
 set -e
 
 # Cleanup function
 cleanup() {
-    echo -e "\n🧹 Cleaning up browser processes..."
+    echo -e "\n🧹 Cleaning up test processes..."
 
-    # Kill any remaining headless browsers
-    pkill -f "chromium.*headless" 2>/dev/null || true
-    pkill -f "headless_shell" 2>/dev/null || true
+    # Kill all child processes
+    jobs -p | xargs -r kill -TERM 2>/dev/null || true
+
+    # Give them a moment to cleanup gracefully
+    sleep 1
+
+    # Force kill if still running
+    jobs -p | xargs -r kill -9 2>/dev/null || true
 
     echo "✓ Cleanup complete"
+    exit 0
 }
 
 # Trap signals
-trap cleanup EXIT SIGINT SIGTERM
+trap cleanup SIGINT SIGTERM EXIT
 
 # Run playwright tests
-echo "🎭 Running Playwright tests..."
+# The webServer in playwright.config.ts handles dotenvx for the dev server
+echo "🧪 Running Playwright E2E tests..."
 npx playwright test "$@"
-
-# Explicit cleanup (trap will also run)
-cleanup
