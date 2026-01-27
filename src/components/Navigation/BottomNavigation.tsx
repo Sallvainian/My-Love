@@ -1,4 +1,4 @@
-import { Heart, Camera, Smile, Users, LogOut, MessageCircle } from 'lucide-react';
+import { Heart, Camera, Smile, Users, LogOut, MessageCircle, BookOpen } from 'lucide-react';
 import type { ViewType } from '../../stores/slices/navigationSlice';
 import { authService } from '../../api/authService';
 
@@ -79,6 +79,19 @@ export function BottomNavigation({ currentView, onViewChange }: BottomNavigation
         >
           <Camera className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium">Photos</span>
+        </button>
+
+        {/* Scripture Tab - Story 1.1: Navigation Entry Point */}
+        <button
+          onClick={() => onViewChange('scripture')}
+          className={`flex flex-col items-center justify-center flex-1 h-full min-w-[48px] min-h-[48px] transition-colors ${
+            currentView === 'scripture' ? 'text-purple-500' : 'text-gray-500 hover:text-gray-600'
+          }`}
+          data-testid="nav-scripture"
+          aria-label="Scripture"
+        >
+          <BookOpen className={`w-6 h-6 mb-1 ${currentView === 'scripture' ? 'fill-current' : ''}`} />
+          <span className="text-xs font-medium">Scripture</span>
         </button>
 
         {/* Logout Button */}
