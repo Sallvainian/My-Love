@@ -28,7 +28,8 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [direction, setDirection] = useState<'left' | 'right'>('left'); // Story 3.2: Track swipe direction
 
-  // Memoize random positions for floating hearts animation to maintain purity
+  // Memoize random positions once on mount (empty deps). Positions remain
+  // fixed for entire session to provide consistent floating hearts animation.
   const heartPositions = useMemo(
     () =>
       Array.from({ length: ANIMATION_VALUES.FLOATING_HEARTS_COUNT }, () => ({

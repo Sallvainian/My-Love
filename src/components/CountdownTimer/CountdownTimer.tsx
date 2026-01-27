@@ -234,7 +234,8 @@ function CelebrationAnimation() {
   const heartCount = ANIMATION_VALUES.FLOATING_HEARTS_COUNT;
   const hearts = Array.from({ length: heartCount }, (_, i) => i);
 
-  // Memoize random X positions to maintain stable values across re-renders
+  // Memoize random X positions for render purity. Regenerates when heartCount
+  // changes but stays stable within a session for consistent animation.
   const randomXPositions = useMemo(
     () => Array.from({ length: heartCount }, () => Math.random() * 100),
     [heartCount]
