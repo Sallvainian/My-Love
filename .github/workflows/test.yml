@@ -83,6 +83,7 @@ jobs:
 
   # ============================================
   # Stage 3: E2E Tests (Playwright - Sharded)
+  # With Supabase Local for database backend
   # ============================================
   e2e-tests:
     name: E2E Tests (Shard ${{ matrix.shard }}/${{ matrix.total }})
@@ -119,6 +120,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # --- Supabase Local Setup (Task 3.1 + 3.2) ---
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.72.7
+
+      - name: Start Supabase Local
+        timeout-minutes: 5
+        run: |
+          supabase start
+          supabase status --output json | jq -e '.DB_URL' > /dev/null
+          echo "Supabase Local started successfully"
+
+      - name: Apply database migrations
+        run: |
+          supabase db reset --linked=false
+          echo "Migrations applied"
+
+      - name: Export Supabase credentials
+        id: supabase-creds
+        run: |
+          echo "SUPABASE_URL=$(supabase status --output json | jq -re '.API_URL')" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -re '.ANON_KEY')" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -re '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
+          echo "Supabase credentials exported"
+
+      - name: Verify Supabase connectivity
+        run: |
+          curl -sf "${SUPABASE_URL}/rest/v1/" -H "apikey: ${SUPABASE_ANON_KEY}" > /dev/null
+          echo "Supabase API is reachable"
+      # --- End Supabase Setup ---
+
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
@@ -140,9 +173,17 @@ jobs:
             playwright-report/
           retention-days: 30
 
+      # --- Supabase Teardown (Task 3.3) ---
+      - name: Stop Supabase Local
+        if: always()
+        run: |
+          supabase stop --no-backup
+          echo "✅ Supabase Local stopped and containers removed"
+
   # ============================================
   # Stage 4: Burn-In (Flaky Test Detection)
   # Only runs on PRs to main - catches flakiness before merge
+  # With Supabase Local for database backend
   # ============================================
   burn-in:
     name: Burn-In (Flaky Detection)
@@ -173,6 +214,37 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # --- Supabase Local Setup ---
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.72.7
+
+      - name: Start Supabase Local
+        timeout-minutes: 5
+        run: |
+          supabase start
+          supabase status --output json | jq -e '.DB_URL' > /dev/null
+          echo "Supabase Local started successfully"
+
+      - name: Apply database migrations
+        run: |
+          supabase db reset --linked=false
+          echo "Migrations applied"
+
+      - name: Export Supabase credentials
+        run: |
+          echo "SUPABASE_URL=$(supabase status --output json | jq -re '.API_URL')" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -re '.ANON_KEY')" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -re '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
+          echo "Supabase credentials exported"
+
+      - name: Verify Supabase connectivity
+        run: |
+          curl -sf "${SUPABASE_URL}/rest/v1/" -H "apikey: ${SUPABASE_ANON_KEY}" > /dev/null
+          echo "Supabase API is reachable"
+      # --- End Supabase Setup ---
 
       - name: Install Playwright system deps
         run: npx playwright install-deps chromium
@@ -220,6 +292,13 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 7
+
+      # --- Supabase Teardown ---
+      - name: Stop Supabase Local
+        if: always()
+        run: |
+          supabase stop --no-backup
+          echo "✅ Supabase Local stopped and containers removed"
 
   # ============================================
   # Stage 5: Merge Reports
