@@ -42,11 +42,11 @@ featureContext:
     - "Supabase Broadcast real-time sync"
     - "State machine for together mode"
     - "New Zustand slice"
-    - "IndexedDB offline-first service"
+    - "IndexedDB caching service (optimistic UI)"
 constraints:
   - Zustand state management (slice pattern)
   - Supabase Broadcast for real-time sync
-  - IndexedDB offline-first (solo mode)
+  - IndexedDB caching with optimistic UI (server is source of truth)
   - Service layer architecture
   - WCAG AA accessibility
   - prefers-reduced-motion support
@@ -96,7 +96,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 **Brownfield Constraints (Must Follow):**
 - Zustand slice composition pattern (new `scriptureReadingSlice`)
 - Supabase Broadcast for real-time (not postgres_changes due to RLS)
-- IndexedDB offline-first with sync queue
+- IndexedDB caching with optimistic UI (server is source of truth)
 - Service layer architecture (new `scriptureReadingService`)
 - Zod validation on all API responses
 - No Server Components (pure client-side SPA)
@@ -139,7 +139,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 | **Styling** | Tailwind CSS 4.1 + Framer Motion 12.27 | Locked |
 | **State** | Zustand 5.0 (slice composition) | Locked |
 | **Backend** | Supabase 2.90 (Auth, DB, Storage, Realtime) | Locked |
-| **Offline** | idb 8.0 (IndexedDB) | Locked |
+| **Caching** | idb 8.0 (IndexedDB) | Locked |
 | **Validation** | Zod 4.3 | Locked |
 
 ### Starter Template Decision: N/A
@@ -148,7 +148,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 
 1. **New Zustand slice** (`scriptureReadingSlice`) following slice composition pattern
 2. **New service** (`scriptureReadingService`) following service layer pattern
-3. **New IndexedDB service** for offline solo mode
+3. **New IndexedDB service** for caching and optimistic UI
 4. **New Supabase tables** (5) with RLS policies
 5. **New components** (8) using existing design system primitives
 
@@ -158,7 +158,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 |---------|------------------------|------------------------|
 | **Zustand slice** | `moodSlice`, `chatSlice`, etc. | `scriptureReadingSlice` |
 | **Service layer** | `authService`, `moodService` | `scriptureReadingService` |
-| **IndexedDB** | `offlineMoodService` | `offlineScriptureService` |
+| **IndexedDB** | `offlineMoodService` | `scriptureReadingService` (cache-only) |
 | **Supabase Broadcast** | Real-time sync pattern | Together mode sync |
 | **Component composition** | `MoodButton`, `MoodDetailModal` | `LockInButton`, `ReflectionSummary` |
 
@@ -172,7 +172,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 1. Data Architecture — Normalized 5 tables + snapshot_json
 2. Real-Time Sync — Hybrid (server-authoritative + client pending)
 3. State Machine — Phase enum + local view state + presence channel
-4. Offline Architecture — MoodService pattern + fix IndexedDB versioning
+4. Caching Architecture — IndexedDB as read cache + optimistic UI pattern
 
 **Important Decisions (Shape Architecture):**
 5. Component Architecture — Feature-scoped subfolders + centralized motion
@@ -181,7 +181,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 **Deferred Decisions (Post-MVP):**
 - Analytics/monitoring instrumentation
 - Performance optimization (lazy loading, code splitting)
-- Extended offline capabilities (Together mode offline queuing)
+- Draft-queue pattern for Solo offline writes (if user demand validated)
 
 ### Decision 1: Data Architecture
 
@@ -745,7 +745,7 @@ tests/
     └── scripture-reading/
         ├── solo-mode.test.ts
         ├── together-mode.test.ts
-        └── offline-sync.test.ts
+        └── network-handling.test.ts
 ```
 
 ### Existing Files Modified
@@ -815,7 +815,7 @@ tests/
 | Concern | Files |
 |---------|-------|
 | **Real-time sync** | `useScriptureBroadcast.ts`, `scriptureReadingSlice.ts` |
-| **Offline persistence** | `dbSchema.ts`, `scriptureReadingService.ts`, `syncService.ts` |
+| **Caching layer** | `dbSchema.ts`, `scriptureReadingService.ts` |
 | **Reduced motion** | `useMotionConfig.ts` (global, used by all animated components) |
 | **RLS policies** | `20260125_scripture_reading.sql` |
 
@@ -1006,7 +1006,7 @@ All 24 NFRs have architectural support:
 - All naming conventions documented
 - Broadcast payload structures defined
 - Component prop patterns with container/presentational split
-- Offline sync pattern follows existing app conventions
+- Optimistic UI pattern follows existing app conventions
 
 ### Gap Analysis Results
 
@@ -1031,7 +1031,7 @@ All 24 NFRs have architectural support:
 - [x] Project context thoroughly analyzed (brownfield, 54 FRs, 24 NFRs)
 - [x] Scale and complexity assessed (medium-high)
 - [x] Technical constraints identified (Zustand, Supabase, IndexedDB)
-- [x] Cross-cutting concerns mapped (sync, offline, accessibility)
+- [x] Cross-cutting concerns mapped (sync, caching, accessibility)
 
 **✅ Architectural Decisions**
 - [x] Critical decisions documented (6 decisions)
@@ -1043,7 +1043,7 @@ All 24 NFRs have architectural support:
 - [x] Naming conventions established (7 patterns)
 - [x] Structure patterns defined (feature folders, test mirrors)
 - [x] Communication patterns specified (broadcast payloads)
-- [x] Process patterns documented (error handling, offline sync)
+- [x] Process patterns documented (error handling, optimistic UI)
 
 **✅ Project Structure**
 - [x] Complete directory structure defined (15 new, 12 modified)
@@ -1068,7 +1068,7 @@ All 24 NFRs have architectural support:
 1. Analytics instrumentation for session tracking
 2. E2E test coverage for Together mode
 3. Code splitting for bundle optimization
-4. Extended offline support (Together mode queue)
+4. Draft-queue pattern for Solo offline writes (if user demand validated)
 
 ### Implementation Handoff
 
