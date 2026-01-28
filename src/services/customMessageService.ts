@@ -7,7 +7,7 @@ import type {
   CustomMessagesExport,
 } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 import {
   CreateMessageInputSchema,
   UpdateMessageInputSchema,
@@ -37,8 +37,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
   }
 
   /**
-   * Initialize IndexedDB connection (DB v4 for version compatibility)
-   * Story 6.2: Updated to v4 to match shared schema
+   * Initialize IndexedDB connection
+   * Uses centralized upgradeDb function from dbSchema.ts
    */
   protected async _doInit(): Promise<void> {
     try {
@@ -47,57 +47,8 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       }
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, _transaction) {
-          if (import.meta.env.DEV) {
-            console.log(
-              `[CustomMessageService] Upgrading database from v${oldVersion} to v${newVersion}`
-            );
-          }
-
-          // Create messages store if it doesn't exist
-          if (!db.objectStoreNames.contains('messages')) {
-            const messageStore = db.createObjectStore('messages', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            messageStore.createIndex('by-category', 'category');
-            messageStore.createIndex('by-date', 'createdAt');
-            if (import.meta.env.DEV) {
-              console.log('[CustomMessageService] Created messages store with indexes');
-            }
-          }
-
-          // Ensure photos store exists (should have been created in v2)
-          if (!db.objectStoreNames.contains('photos')) {
-            const photoStore = db.createObjectStore('photos', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            photoStore.createIndex('by-date', 'uploadDate', { unique: false });
-            if (import.meta.env.DEV) {
-              console.log('[CustomMessageService] Created photos store (fallback)');
-            }
-          }
-
-          // Ensure moods store exists (should have been created in v3)
-          if (!db.objectStoreNames.contains('moods')) {
-            const moodsStore = db.createObjectStore('moods', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            moodsStore.createIndex('by-date', 'date', { unique: true });
-            if (import.meta.env.DEV) {
-              console.log('[CustomMessageService] Created moods store (fallback)');
-            }
-          }
-
-          // Ensure sw-auth store exists (added in v4)
-          if (!db.objectStoreNames.contains('sw-auth')) {
-            db.createObjectStore('sw-auth', { keyPath: 'id' });
-            if (import.meta.env.DEV) {
-              console.log('[CustomMessageService] Created sw-auth store (fallback)');
-            }
-          }
+        upgrade(db, oldVersion, newVersion) {
+          upgradeDb(db, oldVersion, newVersion);
         },
       });
 
