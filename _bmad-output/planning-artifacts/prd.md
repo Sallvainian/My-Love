@@ -142,7 +142,7 @@ Create a calm, "safe-to-be-honest" couples ritual that turns Scripture into a sh
 |-------------|--------|-----------|
 | Real-time sync latency | <500ms | Together mode feels instant |
 | Session state recovery | 100% | Reconnects resume correctly |
-| Offline solo mode | Full functionality | Works on planes, poor signal |
+| Offline resilience | Cached data viewable; writes require connectivity | Graceful degradation with optimistic UI |
 | Race condition prevention | Zero double-advances | Server-authoritative state |
 | Data sync reliability | 99.9% | No lost reflections |
 
@@ -487,9 +487,10 @@ Scripture Reading is a **mobile-first PWA feature** within the existing My-Love 
 ### Offline Behavior
 
 **Solo Mode:**
-- Full offline support (IndexedDB first)
-- Sync to Supabase when online
-- Resume works offline
+- Optimistic UI with IndexedDB caching (server is source of truth)
+- Changes appear instantly, sync in background
+- Resume requires connectivity to fetch latest state
+- Graceful degradation: show cached data with "Offline" indicator when disconnected
 
 **Together Mode:**
 
@@ -667,7 +668,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 - **FR10:** User in Solo mode sees the response text and can continue to reflection
 - **FR11:** User in Solo mode can submit a reflection (rating, help flag, optional note) for each step
 - **FR12:** User in Solo mode can save progress and exit mid-session
-- **FR13:** User in Solo mode can use the feature fully offline (with sync when online)
+- **FR13:** User in Solo mode can use the feature with optimistic UI (changes appear instant, sync in background; requires eventual connectivity)
 
 ---
 
@@ -782,7 +783,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 | **NFR-R1:** Session state recovery | 100% | Reconnects resume correctly |
 | **NFR-R2:** Data sync reliability | 99.9% | No lost reflections |
 | **NFR-R3:** Race condition prevention | Zero double-advances | Server-authoritative state |
-| **NFR-R4:** Offline solo data integrity | 100% | IndexedDB persists all local data |
+| **NFR-R4:** Cache integrity | 100% | IndexedDB cache persists; on corruption, clear and refetch from server |
 | **NFR-R5:** Graceful degradation | Feature remains usable | If partner offline, allow clean exit |
 | **NFR-R6:** Reflection write idempotency | Unique constraint per session_id + step_index + user_id | No double submits under retries/reconnect |
 
@@ -832,4 +833,4 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 | **Daily Prayer Report** | End-of-session summary showing both partners' step-by-step reflections and optional messages to each other. |
 | **Server-authoritative state** | Design pattern where the server is the single source of truth for session state, preventing race conditions and ensuring consistency during reconnections. |
 | **Broadcast channel** | Supabase Realtime feature used to synchronize Together mode events between partners in real-time. |
-| **Offline-first** | Architecture pattern where Solo mode stores data locally (IndexedDB) first and syncs to server when connectivity is available. |
+| **Optimistic UI** | Architecture pattern where user actions appear instant (stored in IndexedDB cache) while syncing to server in background. Server is source of truth; IndexedDB provides fast reads and graceful offline viewing. |

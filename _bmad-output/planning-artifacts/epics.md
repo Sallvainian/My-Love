@@ -36,7 +36,7 @@ This document provides the complete epic and story breakdown for My-Love, decomp
 - FR10: User in Solo mode sees the response text and can continue to reflection
 - FR11: User in Solo mode can submit a reflection (rating, help flag, optional note) for each step
 - FR12: User in Solo mode can save progress and exit mid-session
-- FR13: User in Solo mode can use the feature fully offline (with sync when online)
+- FR13: User in Solo mode can use the feature with optimistic UI (changes appear instant, sync in background; requires eventual connectivity)
 
 **Together Mode Flow (FR14-29)**
 - FR14: User initiating Together mode can select their role (Reader or Responder)
@@ -110,7 +110,7 @@ This document provides the complete epic and story breakdown for My-Love, decomp
 - NFR-R1: Session state recovery — 100% (Reconnects resume correctly)
 - NFR-R2: Data sync reliability — 99.9% (No lost reflections)
 - NFR-R3: Race condition prevention — Zero double-advances (Server-authoritative state)
-- NFR-R4: Offline solo data integrity — 100% (IndexedDB persists all local data)
+- NFR-R4: Cache integrity — 100% (IndexedDB cache persists; on corruption, clear and refetch from server)
 - NFR-R5: Graceful degradation — Feature remains usable (If partner offline, allow clean exit)
 - NFR-R6: Reflection write idempotency — Unique constraint per session_id + step_index + user_id (No double submits)
 
@@ -124,7 +124,7 @@ This document provides the complete epic and story breakdown for My-Love, decomp
 **Integration (NFR-I1 to NFR-I4)**
 - NFR-I1: Supabase compatibility — Full compatibility with existing patterns (Auth, RLS, Realtime Broadcast)
 - NFR-I2: Existing app integration — Seamless navigation (Use existing ViewType pattern)
-- NFR-I3: Offline sync pattern — Consistent with existing sync services (IndexedDB + queue pattern)
+- NFR-I3: Caching pattern — Consistent with optimistic UI (IndexedDB read cache + write-through to server)
 - NFR-I4: State management pattern — Zustand slice composition (Consistent with existing slices)
 
 ### Additional Requirements
@@ -144,7 +144,7 @@ This document provides the complete epic and story breakdown for My-Love, decomp
 - **Phase Enum State Machine** — `'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete'`; step_index 0-16
 - **Supabase Broadcast Channels** — `scripture-session:{session_id}` for state updates, `scripture-presence:{session_id}` for ephemeral presence
 - **New Zustand Slice** — `scriptureReadingSlice` with types co-located in same file
-- **New Service** — `scriptureReadingService` for IndexedDB CRUD with `synced: false` pattern
+- **New Service** — `scriptureReadingService` for IndexedDB cache CRUD (read-heavy, write-through to server)
 - **New Hooks** — `useMotionConfig.ts` (global reduced-motion), `useScriptureBroadcast.ts` (real-time channel)
 - **Component Architecture** — Feature-scoped subfolders: `session/`, `reading/`, `reflection/`; container/presentational split
 - **RLS Policy Pattern** — Session-based access control (user must be session participant)
@@ -192,7 +192,7 @@ This document provides the complete epic and story breakdown for My-Love, decomp
 | FR10 | Epic 1 | Solo response viewing |
 | FR11 | Epic 1 | Solo reflection submission |
 | FR12 | Epic 1 | Solo save and exit |
-| FR13 | Epic 1 | Full offline support |
+| FR13 | Epic 1 | Optimistic UI with caching |
 | FR14 | Epic 3 | Together mode role selection |
 | FR15 | Epic 3 | Together mode lobby |
 | FR16 | Epic 3 | Partner join status |
@@ -243,7 +243,7 @@ Users can access Scripture Reading, start solo sessions, progress through all 17
 
 **FRs covered:** FR1, FR1a, FR2, FR3, FR4, FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR30, FR31, FR32, FR33, FR42, FR43, FR44, FR45, FR46, FR47, FR48, FR49
 
-**Implementation Notes:** Creates all foundational database tables (5 Supabase tables), Zustand slice, IndexedDB stores, services, and core UI components. Delivers complete offline-capable solo experience.
+**Implementation Notes:** Creates all foundational database tables (5 Supabase tables), Zustand slice, IndexedDB cache stores, services, and core UI components. Delivers complete solo experience with optimistic UI and graceful offline viewing.
 
 ---
 
@@ -377,18 +377,29 @@ So that **subsequent stories have reliable persistence and sync infrastructure**
 
 **Given** the `scriptureReadingService` is initialized
 **When** CRUD operations are called
-**Then** they follow the existing `synced: false` pattern for offline-first writes
+**Then** they follow the cache-based pattern (write-through to server, cache in IndexedDB)
 **And** expose methods: `createSession`, `getSession`, `updateSession`, `getSessionsByUser`
 
 **Given** the user is offline
-**When** `createSession` is called
-**Then** record persists to IndexedDB with `synced: false`
-**And** operation succeeds without network
+**When** `getSession` is called
+**Then** cached data is returned from IndexedDB if available
+**And** UI indicates offline status
 
 **Given** the `scriptureReadingSlice` is added to Zustand
 **When** the store initializes
 **Then** types are co-located in the same file
 **And** slice exposes: `currentSession`, `isLoading`, `error`, `sessions[]`
+
+**Given** a test environment needs scripture data
+**When** the `scripture_seed_test_data` RPC is called with options
+**Then** it creates test records across all 5 scripture tables:
+- `scripture_sessions` (configurable count, modes, statuses)
+- `scripture_step_states` (matching sessions with varied lock-in states)
+- `scripture_reflections` (ratings 1-5, optional notes, help flags)
+- `scripture_bookmarks` (random verses bookmarked)
+- `scripture_messages` (optional partner messages)
+**And** returns a summary of created record counts
+**And** the RPC is restricted to non-production environments
 
 **Implementation Notes:**
 
@@ -396,6 +407,7 @@ So that **subsequent stories have reliable persistence and sync infrastructure**
 - Create Supabase migration for tables with RLS policies
 - Create `src/services/scriptureReadingService.ts` following existing service patterns
 - Create `src/store/scriptureReadingSlice.ts` with TypeScript types co-located
+- Create `scripture_seed_test_data` RPC for test data generation
 - Write migration validation tests
 - Test RLS policies with different user contexts
 
@@ -434,10 +446,10 @@ So that **I can begin my personal scripture reading journey**.
 **And** the user is navigated to the first verse (step 0)
 
 **Given** the user is offline
-**When** they start a Solo session
-**Then** the session is created locally in IndexedDB with `synced: false`
-**And** UI transitions to `phase: 'reading'` immediately
-**And** they can proceed without waiting for network
+**When** they attempt to start a Solo session
+**Then** the UI shows "Offline - cannot start new session"
+**And** they can view cached data from previous sessions
+**And** a "Retry when online" option is available
 
 **Implementation Notes:**
 
@@ -579,9 +591,9 @@ So that **I can track my spiritual growth and flag areas needing support**.
 
 **Given** the user submits a reflection with rating=3, help_flag=true, note="Need to pray more"
 **When** they tap "Submit Reflection"
-**Then** a reflection record is created/updated in IndexedDB:
-- `session_id`, `step_index: N`, `user_id`, `rating: 3`, `help_flag: true`, `notes: "Need to pray more"`, `synced: false`
-**And** the record is queued for Supabase sync
+**Then** UI shows immediate success (optimistic)
+**And** reflection is posted to Supabase: `session_id`, `step_index: N`, `user_id`, `rating: 3`, `help_flag: true`, `notes: "Need to pray more"`
+**And** on success, IndexedDB cache is updated
 **And** if step 0-15: session advances to step N+1, phase='verse'
 **And** if step 16: session advances to completion flow
 
@@ -606,8 +618,9 @@ So that **I can track my spiritual growth and flag areas needing support**.
 
 **Given** the user is offline
 **When** they submit a reflection
-**Then** the reflection saves to IndexedDB with `synced: false`
-**And** they can proceed to the next step immediately
+**Then** UI shows "Will save when online" indicator
+**And** reflection is queued for retry when connectivity returns
+**And** they can proceed to the next step immediately with optimistic UI
 
 **Implementation Notes:**
 
@@ -715,63 +728,55 @@ So that **I can continue my scripture reading journey where I left off**.
 
 ---
 
-### Story 1.9: Offline Sync Engine
+### Story 1.9: Network Detection & Optimistic UI
 
 As a **user**,
-I want **my offline scripture reading data to sync reliably when I reconnect**,
-So that **I never lose progress and my data is backed up**.
+I want **instant feedback on my actions with graceful handling when offline**,
+So that **I have a smooth experience regardless of network conditions**.
 
 **Acceptance Criteria:**
 
-**Given** the user completes actions while offline (sessions, reflections)
-**When** network connectivity returns
-**Then** the sync service automatically pushes:
-- Session records to `scripture_sessions`
-- Reflection records to `scripture_reflections`
-**And** records update to `synced: true` locally
-**And** sync happens in background without blocking UI
+**Given** the app is running
+**When** network status changes
+**Then** the app detects online/offline state using `navigator.onLine` and network events
+**And** updates UI accordingly
 
-**Given** a sync conflict occurs (same reflection modified on server)
-**When** sync is attempted
-**Then** client data wins (last-write-wins for user's own reflections)
-**And** conflict is logged for debugging
-**And** no user notification required (silent resolution)
+**Given** the user performs an action (save reflection, bookmark verse)
+**When** the action is triggered
+**Then** UI shows immediate success (optimistic)
+**And** request is sent to server in background
+**And** on success, IndexedDB cache is updated
+**And** on failure, retry UI is shown
 
-**Given** the user edits the same session on two devices while offline
-**When** both devices reconnect and sync
-**Then** last-write-wins applies based on `updated_at` timestamp
-**And** no data corruption occurs
+**Given** a server request fails (network error, 5xx)
+**When** the failure is detected
+**Then** automatic retry with exponential backoff (1s, 2s, 4s, max 3 attempts)
+**And** user-initiated retry option after max attempts
 
-**Given** the sync queue has items pending
-**When** the user views the app
-**Then** a subtle "Syncing..." indicator appears (per NFR-P4)
-**And** it disappears when sync completes
+**Given** the user is offline
+**When** they view any scripture reading screen
+**Then** a subtle indicator shows "Offline - viewing cached data"
+**And** write actions show "Will save when online"
 
-**Given** sync fails (server error, auth expired)
-**When** the failure occurs
-**Then** items remain in queue with `synced: false`
-**And** retry is attempted on next network availability
-**And** user is not interrupted
+**Given** the user was offline and reconnects
+**When** connectivity is restored
+**Then** pending writes are retried
+**And** cache is refreshed with latest server data
 
-**Given** the user's device storage is full (IndexedDB quota exceeded)
-**When** they try to save a reflection
-**Then** they see a neutral warning: "Storage full. Please free up space to continue."
-**And** the reflection is kept in memory with retry option
-**And** existing data is not corrupted
-
-**Given** the sync queue grows large (>50 items)
-**When** sync runs
-**Then** items are processed in batches to avoid timeout
-**And** progress continues across app restarts
+**Given** the IndexedDB cache becomes corrupted
+**When** a read error occurs
+**Then** the cache is cleared
+**And** data is refetched from server
+**And** user sees brief loading state, not error
 
 **Implementation Notes:**
 
-- Implement sync queue processing in existing sync service pattern
-- Add offline detection using `navigator.onLine` and/or existing offline hook
-- Implement last-write-wins conflict resolution using `updated_at`
-- Handle IndexedDB quota exceeded gracefully
-- Batch processing for large queues
-- Subtle sync indicator component
+- Use existing `useOnlineStatus` hook or create if not exists
+- Implement retry logic in `scriptureReadingService`
+- Optimistic UI pattern: update UI → POST to server → confirm/rollback
+- No sync queue needed; each write is independent
+- IndexedDB stores session state for fast resume
+- Cache refresh on reconnect uses server as source of truth
 
 ---
 
@@ -876,8 +881,9 @@ So that **I can share my thoughts or encouragement after our reading**.
 
 **Given** the user taps "Send"
 **When** the message is valid (1-300 characters)
-**Then** the message is saved to `scripture_messages` table
-**And** `synced: false` if offline
+**Then** UI shows immediate success (optimistic)
+**And** message is posted to `scripture_messages` table
+**And** on success, cache is updated
 **And** the user proceeds to the Daily Prayer Report
 
 **Given** the user taps "Skip"
@@ -892,8 +898,9 @@ So that **I can share my thoughts or encouragement after our reading**.
 
 **Given** the user is offline
 **When** they send a message
-**Then** the message saves to IndexedDB with `synced: false`
-**And** the user proceeds normally
+**Then** UI shows "Will send when online" indicator
+**And** message is queued for retry when connectivity returns
+**And** the user proceeds to view cached report data
 
 **Implementation Notes:**
 
