@@ -2,7 +2,7 @@
 title: 'Sprint 0 CI Pipeline'
 slug: 'sprint-0-ci-pipeline'
 created: '2026-01-28'
-status: 'ready-for-development'
+status: 'completed'
 stepsCompleted: [1, 2, 3]
 part: '2 of 3'
 parent_spec: 'Sprint 0 Test Infrastructure'
@@ -89,7 +89,7 @@ Add Supabase Local lifecycle to GitHub Actions CI pipeline:
 
 #### Track 3: CI Pipeline (DevOps)
 
-- [ ] **Task 3.1: Add Supabase Local job to test.yml**
+- [x] **Task 3.1: Add Supabase Local job to test.yml**
   - File: `.github/workflows/test.yml`
   - Action: Add new job `supabase-setup` that runs before `e2e-tests`
   - Details:
@@ -121,7 +121,7 @@ Add Supabase Local lifecycle to GitHub Actions CI pipeline:
           run: supabase db reset
     ```
 
-- [ ] **Task 3.2: Update e2e-tests job to use Supabase Local**
+- [x] **Task 3.2: Update e2e-tests job to use Supabase Local**
   - File: `.github/workflows/test.yml`
   - Action: Modify `e2e-tests` job to depend on `supabase-setup` and use its outputs
   - Details:
@@ -134,7 +134,7 @@ Add Supabase Local lifecycle to GitHub Actions CI pipeline:
       ```
     - Ensure Supabase services are available for the test run
 
-- [ ] **Task 3.3: Add Supabase teardown step**
+- [x] **Task 3.3: Add Supabase teardown step**
   - File: `.github/workflows/test.yml`
   - Action: Add cleanup step in e2e-tests job
   - Details:
@@ -147,10 +147,10 @@ Add Supabase Local lifecycle to GitHub Actions CI pipeline:
 ### Acceptance Criteria
 
 #### AC-4: CI Pipeline Runs With Supabase Local
-- [ ] **AC-4.1**: Given a PR to main branch, when the test workflow runs, then Supabase Local starts successfully within 60 seconds
-- [ ] **AC-4.2**: Given Supabase Local is running, when `supabase db reset` executes, then all migrations apply without error
-- [ ] **AC-4.3**: Given migrations have run, when Playwright tests execute, then they can connect to the local Supabase instance
-- [ ] **AC-4.4**: Given the test job completes (pass or fail), when cleanup runs, then `supabase stop` executes and containers are removed
+- [x] **AC-4.1**: Given a PR to main branch, when the test workflow runs, then Supabase Local starts successfully within 60 seconds
+- [x] **AC-4.2**: Given Supabase Local is running, when `supabase db reset` executes, then all migrations apply without error
+- [x] **AC-4.3**: Given migrations have run, when Playwright tests execute, then they can connect to the local Supabase instance
+- [x] **AC-4.4**: Given the test job completes (pass or fail), when cleanup runs, then `supabase stop` executes and containers are removed
 
 ## Dependencies
 
@@ -191,3 +191,16 @@ Add Supabase Local lifecycle to GitHub Actions CI pipeline:
 **Performance Considerations:**
 - Consider caching Supabase Docker images in future optimization
 - Current timeout of 10 minutes should be sufficient
+
+## Review Notes
+
+- Adversarial review completed: 2026-01-28
+- Findings: 15 total, 6 real issues identified
+- Resolution approach: Walk-through (all 6 fixed)
+- Fixes applied:
+  - F1: Pinned Supabase CLI to v2.72.7
+  - F2: Added timeout and health check on supabase start
+  - F3: Reordered steps (npm ci before Supabase setup)
+  - F5: Added SERVICE_ROLE_KEY export
+  - F9: Changed jq -r to jq -re for null safety
+  - F13: Added Supabase connectivity verification
