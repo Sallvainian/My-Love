@@ -2,7 +2,7 @@
 title: 'Sprint 0 Test Factories'
 slug: 'sprint-0-test-factories'
 created: '2026-01-28'
-status: 'ready-for-development'
+status: 'completed'
 stepsCompleted: [1, 2, 3]
 part: '3 of 3'
 parent_spec: 'Sprint 0 Test Infrastructure'
@@ -104,7 +104,7 @@ export const test = base.extend<CustomFixtures>({
 
 #### Track 4: Test Factories (QA)
 
-- [ ] **Task 4.1: Create test factories file**
+- [x] **Task 4.1: Create test factories file**
   - File: `tests/support/factories/index.ts`
   - Action: Create new file with session and reflection factories
   - Details:
@@ -155,7 +155,7 @@ export const test = base.extend<CustomFixtures>({
     }
     ```
 
-- [ ] **Task 4.2: Add session fixture to Playwright fixtures**
+- [x] **Task 4.2: Add session fixture to Playwright fixtures**
   - File: `tests/support/fixtures/index.ts`
   - Action: Add `testSession` fixture that uses factory
   - Details:
@@ -190,7 +190,7 @@ export const test = base.extend<CustomFixtures>({
 
 #### Track 5: Validation Tests (QA)
 
-- [ ] **Task 5.1: Create dbSchema unit tests**
+- [x] **Task 5.1: Create dbSchema unit tests**
   - File: `tests/unit/services/dbSchema.test.ts`
   - Action: Create tests for upgradeDb function
   - Details:
@@ -263,14 +263,14 @@ export const test = base.extend<CustomFixtures>({
 ### Acceptance Criteria
 
 #### AC-5: Test Factories Create Usable Data
-- [ ] **AC-5.1**: Given a Supabase client, when `createTestSession()` is called, then it returns a `SeedResult` with valid session IDs
-- [ ] **AC-5.2**: Given a test uses the `testSession` fixture, when the test completes, then the fixture cleans up all created data
-- [ ] **AC-5.3**: Given `preset: 'mid_session'`, when `createTestSession()` is called, then the returned session is at step 7
+- [x] **AC-5.1**: Given a Supabase client, when `createTestSession()` is called, then it returns a `SeedResult` with valid session IDs
+- [x] **AC-5.2**: Given a test uses the `testSession` fixture, when the test completes, then the fixture cleans up all created data
+- [x] **AC-5.3**: Given `preset: 'mid_session'`, when `createTestSession()` is called, then the returned session is at step 7
 
 #### AC-6: Unit Tests Validate Schema
-- [ ] **AC-6.1**: Given the dbSchema tests, when `npm run test:unit` executes, then all tests pass
-- [ ] **AC-6.2**: Given a fresh IndexedDB, when upgradeDb runs, then all 8 stores are created
-- [ ] **AC-6.3**: Given a v4 database, when upgradeDb runs, then scripture stores are added
+- [x] **AC-6.1**: Given the dbSchema tests, when `npm run test:unit` executes, then all tests pass
+- [x] **AC-6.2**: Given a fresh IndexedDB, when upgradeDb runs, then all 8 stores are created
+- [x] **AC-6.3**: Given a v4 database, when upgradeDb runs, then scripture stores are added
 
 ## Dependencies
 
@@ -321,3 +321,10 @@ supabase stop
 - Implement 25 P0 tests using these factories and fixtures
 - Add more preset options as test scenarios require
 - Consider adding factory for Together mode sessions
+
+## Review Notes
+- Adversarial review completed (13 findings)
+- Findings: 6 fixed, 7 skipped (noise/low-impact/improvements)
+- Resolution approach: selective fix (F1, F2, F4, F5, F11, F12)
+- Fixed: SeedResult interface shape (F1), cleanup error handling (F2), N+1 parallel cleanup (F4), unused import (F5), afterEach db safety net (F11), typed SupabaseClient (F12)
+- Skipped: F3 (noise), F6/F7 (noise per expert panel), F8 (low), F9/F10 (improvements), F13 (noise)
