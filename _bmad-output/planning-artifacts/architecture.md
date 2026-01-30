@@ -42,11 +42,11 @@ featureContext:
     - "Supabase Broadcast real-time sync"
     - "State machine for together mode"
     - "New Zustand slice"
-    - "IndexedDB offline-first service"
+    - "IndexedDB caching service (optimistic UI)"
 constraints:
   - Zustand state management (slice pattern)
   - Supabase Broadcast for real-time sync
-  - IndexedDB offline-first (solo mode)
+  - IndexedDB caching with optimistic UI (server is source of truth)
   - Service layer architecture
   - WCAG AA accessibility
   - prefers-reduced-motion support
@@ -66,7 +66,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Category | FR Count | Architectural Impact |
 |----------|----------|---------------------|
 | Session Management | FR1-7 | Session lifecycle, mode selection, completion tracking |
-| Solo Mode Flow | FR8-13 | Offline-first storage, save/resume, self-paced progression |
+| Solo Mode Flow | FR8-13 | Optimistic UI with caching, save/resume, self-paced progression |
 | Together Mode Flow | FR14-29 | Real-time sync, lobby, roles, lock-in, reconnection |
 | Reflection System | FR30-33 | Per-step data capture, bookmark flag |
 | Daily Prayer Report | FR34-41 | End-of-session messaging, reflection comparison |
@@ -96,7 +96,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 **Brownfield Constraints (Must Follow):**
 - Zustand slice composition pattern (new `scriptureReadingSlice`)
 - Supabase Broadcast for real-time (not postgres_changes due to RLS)
-- IndexedDB offline-first with sync queue
+- IndexedDB caching with optimistic UI (server is source of truth)
 - Service layer architecture (new `scriptureReadingService`)
 - Zod validation on all API responses
 - No Server Components (pure client-side SPA)
@@ -118,7 +118,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Concern | Components Affected | Architectural Approach |
 |---------|--------------------|-----------------------|
 | **Real-time sync** | Lobby, reading phases, lock-in | Supabase Broadcast channel per session |
-| **Offline persistence** | Solo mode, reflections | IndexedDB service + sync queue |
+| **Caching & Optimistic UI** | Solo mode, reflections | IndexedDB read cache + write-through to server |
 | **Session state machine** | All phases | Zustand slice + server-authoritative state |
 | **Accessibility** | All UI components | Focus management, aria-live, reduced motion |
 | **Partner data isolation** | All data access | RLS policies + broadcast authorization |
@@ -139,7 +139,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 | **Styling** | Tailwind CSS 4.1 + Framer Motion 12.27 | Locked |
 | **State** | Zustand 5.0 (slice composition) | Locked |
 | **Backend** | Supabase 2.90 (Auth, DB, Storage, Realtime) | Locked |
-| **Offline** | idb 8.0 (IndexedDB) | Locked |
+| **Caching** | idb 8.0 (IndexedDB) | Locked |
 | **Validation** | Zod 4.3 | Locked |
 
 ### Starter Template Decision: N/A
@@ -148,7 +148,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 
 1. **New Zustand slice** (`scriptureReadingSlice`) following slice composition pattern
 2. **New service** (`scriptureReadingService`) following service layer pattern
-3. **New IndexedDB service** for offline solo mode
+3. **New IndexedDB service** for caching and optimistic UI
 4. **New Supabase tables** (5) with RLS policies
 5. **New components** (8) using existing design system primitives
 
@@ -158,7 +158,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 |---------|------------------------|------------------------|
 | **Zustand slice** | `moodSlice`, `chatSlice`, etc. | `scriptureReadingSlice` |
 | **Service layer** | `authService`, `moodService` | `scriptureReadingService` |
-| **IndexedDB** | `offlineMoodService` | `offlineScriptureService` |
+| **IndexedDB** | `offlineMoodService` | `scriptureReadingService` (cache-only) |
 | **Supabase Broadcast** | Real-time sync pattern | Together mode sync |
 | **Component composition** | `MoodButton`, `MoodDetailModal` | `LockInButton`, `ReflectionSummary` |
 
@@ -172,7 +172,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 1. Data Architecture — Normalized 5 tables + snapshot_json
 2. Real-Time Sync — Hybrid (server-authoritative + client pending)
 3. State Machine — Phase enum + local view state + presence channel
-4. Offline Architecture — MoodService pattern + fix IndexedDB versioning
+4. Caching Architecture — IndexedDB as read cache + optimistic UI pattern
 
 **Important Decisions (Shape Architecture):**
 5. Component Architecture — Feature-scoped subfolders + centralized motion
@@ -181,7 +181,7 @@ This is **not** a greenfield project. Scripture Reading is being added to an exi
 **Deferred Decisions (Post-MVP):**
 - Analytics/monitoring instrumentation
 - Performance optimization (lazy loading, code splitting)
-- Extended offline capabilities (Together mode offline queuing)
+- Draft-queue pattern for Solo offline writes (if user demand validated)
 
 ### Decision 1: Data Architecture
 
@@ -268,29 +268,33 @@ TOGETHER: lobby → countdown → reading (×17) → reflection → report → c
 SOLO:     reading (×17) → reflection → report → complete
 ```
 
-### Decision 4: Offline Architecture
+### Decision 4: Caching Architecture
 
-**Choice:** MoodService/SyncService Pattern + Fix IndexedDB Versioning
+**Choice:** IndexedDB as Read Cache + Optimistic UI Pattern
+
+**Rationale:** Server is source of truth. IndexedDB provides fast reads and graceful offline viewing. No complex sync queue or conflict resolution needed.
 
 **New Components:**
 | Component | Purpose |
 |-----------|---------|
 | `src/services/dbSchema.ts` | Centralized DB version + upgrade logic |
-| `ScriptureReadingService` | IndexedDB CRUD with `synced: false` pattern |
-| `SyncService` extension | `syncScriptureReadingData()` method |
+| `ScriptureReadingService` | IndexedDB cache CRUD (read-heavy, write-through to server) |
 
-**⚠️ Service Worker Constraint:** `sw-db.ts` must be manually kept in sync with `dbSchema.ts` (Service Workers cannot import idb library).
-
-**IndexedDB Stores:**
+**IndexedDB Stores (Cache-Only):**
 ```typescript
-'scripture_sessions': { keyPath: 'id', indexes: ['synced', 'user_id'] }
-'scripture_step_states': { keyPath: 'id', indexes: ['synced', 'session_id'] }
-'scripture_reflections': { keyPath: 'id', indexes: ['synced', 'session_id'] }
-'scripture_bookmarks': { keyPath: 'id', indexes: ['synced', 'session_id'] }
-'scripture_messages': { keyPath: 'id', indexes: ['synced', 'session_id'] }
+'scripture_sessions': { keyPath: 'id', indexes: ['user_id'] }
+'scripture_reflections': { keyPath: 'id', indexes: ['session_id'] }
+'scripture_bookmarks': { keyPath: 'id', indexes: ['session_id'] }
+'scripture_messages': { keyPath: 'id', indexes: ['session_id'] }
+// Note: No 'synced' index needed - server is source of truth
 ```
 
-**Tech Debt Fix:**
+**Cache Strategy:**
+- **Reads:** Check IndexedDB first → return cached data → fetch fresh from server → update cache
+- **Writes:** POST to server → on success, update IndexedDB cache → on failure, show retry UI
+- **Corruption Recovery:** On IndexedDB error, clear cache and refetch from server
+
+**Tech Debt Fix:** (unchanged)
 - Centralize IndexedDB version management (single source of truth)
 - All services reference shared version constant
 - Upgrade callbacks handle all stores in one place
@@ -425,6 +429,7 @@ CREATE POLICY "scripture_[table]_insert" ON scripture_[table]
   - `scripture_advance_phase(session_id, expected_version)`
   - `scripture_submit_reflection(session_id, step_index, user_id, rating, notes, is_shared)`
   - `scripture_create_session(mode, partner_id?)`
+  - `scripture_seed_test_data(session_count?, include_reflections?, include_messages?)` — test environments only
 
 **Code Naming (Inherited):**
 - Variables/functions: `camelCase` (`sessionId`, `handleLockIn`)
@@ -604,11 +609,11 @@ function LockInButton({ isLocked, isPending, partnerLocked, onLockIn }: LockInBu
 }
 ```
 
-**Offline Sync Pattern:**
-- Write to IndexedDB with `synced: false`
-- SyncService processes queue when online
-- Mark `synced: true` on success
-- Never block UI on sync completion
+**Cache & Optimistic UI Pattern:**
+- **Reads:** Return IndexedDB cache immediately → fetch fresh from server → update cache
+- **Writes:** Show optimistic success → POST to server → on success, update cache → on failure, retry with user feedback
+- **Recovery:** On cache corruption, clear IndexedDB and refetch from server
+- Never block UI on server response (optimistic)
 
 ### Enforcement Guidelines
 
@@ -740,7 +745,7 @@ tests/
     └── scripture-reading/
         ├── solo-mode.test.ts
         ├── together-mode.test.ts
-        └── offline-sync.test.ts
+        └── network-handling.test.ts
 ```
 
 ### Existing Files Modified
@@ -751,7 +756,7 @@ tests/
 | `src/stores/slices/navigationSlice.ts` | Add 'scripture' to ViewType |
 | `src/App.tsx` | Add scripture reading route/view |
 | `src/components/Navigation/BottomNavigation.tsx` | Add scripture tab |
-| `src/services/syncService.ts` | Add `syncScriptureReadingData()` method |
+| `src/services/syncService.ts` | No changes needed for scripture (cache-only pattern) |
 | `src/services/moodService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
 | `src/services/customMessageService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
 | `src/services/photoStorageService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
@@ -783,12 +788,12 @@ tests/
 
 **Data Boundaries:**
 
-| Data Type | Source of Truth | Sync Pattern |
-|-----------|-----------------|--------------|
-| Session state | Supabase (server) | Broadcast → Slice |
+| Data Type | Source of Truth | Cache Pattern |
+|-----------|-----------------|---------------|
+| Session state | Supabase (server) | Broadcast → Slice → IndexedDB cache |
 | Lock-in state | Supabase (server) | RPC → Broadcast |
-| Reflections | IndexedDB (local) | SyncService → Supabase |
-| Bookmarks | IndexedDB (local) | SyncService → Supabase |
+| Reflections | Supabase (server) | Write-through; IndexedDB cache for reads |
+| Bookmarks | Supabase (server) | Write-through; IndexedDB cache for reads |
 | Presence | Ephemeral broadcast | No persistence |
 
 ### Requirements to Structure Mapping
@@ -810,7 +815,7 @@ tests/
 | Concern | Files |
 |---------|-------|
 | **Real-time sync** | `useScriptureBroadcast.ts`, `scriptureReadingSlice.ts` |
-| **Offline persistence** | `dbSchema.ts`, `scriptureReadingService.ts`, `syncService.ts` |
+| **Caching layer** | `dbSchema.ts`, `scriptureReadingService.ts` |
 | **Reduced motion** | `useMotionConfig.ts` (global, used by all animated components) |
 | **RLS policies** | `20260125_scripture_reading.sql` |
 
@@ -895,13 +900,14 @@ export const STORES = {
   moods: { keyPath: 'id', indexes: ['synced', 'user_id'] },
   customMessages: { keyPath: 'id', indexes: ['synced'] },
   photos: { keyPath: 'id', indexes: ['synced'] },
-  // New scripture stores
-  scriptureSessions: { keyPath: 'id', indexes: ['synced', 'user_id'] },
-  scriptureStepStates: { keyPath: 'id', indexes: ['synced', 'session_id'] },
-  scriptureReflections: { keyPath: 'id', indexes: ['synced', 'session_id'] },
-  scriptureBookmarks: { keyPath: 'id', indexes: ['synced', 'session_id'] },
-  scriptureMessages: { keyPath: 'id', indexes: ['synced', 'session_id'] },
+  // New scripture stores (cache-only, no 'synced' index needed)
+  scriptureSessions: { keyPath: 'id', indexes: ['user_id'] },
+  scriptureReflections: { keyPath: 'id', indexes: ['session_id'] },
+  scriptureBookmarks: { keyPath: 'id', indexes: ['session_id'] },
+  scriptureMessages: { keyPath: 'id', indexes: ['session_id'] },
 };
+// Note: Existing stores retain 'synced' index for backward compatibility
+// Scripture stores use cache-only pattern (server is source of truth)
 
 export function upgradeDb(db: IDBPDatabase, oldVersion: number) {
   // Handle all store creation/upgrades in one place
@@ -934,8 +940,9 @@ const DB_VERSION = 5; // Must match DB_VERSION in src/services/dbSchema.ts
 - `moodService.ts` → import `DB_NAME`, `DB_VERSION`, `upgradeDb`
 - `customMessageService.ts` → import shared config
 - `photoStorageService.ts` → import shared config
-- `scriptureReadingService.ts` → import shared config (new)
-- `sw-db.ts` → **manually sync** DB_VERSION constant
+- `scriptureReadingService.ts` → import shared config (new, cache-only pattern)
+
+**Note:** `sw-db.ts` update not required for scripture - Background Sync not used (server is source of truth).
 
 ## Architecture Validation Results
 
@@ -977,7 +984,7 @@ All 54 FRs across 8 categories have architectural support:
 All 24 NFRs have architectural support:
 - Performance: Broadcast <500ms, Motion config <200ms transitions
 - Security: Session-based RLS, private-by-default reflections
-- Reliability: Version-based sync, idempotent writes
+- Reliability: Server-authoritative state, idempotent writes, cache recovery
 - Accessibility: WCAG AA patterns, prefers-reduced-motion
 - Integration: Brownfield constraints followed throughout
 
@@ -999,7 +1006,7 @@ All 24 NFRs have architectural support:
 - All naming conventions documented
 - Broadcast payload structures defined
 - Component prop patterns with container/presentational split
-- Offline sync pattern follows existing app conventions
+- Optimistic UI pattern follows existing app conventions
 
 ### Gap Analysis Results
 
@@ -1024,7 +1031,7 @@ All 24 NFRs have architectural support:
 - [x] Project context thoroughly analyzed (brownfield, 54 FRs, 24 NFRs)
 - [x] Scale and complexity assessed (medium-high)
 - [x] Technical constraints identified (Zustand, Supabase, IndexedDB)
-- [x] Cross-cutting concerns mapped (sync, offline, accessibility)
+- [x] Cross-cutting concerns mapped (sync, caching, accessibility)
 
 **✅ Architectural Decisions**
 - [x] Critical decisions documented (6 decisions)
@@ -1036,7 +1043,7 @@ All 24 NFRs have architectural support:
 - [x] Naming conventions established (7 patterns)
 - [x] Structure patterns defined (feature folders, test mirrors)
 - [x] Communication patterns specified (broadcast payloads)
-- [x] Process patterns documented (error handling, offline sync)
+- [x] Process patterns documented (error handling, optimistic UI)
 
 **✅ Project Structure**
 - [x] Complete directory structure defined (15 new, 12 modified)
@@ -1061,7 +1068,7 @@ All 24 NFRs have architectural support:
 1. Analytics instrumentation for session tracking
 2. E2E test coverage for Together mode
 3. Code splitting for bundle optimization
-4. Extended offline support (Together mode queue)
+4. Draft-queue pattern for Solo offline writes (if user demand validated)
 
 ### Implementation Handoff
 

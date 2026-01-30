@@ -19,6 +19,8 @@
     "test:e2e:raw": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
+    "test:burn-in": "bash scripts/burn-in.sh",
+    "test:ci-local": "bash scripts/ci-local.sh",
     "predeploy": "npm run build && npm run test:smoke",
     "deploy": "gh-pages -d dist",
     "postdeploy": "echo 'Deployment complete! Run: node scripts/post-deploy-check.cjs [YOUR_URL]'",

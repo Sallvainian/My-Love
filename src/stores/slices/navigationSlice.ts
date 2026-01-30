@@ -14,7 +14,7 @@
 
 import type { AppStateCreator } from '../types';
 
-export type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes';
+export type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 
 export interface NavigationSlice {
   // State
@@ -27,6 +27,7 @@ export interface NavigationSlice {
   navigateMood: () => void;
   navigatePartner: () => void;
   navigateNotes: () => void;
+  navigateScripture: () => void;
 }
 
 export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get, _api) => ({
@@ -45,6 +46,7 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
         mood: '/mood',
         partner: '/partner',
         notes: '/notes',
+        scripture: '/scripture',
       };
       const basePath = pathMap[view];
       // Respect base URL in production (e.g., /My-Love/ for GitHub Pages)
@@ -74,5 +76,9 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
 
   navigateNotes: () => {
     get().setView('notes');
+  },
+
+  navigateScripture: () => {
+    get().setView('scripture');
   },
 });
