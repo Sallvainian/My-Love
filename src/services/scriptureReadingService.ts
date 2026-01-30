@@ -12,6 +12,16 @@ import {
   upgradeDb,
 } from './dbSchema';
 import { supabase } from '../api/supabaseClient';
+import {
+  SupabaseSessionSchema,
+  SupabaseReflectionSchema,
+  SupabaseBookmarkSchema,
+  SupabaseMessageSchema,
+  type SupabaseSession,
+  type SupabaseReflection,
+  type SupabaseBookmark,
+  type SupabaseMessage,
+} from '../validation/schemas';
 
 // ============================================
 // Scripture Error Handling (AC: #3, Subtask 2.10)
@@ -66,57 +76,6 @@ function createScriptureError(
 ): ScriptureError {
   return { code, message, details };
 }
-
-// ============================================
-// Zod Validation Schemas (Subtask 2.9)
-// ============================================
-
-const SupabaseSessionSchema = z.object({
-  id: z.string().uuid(),
-  mode: z.enum(['solo', 'together']),
-  user1_id: z.string().uuid(),
-  user2_id: z.string().uuid().nullable(),
-  current_phase: z.enum(['lobby', 'countdown', 'reading', 'reflection', 'report', 'complete']),
-  current_step_index: z.number().int().min(0),
-  status: z.enum(['pending', 'in_progress', 'complete', 'abandoned']),
-  version: z.number().int().min(1),
-  snapshot_json: z.record(z.string(), z.unknown()).nullable(),
-  started_at: z.string(),
-  completed_at: z.string().nullable(),
-});
-
-const SupabaseReflectionSchema = z.object({
-  id: z.string().uuid(),
-  session_id: z.string().uuid(),
-  step_index: z.number().int().min(0),
-  user_id: z.string().uuid(),
-  rating: z.number().int().min(1).max(5).nullable(),
-  notes: z.string().nullable(),
-  is_shared: z.boolean(),
-  created_at: z.string(),
-});
-
-const SupabaseBookmarkSchema = z.object({
-  id: z.string().uuid(),
-  session_id: z.string().uuid(),
-  step_index: z.number().int().min(0),
-  user_id: z.string().uuid(),
-  share_with_partner: z.boolean(),
-  created_at: z.string(),
-});
-
-const SupabaseMessageSchema = z.object({
-  id: z.string().uuid(),
-  session_id: z.string().uuid(),
-  sender_id: z.string().uuid(),
-  message: z.string(),
-  created_at: z.string(),
-});
-
-export type SupabaseSession = z.infer<typeof SupabaseSessionSchema>;
-export type SupabaseReflection = z.infer<typeof SupabaseReflectionSchema>;
-export type SupabaseBookmark = z.infer<typeof SupabaseBookmarkSchema>;
-export type SupabaseMessage = z.infer<typeof SupabaseMessageSchema>;
 
 // ============================================
 // Transform helpers: Supabase → IndexedDB
@@ -324,7 +283,6 @@ class ScriptureReadingService extends BaseIndexedDBService<
   async addReflection(
     sessionId: string,
     stepIndex: number,
-    userId: string,
     rating: number,
     notes: string,
     isShared: boolean
@@ -332,7 +290,6 @@ class ScriptureReadingService extends BaseIndexedDBService<
     const { data, error } = await supabase.rpc('scripture_submit_reflection', {
       p_session_id: sessionId,
       p_step_index: stepIndex,
-      p_user_id: userId,
       p_rating: rating,
       p_notes: notes,
       p_is_shared: isShared,

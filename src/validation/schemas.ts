@@ -264,3 +264,69 @@ export const CustomMessagesExportSchema = z.object({
 });
 
 export type CustomMessagesExportSchemaType = z.infer<typeof CustomMessagesExportSchema>;
+
+// ============================================================================
+// Scripture Reading Validation (Story 1.1)
+// ============================================================================
+
+/**
+ * Supabase scripture_sessions row schema
+ * Validates RPC/query responses at the service boundary.
+ * snapshot_json is optional because not all RPCs return it.
+ */
+export const SupabaseSessionSchema = z.object({
+  id: z.string().uuid(),
+  mode: z.enum(['solo', 'together']),
+  user1_id: z.string().uuid(),
+  user2_id: z.string().uuid().nullable(),
+  current_phase: z.enum(['lobby', 'countdown', 'reading', 'reflection', 'report', 'complete']),
+  current_step_index: z.number().int().min(0),
+  status: z.enum(['pending', 'in_progress', 'complete', 'abandoned']),
+  version: z.number().int().min(1),
+  snapshot_json: z.record(z.string(), z.unknown()).nullable().optional(),
+  started_at: z.string(),
+  completed_at: z.string().nullable(),
+});
+
+/**
+ * Supabase scripture_reflections row schema
+ */
+export const SupabaseReflectionSchema = z.object({
+  id: z.string().uuid(),
+  session_id: z.string().uuid(),
+  step_index: z.number().int().min(0),
+  user_id: z.string().uuid(),
+  rating: z.number().int().min(1).max(5).nullable(),
+  notes: z.string().nullable(),
+  is_shared: z.boolean(),
+  created_at: z.string(),
+});
+
+/**
+ * Supabase scripture_bookmarks row schema
+ */
+export const SupabaseBookmarkSchema = z.object({
+  id: z.string().uuid(),
+  session_id: z.string().uuid(),
+  step_index: z.number().int().min(0),
+  user_id: z.string().uuid(),
+  share_with_partner: z.boolean(),
+  created_at: z.string(),
+});
+
+/**
+ * Supabase scripture_messages row schema
+ */
+export const SupabaseMessageSchema = z.object({
+  id: z.string().uuid(),
+  session_id: z.string().uuid(),
+  sender_id: z.string().uuid(),
+  message: z.string(),
+  created_at: z.string(),
+});
+
+// Inferred TypeScript types from scripture schemas
+export type SupabaseSession = z.infer<typeof SupabaseSessionSchema>;
+export type SupabaseReflection = z.infer<typeof SupabaseReflectionSchema>;
+export type SupabaseBookmark = z.infer<typeof SupabaseBookmarkSchema>;
+export type SupabaseMessage = z.infer<typeof SupabaseMessageSchema>;

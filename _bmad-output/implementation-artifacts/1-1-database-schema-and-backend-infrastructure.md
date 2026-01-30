@@ -347,7 +347,7 @@ The 6 section themes (from PRD): Healing & Restoration, Forgiveness & Reconcilia
 scripture_create_session(p_mode TEXT, p_partner_id UUID DEFAULT NULL) → JSONB
 scripture_lock_in(p_session_id UUID, p_step_index INT, p_user_id UUID, p_expected_version INT) → JSONB
 scripture_advance_phase(p_session_id UUID, p_expected_version INT) → JSONB
-scripture_submit_reflection(p_session_id UUID, p_step_index INT, p_user_id UUID, p_rating INT, p_notes TEXT, p_is_shared BOOLEAN) → JSONB
+scripture_submit_reflection(p_session_id UUID, p_step_index INT, p_rating INT, p_notes TEXT, p_is_shared BOOLEAN) → JSONB
 scripture_seed_test_data(p_preset TEXT DEFAULT 'mid_session') → JSONB (test environments only)
 ```
 
@@ -441,3 +441,13 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 **Created (Phase 1B):**
 - `supabase/migrations/20260130000001_scripture_rpcs.sql` — Fix seed RPC variable reuse bug + scripture_create_session + scripture_submit_reflection RPCs
+- `tests/e2e/scripture/scripture-rls-security.spec.ts` — 10 E2E RLS/RPC API tests (P0-001 through P0-012)
+- `tests/e2e/scripture/scripture-accessibility.spec.ts` — Accessibility E2E test placeholders
+- `tests/e2e/scripture/scripture-overview.spec.ts` — Overview page E2E test placeholders
+- `tests/e2e/scripture/scripture-session.spec.ts` — Session flow E2E test placeholders
+- `tests/e2e/scripture/scripture-solo-reading.spec.ts` — Solo reading E2E test placeholders
+- `tests/unit/hooks/useMotionConfig.test.ts` — RED test for useMotionConfig hook (Story 1.5)
+
+**Modified (Code Review Fixes):**
+- `src/validation/schemas.ts` — Added scripture Zod validation schemas (moved from inline in service)
+- `src/types/models.ts` — Added scripture type re-exports from dbSchema
