@@ -1,0 +1,226 @@
+# Phase 4: Implementation Workflow Status
+# Tracks implementation workflows for BMM brownfield track
+# Reference: https://docs.bmad-method.org/tea/explanation/tea-overview/
+
+generated: "2026-01-28"
+project: "My-Love"
+track: "method-brownfield"
+feature: "Scripture Reading for Couples"
+
+# STATUS DEFINITIONS:
+# - pending: Not yet started
+# - in-progress: Currently executing
+# - completed: Done (shows output file path)
+# - skipped: Intentionally skipped
+# - required: Must complete to progress
+# - recommended: Strongly suggested
+# - optional: Can skip
+# - gate: Quality checkpoint (PASS/CONCERNS/FAIL/WAIVED)
+
+workflow_status:
+  # ============================================
+  # SKIPPED GATE WORKFLOWS (from Phase 2)
+  # Per brownfield track: trace baseline recommended, nfr-assess optional
+  # ============================================
+  - phase: "2-gate"
+    name: "Skipped Phase 2 Gates"
+    note: "Add to Phase 4 as pending - run before release"
+    workflows:
+      - id: "trace-baseline"
+        status: "pending"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-trace"
+        output: "Baseline coverage traceability matrix"
+        scope: "once"
+        note: "Brownfield recommended - establishes test coverage baseline"
+
+      - id: "nfr-assess"
+        status: "optional"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-nfr"
+        output: "NFR assessment report"
+        scope: "release"
+        note: "Optional for brownfield, required for enterprise"
+
+  # ============================================
+  # PHASE 4: SPRINT-LEVEL WORKFLOWS
+  # ============================================
+  - phase: 4
+    name: "Implementation - Sprint Level"
+    workflows:
+      - id: "sprint-planning"
+        seq: 10
+        status: "required"
+        agent: "sm"
+        command: "/bmad_bmm_sprint-planning"
+        output: "sprint-status.yaml"
+        scope: "once-per-sprint"
+
+      - id: "sprint-status"
+        seq: 20
+        status: "optional"
+        agent: "sm"
+        command: "/bmad_bmm_sprint-status"
+        output: "Sprint summary and routing"
+        scope: "anytime"
+
+  # ============================================
+  # PHASE 4: PER-EPIC WORKFLOWS (TEA + Gate)
+  # Run these for EACH epic before stories
+  # ============================================
+  - phase: 4
+    name: "Implementation - Per Epic"
+    note: "Run once per epic, before story development"
+    workflows:
+      - id: "test-design-epic"
+        seq: 41
+        status: "recommended"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-test-design"
+        mode: "epic-level"
+        output: "test-design-epic-{N}.md"
+        scope: "per-epic"
+        trigger: "after sprint-planning, before stories"
+
+      - id: "atdd"
+        seq: 42
+        status: "recommended"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-atdd"
+        output: "atdd-checklist.md + failing tests"
+        scope: "per-epic"
+        trigger: "after test-design-epic"
+
+  # ============================================
+  # PHASE 4: PER-STORY WORKFLOWS (Story Cycle)
+  # Repeat for EACH story in the sprint
+  # ============================================
+  - phase: 4
+    name: "Implementation - Per Story"
+    note: "Story cycle: CS → VS → DS → CR → [loop or next]"
+    workflows:
+      - id: "create-story"
+        seq: 30
+        status: "required"
+        agent: "sm"
+        command: "/bmad_bmm_create-story"
+        output: "story-{epic}-{story}.md"
+        scope: "per-story"
+
+      - id: "validate-story"
+        seq: 35
+        status: "optional"
+        agent: "sm"
+        command: "/bmad_bmm_create-story"
+        mode: "Validate"
+        output: "story-validation-report.md"
+        scope: "per-story"
+
+      - id: "dev-story"
+        seq: 40
+        status: "required"
+        agent: "dev"
+        command: "/bmad_bmm_dev-story"
+        output: "Implementation code + tests"
+        scope: "per-story"
+
+      - id: "code-review"
+        seq: 50
+        status: "optional"
+        agent: "dev"
+        command: "/bmad_bmm_code-review"
+        output: "code-review-report.md"
+        scope: "per-story"
+        note: "Adversarial - finds 3-10 issues per story"
+
+  # ============================================
+  # PHASE 4: POST-EPIC WORKFLOWS (QA + Gates)
+  # Run after all stories in epic complete
+  # ============================================
+  - phase: 4
+    name: "Implementation - Post Epic"
+    note: "Run after epic stories complete, before next epic"
+    workflows:
+      - id: "automate"
+        seq: 43
+        status: "optional"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-automate"
+        output: "automation-summary.md + test files"
+        scope: "per-epic"
+        trigger: "after dev-story complete"
+
+      - id: "test-review"
+        seq: 44
+        status: "recommended"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-test-review"
+        output: "test-review.md (quality score)"
+        scope: "per-epic"
+        trigger: "after automate"
+
+      - id: "trace"
+        seq: 45
+        status: "gate"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-trace"
+        output: "traceability-matrix.md + gate-decision.md"
+        scope: "per-epic"
+        trigger: "after test-review"
+        decisions: ["PASS", "CONCERNS", "FAIL", "WAIVED"]
+
+      - id: "retrospective"
+        seq: 60
+        status: "optional"
+        agent: "sm"
+        command: "/bmad_bmm_retrospective"
+        output: "retrospective-{epic}.md"
+        scope: "per-epic"
+        trigger: "at epic end"
+
+  # ============================================
+  # PHASE 4: RELEASE GATE
+  # Run once before release
+  # ============================================
+  - phase: 4
+    name: "Implementation - Release Gate"
+    note: "Run before production release"
+    workflows:
+      - id: "nfr-assess-release"
+        seq: 46
+        status: "gate"
+        agent: "tea"
+        command: "/bmad_bmm_testarch-nfr"
+        output: "nfr-assessment.md"
+        scope: "release"
+        note: "Optional for brownfield"
+
+  # ============================================
+  # ANYTIME WORKFLOWS
+  # ============================================
+  - phase: 4
+    name: "Implementation - Anytime"
+    workflows:
+      - id: "correct-course"
+        status: "if-needed"
+        agent: "sm"
+        command: "/bmad_bmm_correct-course"
+        output: "change-proposal.md"
+        scope: "anytime"
+        trigger: "when major issues discovered"
+
+# ============================================
+# EXECUTION ORDER SUMMARY
+# ============================================
+# 1. [PENDING] trace-baseline (skipped from Phase 2)
+# 2. sprint-planning (once per sprint)
+# 3. FOR EACH EPIC:
+#    a. test-design-epic
+#    b. atdd (generates failing tests)
+#    c. FOR EACH STORY:
+#       - create-story → validate-story → dev-story → code-review
+#    d. automate (expand coverage)
+#    e. test-review (quality check)
+#    f. trace (gate decision)
+#    g. retrospective (optional)
+# 4. nfr-assess (before release, optional for brownfield)
