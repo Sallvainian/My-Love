@@ -21,20 +21,74 @@ npm run test:e2e:debug
 npx playwright test tests/e2e/example.spec.ts
 ```
 
+## Priority Tags
+
+All tests are tagged with priority levels in their name:
+
+- **[P0]** Critical paths — run every commit / PR check
+- **[P1]** High priority — run on PR to main
+- **[P2]** Medium priority — run nightly
+- **[P3]** Low priority — run on-demand
+
+```bash
+# Run only P0 tests
+npx playwright test --grep "\\[P0\\]"
+
+# Run P0 + P1 tests
+npx playwright test --grep "\\[P0\\]|\\[P1\\]"
+```
+
 ## Directory Structure
 
 ```
 tests/
-├── e2e/                      # End-to-end test files
-│   └── example.spec.ts       # Example tests (delete after adding real tests)
-├── support/                  # Test infrastructure
-│   ├── merged-fixtures.ts    # ⭐ Main entry point - import { test, expect } from here
-│   ├── fixtures/             # Custom project fixtures
-│   │   └── index.ts
-│   └── helpers/              # Pure utility functions
-│       └── index.ts
-├── setup.ts                  # Vitest setup (for unit tests)
-└── README.md                 # This file
+├── e2e/                          # End-to-end test files
+│   ├── auth/                     # Authentication flows
+│   │   ├── login.spec.ts         # Login flow (P0)
+│   │   ├── logout.spec.ts        # Logout flow (P0)
+│   │   ├── google-oauth.spec.ts  # Google OAuth (P0)
+│   │   └── display-name-setup.spec.ts # Display name setup (P0)
+│   ├── navigation/               # Navigation & routing
+│   │   ├── bottom-nav.spec.ts    # Bottom navigation tabs (P0)
+│   │   └── routing.spec.ts       # URL routing & deep links (P0)
+│   ├── home/                     # Home view
+│   │   ├── home-view.spec.ts     # Home widgets (P0)
+│   │   ├── welcome-splash.spec.ts # Welcome splash (P0)
+│   │   └── error-boundary.spec.ts # Error boundary (P0)
+│   ├── photos/                   # Photo gallery & upload
+│   │   ├── photo-gallery.spec.ts # Gallery display (P0)
+│   │   └── photo-upload.spec.ts  # Upload flow (P0)
+│   ├── mood/                     # Mood tracking
+│   │   └── mood-tracker.spec.ts  # Mood logging & history (P0)
+│   ├── partner/                  # Partner interactions
+│   │   └── partner-mood.spec.ts  # Partner mood & poke/kiss (P0)
+│   ├── notes/                    # Love notes messaging
+│   │   └── love-notes.spec.ts    # Send & view messages (P0)
+│   ├── scripture/                # Scripture reading
+│   │   ├── scripture-overview.spec.ts    # Overview page (P0)
+│   │   ├── scripture-session.spec.ts     # Session flow (P0)
+│   │   ├── scripture-reflection.spec.ts  # Reflections (P0)
+│   │   └── scripture-seeding.spec.ts     # Test data seeding (P0)
+│   ├── offline/                  # Offline support
+│   │   ├── network-status.spec.ts # Network indicator (P0)
+│   │   └── data-sync.spec.ts     # Data sync on reconnect (P0)
+│   └── example.spec.ts           # Example/smoke tests
+├── unit/                         # Unit tests (Vitest)
+│   ├── services/
+│   │   ├── dbSchema.test.ts      # IndexedDB schema (P0)
+│   │   └── dbSchema.indexes.test.ts # Index integrity (P0)
+│   ├── utils/
+│   │   ├── dateFormat.test.ts    # Date formatting (P0)
+│   │   └── moodGrouping.test.ts  # Mood grouping (P0)
+│   └── validation/
+│       └── schemas.test.ts       # Zod schemas (P0)
+├── support/                      # Test infrastructure
+│   ├── merged-fixtures.ts        # Main entry — import { test, expect } from here
+│   ├── fixtures/index.ts         # Custom fixtures (supabaseAdmin, testSession)
+│   ├── factories/index.ts        # Data factories (createTestSession, cleanupTestSession)
+│   └── helpers/index.ts          # Utility functions (waitFor, generateTestEmail)
+├── setup.ts                      # Vitest setup (for unit tests)
+└── README.md                     # This file
 ```
 
 ## Architecture

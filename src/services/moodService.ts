@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { MoodEntry } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 import { MoodEntrySchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
@@ -28,8 +28,8 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
   }
 
   /**
-   * Initialize IndexedDB connection with DB version 3
-   * Story 6.2: Create moods store with by-date unique index
+   * Initialize IndexedDB connection
+   * Uses centralized upgradeDb function from dbSchema.ts
    */
   protected async _doInit(): Promise<void> {
     try {
@@ -38,63 +38,13 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       }
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
-        async upgrade(db, oldVersion, newVersion) {
-          if (import.meta.env.DEV) {
-            console.log(`[MoodService] Upgrading database from v${oldVersion} to v${newVersion}`);
-          }
-
-          // Ensure messages store exists (should have been created in v1)
-          if (!db.objectStoreNames.contains('messages')) {
-            const messageStore = db.createObjectStore('messages', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            messageStore.createIndex('by-category', 'category');
-            messageStore.createIndex('by-date', 'createdAt');
-            if (import.meta.env.DEV) {
-              console.log('[MoodService] Created messages store (fallback)');
-            }
-          }
-
-          // Ensure photos store exists (should have been created in v2)
-          if (!db.objectStoreNames.contains('photos')) {
-            const photoStore = db.createObjectStore('photos', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            photoStore.createIndex('by-date', 'uploadDate', { unique: false });
-            if (import.meta.env.DEV) {
-              console.log('[MoodService] Created photos store (fallback)');
-            }
-          }
-
-          // Migration: v2 → v3 - Add moods store
-          if (oldVersion < 3) {
-            const moodsStore = db.createObjectStore('moods', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            // by-date index for fast date-based queries (unique: one mood per day)
-            moodsStore.createIndex('by-date', 'date', { unique: true });
-            if (import.meta.env.DEV) {
-              console.log('[MoodService] Created moods store with by-date unique index (v3)');
-            }
-          }
-
-          // Migration: v3 → v4 - Add sw-auth store for Background Sync
-          if (oldVersion < 4) {
-            if (!db.objectStoreNames.contains('sw-auth')) {
-              db.createObjectStore('sw-auth', { keyPath: 'id' });
-              if (import.meta.env.DEV) {
-                console.log('[MoodService] Created sw-auth store for Background Sync (v4)');
-              }
-            }
-          }
+        upgrade(db, oldVersion, newVersion) {
+          upgradeDb(db, oldVersion, newVersion);
         },
       });
 
       if (import.meta.env.DEV) {
-        console.log('[MoodService] IndexedDB initialized successfully (v4)');
+        console.log(`[MoodService] IndexedDB initialized successfully (v${DB_VERSION})`);
       }
     } catch (error) {
       this.handleError('initialize', error as Error);

@@ -5,7 +5,7 @@
 ## Overview
 
 State management uses Zustand 5.0 with:
-- **Slice composition pattern** - 8 feature slices combined into one store
+- **Slice composition pattern** - 9 feature slices combined into one store
 - **Persist middleware** - LocalStorage for critical state
 - **IndexedDB integration** - Large data stored separately
 

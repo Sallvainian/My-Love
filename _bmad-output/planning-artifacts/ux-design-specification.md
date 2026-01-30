@@ -32,7 +32,7 @@ sourceOfTruth: _bmad-output/planning-artifacts/prd.md
 constraints:
   - Zustand state management (slice pattern)
   - Supabase Broadcast for real-time sync
-  - IndexedDB offline-first (solo mode)
+  - IndexedDB caching with optimistic UI (server is source of truth)
   - Service layer architecture
   - WCAG AA accessibility
   - prefers-reduced-motion support
@@ -77,7 +77,7 @@ The experience consists of 17 scripture steps paired with couple-focused respons
 
 3. **Accessibility in Intimate Context** — WCAG AA compliance, mobile-first touch targets (≥44px), screen reader support for dynamic content, `prefers-reduced-motion` respect, proper focus management.
 
-4. **Offline-First Reliability** — Solo mode must work completely offline with invisible save/resume and background sync when online.
+4. **Optimistic UI Reliability** — Solo mode uses optimistic UI with IndexedDB caching. Changes appear instant; server syncs in background. Cached data viewable offline; writes require eventual connectivity.
 
 ### Design Opportunities
 
@@ -95,14 +95,14 @@ The experience consists of 17 scripture steps paired with couple-focused respons
 |--------|----------|-----------|
 | **Primary Platform** | Mobile PWA | Intimate settings (bed, couch) demand mobile-first |
 | **Interaction Model** | Touch-first | Bottom-anchored actions, thumb-friendly targets |
-| **Offline Support** | Full for Solo mode | Works on planes, poor signal, anywhere |
+| **Offline Resilience** | Cached data viewable; writes require connectivity | Graceful degradation with optimistic UI |
 | **Together Mode** | Online-required | Real-time sync requires network |
 | **Desktop** | Works but not optimized | Secondary use case |
 
 **Technical Integration:**
 - Zustand state (new scriptureReadingSlice)
 - Supabase Broadcast for real-time sync
-- IndexedDB for offline-first data persistence
+- IndexedDB for read caching and optimistic UI (server is source of truth)
 - Framer Motion animations with `prefers-reduced-motion` support
 
 ### Effortless Interactions
@@ -137,7 +137,7 @@ The experience consists of 17 scripture steps paired with couple-focused respons
 
 2. **Synchronized Intimacy** — Together mode feels like being in the same room. Phase transitions are smooth, waiting feels purposeful.
 
-3. **Invisible Reliability** — Offline save, background sync, reconnection just work. Users never think about them.
+3. **Invisible Reliability** — Optimistic UI, background sync, reconnection just work. Users never think about them. Cached data available when offline; writes sync when connectivity returns.
 
 4. **Vulnerability is Invited, Not Demanded** — Bookmarks, notes, and reflections are invitations. Nothing required. Nothing judged.
 
@@ -826,7 +826,7 @@ flowchart TD
 
 ### Solo Mode Flow
 
-Self-paced reading with offline support and save/resume:
+Self-paced reading with optimistic UI and save/resume:
 
 1. **Entry**: Resume prompt if previous session incomplete
 2. **Reading**: Verse ↔ Response (free nav) → "Next Verse" → Repeat
@@ -856,7 +856,7 @@ flowchart TD
     J -->|No| K[Reflection]
 
     F --> L[Tap Exit]
-    L --> M[Save & Exit to IndexedDB]
+    L --> M[Save to Server & Cache Locally]
 
     K --> N[Rating + Note]
     N --> O{Partner Linked?}
