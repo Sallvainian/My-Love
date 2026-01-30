@@ -1,362 +1,118 @@
 # Service Layer
 
-> Services and utilities documentation for My-Love project.
+> Services, hooks, and data layer documentation for My-Love project.
+> Last updated: 2026-01-30 | Scan level: Deep (Rescan)
 
 ## Overview
 
-The service layer (`src/services/`) provides:
-- IndexedDB operations for offline storage
-- Sync orchestration between local and remote
-- Image processing and compression
-- Real-time subscription management
-
-## Service Files
-
-| File | Purpose |
-|------|---------|
-| `BaseIndexedDBService.ts` | Abstract base class for IDB |
-| `moodService.ts` | Mood IndexedDB operations |
-| `photoService.ts` | Photo metadata + Supabase Storage |
-| `photoStorageService.ts` | Supabase Storage integration |
-| `loveNoteImageService.ts` | Chat image uploads |
-| `imageCompressionService.ts` | Client-side compression |
-| `syncService.ts` | Sync orchestration |
-| `realtimeService.ts` | Supabase realtime subscriptions |
-| `customMessageService.ts` | Custom message storage |
-| `migrationService.ts` | Schema migrations |
-| `performanceMonitor.ts` | Performance tracking |
-| `storage.ts` | Generic storage utilities |
-
-## BaseIndexedDBService
-
-Abstract base class for IndexedDB operations.
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `init()` | Initialize database connection |
-| `add(item)` | Insert new record |
-| `get(id)` | Retrieve by ID |
-| `getAll()` | Retrieve all records |
-| `getPage(offset, limit)` | Paginated retrieval |
-| `update(id, changes)` | Update record |
-| `delete(id)` | Delete record |
-
-### Usage Pattern
-
-```typescript
-class MoodService extends BaseIndexedDBService<Mood, MoodDBTypes> {
-  constructor() {
-    super('my-love-db', 'moods', 1);
-  }
-
-  // Add custom methods as needed
-  async getMoodsByDate(date: string): Promise<Mood[]> {
-    // Custom query logic
-  }
-}
-```
-
-## Mood Service
-
-Handles mood data in IndexedDB.
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `saveMood(mood)` | Save mood entry |
-| `getMoods(userId)` | Get user's moods |
-| `getMoodsByDateRange(start, end)` | Range query |
-| `deleteMood(id)` | Remove mood |
-
-### Example
-
-```typescript
-import { moodService } from './services/moodService';
-
-// Save mood locally
-await moodService.saveMood({
-  id: uuid(),
-  user_id: userId,
-  mood_type: 'happy',
-  note: 'Great day!',
-  created_at: new Date().toISOString(),
-});
-
-// Fetch moods
-const moods = await moodService.getMoods(userId);
-```
-
-## Photo Service
-
-Manages photo metadata and Supabase Storage.
-
-### Types
-
-```typescript
-interface SupabasePhoto {
-  id: string;
-  user_id: string;
-  storage_path: string;
-  filename: string;
-  mime_type: string;
-  file_size: number;
-  width: number;
-  height: number;
-  caption: string | null;
-  created_at: string;
-}
+15 service files providing business logic, IndexedDB CRUD, Supabase integration, image processing, and performance monitoring. 13 hooks for React state management. 2 data files with static content.
 
-interface PhotoWithUrls extends SupabasePhoto {
-  url: string;
-  thumbnailUrl: string;
-}
+## Services
 
-interface StorageQuota {
-  used: number;
-  limit: number;
-  percentage: number;
-}
-```
+### scriptureReadingService.ts (NEW)
 
-### Methods
+Scripture reading session management with offline-first IndexedDB caching and Supabase sync.
 
-| Method | Description |
-|--------|-------------|
-| `uploadPhoto(file)` | Upload to Storage + save metadata |
-| `getPhotos(userId)` | Get photos with signed URLs |
-| `getPhotoById(id)` | Get single photo |
-| `updateCaption(id, caption)` | Edit caption |
-| `deletePhoto(id)` | Delete photo and file |
-| `getStorageQuota()` | Get usage stats |
+Key methods: `createSession`, `getSession`, `getUserSessions`, `updateSession`, `addReflection`, `getReflectionsBySession`, `addBookmark`, `toggleBookmark`, `getBookmarksBySession`, `addMessage`, `getMessagesBySession`, `recoverAllCaches`.
 
-### Quota Management
+Pattern: Cache-first reads with background refresh. Server-first writes. Zod validation on all responses.
 
-```typescript
-// Warning thresholds
-const QUOTA_WARNING = 0.8;   // 80%
-const QUOTA_CRITICAL = 0.95; // 95%
-const QUOTA_BLOCKED = 1.0;   // 100%
+Error codes: `VERSION_MISMATCH`, `SESSION_NOT_FOUND`, `UNAUTHORIZED`, `SYNC_FAILED`, `OFFLINE`, `CACHE_CORRUPTED`, `VALIDATION_FAILED`.
 
-const quota = await photoService.getStorageQuota();
-if (quota.percentage >= QUOTA_BLOCKED) {
-  throw new Error('Storage quota exceeded');
-}
-```
-
-## Image Compression Service
+### BaseIndexedDBService.ts
 
-Client-side image compression before upload.
+Generic CRUD base class for IndexedDB stores. Methods: `init`, `add`, `get`, `getAll`, `update`, `delete`, `clear`, `getPage` (cursor-based). Read ops return `null`/`[]`. Write ops throw. Lazy initialization guard.
 
-### Methods
+### dbSchema.ts
 
-| Method | Description |
-|--------|-------------|
-| `compressImage(file, options)` | Compress image |
-| `resizeImage(file, maxDimension)` | Resize maintaining aspect |
-| `convertToWebP(file)` | Convert to WebP format |
+Centralized IndexedDB schema (v5). Stores: `messages`, `photos`, `moods`, `sw-auth`, `scripture-sessions`/`reflections`/`bookmarks`/`messages`. Migration function handles v1-v5 upgrades.
 
-### Options
+### customMessageService.ts
 
-```typescript
-interface CompressionOptions {
-  maxWidth?: number;      // Default: 1920
-  maxHeight?: number;     // Default: 1080
-  quality?: number;       // Default: 0.8
-  mimeType?: string;      // Default: 'image/jpeg'
-}
-```
+Extends `BaseIndexedDBService`. CRUD for custom love messages with Zod validation, filtering (category, active, search), export/import with duplicate detection.
 
-### Example
+### moodService.ts
 
-```typescript
-import { imageCompressionService } from './services/imageCompressionService';
+Extends `BaseIndexedDBService`. Mood entry CRUD with sync tracking. Index: `by-date`. Methods: `create`, `updateMood`, `getMoodForDate`, `getMoodsInRange`, `getUnsyncedMoods`, `markAsSynced`.
 
-const compressed = await imageCompressionService.compressImage(file, {
-  maxWidth: 1200,
-  quality: 0.7,
-});
-```
-
-## Love Note Image Service
-
-Handles image uploads for chat messages.
+### photoStorageService.ts
 
-### Methods
+Extends `BaseIndexedDBService`. Photo CRUD with compression metadata, cursor-based pagination, storage quota estimation via StorageManager API.
 
-| Method | Description |
-|--------|-------------|
-| `uploadImage(file, noteId)` | Upload chat image |
-| `getImageUrl(path)` | Get signed URL |
-| `deleteImage(path)` | Delete image |
+### imageCompressionService.ts
 
-### Storage Path Pattern
-
-```
-love-notes/{userId}/{noteId}/{filename}
-```
+Client-side image compression using Canvas API. Max 2048px, 80% JPEG quality. Validates MIME (JPEG/PNG/WebP), rejects >25MB. Fallback to original on compression failure.
 
-## Sync Service
+### loveNoteImageService.ts
 
-Orchestrates sync between IndexedDB and Supabase.
+Image upload via Edge Function + signed URL management. LRU cache (max 100 URLs) with expiry buffer. Request deduplication. Batch URL generation.
 
-### Sync Strategy
+### photoService.ts
 
-```
-Local Change → Queue → Network Available → Supabase Sync
-                              ↓
-                     Sync Failed → Retry Queue
-```
+Supabase Storage operations. Upload with progress simulation, signed URLs (1hr), storage quota (1GB free, 80%/95% warnings), delete with rollback.
 
-### Methods
+### syncService.ts
 
-| Method | Description |
-|--------|-------------|
-| `queueSync(operation)` | Add to sync queue |
-| `processQueue()` | Process pending syncs |
-| `forceSyncAll()` | Immediate full sync |
-| `getSyncStatus()` | Get queue status |
+Offline-first background sync for mood entries. Partial failure handling. Methods: `syncPendingMoods`, `hasPendingSync`, `getPendingCount`.
 
-## Realtime Service
+### realtimeService.ts
 
-Manages Supabase realtime subscriptions.
+Supabase Realtime subscriptions for mood updates. Channel management, error handling, subscription tracking.
 
-### Subscription Patterns
+### authService.ts (in services/)
 
-```typescript
-// Mood updates via Broadcast (RLS workaround)
-supabase.channel(`mood-updates:${userId}`)
-  .on('broadcast', { event: 'mood-update' }, handler)
-  .subscribe();
+Supabase authentication. Methods: `signIn`, `signOut`, `getSession`, `getUser`, `getCurrentUserId`, `getCurrentUserIdOfflineSafe`.
 
-// Interaction notifications
-supabase.channel(`interactions:${userId}`)
-  .on('broadcast', { event: 'new-interaction' }, handler)
-  .subscribe();
-```
+### performanceMonitor.ts
 
-### Methods
+Operation timing metrics. `measureAsync` wraps operations. Tracks count, avg, min, max, total.
 
-| Method | Description |
-|--------|-------------|
-| `subscribeToMoods(userId, callback)` | Listen for mood updates |
-| `subscribeToInteractions(userId, callback)` | Listen for pokes/kisses |
-| `subscribeToNotes(userId, callback)` | Listen for new notes |
-| `unsubscribeAll()` | Clean up subscriptions |
+### migrationService.ts
 
-## Custom Message Service
+One-time LocalStorage to IndexedDB migration for custom messages with duplicate detection.
 
-Stores user-created messages in IndexedDB.
+### storage.ts
 
-### Methods
+Legacy `StorageService` (pre-refactor). `localStorageHelper`: generic get/set/remove/clear.
 
-| Method | Description |
-|--------|-------------|
-| `addMessage(text, category)` | Add custom message |
-| `getMessages()` | Get all custom messages |
-| `deleteMessage(id)` | Remove message |
+## Hooks
 
-## Migration Service
+| Hook | Purpose | Returns |
+|------|---------|---------|
+| `useAuth` | Current authenticated user | `user`, `isLoading`, `error` |
+| `useLoveNotes` | Love notes chat state + CRUD | `notes`, `sendNote`, `fetchNotes`, `retryFailedMessage`, `hasMore` |
+| `useRealtimeMessages` | Real-time love note subscriptions | (side effects only) |
+| `usePhotos` | Photos state + CRUD actions | `photos`, `uploadPhoto`, `loadPhotos`, `deletePhoto` |
+| `useMoodHistory` | Paginated mood history | `moods`, `loadMore`, `hasMore`, `isLoading` |
+| `usePartnerMood` | Partner mood with real-time updates | `partnerMood`, `connectionStatus` |
+| `useNetworkStatus` | Online/offline detection | `isOnline`, `isConnecting` |
+| `useImageCompression` | React wrapper for compression | `compress`, `result`, `status`, `error` |
+| `useVibration` | Haptic feedback | `vibrate`, `isSupported` |
 
-Handles IndexedDB schema migrations.
+## Data Files
 
-### Migration Pattern
+### scriptureSteps.ts (NEW)
 
-```typescript
-const migrations = [
-  {
-    version: 1,
-    migrate: (db) => {
-      db.createObjectStore('moods', { keyPath: 'id' });
-    },
-  },
-  {
-    version: 2,
-    migrate: (db) => {
-      db.createObjectStore('photos', { keyPath: 'id' });
-    },
-  },
-];
-```
+17 scripture steps across 6 sections (NKJV): Healing & Restoration (3), Forgiveness & Reconciliation (3), Confession & Repentance (3), God's Faithfulness & Peace (3), Power of Words (3), Christlike Character (2). Each step: `sectionTheme`, `verseReference`, `verseText`, `responseText`.
 
-## Performance Monitor
+### defaultMessages.ts
 
-Tracks performance metrics.
+365 pre-written messages across 5 categories (73 each): `reason`, `memory`, `affirmation`, `future`, `custom`. Used for daily message rotation.
 
-### Metrics
+## Architectural Patterns
 
-| Metric | Description |
-|--------|-------------|
-| `apiLatency` | API response times |
-| `renderTime` | Component render duration |
-| `syncTime` | Sync operation duration |
-| `storageUsage` | IndexedDB usage |
-
-### Example
-
-```typescript
-import { performanceMonitor } from './services/performanceMonitor';
-
-performanceMonitor.startMark('api-call');
-await moodApi.fetchByUser(userId);
-performanceMonitor.endMark('api-call');
-```
-
-## Storage Utilities
-
-Generic storage helpers.
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `get(key)` | Get from localStorage |
-| `set(key, value)` | Save to localStorage |
-| `remove(key)` | Delete from localStorage |
-| `clear()` | Clear all storage |
-
-## Best Practices
-
-### Service Singletons
-
-```typescript
-// Export singleton instance
-export const moodService = new MoodService();
-
-// Import and use
-import { moodService } from './services/moodService';
-```
-
-### Error Handling
-
-```typescript
-try {
-  await photoService.uploadPhoto(file);
-} catch (error) {
-  if (error instanceof QuotaExceededError) {
-    // Handle quota exceeded
-  }
-  // Re-throw for caller handling
-  throw error;
-}
-```
-
-### Offline Support
-
-```typescript
-import { isOnline } from '../api/errorHandlers';
-
-async function saveMood(mood: Mood) {
-  // Always save locally first
-  await moodService.saveMood(mood);
-
-  // Sync to server if online
-  if (isOnline()) {
-    await moodApi.create(mood);
-  } else {
-    await syncService.queueSync({ type: 'mood', operation: 'create', data: mood });
-  }
-}
-```
+1. **Cache-first with background refresh** (scriptureReadingService)
+2. **Singleton pattern** (all services)
+3. **Generic base class** (BaseIndexedDBService)
+4. **Zod validation** at service boundaries
+5. **Error resilience**: read operations degrade gracefully, write operations fail explicitly
+6. **Request deduplication** (loveNoteImageService)
+7. **LRU cache eviction** (signed URLs)
+8. **Exponential backoff** (realtime subscriptions)
+9. **Lazy initialization** (BaseIndexedDBService)
+
+## New Since Jan 27
+
+- **scriptureReadingService.ts**: Full CRUD for scripture sessions with IndexedDB caching
+- **scriptureSteps.ts**: 17 static scripture steps data
+- **dbSchema.ts**: v4 to v5 upgrade adding 4 scripture IndexedDB stores
