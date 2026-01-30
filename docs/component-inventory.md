@@ -6,39 +6,41 @@
 
 | Metric | Count |
 |--------|-------|
-| Total Components | 54 |
-| Feature Modules | 15 |
+| Total Components | 58 |
+| Feature Modules | 16 |
 | Shared Components | 2 |
-| Test Files | 4 |
+| Test Files | 8 |
 
 ## Component Tree
 
 ```
 src/components/
-├── AdminPanel/           # Message administration
-├── CountdownTimer/       # Timer display
-├── DailyMessage/         # Main message card
-├── DisplayNameSetup/     # Onboarding name input
-├── ErrorBoundary/        # Error handling
-├── InteractionHistory/   # Poke/kiss history
-├── LoginScreen/          # Authentication
-├── love-notes/           # Chat messaging
-├── MoodHistory/          # Calendar view
-├── MoodTracker/          # Mood logging
-├── Navigation/           # Bottom navigation
-├── PartnerMoodView/      # Partner mood display
-├── PhotoCarousel/        # Photo slider
-├── PhotoDeleteConfirmation/
-├── PhotoEditModal/       # Caption editing
-├── PhotoGallery/         # Photo grid
-├── photos/               # Photo upload
-├── PhotoUpload/          # Upload UI
-├── PokeKissInterface/    # Interactions
-├── RelationshipTimers/   # Countdown timers
-├── Settings/             # User settings
-├── shared/               # Shared utilities
-├── WelcomeButton/        # Welcome action
-└── WelcomeSplash/        # Splash screen
+├── AdminPanel/           # Message administration (6)
+├── CountdownTimer/       # Timer display (1)
+├── DailyMessage/         # Main message card (1)
+├── DisplayNameSetup/     # Onboarding name input (1)
+├── ErrorBoundary/        # Error handling (1)
+├── InteractionHistory/   # Poke/kiss history (1)
+├── LoginScreen/          # Authentication (1)
+├── love-notes/           # Chat messaging (6 + tests)
+├── MoodHistory/          # Calendar view (3)
+├── MoodTracker/          # Mood logging (6)
+├── Navigation/           # Bottom navigation (1 + test)
+├── PartnerMoodView/      # Partner mood display (1)
+├── PhotoCarousel/        # Photo slider (2)
+├── PhotoDeleteConfirmation/ # Delete dialog (1)
+├── PhotoEditModal/       # Caption editing (1)
+├── PhotoGallery/         # Photo grid (4)
+├── photos/               # Photo upload (1)
+├── PhotoUpload/          # Upload UI (1)
+├── PokeKissInterface/    # Interactions (1)
+├── RelationshipTimers/   # Countdown timers (4)
+├── scripture-reading/    # Scripture feature (NEW - 2 + test)
+├── Settings/             # User settings (2)
+├── shared/               # Shared utilities (2)
+├── ViewErrorBoundary/    # View-specific error boundary (1)
+├── WelcomeButton/        # Welcome action (1)
+└── WelcomeSplash/        # Splash screen (1)
 ```
 
 ## Feature Modules
@@ -134,15 +136,27 @@ User settings management.
 | `Settings.tsx` | Main settings panel |
 | `AnniversarySettings.tsx` | Date settings |
 
-### Navigation/ (1 component)
+### Navigation/ (1 component + test)
 
 Bottom tab navigation.
 
 | Component | Purpose |
 |-----------|---------|
 | `BottomNavigation.tsx` | 5-tab bottom nav |
+| `__tests__/BottomNavigation.test.tsx` | Navigation tests |
 
 **Tabs:** Home, Love Notes, Mood, Photos, Settings
+
+### scripture-reading/ (2 components + test) - NEW
+
+Scripture reading feature for couples (in development).
+
+| Component | Purpose |
+|-----------|---------|
+| `containers/ScriptureOverview.tsx` | Smart container for scripture overview |
+| `__tests__/ScriptureOverview.test.tsx` | Container tests |
+
+**Note:** Additional components to be added as feature development progresses.
 
 ### shared/ (2 components)
 

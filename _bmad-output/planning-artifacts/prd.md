@@ -58,7 +58,7 @@ featureContext:
     - "Supabase Broadcast real-time sync"
     - "State machine for together mode"
     - "New Zustand slice"
-    - "IndexedDB offline-first service"
+    - "IndexedDB caching service (optimistic UI)"
 ---
 
 # Product Requirements Document - My-Love
@@ -74,7 +74,7 @@ featureContext:
 
 **Why it exists:** A calm, "safe-to-be-honest" ritual for connection and repair. Helps couples soften toward each other, communicate better (especially after conflict), and build trust through repeated, gentle practice.
 
-**MVP scope:** Solo mode (offline-capable, resumable) + Together mode (lobby, Reader/Responder roles, synchronized phases, 3-second countdown). Reflection per step (1-5 rating, help flag, optional note). Daily Prayer Report (partner messages, shared reflections).
+**MVP scope:** Solo mode (resumable with optimistic UI) + Together mode (lobby, Reader/Responder roles, synchronized phases, 3-second countdown). Reflection per step (1-5 rating, help flag, optional note). Daily Prayer Report (partner messages, shared reflections).
 
 **Key non-goals:** No streaks (avoid pressure). No push notifications (keep calm). No shame UX ("Continue solo" not "Partner abandoned you"). Not therapy — just structured spiritual connection.
 
@@ -142,7 +142,7 @@ Create a calm, "safe-to-be-honest" couples ritual that turns Scripture into a sh
 |-------------|--------|-----------|
 | Real-time sync latency | <500ms | Together mode feels instant |
 | Session state recovery | 100% | Reconnects resume correctly |
-| Offline solo mode | Full functionality | Works on planes, poor signal |
+| Offline resilience | Cached data viewable; writes require connectivity | Graceful degradation with optimistic UI |
 | Race condition prevention | Zero double-advances | Server-authoritative state |
 | Data sync reliability | 99.9% | No lost reflections |
 
@@ -179,7 +179,7 @@ This section defines what's in scope for MVP, what's deferred to future phases, 
 - Together mode with lobby, roles, and real-time sync
 - Reflection system (rating, help flag, notes)
 - Daily Prayer Report (send/receive messages)
-- Offline-first for solo mode
+- Optimistic UI with IndexedDB caching
 - 5 Supabase tables with RLS
 
 **Deferred from MVP:**
@@ -277,7 +277,7 @@ Ana sees it the next morning. She texts: *"I saw your prayer report. That means 
 - Asynchronous Daily Prayer Report (partner sees later)
 - Self-paced step progression
 - Save & Exit / Resume (solo only)
-- Offline-capable
+- Optimistic UI with caching
 
 ---
 
@@ -389,7 +389,7 @@ At the end, neither knows there was a hiccup. The Daily Prayer Report shows all 
 | Journey | Key Capabilities Required |
 |---------|---------------------------|
 | Together — Repair Ritual | Lobby, ready states, countdown, role-based UI, sync, reflections, Daily Prayer Report |
-| Solo — Quiet Reset | Full solo flow, self-paced, async report delivery, save/resume, offline support |
+| Solo — Quiet Reset | Full solo flow, self-paced, async report delivery, save/resume, optimistic UI |
 | Reluctant Partner | Lobby fallback to solo, no-shame UX, report still generated |
 | Unlinked User | partner_id check, Together disabled gracefully, solo works, skip message step |
 | Time-Constrained | Save/resume (solo only MVP), progress persistence, continue prompt |
@@ -487,9 +487,10 @@ Scripture Reading is a **mobile-first PWA feature** within the existing My-Love 
 ### Offline Behavior
 
 **Solo Mode:**
-- Full offline support (IndexedDB first)
-- Sync to Supabase when online
-- Resume works offline
+- Optimistic UI with IndexedDB caching (server is source of truth)
+- Changes appear instantly, sync in background
+- Resume requires connectivity to fetch latest state
+- Graceful degradation: show cached data with "Offline" indicator when disconnected
 
 **Together Mode:**
 
@@ -530,7 +531,7 @@ Inherited from existing My-Love app:
 1. Mobile viewport testing (primary)
 2. Together-mode sync happy path
 3. Reconnect recovery scenarios
-4. Solo offline save/resume
+4. Solo save/resume with caching
 
 ---
 
@@ -562,7 +563,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 |------------|-------|
 | Overview Page | Basic stats (sessions, steps, avg rating, help count, last completed) |
 | Mode Selection | Solo / Together (Together disabled if unlinked) |
-| Solo Flow | Full 17 steps, self-paced, offline-capable, resumable |
+| Solo Flow | Full 17 steps, self-paced, resumable with optimistic UI |
 | Together Flow | Lobby, roles, countdown, synchronized phases (online-required) |
 | Reflections | Rating (1-5), help flag, optional note (200 chars) |
 | Daily Prayer Report | Send message (300 chars), view partner's message |
@@ -571,7 +572,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 | Accessibility | Keyboard nav, aria labels, focus management, reduced motion |
 
 **Network Requirements:**
-- **Solo Mode:** Fully offline-capable with IndexedDB; sync when online
+- **Solo Mode:** Online-required with optimistic UI; IndexedDB provides read caching for performance
 - **Together Mode:** Online-required; if either partner offline, show "Reconnecting..." + pause; allow clean "End session"
 
 **Explicitly NOT in MVP:**
@@ -623,7 +624,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 |------|------------|
 | Real-time sync complexity | Server-authoritative state; simple broadcast events |
 | State machine bugs | Clear phase transitions; extensive Together-mode testing |
-| Offline/online edge cases | Solo = offline-first; Together = online-required |
+| Offline/online edge cases | Solo = optimistic UI with caching; Together = online-required |
 
 **Market Risks:**
 
@@ -667,7 +668,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 - **FR10:** User in Solo mode sees the response text and can continue to reflection
 - **FR11:** User in Solo mode can submit a reflection (rating, help flag, optional note) for each step
 - **FR12:** User in Solo mode can save progress and exit mid-session
-- **FR13:** User in Solo mode can use the feature fully offline (with sync when online)
+- **FR13:** User in Solo mode can use the feature with optimistic UI (changes appear instant, sync in background; requires eventual connectivity)
 
 ---
 
@@ -782,7 +783,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 | **NFR-R1:** Session state recovery | 100% | Reconnects resume correctly |
 | **NFR-R2:** Data sync reliability | 99.9% | No lost reflections |
 | **NFR-R3:** Race condition prevention | Zero double-advances | Server-authoritative state |
-| **NFR-R4:** Offline solo data integrity | 100% | IndexedDB persists all local data |
+| **NFR-R4:** Cache integrity | 100% | IndexedDB cache persists; on corruption, clear and refetch from server |
 | **NFR-R5:** Graceful degradation | Feature remains usable | If partner offline, allow clean exit |
 | **NFR-R6:** Reflection write idempotency | Unique constraint per session_id + step_index + user_id | No double submits under retries/reconnect |
 
@@ -808,7 +809,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 |-------------|--------|---------|
 | **NFR-I1:** Supabase compatibility | Full compatibility with existing patterns | Auth, RLS, Realtime Broadcast |
 | **NFR-I2:** Existing app integration | Seamless navigation | Use existing ViewType pattern |
-| **NFR-I3:** Offline sync pattern | Consistent with existing sync services | IndexedDB + queue pattern |
+| **NFR-I3:** Caching pattern | Consistent with existing services | IndexedDB for read caching |
 | **NFR-I4:** State management pattern | Zustand slice composition | Consistent with existing slices |
 
 ---
@@ -821,7 +822,7 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 
 | Term | Definition |
 |------|------------|
-| **Solo mode** | Single-user session where one partner completes the Scripture Reading independently, offline-capable and resumable. |
+| **Solo mode** | Single-user session where one partner completes the Scripture Reading independently, resumable with optimistic UI. |
 | **Together mode** | Synchronized two-user session where both partners progress through steps in real-time, online-required. |
 | **Reader** | The partner role who reads the scripture verse aloud during Together mode. |
 | **Responder** | The partner role who reads the response prayer during Together mode. |
@@ -832,4 +833,4 @@ Phased delivery strategy from MVP through growth to vision, with explicit risk m
 | **Daily Prayer Report** | End-of-session summary showing both partners' step-by-step reflections and optional messages to each other. |
 | **Server-authoritative state** | Design pattern where the server is the single source of truth for session state, preventing race conditions and ensuring consistency during reconnections. |
 | **Broadcast channel** | Supabase Realtime feature used to synchronize Together mode events between partners in real-time. |
-| **Offline-first** | Architecture pattern where Solo mode stores data locally (IndexedDB) first and syncs to server when connectivity is available. |
+| **Optimistic UI** | Architecture pattern where user actions appear instant (stored in IndexedDB cache) while syncing to server in background. Server is source of truth; IndexedDB provides fast reads and graceful offline viewing. |

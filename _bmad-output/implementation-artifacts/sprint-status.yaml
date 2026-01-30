@@ -1,8 +1,7 @@
-# generated: 2026-01-27
+# generated: 2026-01-30
 # project: My-Love
-# project_key: my-love
 # tracking_system: file-system
-# story_location: /home/salvain/Projects/Personal/My-Love/_bmad-output/implementation-artifacts
+# story_location: _bmad-output/implementation-artifacts
 
 # STATUS DEFINITIONS:
 # ==================
@@ -33,54 +32,36 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-01-27
+generated: 2026-01-30
 project: My-Love
-project_key: my-love
 tracking_system: file-system
-story_location: /home/salvain/Projects/Personal/My-Love/_bmad-output/implementation-artifacts
+story_location: _bmad-output/implementation-artifacts
 
 development_status:
-  # Epic 1: Scripture Reading Foundation & Solo Mode
+  # Epic 1: Foundation & Solo Scripture Reading
   epic-1: backlog
-  1-1-navigation-entry-point: backlog
-  1-2-data-foundation: backlog
-  1-3-solo-session-ui: backlog
-  1-4-verse-reading-flow: backlog
-  1-5-response-display-flow: backlog
-  1-6-reflection-submission: backlog
-  1-7-session-completion-exit: backlog
-  1-8-resume-session-ui: backlog
-  1-9-offline-sync-engine: backlog
-  1-10-overview-page-with-stats: backlog
+  1-1-database-schema-and-backend-infrastructure: backlog
+  1-2-navigation-and-overview-page: backlog
+  1-3-solo-reading-flow: backlog
+  1-4-save-resume-and-optimistic-ui: backlog
+  1-5-accessibility-foundations: backlog
   epic-1-retrospective: optional
 
-  # Epic 2: Daily Prayer Report
+  # Epic 2: Reflection & Daily Prayer Report
   epic-2: backlog
-  2-1-end-of-session-message-composition: backlog
-  2-2-daily-prayer-report-personal-view: backlog
-  2-3-partner-message-async-report-sharing: backlog
+  2-1-per-step-reflection-system: backlog
+  2-2-end-of-session-reflection-summary: backlog
+  2-3-daily-prayer-report-send-and-view: backlog
   epic-2-retrospective: optional
 
-  # Epic 3: Together Mode Lobby & Synchronization
+  # Epic 3: Stats & Overview Dashboard
   epic-3: backlog
-  3-1-together-mode-role-selection-session-creation: backlog
-  3-2-together-mode-lobby: backlog
-  3-3-lobby-fallback-to-solo-countdown-start: backlog
+  3-1-couple-aggregate-stats-dashboard: backlog
   epic-3-retrospective: optional
 
-  # Epic 4: Together Mode Reading Experience
+  # Epic 4: Together Mode — Synchronized Reading
   epic-4: backlog
-  4-1-reader-phase-verse-display-lock-in: backlog
-  4-2-responder-phase-waiting-response-display: backlog
-  4-3-together-mode-reflection-step-advancement: backlog
-  4-4-partner-disconnection-handling: backlog
-  4-5-together-mode-report-side-by-side-view: backlog
+  4-1-lobby-role-selection-and-countdown: backlog
+  4-2-synchronized-reading-with-lock-in: backlog
+  4-3-reconnection-and-graceful-degradation: backlog
   epic-4-retrospective: optional
-
-  # Epic 5: Accessibility & Polish
-  epic-5: backlog
-  5-1-keyboard-navigation: backlog
-  5-2-screen-reader-support: backlog
-  5-3-focus-management: backlog
-  5-4-motion-color-accessibility: backlog
-  epic-5-retrospective: optional

@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { Photo } from '../types';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 import { PhotoSchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod';
@@ -32,9 +32,12 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
   }
 
   /**
-   * Initialize IndexedDB connection with DB version 3
-   * Story 4.1: Migrate from v1 to v2 if needed
-   * Story 6.2: Updated to v3 for version compatibility with moodService
+   * Initialize IndexedDB connection
+   * Uses centralized upgradeDb function from dbSchema.ts
+   *
+   * Note: The v1→v2 photo migration (blob → imageBlob rename) requires transaction
+   * access for data preservation, so it's handled here before delegating to upgradeDb.
+   * This is a one-time historical migration that most users have already completed.
    */
   protected async _doInit(): Promise<void> {
     try {
@@ -44,13 +47,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         async upgrade(db, oldVersion, newVersion, transaction) {
-          if (import.meta.env.DEV) {
-            console.log(`[PhotoStorage] Upgrading database from v${oldVersion} to v${newVersion}`);
-          }
-
-          // Migration: v1 → v2 with data preservation
-          // v1 had photos store but with old schema (blob instead of imageBlob)
-          if (oldVersion < 2) {
+          // Special handling for v1→v2 migration with data preservation
+          // This needs transaction access which upgradeDb() doesn't have
+          if (oldVersion >= 1 && oldVersion < 2 && db.objectStoreNames.contains('photos')) {
             // Type for v1 photos (had 'blob' instead of 'imageBlob')
             interface V1Photo {
               id?: number;
@@ -65,45 +64,29 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
               mimeType: string;
             }
 
-            let migratedPhotos: Photo[] = [];
+            // Step 1: Preserve existing v1 photos before upgradeDb deletes the store
+            const oldPhotosStore = transaction.objectStore('photos');
+            const allV1Photos = (await oldPhotosStore.getAll()) as unknown as V1Photo[];
 
-            // Step 1: Preserve existing v1 photos before deleting store
-            if (db.objectStoreNames.contains('photos')) {
-              const oldPhotosStore = transaction.objectStore('photos');
-              const allV1Photos = (await oldPhotosStore.getAll()) as unknown as V1Photo[];
-
-              if (import.meta.env.DEV) {
-                console.log(`[PhotoStorage] Found ${allV1Photos.length} photos to migrate from v1`);
-              }
-
-              // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
-              migratedPhotos = allV1Photos.map((photo) => ({
-                ...photo,
-                id: photo.id!, // autoIncrement guarantees id exists for stored records
-                imageBlob: photo.blob as Blob, // Rename blob → imageBlob
-              }));
-
-              // Step 3: Delete old v1 store
-              db.deleteObjectStore('photos');
-              if (import.meta.env.DEV) {
-                console.log('[PhotoStorage] Deleted old photos store from v1');
-              }
-            }
-
-            // Step 4: Create new v2 photos store with enhanced schema
-            const photosStore = db.createObjectStore('photos', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            photosStore.createIndex('by-date', 'uploadDate', { unique: false });
             if (import.meta.env.DEV) {
-              console.log('[PhotoStorage] Created photos store with by-date index (v2)');
+              console.log(`[PhotoStorage] Found ${allV1Photos.length} photos to migrate from v1`);
             }
 
-            // Step 5: Re-insert migrated photos into new v2 store
+            // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
+            const migratedPhotos: Photo[] = allV1Photos.map((photo) => ({
+              ...photo,
+              id: photo.id!, // autoIncrement guarantees id exists for stored records
+              imageBlob: photo.blob as Blob, // Rename blob → imageBlob
+            }));
+
+            // Step 3: Let upgradeDb handle store creation/deletion
+            upgradeDb(db, oldVersion, newVersion);
+
+            // Step 4: Re-insert migrated photos into new v2 store
             if (migratedPhotos.length > 0) {
+              const newPhotosStore = transaction.objectStore('photos');
               for (const photo of migratedPhotos) {
-                await photosStore.add(photo);
+                await newPhotosStore.add(photo);
               }
               if (import.meta.env.DEV) {
                 console.log(
@@ -111,39 +94,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
                 );
               }
             }
-          }
-
-          // Ensure messages store exists (should have been created in v1)
-          if (!db.objectStoreNames.contains('messages')) {
-            const messageStore = db.createObjectStore('messages', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            messageStore.createIndex('by-category', 'category');
-            messageStore.createIndex('by-date', 'createdAt');
-            if (import.meta.env.DEV) {
-              console.log('[PhotoStorage] Created messages store (fallback)');
-            }
-          }
-
-          // Ensure moods store exists (should have been created in v3)
-          if (!db.objectStoreNames.contains('moods')) {
-            const moodsStore = db.createObjectStore('moods', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            moodsStore.createIndex('by-date', 'date', { unique: true });
-            if (import.meta.env.DEV) {
-              console.log('[PhotoStorage] Created moods store (fallback)');
-            }
-          }
-
-          // Ensure sw-auth store exists (added in v4)
-          if (!db.objectStoreNames.contains('sw-auth')) {
-            db.createObjectStore('sw-auth', { keyPath: 'id' });
-            if (import.meta.env.DEV) {
-              console.log('[PhotoStorage] Created sw-auth store (fallback)');
-            }
+          } else {
+            // Standard upgrade path - delegate to centralized function
+            upgradeDb(db, oldVersion, newVersion);
           }
         },
       });

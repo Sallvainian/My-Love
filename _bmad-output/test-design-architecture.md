@@ -2,8 +2,8 @@
 
 **Purpose:** Architectural concerns, testability gaps, and NFR requirements for review by Architecture/Dev teams. Serves as a contract between QA and Engineering on what must be addressed before test development begins.
 
-**Date:** 2026-01-27
-**Author:** TEA (Test Engineering Agent)
+**Date:** 2026-01-28
+**Author:** TEA (Test Engineer Agent)
 **Status:** Architecture Review Pending
 **Project:** My-Love
 **PRD Reference:** `_bmad-output/planning-artifacts/prd.md`
@@ -13,59 +13,60 @@
 
 ## Executive Summary
 
-**Scope:** Scripture Reading feature - a guided spiritual activity where couples read scripture together (synchronized real-time) or solo, with reflection tracking, help flags, and a "daily prayer report" summary. 17 scripture steps across themes of healing, forgiveness, confession, peace, words, and character.
+**Scope:** Scripture Reading feature - Solo and Together modes with real-time sync, reflections, and Daily Prayer Report
 
 **Business Context** (from PRD):
-- **Revenue/Impact:** Engagement retention (7-day return >=50%, 30-day >=30%)
-- **Problem:** Couples need a calm, "safe-to-be-honest" ritual for connection and repair
-- **GA Launch:** MVP Phase 1
+- **Revenue/Impact:** Couples engagement and retention - core relationship ritual
+- **Problem:** Couples need a "safe-to-be-honest" ritual for connection and repair
+- **GA Launch:** MVP timeline pending
 
 **Architecture** (from ADR):
-- **Decision 1:** 5 normalized Supabase tables with RLS
-- **Decision 2:** Hybrid sync (server-authoritative + client pending state)
-- **Decision 3:** Zustand slice with phase enum state machine
+- **Key Decision 1:** Supabase Broadcast for real-time Together mode sync
+- **Key Decision 2:** Server-authoritative state with version-based concurrency control
+- **Key Decision 3:** IndexedDB as read cache with optimistic UI (server is source of truth)
+- **Key Decision 4:** Normalized 5-table schema with session-based RLS
 
 **Expected Scale** (from ADR):
 - Couples app with gradual growth; standard Supabase scaling sufficient
 
 **Risk Summary:**
-- **Total risks**: 8
-- **High-priority (>=6)**: 3 risks requiring immediate mitigation
-- **Test effort**: ~80-120 tests (~2-3 weeks for 1 QA)
+- **Total risks**: 9
+- **High-priority (score >=6)**: 3 risks requiring immediate mitigation
+- **Test effort**: ~100-150 tests (~3-5 weeks for 1 QA)
 
 ---
 
 ## Quick Guide
 
-### 🚨 BLOCKERS - Team Must Decide (Can't Proceed Without)
+### BLOCKERS - Team Must Decide (Can't Proceed Without)
 
 **Sprint 0 Critical Path** - These MUST be completed before QA can write integration tests:
 
-1. **B-001: IndexedDB Centralized Schema** - Create `src/services/dbSchema.ts` with single version source of truth before adding 5 new stores (recommended owner: Backend/Dev)
-2. **B-002: Supabase Migration with RLS** - Deploy `scripture_sessions`, `scripture_reflections`, `scripture_step_states`, `scripture_bookmarks`, `scripture_messages` tables with RLS policies (recommended owner: Backend)
-3. **B-003: Test Data Seeding API** - Provide method to seed test sessions/reflections for parallel test execution (recommended owner: Backend)
+1. **R-001: Test Data Seeding API** - Backend must implement `/api/test-data` endpoints for session, reflection, and message seeding (recommended owner: Backend Dev)
+2. **R-002: Supabase Broadcast Mock** - Need mock/stub strategy for Broadcast channels in CI (recommended owner: Backend Dev + QA)
+3. **R-008: Centralized dbSchema.ts** - Tech debt fix required before IndexedDB caching works reliably (recommended owner: Backend Dev)
 
 **What we need from team:** Complete these 3 items in Sprint 0 or test development is blocked.
 
 ---
 
-### ⚠️ HIGH PRIORITY - Team Should Validate (We Provide Recommendation, You Approve)
+### HIGH PRIORITY - Team Should Validate (We Provide Recommendation, You Approve)
 
-1. **R-001: Race Condition Prevention** - Validate version-based optimistic locking prevents double-advances in Together mode (Architecture review Sprint 1)
-2. **R-002: Broadcast Channel Authorization** - Confirm Supabase Broadcast doesn't leak session events to unauthorized users (Security review Sprint 1)
-3. **R-003: Offline Sync Conflict Resolution** - Validate last-write-wins strategy doesn't cause data loss in edge cases (Dev review Sprint 1)
+1. **R-003: Race Condition Prevention** - Server-authoritative state with `expected_version` validation looks solid; recommend testing version mismatch scenarios extensively (Sprint 1)
+2. **R-004: Reconnection Handling** - Broadcast reconnection with state resync defined; recommend chaos testing (periodic disconnect) in staging (Sprint 1-2)
+3. **R-005: IndexedDB Cache Corruption** - Recovery strategy defined (clear and refetch); recommend automated recovery validation (Sprint 1)
 
 **What we need from team:** Review recommendations and approve (or suggest changes).
 
 ---
 
-### 📋 INFO ONLY - Solutions Provided (Review, No Decisions Needed)
+### INFO ONLY - Solutions Provided (Review, No Decisions Needed)
 
-1. **Test strategy**: 60/30/10 API/E2E/Unit (real-time sync is API-testable, E2E for critical user journeys)
-2. **Tooling**: Playwright for E2E/API tests with `@seontechnologies/playwright-utils`
-3. **Tiered CI/CD**: All Playwright tests in PR (~10-15 min parallelized), performance tests nightly
-4. **Coverage**: ~80-120 test scenarios prioritized P0-P3 with risk-based classification
-5. **Quality gates**: P0 100% pass, P1 >=95%, no unmitigated high-risk items
+1. **Test strategy**: ~70% API/Unit, ~20% Integration, ~10% E2E (API-heavy architecture)
+2. **Tooling**: Playwright + @seontechnologies/playwright-utils (configured)
+3. **Tiered CI/CD**: PR (~10-15 min), Nightly (performance), Weekly (chaos)
+4. **Coverage**: ~100-150 test scenarios prioritized P0-P3 with risk-based classification
+5. **Quality gates**: P0 100%, P1 >=95%, high-risk mitigations complete
 
 **What we need from team:** Just review and acknowledge (we already have the solution).
 
@@ -75,30 +76,31 @@
 
 ### Risk Assessment
 
-**Total risks identified**: 8 (3 high-priority score >=6, 3 medium, 2 low)
+**Total risks identified**: 9 (3 high-priority score >=6, 4 medium, 2 low)
 
 #### High-Priority Risks (Score >=6) - IMMEDIATE ATTENTION
 
 | Risk ID | Category | Description | Probability | Impact | Score | Mitigation | Owner | Timeline |
 |---------|----------|-------------|-------------|--------|-------|------------|-------|----------|
-| **R-001** | **TECH** | Race conditions in Together mode lock-in causing double-advances or stuck sessions | 2 | 3 | **6** | Server-authoritative version check; reject stale mutations with 409 | Backend | Sprint 0 |
-| **R-002** | **SEC** | Broadcast channel could leak session events to non-participants | 2 | 3 | **6** | Validate session membership on channel subscription; audit RLS | Security | Sprint 0 |
-| **R-003** | **DATA** | Offline sync conflicts could lose reflections when both devices edit same step | 2 | 3 | **6** | Last-write-wins with `updated_at`; log conflicts for debugging | Backend | Sprint 1 |
+| **R-001** | **TECH** | No test data seeding APIs for sessions, reflections, messages | 3 | 3 | **9** | Implement `/api/test-data` endpoints (dev/staging only) | Backend Dev | Sprint 0 |
+| **R-002** | **TECH** | Supabase Broadcast cannot be mocked in CI | 3 | 2 | **6** | Create mock broadcast channel for CI tests | Backend Dev + QA | Sprint 0 |
+| **R-003** | **DATA** | Race conditions in Together mode lock-in and phase advancement | 2 | 3 | **6** | Version-based concurrency control already in ADR; extensive testing needed | QA | Sprint 1 |
 
 #### Medium-Priority Risks (Score 3-5)
 
 | Risk ID | Category | Description | Probability | Impact | Score | Mitigation | Owner |
 |---------|----------|-------------|-------------|--------|-------|------------|-------|
-| R-004 | TECH | IndexedDB VersionError from non-centralized schema | 2 | 2 | 4 | Create `dbSchema.ts` as single source of truth | Backend |
-| R-005 | PERF | Real-time sync latency exceeds 500ms SLO under load | 2 | 2 | 4 | Test with 100+ concurrent sessions; optimize broadcast payload | Backend |
-| R-006 | OPS | Partner reconnection fails to resync state correctly | 2 | 2 | 4 | Server-authoritative resync on reconnection; test offline scenarios | Backend |
+| R-004 | TECH | Broadcast reconnection may lose state during network flaps | 2 | 2 | 4 | Server resync on reconnect (defined in ADR) | Backend Dev |
+| R-005 | DATA | IndexedDB cache corruption could block feature | 2 | 2 | 4 | Clear cache and refetch (defined in ADR) | Backend Dev |
+| R-006 | SEC | RLS policies may have gaps for partner data isolation | 2 | 2 | 4 | Session-based RLS pattern; penetration testing | Security + QA |
+| R-007 | PERF | Real-time sync latency may exceed 500ms target | 2 | 2 | 4 | Monitor P95 latency; optimize if needed | Backend Dev |
 
 #### Low-Priority Risks (Score 1-2)
 
 | Risk ID | Category | Description | Probability | Impact | Score | Action |
 |---------|----------|-------------|-------------|--------|-------|--------|
-| R-007 | BUS | User completes partial session offline, partner unaware | 1 | 2 | 2 | Monitor; Solo sessions sync asynchronously by design |
-| R-008 | OPS | sw-db.ts manual sync with dbSchema.ts forgotten | 1 | 1 | 1 | Add comment warning; document in tech debt |
+| R-008 | TECH | dbSchema.ts centralization is tech debt affecting reliability | 1 | 2 | 2 | Address in Sprint 0 as prerequisite |
+| R-009 | OPS | Feature flag for gradual rollout not defined | 1 | 1 | 1 | Add feature flag if needed post-MVP |
 
 #### Risk Category Legend
 
@@ -113,108 +115,95 @@
 
 ### Testability Concerns and Architectural Gaps
 
-**🚨 ACTIONABLE CONCERNS - Architecture Team Must Address**
-
 #### 1. Blockers to Fast Feedback (WHAT WE NEED FROM ARCHITECTURE)
 
 | Concern | Impact | What Architecture Must Provide | Owner | Timeline |
 |---------|--------|--------------------------------|-------|----------|
-| **No test data seeding API** | Cannot create sessions/reflections programmatically for tests; tests slow and coupled | Provide `scriptureReadingService.seedTestSession()` or RPC `scripture_seed_test_data` | Backend | Sprint 0 |
-| **IndexedDB version conflicts** | Existing VersionError flakiness will affect new stores; parallel test execution unreliable | Complete centralized `dbSchema.ts` before adding scripture stores | Backend | Sprint 0 |
-| **Broadcast channel mocking** | Cannot unit test real-time sync without live Supabase connection | Provide mock broadcast channel adapter for testing | Backend | Sprint 1 |
+| **No test data seeding APIs** | Cannot create test sessions, reflections, or messages programmatically | `/api/test-data` endpoints: `POST /scripture/seed-session`, `POST /scripture/seed-reflection`, `POST /scripture/seed-message` | Backend Dev | Sprint 0 |
+| **Supabase Broadcast not mockable** | Cannot run Together mode tests in CI | Mock broadcast channel implementation OR Supabase local instance in CI | Backend Dev + DevOps | Sprint 0 |
+| **IndexedDB version management fragmented** | Existing VersionError flakiness affects all caching tests | Centralize to `src/services/dbSchema.ts` as specified in ADR | Backend Dev | Sprint 0 |
 
 #### 2. Architectural Improvements Needed (WHAT SHOULD BE CHANGED)
 
-1. **Centralized IndexedDB Schema**
-   - **Current problem**: Multiple services use different DB versions causing VersionError
-   - **Required change**: Create `src/services/dbSchema.ts` with single `DB_VERSION` constant; all services import from there
-   - **Impact if not fixed**: Flaky tests, unreliable offline mode, regression risk
-   - **Owner**: Backend
+1. **Test Customer ID Scoping**
+   - **Current problem**: Tests may pollute real user data if `customer_id` not properly isolated
+   - **Required change**: Ensure all queries scope by `user_id` or `session_id`; add `is_test_data` flag for cleanup
+   - **Impact if not fixed**: Test data pollution, GDPR concerns
+   - **Owner**: Backend Dev
    - **Timeline**: Sprint 0
 
-2. **Session Cleanup for Tests**
-   - **Current problem**: No mechanism to delete test sessions/reflections after test runs
-   - **Required change**: Add soft-delete or hard-delete RPC for test cleanup (protected by test environment flag)
-   - **Impact if not fixed**: Test data accumulates; tests become slower; database bloat
-   - **Owner**: Backend
+2. **Idempotent Seeding Endpoints**
+   - **Current problem**: No seeding mechanism exists
+   - **Required change**: Implement idempotent seed RPCs: `scripture_seed_test_data(session_count, include_reflections, include_messages)`
+   - **Impact if not fixed**: Slow test setup, inability to test edge cases
+   - **Owner**: Backend Dev
    - **Timeline**: Sprint 0
-
-3. **Deterministic Countdown Testing**
-   - **Current problem**: 3-second countdown is wall-clock based; tests must wait real time
-   - **Required change**: Accept optional `countdown_start_time` in test mode to fast-forward
-   - **Impact if not fixed**: Slow E2E tests; flaky timing-dependent assertions
-   - **Owner**: Frontend
-   - **Timeline**: Sprint 1
 
 ---
 
 ### Testability Assessment Summary
 
-**📊 CURRENT STATE - FYI**
-
 #### What Works Well
 
-- API-first design with server-authoritative state supports parallel test execution
-- Zustand slice pattern enables isolated unit testing of state logic
-- Session-based RLS pattern allows clean test isolation per session
-- Explicit phase enum (`lobby | countdown | reading | reflection | report | complete`) makes assertions straightforward
-- Existing brownfield patterns (MoodService, SyncService) provide proven templates
+- API-first design (all business logic accessible via RPCs)
+- Server-authoritative state prevents client-side race conditions
+- Normalized schema enables clean SQL queries for test assertions
+- Session-based RLS is consistent and testable
+- Zustand slice pattern enables unit testing state logic
 
 #### Accepted Trade-offs (No Action Required)
 
-For Scripture Reading Phase 1, the following trade-offs are acceptable:
-- **Together mode is online-required** - Solo covers offline; Together can be tested in online integration environment only
-- **Last-write-wins for sync conflicts** - Edge case; logging sufficient for debugging
-- **Manual sw-db.ts sync** - Documented; Service Worker can't import idb library
+For Scripture Reading MVP, the following trade-offs are acceptable:
+- **No offline writes in Together mode** - Online-required; tests don't need offline sync scenarios
+- **No push notifications** - Keep calm UX; no notification testing needed for MVP
 
 ---
 
 ### Risk Mitigation Plans (High-Priority Risks >=6)
 
-**Purpose**: Detailed mitigation strategies for all 3 high-priority risks (score >=6). These risks MUST be addressed before MVP launch.
-
-#### R-001: Race Conditions in Together Mode Lock-In (Score: 6) - HIGH
+#### R-001: No Test Data Seeding APIs (Score: 9) - CRITICAL
 
 **Mitigation Strategy:**
-1. Implement `expected_version` parameter on all state-mutating RPCs (`scripture_lock_in`, `scripture_advance_phase`)
-2. Reject mutations where `expected_version != current_version` with HTTP 409
-3. Client rollback on 409: refetch session state, update local cache, retry with new version
-4. Add unique constraint on `scripture_step_states(session_id, step_index, user_id)`
+1. Implement Supabase RPC `scripture_seed_test_data(session_count?, include_reflections?, include_messages?)`
+2. Restrict RPC to dev/staging environments only (check environment variable)
+3. Return created IDs for cleanup in test teardown
+4. Include edge case presets: "user_with_completed_session", "user_mid_session_step_7", "user_with_help_flags"
 
-**Owner:** Backend
-**Timeline:** Sprint 0
+**Owner:** Backend Dev
+**Timeline:** Sprint 0 (Week 1)
 **Status:** Planned
-**Verification:** E2E test simulating concurrent lock-in from two clients; verify no double-advance
+**Verification:** QA can call seed RPC and verify data created in <100ms
 
 ---
 
-#### R-002: Broadcast Channel Authorization (Score: 6) - HIGH
+#### R-002: Supabase Broadcast Not Mockable (Score: 6) - HIGH
 
 **Mitigation Strategy:**
-1. Validate session membership on Supabase Broadcast channel subscription (server-side RLS check)
-2. Include `session_id` and `user_id` in broadcast payload; clients ignore events for wrong session
-3. Security audit: attempt to subscribe to another user's session channel; verify rejection
-4. Add RLS policy on broadcast channel if Supabase supports it
+1. Option A: Run Supabase local instance in CI (preferred - realistic testing)
+2. Option B: Create broadcast channel mock that simulates message delivery
+3. Document mock behavior for QA to understand limitations
 
-**Owner:** Security
-**Timeline:** Sprint 0
+**Owner:** Backend Dev + DevOps
+**Timeline:** Sprint 0 (Week 1-2)
 **Status:** Planned
-**Verification:** Security test attempting unauthorized channel subscription; verify 403
+**Verification:** CI can run Together mode happy path test with mock/local Supabase
 
 ---
 
-#### R-003: Offline Sync Conflict Resolution (Score: 6) - HIGH
+#### R-003: Race Conditions in Together Mode (Score: 6) - HIGH
 
 **Mitigation Strategy:**
-1. Use `updated_at` timestamp for last-write-wins conflict resolution
-2. Log all conflicts to `scripture_sync_conflicts` table for debugging (session_id, user_id, local_value, server_value, resolved_at)
-3. Silent resolution: no user notification required for reflection conflicts (user's own data)
-4. Edge case: if both partners edit same step offline simultaneously, most recent wins; other is logged
+1. ADR already specifies version-based concurrency control (`expected_version` in RPCs)
+2. QA will create dedicated race condition test suite:
+   - Concurrent lock-ins from both partners
+   - Stale client attempting phase advance
+   - Network latency simulation (delay responses)
+3. All race condition tests must pass 100/100 runs (flakiness = fail)
 
-**Owner:** Backend
+**Owner:** QA (test creation), Backend Dev (RPC hardening if issues found)
 **Timeline:** Sprint 1
 **Status:** Planned
-**Verification:** Integration test: two devices edit same reflection offline, reconnect, verify one wins and both synced correctly
+**Verification:** Race condition test suite passes 100/100 in CI
 
 ---
 
@@ -222,37 +211,31 @@ For Scripture Reading Phase 1, the following trade-offs are acceptable:
 
 #### Assumptions
 
-1. Supabase Realtime Broadcast supports session-scoped channels (verified in existing codebase)
-2. IndexedDB quota is sufficient for storing 17-step sessions locally (typical session ~50KB)
-3. RLS policies can enforce session-based access without performance degradation
-4. Playwright can test Supabase Broadcast via WebSocket interception or integration mode
+1. Supabase Realtime Broadcast channel limits are sufficient for couples use (2 users per channel)
+2. IndexedDB storage quotas are sufficient for scripture reading cache (~1MB expected)
+3. Network latency for Broadcast is typically <500ms in production
 
 #### Dependencies
 
-1. **Centralized dbSchema.ts** - Required by Sprint 0 start
-2. **Supabase migration deployed** - Required by Sprint 0 week 2
-3. **Test data seeding mechanism** - Required by Sprint 1 start
-4. **Playwright Utils configured** - Required by Sprint 1 (existing dependency, should be available)
+1. Supabase local or mock - Required by Sprint 0 Week 2
+2. Backend seed RPCs - Required by Sprint 0 Week 1
+3. dbSchema.ts centralization - Required by Sprint 0 Week 1
 
 #### Risks to Plan
 
-- **Risk**: Supabase Broadcast doesn't support channel-level authorization
-  - **Impact**: Cannot guarantee R-002 mitigation; may need application-level validation
-  - **Contingency**: Add client-side validation + server-side audit logging
-
-- **Risk**: IndexedDB VersionError persists despite centralization
-  - **Impact**: Offline tests remain flaky
-  - **Contingency**: Reset IndexedDB before each test run; accept slower test execution
+- **Risk**: Supabase Broadcast behavior differs in CI vs production
+  - **Impact**: False positives/negatives in Together mode tests
+  - **Contingency**: Run critical Together mode tests against staging environment nightly
 
 ---
 
 **End of Architecture Document**
 
 **Next Steps for Architecture Team:**
-1. Review Quick Guide (blockers/high priority) and assign owners
-2. Complete Sprint 0 blockers (dbSchema.ts, Supabase migration, test seeding)
-3. Validate assumptions about Broadcast channel authorization
-4. Provide feedback on testability gaps
+1. Review Quick Guide (BLOCKERS/HIGH PRIORITY/INFO ONLY) and prioritize blockers
+2. Assign owners and timelines for high-priority risks (>=6)
+3. Validate assumptions and dependencies
+4. Provide feedback to QA on testability gaps
 
 **Next Steps for QA Team:**
 1. Wait for Sprint 0 blockers to be resolved

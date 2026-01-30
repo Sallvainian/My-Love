@@ -34,6 +34,11 @@ const LoveNotes = lazy(() =>
   import('./components/love-notes').then((m) => ({ default: m.LoveNotes }))
 );
 
+// Story 1.1: Scripture Reading Entry Point
+const ScriptureOverview = lazy(() =>
+  import('./components/scripture-reading').then((m) => ({ default: m.ScriptureOverview }))
+);
+
 // Lazy load modal/conditional components to reduce initial bundle
 const WelcomeSplash = lazy(() =>
   import('./components/WelcomeSplash/WelcomeSplash').then((m) => ({ default: m.WelcomeSplash }))
@@ -132,7 +137,9 @@ function App() {
             ? 'partner'
             : routePath === '/notes'
               ? 'notes'
-              : 'home';
+              : routePath === '/scripture'
+                ? 'scripture'
+                : 'home';
     setView(initialView, true); // Skip history update on initial load
 
     // AC-4.5.6: Browser back/forward button support
@@ -147,7 +154,9 @@ function App() {
               ? 'partner'
               : routePath === '/notes'
                 ? 'notes'
-                : 'home';
+                : routePath === '/scripture'
+                  ? 'scripture'
+                  : 'home';
       setView(view, true); // Skip history update to prevent loop
       console.log(`[App] Popstate: navigated to ${view}`);
     };
@@ -551,6 +560,9 @@ function App() {
               {currentView === 'partner' && <PartnerMoodView />}
 
               {currentView === 'notes' && <LoveNotes />}
+
+              {/* Story 1.1: Scripture Reading Entry Point */}
+              {currentView === 'scripture' && <ScriptureOverview />}
             </Suspense>
           </ViewErrorBoundary>
         )}

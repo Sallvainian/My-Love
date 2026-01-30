@@ -56,9 +56,9 @@ alter table "public"."moods" alter column "mood_type" set data type text using "
 
 alter table "public"."moods" alter column "mood_types" set data type text[] using "mood_types"::text[];
 
-alter table "public"."partner_requests" alter column "status" set default 'pending'::text;
-
 alter table "public"."partner_requests" alter column "status" set data type text using "status"::text;
+
+alter table "public"."partner_requests" alter column "status" set default 'pending'::text;
 
 alter table "public"."users" alter column "device_id" set default gen_random_uuid();
 
