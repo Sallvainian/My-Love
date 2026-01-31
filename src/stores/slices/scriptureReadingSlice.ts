@@ -1,6 +1,6 @@
 /**
  * Scripture Reading Slice — Zustand state management for Scripture Reading feature
- * Story 1.1: AC #4, Story 1.3: Solo Reading Flow
+ * Story 1.1: AC #4, Story 1.3: Solo Reading Flow, Story 1.4: Save, Resume & Optimistic UI
  *
  * Types imported from dbSchema (single source of truth).
  * Follows StateCreator<AppState, AppMiddleware, [], ScriptureSlice> pattern.
@@ -37,6 +37,16 @@ function isScriptureError(value: unknown): value is ScriptureError {
 }
 
 // ============================================
+// Retry types (Story 1.4)
+// ============================================
+
+export interface PendingRetry {
+  type: 'advanceStep' | 'saveSession';
+  attempts: number;
+  maxAttempts: number;
+}
+
+// ============================================
 // State interface (Subtask 3.3)
 // ============================================
 
@@ -50,6 +60,8 @@ export interface ScriptureReadingState {
   scriptureError: ScriptureError | null;
   activeSession: ScriptureSession | null;
   isCheckingSession: boolean;
+  // Story 1.4: Retry state
+  pendingRetry: PendingRetry | null;
 }
 
 // ============================================
@@ -67,6 +79,10 @@ export interface ScriptureSlice extends ScriptureReadingState {
   // Story 1.3: Solo Reading Flow actions
   advanceStep: () => Promise<void>;
   saveAndExit: () => Promise<void>;
+  // Story 1.4: Save, Resume & Optimistic UI actions
+  saveSession: () => Promise<void>;
+  abandonSession: (sessionId: string) => Promise<void>;
+  retryFailedWrite: () => Promise<void>;
 }
 
 // ============================================
@@ -83,6 +99,7 @@ const initialScriptureState: ScriptureReadingState = {
   scriptureError: null,
   activeSession: null,
   isCheckingSession: false,
+  pendingRetry: null,
 };
 
 // ============================================
@@ -225,7 +242,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           status: 'complete',
           completedAt: updatedSession.completedAt,
         });
-        set({ isSyncing: false });
+        set({ isSyncing: false, pendingRetry: null });
       } catch (error) {
         const scriptureError: ScriptureError = isScriptureError(error)
           ? error
@@ -235,7 +252,11 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               details: error,
             };
         handleScriptureError(scriptureError);
-        set({ scriptureError, isSyncing: false });
+        set({
+          scriptureError,
+          isSyncing: false,
+          pendingRetry: { type: 'advanceStep', attempts: 1, maxAttempts: 3 },
+        });
       }
     } else {
       // Normal step advancement
@@ -250,7 +271,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         await scriptureReadingService.updateSession(session.id, {
           currentStepIndex: nextStep,
         });
-        set({ isSyncing: false });
+        set({ isSyncing: false, pendingRetry: null });
       } catch (error) {
         const scriptureError: ScriptureError = isScriptureError(error)
           ? error
@@ -260,7 +281,11 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               details: error,
             };
         handleScriptureError(scriptureError);
-        set({ scriptureError, isSyncing: false });
+        set({
+          scriptureError,
+          isSyncing: false,
+          pendingRetry: { type: 'advanceStep', attempts: 1, maxAttempts: 3 },
+        });
       }
     }
   },
@@ -293,6 +318,95 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           };
       handleScriptureError(scriptureError);
       set({ scriptureError, isSyncing: false });
+    }
+  },
+
+  // Story 1.4: Save session without clearing state (silent save)
+  saveSession: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    set({ isSyncing: true });
+
+    try {
+      await scriptureReadingService.updateSession(session.id, {
+        currentStepIndex: session.currentStepIndex,
+        currentPhase: session.currentPhase,
+        status: session.status,
+      });
+      set({ isSyncing: false });
+    } catch (error) {
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Failed to save session',
+            details: error,
+          };
+      handleScriptureError(scriptureError);
+      set({ scriptureError, isSyncing: false });
+    }
+  },
+
+  // Story 1.4: Abandon session on server and clear local state
+  abandonSession: async (sessionId) => {
+    set({ scriptureLoading: true, scriptureError: null });
+
+    try {
+      await scriptureReadingService.updateSession(sessionId, {
+        status: 'abandoned',
+      });
+      set({ ...initialScriptureState });
+    } catch (error) {
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Failed to abandon session',
+            details: error,
+          };
+      handleScriptureError(scriptureError);
+      set({ scriptureError, scriptureLoading: false });
+    }
+  },
+
+  // Story 1.4: Retry failed server write
+  retryFailedWrite: async () => {
+    const state = get();
+    const { pendingRetry, session } = state;
+    if (!pendingRetry || !session) return;
+
+    set({ isSyncing: true, scriptureError: null });
+
+    try {
+      await scriptureReadingService.updateSession(session.id, {
+        currentStepIndex: session.currentStepIndex,
+        currentPhase: session.currentPhase,
+        status: session.status,
+      });
+      set({ isSyncing: false, pendingRetry: null, scriptureError: null });
+    } catch (error) {
+      const newAttempts = pendingRetry.attempts + 1;
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Retry failed',
+            details: error,
+          };
+      handleScriptureError(scriptureError);
+
+      if (newAttempts >= pendingRetry.maxAttempts) {
+        // Max attempts reached — clear retry but keep error
+        set({ scriptureError, isSyncing: false, pendingRetry: { ...pendingRetry, attempts: newAttempts } });
+      } else {
+        set({
+          scriptureError,
+          isSyncing: false,
+          pendingRetry: { ...pendingRetry, attempts: newAttempts },
+        });
+      }
     }
   },
 });

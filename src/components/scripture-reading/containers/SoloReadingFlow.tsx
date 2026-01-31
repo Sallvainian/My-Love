@@ -2,6 +2,8 @@
  * SoloReadingFlow Container Component
  *
  * Story 1.3: Solo Reading Flow
+ * Story 1.4: Save, Resume & Optimistic UI
+ *
  * Manages the step-by-step scripture reading experience.
  *
  * Handles:
@@ -10,16 +12,22 @@
  * - Progress tracking (Verse X of 17)
  * - Exit confirmation with save
  * - Session completion transition to reflection phase
+ * - Story 1.4: Auto-save on visibility change / beforeunload
+ * - Story 1.4: Offline indicator and blocked advancement
+ * - Story 1.4: Retry UI for failed server writes
+ * - Story 1.4: Auto-retry on reconnect
  *
  * Uses container/presentational pattern:
  * - This container connects to Zustand store
  * - Passes props to presentational sub-components
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAppStore } from '../../../stores/useAppStore';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
+import { useAutoSave } from '../../../hooks/useAutoSave';
+import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 
 // Lavender Dreams design tokens (shared with ScriptureOverview)
 const scriptureTheme = {
@@ -40,23 +48,49 @@ type SlideDirection = 'left' | 'right';
 
 export function SoloReadingFlow() {
   const shouldReduceMotion = useReducedMotion();
+  const { isOnline } = useNetworkStatus();
 
-  // Scripture reading slice state (H1: exitSession included in selector)
-  const { session, isSyncing, scriptureError, advanceStep, saveAndExit, exitSession } = useAppStore(
-    (state) => ({
-      session: state.session,
-      isSyncing: state.isSyncing,
-      scriptureError: state.scriptureError,
-      advanceStep: state.advanceStep,
-      saveAndExit: state.saveAndExit,
-      exitSession: state.exitSession,
-    })
-  );
+  // Scripture reading slice state
+  const {
+    session,
+    isSyncing,
+    scriptureError,
+    pendingRetry,
+    advanceStep,
+    saveAndExit,
+    saveSession,
+    exitSession,
+    retryFailedWrite,
+  } = useAppStore((state) => ({
+    session: state.session,
+    isSyncing: state.isSyncing,
+    scriptureError: state.scriptureError,
+    pendingRetry: state.pendingRetry,
+    advanceStep: state.advanceStep,
+    saveAndExit: state.saveAndExit,
+    saveSession: state.saveSession,
+    exitSession: state.exitSession,
+    retryFailedWrite: state.retryFailedWrite,
+  }));
+
+  // Story 1.4: Wire useAutoSave (must be before session null-guard)
+  useAutoSave({ session, saveSession });
 
   // Local UI state
   const [subView, setSubView] = useState<StepSubView>('verse');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [slideDirection, setSlideDirection] = useState<SlideDirection>('left');
+
+  // Track previous isOnline to detect offline → online transitions
+  const prevIsOnlineRef = useRef(isOnline);
+
+  // Story 1.4: Auto-retry on reconnect (offline → online with pendingRetry)
+  useEffect(() => {
+    if (!prevIsOnlineRef.current && isOnline && pendingRetry && pendingRetry.attempts < pendingRetry.maxAttempts) {
+      void retryFailedWrite();
+    }
+    prevIsOnlineRef.current = isOnline;
+  }, [isOnline, pendingRetry, retryFailedWrite]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
   const handleNextVerse = useCallback(async () => {
@@ -104,6 +138,9 @@ export function SoloReadingFlow() {
   const currentStep = SCRIPTURE_STEPS[session.currentStepIndex];
   const isLastStep = session.currentStepIndex >= MAX_STEPS - 1;
   const isCompleted = session.status === 'complete' || session.currentPhase === 'reflection';
+
+  // Determine if Next Verse should be disabled
+  const isNextDisabled = isSyncing || !isOnline;
 
   // Animation variants
   const crossfadeTransition = shouldReduceMotion
@@ -275,6 +312,23 @@ export function SoloReadingFlow() {
           </motion.div>
         </AnimatePresence>
 
+        {/* Story 1.4: Offline indicator (AC #4) */}
+        {!isOnline && (
+          <div
+            className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm flex items-center gap-2 mb-2"
+            data-testid="offline-indicator"
+            role="status"
+            aria-live="polite"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+            </svg>
+            <span>You&apos;re offline. Cached data shown. Connect to continue.</span>
+          </div>
+        )}
+
         {/* Syncing indicator */}
         {isSyncing && (
           <div
@@ -286,7 +340,7 @@ export function SoloReadingFlow() {
         )}
 
         {/* Error display */}
-        {scriptureError && (
+        {scriptureError && !pendingRetry && (
           <div
             className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm mb-2"
             data-testid="reading-error"
@@ -295,6 +349,30 @@ export function SoloReadingFlow() {
             {typeof scriptureError === 'string'
               ? scriptureError
               : scriptureError.message}
+          </div>
+        )}
+
+        {/* Story 1.4: Retry UI (AC #6) */}
+        {pendingRetry && (
+          <div
+            className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between mb-2"
+            data-testid="retry-banner"
+          >
+            <span className="text-amber-700 text-sm">
+              {pendingRetry.attempts >= pendingRetry.maxAttempts
+                ? 'Save failed. Your progress is saved locally.'
+                : 'Save failed. Tap to retry.'}
+            </span>
+            {pendingRetry.attempts < pendingRetry.maxAttempts && (
+              <button
+                onClick={retryFailedWrite}
+                className="text-amber-800 font-medium text-sm hover:text-amber-900 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                data-testid="retry-button"
+                type="button"
+              >
+                Retry ({pendingRetry.attempts}/{pendingRetry.maxAttempts})
+              </button>
+            )}
           </div>
         )}
 
@@ -315,7 +393,7 @@ export function SoloReadingFlow() {
               {/* Next Verse - primary button */}
               <button
                 onClick={handleNextVerse}
-                disabled={isSyncing}
+                disabled={isNextDisabled}
                 className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25"
                 data-testid="scripture-next-verse-button"
                 type="button"
@@ -338,7 +416,7 @@ export function SoloReadingFlow() {
               {/* Next Verse - primary button (also available on response screen) */}
               <button
                 onClick={handleNextVerse}
-                disabled={isSyncing}
+                disabled={isNextDisabled}
                 className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25"
                 data-testid="scripture-next-verse-button"
                 type="button"

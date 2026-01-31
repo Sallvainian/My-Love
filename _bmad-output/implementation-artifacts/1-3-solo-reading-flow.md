@@ -1,6 +1,6 @@
 # Story 1.3: Solo Reading Flow
 
-Status: review
+Status: done
 
 ## Story
 
