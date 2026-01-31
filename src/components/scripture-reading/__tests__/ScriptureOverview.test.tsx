@@ -1,7 +1,7 @@
 /**
  * ScriptureOverview Component Tests
  *
- * Story 1.1 + 1.2: Navigation Entry Point & Overview Page
+ * Story 1.1 + 1.2 + 1.4: Navigation Entry Point, Overview Page, Save/Resume & Optimistic UI
  * Unit tests for the Scripture Reading overview/entry point.
  *
  * Tests:
@@ -13,12 +13,9 @@
  * - Loading and error states
  * - Lavender Dreams styling (AC #2)
  * - Accessibility
- *
- * Note: Story 1.1 had 45 tests. Story 1.2 rewrote tests to match new Start→mode
- * flow and added session resume coverage (40 tests). Code review follow-ups added
- * session check failure tests (M3). Previous test count difference (45→40) was due
- * to consolidating redundant partner-state tests and removing offline-indicator tests
- * for dead code that was later removed (M2).
+ * - Story 1.4: "Start fresh" calls abandonSession
+ * - Story 1.4: Start button disabled when offline
+ * - Story 1.4: Offline indicator
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -38,12 +35,18 @@ vi.mock('framer-motion', () => ({
   useReducedMotion: () => false,
 }));
 
+// Mock useNetworkStatus
+let mockIsOnline = true;
+vi.mock('../../../hooks/useNetworkStatus', () => ({
+  useNetworkStatus: () => ({ isOnline: mockIsOnline, isConnecting: false }),
+}));
+
 // Mock the Zustand store
 const mockLoadPartner = vi.fn();
 const mockSetView = vi.fn();
 const mockCreateSession = vi.fn().mockResolvedValue(undefined);
 const mockLoadSession = vi.fn().mockResolvedValue(undefined);
-const mockExitSession = vi.fn();
+const mockAbandonSession = vi.fn().mockResolvedValue(undefined);
 const mockClearScriptureError = vi.fn();
 const mockCheckForActiveSession = vi.fn().mockResolvedValue(undefined);
 const mockClearActiveSession = vi.fn();
@@ -69,7 +72,7 @@ const mockStoreState = {
   isCheckingSession: false,
   createSession: mockCreateSession,
   loadSession: mockLoadSession,
-  exitSession: mockExitSession,
+  abandonSession: mockAbandonSession,
   clearScriptureError: mockClearScriptureError,
   checkForActiveSession: mockCheckForActiveSession,
   clearActiveSession: mockClearActiveSession,
@@ -92,6 +95,7 @@ describe('ScriptureOverview', () => {
     mockStoreState.scriptureError = null;
     mockStoreState.activeSession = null;
     mockStoreState.isCheckingSession = false;
+    mockIsOnline = true;
   });
 
   afterEach(() => {
@@ -122,14 +126,14 @@ describe('ScriptureOverview', () => {
     it('should render Start button by default', () => {
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.getByText('Start')).toBeInTheDocument();
     });
 
     it('should NOT render mode cards before Start is tapped', () => {
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.queryByTestId('mode-selection')).not.toBeInTheDocument();
       expect(screen.queryByText('Solo')).not.toBeInTheDocument();
       expect(screen.queryByText('Together')).not.toBeInTheDocument();
@@ -140,7 +144,7 @@ describe('ScriptureOverview', () => {
     it('should show mode selection after Start is tapped', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByTestId('mode-selection')).toBeInTheDocument();
       expect(screen.getByText('Solo')).toBeInTheDocument();
@@ -150,15 +154,15 @@ describe('ScriptureOverview', () => {
     it('should hide Start button after tapping it', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
-      expect(screen.queryByTestId('start-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('scripture-start-button')).not.toBeInTheDocument();
     });
 
     it('should clear scripture error when Start is tapped', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(mockClearScriptureError).toHaveBeenCalled();
     });
@@ -192,7 +196,7 @@ describe('ScriptureOverview', () => {
       render(<ScriptureOverview />);
 
       expect(screen.getByTestId('resume-prompt')).toBeInTheDocument();
-      expect(screen.queryByTestId('start-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('scripture-start-button')).not.toBeInTheDocument();
     });
 
     it('should NOT show resume prompt when no incomplete session', () => {
@@ -200,7 +204,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.queryByTestId('resume-prompt')).not.toBeInTheDocument();
     });
 
@@ -223,14 +227,17 @@ describe('ScriptureOverview', () => {
       expect(mockLoadSession).toHaveBeenCalledWith('session-456');
     });
 
-    it('should call exitSession when Start fresh is tapped', () => {
+    // Story 1.4: "Start fresh" calls abandonSession
+    it('should call abandonSession when Start fresh is tapped', async () => {
       mockStoreState.activeSession = incompleteSession;
 
       render(<ScriptureOverview />);
 
       fireEvent.click(screen.getByTestId('resume-start-fresh'));
 
-      expect(mockExitSession).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockAbandonSession).toHaveBeenCalledWith('session-456');
+      });
     });
   });
 
@@ -238,7 +245,7 @@ describe('ScriptureOverview', () => {
     it('should call createSession with solo when Solo card is clicked', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const soloButton = screen.getByText('Solo').closest('button');
       fireEvent.click(soloButton!);
@@ -251,7 +258,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const togetherButton = screen.getByText('Together').closest('button');
       fireEvent.click(togetherButton!);
@@ -266,7 +273,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByTestId('session-loading')).toBeInTheDocument();
       expect(screen.getByText('Creating session...')).toBeInTheDocument();
@@ -277,7 +284,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const soloButton = screen.getByText('Solo').closest('button');
       expect(soloButton).toBeDisabled();
@@ -342,7 +349,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const togetherButton = screen.getByText('Together').closest('button');
       expect(togetherButton).not.toBeDisabled();
@@ -376,7 +383,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const togetherButton = screen.getByText('Together').closest('button');
       expect(togetherButton).toBeDisabled();
@@ -388,7 +395,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByTestId('setup-partner-link')).toBeInTheDocument();
       expect(screen.getByText('Set up partner')).toBeInTheDocument();
@@ -399,7 +406,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
       fireEvent.click(screen.getByTestId('setup-partner-link'));
 
       expect(mockSetView).toHaveBeenCalledWith('partner');
@@ -463,7 +470,7 @@ describe('ScriptureOverview', () => {
     it('should apply glass morphism to mode cards', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const soloButton = screen.getByText('Solo').closest('button');
       expect(soloButton).toHaveClass('backdrop-blur-sm');
@@ -494,7 +501,7 @@ describe('ScriptureOverview', () => {
 
       expect(screen.getByLabelText('Partner status')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByLabelText('Choose reading mode')).toBeInTheDocument();
     });
@@ -504,7 +511,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByRole('button', { name: /solo/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /together/i })).toBeInTheDocument();
@@ -547,11 +554,10 @@ describe('ScriptureOverview', () => {
       render(<ScriptureOverview />);
 
       expect(screen.getByTestId('session-check-loading')).toBeInTheDocument();
-      expect(screen.queryByTestId('start-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('scripture-start-button')).not.toBeInTheDocument();
     });
 
     it('should gracefully handle checkForActiveSession being called (no crash)', () => {
-      // Simulate the checkForActiveSession being a no-op (already resolved)
       mockCheckForActiveSession.mockResolvedValue(undefined);
 
       render(<ScriptureOverview />);
@@ -566,8 +572,72 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.queryByTestId('resume-prompt')).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================
+  // Story 1.4: Offline Behavior (AC #4)
+  // ============================================
+
+  describe('Offline Behavior', () => {
+    it('should disable Start button when offline', () => {
+      mockIsOnline = false;
+
+      render(<ScriptureOverview />);
+
+      expect(screen.getByTestId('scripture-start-button')).toBeDisabled();
+    });
+
+    it('should show offline indicator when offline', () => {
+      mockIsOnline = false;
+
+      render(<ScriptureOverview />);
+
+      expect(screen.getByTestId('offline-indicator')).toBeInTheDocument();
+    });
+
+    it('should hide offline indicator when online', () => {
+      mockIsOnline = true;
+
+      render(<ScriptureOverview />);
+
+      expect(screen.queryByTestId('offline-indicator')).not.toBeInTheDocument();
+    });
+
+
+    it('should disable mode cards when offline', () => {
+      // Start online, click Start to show modes, then go offline
+      mockIsOnline = true;
+      const { rerender } = render(<ScriptureOverview />);
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
+
+      // Now go offline and rerender
+      mockIsOnline = false;
+      rerender(<ScriptureOverview />);
+
+      const soloButton = screen.getByText('Solo').closest('button');
+      expect(soloButton).toBeDisabled();
+    });
+
+    it('should still allow Continue when offline (cache-only load)', () => {
+      mockIsOnline = false;
+      mockStoreState.activeSession = {
+        id: 'session-456',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 4,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      };
+
+      render(<ScriptureOverview />);
+
+      const continueButton = screen.getByTestId('resume-continue');
+      expect(continueButton).not.toBeDisabled();
     });
   });
 });

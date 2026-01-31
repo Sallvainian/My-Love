@@ -1,7 +1,9 @@
 /**
  * ScriptureOverview Container Component
  *
- * Story 1.1 + 1.2: Navigation Entry Point & Overview Page
+ * Story 1.1 + 1.2 + 1.3 + 1.4: Navigation Entry Point, Overview Page, Reading Flow Router,
+ * Save/Resume & Optimistic UI
+ *
  * Main entry point for Scripture Reading feature.
  *
  * Handles:
@@ -11,6 +13,9 @@
  * - Session resume for incomplete solo sessions
  * - Session creation via scriptureReadingSlice
  * - Navigation to partner setup flow
+ * - Story 1.3: Routes to SoloReadingFlow when session is active
+ * - Story 1.4: Offline blocking of Start/mode selection
+ * - Story 1.4: "Start fresh" calls abandonSession to mark server session as abandoned
  *
  * Uses container/presentational pattern:
  * - This container connects to Zustand store
@@ -21,6 +26,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAppStore } from '../../../stores/useAppStore';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
+import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
+import { SoloReadingFlow } from './SoloReadingFlow';
 
 // Lavender Dreams design tokens
 const scriptureTheme = {
@@ -51,9 +58,10 @@ interface ModeCardProps {
   onClick: () => void;
   disabled?: boolean;
   variant: 'primary' | 'secondary';
+  testId?: string;
 }
 
-function ModeCard({ title, description, icon, onClick, disabled, variant }: ModeCardProps) {
+function ModeCard({ title, description, icon, onClick, disabled, variant, testId }: ModeCardProps) {
   const baseClasses =
     'w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm';
   const variantClasses =
@@ -69,6 +77,7 @@ function ModeCard({ title, description, icon, onClick, disabled, variant }: Mode
       onClick={onClick}
       disabled={disabled}
       className={`${baseClasses} ${variantClasses} ${disabledClasses}`}
+      data-testid={testId}
       type="button"
     >
       <div className="flex items-center gap-3 mb-2">
@@ -138,6 +147,7 @@ function TogetherIcon() {
 
 export function ScriptureOverview() {
   const shouldReduceMotion = useReducedMotion();
+  const { isOnline } = useNetworkStatus();
 
   // Partner slice state
   const { partner, isLoadingPartner, loadPartner, setView } = useAppStore((state) => ({
@@ -149,23 +159,25 @@ export function ScriptureOverview() {
 
   // Scripture reading slice state
   const {
+    session,
     isSessionLoading,
     sessionError,
     activeSession,
     isCheckingSession,
     createSession,
     loadSession,
-    exitSession,
+    abandonSession,
     clearScriptureError,
     checkForActiveSession,
   } = useAppStore((state) => ({
+    session: state.session,
     isSessionLoading: state.scriptureLoading,
     sessionError: state.scriptureError,
     activeSession: state.activeSession,
     isCheckingSession: state.isCheckingSession,
     createSession: state.createSession,
     loadSession: state.loadSession,
-    exitSession: state.exitSession,
+    abandonSession: state.abandonSession,
     clearScriptureError: state.clearScriptureError,
     checkForActiveSession: state.checkForActiveSession,
   }));
@@ -214,16 +226,29 @@ export function ScriptureOverview() {
     }
   }, [activeSession, loadSession]);
 
-  const handleStartFresh = useCallback(() => {
-    exitSession();
+  // Story 1.4: "Start fresh" → abandon server session, then allow new session
+  const handleStartFresh = useCallback(async () => {
+    if (activeSession) {
+      await abandonSession(activeSession.id);
+    }
     setShowModes(false);
-  }, [exitSession]);
+  }, [activeSession, abandonSession]);
 
   const handleLinkPartner = useCallback(() => {
     setView('partner');
   }, [setView]);
 
   const fadeTransition = shouldReduceMotion ? { duration: 0 } : { duration: MODE_REVEAL_DURATION };
+
+  // Story 1.3: Route to SoloReadingFlow when session is active
+  if (session && session.status === 'in_progress' && session.mode === 'solo') {
+    return <SoloReadingFlow />;
+  }
+
+  // Story 1.3: Also route to SoloReadingFlow for completion screen
+  if (session && (session.status === 'complete' || session.currentPhase === 'reflection')) {
+    return <SoloReadingFlow />;
+  }
 
   return (
     <div
@@ -276,6 +301,23 @@ export function ScriptureOverview() {
           </section>
         )}
 
+        {/* Story 1.4: Offline indicator for overview (AC #4) */}
+        {!isOnline && (
+          <div
+            className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm flex items-center gap-2"
+            data-testid="offline-indicator"
+            role="status"
+            aria-live="polite"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+            </svg>
+            <span>You&apos;re offline</span>
+          </div>
+        )}
+
         {/* Error Display */}
         {sessionError && (
           <div
@@ -291,8 +333,9 @@ export function ScriptureOverview() {
         {!showModes && !activeSession && !isCheckingSession && (
           <button
             onClick={handleStart}
-            className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 min-h-[56px] shadow-lg shadow-purple-500/25"
-            data-testid="start-button"
+            disabled={!isOnline}
+            className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25"
+            data-testid="scripture-start-button"
             type="button"
           >
             Start
@@ -329,14 +372,15 @@ export function ScriptureOverview() {
                 </div>
               )}
 
-              {/* Solo Mode - Always accessible */}
+              {/* Solo Mode - Always accessible (when online) */}
               <ModeCard
                 title="Solo"
                 description="Read and reflect on your own time"
                 icon={<SoloIcon />}
                 onClick={handleStartSolo}
-                disabled={isSessionLoading}
+                disabled={isSessionLoading || !isOnline}
                 variant="secondary"
+                testId="scripture-mode-solo"
               />
 
               {/* Together Mode - Conditional on partner (AC #4, #5) */}
@@ -349,7 +393,7 @@ export function ScriptureOverview() {
                 }
                 icon={<TogetherIcon />}
                 onClick={handleStartTogether}
-                disabled={partnerStatus !== 'linked' || isSessionLoading}
+                disabled={partnerStatus !== 'linked' || isSessionLoading || !isOnline}
                 variant="primary"
               />
 
