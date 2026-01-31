@@ -1,6 +1,6 @@
 # Story 1.1: Database Schema & Backend Infrastructure
 
-Status: review
+Status: complete
 
 ## Story
 
@@ -17,7 +17,7 @@ So that all frontend features have a reliable backend foundation.
    - `scripture_bookmarks` (id, session_id, step_index, user_id, share_with_partner, created_at) — **DONE (Sprint 0)**
    - `scripture_messages` (id, session_id, sender_id, message, created_at) — **DONE (Sprint 0)**
    - RLS policies enforce session-based access (only session participants can read/write) — **DONE (Sprint 0)**
-   - RPCs exist: `scripture_create_session`, `scripture_submit_reflection`, `scripture_lock_in`, `scripture_advance_phase` — **DONE (Sprint 0)**
+   - RPCs exist: `scripture_create_session`, `scripture_submit_reflection` — **DONE (Phase 1B, Tasks 12-13)**; `scripture_lock_in`, `scripture_advance_phase` — **STUB only (Sprint 0, not yet functional)**
    - Unique constraint on scripture_reflections (session_id, step_index, user_id) for idempotent writes — **DONE (Sprint 0)**
 
 2. **Centralized IndexedDB Schema Exists**
@@ -125,6 +125,20 @@ So that all frontend features have a reliable backend foundation.
   - [x] 13.5 RPC returns JSONB with reflection object (id, session_id, step_index, user_id, rating, notes, is_shared)
   - [x] 13.6 Grant EXECUTE to `authenticated` role
   - [x] 13.7 Second call with same (session_id, step_index) updates existing row — verify only 1 row exists after 2 calls
+
+### Review Follow-ups (AI)
+
+> **Reviewer:** Claude Opus 4.5 | **Date:** 2026-01-31 | **Verdict:** Changes Requested (4H, 3M, 2L)
+
+- [x] [AI-Review][HIGH] H1: Resolve duplicate `ScriptureSession` type definitions — Slice now imports `ScriptureSession`, `ScriptureSessionPhase`, `ScriptureSessionMode` from `dbSchema.ts` (single source of truth). Re-exports as `SessionPhase`, `SessionMode` for consumer convenience. Removed duplicate interface from slice.
+- [x] [AI-Review][HIGH] H2: Service test coverage is misleading — Added 20 service-level tests covering: `getSession` (cache-first + background refresh + onRefresh callback + error handling), `getUserSessions` (cache-first + server fallback), `updateSession` (write-through + cache update + server failure), `addBookmark`/`toggleBookmark`/`getBookmarksBySession`, `addMessage`/`getMessagesBySession`, `recoverSessionCache`/`recoverAllCaches`. Total: 37 service tests (17 existing + 20 new).
+- [x] [AI-Review][HIGH] H3: `updateSession` now implements write-through pattern — server first via `supabase.from('scripture_sessions').update().eq()`, then updates IndexedDB cache on success. On server failure, cache is not modified and error is thrown.
+- [x] [AI-Review][HIGH] H4: AC #1 labels updated — RPCs now split: `scripture_create_session`, `scripture_submit_reflection` marked as "DONE (Phase 1B, Tasks 12-13)"; `scripture_lock_in`, `scripture_advance_phase` marked as "STUB only (Sprint 0, not yet functional)".
+- [x] [AI-Review][MEDIUM] M1: Removed `synced: boolean` from all 4 scripture IndexedDB types in `dbSchema.ts`. Removed `synced: true` from all `toLocal*` transform functions in `scriptureReadingService.ts`. Cache-only pattern has no use for sync tracking.
+- [x] [AI-Review][MEDIUM] M2: Removed redundant `supabase.auth.getUser()` calls from `createSession` and `fetchAndCacheSession`. Now uses `validated.user1_id` (from RPC/query response) instead — single source of truth, no extra network round-trip.
+- [x] [AI-Review][MEDIUM] M3: `getSession` now accepts `onRefresh` callback parameter. Background refresh invokes callback with refreshed session data, which Zustand slice passes as `(refreshed) => set({ session: refreshed })` to propagate fresh state.
+- [x] [AI-Review][LOW] L1: Slice catch blocks now use `isScriptureError()` type guard to check if caught error is already a `ScriptureError`. If so, uses it directly preserving original error code. Only wraps in `SYNC_FAILED` for non-ScriptureError exceptions.
+- [x] [AI-Review][LOW] L2: Removed redundant `as const` from `SCRIPTURE_STEPS` array. The `readonly ScriptureStep[]` type annotation already provides immutability.
 
 ## Dev Notes
 
@@ -411,18 +425,31 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - Task 3: Created scriptureReadingSlice.ts (5.3KB) — Zustand slice with SessionPhase, SessionMode, ScriptureSession types co-located. State: session, isLoading, isInitialized, isPendingLockIn, isPendingReflection, isSyncing, error. Actions: createSession, loadSession, exitSession, updatePhase, clearScriptureError. Composed into useAppStore.ts and AppState via types.ts.
 - Task 4: Created scriptureSteps.ts (9.5KB) — 17 scripture steps across 6 themes (Healing & Restoration, Forgiveness & Reconciliation, Confession & Repentance, God's Faithfulness & Peace, The Power of Words, Christlike Character). NKJV verses with couple-focused response prayers. MAX_STEPS=17 constant exported.
 - Task 5: Regenerated database.types.ts via `supabase gen types typescript --local`. Now includes all 5 scripture tables, 3 enums (mode, phase, status), and scripture_seed_test_data RPC.
-- Task 6: Wrote 31 new unit tests across 3 test files. All 240 tests pass (22 files), zero regressions. Tests cover: IndexedDB CRUD for all 4 scripture stores, cache corruption recovery, error codes, slice state transitions, static data validation.
+- Task 6: Wrote 31 new unit tests across 3 test files (expanded to 51 after H2 review fix). All 286 tests pass (23 files), zero regressions. Tests cover: IndexedDB CRUD for all 4 scripture stores, cache-first reads, write-through writes, background refresh, bookmark/message CRUD, corruption recovery, error codes, slice state transitions, static data validation.
 
 - Story re-opened (review → ready-for-dev) on 2026-01-30: Added Tasks 7-13 (Phase 1B) from ATDD checklist. 7 new tasks to make 10 RED API tests in scripture-rls-security.spec.ts pass. Tasks 7-11 verify existing RLS policies work with test infrastructure. Tasks 12-13 create net-new RPCs (scripture_create_session, scripture_submit_reflection).
 - Tasks 7-11 (RLS verification): RLS policies from Sprint 0 migration work correctly. Found and fixed a critical bug in `scripture_seed_test_data` RPC — the `RETURNING id INTO v_session_id` in reflection/message insert loops was overwriting the session_id variable, causing FK constraint violations when `includeReflections: true`. Fix: introduced separate `v_temp_id` variable for sub-insert RETURNING clauses. With test users created in local Supabase, all 8 RLS tests pass (P0-001 through P0-005). Together-mode seeding works correctly with 2 auth users — partner visibility test (P0-005) confirms unshared reflections hidden from partner.
 - Task 12: Created `scripture_create_session` RPC in new migration `20260130000001_scripture_rpcs.sql`. RPC validates mode ('solo'/'together'), validates partner exists for together mode, inserts session with `auth.uid()` as user1, sets initial state (phase='reading', step_index=0, status='in_progress', version=1). Returns full JSONB session object. Granted EXECUTE to authenticated. Test P0-008 passes.
 - Task 13: Created `scripture_submit_reflection` RPC in same migration. Uses `INSERT ... ON CONFLICT (session_id, step_index, user_id) DO UPDATE` for idempotent upsert. Enforces session membership via `is_scripture_session_member()` and `user_id = auth.uid()`. Validates rating range 1-5. Returns JSONB reflection object. Test P0-012 confirms: two calls with same (session_id, step_index) produce exactly 1 row with updated values.
 
+- Review Follow-ups (9 items, all addressed):
+  - H1: Unified ScriptureSession type — slice now imports from dbSchema.ts (single source of truth), re-exports for consumers. Removed duplicate interface.
+  - H2: Added 20 service-level tests covering getSession (cache-first + background refresh), getUserSessions, updateSession (write-through), bookmark/message CRUD, corruption recovery. Total service tests: 37.
+  - H3: updateSession now implements write-through — Supabase first, then IndexedDB on success. Server failures leave cache unchanged.
+  - H4: Updated AC #1 labels to distinguish Sprint 0 work from Phase 1B RPCs and stub-only RPCs.
+  - M1: Removed dead `synced: boolean` field from all 4 scripture IndexedDB types and toLocal transforms.
+  - M2: Removed redundant `supabase.auth.getUser()` calls — uses validated.user1_id from RPC response instead.
+  - M3: getSession now accepts onRefresh callback for background refresh state propagation to Zustand.
+  - L1: Slice catch blocks use isScriptureError() type guard to preserve original error codes.
+  - L2: Removed redundant `as const` from SCRIPTURE_STEPS.
+  - Slice field rename: `isLoading` → `scriptureLoading`, `error` → `scriptureError` to avoid AppState intersection collision. Validation schemas centralized in `src/validation/schemas.ts`. Updated all test files to match renamed fields.
+
 ### Validation Gates
 - TypeScript: `npx tsc --noEmit` — PASS (zero errors)
-- Tests: `npx vitest run` — 22 files, 240 tests, all PASS (1 expected failure: useMotionConfig.test.ts — hook not yet created, Phase 5 RED test)
-- Regressions: Zero (240 existing tests all pass)
+- Tests: `npx vitest run` — 23 files, 286 tests, all PASS (1 expected failure: useMotionConfig.test.ts — hook not yet created, Phase 5 RED test)
+- Regressions: Zero (286 tests all pass)
 - ATDD API Tests: `npx playwright test tests/e2e/scripture/scripture-rls-security.spec.ts` — 10 tests, all GREEN ✅
+- Review Follow-ups: 9/9 items addressed (4H, 3M, 2L) — all verified via test suite + tsc
 
 ### File List
 
@@ -449,5 +476,11 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - `tests/unit/hooks/useMotionConfig.test.ts` — RED test for useMotionConfig hook (Story 1.5)
 
 **Modified (Code Review Fixes):**
-- `src/validation/schemas.ts` — Added scripture Zod validation schemas (moved from inline in service)
+- `src/validation/schemas.ts` — Centralized scripture Zod validation schemas (moved from inline in service)
 - `src/types/models.ts` — Added scripture type re-exports from dbSchema
+- `src/services/scriptureReadingService.ts` — Write-through updateSession, removed redundant auth.getUser(), onRefresh callback for getSession, removed `synced` from toLocal transforms, updated RPC signature for addReflection
+- `src/stores/slices/scriptureReadingSlice.ts` — Import types from dbSchema (single source of truth), isScriptureError type guard, renamed isLoading→scriptureLoading/error→scriptureError
+- `src/services/dbSchema.ts` — Removed `synced: boolean` from 4 scripture IndexedDB types
+- `src/data/scriptureSteps.ts` — Removed redundant `as const`
+- `tests/unit/services/scriptureReadingService.test.ts` — Added 20 service-level tests (cache-first, write-through, bookmark/message CRUD, recovery)
+- `tests/unit/stores/scriptureReadingSlice.test.ts` — Updated field references to scriptureLoading/scriptureError
