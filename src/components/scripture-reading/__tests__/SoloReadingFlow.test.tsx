@@ -2,6 +2,8 @@
  * SoloReadingFlow Component Tests
  *
  * Story 1.3: Solo Reading Flow
+ * Story 1.4: Save, Resume & Optimistic UI
+ *
  * Unit tests for the step-by-step scripture reading experience.
  *
  * Tests:
@@ -16,6 +18,9 @@
  * - Error and syncing states
  * - Accessibility (aria labels, dialog, roles)
  * - Reduced motion support
+ * - Story 1.4: Offline indicator (AC #4)
+ * - Story 1.4: Next Verse disabled when offline
+ * - Story 1.4: Retry UI (AC #6)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -57,10 +62,24 @@ vi.mock('framer-motion', () => ({
   useReducedMotion: () => mockUseReducedMotion,
 }));
 
+// Mock useNetworkStatus
+let mockIsOnline = true;
+vi.mock('../../../hooks/useNetworkStatus', () => ({
+  useNetworkStatus: () => ({ isOnline: mockIsOnline, isConnecting: false }),
+}));
+
+// Mock useAutoSave
+const mockUseAutoSave = vi.fn();
+vi.mock('../../../hooks/useAutoSave', () => ({
+  useAutoSave: (...args: unknown[]) => mockUseAutoSave(...args),
+}));
+
 // Mock Zustand store
 const mockAdvanceStep = vi.fn().mockResolvedValue(undefined);
 const mockSaveAndExit = vi.fn().mockResolvedValue(undefined);
+const mockSaveSession = vi.fn().mockResolvedValue(undefined);
 const mockExitSession = vi.fn();
+const mockRetryFailedWrite = vi.fn().mockResolvedValue(undefined);
 
 interface MockSession {
   id: string;
@@ -74,20 +93,32 @@ interface MockSession {
   completedAt?: Date;
 }
 
+interface MockPendingRetry {
+  type: 'advanceStep' | 'saveSession';
+  attempts: number;
+  maxAttempts: number;
+}
+
 const mockStoreState: {
   session: MockSession | null;
   isSyncing: boolean;
   scriptureError: { code: string; message: string } | null;
+  pendingRetry: MockPendingRetry | null;
   advanceStep: typeof mockAdvanceStep;
   saveAndExit: typeof mockSaveAndExit;
+  saveSession: typeof mockSaveSession;
   exitSession: typeof mockExitSession;
+  retryFailedWrite: typeof mockRetryFailedWrite;
 } = {
   session: null,
   isSyncing: false,
   scriptureError: null,
+  pendingRetry: null,
   advanceStep: mockAdvanceStep,
   saveAndExit: mockSaveAndExit,
+  saveSession: mockSaveSession,
   exitSession: mockExitSession,
+  retryFailedWrite: mockRetryFailedWrite,
 };
 
 // Create a function to get state for the useAppStore mock
@@ -124,7 +155,9 @@ describe('SoloReadingFlow', () => {
     mockStoreState.session = createMockSession();
     mockStoreState.isSyncing = false;
     mockStoreState.scriptureError = null;
+    mockStoreState.pendingRetry = null;
     mockUseReducedMotion = false;
+    mockIsOnline = true;
   });
 
   // ============================================
@@ -487,11 +520,12 @@ describe('SoloReadingFlow', () => {
       expect(screen.queryByTestId('sync-indicator')).toBeNull();
     });
 
-    it('shows error message when scriptureError is set', () => {
+    it('shows error message when scriptureError is set and no pendingRetry', () => {
       mockStoreState.scriptureError = {
         code: 'SYNC_FAILED',
         message: 'Failed to save step progress',
       };
+      mockStoreState.pendingRetry = null;
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('reading-error')).toHaveTextContent(
         'Failed to save step progress'
@@ -510,6 +544,17 @@ describe('SoloReadingFlow', () => {
     it('does not show error when no error exists', () => {
       render(<SoloReadingFlow />);
       expect(screen.queryByTestId('reading-error')).toBeNull();
+    });
+
+    it('does not show error banner when pendingRetry is active (retry banner shows instead)', () => {
+      mockStoreState.scriptureError = {
+        code: 'SYNC_FAILED',
+        message: 'Failed to save',
+      };
+      mockStoreState.pendingRetry = { type: 'advanceStep', attempts: 1, maxAttempts: 3 };
+      render(<SoloReadingFlow />);
+      expect(screen.queryByTestId('reading-error')).toBeNull();
+      expect(screen.getByTestId('retry-banner')).toBeDefined();
     });
   });
 
@@ -584,9 +629,6 @@ describe('SoloReadingFlow', () => {
   describe('Reduced Motion', () => {
     it('uses zero-duration animations when useReducedMotion returns true', () => {
       mockUseReducedMotion = true;
-      // The component should render without errors and use duration: 0 transitions.
-      // Since framer-motion is mocked and doesn't actually animate, we verify the
-      // component still renders and functions correctly with reduced motion enabled.
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('solo-reading-flow')).toBeDefined();
       expect(screen.getByTestId('verse-screen')).toBeDefined();
@@ -599,6 +641,109 @@ describe('SoloReadingFlow', () => {
       fireEvent.click(screen.getByTestId('scripture-back-to-verse-button'));
       fireEvent.click(screen.getByTestId('exit-button'));
       expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
+    });
+  });
+
+  // ============================================
+  // Story 1.4: Offline Indicator (AC #4)
+  // ============================================
+
+  describe('Offline Indicator', () => {
+    it('shows offline indicator when offline', () => {
+      mockIsOnline = false;
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('offline-indicator')).toBeDefined();
+      expect(screen.getByText(/You're offline/)).toBeDefined();
+    });
+
+    it('hides offline indicator when online', () => {
+      mockIsOnline = true;
+      render(<SoloReadingFlow />);
+      expect(screen.queryByTestId('offline-indicator')).toBeNull();
+    });
+
+    it('offline indicator has role=status and aria-live=polite', () => {
+      mockIsOnline = false;
+      render(<SoloReadingFlow />);
+      const indicator = screen.getByTestId('offline-indicator');
+      expect(indicator.getAttribute('role')).toBe('status');
+      expect(indicator.getAttribute('aria-live')).toBe('polite');
+    });
+
+    it('disables Next Verse button when offline', () => {
+      mockIsOnline = false;
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('scripture-next-verse-button')).toBeDisabled();
+    });
+
+    it('View Response button still works when offline', () => {
+      mockIsOnline = false;
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      expect(screen.getByTestId('response-screen')).toBeDefined();
+    });
+  });
+
+  // ============================================
+  // Story 1.4: Retry UI (AC #6)
+  // ============================================
+
+  describe('Retry UI', () => {
+    it('shows retry banner when pendingRetry is present', () => {
+      mockStoreState.pendingRetry = { type: 'advanceStep', attempts: 1, maxAttempts: 3 };
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('retry-banner')).toBeDefined();
+      expect(screen.getByText('Save failed. Tap to retry.')).toBeDefined();
+    });
+
+    it('shows retry button with attempt count', () => {
+      mockStoreState.pendingRetry = { type: 'advanceStep', attempts: 1, maxAttempts: 3 };
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('retry-button')).toHaveTextContent('Retry (1/3)');
+    });
+
+    it('calls retryFailedWrite when retry button is tapped', () => {
+      mockStoreState.pendingRetry = { type: 'advanceStep', attempts: 1, maxAttempts: 3 };
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('retry-button'));
+      expect(mockRetryFailedWrite).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows max attempts message when retries exhausted', () => {
+      mockStoreState.pendingRetry = { type: 'advanceStep', attempts: 3, maxAttempts: 3 };
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('retry-banner')).toBeDefined();
+      expect(screen.getByText('Save failed. Your progress is saved locally.')).toBeDefined();
+      expect(screen.queryByTestId('retry-button')).toBeNull();
+    });
+
+    it('does not show retry banner when no pendingRetry', () => {
+      mockStoreState.pendingRetry = null;
+      render(<SoloReadingFlow />);
+      expect(screen.queryByTestId('retry-banner')).toBeNull();
+    });
+  });
+
+  // ============================================
+  // Story 1.4: useAutoSave wiring
+  // ============================================
+
+  describe('useAutoSave wiring', () => {
+    it('calls useAutoSave with session and saveSession', () => {
+      render(<SoloReadingFlow />);
+      expect(mockUseAutoSave).toHaveBeenCalledWith({
+        session: mockStoreState.session,
+        saveSession: mockSaveSession,
+      });
+    });
+
+    it('calls useAutoSave even when session is null', () => {
+      mockStoreState.session = null;
+      render(<SoloReadingFlow />);
+      expect(mockUseAutoSave).toHaveBeenCalledWith({
+        session: null,
+        saveSession: mockSaveSession,
+      });
     });
   });
 });
