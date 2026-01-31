@@ -19,6 +19,9 @@
       --bookmark-active: #F59E0B;
       --card-bg: rgba(255, 255, 255, 0.8);
       --card-shadow: 0 10px 40px rgba(168, 85, 247, 0.15);
+      --green: #51CF66;
+      --yellow: #FCC419;
+      --red: #FF6B6B;
     }
 
     * {
@@ -29,42 +32,44 @@
 
     body {
       font-family: 'Inter', system-ui, sans-serif;
-      background: var(--background);
+      background: #1a1a2e;
       color: var(--text-primary);
       min-height: 100vh;
     }
 
-    /* Navigation */
+    /* Top Navigation */
     .nav {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      background: var(--card-bg);
+      background: rgba(26, 26, 46, 0.95);
       backdrop-filter: blur(20px);
-      padding: 16px 24px;
+      padding: 12px 16px;
       display: flex;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
       z-index: 100;
-      border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+      border-bottom: 1px solid rgba(168, 85, 247, 0.2);
       flex-wrap: wrap;
     }
 
     .nav-btn {
-      padding: 8px 16px;
+      padding: 6px 12px;
       border: none;
       background: transparent;
-      color: var(--text-secondary);
-      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      border-radius: 20px;
+      border-radius: 16px;
       transition: all 0.2s;
+      white-space: nowrap;
     }
 
     .nav-btn:hover {
-      background: rgba(168, 85, 247, 0.1);
+      background: rgba(168, 85, 247, 0.2);
+      color: rgba(255, 255, 255, 0.8);
     }
 
     .nav-btn.active {
@@ -74,50 +79,55 @@
 
     /* Screen Container */
     .screens {
-      padding-top: 80px;
+      padding-top: 72px;
+      padding-bottom: 40px;
     }
 
     .screen {
       display: none;
-      min-height: calc(100vh - 80px);
+      min-height: calc(100vh - 72px);
       padding: 24px;
-      background: var(--background-gradient);
     }
 
     .screen.active {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
     }
 
     /* Phone Frame */
     .phone-frame {
-      max-width: 390px;
-      margin: 0 auto;
-      background: var(--background-gradient);
-      border-radius: 40px;
-      padding: 20px;
-      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
-      border: 8px solid #1a1a1a;
+      width: 390px;
+      max-width: 100%;
+      background: #1a1a1a;
+      border-radius: 48px;
+      padding: 12px;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
       position: relative;
     }
 
     .phone-frame::before {
       content: '';
       position: absolute;
-      top: 8px;
+      top: 16px;
       left: 50%;
       transform: translateX(-50%);
-      width: 80px;
-      height: 24px;
+      width: 90px;
+      height: 28px;
       background: #1a1a1a;
       border-radius: 20px;
+      z-index: 10;
     }
 
     .phone-content {
       background: var(--background-gradient);
-      border-radius: 28px;
-      min-height: 700px;
+      border-radius: 38px;
+      min-height: 720px;
       overflow: hidden;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
 
     /* Cards */
@@ -130,10 +140,24 @@
       margin-bottom: 16px;
     }
 
-    /* Screen Header */
+    /* Screen Header - Session Layout Contract TOP AREA */
+    .session-top {
+      padding: 48px 20px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .session-progress {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* Screen Header for non-session screens */
     .screen-header {
       text-align: center;
-      padding: 40px 20px 20px;
+      padding: 48px 20px 20px;
     }
 
     .screen-title {
@@ -205,8 +229,8 @@
       position: absolute;
       top: 16px;
       right: 16px;
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
       border: none;
       background: transparent;
       cursor: pointer;
@@ -219,6 +243,11 @@
 
     .bookmark-btn:hover {
       background: rgba(168, 85, 247, 0.1);
+    }
+
+    .bookmark-btn:focus-visible {
+      outline: 2px solid var(--primary-light);
+      outline-offset: 2px;
     }
 
     .bookmark-btn svg {
@@ -248,13 +277,20 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--primary-light);
-      animation: pulse 2s infinite;
+      transition: background 0.3s;
     }
+
+    .partner-dot.same-page { background: var(--yellow); }
+    .partner-dot.different-page { background: var(--red); }
+    .partner-dot.both-ready { background: var(--green); }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
+    }
+
+    .partner-dot.animated {
+      animation: pulse 2s infinite;
     }
 
     /* Navigation Buttons */
@@ -277,10 +313,16 @@
       cursor: pointer;
       border-radius: 20px;
       transition: all 0.2s;
+      min-height: 48px;
     }
 
     .nav-arrow:hover {
       background: rgba(168, 85, 247, 0.2);
+    }
+
+    .nav-arrow:focus-visible {
+      outline: 2px solid var(--primary-light);
+      outline-offset: 2px;
     }
 
     .nav-arrow svg {
@@ -288,7 +330,13 @@
       height: 16px;
     }
 
-    /* Lock-in Button */
+    /* Lock-in Button - Session Layout Contract BOTTOM AREA */
+    .bottom-actions {
+      margin-top: auto;
+      padding: 20px;
+      background: linear-gradient(transparent, rgba(243, 229, 245, 0.9));
+    }
+
     .lock-in-btn {
       width: 100%;
       padding: 18px 24px;
@@ -301,6 +349,7 @@
       border-radius: 28px;
       transition: all 0.2s;
       box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+      min-height: 56px;
     }
 
     .lock-in-btn:hover {
@@ -308,36 +357,23 @@
       box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
     }
 
-    .lock-in-btn.waiting {
-      background: var(--accent);
-      color: var(--text-primary);
+    .lock-in-btn:focus-visible {
+      outline: 2px solid white;
+      outline-offset: 2px;
+    }
+
+    .lock-in-btn.ready-state {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--primary);
       box-shadow: none;
+      border: 2px solid var(--accent);
     }
 
-    .lock-in-btn.waiting::after {
-      content: '';
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid var(--text-muted);
-      border-top-color: transparent;
-      border-radius: 50%;
-      margin-left: 8px;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Bottom Actions */
-    .bottom-actions {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 20px;
-      background: linear-gradient(transparent, var(--background));
+    .lock-in-helper {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 8px;
     }
 
     /* Countdown */
@@ -410,11 +446,11 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: #10B981;
     }
 
+    .status-dot.online { background: var(--green); }
     .status-dot.waiting {
-      background: var(--bookmark-active);
+      background: var(--yellow);
       animation: pulse 1.5s infinite;
     }
 
@@ -430,15 +466,23 @@
       border-radius: 28px;
       margin-top: 32px;
       transition: all 0.2s;
+      min-height: 56px;
+    }
+
+    .ready-btn:focus-visible {
+      outline: 2px solid var(--primary-light);
+      outline-offset: 2px;
     }
 
     .ready-btn.checked {
-      background: #10B981;
+      background: var(--green);
     }
 
     /* Reflection */
     .reflection-section {
       padding: 20px;
+      flex: 1;
+      overflow-y: auto;
     }
 
     .section-title {
@@ -465,6 +509,9 @@
       cursor: pointer;
       border-radius: 20px;
       transition: all 0.2s;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
     }
 
     .verse-chip.bookmarked {
@@ -479,11 +526,22 @@
     }
 
     /* Rating */
+    .rating-container {
+      margin-bottom: 24px;
+    }
+
     .rating-row {
       display: flex;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 24px;
+      margin-bottom: 8px;
+    }
+
+    .rating-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
     .rating-btn {
@@ -497,6 +555,13 @@
       cursor: pointer;
       border-radius: 16px;
       transition: all 0.2s;
+      min-height: 48px;
+      min-width: 48px;
+    }
+
+    .rating-btn:focus-visible {
+      outline: 2px solid var(--primary-light);
+      outline-offset: 2px;
     }
 
     .rating-btn.selected {
@@ -516,7 +581,7 @@
       font-family: inherit;
       border-radius: 16px;
       resize: none;
-      min-height: 100px;
+      min-height: 80px;
       margin-bottom: 16px;
     }
 
@@ -529,10 +594,54 @@
       color: var(--text-muted);
     }
 
+    /* Toggle */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      margin-bottom: 16px;
+      cursor: pointer;
+      min-height: 48px;
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .toggle-track {
+      width: 44px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 12px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-track.on {
+      background: var(--primary);
+    }
+
+    .toggle-thumb {
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+
+    .toggle-track.on .toggle-thumb {
+      transform: translateX(20px);
+    }
+
     /* Daily Prayer Report */
     .report-header {
       text-align: center;
-      padding: 40px 20px 20px;
+      padding: 48px 20px 20px;
     }
 
     .report-title {
@@ -549,7 +658,7 @@
 
     .message-reveal {
       text-align: center;
-      padding: 32px 20px;
+      padding: 24px 20px;
     }
 
     .message-from {
@@ -603,23 +712,24 @@
     /* Description Panel */
     .description-panel {
       max-width: 600px;
-      margin: 40px auto 0;
+      width: 100%;
       padding: 24px;
-      background: var(--card-bg);
+      background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(20px);
       border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .description-panel h3 {
       font-size: 18px;
       font-weight: 600;
-      color: var(--text-primary);
+      color: rgba(255, 255, 255, 0.9);
       margin-bottom: 12px;
     }
 
     .description-panel p {
       font-size: 14px;
-      color: var(--text-secondary);
+      color: rgba(255, 255, 255, 0.6);
       line-height: 1.6;
       margin-bottom: 12px;
     }
@@ -631,8 +741,8 @@
 
     .description-panel li {
       font-size: 14px;
-      color: var(--text-secondary);
-      padding: 8px 0;
+      color: rgba(255, 255, 255, 0.6);
+      padding: 6px 0;
       padding-left: 24px;
       position: relative;
     }
@@ -641,35 +751,232 @@
       content: '✓';
       position: absolute;
       left: 0;
-      color: var(--primary);
+      color: var(--primary-light);
       font-weight: 600;
     }
 
-    /* Interactive states */
+    .spec-callout {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: rgba(168, 85, 247, 0.1);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .spec-callout strong {
+      color: var(--primary-light);
+    }
+
+    /* Interactive notes */
     .interactive-note {
       font-size: 12px;
       color: var(--text-muted);
       text-align: center;
-      margin-top: 16px;
+      margin-top: 12px;
       font-style: italic;
+    }
+
+    /* Overview page styles */
+    .overview-content {
+      padding: 48px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .overview-greeting {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .overview-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+    }
+
+    .mode-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 20px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+
+    .mode-card:hover {
+      border-color: var(--primary-light);
+      transform: translateY(-2px);
+    }
+
+    .mode-card.selected {
+      border-color: var(--primary);
+    }
+
+    .mode-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .mode-card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .mode-card-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Solo mode navigation */
+    .solo-nav-btn {
+      width: 100%;
+      padding: 16px 24px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 28px;
+      min-height: 56px;
+    }
+
+    /* Reconnection */
+    .reconnect-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(74, 31, 111, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-radius: 24px 24px 0 0;
+      text-align: center;
+    }
+
+    .reconnect-text {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .reconnect-sub {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 13px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    /* Layout zone annotation */
+    .zone-label {
+      position: absolute;
+      right: -8px;
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(168, 85, 247, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      writing-mode: vertical-rl;
     }
   </style>
 </head>
 <body>
   <!-- Navigation -->
-  <nav class="nav">
-    <button class="nav-btn active" data-screen="lobby">Lobby</button>
+  <nav class="nav" role="navigation" aria-label="Screen navigation">
+    <button class="nav-btn active" data-screen="overview">Overview</button>
+    <button class="nav-btn" data-screen="lobby">Lobby</button>
     <button class="nav-btn" data-screen="countdown">Countdown</button>
-    <button class="nav-btn" data-screen="verse">Verse (Reader)</button>
+    <button class="nav-btn" data-screen="verse-reader">Verse (Reader)</button>
+    <button class="nav-btn" data-screen="verse-listener">Verse (Listener)</button>
     <button class="nav-btn" data-screen="response">Response</button>
-    <button class="nav-btn" data-screen="waiting">Lock-in Wait</button>
+    <button class="nav-btn" data-screen="lockin">Lock-in States</button>
     <button class="nav-btn" data-screen="reflection">Reflection</button>
     <button class="nav-btn" data-screen="report">Prayer Report</button>
+    <button class="nav-btn" data-screen="solo">Solo Mode</button>
+    <button class="nav-btn" data-screen="reconnect">Reconnection</button>
   </nav>
 
   <div class="screens">
-    <!-- Screen 1: Lobby -->
-    <section class="screen active" id="lobby">
+
+    <!-- ============================================ -->
+    <!-- Screen 1: Overview / Entry Page              -->
+    <!-- ============================================ -->
+    <section class="screen active" id="overview">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="overview-content">
+            <div class="overview-greeting">Scripture Reading</div>
+            <div class="overview-subtitle">A quiet space to read and reflect together</div>
+
+            <div class="mode-card selected" onclick="document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');">
+              <div class="mode-card-title">Together</div>
+              <div class="mode-card-desc">Read in sync with your partner — see the same verses, take turns reading aloud</div>
+              <div class="mode-card-status">
+                <span class="status-dot online"></span>
+                Jordan is online
+              </div>
+            </div>
+
+            <div class="mode-card" onclick="document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');">
+              <div class="mode-card-title">Solo</div>
+              <div class="mode-card-desc">Read at your own pace — your reflection will be shared when you're both done</div>
+            </div>
+          </div>
+
+          <div class="bottom-actions">
+            <button class="lock-in-btn">Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Overview / Entry Page</h3>
+        <p>The calm entry point. Users choose Together or Solo mode before starting.</p>
+        <ul>
+          <li>3 taps from overview to reading (minimized steps to value)</li>
+          <li>Partner online status visible on Together card</li>
+          <li>"Continue" not "Start" — ritual language</li>
+          <li>If previous solo session exists, "Resume" option appears</li>
+          <li>Lavender Dreams theme signals calm, contemplative mood</li>
+        </ul>
+        <div class="spec-callout">
+          <strong>Emotional goal:</strong> Safe &amp; Unhurried — no pressure, no guilt. They chose this freely.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- Screen 2: Lobby (Together Mode)              -->
+    <!-- ============================================ -->
+    <section class="screen" id="lobby">
       <div class="phone-frame">
         <div class="phone-content">
           <div class="screen-header">
@@ -681,7 +988,7 @@
             <div class="partner-avatar">J</div>
             <div class="partner-name">Jordan</div>
             <div class="partner-status">
-              <span class="status-dot"></span>
+              <span class="status-dot online"></span>
               <span>Online</span>
             </div>
           </div>
@@ -697,7 +1004,7 @@
               </div>
             </div>
 
-            <button class="ready-btn" onclick="this.classList.toggle('checked'); this.textContent = this.classList.contains('checked') ? '✓ Ready' : 'I\'m Ready'">I'm Ready</button>
+            <button class="ready-btn" id="readyBtn" onclick="this.classList.toggle('checked'); this.textContent = this.classList.contains('checked') ? '✓ Ready' : 'I\'m Ready'">I'm Ready</button>
 
             <p class="interactive-note">Tap "I'm Ready" to see the ready state</p>
           </div>
@@ -706,22 +1013,28 @@
 
       <div class="description-panel">
         <h3>Lobby Screen</h3>
-        <p>Both partners see each other's online status and tap "Ready" when prepared to begin.</p>
+        <p>Both partners see each other's online status and tap "Ready" when prepared to begin. Both must be ready before countdown starts.</p>
         <ul>
           <li>Partner presence with avatar and name</li>
           <li>Clear ready/waiting status indicators</li>
           <li>Both must be ready before countdown starts</li>
-          <li>Calm, unhurried entry point</li>
+          <li>Calm, unhurried entry point — no pressure</li>
+          <li>Fallback: "Continue solo" option if partner doesn't join (no shame language)</li>
         </ul>
+        <div class="spec-callout">
+          <strong>No-shame copy:</strong> "Continue solo" (not "Partner didn't show up"). "Try together another time" (not "Partner abandoned you").
+        </div>
       </div>
     </section>
 
-    <!-- Screen 2: Countdown -->
+    <!-- ============================================ -->
+    <!-- Screen 3: Countdown                          -->
+    <!-- ============================================ -->
     <section class="screen" id="countdown">
       <div class="phone-frame">
         <div class="phone-content">
-          <div class="countdown-overlay">
-            <div class="countdown-number">3</div>
+          <div class="countdown-overlay" aria-label="Session starting in 3 seconds">
+            <div class="countdown-number" aria-hidden="true">3</div>
             <div class="countdown-text">Starting together...</div>
           </div>
         </div>
@@ -729,27 +1042,35 @@
 
       <div class="description-panel">
         <h3>Countdown Screen</h3>
-        <p>The 3-2-1 countdown creates shared anticipation before the session begins.</p>
+        <p>The 3-2-1 countdown creates shared anticipation — the "defining moment" where the together magic is established.</p>
         <ul>
-          <li>Large, elegant number display</li>
-          <li>Gentle pulse animation (respects reduced motion)</li>
-          <li>Same countdown appears on both devices simultaneously</li>
-          <li>Builds the "together" feeling before reading</li>
+          <li>Large, elegant Playfair Display number</li>
+          <li>Gentle pulse animation (Framer Motion)</li>
+          <li>Same countdown on both devices simultaneously</li>
+          <li>Single aria-live="polite" announcement at start</li>
+          <li>Reduced motion: static number display, no animation</li>
         </ul>
+        <div class="spec-callout">
+          <strong>Accessibility:</strong> One announcement: "Session starting in 3 seconds." Visual numbers are aria-hidden to prevent per-number screen reader spam.
+        </div>
       </div>
     </section>
 
-    <!-- Screen 3: Verse (Reader) -->
-    <section class="screen" id="verse">
+    <!-- ============================================ -->
+    <!-- Screen 4: Verse (Reader Role)                -->
+    <!-- ============================================ -->
+    <section class="screen" id="verse-reader">
       <div class="phone-frame">
         <div class="phone-content">
-          <div class="screen-header">
-            <div class="screen-title">Verse 1 of 17</div>
+          <!-- TOP AREA: Session Layout Contract -->
+          <div class="session-top">
+            <span class="session-progress" aria-label="Currently on verse 1 of 17">Verse 1 of 17</span>
           </div>
 
-          <div style="padding: 0 20px;">
+          <!-- CENTER AREA -->
+          <div style="padding: 0 20px; flex: 1;">
             <div class="card" style="position: relative;">
-              <button class="bookmark-btn" onclick="this.classList.toggle('active')" title="Bookmark this verse">
+              <button class="bookmark-btn" onclick="this.classList.toggle('active')" aria-label="Bookmark this verse">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                 </svg>
@@ -770,7 +1091,7 @@
             </div>
 
             <div class="partner-position">
-              <span class="partner-dot"></span>
+              <span class="partner-dot same-page animated"></span>
               <span>Jordan is viewing the verse</span>
             </div>
 
@@ -784,7 +1105,77 @@
               </button>
             </div>
 
-            <p class="interactive-note">Tap the bookmark icon to see the active state</p>
+            <p class="interactive-note">Tap bookmark icon to toggle. Yellow dot = same page as partner.</p>
+          </div>
+
+          <!-- BOTTOM AREA -->
+          <div class="bottom-actions">
+            <button class="lock-in-btn">Ready for next verse</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Verse Screen — Reader Role</h3>
+        <p>The reader sees their verse with a clear indicator. Playfair Display makes scripture feel reverent, not like a text doc.</p>
+        <ul>
+          <li>Role indicator: "You read this" pill badge with mic icon</li>
+          <li>Bookmark flag: 48×48px touch target, instant toggle, amber when active</li>
+          <li>Partner position: yellow dot = same page, red = different page</li>
+          <li>Free navigation to response via "View Response"</li>
+          <li>"Verse 1 of 17" text-only (no progress bar — ritual, not task)</li>
+          <li>Roles alternate: Reader on verse N → Responder on verse N+1</li>
+        </ul>
+        <div class="spec-callout">
+          <strong>Session Layout Contract:</strong> Top = progress + partner. Center = content card. Bottom = primary CTA in thumb zone.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- Screen 5: Verse (Listener/Partner's View)    -->
+    <!-- ============================================ -->
+    <section class="screen" id="verse-listener">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="session-top">
+            <span class="session-progress" aria-label="Currently on verse 1 of 17">Verse 1 of 17</span>
+          </div>
+
+          <div style="padding: 0 20px; flex: 1;">
+            <div class="card" style="position: relative;">
+              <button class="bookmark-btn" onclick="this.classList.toggle('active')" aria-label="Bookmark this verse">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </button>
+
+              <span class="role-indicator responder">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                </svg>
+                Jordan reads this
+              </span>
+
+              <div class="verse-reference">Proverbs 15:1</div>
+              <p class="verse-text">A soft answer turns away wrath, but a harsh word stirs up anger.</p>
+            </div>
+
+            <div class="partner-position">
+              <span class="partner-dot same-page animated"></span>
+              <span>Jordan is viewing the verse</span>
+            </div>
+
+            <div class="nav-arrows">
+              <div></div>
+              <button class="nav-arrow">
+                View Response
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div class="bottom-actions">
@@ -794,27 +1185,31 @@
       </div>
 
       <div class="description-panel">
-        <h3>Verse Screen (Reader Role)</h3>
-        <p>The reader sees the verse with a clear indicator that it's their turn to read aloud.</p>
+        <h3>Verse Screen — Listener Role (Partner's Device)</h3>
+        <p>The listener sees the same verse but their role indicator says "Jordan reads this" — they follow along while their partner reads aloud.</p>
         <ul>
-          <li>Role indicator badge: "You read this"</li>
-          <li>Playfair Display for elegant scripture typography</li>
-          <li>Bookmark flag to mark meaningful verses</li>
-          <li>Partner position shows where they are</li>
-          <li>Free navigation to response screen</li>
+          <li>Role indicator: "Jordan reads this" (lighter purple)</li>
+          <li>Same bookmark flag available — both can independently bookmark</li>
+          <li>Same free navigation and lock-in button</li>
+          <li>Bookmarks are private by default — partner can't see during session</li>
         </ul>
+        <div class="spec-callout">
+          <strong>Privacy:</strong> Bookmarks are private. At reflection, a single toggle lets you opt-in to sharing them in the report.
+        </div>
       </div>
     </section>
 
-    <!-- Screen 4: Response -->
+    <!-- ============================================ -->
+    <!-- Screen 6: Response Screen                    -->
+    <!-- ============================================ -->
     <section class="screen" id="response">
       <div class="phone-frame">
         <div class="phone-content">
-          <div class="screen-header">
-            <div class="screen-title">Verse 1 of 17</div>
+          <div class="session-top">
+            <span class="session-progress">Verse 1 of 17</span>
           </div>
 
-          <div style="padding: 0 20px;">
+          <div style="padding: 0 20px; flex: 1;">
             <div class="card">
               <span class="role-indicator responder">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -831,8 +1226,8 @@
             </div>
 
             <div class="partner-position">
-              <span class="partner-dot"></span>
-              <span>Jordan is viewing the response</span>
+              <span class="partner-dot different-page animated"></span>
+              <span>Jordan is viewing the verse</span>
             </div>
 
             <div class="nav-arrows">
@@ -854,67 +1249,106 @@
 
       <div class="description-panel">
         <h3>Response Screen</h3>
-        <p>The response prayer follows the verse. The responder role is indicated clearly.</p>
+        <p>The response prayer follows the verse. The responder role is clearly indicated — they read this aloud.</p>
         <ul>
-          <li>Role indicator shows partner responds</li>
-          <li>Inter font for response text (distinct from verse)</li>
+          <li>Role indicator: "Jordan responds" (lighter purple)</li>
+          <li>Inter font for response (distinct from Playfair verse text)</li>
           <li>Back navigation to verse for re-reading</li>
-          <li>Same lock-in button available here</li>
+          <li>Red dot = partner is on a different page (viewing the verse)</li>
+          <li>Same lock-in button — can lock in from either screen</li>
         </ul>
+        <div class="spec-callout">
+          <strong>Partner position colors:</strong> Yellow = same page. Red = different page. Green = both ready. Off = disconnected.
+        </div>
       </div>
     </section>
 
-    <!-- Screen 5: Waiting for Lock-in -->
-    <section class="screen" id="waiting">
-      <div class="phone-frame">
-        <div class="phone-content">
-          <div class="screen-header">
-            <div class="screen-title">Verse 1 of 17</div>
+    <!-- ============================================ -->
+    <!-- Screen 7: Lock-in Button States              -->
+    <!-- ============================================ -->
+    <section class="screen" id="lockin">
+      <!-- State 1: Available -->
+      <div class="phone-frame" style="margin-bottom: 24px;">
+        <div class="phone-content" style="min-height: 280px;">
+          <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; font-weight: 600;">STATE 1: Available</div>
           </div>
-
-          <div style="padding: 0 20px;">
-            <div class="card">
-              <span class="role-indicator reader">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                </svg>
-                You read this
-              </span>
-
-              <div class="verse-reference">Proverbs 15:1</div>
-              <p class="verse-text">A soft answer turns away wrath, but a harsh word stirs up anger.</p>
-            </div>
-
-            <div class="partner-position">
-              <span class="partner-dot"></span>
-              <span>Jordan is viewing the response</span>
-            </div>
-          </div>
-
           <div class="bottom-actions">
-            <button class="lock-in-btn waiting">Waiting for Jordan...</button>
+            <button class="lock-in-btn">Ready for next verse</button>
           </div>
         </div>
       </div>
 
-      <div class="description-panel">
-        <h3>Lock-in Waiting State</h3>
-        <p>After you tap "Ready for next verse", the button shows a waiting state until your partner also locks in.</p>
+      <!-- State 2: You're Ready -->
+      <div class="phone-frame" style="margin-bottom: 24px;">
+        <div class="phone-content" style="min-height: 280px;">
+          <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; font-weight: 600;">STATE 2: You're Ready (partner hasn't)</div>
+            <div class="partner-position">
+              <span class="partner-dot different-page animated"></span>
+              <span>Jordan is viewing the response</span>
+            </div>
+          </div>
+          <div class="bottom-actions">
+            <button class="lock-in-btn ready-state">Ready ✓ &nbsp;<span style="font-weight: 400; font-size: 13px; opacity: 0.7;">Tap to undo</span></button>
+            <div class="lock-in-helper">We'll continue when you're both ready</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 3: Sync Paused (reconnecting) -->
+      <div class="phone-frame" style="margin-bottom: 24px;">
+        <div class="phone-content" style="min-height: 280px;">
+          <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; font-weight: 600;">STATE 3: Sync Paused</div>
+          </div>
+          <div class="bottom-actions">
+            <button class="lock-in-btn" style="background: var(--accent); color: var(--text-secondary); box-shadow: none;">
+              <span class="spinner"></span>Holding your place
+            </button>
+            <div class="lock-in-helper">Jordan is reconnecting...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 4: Both Ready (transitioning) -->
+      <div class="phone-frame">
+        <div class="phone-content" style="min-height: 280px;">
+          <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; font-weight: 600;">STATE 4: Both Ready</div>
+            <div class="partner-position">
+              <span class="partner-dot both-ready"></span>
+              <span>Both ready</span>
+            </div>
+          </div>
+          <div class="bottom-actions">
+            <button class="lock-in-btn" style="opacity: 0.6;">Continuing...</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel" style="margin-top: 24px;">
+        <h3>Lock-in Button — All 4 States</h3>
+        <p>The "both must confirm" pattern ensures synchronized progression. Neither partner can rush the other.</p>
         <ul>
-          <li>Clear waiting indicator with partner's name</li>
-          <li>Subtle loading animation</li>
-          <li>Partner can continue navigating freely</li>
-          <li>Auto-advances when both lock in</li>
-          <li>No pressure — waiting feels purposeful</li>
+          <li><strong>Available:</strong> Primary gradient — "Ready for next verse"</li>
+          <li><strong>You're Ready:</strong> Secondary outlined — "Ready ✓ Tap to undo"</li>
+          <li><strong>Sync Paused:</strong> Muted accent — "Holding your place"</li>
+          <li><strong>Both Ready:</strong> Fading out — "Continuing..." (300-400ms transition)</li>
         </ul>
+        <div class="spec-callout">
+          <strong>No-blame copy:</strong> Primary helper text is "We'll continue when you're both ready" — never "Waiting for Jordan..." as primary (that subtly makes partner the bottleneck).
+        </div>
       </div>
     </section>
 
-    <!-- Screen 6: Reflection -->
+    <!-- ============================================ -->
+    <!-- Screen 8: Reflection                         -->
+    <!-- ============================================ -->
     <section class="screen" id="reflection">
       <div class="phone-frame">
-        <div class="phone-content" style="overflow-y: auto;">
-          <div class="screen-header">
+        <div class="phone-content">
+          <div class="screen-header" style="padding-bottom: 8px;">
             <div class="screen-title">Session Reflection</div>
             <div class="step-indicator">17 verses complete</div>
           </div>
@@ -922,25 +1356,38 @@
           <div class="reflection-section">
             <div class="section-title">Verses you marked</div>
             <div class="verse-chips">
-              <button class="verse-chip bookmarked selected">Proverbs 15:1</button>
-              <button class="verse-chip bookmarked">Ephesians 4:26</button>
-              <button class="verse-chip">Col 3:13</button>
+              <button class="verse-chip bookmarked selected" onclick="document.querySelectorAll('.verse-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');">Proverbs 15:1</button>
+              <button class="verse-chip bookmarked" onclick="document.querySelectorAll('.verse-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');">Ephesians 4:26</button>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: -16px; margin-bottom: 20px;">Tap the verse that stood out most</div>
+
+            <div class="section-title">How meaningful was this for you today?</div>
+            <div class="rating-container">
+              <div class="rating-row">
+                <button class="rating-btn" onclick="document.querySelectorAll('.rating-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected');">1</button>
+                <button class="rating-btn" onclick="document.querySelectorAll('.rating-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected');">2</button>
+                <button class="rating-btn" onclick="document.querySelectorAll('.rating-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected');">3</button>
+                <button class="rating-btn selected" onclick="document.querySelectorAll('.rating-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected');">4</button>
+                <button class="rating-btn" onclick="document.querySelectorAll('.rating-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected');">5</button>
+              </div>
+              <div class="rating-labels">
+                <span>A little</span>
+                <span>A lot</span>
+              </div>
             </div>
 
-            <div class="section-title">How meaningful was this session?</div>
-            <div class="rating-row">
-              <button class="rating-btn">1</button>
-              <button class="rating-btn">2</button>
-              <button class="rating-btn">3</button>
-              <button class="rating-btn selected">4</button>
-              <button class="rating-btn">5</button>
-            </div>
-
-            <div class="section-title">Reflection note (optional)</div>
+            <div class="section-title">Reflection note <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></div>
             <textarea class="text-input" placeholder="What stood out to you today?"></textarea>
 
             <div class="section-title">Message for Jordan</div>
             <textarea class="text-input" placeholder="Write something for your partner..."></textarea>
+
+            <div class="toggle-row" onclick="this.querySelector('.toggle-track').classList.toggle('on')">
+              <span class="toggle-label">Share the verses you marked in today's report?</span>
+              <div class="toggle-track">
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
 
             <button class="lock-in-btn" style="margin-top: 8px;">Share reflection</button>
           </div>
@@ -949,24 +1396,30 @@
 
       <div class="description-panel">
         <h3>End-of-Session Reflection</h3>
-        <p>After completing all 17 verses, users enter a reflection phase to capture their thoughts.</p>
+        <p>After all 17 verses, users capture their thoughts. This is where vulnerability is <em>invited, not demanded</em>.</p>
         <ul>
-          <li>Bookmarked verses highlighted for easy selection</li>
-          <li>Simple 1-5 rating for session meaningfulness</li>
-          <li>Optional reflection note (no pressure)</li>
-          <li>Message field for partner</li>
-          <li>Both submit to reveal Daily Prayer Report</li>
+          <li>Only bookmarked verses shown (not all 17) — reduces overwhelm</li>
+          <li>No bookmarks? "You didn't mark any verses — that's okay"</li>
+          <li>Rating: 1-5 with "A little" ↔ "A lot" labels</li>
+          <li>Required: verse selection + rating. Optional: note + message</li>
+          <li>Bookmark sharing toggle: private by default, opt-in</li>
+          <li>Validation: quiet helper text on "Continue" tap, no red flashes</li>
         </ul>
+        <div class="spec-callout">
+          <strong>Ritual language:</strong> "Share reflection" not "Submit". "Close for today" not "Done". These words matter for emotional safety.
+        </div>
       </div>
     </section>
 
-    <!-- Screen 7: Daily Prayer Report -->
+    <!-- ============================================ -->
+    <!-- Screen 9: Daily Prayer Report                -->
+    <!-- ============================================ -->
     <section class="screen" id="report">
       <div class="phone-frame">
         <div class="phone-content" style="overflow-y: auto;">
           <div class="report-header">
             <div class="report-title">Daily Prayer Report</div>
-            <div class="report-subtitle">January 25, 2026</div>
+            <div class="report-subtitle">January 31, 2026</div>
           </div>
 
           <div class="message-reveal">
@@ -995,6 +1448,17 @@
             </div>
           </div>
 
+          <div style="padding: 0 20px;">
+            <div class="card" style="text-align: center;">
+              <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Jordan's bookmarked verses</div>
+              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                <span class="verse-chip bookmarked" style="cursor: default;">Eph 4:26</span>
+                <span class="verse-chip bookmarked" style="cursor: default;">Col 3:13</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Jordan chose to share these</div>
+            </div>
+          </div>
+
           <div style="padding: 20px;">
             <button class="lock-in-btn" style="background: var(--text-secondary);">Close for today</button>
           </div>
@@ -1003,45 +1467,142 @@
 
       <div class="description-panel">
         <h3>Daily Prayer Report</h3>
-        <p>The emotional payoff — partner's message is revealed like receiving a gift.</p>
+        <p>The emotional payoff — where couples actually connect. Partner's message is revealed like receiving a gift.</p>
         <ul>
-          <li>Partner message displayed in Dancing Script</li>
-          <li>Side-by-side verse and rating comparison</li>
-          <li>Intimate reveal without exposure</li>
-          <li>Gentle "Close for today" (not "Done")</li>
-          <li>Creates tender, relieved feeling</li>
+          <li>Partner message in Dancing Script — intimate, personal</li>
+          <li>"Stood out to you" / "Stood out to Jordan" — side-by-side</li>
+          <li>Rating comparison (non-judgmental, just sharing)</li>
+          <li>Partner's bookmarked verses only if they opted in</li>
+          <li>"Close for today" — gentle, not "Done"</li>
+          <li>Creates tender, relieved feeling: "we softened"</li>
         </ul>
+        <div class="spec-callout">
+          <strong>Emotional payoff:</strong> This is the "why" of the feature — where the couple connects. The message reveal should feel like unwrapping something precious.
+        </div>
       </div>
     </section>
+
+    <!-- ============================================ -->
+    <!-- Screen 10: Solo Mode                         -->
+    <!-- ============================================ -->
+    <section class="screen" id="solo">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="session-top">
+            <span class="session-progress">Verse 5 of 17</span>
+          </div>
+
+          <div style="padding: 0 20px; flex: 1;">
+            <div class="card" style="position: relative;">
+              <button class="bookmark-btn active" aria-label="Bookmark this verse (bookmarked)">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </button>
+
+              <div class="verse-reference">Colossians 3:13</div>
+              <p class="verse-text">Bear with each other and forgive one another if any of you has a grievance against someone. Forgive as the Lord forgave you.</p>
+            </div>
+
+            <div class="nav-arrows">
+              <div></div>
+              <button class="nav-arrow">
+                View Response
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="bottom-actions">
+            <button class="solo-nav-btn">Next Verse</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Solo Mode</h3>
+        <p>Self-paced reading without synchronization. No partner indicator, no lock-in — just you and the text.</p>
+        <ul>
+          <li>No role indicator (no partner to coordinate with)</li>
+          <li>No partner position dot</li>
+          <li>"Next Verse" instead of "Ready for next verse"</li>
+          <li>Bookmark flag still available — surfaces at reflection</li>
+          <li>Progress saves automatically (IndexedDB + server sync)</li>
+          <li>Resumable: "Continue from Verse 5" on next visit</li>
+          <li>Optimistic UI — changes appear instant, server syncs in background</li>
+        </ul>
+        <div class="spec-callout">
+          <strong>Save/Resume:</strong> Auto-save is invisible. On return, user sees "Continue from Verse X" or "Start fresh" (preserves agency).
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- Screen 11: Reconnection Flow                 -->
+    <!-- ============================================ -->
+    <section class="screen" id="reconnect">
+      <div class="phone-frame">
+        <div class="phone-content">
+          <div class="session-top">
+            <span class="session-progress">Verse 9 of 17</span>
+          </div>
+
+          <div style="padding: 0 20px; flex: 1;">
+            <div class="card" style="position: relative;">
+              <span class="role-indicator reader">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                </svg>
+                You read this
+              </span>
+
+              <div class="verse-reference">Psalm 34:14</div>
+              <p class="verse-text">Turn from evil and do good; seek peace and pursue it.</p>
+            </div>
+          </div>
+
+          <!-- Reconnection overlay -->
+          <div class="reconnect-overlay">
+            <div class="reconnect-text"><span class="spinner"></span>Jordan is reconnecting...</div>
+            <div class="reconnect-sub" style="margin-bottom: 16px;">You can keep reading while we restore the connection</div>
+            <div style="display: flex; gap: 8px;">
+              <button style="flex: 1; padding: 12px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: rgba(255,255,255,0.7); border-radius: 16px; font-size: 14px; cursor: pointer; min-height: 48px;">Keep waiting</button>
+              <button style="flex: 1; padding: 12px; border: none; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); border-radius: 16px; font-size: 14px; cursor: pointer; min-height: 48px;">End for today</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="description-panel">
+        <h3>Reconnection Flow</h3>
+        <p>Graceful handling when a partner's connection drops mid-session. Calm patience, not alarm.</p>
+        <ul>
+          <li>"Jordan is reconnecting..." with subtle spinner</li>
+          <li>"You can keep reading" — reassures the user</li>
+          <li>30-second timeout before showing "End for today" option</li>
+          <li>Server-authoritative state ensures clean resync</li>
+          <li>"End for today" not "End session" — gentle language</li>
+          <li>Both partners' progress saved on clean exit</li>
+        </ul>
+        <div class="spec-callout">
+          <strong>Error emotion:</strong> Calm patience, not alarm. Network drops → neutral, presence-aware waiting. Never problem-focused.
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <script>
     // Screen navigation
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        // Update nav buttons
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-
-        // Update screens
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(btn.dataset.screen).classList.add('active');
-      });
-    });
-
-    // Interactive rating buttons
-    document.querySelectorAll('.rating-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-      });
-    });
-
-    // Interactive verse chips
-    document.querySelectorAll('.verse-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        document.querySelectorAll('.verse-chip').forEach(c => c.classList.remove('selected'));
-        chip.classList.add('selected');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
   </script>

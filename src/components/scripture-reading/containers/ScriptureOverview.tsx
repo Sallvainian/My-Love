@@ -1,12 +1,15 @@
 /**
  * ScriptureOverview Container Component
  *
- * Story 1.1: Navigation Entry Point
+ * Story 1.1 + 1.2: Navigation Entry Point & Overview Page
  * Main entry point for Scripture Reading feature.
  *
  * Handles:
- * - Partner status detection (linked/unlinked/loading/error)
+ * - Partner status detection (linked/unlinked/loading)
+ * - Start button entry point → mode selection reveal
  * - Mode selection (Solo always available, Together conditional on partner)
+ * - Session resume for incomplete solo sessions
+ * - Session creation via scriptureReadingSlice
  * - Navigation to partner setup flow
  *
  * Uses container/presentational pattern:
@@ -14,8 +17,10 @@
  * - Passes props to presentational components
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAppStore } from '../../../stores/useAppStore';
+import { MAX_STEPS } from '../../../data/scriptureSteps';
 
 // Lavender Dreams design tokens
 const scriptureTheme = {
@@ -24,8 +29,20 @@ const scriptureTheme = {
   surface: '#FAF5FF', // Very light purple
 };
 
+// Animation duration for mode selection reveal (seconds)
+const MODE_REVEAL_DURATION = 0.2;
+
 // Partner status union type for explicit handling
-type PartnerStatus = 'loading' | 'linked' | 'unlinked' | 'error';
+type PartnerStatus = 'loading' | 'linked' | 'unlinked';
+
+// Helper: extract message from error (handles both string and ScriptureError)
+function getErrorMessage(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return 'An unexpected error occurred';
+}
 
 interface ModeCardProps {
   title: string;
@@ -38,20 +55,20 @@ interface ModeCardProps {
 
 function ModeCard({ title, description, icon, onClick, disabled, variant }: ModeCardProps) {
   const baseClasses =
-    'w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col';
+    'w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm';
   const variantClasses =
     variant === 'primary'
-      ? 'bg-purple-500 text-white hover:bg-purple-600 active:bg-purple-700'
-      : 'bg-white border-2 border-purple-200 text-gray-800 hover:border-purple-400 active:bg-purple-50';
+      ? 'bg-purple-500/90 text-white hover:bg-purple-600/90 active:bg-purple-700/90 border border-purple-400/50'
+      : 'bg-white/80 border border-purple-200/50 text-gray-800 hover:border-purple-400 active:bg-purple-50/80';
   const disabledClasses = disabled
-    ? 'opacity-50 cursor-not-allowed hover:bg-white hover:border-purple-200'
+    ? 'opacity-50 cursor-not-allowed'
     : 'cursor-pointer';
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`${baseClasses} ${variantClasses} ${disabled ? disabledClasses : ''}`}
+      className={`${baseClasses} ${variantClasses} ${disabledClasses}`}
       type="button"
     >
       <div className="flex items-center gap-3 mb-2">
@@ -91,17 +108,6 @@ function PartnerLinkMessage({ onLinkPartner }: PartnerLinkMessageProps) {
   );
 }
 
-function OfflineIndicator() {
-  return (
-    <div
-      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-600"
-      data-testid="offline-indicator"
-    >
-      <span className="text-sm">📡 Unable to check partner status. Solo mode available.</span>
-    </div>
-  );
-}
-
 // Solo icon component
 function SoloIcon() {
   return (
@@ -131,6 +137,9 @@ function TogetherIcon() {
 }
 
 export function ScriptureOverview() {
+  const shouldReduceMotion = useReducedMotion();
+
+  // Partner slice state
   const { partner, isLoadingPartner, loadPartner, setView } = useAppStore((state) => ({
     partner: state.partner,
     isLoadingPartner: state.isLoadingPartner,
@@ -138,43 +147,83 @@ export function ScriptureOverview() {
     setView: state.setView,
   }));
 
-  // Track if partner load failed (network error)
-  // We use a simple heuristic: if loading finished and partner is null,
-  // we check if it was a real "no partner" or an error
-  // For now, we'll treat null after loading as "unlinked"
-  // Error state would require tracking in the slice (future enhancement)
+  // Scripture reading slice state
+  const {
+    isSessionLoading,
+    sessionError,
+    activeSession,
+    isCheckingSession,
+    createSession,
+    loadSession,
+    exitSession,
+    clearScriptureError,
+    checkForActiveSession,
+  } = useAppStore((state) => ({
+    isSessionLoading: state.scriptureLoading,
+    sessionError: state.scriptureError,
+    activeSession: state.activeSession,
+    isCheckingSession: state.isCheckingSession,
+    createSession: state.createSession,
+    loadSession: state.loadSession,
+    exitSession: state.exitSession,
+    clearScriptureError: state.clearScriptureError,
+    checkForActiveSession: state.checkForActiveSession,
+  }));
+
+  // Local UI state
+  const [showModes, setShowModes] = useState(false);
 
   // Load partner status on mount
   useEffect(() => {
     loadPartner();
   }, [loadPartner]);
 
+  // Check for incomplete solo session on mount (AC #6)
+  useEffect(() => {
+    void checkForActiveSession();
+  }, [checkForActiveSession]);
+
   // Determine partner status
   const getPartnerStatus = (): PartnerStatus => {
     if (isLoadingPartner) return 'loading';
     if (partner !== null) return 'linked';
-    // If not loading and no partner, they're unlinked
-    // Note: Error state would need slice-level tracking
     return 'unlinked';
   };
 
   const partnerStatus = getPartnerStatus();
 
-  // Navigation handlers
-  const handleStartSolo = () => {
-    // For now, just stay on scripture view - future stories will add session creation
-    console.log('[ScriptureOverview] Starting Solo mode');
-  };
+  // Action handlers
+  const handleStart = useCallback(() => {
+    setShowModes(true);
+    clearScriptureError();
+  }, [clearScriptureError]);
 
-  const handleStartTogether = () => {
-    // For now, just log - future stories will add together mode
-    console.log('[ScriptureOverview] Starting Together mode');
-  };
+  const handleStartSolo = useCallback(async () => {
+    await createSession('solo');
+  }, [createSession]);
 
-  const handleLinkPartner = () => {
-    // Navigate to partner setup flow (existing ViewType)
+  const handleStartTogether = useCallback(async () => {
+    if (partner) {
+      await createSession('together', partner.id);
+    }
+  }, [createSession, partner]);
+
+  const handleContinue = useCallback(async () => {
+    if (activeSession) {
+      await loadSession(activeSession.id);
+    }
+  }, [activeSession, loadSession]);
+
+  const handleStartFresh = useCallback(() => {
+    exitSession();
+    setShowModes(false);
+  }, [exitSession]);
+
+  const handleLinkPartner = useCallback(() => {
     setView('partner');
-  };
+  }, [setView]);
+
+  const fadeTransition = shouldReduceMotion ? { duration: 0 } : { duration: MODE_REVEAL_DURATION };
 
   return (
     <div
@@ -183,9 +232,9 @@ export function ScriptureOverview() {
       data-testid="scripture-overview"
     >
       <div className="max-w-md mx-auto space-y-6">
-        {/* Header */}
+        {/* Header with Playfair Display */}
         <header className="text-center pt-4 pb-2">
-          <h1 className="text-2xl font-bold text-purple-900">Scripture Reading</h1>
+          <h1 className="text-2xl font-bold text-purple-900 font-serif">Scripture Reading</h1>
           <p className="text-purple-700 mt-1">Read and reflect together</p>
         </header>
 
@@ -193,35 +242,131 @@ export function ScriptureOverview() {
         <section className="space-y-4" aria-label="Partner status">
           {partnerStatus === 'loading' && <PartnerStatusSkeleton />}
           {partnerStatus === 'unlinked' && <PartnerLinkMessage onLinkPartner={handleLinkPartner} />}
-          {partnerStatus === 'error' && <OfflineIndicator />}
-          {/* AC #2: When linked, no partner-related messaging shown */}
         </section>
 
-        {/* Mode Selection Cards */}
-        <section className="space-y-4" aria-label="Choose reading mode">
-          {/* Solo Mode - Always accessible (AC #3, AC #6) */}
-          <ModeCard
-            title="Solo"
-            description="Read and reflect on your own time"
-            icon={<SoloIcon />}
-            onClick={handleStartSolo}
-            variant="secondary"
-          />
+        {/* Resume Prompt (AC #6) */}
+        {!isCheckingSession && activeSession && !showModes && (
+          <section
+            className="bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-5 space-y-4"
+            data-testid="resume-prompt"
+            aria-label="Resume session"
+          >
+            <p className="text-purple-900 font-medium">
+              Continue where you left off? (Step {activeSession.currentStepIndex + 1} of {MAX_STEPS})
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleContinue}
+                disabled={isSessionLoading}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-medium hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[48px]"
+                data-testid="resume-continue"
+                type="button"
+              >
+                {isSessionLoading ? 'Loading...' : 'Continue'}
+              </button>
+              <button
+                onClick={handleStartFresh}
+                className="py-3 px-4 text-purple-600 hover:text-purple-800 font-medium min-h-[48px]"
+                data-testid="resume-start-fresh"
+                type="button"
+              >
+                Start fresh
+              </button>
+            </div>
+          </section>
+        )}
 
-          {/* Together Mode - Conditional on partner (AC #2) */}
-          <ModeCard
-            title="Together"
-            description={
-              partnerStatus === 'linked'
-                ? 'Read and reflect with your partner in real-time'
-                : 'Link your partner to unlock'
-            }
-            icon={<TogetherIcon />}
-            onClick={handleStartTogether}
-            disabled={partnerStatus !== 'linked'}
-            variant="primary"
+        {/* Error Display */}
+        {sessionError && (
+          <div
+            className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"
+            data-testid="session-error"
+            role="alert"
+          >
+            {getErrorMessage(sessionError)}
+          </div>
+        )}
+
+        {/* Start Button (AC #2, #3) — shown when no resume prompt and modes not yet revealed */}
+        {!showModes && !activeSession && !isCheckingSession && (
+          <button
+            onClick={handleStart}
+            className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 min-h-[56px] shadow-lg shadow-purple-500/25"
+            data-testid="start-button"
+            type="button"
+          >
+            Start
+          </button>
+        )}
+
+        {/* Loading skeleton while checking for active session */}
+        {!showModes && isCheckingSession && (
+          <div
+            className="w-full h-[56px] bg-purple-200/50 rounded-2xl animate-pulse"
+            data-testid="session-check-loading"
           />
-        </section>
+        )}
+
+        {/* Mode Selection Cards (AC #3, #4, #5) — revealed after Start tap */}
+        <AnimatePresence>
+          {showModes && (
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={fadeTransition}
+              className="space-y-4"
+              aria-label="Choose reading mode"
+              data-testid="mode-selection"
+            >
+              {/* Loading overlay during session creation */}
+              {isSessionLoading && (
+                <div
+                  className="text-center text-purple-600 py-2"
+                  data-testid="session-loading"
+                >
+                  Creating session...
+                </div>
+              )}
+
+              {/* Solo Mode - Always accessible */}
+              <ModeCard
+                title="Solo"
+                description="Read and reflect on your own time"
+                icon={<SoloIcon />}
+                onClick={handleStartSolo}
+                disabled={isSessionLoading}
+                variant="secondary"
+              />
+
+              {/* Together Mode - Conditional on partner (AC #4, #5) */}
+              <ModeCard
+                title="Together"
+                description={
+                  partnerStatus === 'linked'
+                    ? 'Read and reflect with your partner in real-time'
+                    : 'Link your partner to do this together'
+                }
+                icon={<TogetherIcon />}
+                onClick={handleStartTogether}
+                disabled={partnerStatus !== 'linked' || isSessionLoading}
+                variant="primary"
+              />
+
+              {/* Partner link for unlinked users within mode selection (AC #5) */}
+              {partnerStatus === 'unlinked' && (
+                <button
+                  onClick={handleLinkPartner}
+                  className="w-full text-center text-purple-600 hover:text-purple-800 text-sm font-medium py-2"
+                  data-testid="setup-partner-link"
+                  type="button"
+                >
+                  Set up partner
+                </button>
+              )}
+            </motion.section>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

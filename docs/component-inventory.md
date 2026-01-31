@@ -1,286 +1,146 @@
 # Component Inventory
 
-> Complete UI component catalog for My-Love project.
+> UI component catalog for My-Love project.
+> Last updated: 2026-01-30 | Scan level: Deep (Rescan)
 
 ## Overview
 
-| Metric | Count |
-|--------|-------|
-| Total Components | 58 |
-| Feature Modules | 16 |
-| Shared Components | 2 |
-| Test Files | 8 |
+71 TSX/TS files across 26 component directories. React 19 with TypeScript, Framer Motion animations, Tailwind CSS styling, lucide-react icons. Zustand for state. Lazy-loaded route views.
 
-## Component Tree
+## Application Shell (App.tsx)
 
-```
-src/components/
-├── AdminPanel/           # Message administration (6)
-├── CountdownTimer/       # Timer display (1)
-├── DailyMessage/         # Main message card (1)
-├── DisplayNameSetup/     # Onboarding name input (1)
-├── ErrorBoundary/        # Error handling (1)
-├── InteractionHistory/   # Poke/kiss history (1)
-├── LoginScreen/          # Authentication (1)
-├── love-notes/           # Chat messaging (6 + tests)
-├── MoodHistory/          # Calendar view (3)
-├── MoodTracker/          # Mood logging (6)
-├── Navigation/           # Bottom navigation (1 + test)
-├── PartnerMoodView/      # Partner mood display (1)
-├── PhotoCarousel/        # Photo slider (2)
-├── PhotoDeleteConfirmation/ # Delete dialog (1)
-├── PhotoEditModal/       # Caption editing (1)
-├── PhotoGallery/         # Photo grid (4)
-├── photos/               # Photo upload (1)
-├── PhotoUpload/          # Upload UI (1)
-├── PokeKissInterface/    # Interactions (1)
-├── RelationshipTimers/   # Countdown timers (4)
-├── scripture-reading/    # Scripture feature (NEW - 2 + test)
-├── Settings/             # User settings (2)
-├── shared/               # Shared utilities (2)
-├── ViewErrorBoundary/    # View-specific error boundary (1)
-├── WelcomeButton/        # Welcome action (1)
-└── WelcomeSplash/        # Splash screen (1)
-```
+- Auth flow: LoginScreen → DisplayNameSetup → Main App
+- Lazy-loaded views with Suspense: photos, mood, partner, notes, scripture
+- ViewErrorBoundary wraps each route view
+- BottomNavigation for non-home views
 
-## Feature Modules
+## Feature Components
 
-### AdminPanel/ (6 components)
+### Scripture Reading (NEW)
 
-Message CRUD administration.
+| Component | File | Purpose | Props |
+|-----------|------|---------|-------|
+| ScriptureOverview | containers/ScriptureOverview.tsx | Main entry, mode selection | None (store) |
 
-| Component | Purpose |
-|-----------|---------|
-| `AdminPanel.tsx` | Main admin container |
-| `CreateMessageForm.tsx` | New message form |
-| `EditMessageForm.tsx` | Edit message form |
-| `DeleteConfirmDialog.tsx` | Delete confirmation |
-| `MessageList.tsx` | Message list view |
-| `MessageRow.tsx` | Individual message row |
+Features: Partner status detection, solo/together mode, lavender theme. Dependencies: useAppStore, Framer Motion.
 
-### love-notes/ (5 components + tests)
+### Love Notes Chat
 
-Real-time chat messaging with partner.
+| Component | File | Purpose | Key Props |
+|-----------|------|---------|-----------|
+| LoveNotes | LoveNotes.tsx | Chat container | None |
+| MessageList | MessageList.tsx | Virtualized messages | notes, currentUserId, onLoadMore |
+| LoveNoteMessage | LoveNoteMessage.tsx | Chat bubble | message, isOwnMessage |
+| MessageInput | MessageInput.tsx | Text + image input | None |
+| ImagePreview | ImagePreview.tsx | Pre-send preview | file, onRemove |
+| FullScreenImageViewer | FullScreenImageViewer.tsx | Image modal | imageUrl, isOpen, onClose |
 
-| Component | Purpose |
-|-----------|---------|
-| `LoveNotes.tsx` | Main chat container |
-| `MessageList.tsx` | Scrollable message list |
-| `MessageInput.tsx` | Text/image input |
-| `LoveNoteMessage.tsx` | Individual message bubble |
-| `ImagePreview.tsx` | Image attachment preview |
-| `FullScreenImageViewer.tsx` | Full-screen image modal |
+Features: react-window virtualization, infinite scroll, XSS sanitization (DOMPurify), image compression, optimistic UI, retry logic, keyboard shortcuts, rate limiting (10/min).
 
-**Tests:** `__tests__/` contains 4 test files.
+### Mood Tracker
 
-### MoodTracker/ (6 components)
+| Component | File | Purpose | Key Props |
+|-----------|------|---------|-----------|
+| MoodTracker | MoodTracker.tsx | Main tracker | None |
+| MoodButton | MoodButton.tsx | Mood selector | mood, isSelected, onClick |
+| MoodHistoryTimeline | MoodHistoryTimeline.tsx | Virtualized timeline | userId, isPartnerView? |
+| MoodHistoryItem | MoodHistoryItem.tsx | Single entry | mood, isPartnerView? |
+| PartnerMoodDisplay | PartnerMoodDisplay.tsx | Real-time partner mood | partnerId |
+| NoMoodLoggedState | NoMoodLoggedState.tsx | Empty state | None |
+| MoodHistoryCalendar | MoodHistory/ | Calendar view | (in subdirectory) |
 
-Emoji-based mood logging.
+Features: Multi-mood selection (12 moods), 200-char notes, tabs (Log/Timeline/Calendar), real-time partner mood, offline support, sync status, haptic feedback.
 
-| Component | Purpose |
-|-----------|---------|
-| `MoodTracker.tsx` | Main tracker container |
-| `MoodButton.tsx` | Emoji mood button |
-| `PartnerMoodDisplay.tsx` | Partner's current mood |
-| `MoodHistoryTimeline.tsx` | Timeline view |
-| `MoodHistoryItem.tsx` | Timeline item |
-| `NoMoodLoggedState.tsx` | Empty state |
+### Photo Gallery
 
-### MoodHistory/ (3 components)
+| Component | File | Purpose | Key Props |
+|-----------|------|---------|-----------|
+| PhotoGallery | PhotoGallery.tsx | Grid with pagination | onUploadClick? |
+| PhotoGridItem | PhotoGridItem.tsx | Thumbnail | photo, onPhotoClick |
+| PhotoViewer | PhotoViewer.tsx | Full-screen carousel | photos, selectedPhotoId, onClose |
+| PhotoUpload | PhotoUpload.tsx | Multi-step upload | isOpen, onClose |
 
-Calendar-based mood history.
+Features: Responsive grid (3-4 cols), Intersection Observer lazy loading, swipe gestures, double-tap zoom, pan when zoomed, photo preloading, delete confirmation, storage quota checks (80%/95% warnings).
 
-| Component | Purpose |
-|-----------|---------|
-| `MoodHistoryCalendar.tsx` | Calendar container |
-| `CalendarDay.tsx` | Day cell with mood |
-| `MoodDetailModal.tsx` | Mood detail popup |
+### Relationship Timers
 
-### PhotoGallery/ (4 components)
+| Component | File | Purpose | Key Props |
+|-----------|------|---------|-----------|
+| RelationshipTimers | RelationshipTimers.tsx | Timer panel | className? |
+| TimeTogether | TimeTogether.tsx | Duration count-up | None |
+| BirthdayCountdown | BirthdayCountdown.tsx | Birthday countdown | birthday |
+| EventCountdown | EventCountdown.tsx | Generic countdown | label, icon, date |
 
-Photo grid with viewer.
+Features: Real-time second-by-second updates, birthday detection, color-coded events.
 
-| Component | Purpose |
-|-----------|---------|
-| `PhotoGallery.tsx` | Main gallery container |
-| `PhotoGridItem.tsx` | Grid thumbnail |
-| `PhotoViewer.tsx` | Full-screen viewer |
-| `PhotoGridSkeleton.tsx` | Loading skeleton |
+### Navigation
 
-### PhotoCarousel/ (2 components)
+| Component | File | Purpose |
+|-----------|------|---------|
+| BottomNavigation | BottomNavigation.tsx | 7-tab bottom nav |
 
-Photo carousel slider.
+Tabs: Home, Mood, Notes, Partner, Photos, Scripture, Logout. Safe area handling.
 
-| Component | Purpose |
-|-----------|---------|
-| `PhotoCarousel.tsx` | Carousel container |
-| `PhotoCarouselControls.tsx` | Nav controls |
+### Daily Message
 
-### RelationshipTimers/ (4 components)
+| Component | File | Purpose |
+|-----------|------|---------|
+| DailyMessage | DailyMessage.tsx | Message card with swipe |
 
-Countdown timers for special dates.
+Features: Swipe/keyboard navigation, floating hearts (45), favorite toggle, share (native + clipboard), category badges, anniversary countdown.
 
-| Component | Purpose |
-|-----------|---------|
-| `RelationshipTimers.tsx` | Main container |
-| `TimeTogether.tsx` | Duration counter |
-| `BirthdayCountdown.tsx` | Birthday timer |
-| `EventCountdown.tsx` | Generic event timer |
+### Authentication
 
-### Settings/ (2 components)
+| Component | File | Purpose |
+|-----------|------|---------|
+| LoginScreen | LoginScreen.tsx | Email/password + Google OAuth |
+| DisplayNameSetup | DisplayNameSetup/ | OAuth display name setup |
 
-User settings management.
+### Partner Management
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| PartnerMoodView | PartnerMoodView.tsx | Partner search + mood view |
+| PokeKissInterface | PokeKissInterface/ | Poke/kiss interaction buttons |
+
+Features: Partner search, send/accept/decline requests, real-time mood subscriptions, connection status indicator.
+
+### Admin
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| AdminPanel | AdminPanel.tsx | Custom message CRUD |
+
+Features: Create/Edit/Delete messages, JSON export/import.
+
+### Shared Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| NetworkStatusIndicator | shared/NetworkStatusIndicator.tsx | Online/offline banner |
+| SyncToast | shared/SyncToast.tsx | Sync completion toast |
+
+### Utility Components
 
 | Component | Purpose |
 |-----------|---------|
-| `Settings.tsx` | Main settings panel |
-| `AnniversarySettings.tsx` | Date settings |
+| ErrorBoundary | Global error catch |
+| ViewErrorBoundary | Route-level error boundary |
+| WelcomeSplash | First-visit welcome with raining hearts |
+| WelcomeButton | Trigger welcome splash |
+| CountdownTimer | Anniversary countdown |
+| Settings | User account settings |
 
-### Navigation/ (1 component + test)
+## Architecture Patterns
 
-Bottom tab navigation.
+- **Container/Presentational**: Containers connect to store, presentationals receive props
+- **Lazy Loading**: Route views loaded with React.lazy + Suspense
+- **Error Isolation**: ViewErrorBoundary keeps nav visible on view errors
+- **Virtualization**: react-window for MessageList and MoodHistoryTimeline
+- **Optimistic UI**: Love notes show immediately, retry on failure
+- **Accessibility**: ARIA labels, live regions, focus traps, keyboard support
 
-| Component | Purpose |
-|-----------|---------|
-| `BottomNavigation.tsx` | 5-tab bottom nav |
-| `__tests__/BottomNavigation.test.tsx` | Navigation tests |
+## New Since Jan 27
 
-**Tabs:** Home, Love Notes, Mood, Photos, Settings
-
-### scripture-reading/ (2 components + test) - NEW
-
-Scripture reading feature for couples (in development).
-
-| Component | Purpose |
-|-----------|---------|
-| `containers/ScriptureOverview.tsx` | Smart container for scripture overview |
-| `__tests__/ScriptureOverview.test.tsx` | Container tests |
-
-**Note:** Additional components to be added as feature development progresses.
-
-### shared/ (2 components)
-
-Cross-feature utilities.
-
-| Component | Purpose |
-|-----------|---------|
-| `NetworkStatusIndicator.tsx` | Online/offline badge |
-| `SyncToast.tsx` | Sync notification toast |
-
-### Single-Component Modules
-
-| Module | Component | Purpose |
-|--------|-----------|---------|
-| `CountdownTimer/` | `CountdownTimer.tsx` | Time countdown display |
-| `DailyMessage/` | `DailyMessage.tsx` | Main message card |
-| `DisplayNameSetup/` | `DisplayNameSetup.tsx` | Name onboarding |
-| `ErrorBoundary/` | `ErrorBoundary.tsx` | Error boundary (class) |
-| `InteractionHistory/` | `InteractionHistory.tsx` | Interaction list |
-| `LoginScreen/` | `LoginScreen.tsx` | Auth UI |
-| `PartnerMoodView/` | `PartnerMoodView.tsx` | Partner mood |
-| `PhotoDeleteConfirmation/` | `PhotoDeleteConfirmation.tsx` | Delete dialog |
-| `PhotoEditModal/` | `PhotoEditModal.tsx` | Caption editor |
-| `PhotoUpload/` | `PhotoUpload.tsx` | Upload UI |
-| `photos/` | `PhotoUploader.tsx` | Upload component |
-| `PokeKissInterface/` | `PokeKissInterface.tsx` | Interaction buttons |
-| `WelcomeButton/` | `WelcomeButton.tsx` | Welcome CTA |
-| `WelcomeSplash/` | `WelcomeSplash.tsx` | Splash screen |
-
-## Component Patterns
-
-### Functional Components (Standard)
-
-All components are functional with hooks.
-
-```typescript
-export const MoodTracker: React.FC = () => {
-  const moods = useAppStore(state => state.moods);
-  // ...
-};
-```
-
-### Class Component (Exception)
-
-Only `ErrorBoundary` is a class component (React limitation).
-
-```typescript
-export class ErrorBoundary extends React.Component {
-  static getDerivedStateFromError(error: Error) {
-    // ...
-  }
-}
-```
-
-### State Access
-
-```typescript
-// Selector pattern
-const { notes, sendNote } = useAppStore(state => ({
-  notes: state.notes,
-  sendNote: state.sendNote,
-}));
-```
-
-### Lazy Loading
-
-Route-level code splitting:
-
-```typescript
-const PhotoGallery = lazy(() => import('./components/PhotoGallery/PhotoGallery'));
-const MoodTracker = lazy(() => import('./components/MoodTracker/MoodTracker'));
-```
-
-### Animation
-
-Framer Motion for animations:
-
-```typescript
-<motion.div
-  initial={{ opacity: 0 }}
-  animate={{ opacity: 1 }}
-  exit={{ opacity: 0 }}
->
-  {content}
-</motion.div>
-```
-
-### Styling
-
-Tailwind CSS utility classes:
-
-```typescript
-<button className="bg-sunset-500 hover:bg-sunset-600 px-4 py-2 rounded-lg">
-  Send
-</button>
-```
-
-## Custom Hooks Used
-
-| Hook | Used By |
-|------|---------|
-| `useAuth` | LoginScreen |
-| `useLoveNotes` | love-notes components |
-| `useMoodHistory` | MoodHistory components |
-| `usePartnerMood` | MoodTracker, PartnerMoodView |
-| `usePhotos` | PhotoGallery, PhotoUpload |
-| `useRealtimeMessages` | love-notes |
-| `useNetworkStatus` | shared components |
-| `useVibration` | PokeKissInterface |
-| `useImageCompression` | PhotoUpload, love-notes |
-
-## Testing Strategy
-
-- **Location:** Colocated in `__tests__/` subdirectories
-- **Framework:** Vitest + Testing Library
-- **Environment:** happy-dom with fake-indexeddb
-
-```typescript
-// Example test
-import { render, screen } from '@testing-library/react';
-import { LoveNoteMessage } from '../LoveNoteMessage';
-
-test('renders message content', () => {
-  render(<LoveNoteMessage note={mockNote} />);
-  expect(screen.getByText(mockNote.content)).toBeInTheDocument();
-});
-```
+- **scripture-reading/ScriptureOverview**: New feature entry point with mode selection
+- **NavigationSlice**: 'scripture' tab added to BottomNavigation

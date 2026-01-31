@@ -10,6 +10,7 @@ import { createMoodSlice } from './slices/moodSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createPartnerSlice } from './slices/partnerSlice';
 import { createNotesSlice } from './slices/notesSlice';
+import { createScriptureReadingSlice } from './slices/scriptureReadingSlice';
 
 // Re-export AppState for consumers
 export type { AppState } from './types';
@@ -75,6 +76,7 @@ export const useAppStore = create<AppState>()(
       ...createInteractionsSlice(set, get, api),
       ...createPartnerSlice(set, get, api),
       ...createNotesSlice(set, get, api),
+      ...createScriptureReadingSlice(set, get, api),
     }),
     {
       name: 'my-love-storage',
