@@ -15,12 +15,16 @@
  * - Save & Exit functionality
  * - Error and syncing states
  * - Accessibility (aria labels, dialog, roles)
+ * - Reduced motion support
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SoloReadingFlow } from '../containers/SoloReadingFlow';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
+
+// Store the useReducedMotion mock so we can change its return value per-test
+let mockUseReducedMotion = false;
 
 // Mock framer-motion (project pattern)
 vi.mock('framer-motion', () => ({
@@ -50,7 +54,7 @@ vi.mock('framer-motion', () => ({
     },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useReducedMotion: () => false,
+  useReducedMotion: () => mockUseReducedMotion,
 }));
 
 // Mock Zustand store
@@ -120,6 +124,7 @@ describe('SoloReadingFlow', () => {
     mockStoreState.session = createMockSession();
     mockStoreState.isSyncing = false;
     mockStoreState.scriptureError = null;
+    mockUseReducedMotion = false;
   });
 
   // ============================================
@@ -381,11 +386,11 @@ describe('SoloReadingFlow', () => {
       expect(screen.getByText('Save your progress?')).toBeDefined();
     });
 
-    it('dialog shows "You can continue later" description', () => {
+    it('dialog shows AC-spec description text', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('exit-button'));
       expect(
-        screen.getByText('You can continue later from where you left off.')
+        screen.getByText('Save your progress? You can continue later.')
       ).toBeDefined();
     });
 
@@ -416,6 +421,30 @@ describe('SoloReadingFlow', () => {
       expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
       fireEvent.click(screen.getByTestId('cancel-exit-button'));
       expect(screen.queryByTestId('exit-confirm-dialog')).toBeNull();
+    });
+
+    it('closes dialog when Escape key is pressed', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('exit-button'));
+      expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByTestId('exit-confirm-dialog')).toBeNull();
+    });
+
+    it('closes dialog when backdrop overlay is clicked', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('exit-button'));
+      expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
+      fireEvent.click(screen.getByTestId('exit-confirm-overlay'));
+      expect(screen.queryByTestId('exit-confirm-dialog')).toBeNull();
+    });
+
+    it('does not close dialog when dialog body is clicked', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('exit-button'));
+      expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
+      fireEvent.click(screen.getByTestId('exit-confirm-dialog'));
+      expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
     });
 
     it('dialog has proper ARIA attributes', () => {
@@ -545,6 +574,31 @@ describe('SoloReadingFlow', () => {
         );
         unmount();
       }
+    });
+  });
+
+  // ============================================
+  // M7: Reduced Motion Support
+  // ============================================
+
+  describe('Reduced Motion', () => {
+    it('uses zero-duration animations when useReducedMotion returns true', () => {
+      mockUseReducedMotion = true;
+      // The component should render without errors and use duration: 0 transitions.
+      // Since framer-motion is mocked and doesn't actually animate, we verify the
+      // component still renders and functions correctly with reduced motion enabled.
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('solo-reading-flow')).toBeDefined();
+      expect(screen.getByTestId('verse-screen')).toBeDefined();
+
+      // Navigation should still work with reduced motion
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      expect(screen.getByTestId('response-screen')).toBeDefined();
+
+      // Exit dialog should still work
+      fireEvent.click(screen.getByTestId('scripture-back-to-verse-button'));
+      fireEvent.click(screen.getByTestId('exit-button'));
+      expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
     });
   });
 });

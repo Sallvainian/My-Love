@@ -16,7 +16,7 @@
  * - Passes props to presentational sub-components
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAppStore } from '../../../stores/useAppStore';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
@@ -41,14 +41,15 @@ type SlideDirection = 'left' | 'right';
 export function SoloReadingFlow() {
   const shouldReduceMotion = useReducedMotion();
 
-  // Scripture reading slice state
-  const { session, isSyncing, scriptureError, advanceStep, saveAndExit } = useAppStore(
+  // Scripture reading slice state (H1: exitSession included in selector)
+  const { session, isSyncing, scriptureError, advanceStep, saveAndExit, exitSession } = useAppStore(
     (state) => ({
       session: state.session,
       isSyncing: state.isSyncing,
       scriptureError: state.scriptureError,
       advanceStep: state.advanceStep,
       saveAndExit: state.saveAndExit,
+      exitSession: state.exitSession,
     })
   );
 
@@ -57,14 +58,7 @@ export function SoloReadingFlow() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [slideDirection, setSlideDirection] = useState<SlideDirection>('left');
 
-  // Guard: no session means we shouldn't be here
-  if (!session) return null;
-
-  const currentStep = SCRIPTURE_STEPS[session.currentStepIndex];
-  const isLastStep = session.currentStepIndex >= MAX_STEPS - 1;
-  const isCompleted = session.status === 'complete' || session.currentPhase === 'reflection';
-
-  // Action handlers
+  // H1 Fix: ALL useCallback hooks BEFORE the session guard
   const handleNextVerse = useCallback(async () => {
     setSlideDirection('left');
     setSubView('verse');
@@ -91,6 +85,25 @@ export function SoloReadingFlow() {
     setShowExitConfirm(false);
     await saveAndExit();
   }, [saveAndExit]);
+
+  // M1: Escape key handler for exit dialog
+  useEffect(() => {
+    if (!showExitConfirm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowExitConfirm(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showExitConfirm]);
+
+  // Guard: no session means we shouldn't be here
+  if (!session) return null;
+
+  const currentStep = SCRIPTURE_STEPS[session.currentStepIndex];
+  const isLastStep = session.currentStepIndex >= MAX_STEPS - 1;
+  const isCompleted = session.status === 'complete' || session.currentPhase === 'reflection';
 
   // Animation variants
   const crossfadeTransition = shouldReduceMotion
@@ -139,11 +152,7 @@ export function SoloReadingFlow() {
             Reflection feature coming soon (Epic 2)
           </p>
           <button
-            onClick={() => {
-              // Return to overview by clearing session
-              const { exitSession } = useAppStore.getState();
-              exitSession();
-            }}
+            onClick={() => exitSession()}
             className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 min-h-[56px] shadow-lg shadow-purple-500/25"
             data-testid="return-to-overview"
             type="button"
@@ -220,9 +229,9 @@ export function SoloReadingFlow() {
                 className="flex-1 flex flex-col justify-center space-y-6"
                 data-testid="verse-screen"
               >
-                {/* Verse reference */}
+                {/* M5: Verse reference — text-xs (12px) to match AC spec */}
                 <p
-                  className="text-center text-purple-500 text-sm font-medium tracking-wide"
+                  className="text-center text-purple-500 text-xs font-medium tracking-wide"
                   data-testid="scripture-verse-reference"
                 >
                   {currentStep.verseReference}
@@ -351,6 +360,7 @@ export function SoloReadingFlow() {
             transition={crossfadeTransition}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
             data-testid="exit-confirm-overlay"
+            onClick={handleExitCancel}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -362,6 +372,7 @@ export function SoloReadingFlow() {
               role="dialog"
               aria-labelledby="exit-dialog-title"
               aria-describedby="exit-dialog-desc"
+              onClick={(e) => e.stopPropagation()}
             >
               <h2
                 id="exit-dialog-title"
@@ -373,7 +384,7 @@ export function SoloReadingFlow() {
                 id="exit-dialog-desc"
                 className="text-purple-700 text-sm"
               >
-                You can continue later from where you left off.
+                Save your progress? You can continue later.
               </p>
               <div className="flex gap-3">
                 <button
@@ -382,6 +393,7 @@ export function SoloReadingFlow() {
                   className="flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-medium hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 min-h-[48px]"
                   data-testid="save-and-exit-button"
                   type="button"
+                  autoFocus
                 >
                   {isSyncing ? 'Saving...' : 'Save & Exit'}
                 </button>
