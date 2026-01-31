@@ -122,14 +122,14 @@ describe('ScriptureOverview', () => {
     it('should render Start button by default', () => {
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.getByText('Start')).toBeInTheDocument();
     });
 
     it('should NOT render mode cards before Start is tapped', () => {
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.queryByTestId('mode-selection')).not.toBeInTheDocument();
       expect(screen.queryByText('Solo')).not.toBeInTheDocument();
       expect(screen.queryByText('Together')).not.toBeInTheDocument();
@@ -140,7 +140,7 @@ describe('ScriptureOverview', () => {
     it('should show mode selection after Start is tapped', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByTestId('mode-selection')).toBeInTheDocument();
       expect(screen.getByText('Solo')).toBeInTheDocument();
@@ -150,15 +150,15 @@ describe('ScriptureOverview', () => {
     it('should hide Start button after tapping it', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
-      expect(screen.queryByTestId('start-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('scripture-start-button')).not.toBeInTheDocument();
     });
 
     it('should clear scripture error when Start is tapped', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(mockClearScriptureError).toHaveBeenCalled();
     });
@@ -192,7 +192,7 @@ describe('ScriptureOverview', () => {
       render(<ScriptureOverview />);
 
       expect(screen.getByTestId('resume-prompt')).toBeInTheDocument();
-      expect(screen.queryByTestId('start-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('scripture-start-button')).not.toBeInTheDocument();
     });
 
     it('should NOT show resume prompt when no incomplete session', () => {
@@ -200,7 +200,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.queryByTestId('resume-prompt')).not.toBeInTheDocument();
     });
 
@@ -238,7 +238,7 @@ describe('ScriptureOverview', () => {
     it('should call createSession with solo when Solo card is clicked', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const soloButton = screen.getByText('Solo').closest('button');
       fireEvent.click(soloButton!);
@@ -251,7 +251,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const togetherButton = screen.getByText('Together').closest('button');
       fireEvent.click(togetherButton!);
@@ -266,7 +266,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByTestId('session-loading')).toBeInTheDocument();
       expect(screen.getByText('Creating session...')).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const soloButton = screen.getByText('Solo').closest('button');
       expect(soloButton).toBeDisabled();
@@ -342,7 +342,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const togetherButton = screen.getByText('Together').closest('button');
       expect(togetherButton).not.toBeDisabled();
@@ -376,7 +376,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const togetherButton = screen.getByText('Together').closest('button');
       expect(togetherButton).toBeDisabled();
@@ -388,7 +388,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByTestId('setup-partner-link')).toBeInTheDocument();
       expect(screen.getByText('Set up partner')).toBeInTheDocument();
@@ -399,7 +399,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
       fireEvent.click(screen.getByTestId('setup-partner-link'));
 
       expect(mockSetView).toHaveBeenCalledWith('partner');
@@ -463,7 +463,7 @@ describe('ScriptureOverview', () => {
     it('should apply glass morphism to mode cards', () => {
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       const soloButton = screen.getByText('Solo').closest('button');
       expect(soloButton).toHaveClass('backdrop-blur-sm');
@@ -494,7 +494,7 @@ describe('ScriptureOverview', () => {
 
       expect(screen.getByLabelText('Partner status')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByLabelText('Choose reading mode')).toBeInTheDocument();
     });
@@ -504,7 +504,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      fireEvent.click(screen.getByTestId('start-button'));
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
 
       expect(screen.getByRole('button', { name: /solo/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /together/i })).toBeInTheDocument();
@@ -547,7 +547,7 @@ describe('ScriptureOverview', () => {
       render(<ScriptureOverview />);
 
       expect(screen.getByTestId('session-check-loading')).toBeInTheDocument();
-      expect(screen.queryByTestId('start-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('scripture-start-button')).not.toBeInTheDocument();
     });
 
     it('should gracefully handle checkForActiveSession being called (no crash)', () => {
@@ -566,7 +566,7 @@ describe('ScriptureOverview', () => {
 
       render(<ScriptureOverview />);
 
-      expect(screen.getByTestId('start-button')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-start-button')).toBeInTheDocument();
       expect(screen.queryByTestId('resume-prompt')).not.toBeInTheDocument();
     });
   });

@@ -135,35 +135,35 @@ describe('SoloReadingFlow', () => {
 
     it('displays the verse reference', () => {
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('verse-reference')).toHaveTextContent(
+      expect(screen.getByTestId('scripture-verse-reference')).toHaveTextContent(
         SCRIPTURE_STEPS[0].verseReference
       );
     });
 
     it('displays the verse text prominently', () => {
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('verse-text')).toHaveTextContent(
+      expect(screen.getByTestId('scripture-verse-text')).toHaveTextContent(
         SCRIPTURE_STEPS[0].verseText
       );
     });
 
     it('shows View Response button', () => {
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('view-response-button')).toHaveTextContent('View Response');
+      expect(screen.getByTestId('scripture-view-response-button')).toHaveTextContent('View Response');
     });
 
     it('shows Next Verse button', () => {
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('next-verse-button')).toHaveTextContent('Next Verse');
+      expect(screen.getByTestId('scripture-next-verse-button')).toHaveTextContent('Next Verse');
     });
 
     it('displays correct verse for non-zero step index', () => {
       mockStoreState.session = createMockSession({ currentStepIndex: 5 });
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('verse-reference')).toHaveTextContent(
+      expect(screen.getByTestId('scripture-verse-reference')).toHaveTextContent(
         SCRIPTURE_STEPS[5].verseReference
       );
-      expect(screen.getByTestId('verse-text')).toHaveTextContent(
+      expect(screen.getByTestId('scripture-verse-text')).toHaveTextContent(
         SCRIPTURE_STEPS[5].verseText
       );
     });
@@ -176,43 +176,43 @@ describe('SoloReadingFlow', () => {
   describe('Response Screen', () => {
     it('renders response screen after tapping View Response', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
       expect(screen.getByTestId('response-screen')).toBeDefined();
     });
 
     it('displays the response prayer text', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
-      expect(screen.getByTestId('response-text')).toHaveTextContent(
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      expect(screen.getByTestId('scripture-response-text')).toHaveTextContent(
         SCRIPTURE_STEPS[0].responseText
       );
     });
 
     it('shows the verse reference as context on response screen', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
-      expect(screen.getByTestId('response-verse-reference')).toHaveTextContent(
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      expect(screen.getByTestId('scripture-response-verse-reference')).toHaveTextContent(
         `Response to ${SCRIPTURE_STEPS[0].verseReference}`
       );
     });
 
     it('shows Back to Verse button on response screen', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
-      expect(screen.getByTestId('back-to-verse-button')).toHaveTextContent('Back to Verse');
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      expect(screen.getByTestId('scripture-back-to-verse-button')).toHaveTextContent('Back to Verse');
     });
 
     it('shows Next Verse button on response screen', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
-      expect(screen.getByTestId('next-verse-button')).toHaveTextContent('Next Verse');
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      expect(screen.getByTestId('scripture-next-verse-button')).toHaveTextContent('Next Verse');
     });
 
     it('returns to verse screen when Back to Verse is tapped', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
       expect(screen.getByTestId('response-screen')).toBeDefined();
-      fireEvent.click(screen.getByTestId('back-to-verse-button'));
+      fireEvent.click(screen.getByTestId('scripture-back-to-verse-button'));
       expect(screen.getByTestId('verse-screen')).toBeDefined();
     });
   });
@@ -224,25 +224,25 @@ describe('SoloReadingFlow', () => {
   describe('Progress Indicator', () => {
     it('shows progress as "Verse 1 of 17" for first step', () => {
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('progress-indicator')).toHaveTextContent('Verse 1 of 17');
+      expect(screen.getByTestId('scripture-progress-indicator')).toHaveTextContent('Verse 1 of 17');
     });
 
     it('shows correct progress for step 5', () => {
       mockStoreState.session = createMockSession({ currentStepIndex: 4 });
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('progress-indicator')).toHaveTextContent('Verse 5 of 17');
+      expect(screen.getByTestId('scripture-progress-indicator')).toHaveTextContent('Verse 5 of 17');
     });
 
     it('shows progress as "Verse 17 of 17" for last step', () => {
       mockStoreState.session = createMockSession({ currentStepIndex: 16 });
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('progress-indicator')).toHaveTextContent('Verse 17 of 17');
+      expect(screen.getByTestId('scripture-progress-indicator')).toHaveTextContent('Verse 17 of 17');
     });
 
     it('has accessible label for screen readers', () => {
       mockStoreState.session = createMockSession({ currentStepIndex: 4 });
       render(<SoloReadingFlow />);
-      const indicator = screen.getByTestId('progress-indicator');
+      const indicator = screen.getByTestId('scripture-progress-indicator');
       expect(indicator.getAttribute('aria-label')).toBe('Currently on verse 5 of 17');
     });
 
@@ -261,27 +261,27 @@ describe('SoloReadingFlow', () => {
   describe('Step Advancement', () => {
     it('calls advanceStep when Next Verse is tapped on verse screen', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('next-verse-button'));
+      fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
       expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
     });
 
     it('calls advanceStep when Next Verse is tapped on response screen', () => {
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('view-response-button'));
-      fireEvent.click(screen.getByTestId('next-verse-button'));
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
       expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
     });
 
     it('shows "Complete Reading" on last step instead of "Next Verse"', () => {
       mockStoreState.session = createMockSession({ currentStepIndex: 16 });
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('next-verse-button')).toHaveTextContent('Complete Reading');
+      expect(screen.getByTestId('scripture-next-verse-button')).toHaveTextContent('Complete Reading');
     });
 
     it('disables Next Verse button while syncing', () => {
       mockStoreState.isSyncing = true;
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('next-verse-button')).toBeDisabled();
+      expect(screen.getByTestId('scripture-next-verse-button')).toBeDisabled();
     });
   });
 
@@ -298,7 +298,7 @@ describe('SoloReadingFlow', () => {
         completedAt: new Date(),
       });
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('reading-complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-completion-screen')).toBeDefined();
     });
 
     it('shows "Reading Complete" heading on completion', () => {
@@ -348,7 +348,7 @@ describe('SoloReadingFlow', () => {
         status: 'in_progress',
       });
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('reading-complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-completion-screen')).toBeDefined();
     });
   });
 
@@ -511,13 +511,13 @@ describe('SoloReadingFlow', () => {
 
     it('verse text uses serif font for Playfair Display', () => {
       render(<SoloReadingFlow />);
-      const verseText = screen.getByTestId('verse-text').querySelector('p');
+      const verseText = screen.getByTestId('scripture-verse-text').querySelector('p');
       expect(verseText?.className).toContain('font-serif');
     });
 
     it('verse text container has glass morphism styling', () => {
       render(<SoloReadingFlow />);
-      const verseContainer = screen.getByTestId('verse-text');
+      const verseContainer = screen.getByTestId('scripture-verse-text');
       expect(verseContainer.className).toContain('backdrop-blur-sm');
       expect(verseContainer.className).toContain('rounded-2xl');
     });
@@ -540,7 +540,7 @@ describe('SoloReadingFlow', () => {
       for (const idx of testIndices) {
         mockStoreState.session = createMockSession({ currentStepIndex: idx });
         const { unmount } = render(<SoloReadingFlow />);
-        expect(screen.getByTestId('verse-reference')).toHaveTextContent(
+        expect(screen.getByTestId('scripture-verse-reference')).toHaveTextContent(
           SCRIPTURE_STEPS[idx].verseReference
         );
         unmount();

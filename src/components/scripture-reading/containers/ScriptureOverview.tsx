@@ -53,9 +53,10 @@ interface ModeCardProps {
   onClick: () => void;
   disabled?: boolean;
   variant: 'primary' | 'secondary';
+  testId?: string;
 }
 
-function ModeCard({ title, description, icon, onClick, disabled, variant }: ModeCardProps) {
+function ModeCard({ title, description, icon, onClick, disabled, variant, testId }: ModeCardProps) {
   const baseClasses =
     'w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm';
   const variantClasses =
@@ -71,6 +72,7 @@ function ModeCard({ title, description, icon, onClick, disabled, variant }: Mode
       onClick={onClick}
       disabled={disabled}
       className={`${baseClasses} ${variantClasses} ${disabledClasses}`}
+      data-testid={testId}
       type="button"
     >
       <div className="flex items-center gap-3 mb-2">
@@ -306,7 +308,7 @@ export function ScriptureOverview() {
           <button
             onClick={handleStart}
             className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 min-h-[56px] shadow-lg shadow-purple-500/25"
-            data-testid="start-button"
+            data-testid="scripture-start-button"
             type="button"
           >
             Start
@@ -351,6 +353,7 @@ export function ScriptureOverview() {
                 onClick={handleStartSolo}
                 disabled={isSessionLoading}
                 variant="secondary"
+                testId="scripture-mode-solo"
               />
 
               {/* Together Mode - Conditional on partner (AC #4, #5) */}

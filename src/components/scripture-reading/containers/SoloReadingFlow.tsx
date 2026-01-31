@@ -122,7 +122,7 @@ export function SoloReadingFlow() {
       <div
         className="min-h-screen p-4 flex flex-col"
         style={{ backgroundColor: scriptureTheme.background }}
-        data-testid="reading-complete"
+        data-testid="scripture-completion-screen"
       >
         <div className="max-w-md mx-auto flex-1 flex flex-col items-center justify-center text-center space-y-6">
           <div className="text-6xl" aria-hidden="true">
@@ -187,7 +187,7 @@ export function SoloReadingFlow() {
         <span
           className="text-purple-600 text-sm font-medium"
           aria-label={`Currently on verse ${session.currentStepIndex + 1} of ${MAX_STEPS}`}
-          data-testid="progress-indicator"
+          data-testid="scripture-progress-indicator"
         >
           Verse {session.currentStepIndex + 1} of {MAX_STEPS}
         </span>
@@ -223,7 +223,7 @@ export function SoloReadingFlow() {
                 {/* Verse reference */}
                 <p
                   className="text-center text-purple-500 text-sm font-medium tracking-wide"
-                  data-testid="verse-reference"
+                  data-testid="scripture-verse-reference"
                 >
                   {currentStep.verseReference}
                 </p>
@@ -231,7 +231,7 @@ export function SoloReadingFlow() {
                 {/* Verse text - prominent display */}
                 <blockquote
                   className="bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-6"
-                  data-testid="verse-text"
+                  data-testid="scripture-verse-text"
                 >
                   <p className="text-xl text-purple-900 font-serif leading-relaxed">
                     {currentStep.verseText}
@@ -247,7 +247,7 @@ export function SoloReadingFlow() {
                 {/* Verse reference (context) */}
                 <p
                   className="text-center text-purple-400 text-xs font-medium tracking-wide"
-                  data-testid="response-verse-reference"
+                  data-testid="scripture-response-verse-reference"
                 >
                   Response to {currentStep.verseReference}
                 </p>
@@ -255,7 +255,7 @@ export function SoloReadingFlow() {
                 {/* Response prayer text */}
                 <div
                   className="bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-6"
-                  data-testid="response-text"
+                  data-testid="scripture-response-text"
                 >
                   <p className="text-base text-purple-800 leading-relaxed">
                     {currentStep.responseText}
@@ -297,7 +297,7 @@ export function SoloReadingFlow() {
               <button
                 onClick={handleViewResponse}
                 className="w-full py-3 px-4 bg-white/80 backdrop-blur-sm border border-purple-200/50 text-purple-700 rounded-xl font-medium hover:bg-purple-50/80 active:bg-purple-100/80 transition-colors min-h-[48px]"
-                data-testid="view-response-button"
+                data-testid="scripture-view-response-button"
                 type="button"
               >
                 View Response
@@ -308,7 +308,7 @@ export function SoloReadingFlow() {
                 onClick={handleNextVerse}
                 disabled={isSyncing}
                 className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25"
-                data-testid="next-verse-button"
+                data-testid="scripture-next-verse-button"
                 type="button"
               >
                 {isLastStep ? 'Complete Reading' : 'Next Verse'}
@@ -320,7 +320,7 @@ export function SoloReadingFlow() {
               <button
                 onClick={handleBackToVerse}
                 className="w-full py-3 px-4 bg-white/80 backdrop-blur-sm border border-purple-200/50 text-purple-700 rounded-xl font-medium hover:bg-purple-50/80 active:bg-purple-100/80 transition-colors min-h-[48px]"
-                data-testid="back-to-verse-button"
+                data-testid="scripture-back-to-verse-button"
                 type="button"
               >
                 Back to Verse
@@ -331,7 +331,7 @@ export function SoloReadingFlow() {
                 onClick={handleNextVerse}
                 disabled={isSyncing}
                 className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25"
-                data-testid="next-verse-button"
+                data-testid="scripture-next-verse-button"
                 type="button"
               >
                 {isLastStep ? 'Complete Reading' : 'Next Verse'}
