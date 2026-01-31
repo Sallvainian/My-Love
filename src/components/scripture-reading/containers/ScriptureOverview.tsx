@@ -1,7 +1,7 @@
 /**
  * ScriptureOverview Container Component
  *
- * Story 1.1 + 1.2: Navigation Entry Point & Overview Page
+ * Story 1.1 + 1.2 + 1.3: Navigation Entry Point, Overview Page, & Reading Flow Router
  * Main entry point for Scripture Reading feature.
  *
  * Handles:
@@ -11,6 +11,7 @@
  * - Session resume for incomplete solo sessions
  * - Session creation via scriptureReadingSlice
  * - Navigation to partner setup flow
+ * - Story 1.3: Routes to SoloReadingFlow when session is active
  *
  * Uses container/presentational pattern:
  * - This container connects to Zustand store
@@ -21,6 +22,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAppStore } from '../../../stores/useAppStore';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
+import { SoloReadingFlow } from './SoloReadingFlow';
 
 // Lavender Dreams design tokens
 const scriptureTheme = {
@@ -149,6 +151,7 @@ export function ScriptureOverview() {
 
   // Scripture reading slice state
   const {
+    session,
     isSessionLoading,
     sessionError,
     activeSession,
@@ -159,6 +162,7 @@ export function ScriptureOverview() {
     clearScriptureError,
     checkForActiveSession,
   } = useAppStore((state) => ({
+    session: state.session,
     isSessionLoading: state.scriptureLoading,
     sessionError: state.scriptureError,
     activeSession: state.activeSession,
@@ -224,6 +228,16 @@ export function ScriptureOverview() {
   }, [setView]);
 
   const fadeTransition = shouldReduceMotion ? { duration: 0 } : { duration: MODE_REVEAL_DURATION };
+
+  // Story 1.3: Route to SoloReadingFlow when session is active
+  if (session && session.status === 'in_progress' && session.mode === 'solo') {
+    return <SoloReadingFlow />;
+  }
+
+  // Story 1.3: Also route to SoloReadingFlow for completion screen
+  if (session && (session.status === 'complete' || session.currentPhase === 'reflection')) {
+    return <SoloReadingFlow />;
+  }
 
   return (
     <div

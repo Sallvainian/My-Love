@@ -41,8 +41,8 @@ development_status:
   # Epic 1: Foundation & Solo Scripture Reading
   epic-1: in-progress
   1-1-database-schema-and-backend-infrastructure: done
-  1-2-navigation-and-overview-page: review
-  1-3-solo-reading-flow: backlog
+  1-2-navigation-and-overview-page: done
+  1-3-solo-reading-flow: in-progress
   1-4-save-resume-and-optimistic-ui: backlog
   1-5-accessibility-foundations: backlog
   epic-1-retrospective: optional

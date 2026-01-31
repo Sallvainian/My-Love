@@ -32,6 +32,7 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
     createSession: vi.fn(),
     getSession: vi.fn(),
     getUserSessions: vi.fn(),
+    updateSession: vi.fn(),
   },
   ScriptureErrorCode: {
     VERSION_MISMATCH: 'VERSION_MISMATCH',
@@ -449,6 +450,222 @@ describe('scriptureReadingSlice', () => {
       await store.getState().checkForActiveSession();
 
       expect(store.getState().activeSession).toBeNull();
+    });
+  });
+
+  // Story 1.3: Solo Reading Flow actions
+  describe('advanceStep', () => {
+    it('should increment currentStepIndex', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 3,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      expect(store.getState().session!.currentStepIndex).toBe(3);
+
+      await store.getState().advanceStep();
+
+      expect(store.getState().session!.currentStepIndex).toBe(4);
+      expect(store.getState().isSyncing).toBe(false);
+    });
+
+    it('should persist step to server via updateSession', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+      await store.getState().advanceStep();
+
+      expect(scriptureReadingService.updateSession).toHaveBeenCalledWith(
+        'session-1',
+        { currentStepIndex: 1 }
+      );
+    });
+
+    it('should transition to reflection phase at last step (step 17)', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 16, // Last step (index 16 = step 17)
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+      await store.getState().advanceStep();
+
+      expect(store.getState().session!.currentPhase).toBe('reflection');
+      expect(store.getState().session!.status).toBe('complete');
+      expect(store.getState().session!.completedAt).toBeDefined();
+    });
+
+    it('should do nothing when session is null', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      const store = createTestStore();
+      await store.getState().advanceStep();
+
+      expect(store.getState().session).toBeNull();
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalled();
+    });
+
+    it('should set error on server update failure', async () => {
+      const { scriptureReadingService, handleScriptureError } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 5,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+      await store.getState().advanceStep();
+
+      // Step should still be advanced locally (optimistic)
+      expect(store.getState().session!.currentStepIndex).toBe(6);
+      // But error should be set
+      expect(store.getState().scriptureError).not.toBeNull();
+      expect(store.getState().isSyncing).toBe(false);
+      expect(handleScriptureError).toHaveBeenCalled();
+    });
+  });
+
+  describe('saveAndExit', () => {
+    it('should persist session and reset state', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 7,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      expect(store.getState().session).not.toBeNull();
+
+      await store.getState().saveAndExit();
+
+      // Should have persisted to server
+      expect(scriptureReadingService.updateSession).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({
+          currentStepIndex: 7,
+          currentPhase: 'reading',
+          status: 'in_progress',
+        })
+      );
+
+      // Should have reset state
+      expect(store.getState().session).toBeNull();
+      expect(store.getState().isSyncing).toBe(false);
+    });
+
+    it('should do nothing when session is null', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      const store = createTestStore();
+      await store.getState().saveAndExit();
+
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalled();
+    });
+
+    it('should set error on save failure without clearing session', async () => {
+      const { scriptureReadingService, handleScriptureError } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 10,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(
+        new Error('Save failed')
+      );
+
+      const store = createTestStore();
+      await store.getState().createSession('solo');
+
+      await store.getState().saveAndExit();
+
+      // Session should NOT be cleared on save failure
+      expect(store.getState().scriptureError).not.toBeNull();
+      expect(store.getState().scriptureError!.code).toBe('SYNC_FAILED');
+      expect(store.getState().isSyncing).toBe(false);
+      expect(handleScriptureError).toHaveBeenCalled();
     });
   });
 

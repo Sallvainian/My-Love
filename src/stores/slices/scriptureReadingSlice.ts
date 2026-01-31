@@ -1,6 +1,6 @@
 /**
  * Scripture Reading Slice — Zustand state management for Scripture Reading feature
- * Story 1.1: AC #4
+ * Story 1.1: AC #4, Story 1.3: Solo Reading Flow
  *
  * Types imported from dbSchema (single source of truth).
  * Follows StateCreator<AppState, AppMiddleware, [], ScriptureSlice> pattern.
@@ -16,6 +16,7 @@ import type {
   ScriptureSessionPhase as SessionPhase,
   ScriptureSessionMode as SessionMode,
 } from '../../services/dbSchema';
+import { MAX_STEPS } from '../../data/scriptureSteps';
 
 // Re-export for consumer convenience
 export type { SessionPhase, SessionMode, ScriptureSession };
@@ -63,6 +64,9 @@ export interface ScriptureSlice extends ScriptureReadingState {
   clearScriptureError: () => void;
   checkForActiveSession: () => Promise<void>;
   clearActiveSession: () => void;
+  // Story 1.3: Solo Reading Flow actions
+  advanceStep: () => Promise<void>;
+  saveAndExit: () => Promise<void>;
 }
 
 // ============================================
@@ -85,7 +89,7 @@ const initialScriptureState: ScriptureReadingState = {
 // Slice creator (Subtask 3.4)
 // ============================================
 
-export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set) => ({
+export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set, get) => ({
   ...initialScriptureState,
 
   createSession: async (mode, partnerId) => {
@@ -191,5 +195,104 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
   clearActiveSession: () => {
     set({ activeSession: null });
+  },
+
+  // Story 1.3: Advance to next step in the reading flow
+  advanceStep: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    const nextStep = session.currentStepIndex + 1;
+    const isLastStep = nextStep >= MAX_STEPS;
+
+    if (isLastStep) {
+      // Transition to reflection phase (Epic 2 handles actual reflection)
+      const updatedSession: ScriptureSession = {
+        ...session,
+        currentPhase: 'reflection' as SessionPhase,
+        currentStepIndex: MAX_STEPS - 1,
+        status: 'complete',
+        completedAt: new Date(),
+      };
+      set({ session: updatedSession, isSyncing: true });
+
+      // Persist completion to server
+      try {
+        await scriptureReadingService.updateSession(session.id, {
+          currentPhase: 'reflection' as SessionPhase,
+          currentStepIndex: MAX_STEPS - 1,
+          status: 'complete',
+          completedAt: updatedSession.completedAt,
+        });
+        set({ isSyncing: false });
+      } catch (error) {
+        const scriptureError: ScriptureError = isScriptureError(error)
+          ? error
+          : {
+              code: ScriptureErrorCode.SYNC_FAILED,
+              message: error instanceof Error ? error.message : 'Failed to complete session',
+              details: error,
+            };
+        handleScriptureError(scriptureError);
+        set({ scriptureError, isSyncing: false });
+      }
+    } else {
+      // Normal step advancement
+      const updatedSession: ScriptureSession = {
+        ...session,
+        currentStepIndex: nextStep,
+      };
+      set({ session: updatedSession, isSyncing: true });
+
+      // Persist to server in background
+      try {
+        await scriptureReadingService.updateSession(session.id, {
+          currentStepIndex: nextStep,
+        });
+        set({ isSyncing: false });
+      } catch (error) {
+        const scriptureError: ScriptureError = isScriptureError(error)
+          ? error
+          : {
+              code: ScriptureErrorCode.SYNC_FAILED,
+              message: error instanceof Error ? error.message : 'Failed to save step progress',
+              details: error,
+            };
+        handleScriptureError(scriptureError);
+        set({ scriptureError, isSyncing: false });
+      }
+    }
+  },
+
+  // Story 1.3: Save current progress and exit to overview
+  saveAndExit: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    set({ isSyncing: true, scriptureError: null });
+
+    try {
+      // Persist current step to server
+      await scriptureReadingService.updateSession(session.id, {
+        currentStepIndex: session.currentStepIndex,
+        currentPhase: session.currentPhase,
+        status: session.status,
+      });
+
+      // Clear session from active state (return to overview)
+      set({ ...initialScriptureState });
+    } catch (error) {
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Failed to save progress',
+            details: error,
+          };
+      handleScriptureError(scriptureError);
+      set({ scriptureError, isSyncing: false });
+    }
   },
 });
