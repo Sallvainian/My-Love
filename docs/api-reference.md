@@ -1,233 +1,160 @@
 # API Reference
 
-> API layer documentation for My-Love project.
+> Complete API layer documentation for My-Love project.
+> Last updated: 2026-01-30 | Scan level: Deep (Rescan)
 
 ## Overview
 
-The API layer (`src/api/`) provides validated wrappers around Supabase operations.
+The API layer (`src/api/`) provides validated CRUD operations against Supabase, with structured error handling, Zod response validation, and real-time subscriptions. 8 source files, 11 database tables.
 
-## API Files
+## Supabase Client (`supabaseClient.ts`)
 
-| File | Purpose | Exports |
-|------|---------|---------|
-| `supabaseClient.ts` | Supabase singleton | `supabase`, `getPartnerId`, `getPartnerDisplayName` |
-| `authService.ts` | Authentication | `authService` (singleton) |
-| `moodApi.ts` | Mood CRUD | `moodApi` (singleton) |
-| `moodSyncService.ts` | Real-time sync | Sync utilities |
-| `interactionService.ts` | Interactions | Poke/kiss/fart functions |
-| `partnerService.ts` | Partner data | Partner queries |
-| `errorHandlers.ts` | Error handling | Error utilities |
-| `validation/supabaseSchemas.ts` | Zod schemas | Type validators |
+- Singleton Supabase client with environment configuration
+- Exports: `supabase`, `getPartnerId()`, `getPartnerDisplayName()`, `isSupabaseConfigured()`
+- JWT authentication with session persistence and auto-refresh
+- Dynamic import of authService to avoid circular deps
 
-## Supabase Client
-
-### Initialization
-
-```typescript
-import { supabase } from './api/supabaseClient';
-
-// Typed client with Database schema
-const { data, error } = await supabase
-  .from('moods')
-  .select('*')
-  .eq('user_id', userId);
-```
-
-### Partner Utilities
-
-```typescript
-// Get partner's user ID
-const partnerId = await getPartnerId();
-
-// Get partner's display name
-const partnerName = await getPartnerDisplayName();
-```
-
-## Auth Service
+## Authentication Service (`authService.ts`)
 
 ### Methods
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `signIn(credentials)` | Email/password login | `AuthResult` |
-| `signUp(credentials)` | Create account | `AuthResult` |
-| `signOut()` | Logout | `void` |
-| `signInWithGoogle()` | OAuth login | `AuthError | null` |
-| `getSession()` | Get current session | `Session | null` |
-| `getUser()` | Get current user | `User | null` |
-| `getCurrentUserId()` | Get user ID | `string | null` |
-| `getCurrentUserIdOfflineSafe()` | Offline-safe user ID | `string | null` |
-| `getAuthStatus()` | Full auth status | `AuthStatus` |
-| `onAuthStateChange(callback)` | Listen to auth changes | `() => void` |
-| `resetPassword(email)` | Send reset email | `AuthError | null` |
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| signIn | `(credentials: AuthCredentials) => Promise<AuthResult>` | Email/password login |
+| signUp | `(credentials: AuthCredentials) => Promise<AuthResult>` | Registration |
+| signOut | `() => Promise<void>` | Logout + token cleanup |
+| getSession | `() => Promise<Session \| null>` | Get current JWT |
+| getUser | `() => Promise<User \| null>` | Get auth user |
+| getCurrentUserId | `() => Promise<string \| null>` | User UUID |
+| getCurrentUserIdOfflineSafe | `() => Promise<string \| null>` | Offline-safe user ID |
+| getAuthStatus | `() => Promise<AuthStatus>` | Comprehensive auth status |
+| onAuthStateChange | `(callback) => () => void` | Auth state listener |
+| resetPassword | `(email: string) => Promise<AuthError \| null>` | Password reset |
+| signInWithGoogle | `() => Promise<AuthError \| null>` | Google OAuth |
 
-### Usage Examples
+### Auth Token Storage
 
-```typescript
-import { authService } from './api/authService';
+- JWT tokens stored in IndexedDB via `storeAuthToken()` for Background Sync access
+- Updated on SIGNED_IN and TOKEN_REFRESHED events
+- Cleared on SIGNED_OUT
 
-// Sign in
-const result = await authService.signIn({
-  email: 'user@example.com',
-  password: 'password123'
-});
+## Mood API (`moodApi.ts`)
 
-// Check auth status
-const { isAuthenticated, user } = await authService.getAuthStatus();
+Class-based validated CRUD for mood entries.
 
-// Listen to changes
-const unsubscribe = authService.onAuthStateChange((session) => {
-  if (session) {
-    console.log('Signed in:', session.user.email);
-  }
-});
-```
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| create | `(moodData: MoodInsert) => Promise<SupabaseMood>` | Insert validated mood |
+| fetchByUser | `(userId, limit=50) => Promise<SupabaseMood[]>` | User's recent moods |
+| fetchByDateRange | `(userId, start, end) => Promise<SupabaseMood[]>` | Date range query |
+| fetchById | `(moodId) => Promise<SupabaseMood \| null>` | Single mood |
+| update | `(moodId, updates) => Promise<SupabaseMood>` | Update mood |
+| delete | `(moodId) => Promise<void>` | Delete mood |
+| getMoodHistory | `(userId, offset=0, limit=50) => Promise<SupabaseMood[]>` | Paginated history |
 
-## Mood API
+All responses validated with Zod schemas. Checks `isOnline()` before operations.
 
-### Methods
+## Mood Sync Service (`moodSyncService.ts`)
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `create(moodData)` | Create mood entry | `SupabaseMood` |
-| `fetchByUser(userId, limit?)` | Get user's moods | `SupabaseMood[]` |
-| `fetchByDateRange(userId, start, end)` | Get moods in range | `SupabaseMood[]` |
-| `fetchById(moodId)` | Get single mood | `SupabaseMood | null` |
-| `update(moodId, updates)` | Update mood | `SupabaseMood` |
-| `delete(moodId)` | Delete mood | `void` |
-| `getMoodHistory(userId, offset?, limit?)` | Paginated history | `SupabaseMood[]` |
+Real-time mood synchronization with partner.
 
-### Usage Examples
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| syncMood | `(mood: MoodEntry) => Promise<SupabaseMoodRecord>` | Upload single mood |
+| syncPendingMoods | `() => Promise<SyncResult>` | Batch sync from IndexedDB |
+| subscribeMoodUpdates | `(callback, onStatusChange?) => Promise<() => void>` | Real-time partner moods |
+| fetchMoods | `(userId, limit=50) => Promise<SupabaseMoodRecord[]>` | Get user's moods |
+| getLatestPartnerMood | `(userId) => Promise<SupabaseMoodRecord \| null>` | Partner's current mood |
 
-```typescript
-import { moodApi } from './api/moodApi';
+Uses Supabase Broadcast API (not postgres_changes) for real-time updates. Retry: 3 attempts, exponential backoff (1s, 2s, 4s).
 
-// Create mood
-const mood = await moodApi.create({
-  user_id: userId,
-  mood_type: 'happy',
-  note: 'Great day!',
-  created_at: new Date().toISOString(),
-});
+## Interaction Service (`interactionService.ts`)
 
-// Fetch with pagination
-const moods = await moodApi.getMoodHistory(userId, 0, 20);
-```
+Poke/kiss interactions with real-time updates.
 
-## Error Handling
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| sendPoke | `(partnerId: string) => Promise<SupabaseInteractionRecord>` | Send poke |
+| sendKiss | `(partnerId: string) => Promise<SupabaseInteractionRecord>` | Send kiss |
+| subscribeInteractions | `(callback) => Promise<() => void>` | Real-time incoming |
+| getInteractionHistory | `(limit=50, offset=0) => Promise<Interaction[]>` | History |
+| getUnviewedInteractions | `() => Promise<Interaction[]>` | Unviewed |
+| markAsViewed | `(interactionId) => Promise<void>` | Mark viewed |
 
-### Error Types
+Uses `postgres_changes` for INSERT events filtered by `to_user_id`.
 
-| Error | Description |
-|-------|-------------|
-| `ApiValidationError` | Zod schema validation failed |
-| `SupabaseServiceError` | Database operation failed |
-| Network errors | Offline or timeout |
+## Partner Service (`partnerService.ts`)
 
-### Error Utilities
+Partner connection management.
 
-```typescript
-import {
-  isOnline,
-  handleSupabaseError,
-  handleNetworkError,
-  logSupabaseError,
-  isPostgrestError,
-} from './api/errorHandlers';
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| getPartner | `() => Promise<PartnerInfo \| null>` | Current partner info |
+| searchUsers | `(query, limit=10) => Promise<UserSearchResult[]>` | Search by name/email |
+| sendPartnerRequest | `(toUserId) => Promise<void>` | Send connection request |
+| getPendingRequests | `() => Promise<{sent, received}>` | Get all requests |
+| acceptPartnerRequest | `(requestId) => Promise<void>` | Accept via RPC |
+| declinePartnerRequest | `(requestId) => Promise<void>` | Decline via RPC |
+| hasPartner | `() => Promise<boolean>` | Check status |
 
-// Check network status
-if (!isOnline()) {
-  throw handleNetworkError(new Error('Offline'), 'context');
-}
+RPC Functions: `accept_partner_request`, `decline_partner_request`
 
-// Handle Supabase errors
-if (isPostgrestError(error)) {
-  throw handleSupabaseError(error, 'MoodApi.create');
-}
-```
+## Validation Schemas (`validation/supabaseSchemas.ts`)
 
-## Zod Schemas
+Zod schemas for all Supabase API responses:
 
-### Available Schemas
+| Schema | Fields |
+|--------|--------|
+| SupabaseUserSchema | id, email, display_name, partner_id, created_at, updated_at |
+| SupabaseMoodSchema | id, user_id, mood_type, mood_types[], note, created_at |
+| SupabaseInteractionSchema | id, from_user_id, to_user_id, type, viewed, created_at |
+| MoodInsertSchema | user_id, mood_type, mood_types[], note (200 char max) |
+| InteractionInsertSchema | from_user_id, to_user_id, type ('poke' \| 'kiss') |
 
-```typescript
-import {
-  SupabaseMoodSchema,
-  MoodArraySchema,
-  SupabaseUserSchema,
-  SupabaseInteractionSchema,
-  // ... more schemas
-} from './api/validation/supabaseSchemas';
-```
+Mood Types: loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired
 
-### Validation Pattern
+## Error Handling (`errorHandlers.ts`)
 
-```typescript
-// Validate API response
-try {
-  const validatedMood = SupabaseMoodSchema.parse(data);
-  return validatedMood;
-} catch (error) {
-  if (error instanceof ZodError) {
-    throw new ApiValidationError('Invalid data', error);
-  }
-  throw error;
-}
-```
+| Export | Type | Description |
+|--------|------|-------------|
+| SupabaseServiceError | Class | Custom error with code, details, hint, isNetworkError |
+| handleSupabaseError | Function | Transform PostgrestError to SupabaseServiceError |
+| handleNetworkError | Function | Network error wrapper |
+| retryWithBackoff | Function | Exponential backoff (3 attempts, 1s-30s, 2x multiplier) |
+| isOnline | Function | Network connectivity check |
+| createOfflineMessage | Function | User-friendly offline message |
 
-## Real-Time Subscriptions
+PostgreSQL Error Mappings: 23505 (unique), 23503 (FK), 23502 (null), 42501 (permission), 42P01 (table), PGRST116 (no rows)
 
-### Mood Sync (Broadcast Pattern)
+## Real-Time Architecture
 
-```typescript
-// Due to RLS, uses Broadcast instead of postgres_changes
-const channel = supabase.channel(`mood-updates:${userId}`);
+| Feature | Mechanism | Channel |
+|---------|-----------|---------|
+| Partner mood updates | Broadcast API | `mood-updates:{userId}` |
+| Incoming interactions | postgres_changes (INSERT) | `incoming-interactions` |
+| Love note messages | Broadcast API | `love-notes:{userId}` |
 
-channel
-  .on('broadcast', { event: 'mood-update' }, (payload) => {
-    // Handle mood update
-  })
-  .subscribe();
-```
+## Database Tables
 
-### Interaction Notifications
+| Table | Purpose | RLS |
+|-------|---------|-----|
+| users | User profiles, partner relationships | Yes |
+| moods | Emoji mood entries with notes | Yes |
+| love_notes | Chat messages between partners | Yes |
+| interactions | Poke/kiss interactions | Yes |
+| partner_requests | Partner connection workflow | Yes |
+| photos | Photo metadata | Yes |
+| scripture_sessions | Scripture reading sessions (NEW) | Yes |
+| scripture_step_states | Step-level progress tracking (NEW) | Yes |
+| scripture_reflections | User reflections on passages (NEW) | Yes |
+| scripture_bookmarks | Passage bookmarks (NEW) | Yes |
+| scripture_messages | Prayer/report messages (NEW) | Yes |
 
-```typescript
-// Listen for pokes/kisses
-supabase
-  .channel(`interactions:${userId}`)
-  .on('broadcast', { event: 'new-interaction' }, handler)
-  .subscribe();
-```
+## RPC Functions
 
-## Best Practices
-
-### Always Validate Responses
-
-```typescript
-// DO: Validate with Zod
-const validated = Schema.parse(response);
-
-// DON'T: Trust raw response
-const data = response; // Unsafe
-```
-
-### Handle Offline State
-
-```typescript
-// Check network before API calls
-if (!isOnline()) {
-  // Fall back to IndexedDB
-  return await indexedDBService.get(id);
-}
-```
-
-### Use Singletons
-
-```typescript
-// DO: Import singleton
-import { moodApi } from './api/moodApi';
-
-// DON'T: Create new instance
-const api = new MoodApi(); // Wrong
-```
+| Function | Parameters | Returns |
+|----------|-----------|---------|
+| accept_partner_request | p_request_id: string | void |
+| decline_partner_request | p_request_id: string | void |
+| is_scripture_session_member | p_session_id: string | boolean |
+| scripture_seed_test_data | p_session_count, p_include_reflections, p_include_messages, p_preset | JSONB |

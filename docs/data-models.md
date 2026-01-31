@@ -1,291 +1,219 @@
 # Data Models
 
-> Database schema and TypeScript types for My-Love project.
+> Database schema and data structure documentation for My-Love project.
+> Last updated: 2026-01-30 | Scan level: Deep (Rescan)
 
-## Database Schema
+## Database Overview
 
-### Overview
+PostgreSQL via Supabase with Row Level Security (RLS) on all tables. 11 tables total (6 original + 5 scripture reading). 8 migrations. IndexedDB v5 for offline storage.
 
-| Table | Description | RLS |
-|-------|-------------|-----|
-| `users` | User profiles | Yes |
-| `moods` | Mood entries | Yes |
-| `interactions` | Poke/kiss/fart records | Yes |
-| `love_notes` | Chat messages | Yes |
-| `photos` | Photo metadata | Yes |
-| `partner_requests` | Partner connection flow | Yes |
+## Supabase Tables
 
 ### users
 
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  email TEXT,
-  display_name TEXT,
-  partner_id UUID REFERENCES users(id),
-  partner_name TEXT,
-  device_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-| Column | Type | Description |
+| Column | Type | Constraints |
 |--------|------|-------------|
-| `id` | UUID | Auth user ID |
-| `email` | TEXT | User email |
-| `display_name` | TEXT | Display name |
-| `partner_id` | UUID | Linked partner |
-| `partner_name` | TEXT | Partner's name |
-| `device_id` | TEXT | Device identifier |
+| id | UUID | PK, references auth.users |
+| email | text | |
+| display_name | text | |
+| partner_id | UUID | FK → users.id, nullable |
+| created_at | timestamptz | default now() |
+| updated_at | timestamptz | default now() |
+
+RLS: Users can read/update own record. Partner read via partner_id.
 
 ### moods
 
-```sql
-CREATE TABLE moods (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
-  mood_type TEXT NOT NULL,
-  mood_types TEXT[],
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-| Column | Type | Description |
+| Column | Type | Constraints |
 |--------|------|-------------|
-| `id` | UUID | Mood entry ID |
-| `user_id` | UUID | Owner user |
-| `mood_type` | TEXT | Primary mood emoji |
-| `mood_types` | TEXT[] | Multiple moods |
-| `note` | TEXT | Optional note |
+| id | UUID | PK |
+| user_id | UUID | FK → auth.users |
+| mood_type | text | Legacy single mood |
+| mood_types | text[] | Array of selected moods |
+| note | text | 200 char max |
+| created_at | timestamptz | default now() |
+| updated_at | timestamptz | default now() |
 
-### interactions
-
-```sql
-CREATE TABLE interactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  from_user_id UUID NOT NULL REFERENCES users(id),
-  to_user_id UUID NOT NULL REFERENCES users(id),
-  type TEXT NOT NULL,
-  viewed BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `type` | TEXT | 'poke', 'kiss', 'fart' |
-| `viewed` | BOOLEAN | Read status |
+Mood enum: `loved`, `happy`, `content`, `excited`, `thoughtful`, `grateful`, `sad`, `anxious`, `frustrated`, `angry`, `lonely`, `tired`
 
 ### love_notes
 
-```sql
-CREATE TABLE love_notes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  from_user_id UUID NOT NULL,
-  to_user_id UUID NOT NULL,
-  content TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| from_user_id | UUID | FK → auth.users |
+| to_user_id | UUID | FK → auth.users |
+| content | text | |
+| image_url | text | nullable, storage path |
+| created_at | timestamptz | default now() |
 
-### photos
+### interactions
 
-```sql
-CREATE TABLE photos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  storage_path TEXT NOT NULL,
-  filename TEXT NOT NULL,
-  mime_type TEXT DEFAULT 'image/jpeg',
-  file_size INTEGER NOT NULL,
-  width INTEGER NOT NULL,
-  height INTEGER NOT NULL,
-  caption TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| from_user_id | UUID | FK → auth.users |
+| to_user_id | UUID | FK → auth.users |
+| type | text | 'poke' or 'kiss' |
+| viewed | boolean | default false |
+| created_at | timestamptz | default now() |
 
 ### partner_requests
 
-```sql
-CREATE TABLE partner_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  from_user_id UUID NOT NULL REFERENCES users(id),
-  to_user_id UUID NOT NULL REFERENCES users(id),
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| from_user_id | UUID | FK → auth.users |
+| to_user_id | UUID | FK → auth.users |
+| status | text | pending/accepted/declined |
+| created_at | timestamptz | default now() |
+
+### photos
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| user_id | UUID | FK → auth.users |
+| storage_path | text | Supabase storage path |
+| caption | text | nullable |
+| mime_type | text | jpeg/png/webp |
+| file_size | integer | bytes |
+| width | integer | pixels |
+| height | integer | pixels |
+| created_at | timestamptz | default now() |
+
+## Scripture Reading Tables (NEW - Sprint 0)
+
+### Enum Types
+
+- `scripture_session_mode`: 'solo' | 'together'
+- `scripture_session_phase`: 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete'
+- `scripture_session_status`: 'pending' | 'in_progress' | 'complete' | 'abandoned'
+
+### scripture_sessions
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| mode | scripture_session_mode | NOT NULL |
+| user1_id | UUID | FK → auth.users, NOT NULL |
+| user2_id | UUID | FK → auth.users, nullable |
+| current_phase | scripture_session_phase | |
+| current_step_index | INT | 0-16 |
+| status | scripture_session_status | |
+| version | INT | Concurrency control |
+| snapshot_json | JSONB | Session state snapshot |
+| started_at | timestamptz | default now() |
+| completed_at | timestamptz | nullable |
+
+Indexes: `(user1_id, started_at DESC)`, `(user2_id, started_at DESC)`
+
+### scripture_step_states
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| session_id | UUID | FK → scripture_sessions, CASCADE |
+| step_index | INT | 0-16 |
+| user1_locked_at | timestamptz | nullable |
+| user2_locked_at | timestamptz | nullable |
+| advanced_at | timestamptz | nullable |
+
+UNIQUE constraint: `(session_id, step_index)`
+
+### scripture_reflections
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| session_id | UUID | FK → scripture_sessions |
+| step_index | INT | |
+| user_id | UUID | FK → auth.users |
+| rating | INT | CHECK 1-5 |
+| notes | TEXT | |
+| is_shared | BOOLEAN | default false |
+| created_at | timestamptz | default now() |
+
+UNIQUE constraint: `(session_id, step_index, user_id)`
+
+### scripture_bookmarks
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| session_id | UUID | FK → scripture_sessions |
+| step_index | INT | |
+| user_id | UUID | FK → auth.users |
+| share_with_partner | BOOLEAN | default false |
+| created_at | timestamptz | default now() |
+
+UNIQUE constraint: `(session_id, step_index, user_id)`
+
+### scripture_messages
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK |
+| session_id | UUID | FK → scripture_sessions |
+| sender_id | UUID | FK → auth.users |
+| message | TEXT | NOT NULL |
+| created_at | timestamptz | default now() |
+
+Index: `(session_id, created_at)`
+
+## RLS Policies
+
+### Scripture Session Access
+
+- **SELECT**: user is `user1_id` OR `user2_id`
+- **INSERT**: user creates as `user1`
+- **UPDATE**: user is session member
+
+### Scripture Reflections
+
+- **SELECT** own OR shared where session member
+- **INSERT/UPDATE** own only
+
+### Scripture Bookmarks
+
+- **SELECT** own OR shared where session member
+- **INSERT/UPDATE/DELETE** own only
+
+### Scripture Messages
+
+- **SELECT**: session member
+- **INSERT**: sender is current user AND session member
+
+## IndexedDB Schema (v5)
+
+| Store | Key | Indexes | Purpose |
+|-------|-----|---------|---------|
+| messages | id (autoIncrement) | - | Love messages |
+| photos | id (autoIncrement) | by-date | Photo metadata |
+| moods | id (autoIncrement) | by-date | Mood entries (offline) |
+| sw-auth | key (string) | - | JWT tokens for SW |
+| scripture-sessions | id (string) | - | Session cache |
+| scripture-reflections | id (string) | by-session | Reflection cache |
+| scripture-bookmarks | id (string) | by-session | Bookmark cache |
+| scripture-messages | id (string) | by-session | Message cache |
+
+## Migrations
+
+| Migration | Date | Description |
+|-----------|------|-------------|
+| 20251203000001 | 2025-12-03 | Base schema (users, moods, interactions, partner_requests) |
+| 20251203190800 | 2025-12-03 | Photos table |
+| 20251205000001 | 2025-12-05 | Love notes images |
+| 20251205000002 | 2025-12-05 | MIME type validation |
+| 20251206024345 | 2025-12-06 | Remote schema |
+| 20251206124803 | 2025-12-06 | Fix users RLS policy |
+| 20251206200000 | 2025-12-06 | Fix privilege escalation |
+| 20260128000001 | 2026-01-28 | Scripture reading (5 tables, 3 enums, RLS, RPC, test data seeding) |
+
+## Data Flow
+
 ```
-
-## TypeScript Types
-
-### Database Types (`src/types/database.types.ts`)
-
-Auto-generated from Supabase schema:
-
-```typescript
-export type Database = {
-  public: {
-    Tables: {
-      users: { Row: {...}, Insert: {...}, Update: {...} },
-      moods: { Row: {...}, Insert: {...}, Update: {...} },
-      interactions: { Row: {...}, Insert: {...}, Update: {...} },
-      love_notes: { Row: {...}, Insert: {...}, Update: {...} },
-      photos: { Row: {...}, Insert: {...}, Update: {...} },
-      partner_requests: { Row: {...}, Insert: {...}, Update: {...} },
-    },
-    Functions: {
-      accept_partner_request: {...},
-      decline_partner_request: {...},
-    }
-  }
-}
-```
-
-### Application Models (`src/types/models.ts`)
-
-```typescript
-// Love Note
-interface LoveNote {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
-  content: string;
-  created_at: string;
-  image_url?: string | null;
-  // Client-side optimistic fields
-  sending?: boolean;
-  error?: boolean;
-  tempId?: string;
-}
-
-// Love Notes State
-interface LoveNotesState {
-  notes: LoveNote[];
-  isLoading: boolean;
-  error: string | null;
-  hasMore: boolean;
-}
-
-// Send Message Input
-interface SendMessageInput {
-  content: string;
-  timestamp: string;
-  imageFile?: File;
-}
-```
-
-### Photo Types
-
-```typescript
-// From photoService
-interface SupabasePhoto {
-  id: string;
-  user_id: string;
-  storage_path: string;
-  filename: string;
-  mime_type: string;
-  file_size: number;
-  width: number;
-  height: number;
-  caption: string | null;
-  created_at: string;
-}
-
-interface PhotoWithUrls extends SupabasePhoto {
-  url: string;          // Signed URL
-  thumbnailUrl: string; // Thumbnail URL
-}
-
-interface StorageQuota {
-  used: number;
-  limit: number;
-  percentage: number;
-}
-```
-
-## Zod Schemas
-
-### Mood Schema
-
-```typescript
-const SupabaseMoodSchema = z.object({
-  id: z.string().uuid(),
-  user_id: z.string().uuid(),
-  mood_type: z.string(),
-  mood_types: z.array(z.string()).nullable(),
-  note: z.string().nullable(),
-  created_at: z.string().nullable(),
-  updated_at: z.string().nullable(),
-});
-
-type SupabaseMood = z.infer<typeof SupabaseMoodSchema>;
-```
-
-### User Schema
-
-```typescript
-const SupabaseUserSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email().nullable(),
-  display_name: z.string().nullable(),
-  partner_id: z.string().uuid().nullable(),
-  partner_name: z.string().nullable(),
-  device_id: z.string().nullable(),
-  created_at: z.string().nullable(),
-  updated_at: z.string().nullable(),
-});
-```
-
-## Database Functions
-
-### accept_partner_request
-
-```sql
-CREATE FUNCTION accept_partner_request(p_request_id UUID)
-RETURNS void AS $$
-BEGIN
-  -- Update request status
-  -- Link users as partners
-  -- Cleanup pending requests
-END;
-$$ LANGUAGE plpgsql;
-```
-
-### decline_partner_request
-
-```sql
-CREATE FUNCTION decline_partner_request(p_request_id UUID)
-RETURNS void AS $$
-BEGIN
-  -- Update request status to 'declined'
-END;
-$$ LANGUAGE plpgsql;
-```
-
-## Row Level Security
-
-All tables have RLS policies ensuring:
-- Users can only read/write their own data
-- Partner data accessible via `partner_id` relationship
-- No cross-user data access
-
-Example policy:
-
-```sql
-CREATE POLICY "Users can view own moods"
-  ON moods FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view partner moods"
-  ON moods FOR SELECT
-  USING (
-    user_id IN (
-      SELECT partner_id FROM users WHERE id = auth.uid()
-    )
-  );
+Components → Hooks → Store (Zustand) → Services → API (Supabase)
+                                     ↓
+                              IndexedDB (offline cache)
 ```

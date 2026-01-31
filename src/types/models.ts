@@ -15,6 +15,17 @@ export type {
   PhotoUploadInput,
 } from '../services/photoService';
 
+// Scripture Reading types (Story 1.1)
+export type {
+  ScriptureSession,
+  ScriptureReflection,
+  ScriptureBookmark,
+  ScriptureMessage,
+  ScriptureSessionMode,
+  ScriptureSessionPhase,
+  ScriptureSessionStatus,
+} from '../services/dbSchema';
+
 // Love Notes types (Story 2.1)
 
 /**
