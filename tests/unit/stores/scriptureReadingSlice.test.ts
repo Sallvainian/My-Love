@@ -16,11 +16,22 @@ import { create } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 
+// Mock supabase client
+const mockGetUser = vi.fn();
+vi.mock('../../../src/api/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getUser: () => mockGetUser(),
+    },
+  },
+}));
+
 // Mock the scriptureReadingService
 vi.mock('../../../src/services/scriptureReadingService', () => ({
   scriptureReadingService: {
     createSession: vi.fn(),
     getSession: vi.fn(),
+    getUserSessions: vi.fn(),
   },
   ScriptureErrorCode: {
     VERSION_MISMATCH: 'VERSION_MISMATCH',
@@ -52,17 +63,17 @@ describe('scriptureReadingSlice', () => {
       const state = store.getState();
 
       expect(state.session).toBeNull();
-      expect(state.isLoading).toBe(false);
+      expect(state.scriptureLoading).toBe(false);
       expect(state.isInitialized).toBe(false);
       expect(state.isPendingLockIn).toBe(false);
       expect(state.isPendingReflection).toBe(false);
       expect(state.isSyncing).toBe(false);
-      expect(state.error).toBeNull();
+      expect(state.scriptureError).toBeNull();
     });
   });
 
   describe('createSession', () => {
-    it('should set isLoading while creating session', async () => {
+    it('should set scriptureLoading while creating session', async () => {
       const { scriptureReadingService } = await import(
         '../../../src/services/scriptureReadingService'
       );
@@ -81,8 +92,8 @@ describe('scriptureReadingSlice', () => {
       const createPromise = store.getState().createSession('solo');
 
       // Should be loading
-      expect(store.getState().isLoading).toBe(true);
-      expect(store.getState().error).toBeNull();
+      expect(store.getState().scriptureLoading).toBe(true);
+      expect(store.getState().scriptureError).toBeNull();
 
       // Resolve with a session
       resolveCreate!({
@@ -98,7 +109,7 @@ describe('scriptureReadingSlice', () => {
 
       await createPromise;
 
-      expect(store.getState().isLoading).toBe(false);
+      expect(store.getState().scriptureLoading).toBe(false);
       expect(store.getState().session).not.toBeNull();
       expect(store.getState().session!.id).toBe('session-1');
       expect(store.getState().isInitialized).toBe(true);
@@ -116,10 +127,10 @@ describe('scriptureReadingSlice', () => {
       const store = createTestStore();
       await store.getState().createSession('solo');
 
-      expect(store.getState().isLoading).toBe(false);
+      expect(store.getState().scriptureLoading).toBe(false);
       expect(store.getState().session).toBeNull();
-      expect(store.getState().error).not.toBeNull();
-      expect(store.getState().error!.code).toBe('SYNC_FAILED');
+      expect(store.getState().scriptureError).not.toBeNull();
+      expect(store.getState().scriptureError!.code).toBe('SYNC_FAILED');
     });
   });
 
@@ -138,13 +149,13 @@ describe('scriptureReadingSlice', () => {
         userId: 'user-123',
         status: 'in_progress',
         startedAt: new Date(),
-        synced: true,
+
       });
 
       const store = createTestStore();
       await store.getState().loadSession('session-1');
 
-      expect(store.getState().isLoading).toBe(false);
+      expect(store.getState().scriptureLoading).toBe(false);
       expect(store.getState().session).not.toBeNull();
       expect(store.getState().session!.currentPhase).toBe('reflection');
       expect(store.getState().session!.currentStepIndex).toBe(10);
@@ -161,10 +172,10 @@ describe('scriptureReadingSlice', () => {
       const store = createTestStore();
       await store.getState().loadSession('nonexistent');
 
-      expect(store.getState().isLoading).toBe(false);
+      expect(store.getState().scriptureLoading).toBe(false);
       expect(store.getState().session).toBeNull();
-      expect(store.getState().error).not.toBeNull();
-      expect(store.getState().error!.code).toBe('SESSION_NOT_FOUND');
+      expect(store.getState().scriptureError).not.toBeNull();
+      expect(store.getState().scriptureError!.code).toBe('SESSION_NOT_FOUND');
     });
 
     it('should set error on loadSession failure', async () => {
@@ -179,8 +190,8 @@ describe('scriptureReadingSlice', () => {
       const store = createTestStore();
       await store.getState().loadSession('session-1');
 
-      expect(store.getState().error).not.toBeNull();
-      expect(store.getState().error!.code).toBe('SYNC_FAILED');
+      expect(store.getState().scriptureError).not.toBeNull();
+      expect(store.getState().scriptureError!.code).toBe('SYNC_FAILED');
     });
   });
 
@@ -211,12 +222,12 @@ describe('scriptureReadingSlice', () => {
       store.getState().exitSession();
 
       expect(store.getState().session).toBeNull();
-      expect(store.getState().isLoading).toBe(false);
+      expect(store.getState().scriptureLoading).toBe(false);
       expect(store.getState().isInitialized).toBe(false);
       expect(store.getState().isPendingLockIn).toBe(false);
       expect(store.getState().isPendingReflection).toBe(false);
       expect(store.getState().isSyncing).toBe(false);
-      expect(store.getState().error).toBeNull();
+      expect(store.getState().scriptureError).toBeNull();
     });
   });
 
@@ -267,11 +278,11 @@ describe('scriptureReadingSlice', () => {
       const store = createTestStore();
       await store.getState().createSession('solo');
 
-      expect(store.getState().error).not.toBeNull();
+      expect(store.getState().scriptureError).not.toBeNull();
 
       store.getState().clearScriptureError();
 
-      expect(store.getState().error).toBeNull();
+      expect(store.getState().scriptureError).toBeNull();
     });
   });
 
@@ -308,6 +319,168 @@ describe('scriptureReadingSlice', () => {
         store.getState().updatePhase(phase as 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete');
         expect(store.getState().session!.currentPhase).toBe(phase);
       }
+    });
+  });
+
+  describe('checkForActiveSession', () => {
+    it('should find and store an incomplete solo session', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      });
+
+      const incompleteSession = {
+        id: 'session-abc',
+        mode: 'solo' as const,
+        currentPhase: 'reading' as const,
+        currentStepIndex: 5,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress' as const,
+        startedAt: new Date(),
+      };
+
+      vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
+        incompleteSession,
+      ]);
+
+      const store = createTestStore();
+      expect(store.getState().isCheckingSession).toBe(false);
+
+      await store.getState().checkForActiveSession();
+
+      expect(store.getState().isCheckingSession).toBe(false);
+      expect(store.getState().activeSession).not.toBeNull();
+      expect(store.getState().activeSession!.id).toBe('session-abc');
+    });
+
+    it('should set activeSession to null when no incomplete solo session found', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      });
+
+      vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
+        {
+          id: 'session-done',
+          mode: 'solo' as const,
+          currentPhase: 'complete' as const,
+          currentStepIndex: 16,
+          version: 1,
+          userId: 'user-123',
+          status: 'complete' as const,
+          startedAt: new Date(),
+          completedAt: new Date(),
+        },
+      ]);
+
+      const store = createTestStore();
+      await store.getState().checkForActiveSession();
+
+      expect(store.getState().isCheckingSession).toBe(false);
+      expect(store.getState().activeSession).toBeNull();
+    });
+
+    it('should handle getUser failure gracefully (no crash, no activeSession)', async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+      });
+
+      const store = createTestStore();
+      await store.getState().checkForActiveSession();
+
+      expect(store.getState().isCheckingSession).toBe(false);
+      expect(store.getState().activeSession).toBeNull();
+      expect(store.getState().scriptureError).toBeNull();
+    });
+
+    it('should handle getUserSessions failure with proper error handling', async () => {
+      const { scriptureReadingService, handleScriptureError } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      });
+
+      vi.mocked(scriptureReadingService.getUserSessions).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      const store = createTestStore();
+      await store.getState().checkForActiveSession();
+
+      expect(store.getState().isCheckingSession).toBe(false);
+      expect(store.getState().activeSession).toBeNull();
+      expect(handleScriptureError).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'SYNC_FAILED' })
+      );
+    });
+
+    it('should ignore together mode sessions when finding active session', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      });
+
+      vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
+        {
+          id: 'session-together',
+          mode: 'together' as const,
+          currentPhase: 'reading' as const,
+          currentStepIndex: 3,
+          version: 1,
+          userId: 'user-123',
+          status: 'in_progress' as const,
+          startedAt: new Date(),
+        },
+      ]);
+
+      const store = createTestStore();
+      await store.getState().checkForActiveSession();
+
+      expect(store.getState().activeSession).toBeNull();
+    });
+  });
+
+  describe('clearActiveSession', () => {
+    it('should clear the active session', async () => {
+      const { scriptureReadingService } = await import(
+        '../../../src/services/scriptureReadingService'
+      );
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      });
+
+      vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
+        {
+          id: 'session-abc',
+          mode: 'solo' as const,
+          currentPhase: 'reading' as const,
+          currentStepIndex: 5,
+          version: 1,
+          userId: 'user-123',
+          status: 'in_progress' as const,
+          startedAt: new Date(),
+        },
+      ]);
+
+      const store = createTestStore();
+      await store.getState().checkForActiveSession();
+      expect(store.getState().activeSession).not.toBeNull();
+
+      store.getState().clearActiveSession();
+      expect(store.getState().activeSession).toBeNull();
     });
   });
 });

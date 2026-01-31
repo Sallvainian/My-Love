@@ -94,7 +94,6 @@ function toLocalSession(row: SupabaseSession, userId: string): ScriptureSession 
     snapshotJson: row.snapshot_json ?? undefined,
     startedAt: new Date(row.started_at),
     completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-    synced: true,
   };
 }
 
@@ -108,7 +107,6 @@ function toLocalReflection(row: SupabaseReflection): ScriptureReflection {
     notes: row.notes ?? undefined,
     isShared: row.is_shared,
     createdAt: new Date(row.created_at),
-    synced: true,
   };
 }
 
@@ -120,7 +118,6 @@ function toLocalBookmark(row: SupabaseBookmark): ScriptureBookmark {
     userId: row.user_id,
     shareWithPartner: row.share_with_partner,
     createdAt: new Date(row.created_at),
-    synced: true,
   };
 }
 
@@ -131,7 +128,6 @@ function toLocalMessage(row: SupabaseMessage): ScriptureMessage {
     senderId: row.sender_id,
     message: row.message,
     createdAt: new Date(row.created_at),
-    synced: true,
   };
 }
 
@@ -207,9 +203,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     }
 
     const validated = SupabaseSessionSchema.parse(data);
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData?.user?.id ?? '';
-    const local = toLocalSession(validated, userId);
+    const local = toLocalSession(validated, validated.user1_id);
 
     await this.cacheSession(local);
     return local;
@@ -219,13 +213,19 @@ class ScriptureReadingService extends BaseIndexedDBService<
    * Get a session — cache-first read pattern (Subtask 2.6).
    * 1. Check IndexedDB → return if found
    * 2. Fetch from Supabase → cache → return
+   *
+   * @param onRefresh - Optional callback invoked when background refresh completes
+   *   with fresh data, allowing Zustand state to stay in sync.
    */
-  async getSession(sessionId: string): Promise<ScriptureSession | null> {
+  async getSession(
+    sessionId: string,
+    onRefresh?: (session: ScriptureSession) => void
+  ): Promise<ScriptureSession | null> {
     // Try cache first
     const cached = await this.get(sessionId);
     if (cached) {
-      // Fire-and-forget background refresh
-      void this.refreshSessionFromServer(sessionId);
+      // Fire-and-forget background refresh with state propagation
+      void this.refreshSessionFromServer(sessionId, onRefresh);
       return cached;
     }
 
@@ -258,14 +258,38 @@ class ScriptureReadingService extends BaseIndexedDBService<
   }
 
   /**
-   * Update a session in both server and cache.
-   * Write pattern: server first → update cache.
+   * Update a session — write-through pattern: server first → update cache.
+   * Converts camelCase fields to snake_case for Supabase.
    */
   async updateSession(
     sessionId: string,
-    updates: Partial<ScriptureSession>
+    updates: Partial<Pick<ScriptureSession, 'currentPhase' | 'currentStepIndex' | 'status' | 'version' | 'completedAt'>>
   ): Promise<void> {
-    // Update cache immediately for responsiveness
+    // Build snake_case update payload for Supabase
+    const supabaseUpdates: Record<string, unknown> = {};
+    if (updates.currentPhase !== undefined) supabaseUpdates.current_phase = updates.currentPhase;
+    if (updates.currentStepIndex !== undefined) supabaseUpdates.current_step_index = updates.currentStepIndex;
+    if (updates.status !== undefined) supabaseUpdates.status = updates.status;
+    if (updates.version !== undefined) supabaseUpdates.version = updates.version;
+    if (updates.completedAt !== undefined) supabaseUpdates.completed_at = updates.completedAt?.toISOString() ?? null;
+
+    // Server first
+    const { error } = await supabase
+      .from('scripture_sessions')
+      .update(supabaseUpdates)
+      .eq('id', sessionId);
+
+    if (error) {
+      const scriptureErr = createScriptureError(
+        ScriptureErrorCode.SYNC_FAILED,
+        `Failed to update session: ${error.message}`,
+        error
+      );
+      handleScriptureError(scriptureErr);
+      throw scriptureErr;
+    }
+
+    // On success → update cache
     await this.init();
     const existing = await this.get(sessionId);
     if (existing) {
@@ -563,9 +587,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
       }
 
       const validated = SupabaseSessionSchema.parse(data);
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id ?? '';
-      const local = toLocalSession(validated, userId);
+      const local = toLocalSession(validated, validated.user1_id);
 
       await this.cacheSession(local);
       return local;
@@ -668,9 +690,15 @@ class ScriptureReadingService extends BaseIndexedDBService<
   }
 
   // Background refresh helpers — update cache silently
-  private async refreshSessionFromServer(sessionId: string): Promise<void> {
+  private async refreshSessionFromServer(
+    sessionId: string,
+    onRefresh?: (session: ScriptureSession) => void
+  ): Promise<void> {
     try {
-      await this.fetchAndCacheSession(sessionId);
+      const fresh = await this.fetchAndCacheSession(sessionId);
+      if (fresh && onRefresh) {
+        onRefresh(fresh);
+      }
     } catch {
       // Silent failure — cache serves stale data
     }

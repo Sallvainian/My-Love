@@ -184,4 +184,4 @@ export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
     responseText:
       'Father, produce the fruit of Your Spirit in our marriage. Fill us with love, joy, and peace. Grant us patience, kindness, and goodness toward each other. Make us faithful, gentle, and self-controlled. Let our marriage be a garden where Your fruit flourishes.',
   },
-] as const;
+];

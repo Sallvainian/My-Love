@@ -2,7 +2,7 @@
  * Scripture Reading Slice — Zustand state management for Scripture Reading feature
  * Story 1.1: AC #4
  *
- * Types co-located with slice per architecture rules.
+ * Types imported from dbSchema (single source of truth).
  * Follows StateCreator<AppState, AppMiddleware, [], ScriptureSlice> pattern.
  */
 
@@ -10,25 +10,29 @@ import type { AppStateCreator } from '../types';
 import { scriptureReadingService } from '../../services/scriptureReadingService';
 import type { ScriptureError } from '../../services/scriptureReadingService';
 import { ScriptureErrorCode, handleScriptureError } from '../../services/scriptureReadingService';
+import { supabase } from '../../api/supabaseClient';
+import type {
+  ScriptureSession,
+  ScriptureSessionPhase as SessionPhase,
+  ScriptureSessionMode as SessionMode,
+} from '../../services/dbSchema';
+
+// Re-export for consumer convenience
+export type { SessionPhase, SessionMode, ScriptureSession };
 
 // ============================================
-// Types (Subtask 3.2)
+// Helpers
 // ============================================
 
-export type SessionPhase = 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete';
-export type SessionMode = 'solo' | 'together';
-
-export interface ScriptureSession {
-  id: string;
-  mode: SessionMode;
-  currentPhase: SessionPhase;
-  currentStepIndex: number;
-  version: number;
-  userId: string;
-  partnerId?: string;
-  status: 'pending' | 'in_progress' | 'complete' | 'abandoned';
-  startedAt: Date;
-  completedAt?: Date;
+function isScriptureError(value: unknown): value is ScriptureError {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'code' in value &&
+    'message' in value &&
+    typeof (value as ScriptureError).code === 'string' &&
+    Object.values(ScriptureErrorCode).includes((value as ScriptureError).code)
+  );
 }
 
 // ============================================
@@ -37,12 +41,14 @@ export interface ScriptureSession {
 
 export interface ScriptureReadingState {
   session: ScriptureSession | null;
-  isLoading: boolean;
+  scriptureLoading: boolean;
   isInitialized: boolean;
   isPendingLockIn: boolean;
   isPendingReflection: boolean;
   isSyncing: boolean;
-  error: ScriptureError | null;
+  scriptureError: ScriptureError | null;
+  activeSession: ScriptureSession | null;
+  isCheckingSession: boolean;
 }
 
 // ============================================
@@ -50,12 +56,13 @@ export interface ScriptureReadingState {
 // ============================================
 
 export interface ScriptureSlice extends ScriptureReadingState {
-  // Actions (Subtask 3.4)
   createSession: (mode: SessionMode, partnerId?: string) => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   exitSession: () => void;
   updatePhase: (phase: SessionPhase) => void;
   clearScriptureError: () => void;
+  checkForActiveSession: () => Promise<void>;
+  clearActiveSession: () => void;
 }
 
 // ============================================
@@ -64,12 +71,14 @@ export interface ScriptureSlice extends ScriptureReadingState {
 
 const initialScriptureState: ScriptureReadingState = {
   session: null,
-  isLoading: false,
+  scriptureLoading: false,
   isInitialized: false,
   isPendingLockIn: false,
   isPendingReflection: false,
   isSyncing: false,
-  error: null,
+  scriptureError: null,
+  activeSession: null,
+  isCheckingSession: false,
 };
 
 // ============================================
@@ -80,74 +89,54 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   ...initialScriptureState,
 
   createSession: async (mode, partnerId) => {
-    set({ isLoading: true, error: null });
+    set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      const serviceSession = await scriptureReadingService.createSession(mode, partnerId);
-
-      const session: ScriptureSession = {
-        id: serviceSession.id,
-        mode: serviceSession.mode,
-        currentPhase: serviceSession.currentPhase,
-        currentStepIndex: serviceSession.currentStepIndex,
-        version: serviceSession.version,
-        userId: serviceSession.userId,
-        partnerId: serviceSession.partnerId,
-        status: serviceSession.status,
-        startedAt: serviceSession.startedAt,
-        completedAt: serviceSession.completedAt,
-      };
-
-      set({ session, isLoading: false, isInitialized: true });
+      const session = await scriptureReadingService.createSession(mode, partnerId);
+      set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
-      const scriptureError: ScriptureError = {
-        code: ScriptureErrorCode.SYNC_FAILED,
-        message: error instanceof Error ? error.message : 'Failed to create session',
-        details: error,
-      };
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Failed to create session',
+            details: error,
+          };
       handleScriptureError(scriptureError);
-      set({ error: scriptureError, isLoading: false });
+      set({ scriptureError, scriptureLoading: false });
     }
   },
 
   loadSession: async (sessionId) => {
-    set({ isLoading: true, error: null });
+    set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      const serviceSession = await scriptureReadingService.getSession(sessionId);
+      const session = await scriptureReadingService.getSession(
+        sessionId,
+        (refreshed) => set({ session: refreshed })
+      );
 
-      if (!serviceSession) {
+      if (!session) {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SESSION_NOT_FOUND,
           message: `Session ${sessionId} not found`,
         };
         handleScriptureError(scriptureError);
-        set({ error: scriptureError, isLoading: false });
+        set({ scriptureError, scriptureLoading: false });
         return;
       }
 
-      const session: ScriptureSession = {
-        id: serviceSession.id,
-        mode: serviceSession.mode,
-        currentPhase: serviceSession.currentPhase,
-        currentStepIndex: serviceSession.currentStepIndex,
-        version: serviceSession.version,
-        userId: serviceSession.userId,
-        partnerId: serviceSession.partnerId,
-        status: serviceSession.status,
-        startedAt: serviceSession.startedAt,
-        completedAt: serviceSession.completedAt,
-      };
-
-      set({ session, isLoading: false, isInitialized: true });
+      set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
-      const scriptureError: ScriptureError = {
-        code: ScriptureErrorCode.SYNC_FAILED,
-        message: error instanceof Error ? error.message : 'Failed to load session',
-        details: error,
-      };
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Failed to load session',
+            details: error,
+          };
       handleScriptureError(scriptureError);
-      set({ error: scriptureError, isLoading: false });
+      set({ scriptureError, scriptureLoading: false });
     }
   },
 
@@ -168,6 +157,39 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   },
 
   clearScriptureError: () => {
-    set({ error: null });
+    set({ scriptureError: null });
+  },
+
+  checkForActiveSession: async () => {
+    set({ isCheckingSession: true });
+
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) {
+        set({ isCheckingSession: false });
+        return;
+      }
+
+      const sessions = await scriptureReadingService.getUserSessions(userId);
+      const incomplete = sessions.find(
+        (s) => s.status === 'in_progress' && s.mode === 'solo'
+      );
+      set({ activeSession: incomplete ?? null, isCheckingSession: false });
+    } catch (error) {
+      const scriptureError: ScriptureError = isScriptureError(error)
+        ? error
+        : {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: error instanceof Error ? error.message : 'Failed to check for active session',
+            details: error,
+          };
+      handleScriptureError(scriptureError);
+      set({ activeSession: null, isCheckingSession: false });
+    }
+  },
+
+  clearActiveSession: () => {
+    set({ activeSession: null });
   },
 });
