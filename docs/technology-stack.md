@@ -1,6 +1,7 @@
 # Technology Stack
 
 > Complete technology inventory for My-Love project.
+> Last updated: 2026-01-30 | Scan level: Deep (Rescan)
 
 ## Core Technologies
 
@@ -9,7 +10,7 @@
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | TypeScript | 5.9.3 | Static typing with strict mode |
-| Node.js | 18+ | Development runtime |
+| Node.js | 24.13.0 | Development runtime (via .nvmrc) |
 | ES2022 | Target | JavaScript target |
 
 ### Frontend Framework
@@ -76,6 +77,8 @@
 | Testing Library | 16.3.2 | React testing |
 | happy-dom | 20.3.4 | DOM environment |
 | fake-indexeddb | 6.2.5 | IndexedDB mock |
+| tdd-guard-vitest | 0.1.6 | TDD enforcement reporter |
+| @seontechnologies/playwright-utils | 3.13.1 | Playwright test utilities |
 
 ### Code Quality
 
@@ -113,6 +116,9 @@
 | `eslint.config.js` | ESLint rules |
 | `playwright.config.ts` | E2E test config |
 | `vitest.config.ts` | Unit test config |
+| `.prettierrc` | Prettier formatting rules |
+| `.nvmrc` | Node.js version (24.13.0) |
+| `.env.example` | Environment variables template |
 
 ## TypeScript Configuration
 

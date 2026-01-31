@@ -16,6 +16,7 @@ import type { MoodSlice } from './slices/moodSlice';
 import type { InteractionsSlice } from './slices/interactionsSlice';
 import type { PartnerSlice } from './slices/partnerSlice';
 import type { NotesSlice } from './slices/notesSlice';
+import type { ScriptureSlice } from './slices/scriptureReadingSlice';
 
 /**
  * AppSlice interface - DEFINED HERE to avoid circular imports.
@@ -50,7 +51,8 @@ export interface AppState
     MoodSlice,
     InteractionsSlice,
     PartnerSlice,
-    NotesSlice {}
+    NotesSlice,
+    ScriptureSlice {}
 
 /**
  * Type-safe slice creator for Zustand with persist middleware.

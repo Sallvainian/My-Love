@@ -41,8 +41,6 @@ export interface ScriptureSession {
   snapshotJson?: Record<string, unknown>;
   startedAt: Date;
   completedAt?: Date;
-  synced: boolean;
-  supabaseId?: string;
 }
 
 /**
@@ -57,7 +55,6 @@ export interface ScriptureReflection {
   notes?: string;
   isShared: boolean;
   createdAt: Date;
-  synced: boolean;
 }
 
 /**
@@ -70,7 +67,6 @@ export interface ScriptureBookmark {
   userId: string;
   shareWithPartner: boolean;
   createdAt: Date;
-  synced: boolean;
 }
 
 /**
@@ -82,7 +78,6 @@ export interface ScriptureMessage {
   senderId: string;
   message: string;
   createdAt: Date;
-  synced: boolean;
 }
 
 /**

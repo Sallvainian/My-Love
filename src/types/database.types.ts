@@ -1,3 +1,4 @@
+Connecting to db 5432
 export type Json =
   | string
   | number
@@ -7,11 +8,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -87,6 +83,7 @@ export type Database = {
           created_at: string
           from_user_id: string
           id: string
+          image_url: string | null
           to_user_id: string
         }
         Insert: {
@@ -94,6 +91,7 @@ export type Database = {
           created_at?: string
           from_user_id: string
           id?: string
+          image_url?: string | null
           to_user_id: string
         }
         Update: {
@@ -101,6 +99,7 @@ export type Database = {
           created_at?: string
           from_user_id?: string
           id?: string
+          image_url?: string | null
           to_user_id?: string
         }
         Relationships: []
@@ -224,6 +223,191 @@ export type Database = {
         }
         Relationships: []
       }
+      scripture_bookmarks: {
+        Row: {
+          created_at: string
+          id: string
+          session_id: string
+          share_with_partner: boolean
+          step_index: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_id: string
+          share_with_partner?: boolean
+          step_index: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_id?: string
+          share_with_partner?: boolean
+          step_index?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scripture_bookmarks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "scripture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scripture_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender_id: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender_id: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scripture_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "scripture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scripture_reflections: {
+        Row: {
+          created_at: string
+          id: string
+          is_shared: boolean
+          notes: string | null
+          rating: number | null
+          session_id: string
+          step_index: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_shared?: boolean
+          notes?: string | null
+          rating?: number | null
+          session_id: string
+          step_index: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_shared?: boolean
+          notes?: string | null
+          rating?: number | null
+          session_id?: string
+          step_index?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scripture_reflections_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "scripture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scripture_sessions: {
+        Row: {
+          completed_at: string | null
+          current_phase: Database["public"]["Enums"]["scripture_session_phase"]
+          current_step_index: number
+          id: string
+          mode: Database["public"]["Enums"]["scripture_session_mode"]
+          snapshot_json: Json | null
+          started_at: string
+          status: Database["public"]["Enums"]["scripture_session_status"]
+          user1_id: string
+          user2_id: string | null
+          version: number
+        }
+        Insert: {
+          completed_at?: string | null
+          current_phase?: Database["public"]["Enums"]["scripture_session_phase"]
+          current_step_index?: number
+          id?: string
+          mode: Database["public"]["Enums"]["scripture_session_mode"]
+          snapshot_json?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["scripture_session_status"]
+          user1_id: string
+          user2_id?: string | null
+          version?: number
+        }
+        Update: {
+          completed_at?: string | null
+          current_phase?: Database["public"]["Enums"]["scripture_session_phase"]
+          current_step_index?: number
+          id?: string
+          mode?: Database["public"]["Enums"]["scripture_session_mode"]
+          snapshot_json?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["scripture_session_status"]
+          user1_id?: string
+          user2_id?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
+      scripture_step_states: {
+        Row: {
+          advanced_at: string | null
+          id: string
+          session_id: string
+          step_index: number
+          user1_locked_at: string | null
+          user2_locked_at: string | null
+        }
+        Insert: {
+          advanced_at?: string | null
+          id?: string
+          session_id: string
+          step_index: number
+          user1_locked_at?: string | null
+          user2_locked_at?: string | null
+        }
+        Update: {
+          advanced_at?: string | null
+          id?: string
+          session_id?: string
+          step_index?: number
+          user1_locked_at?: string | null
+          user2_locked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scripture_step_states_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "scripture_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string | null
@@ -278,9 +462,48 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      is_scripture_session_member: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
+      scripture_create_session: {
+        Args: { p_mode: string; p_partner_id?: string }
+        Returns: Json
+      }
+      scripture_seed_test_data: {
+        Args: {
+          p_include_messages?: boolean
+          p_include_reflections?: boolean
+          p_preset?: string
+          p_session_count?: number
+        }
+        Returns: Json
+      }
+      scripture_submit_reflection: {
+        Args: {
+          p_is_shared: boolean
+          p_notes: string
+          p_rating: number
+          p_session_id: string
+          p_step_index: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      scripture_session_mode: "solo" | "together"
+      scripture_session_phase:
+        | "lobby"
+        | "countdown"
+        | "reading"
+        | "reflection"
+        | "report"
+        | "complete"
+      scripture_session_status:
+        | "pending"
+        | "in_progress"
+        | "complete"
+        | "abandoned"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -410,6 +633,23 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      scripture_session_mode: ["solo", "together"],
+      scripture_session_phase: [
+        "lobby",
+        "countdown",
+        "reading",
+        "reflection",
+        "report",
+        "complete",
+      ],
+      scripture_session_status: [
+        "pending",
+        "in_progress",
+        "complete",
+        "abandoned",
+      ],
+    },
   },
 } as const
+
