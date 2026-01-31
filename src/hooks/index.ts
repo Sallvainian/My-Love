@@ -8,6 +8,7 @@
  */
 
 export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
+export { useAutoSave, type UseAutoSaveOptions } from './useAutoSave';
 export { useLoveNotes, type UseLoveNotesResult } from './useLoveNotes';
 export {
   useVibration,
