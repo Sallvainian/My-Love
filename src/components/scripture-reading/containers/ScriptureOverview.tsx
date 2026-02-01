@@ -1,8 +1,8 @@
 /**
  * ScriptureOverview Container Component
  *
- * Story 1.1 + 1.2 + 1.3 + 1.4: Navigation Entry Point, Overview Page, Reading Flow Router,
- * Save/Resume & Optimistic UI
+ * Story 1.1 + 1.2 + 1.3 + 1.4 + 1.5: Navigation Entry Point, Overview Page,
+ * Reading Flow Router, Save/Resume & Optimistic UI, Accessibility Foundations
  *
  * Main entry point for Scripture Reading feature.
  *
@@ -16,6 +16,8 @@
  * - Story 1.3: Routes to SoloReadingFlow when session is active
  * - Story 1.4: Offline blocking of Start/mode selection
  * - Story 1.4: "Start fresh" calls abandonSession to mark server session as abandoned
+ * - Story 1.5: Focus-visible styles, semantic HTML, contrast fixes, error icon,
+ *   screen reader announcements, touch targets
  *
  * Uses container/presentational pattern:
  * - This container connects to Zustand store
@@ -23,10 +25,12 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
+import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { SoloReadingFlow } from './SoloReadingFlow';
 
 // Lavender Dreams design tokens
@@ -36,8 +40,8 @@ const scriptureTheme = {
   surface: '#FAF5FF', // Very light purple
 };
 
-// Animation duration for mode selection reveal (seconds)
-const MODE_REVEAL_DURATION = 0.2;
+// Shared focus ring classes (Story 1.5: AC #1)
+const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
 
 // Partner status union type for explicit handling
 type PartnerStatus = 'loading' | 'linked' | 'unlinked';
@@ -63,7 +67,7 @@ interface ModeCardProps {
 
 function ModeCard({ title, description, icon, onClick, disabled, variant, testId }: ModeCardProps) {
   const baseClasses =
-    'w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm';
+    `w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm ${FOCUS_RING}`;
   const variantClasses =
     variant === 'primary'
       ? 'bg-purple-500/90 text-white hover:bg-purple-600/90 active:bg-purple-700/90 border border-purple-400/50'
@@ -108,7 +112,7 @@ function PartnerLinkMessage({ onLinkPartner }: PartnerLinkMessageProps) {
   return (
     <button
       onClick={onLinkPartner}
-      className="w-full p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-700 hover:bg-purple-100 transition-colors text-left"
+      className={`w-full p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-700 hover:bg-purple-100 transition-colors text-left ${FOCUS_RING}`}
       data-testid="link-partner-message"
       type="button"
     >
@@ -146,16 +150,18 @@ function TogetherIcon() {
 }
 
 export function ScriptureOverview() {
-  const shouldReduceMotion = useReducedMotion();
+  const { modeReveal } = useMotionConfig();
   const { isOnline } = useNetworkStatus();
 
   // Partner slice state
-  const { partner, isLoadingPartner, loadPartner, setView } = useAppStore((state) => ({
-    partner: state.partner,
-    isLoadingPartner: state.isLoadingPartner,
-    loadPartner: state.loadPartner,
-    setView: state.setView,
-  }));
+  const { partner, isLoadingPartner, loadPartner, setView } = useAppStore(
+    useShallow((state) => ({
+      partner: state.partner,
+      isLoadingPartner: state.isLoadingPartner,
+      loadPartner: state.loadPartner,
+      setView: state.setView,
+    }))
+  );
 
   // Scripture reading slice state
   const {
@@ -169,21 +175,26 @@ export function ScriptureOverview() {
     abandonSession,
     clearScriptureError,
     checkForActiveSession,
-  } = useAppStore((state) => ({
-    session: state.session,
-    isSessionLoading: state.scriptureLoading,
-    sessionError: state.scriptureError,
-    activeSession: state.activeSession,
-    isCheckingSession: state.isCheckingSession,
-    createSession: state.createSession,
-    loadSession: state.loadSession,
-    abandonSession: state.abandonSession,
-    clearScriptureError: state.clearScriptureError,
-    checkForActiveSession: state.checkForActiveSession,
-  }));
+  } = useAppStore(
+    useShallow((state) => ({
+      session: state.session,
+      isSessionLoading: state.scriptureLoading,
+      sessionError: state.scriptureError,
+      activeSession: state.activeSession,
+      isCheckingSession: state.isCheckingSession,
+      createSession: state.createSession,
+      loadSession: state.loadSession,
+      abandonSession: state.abandonSession,
+      clearScriptureError: state.clearScriptureError,
+      checkForActiveSession: state.checkForActiveSession,
+    }))
+  );
 
   // Local UI state
   const [showModes, setShowModes] = useState(false);
+
+  // Story 1.5: Screen reader announcement state (AC #2)
+  const [announcement, setAnnouncement] = useState('');
 
   // Load partner status on mount
   useEffect(() => {
@@ -194,6 +205,15 @@ export function ScriptureOverview() {
   useEffect(() => {
     void checkForActiveSession();
   }, [checkForActiveSession]);
+
+  // Story 1.5: Announce session resume when activeSession loads (AC #2)
+  useEffect(() => {
+    if (activeSession && !isCheckingSession) {
+      setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
+      const timer = setTimeout(() => setAnnouncement(''), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeSession, isCheckingSession]);
 
   // Determine partner status
   const getPartnerStatus = (): PartnerStatus => {
@@ -238,7 +258,7 @@ export function ScriptureOverview() {
     setView('partner');
   }, [setView]);
 
-  const fadeTransition = shouldReduceMotion ? { duration: 0 } : { duration: MODE_REVEAL_DURATION };
+  const fadeTransition = modeReveal;
 
   // Story 1.3: Route to SoloReadingFlow when session is active
   if (session && session.status === 'in_progress' && session.mode === 'solo') {
@@ -251,11 +271,21 @@ export function ScriptureOverview() {
   }
 
   return (
-    <div
+    <main
       className="min-h-screen p-4"
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="scripture-overview"
     >
+      {/* Story 1.5: Screen reader announcer (AC #2) */}
+      <div
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="sr-announcer"
+      >
+        {announcement}
+      </div>
+
       <div className="max-w-md mx-auto space-y-6">
         {/* Header with Playfair Display */}
         <header className="text-center pt-4 pb-2">
@@ -283,7 +313,7 @@ export function ScriptureOverview() {
               <button
                 onClick={handleContinue}
                 disabled={isSessionLoading}
-                className="flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-medium hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[48px]"
+                className={`flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-medium hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[48px] ${FOCUS_RING}`}
                 data-testid="resume-continue"
                 type="button"
               >
@@ -291,7 +321,7 @@ export function ScriptureOverview() {
               </button>
               <button
                 onClick={handleStartFresh}
-                className="py-3 px-4 text-purple-600 hover:text-purple-800 font-medium min-h-[48px]"
+                className={`py-3 px-4 text-purple-600 hover:text-purple-800 font-medium min-h-[48px] rounded-lg ${FOCUS_RING}`}
                 data-testid="resume-start-fresh"
                 type="button"
               >
@@ -318,14 +348,18 @@ export function ScriptureOverview() {
           </div>
         )}
 
-        {/* Error Display */}
+        {/* Error Display — Story 1.5: warning icon for color independence (AC #5) */}
         {sessionError && (
           <div
-            className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"
+            className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm flex items-center gap-2"
             data-testid="session-error"
             role="alert"
           >
-            {getErrorMessage(sessionError)}
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-testid="error-icon">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span>{getErrorMessage(sessionError)}</span>
           </div>
         )}
 
@@ -334,7 +368,7 @@ export function ScriptureOverview() {
           <button
             onClick={handleStart}
             disabled={!isOnline}
-            className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25"
+            className={`w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25 ${FOCUS_RING}`}
             data-testid="scripture-start-button"
             type="button"
           >
@@ -397,11 +431,11 @@ export function ScriptureOverview() {
                 variant="primary"
               />
 
-              {/* Partner link for unlinked users within mode selection (AC #5) */}
+              {/* Partner link for unlinked users within mode selection (AC #5) — Story 1.5: min touch target */}
               {partnerStatus === 'unlinked' && (
                 <button
                   onClick={handleLinkPartner}
-                  className="w-full text-center text-purple-600 hover:text-purple-800 text-sm font-medium py-2"
+                  className={`w-full text-center text-purple-600 hover:text-purple-800 text-sm font-medium py-2 min-h-[44px] rounded-lg ${FOCUS_RING}`}
                   data-testid="setup-partner-link"
                   type="button"
                 >
@@ -412,6 +446,6 @@ export function ScriptureOverview() {
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </main>
   );
 }

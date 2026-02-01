@@ -32,7 +32,18 @@ vi.mock('framer-motion', () => ({
     ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useReducedMotion: () => false,
+}));
+
+// Mock useMotionConfig (centralized motion hook — Story 1.5)
+vi.mock('../../../hooks/useMotionConfig', () => ({
+  useMotionConfig: () => ({
+    shouldReduceMotion: false,
+    crossfade: { duration: 0.2 },
+    slide: { duration: 0.3, ease: 'easeInOut' },
+    spring: { type: 'spring', stiffness: 100, damping: 15 },
+    fadeIn: { duration: 0.2 },
+    modeReveal: { duration: 0.2 },
+  }),
 }));
 
 // Mock useNetworkStatus
@@ -638,6 +649,107 @@ describe('ScriptureOverview', () => {
 
       const continueButton = screen.getByTestId('resume-continue');
       expect(continueButton).not.toBeDisabled();
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Accessibility Enhancements
+  // ============================================
+
+  describe('Story 1.5: Accessibility Enhancements', () => {
+    it('uses main element instead of div as outer container', () => {
+      render(<ScriptureOverview />);
+      const overview = screen.getByTestId('scripture-overview');
+      expect(overview.tagName).toBe('MAIN');
+    });
+
+    it('sr-announcer region exists with aria-live="polite"', () => {
+      render(<ScriptureOverview />);
+      const announcer = screen.getByTestId('sr-announcer');
+      expect(announcer).toBeInTheDocument();
+      expect(announcer.getAttribute('aria-live')).toBe('polite');
+      expect(announcer.getAttribute('aria-atomic')).toBe('true');
+    });
+
+    it('start button has focus-visible ring classes', () => {
+      render(<ScriptureOverview />);
+      const btn = screen.getByTestId('scripture-start-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('continue button has focus-visible ring classes', () => {
+      mockStoreState.activeSession = {
+        id: 'session-456',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 4,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      };
+
+      render(<ScriptureOverview />);
+      const btn = screen.getByTestId('resume-continue');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('start fresh button has focus-visible ring classes', () => {
+      mockStoreState.activeSession = {
+        id: 'session-456',
+        mode: 'solo',
+        currentPhase: 'reading',
+        currentStepIndex: 4,
+        version: 1,
+        userId: 'user-123',
+        status: 'in_progress',
+        startedAt: new Date(),
+      };
+
+      render(<ScriptureOverview />);
+      const btn = screen.getByTestId('resume-start-fresh');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('error indicator includes warning icon', () => {
+      mockStoreState.scriptureError = {
+        code: 'SYNC_FAILED',
+        message: 'Failed to create session',
+      } as unknown as typeof mockStoreState.scriptureError;
+
+      render(<ScriptureOverview />);
+      expect(screen.getByTestId('error-icon')).toBeInTheDocument();
+    });
+
+    it('setup partner link has min-h-[44px] for touch target', () => {
+      mockStoreState.partner = null;
+
+      render(<ScriptureOverview />);
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
+
+      const link = screen.getByTestId('setup-partner-link');
+      expect(link.className.includes('min-h-[44px]')).toBe(true);
+    });
+
+    it('mode card buttons have focus-visible ring classes', () => {
+      render(<ScriptureOverview />);
+      fireEvent.click(screen.getByTestId('scripture-start-button'));
+
+      const soloButton = screen.getByText('Solo').closest('button');
+      expect(soloButton!.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(soloButton!.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(soloButton!.className.includes('focus-visible:ring-offset-2')).toBe(true);
+
+      const togetherButton = screen.getByText('Together').closest('button');
+      expect(togetherButton!.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(togetherButton!.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(togetherButton!.className.includes('focus-visible:ring-offset-2')).toBe(true);
     });
   });
 });
