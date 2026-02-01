@@ -28,9 +28,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { SoloReadingFlow } from '../containers/SoloReadingFlow';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 
-// Store the useReducedMotion mock so we can change its return value per-test
-let mockUseReducedMotion = false;
-
 // Mock framer-motion (project pattern)
 vi.mock('framer-motion', () => ({
   motion: {
@@ -59,7 +56,19 @@ vi.mock('framer-motion', () => ({
     },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useReducedMotion: () => mockUseReducedMotion,
+}));
+
+// Mock useMotionConfig (centralized motion hook — Story 1.5)
+let mockShouldReduceMotion = false;
+vi.mock('../../../hooks/useMotionConfig', () => ({
+  useMotionConfig: () => ({
+    shouldReduceMotion: mockShouldReduceMotion,
+    crossfade: mockShouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
+    slide: mockShouldReduceMotion ? { duration: 0 } : { duration: 0.3, ease: 'easeInOut' },
+    spring: mockShouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 100, damping: 15 },
+    fadeIn: mockShouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
+    modeReveal: mockShouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
+  }),
 }));
 
 // Mock useNetworkStatus
@@ -156,7 +165,7 @@ describe('SoloReadingFlow', () => {
     mockStoreState.isSyncing = false;
     mockStoreState.scriptureError = null;
     mockStoreState.pendingRetry = null;
-    mockUseReducedMotion = false;
+    mockShouldReduceMotion = false;
     mockIsOnline = true;
   });
 
@@ -627,8 +636,8 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Reduced Motion', () => {
-    it('uses zero-duration animations when useReducedMotion returns true', () => {
-      mockUseReducedMotion = true;
+    it('uses zero-duration animations when reduced motion preference is on', () => {
+      mockShouldReduceMotion = true;
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('solo-reading-flow')).toBeDefined();
       expect(screen.getByTestId('verse-screen')).toBeDefined();
@@ -744,6 +753,238 @@ describe('SoloReadingFlow', () => {
         session: null,
         saveSession: mockSaveSession,
       });
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Keyboard Focus Styles (AC #1)
+  // ============================================
+
+  describe('Story 1.5: Keyboard Focus Styles (AC #1)', () => {
+    it('exit button has focus-visible ring classes', () => {
+      render(<SoloReadingFlow />);
+      const btn = screen.getByTestId('exit-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('view response button has focus-visible ring classes', () => {
+      render(<SoloReadingFlow />);
+      const btn = screen.getByTestId('scripture-view-response-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('next verse button has focus-visible ring classes', () => {
+      render(<SoloReadingFlow />);
+      const btn = screen.getByTestId('scripture-next-verse-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('back to verse button has focus-visible ring classes', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      const btn = screen.getByTestId('scripture-back-to-verse-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('retry button has focus-visible ring classes', () => {
+      mockStoreState.pendingRetry = { type: 'advanceStep', attempts: 1, maxAttempts: 3 };
+      render(<SoloReadingFlow />);
+      const btn = screen.getByTestId('retry-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Screen Reader Announcements (AC #2)
+  // ============================================
+
+  describe('Story 1.5: Screen Reader Announcements (AC #2)', () => {
+    it('sr-announcer region exists with aria-live="polite"', () => {
+      render(<SoloReadingFlow />);
+      const announcer = screen.getByTestId('sr-announcer');
+      expect(announcer).toBeDefined();
+      expect(announcer.getAttribute('aria-live')).toBe('polite');
+    });
+
+    it('sr-announcer region has aria-atomic="true"', () => {
+      render(<SoloReadingFlow />);
+      const announcer = screen.getByTestId('sr-announcer');
+      expect(announcer.getAttribute('aria-atomic')).toBe('true');
+    });
+
+    it('progress indicator has aria-current="step"', () => {
+      render(<SoloReadingFlow />);
+      const indicator = screen.getByTestId('scripture-progress-indicator');
+      expect(indicator.getAttribute('aria-current')).toBe('step');
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Focus Management (AC #3)
+  // ============================================
+
+  describe('Story 1.5: Focus Management (AC #3)', () => {
+    // Mock requestAnimationFrame to execute synchronously for focus tests
+    let originalRAF: typeof requestAnimationFrame;
+
+    beforeEach(() => {
+      originalRAF = globalThis.requestAnimationFrame;
+      globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    });
+
+    afterEach(() => {
+      globalThis.requestAnimationFrame = originalRAF;
+    });
+
+    it('verse reference has tabIndex={-1} for programmatic focus', () => {
+      render(<SoloReadingFlow />);
+      const verseRef = screen.getByTestId('scripture-verse-reference');
+      expect(verseRef.getAttribute('tabindex')).toBe('-1');
+    });
+
+    it('completion heading has tabIndex={-1} and data-testid="completion-heading"', () => {
+      mockStoreState.session = createMockSession({
+        status: 'complete',
+        currentPhase: 'reflection',
+      });
+      render(<SoloReadingFlow />);
+      const heading = screen.getByTestId('completion-heading');
+      expect(heading.getAttribute('tabindex')).toBe('-1');
+      expect(heading).toHaveTextContent('Reading Complete');
+    });
+
+    it('focuses Back to Verse button after View Response click', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      const backBtn = screen.getByTestId('scripture-back-to-verse-button');
+      expect(document.activeElement).toBe(backBtn);
+    });
+
+    it('focuses verse heading after Back to Verse click', () => {
+      render(<SoloReadingFlow />);
+      // Go to response screen first
+      fireEvent.click(screen.getByTestId('scripture-view-response-button'));
+      // Go back to verse
+      fireEvent.click(screen.getByTestId('scripture-back-to-verse-button'));
+      const verseRef = screen.getByTestId('scripture-verse-reference');
+      expect(document.activeElement).toBe(verseRef);
+    });
+
+    it('focuses verse heading after Next Verse step advancement', () => {
+      // Start at step 0, advance to step 1
+      mockAdvanceStep.mockImplementation(async () => {
+        mockStoreState.session = createMockSession({ currentStepIndex: 1 });
+      });
+      const { rerender } = render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
+      // Re-render to trigger effects with new step index
+      mockStoreState.session = createMockSession({ currentStepIndex: 1 });
+      rerender(<SoloReadingFlow />);
+      const verseRef = screen.getByTestId('scripture-verse-reference');
+      expect(document.activeElement).toBe(verseRef);
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Color Independence (AC #5)
+  // ============================================
+
+  describe('Story 1.5: Color Independence (AC #5)', () => {
+    it('error indicator includes icon element', () => {
+      mockStoreState.scriptureError = {
+        code: 'SYNC_FAILED',
+        message: 'Something went wrong',
+      };
+      mockStoreState.pendingRetry = null;
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('error-icon')).toBeDefined();
+    });
+
+    it('disabled button shows helper text when offline', () => {
+      mockIsOnline = false;
+      render(<SoloReadingFlow />);
+      const reason = screen.getByTestId('disabled-reason');
+      expect(reason).toBeDefined();
+      expect(reason).toHaveTextContent('Connect to internet to continue');
+    });
+
+    it('section theme uses text-purple-600', () => {
+      render(<SoloReadingFlow />);
+      const theme = screen.getByTestId('section-theme');
+      expect(theme.className.includes('text-purple-600')).toBe(true);
+      expect(theme.className.includes('text-purple-400')).toBe(false);
+    });
+
+    it('verse reference uses text-purple-600', () => {
+      render(<SoloReadingFlow />);
+      const verseRef = screen.getByTestId('scripture-verse-reference');
+      expect(verseRef.className.includes('text-purple-600')).toBe(true);
+      expect(verseRef.className.includes('text-purple-500')).toBe(false);
+    });
+
+    it('syncing indicator uses text-purple-600', () => {
+      mockStoreState.isSyncing = true;
+      render(<SoloReadingFlow />);
+      const syncIndicator = screen.getByTestId('sync-indicator');
+      expect(syncIndicator.className.includes('text-purple-600')).toBe(true);
+      expect(syncIndicator.className.includes('text-purple-400')).toBe(false);
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Dialog Accessibility (AC #1, #8)
+  // ============================================
+
+  describe('Story 1.5: Dialog Accessibility (AC #1, #8)', () => {
+    it('dialog element exists when exit button is clicked', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('exit-button'));
+      const dialog = screen.getByTestId('exit-confirm-dialog');
+      expect(dialog).toBeDefined();
+      expect(dialog.getAttribute('role')).toBe('dialog');
+    });
+
+    it('save-and-exit button has focus-visible ring classes', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('exit-button'));
+      const btn = screen.getByTestId('save-and-exit-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+
+    it('cancel button has focus-visible ring classes', () => {
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('exit-button'));
+      const btn = screen.getByTestId('cancel-exit-button');
+      expect(btn.className.includes('focus-visible:ring-2')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-purple-400')).toBe(true);
+      expect(btn.className.includes('focus-visible:ring-offset-2')).toBe(true);
+    });
+  });
+
+  // ============================================
+  // Story 1.5: Reduced Motion via useMotionConfig (AC #4)
+  // ============================================
+
+  describe('Story 1.5: Reduced Motion via useMotionConfig (AC #4)', () => {
+    it('renders correctly with reduced motion enabled via useMotionConfig', () => {
+      mockShouldReduceMotion = true;
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('solo-reading-flow')).toBeDefined();
+      expect(screen.getByTestId('verse-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-verse-reference')).toBeDefined();
+      expect(screen.getByTestId('scripture-next-verse-button')).toBeDefined();
     });
   });
 });

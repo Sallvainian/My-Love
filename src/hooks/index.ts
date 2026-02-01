@@ -15,3 +15,4 @@ export {
   type UseVibrationReturn,
   type VibrationPattern,
 } from './useVibration';
+export { useMotionConfig } from './useMotionConfig';
