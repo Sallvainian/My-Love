@@ -43,8 +43,8 @@ development_status:
   1-1-database-schema-and-backend-infrastructure: done
   1-2-navigation-and-overview-page: done
   1-3-solo-reading-flow: done
-  1-4-save-resume-and-optimistic-ui: review
-  1-5-accessibility-foundations: backlog
+  1-4-save-resume-and-optimistic-ui: done
+  1-5-accessibility-foundations: done
   epic-1-retrospective: optional
 
   # Epic 2: Reflection & Daily Prayer Report
