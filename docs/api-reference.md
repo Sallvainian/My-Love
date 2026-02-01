@@ -1,160 +1,299 @@
 # API Reference
 
 > Complete API layer documentation for My-Love project.
-> Last updated: 2026-01-30 | Scan level: Deep (Rescan)
+> Last updated: 2026-02-01 | Scan level: Deep (Rescan)
 
 ## Overview
 
-The API layer (`src/api/`) provides validated CRUD operations against Supabase, with structured error handling, Zod response validation, and real-time subscriptions. 8 source files, 11 database tables.
+The API layer uses Supabase as Backend-as-a-Service, with services organized by domain. All Supabase responses are validated at service boundaries using Zod v4 schemas. Error handling follows a consistent pattern with typed error classes.
 
-## Supabase Client (`supabaseClient.ts`)
+## Authentication
 
-- Singleton Supabase client with environment configuration
-- Exports: `supabase`, `getPartnerId()`, `getPartnerDisplayName()`, `isSupabaseConfigured()`
-- JWT authentication with session persistence and auto-refresh
-- Dynamic import of authService to avoid circular deps
+**Supabase Auth** (`src/api/authService.ts`):
+- JWT-based with session in localStorage
+- RLS policies verify `auth.uid()`
+- Edge Function validates JWT in Authorization header
+- Service Worker stores auth token in IndexedDB (`sw-auth` store) for Background Sync
 
-## Authentication Service (`authService.ts`)
+**Key Methods**:
+- `getCurrentUserId()` — Returns current authenticated user ID
+- `getCurrentUserIdOfflineSafe()` — Returns user ID with offline fallback
+- `getSession()` — Gets current session from Supabase
+- `signIn(email, password)` — Email/password login
+- `signInWithGoogle()` — OAuth redirect flow
+- `signOut()` — Clears session
+- `onAuthStateChange(callback)` — Auth event listener
 
-### Methods
+## API Services
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| signIn | `(credentials: AuthCredentials) => Promise<AuthResult>` | Email/password login |
-| signUp | `(credentials: AuthCredentials) => Promise<AuthResult>` | Registration |
-| signOut | `() => Promise<void>` | Logout + token cleanup |
-| getSession | `() => Promise<Session \| null>` | Get current JWT |
-| getUser | `() => Promise<User \| null>` | Get auth user |
-| getCurrentUserId | `() => Promise<string \| null>` | User UUID |
-| getCurrentUserIdOfflineSafe | `() => Promise<string \| null>` | Offline-safe user ID |
-| getAuthStatus | `() => Promise<AuthStatus>` | Comprehensive auth status |
-| onAuthStateChange | `(callback) => () => void` | Auth state listener |
-| resetPassword | `(email: string) => Promise<AuthError \| null>` | Password reset |
-| signInWithGoogle | `() => Promise<AuthError \| null>` | Google OAuth |
+### MoodApi
 
-### Auth Token Storage
+**File**: `src/api/moodApi.ts` | **Singleton**: `moodApi` | **Table**: `moods`
 
-- JWT tokens stored in IndexedDB via `storeAuthToken()` for Background Sync access
-- Updated on SIGNED_IN and TOKEN_REFRESHED events
-- Cleared on SIGNED_OUT
+| Method | Parameters | Returns | Notes |
+|--------|-----------|---------|-------|
+| `create()` | `moodData: MoodInsert` | `SupabaseMood` | Validated response |
+| `fetchByUser()` | `userId, limit?: 50` | `SupabaseMood[]` | Ordered by created_at DESC |
+| `fetchByDateRange()` | `userId, startDate, endDate` | `SupabaseMood[]` | ISO date strings |
+| `fetchById()` | `moodId: string` | `SupabaseMood \| null` | Single lookup |
+| `update()` | `moodId, updates` | `SupabaseMood` | Partial updates |
+| `delete()` | `moodId: string` | `void` | Hard delete |
+| `getMoodHistory()` | `userId, offset?, limit?` | `SupabaseMood[]` | Paginated |
 
-## Mood API (`moodApi.ts`)
+All methods check `isOnline()` first. Responses validated via `SupabaseMoodSchema`.
 
-Class-based validated CRUD for mood entries.
+### InteractionService
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| create | `(moodData: MoodInsert) => Promise<SupabaseMood>` | Insert validated mood |
-| fetchByUser | `(userId, limit=50) => Promise<SupabaseMood[]>` | User's recent moods |
-| fetchByDateRange | `(userId, start, end) => Promise<SupabaseMood[]>` | Date range query |
-| fetchById | `(moodId) => Promise<SupabaseMood \| null>` | Single mood |
-| update | `(moodId, updates) => Promise<SupabaseMood>` | Update mood |
-| delete | `(moodId) => Promise<void>` | Delete mood |
-| getMoodHistory | `(userId, offset=0, limit=50) => Promise<SupabaseMood[]>` | Paginated history |
+**File**: `src/api/interactionService.ts` | **Singleton**: `interactionService` | **Table**: `interactions`
 
-All responses validated with Zod schemas. Checks `isOnline()` before operations.
+| Method | Parameters | Returns | Notes |
+|--------|-----------|---------|-------|
+| `sendPoke()` | `partnerId: string` | `SupabaseInteractionRecord` | Poke type |
+| `sendKiss()` | `partnerId: string` | `SupabaseInteractionRecord` | Kiss type |
+| `subscribeInteractions()` | `callback` | `() => void` | Returns unsubscribe fn |
+| `getInteractionHistory()` | `limit?, offset?` | `Interaction[]` | Sent or received |
+| `getUnviewedInteractions()` | — | `Interaction[]` | Unviewed, received |
+| `markAsViewed()` | `interactionId` | `void` | Sets viewed = true |
 
-## Mood Sync Service (`moodSyncService.ts`)
+**Realtime**: INSERT on `interactions` table filtered by `to_user_id`.
 
-Real-time mood synchronization with partner.
+### PartnerService
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| syncMood | `(mood: MoodEntry) => Promise<SupabaseMoodRecord>` | Upload single mood |
-| syncPendingMoods | `() => Promise<SyncResult>` | Batch sync from IndexedDB |
-| subscribeMoodUpdates | `(callback, onStatusChange?) => Promise<() => void>` | Real-time partner moods |
-| fetchMoods | `(userId, limit=50) => Promise<SupabaseMoodRecord[]>` | Get user's moods |
-| getLatestPartnerMood | `(userId) => Promise<SupabaseMoodRecord \| null>` | Partner's current mood |
+**File**: `src/api/partnerService.ts` | **Tables**: `users`, `partner_requests`
 
-Uses Supabase Broadcast API (not postgres_changes) for real-time updates. Retry: 3 attempts, exponential backoff (1s, 2s, 4s).
+| Method | Parameters | Returns | Notes |
+|--------|-----------|---------|-------|
+| `searchUsers()` | `query: string` | `UserSearchResult[]` | Min 2 chars |
+| `sendPartnerRequest()` | `toUserId` | `PartnerRequest` | Creates pending |
+| `acceptPartnerRequest()` | `requestId` | `void` | RPC: bidirectional |
+| `declinePartnerRequest()` | `requestId` | `void` | RPC: status change |
+| `getPartner()` | — | `PartnerInfo \| null` | Current partner |
+| `getPendingRequests()` | — | `{sent, received}` | Both directions |
 
-## Interaction Service (`interactionService.ts`)
+## Edge Functions
 
-Poke/kiss interactions with real-time updates.
+### upload-love-note-image
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| sendPoke | `(partnerId: string) => Promise<SupabaseInteractionRecord>` | Send poke |
-| sendKiss | `(partnerId: string) => Promise<SupabaseInteractionRecord>` | Send kiss |
-| subscribeInteractions | `(callback) => Promise<() => void>` | Real-time incoming |
-| getInteractionHistory | `(limit=50, offset=0) => Promise<Interaction[]>` | History |
-| getUnviewedInteractions | `() => Promise<Interaction[]>` | Unviewed |
-| markAsViewed | `(interactionId) => Promise<void>` | Mark viewed |
+**Location**: `supabase/functions/upload-love-note-image/index.ts`
+**Bucket**: `love-notes-images` (private)
 
-Uses `postgres_changes` for INSERT events filtered by `to_user_id`.
+**Request**:
+```http
+POST /functions/v1/upload-love-note-image
+Authorization: Bearer {jwt_token}
+Content-Type: application/octet-stream
+[binary image data]
+```
 
-## Partner Service (`partnerService.ts`)
+**Validation**:
+1. JWT authentication
+2. Rate limiting (10 uploads/minute/user, in-memory)
+3. File size (max 5MB compressed)
+4. MIME type via magic bytes (JPEG: `FF D8 FF`, PNG: `89 50 4E 47`, WebP: `52 49 46 46...57 45 42 50`, GIF: `47 49 46 38`)
 
-Partner connection management.
+**Success Response** (200):
+```json
+{
+  "success": true,
+  "storagePath": "user-id/1234567890-uuid.jpg",
+  "size": 123456,
+  "mimeType": "image/jpeg",
+  "rateLimitRemaining": 9
+}
+```
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| getPartner | `() => Promise<PartnerInfo \| null>` | Current partner info |
-| searchUsers | `(query, limit=10) => Promise<UserSearchResult[]>` | Search by name/email |
-| sendPartnerRequest | `(toUserId) => Promise<void>` | Send connection request |
-| getPendingRequests | `() => Promise<{sent, received}>` | Get all requests |
-| acceptPartnerRequest | `(requestId) => Promise<void>` | Accept via RPC |
-| declinePartnerRequest | `(requestId) => Promise<void>` | Decline via RPC |
-| hasPartner | `() => Promise<boolean>` | Check status |
+**Error Codes**: 401 (auth), 405 (method), 413 (size >5MB), 415 (invalid MIME), 429 (rate limit), 500 (server)
 
-RPC Functions: `accept_partner_request`, `decline_partner_request`
+## Validation Schemas
 
-## Validation Schemas (`validation/supabaseSchemas.ts`)
+All schemas use **Zod v4** (`src/validation/schemas.ts`, `src/api/validation/supabaseSchemas.ts`).
 
-Zod schemas for all Supabase API responses:
+### Message Schemas
 
-| Schema | Fields |
-|--------|--------|
-| SupabaseUserSchema | id, email, display_name, partner_id, created_at, updated_at |
-| SupabaseMoodSchema | id, user_id, mood_type, mood_types[], note, created_at |
-| SupabaseInteractionSchema | id, from_user_id, to_user_id, type, viewed, created_at |
-| MoodInsertSchema | user_id, mood_type, mood_types[], note (200 char max) |
-| InteractionInsertSchema | from_user_id, to_user_id, type ('poke' \| 'kiss') |
+```typescript
+MessageCategorySchema: z.enum(['reason', 'memory', 'affirmation', 'future', 'custom'])
 
-Mood Types: loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired
+MessageSchema: {
+  id: z.number().optional(),
+  text: z.string().min(1).max(500),
+  category: MessageCategorySchema,
+  isCustom: z.boolean(),
+  active: z.boolean().default(true),
+  createdAt: z.date(),
+  isFavorite: z.boolean().optional(),
+}
 
-## Error Handling (`errorHandlers.ts`)
+CreateMessageInputSchema: {
+  text: z.string().trim().min(1).max(500),
+  category: MessageCategorySchema,
+  active: z.boolean().default(true),
+}
 
-| Export | Type | Description |
-|--------|------|-------------|
-| SupabaseServiceError | Class | Custom error with code, details, hint, isNetworkError |
-| handleSupabaseError | Function | Transform PostgrestError to SupabaseServiceError |
-| handleNetworkError | Function | Network error wrapper |
-| retryWithBackoff | Function | Exponential backoff (3 attempts, 1s-30s, 2x multiplier) |
-| isOnline | Function | Network connectivity check |
-| createOfflineMessage | Function | User-friendly offline message |
+UpdateMessageInputSchema: {
+  id: z.number().int().positive(),
+  text: z.string().optional(),
+  category: MessageCategorySchema.optional(),
+  active: z.boolean().optional(),
+}
 
-PostgreSQL Error Mappings: 23505 (unique), 23503 (FK), 23502 (null), 42501 (permission), 42P01 (table), PGRST116 (no rows)
+CustomMessagesExportSchema  // validates export/import structure
+```
 
-## Real-Time Architecture
+### Photo Schemas
 
-| Feature | Mechanism | Channel |
-|---------|-----------|---------|
-| Partner mood updates | Broadcast API | `mood-updates:{userId}` |
-| Incoming interactions | postgres_changes (INSERT) | `incoming-interactions` |
-| Love note messages | Broadcast API | `love-notes:{userId}` |
+```typescript
+PhotoMimeTypeSchema: z.enum(['image/jpeg', 'image/png', 'image/webp'])
 
-## Database Tables
+PhotoSchema: {
+  imageBlob: z.instanceof(Blob),
+  caption: z.string().max(500).optional(),
+  originalSize/compressedSize: z.number().positive(),
+  width/height: z.number().int().positive(),
+  mimeType: PhotoMimeTypeSchema,
+}
 
-| Table | Purpose | RLS |
-|-------|---------|-----|
-| users | User profiles, partner relationships | Yes |
-| moods | Emoji mood entries with notes | Yes |
-| love_notes | Chat messages between partners | Yes |
-| interactions | Poke/kiss interactions | Yes |
-| partner_requests | Partner connection workflow | Yes |
-| photos | Photo metadata | Yes |
-| scripture_sessions | Scripture reading sessions (NEW) | Yes |
-| scripture_step_states | Step-level progress tracking (NEW) | Yes |
-| scripture_reflections | User reflections on passages (NEW) | Yes |
-| scripture_bookmarks | Passage bookmarks (NEW) | Yes |
-| scripture_messages | Prayer/report messages (NEW) | Yes |
+PhotoUploadInputSchema: {
+  file: z.instanceof(File),
+  caption: z.string().max(500).optional(),
+}
+```
 
-## RPC Functions
+### Mood Schemas
 
-| Function | Parameters | Returns |
-|----------|-----------|---------|
-| accept_partner_request | p_request_id: string | void |
-| decline_partner_request | p_request_id: string | void |
-| is_scripture_session_member | p_session_id: string | boolean |
-| scripture_seed_test_data | p_session_count, p_include_reflections, p_include_messages, p_preset | JSONB |
+```typescript
+MoodTypeSchema: z.enum([
+  'loved', 'happy', 'content', 'excited', 'thoughtful', 'grateful',
+  'sad', 'anxious', 'frustrated', 'angry', 'lonely', 'tired'
+])
+
+IsoDateStringSchema: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine(date => validates actual month/day values)
+
+MoodEntrySchema: {
+  date: IsoDateStringSchema,
+  mood: MoodTypeSchema,
+  moods: z.array(MoodTypeSchema).min(1).optional(),
+  note: z.string().max(200).optional().or(z.literal('')),
+}
+```
+
+### Settings Schema
+
+```typescript
+ThemeNameSchema: z.enum(['sunset', 'ocean', 'lavender', 'rose'])
+TimeFormatSchema: z.string().regex(/^\d{2}:\d{2}$/).refine(validates HH:MM)
+
+SettingsSchema: {
+  themeName: ThemeNameSchema,
+  notificationTime: TimeFormatSchema,
+  relationship: {
+    startDate: IsoDateStringSchema,
+    partnerName: z.string().min(1),
+    anniversaries: z.array(AnniversarySchema),
+  },
+  customization: { accentColor: z.string(), fontFamily: z.string() },
+  notifications: { enabled: z.boolean(), time: z.string() },
+}
+```
+
+### Supabase Response Schemas
+
+```typescript
+SupabaseSessionSchema: {
+  id: z.string().uuid(),
+  mode: z.enum(['solo', 'together']),
+  user1_id / user2_id: UUID / UUID nullable,
+  current_phase: z.enum(['lobby','countdown','reading','reflection','report','complete']),
+  current_step_index: z.number().int().min(0),
+  status: z.enum(['pending','in_progress','complete','abandoned']),
+  version: z.number().int().min(1),
+  snapshot_json: z.record(z.unknown()).nullable().optional(),
+}
+
+SupabaseMoodSchema: {
+  id: UUID, user_id: UUID,
+  mood_type: enum, mood_types: string[] | null,
+  note: string | null, created_at / updated_at: timestamp | null,
+}
+
+SupabaseReflectionSchema: { id, session_id, step_index, user_id, rating (1-5), notes, is_shared }
+SupabaseBookmarkSchema: { id, session_id, step_index, user_id, share_with_partner }
+SupabaseMessageSchema: { id, session_id, sender_id, message }
+```
+
+## Real-time Subscriptions
+
+### RealtimeService (`src/services/realtimeService.ts`)
+
+| Method | Parameters | Returns | Notes |
+|--------|-----------|---------|-------|
+| `subscribeMoodChanges()` | `userId, onMoodChange, onError?` | `channelId` | postgres_changes on moods |
+| `unsubscribe()` | `channelId` | `void` | Remove channel |
+| `unsubscribeAll()` | — | `void` | Cleanup |
+| `getActiveSubscriptions()` | — | `number` | Channel count |
+
+**Channel**: `moods:{userId}` | **Events**: INSERT, UPDATE, DELETE on `public.moods`
+**Status**: SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT
+
+### Love Notes Broadcast (`src/hooks/useRealtimeMessages.ts`)
+
+- Channel: `love-notes:{userId}`
+- Event: `new_message` (Supabase Broadcast API)
+- Features: deduplication, exponential backoff (max 5 retries, up to 30s), vibration feedback, auto-cleanup
+
+## Error Handling
+
+### Error Types
+
+| Error Type | Source | Properties |
+|------------|--------|------------|
+| `ApiValidationError` | Zod parse failure | `validationErrors: ZodError` |
+| `SupabaseServiceError` | Database/auth errors | Wrapped from Postgrest |
+| `NetworkError` | Offline check | Generic with context |
+| `ValidationError` | CustomMessageService | User-friendly message |
+
+### Error Handlers (`src/api/errorHandlers.ts`)
+
+| Function | Purpose |
+|----------|---------|
+| `isOnline()` | Check `navigator.onLine` |
+| `isPostgrestError()` | Detect Supabase Postgrest errors |
+| `handleSupabaseError()` | Wrap Postgrest → SupabaseServiceError |
+| `handleNetworkError()` | Wrap network → SupabaseServiceError |
+| `isZodError()` | Detect Zod validation errors |
+| `createValidationError()` | Format Zod errors for users |
+| `logSupabaseError()` | Context-aware error logging |
+
+### Common Postgrest Error Codes
+
+- `PGRST116`: No rows found (expected for null returns)
+- `PGRST110`: Constraint violation / RLS deny
+- `42P01`: Table does not exist
+- `23502`: NOT NULL violation
+
+## RLS Policies Summary
+
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|-------|--------|--------|--------|--------|
+| users | Own + partner | Own only | Own (no partner_id) | — |
+| moods | Own + partner's | Own only | Own only | Own only |
+| love_notes | Sent or received | As sender | — | As sender |
+| interactions | To/from self | As sender | Mark received viewed | — |
+| partner_requests | Sent or received | As sender | Recipient only | — |
+| photos | Own + partner's | Own folder | Own only | Own only |
+| scripture_sessions | Session member | As user1 | Session member | — |
+| scripture_reflections | Own + shared partner | Own in session | Own only | — |
+| scripture_bookmarks | Own + shared partner | In own sessions | Own only | Own only |
+| scripture_messages | Session member | In own sessions | — | — |
+
+## RPCs (SECURITY DEFINER)
+
+| Function | Purpose |
+|----------|---------|
+| `get_partner_id(user_id)` | Partner lookup avoiding RLS recursion |
+| `accept_partner_request(id)` | Atomic bidirectional partner_id + auto-decline others |
+| `decline_partner_request(id)` | Recipient-only status change |
+| `scripture_create_session(mode, partner?)` | Server-timestamped session creation |
+| `scripture_submit_reflection(...)` | Upsert with ON CONFLICT resolution |
+| `is_scripture_session_member(id)` | Helper to prevent RLS recursion |
+| `scripture_seed_test_data(...)` | Dev-only test data seeding (env guard) |
