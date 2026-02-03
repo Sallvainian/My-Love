@@ -1,4 +1,26 @@
+import { execSync } from 'child_process';
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Load Supabase local env vars for test fixtures.
+ * Parses `supabase status -o env` to set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+ * and SUPABASE_ANON_KEY. Falls back gracefully if Supabase CLI is unavailable (CI).
+ */
+if (!process.env.SUPABASE_URL) {
+  try {
+    const output = execSync('supabase status -o env 2>/dev/null', { encoding: 'utf-8' });
+    const vars: Record<string, string> = {};
+    for (const line of output.split('\n')) {
+      const match = line.match(/^(\w+)="(.+)"$/);
+      if (match) vars[match[1]] = match[2];
+    }
+    process.env.SUPABASE_URL ??= vars.API_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??= vars.SERVICE_ROLE_KEY;
+    process.env.SUPABASE_ANON_KEY ??= vars.ANON_KEY;
+  } catch {
+    // Supabase CLI unavailable — env vars must be set externally (CI)
+  }
+}
 
 /**
  * Playwright Test Configuration
@@ -8,7 +30,7 @@ import { defineConfig, devices } from '@playwright/test';
  * See tests/support/merged-fixtures.ts for fixture composition.
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -40,7 +62,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testDir: './tests/e2e',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'api',
+      testDir: './tests/api',
     },
     // Uncomment for cross-browser testing
     // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
