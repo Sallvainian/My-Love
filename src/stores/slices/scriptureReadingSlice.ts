@@ -224,23 +224,19 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     const isLastStep = nextStep >= MAX_STEPS;
 
     if (isLastStep) {
-      // Transition to reflection phase (Epic 2 handles actual reflection)
+      // Transition to reflection phase — status stays 'in_progress' until Story 2.3 report phase
       const updatedSession: ScriptureSession = {
         ...session,
         currentPhase: 'reflection' as SessionPhase,
         currentStepIndex: MAX_STEPS - 1,
-        status: 'complete',
-        completedAt: new Date(),
       };
       set({ session: updatedSession, isSyncing: true });
 
-      // Persist completion to server
+      // Persist phase change to server
       try {
         await scriptureReadingService.updateSession(session.id, {
           currentPhase: 'reflection' as SessionPhase,
           currentStepIndex: MAX_STEPS - 1,
-          status: 'complete',
-          completedAt: updatedSession.completedAt,
         });
         set({ isSyncing: false, pendingRetry: null });
       } catch (error) {

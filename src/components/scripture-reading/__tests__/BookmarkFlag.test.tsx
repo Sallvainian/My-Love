@@ -6,16 +6,15 @@
  * Tests:
  * - Renders outlined bookmark icon when inactive
  * - Renders filled amber bookmark icon when active
- * - Toggles state on click
  * - Correct aria-label toggling
  * - aria-pressed attribute reflects state
  * - 48x48px minimum touch target
- * - Debounce rapid toggles (300ms)
- * - Calls onToggle callback
+ * - Calls onToggle callback immediately (no internal debounce)
+ * - Disabled state prevents toggle
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 
 describe('BookmarkFlag', () => {
@@ -27,11 +26,6 @@ describe('BookmarkFlag', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   // ============================================
@@ -126,62 +120,28 @@ describe('BookmarkFlag', () => {
   // ============================================
 
   describe('Toggle Behavior', () => {
-    it('calls onToggle when clicked', () => {
+    it('calls onToggle immediately when clicked', () => {
       const onToggle = vi.fn();
       render(<BookmarkFlag {...defaultProps} onToggle={onToggle} />);
       fireEvent.click(screen.getByTestId('scripture-bookmark-button'));
-      act(() => { vi.advanceTimersByTime(300); });
       expect(onToggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onToggle on each click (no internal debounce)', () => {
+      const onToggle = vi.fn();
+      render(<BookmarkFlag {...defaultProps} onToggle={onToggle} />);
+      const btn = screen.getByTestId('scripture-bookmark-button');
+      fireEvent.click(btn);
+      fireEvent.click(btn);
+      fireEvent.click(btn);
+      expect(onToggle).toHaveBeenCalledTimes(3);
     });
 
     it('does not call onToggle when disabled', () => {
       const onToggle = vi.fn();
       render(<BookmarkFlag {...defaultProps} onToggle={onToggle} disabled={true} />);
       fireEvent.click(screen.getByTestId('scripture-bookmark-button'));
-      act(() => { vi.advanceTimersByTime(300); });
       expect(onToggle).not.toHaveBeenCalled();
-    });
-  });
-
-  // ============================================
-  // Debounce (300ms)
-  // ============================================
-
-  describe('Debounce', () => {
-    it('debounces rapid toggles — only last call fires after 300ms', () => {
-      const onToggle = vi.fn();
-      render(<BookmarkFlag {...defaultProps} onToggle={onToggle} />);
-      const btn = screen.getByTestId('scripture-bookmark-button');
-
-      // Rapid clicks
-      fireEvent.click(btn);
-      fireEvent.click(btn);
-      fireEvent.click(btn);
-
-      // Before debounce expires
-      expect(onToggle).not.toHaveBeenCalled();
-
-      // After debounce
-      act(() => { vi.advanceTimersByTime(300); });
-      expect(onToggle).toHaveBeenCalledTimes(1);
-    });
-
-    it('resets debounce timer on each click', () => {
-      const onToggle = vi.fn();
-      render(<BookmarkFlag {...defaultProps} onToggle={onToggle} />);
-      const btn = screen.getByTestId('scripture-bookmark-button');
-
-      fireEvent.click(btn);
-      act(() => { vi.advanceTimersByTime(200); });
-      fireEvent.click(btn);
-      act(() => { vi.advanceTimersByTime(200); });
-
-      // Still within debounce after second click
-      expect(onToggle).not.toHaveBeenCalled();
-
-      // 300ms after last click
-      act(() => { vi.advanceTimersByTime(100); });
-      expect(onToggle).toHaveBeenCalledTimes(1);
     });
   });
 

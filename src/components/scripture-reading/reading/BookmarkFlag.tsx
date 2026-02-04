@@ -8,14 +8,12 @@
  * - 48x48px minimum touch target
  * - aria-label toggling: "Bookmark this verse" / "Remove bookmark"
  * - aria-pressed reflects bookmark state
- * - 300ms debounce for rapid toggles (last-write-wins)
+ * - Pure presentational — debounce handled by container (SoloReadingFlow)
  */
 
-import { useRef, useCallback } from 'react';
 import { Bookmark } from 'lucide-react';
 
 const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
-const DEBOUNCE_MS = 300;
 
 interface BookmarkFlagProps {
   isBookmarked: boolean;
@@ -24,25 +22,10 @@ interface BookmarkFlagProps {
 }
 
 export function BookmarkFlag({ isBookmarked, onToggle, disabled = false }: BookmarkFlagProps) {
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleClick = useCallback(() => {
-    if (disabled) return;
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      onToggle();
-      debounceRef.current = null;
-    }, DEBOUNCE_MS);
-  }, [onToggle, disabled]);
-
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={disabled ? undefined : onToggle}
       disabled={disabled}
       aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark this verse'}
       aria-pressed={isBookmarked}

@@ -10,7 +10,7 @@
  * - Rating selection and aria-checked toggling
  * - Keyboard navigation (arrow keys within radiogroup)
  * - Optional note textarea (max 200 chars, resize-none)
- * - Character counter at 200+ chars
+ * - Character counter at 150+ chars (UX improvement over spec's 200+)
  * - Continue button disabled until rating selected
  * - Validation: quiet helper text "Please select a rating"
  * - Focus ring styles

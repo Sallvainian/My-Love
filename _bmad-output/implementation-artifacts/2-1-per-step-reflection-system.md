@@ -1,6 +1,6 @@
 # Story 2.1: Per-Step Reflection System
 
-Status: complete
+Status: done
 
 ## Story
 
@@ -207,8 +207,8 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 - `2.1-UNIT-001`: Bookmark toggle debounce
 
 **Test file locations:**
-- `tests/unit/components/scripture-reading/reading/BookmarkFlag.test.tsx`
-- `tests/unit/components/scripture-reading/reflection/PerStepReflection.test.tsx`
+- `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx`
+- `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx`
 
 ### Accessibility Checklist
 
@@ -286,9 +286,11 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 | `src/components/scripture-reading/reflection/PerStepReflection.tsx` | Created | Rating + note reflection form component |
 | `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | Modified | Added reflection subview, bookmark integration, service wiring |
 | `src/components/scripture-reading/index.ts` | Modified | Added barrel exports for BookmarkFlag, PerStepReflection |
-| `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx` | Created | 14 unit tests for BookmarkFlag |
+| `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx` | Created | 12 unit tests for BookmarkFlag |
 | `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx` | Created | 36 unit tests for PerStepReflection |
 | `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Modified | Updated step advancement tests for reflection flow, added service mocks |
+| `tests/api/scripture-reflection-api.spec.ts` | Modified | Removed test.skip() from P0/P1 API tests, removed unused import |
+| `tests/e2e/scripture/scripture-reflection.spec.ts` | Modified | Removed test.skip() from P0/P1 E2E tests, added 2.1-E2E-005 and 2.1-E2E-006 P2 tests |
 
 ### Change Log
 
@@ -298,10 +300,14 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 | `handleNextVerse` no longer calls `advanceStep` directly | Now transitions to reflection subview first |
 | `handleReflectionSubmit` added | Saves reflection non-blocking then advances step |
 | `bookmarkedSteps` state added (Set\<number\>) | Tracks which steps are bookmarked (optimistic UI) |
-| `handleBookmarkToggle` with optimistic revert | Toggle bookmark immediately, write-through, revert on failure |
+| `handleBookmarkToggle` with debounced server write | Optimistic toggle immediate, server write debounced 300ms (last-write-wins) |
 | Bookmark load useEffect on session mount | Loads existing bookmarks from service layer |
 | Action buttons wrapped in `subView !== 'reflection'` | Hide verse/response buttons during reflection |
 | Completion text updated | Placeholder text for Story 2.2 |
-| Test mocks added for supabase, scriptureReadingService | Required for new imports in SoloReadingFlow |
+| Test mocks added for scriptureReadingService | Required for new imports in SoloReadingFlow |
 | 2 advanceStep tests updated | Tests now verify reflection flow (Next Verse → reflection → submit → advanceStep) |
 | Focus test updated | Focus now verified after full reflection submit flow |
+| [Code Review] BookmarkFlag debounce moved to SoloReadingFlow | AC #1 requires instant visual toggle; debounce now only gates server write |
+| [Code Review] Removed direct `supabase` import from SoloReadingFlow | Architecture violation — uses `session.userId` instead of `supabase.auth.getUser()` |
+| [Code Review] Removed duplicate aria-live announcer in reflection subview | Screen readers heard "Reflect on this verse" twice — dynamic announcer is sufficient |
+| [Code Review] Added bookmark debounce unmount cleanup | Prevents timer leak and ghost toggles on navigation |
