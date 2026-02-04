@@ -10,3 +10,4 @@ export { ScriptureOverview } from "./containers/ScriptureOverview";
 export { SoloReadingFlow } from "./containers/SoloReadingFlow";
 export { BookmarkFlag } from "./reading/BookmarkFlag";
 export { PerStepReflection } from "./reflection/PerStepReflection";
+export { ReflectionSummary } from "./reflection/ReflectionSummary";

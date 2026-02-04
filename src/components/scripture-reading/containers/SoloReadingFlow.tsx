@@ -35,8 +35,8 @@ import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { PerStepReflection } from '../reflection/PerStepReflection';
+import { ReflectionSummary } from '../reflection/ReflectionSummary';
 import { scriptureReadingService } from '../../../services/scriptureReadingService';
-import { supabase } from '../../../api/supabaseClient';
 
 // Lavender Dreams design tokens (shared with ScriptureOverview)
 const scriptureTheme = {
@@ -69,6 +69,7 @@ export function SoloReadingFlow() {
     saveSession,
     exitSession,
     retryFailedWrite,
+    updatePhase,
   } = useAppStore(
     useShallow((state) => ({
       session: state.session,
@@ -80,6 +81,7 @@ export function SoloReadingFlow() {
       saveSession: state.saveSession,
       exitSession: state.exitSession,
       retryFailedWrite: state.retryFailedWrite,
+      updatePhase: state.updatePhase,
     }))
   );
 
@@ -110,6 +112,16 @@ export function SoloReadingFlow() {
   const prevSubViewRef = useRef<StepSubView>('verse');
   const prevIsCompletedRef = useRef(false);
 
+  // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
+  const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup bookmark debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (bookmarkDebounceRef.current) clearTimeout(bookmarkDebounceRef.current);
+    };
+  }, []);
+
   // Track previous isOnline to detect offline → online transitions
   const prevIsOnlineRef = useRef(isOnline);
 
@@ -130,21 +142,18 @@ export function SoloReadingFlow() {
   useEffect(() => {
     if (!session) return;
     void (async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
-      if (!userId) return;
       const bookmarks = await scriptureReadingService.getBookmarksBySession(session.id);
-      const userBookmarks = bookmarks.filter((b) => b.userId === userId);
+      const userBookmarks = bookmarks.filter((b) => b.userId === session.userId);
       setBookmarkedSteps(new Set(userBookmarks.map((b) => b.stepIndex)));
     })();
-  }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.userId]);
 
-  // Story 2.1: Bookmark toggle handler (optimistic UI, write-through)
-  const handleBookmarkToggle = useCallback(async () => {
+  // Story 2.1: Bookmark toggle handler (optimistic UI immediate, debounced server write)
+  const handleBookmarkToggle = useCallback(() => {
     if (!session) return;
     const stepIndex = session.currentStepIndex;
 
-    // Optimistic toggle
+    // Optimistic toggle (instant per AC #1)
     setBookmarkedSteps((prev) => {
       const next = new Set(prev);
       if (next.has(stepIndex)) {
@@ -155,25 +164,71 @@ export function SoloReadingFlow() {
       return next;
     });
 
-    // Write-through to server
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
-      if (!userId) return;
-      await scriptureReadingService.toggleBookmark(session.id, stepIndex, userId, false);
-    } catch {
-      // Revert on failure
-      setBookmarkedSteps((prev) => {
-        const next = new Set(prev);
-        if (next.has(stepIndex)) {
-          next.delete(stepIndex);
-        } else {
-          next.add(stepIndex);
-        }
-        return next;
-      });
+    // Debounce server write (300ms, last-write-wins)
+    if (bookmarkDebounceRef.current) {
+      clearTimeout(bookmarkDebounceRef.current);
     }
+    bookmarkDebounceRef.current = setTimeout(() => {
+      bookmarkDebounceRef.current = null;
+      void (async () => {
+        try {
+          await scriptureReadingService.toggleBookmark(session.id, stepIndex, session.userId, false);
+        } catch {
+          // Revert on failure
+          setBookmarkedSteps((prev) => {
+            const next = new Set(prev);
+            if (next.has(stepIndex)) {
+              next.delete(stepIndex);
+            } else {
+              next.add(stepIndex);
+            }
+            return next;
+          });
+        }
+      })();
+    }, 300);
   }, [session]);
+
+  // Story 2.2: Handle reflection summary submission — save session reflection then advance to report
+  const handleReflectionSummarySubmit = useCallback(
+    (data: { standoutVerses: number[]; rating: number; notes: string }) => {
+      if (!session) return;
+
+      // Save session-level reflection in background (non-blocking)
+      void (async () => {
+        try {
+          const jsonNotes = JSON.stringify({
+            standoutVerses: data.standoutVerses,
+            userNote: data.notes,
+          });
+          await scriptureReadingService.addReflection(
+            session.id,
+            MAX_STEPS, // sentinel value for session-level reflection
+            data.rating,
+            jsonNotes,
+            false
+          );
+        } catch {
+          // Non-blocking: reflection write failure shouldn't block phase advancement
+        }
+      })();
+
+      // Advance phase to 'report' optimistically via store
+      updatePhase('report');
+
+      // Persist phase change to server in background
+      void (async () => {
+        try {
+          await scriptureReadingService.updateSession(session.id, {
+            currentPhase: 'report',
+          });
+        } catch {
+          // Non-blocking: phase persistence failure handled by eventual consistency
+        }
+      })();
+    },
+    [session, updatePhase]
+  );
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
   // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
@@ -326,15 +381,17 @@ export function SoloReadingFlow() {
   }, [subView, session?.currentStepIndex]);
 
   // Computed before guard for useEffect dependency
-  const isCompleted = session
-    ? session.status === 'complete' || session.currentPhase === 'reflection'
-    : false;
+  const isReflectionPhase = session ? session.currentPhase === 'reflection' : false;
+  const isReportPhase = session ? session.currentPhase === 'report' : false;
+  const isCompleted = isReflectionPhase || isReportPhase;
 
-  // Story 1.5: Completion screen announcement + focus (AC #2, #3)
+  // Story 1.5 + 2.2: Completion screen announcement + focus (AC #2, #3)
   useEffect(() => {
     if (isCompleted && !prevIsCompletedRef.current) {
       prevIsCompletedRef.current = true;
-      const msg = `Reading complete. All ${MAX_STEPS} verses finished.`;
+      const msg = isReflectionPhase
+        ? 'Review your session reflections'
+        : `Reading complete. All ${MAX_STEPS} verses finished.`;
       setTimeout(() => setAnnouncement(msg), 100);
       requestAnimationFrame(() => {
         completionHeadingRef.current?.focus();
@@ -342,7 +399,7 @@ export function SoloReadingFlow() {
       const timer = setTimeout(() => setAnnouncement(''), 1000);
       return () => clearTimeout(timer);
     }
-  }, [isCompleted]);
+  }, [isCompleted, isReflectionPhase]);
 
   // Guard: no session means we shouldn't be here
   if (!session) return null;
@@ -369,15 +426,51 @@ export function SoloReadingFlow() {
     }),
   };
 
-  // Completion screen (placeholder for Epic 2 reflection)
-  if (isCompleted) {
+  // Story 2.2: Reflection summary screen (after step 17 reflection completes)
+  if (isReflectionPhase) {
+    // Map bookmarkedSteps Set to array of verse data for ReflectionSummary
+    const bookmarkedVerses = Array.from(bookmarkedSteps)
+      .sort((a, b) => a - b)
+      .map((stepIndex) => ({
+        stepIndex,
+        verseReference: SCRIPTURE_STEPS[stepIndex].verseReference,
+        verseText: SCRIPTURE_STEPS[stepIndex].verseText,
+      }));
+
+    return (
+      <motion.div
+        className="flex min-h-screen flex-col p-4 pb-20"
+        style={{ backgroundColor: scriptureTheme.background }}
+        data-testid="scripture-completion-screen"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={crossfade}
+      >
+        {/* Screen reader announcer */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+          {announcement}
+        </div>
+
+        <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+          <ReflectionSummary
+            bookmarkedVerses={bookmarkedVerses}
+            onSubmit={handleReflectionSummarySubmit}
+            disabled={isSyncing}
+          />
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Story 2.2: Report phase placeholder (Story 2.3 will implement the actual report)
+  if (isReportPhase) {
     return (
       <div
         className="flex min-h-screen flex-col p-4 pb-20"
         style={{ backgroundColor: scriptureTheme.background }}
-        data-testid="scripture-completion-screen"
+        data-testid="scripture-report-placeholder"
       >
-        {/* Story 1.5: Screen reader announcer (AC #2) */}
+        {/* Screen reader announcer */}
         <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
           {announcement}
         </div>
@@ -395,10 +488,9 @@ export function SoloReadingFlow() {
             Reading Complete
           </h1>
           <p className="text-purple-700">
-            You&apos;ve completed all {MAX_STEPS} scripture readings. Take a moment to reflect on
-            what you&apos;ve read.
+            You&apos;ve completed all {MAX_STEPS} scripture readings and your reflection.
           </p>
-          <p className="text-sm text-purple-600">Reflection summary coming in Story 2.2</p>
+          <p className="text-sm text-purple-600">Daily Prayer Report coming in Story 2.3</p>
           <button
             onClick={() => exitSession()}
             className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
@@ -534,10 +626,6 @@ export function SoloReadingFlow() {
             ) : (
               /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
               <div data-testid="reflection-subview">
-                {/* Story 2.1: aria-live announcement */}
-                <div className="sr-only" aria-live="polite" data-testid="reflection-announcer">
-                  Reflect on this verse
-                </div>
                 <PerStepReflection
                   onSubmit={handleReflectionSubmit}
                   disabled={isSyncing}

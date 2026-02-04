@@ -83,24 +83,17 @@ vi.mock('../../../hooks/useAutoSave', () => ({
   useAutoSave: (...args: unknown[]) => mockUseAutoSave(...args),
 }));
 
-// Story 2.1: Mock supabase client
-vi.mock('../../../api/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-456' } } }),
-    },
-  },
-}));
-
 // Story 2.1: Mock scriptureReadingService
 const mockGetBookmarksBySession = vi.fn().mockResolvedValue([]);
 const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
 const mockAddReflection = vi.fn().mockResolvedValue(undefined);
+const mockUpdateSession = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../../services/scriptureReadingService', () => ({
   scriptureReadingService: {
     getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
     toggleBookmark: (...args: unknown[]) => mockToggleBookmark(...args),
     addReflection: (...args: unknown[]) => mockAddReflection(...args),
+    updateSession: (...args: unknown[]) => mockUpdateSession(...args),
   },
 }));
 
@@ -110,6 +103,7 @@ const mockSaveAndExit = vi.fn().mockResolvedValue(undefined);
 const mockSaveSession = vi.fn().mockResolvedValue(undefined);
 const mockExitSession = vi.fn();
 const mockRetryFailedWrite = vi.fn().mockResolvedValue(undefined);
+const mockUpdatePhase = vi.fn();
 
 interface MockSession {
   id: string;
@@ -139,6 +133,7 @@ const mockStoreState: {
   saveSession: typeof mockSaveSession;
   exitSession: typeof mockExitSession;
   retryFailedWrite: typeof mockRetryFailedWrite;
+  updatePhase: typeof mockUpdatePhase;
 } = {
   session: null,
   isSyncing: false,
@@ -149,6 +144,7 @@ const mockStoreState: {
   saveSession: mockSaveSession,
   exitSession: mockExitSession,
   retryFailedWrite: mockRetryFailedWrite,
+  updatePhase: mockUpdatePhase,
 };
 
 // Create a function to get state for the useAppStore mock
@@ -373,30 +369,41 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Session Completion', () => {
-    it('shows completion screen when session is complete', () => {
+    it('shows ReflectionSummary when phase is reflection', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
         currentPhase: 'reflection',
+        status: 'in_progress',
         currentStepIndex: 16,
-        completedAt: new Date(),
       });
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('scripture-completion-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
     });
 
-    it('shows "Reading Complete" heading on completion', () => {
+    it('shows report placeholder when phase is report', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      expect(screen.getByTestId('scripture-report-placeholder')).toBeDefined();
+      expect(screen.getByText('Reading Complete')).toBeDefined();
+    });
+
+    it('shows "Reading Complete" heading on report phase', () => {
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       expect(screen.getByText('Reading Complete')).toBeDefined();
     });
 
-    it('shows completion message with step count', () => {
+    it('shows completion message with step count on report phase', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       expect(
@@ -404,10 +411,10 @@ describe('SoloReadingFlow', () => {
       ).toBeDefined();
     });
 
-    it('shows Return to Overview button on completion', () => {
+    it('shows Return to Overview button on report phase', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('return-to-overview')).toHaveTextContent(
@@ -415,23 +422,24 @@ describe('SoloReadingFlow', () => {
       );
     });
 
-    it('calls exitSession when Return to Overview is tapped', () => {
+    it('calls exitSession when Return to Overview is tapped on report phase', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('return-to-overview'));
       expect(mockExitSession).toHaveBeenCalledTimes(1);
     });
 
-    it('shows completion for reflection phase even if status is not complete', () => {
+    it('shows ReflectionSummary for reflection phase with in_progress status', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'reflection',
         status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('scripture-completion-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
     });
   });
 
@@ -890,8 +898,8 @@ describe('SoloReadingFlow', () => {
 
     it('completion heading has tabIndex={-1} and data-testid="completion-heading"', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       const heading = screen.getByTestId('completion-heading');
@@ -1029,6 +1037,236 @@ describe('SoloReadingFlow', () => {
       expect(screen.getByTestId('verse-screen')).toBeDefined();
       expect(screen.getByTestId('scripture-verse-reference')).toBeDefined();
       expect(screen.getByTestId('scripture-next-verse-button')).toBeDefined();
+    });
+  });
+
+  // ============================================
+  // Story 2.2: Reflection Summary
+  // ============================================
+
+  describe('Story 2.2: Reflection Summary', () => {
+    it('shows ReflectionSummary when phase is reflection (2.2-CMP-012)', () => {
+      mockStoreState.session = createMockSession({
+        currentPhase: 'reflection',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show ReflectionSummary component instead of old placeholder
+      expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-summary-heading')).toHaveTextContent('Your Session');
+      // Should NOT show the old completion placeholder text
+      expect(screen.queryByText('Reflection summary coming in Story 2.2')).toBeNull();
+    });
+
+    it('calls updatePhase with report after reflection summary submission (2.2-CMP-018)', async () => {
+      // Mock requestAnimationFrame for focus tests
+      const origRAF = globalThis.requestAnimationFrame;
+      globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+
+      mockStoreState.session = createMockSession({
+        currentPhase: 'reflection',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      // Provide bookmarks so verse selection is available
+      mockGetBookmarksBySession.mockResolvedValue([
+        { stepIndex: 0, userId: 'user-456' },
+      ]);
+      render(<SoloReadingFlow />);
+      // Wait for async bookmark loading to complete
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-standout-verse-0')).toBeDefined();
+      });
+      // Select a standout verse
+      fireEvent.click(screen.getByTestId('scripture-standout-verse-0'));
+      // Select a session rating
+      fireEvent.click(screen.getByTestId('scripture-session-rating-4'));
+      // Submit the reflection summary
+      fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
+      // Verify updatePhase was called with 'report'
+      expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+
+      globalThis.requestAnimationFrame = origRAF;
+    });
+
+    it('shows report placeholder when phase is report (2.2-CMP-013)', () => {
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show the Story 2.3 report placeholder
+      expect(screen.getByTestId('scripture-report-placeholder')).toBeDefined();
+      expect(screen.getByText(/Daily Prayer Report coming in Story 2.3/)).toBeDefined();
+      // Should still have Return to Overview button
+      expect(screen.getByTestId('return-to-overview')).toBeDefined();
+      // Should NOT show the ReflectionSummary
+      expect(screen.queryByTestId('scripture-reflection-summary-screen')).toBeNull();
+    });
+  });
+
+  // ============================================
+  // Story 2.3: Daily Prayer Report
+  // ============================================
+
+  describe('Story 2.3: Daily Prayer Report', () => {
+    // Partner mock for linked user tests
+    let mockPartner: { id: string; displayName: string; email: string; connectedAt: Date } | null = null;
+
+    // Mock addMessage service method (Story 2.3)
+    const mockAddMessage = vi.fn().mockResolvedValue(undefined);
+
+    beforeEach(() => {
+      mockPartner = null;
+      mockAddMessage.mockClear();
+    });
+
+    it.skip('shows MessageCompose when phase is report and partner exists (2.3-INT-002)', () => {
+      mockPartner = {
+        id: 'partner-1',
+        displayName: 'Sarah',
+        email: 'sarah@example.com',
+        connectedAt: new Date('2026-01-15'),
+      };
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show MessageCompose screen instead of placeholder
+      expect(screen.getByTestId('scripture-message-compose-screen')).toBeDefined();
+      // Should NOT show the old placeholder
+      expect(screen.queryByTestId('scripture-report-placeholder')).toBeNull();
+    });
+
+    it.skip('shows unlinked completion screen when phase is report and no partner (2.3-INT-001)', () => {
+      mockPartner = null;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show unlinked completion screen
+      expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
+      // Should NOT show MessageCompose
+      expect(screen.queryByTestId('scripture-message-compose-screen')).toBeNull();
+    });
+
+    it.skip('sending message calls addMessage service (2.3-INT-003)', async () => {
+      mockPartner = {
+        id: 'partner-1',
+        displayName: 'Sarah',
+        email: 'sarah@example.com',
+        connectedAt: new Date('2026-01-15'),
+      };
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Type a message
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'I love you' } });
+      // Click send
+      fireEvent.click(screen.getByTestId('scripture-message-send-btn'));
+      await vi.waitFor(() => {
+        expect(mockAddMessage).toHaveBeenCalledWith(
+          'session-123',
+          'user-456',
+          'I love you'
+        );
+      });
+    });
+
+    it.skip('skipping message still marks session complete (2.3-INT-004)', async () => {
+      mockPartner = {
+        id: 'partner-1',
+        displayName: 'Sarah',
+        email: 'sarah@example.com',
+        connectedAt: new Date('2026-01-15'),
+      };
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Click skip
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+      await vi.waitFor(() => {
+        expect(mockUpdateSession).toHaveBeenCalledWith(
+          'session-123',
+          expect.objectContaining({ status: 'complete' })
+        );
+      });
+    });
+
+    it.skip('DailyPrayerReport appears after send/skip (2.3-INT-005)', async () => {
+      mockPartner = {
+        id: 'partner-1',
+        displayName: 'Sarah',
+        email: 'sarah@example.com',
+        connectedAt: new Date('2026-01-15'),
+      };
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Type and send a message
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'Thinking of you' } });
+      fireEvent.click(screen.getByTestId('scripture-message-send-btn'));
+      // After send, report screen should appear
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+    });
+
+    it.skip('session marked complete after report phase entry for unlinked user (2.3-INT-006)', async () => {
+      mockPartner = null;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Unlinked user skips compose, session should be marked complete on mount
+      await vi.waitFor(() => {
+        expect(mockUpdateSession).toHaveBeenCalledWith(
+          'session-123',
+          expect.objectContaining({ status: 'complete' })
+        );
+      });
+    });
+
+    it.skip('Return to Overview calls exitSession (2.3-INT-007)', async () => {
+      mockPartner = {
+        id: 'partner-1',
+        displayName: 'Sarah',
+        email: 'sarah@example.com',
+        connectedAt: new Date('2026-01-15'),
+      };
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Skip to get to report
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+      // Click return
+      fireEvent.click(screen.getByTestId('scripture-report-return-btn'));
+      expect(mockExitSession).toHaveBeenCalledTimes(1);
     });
   });
 });
