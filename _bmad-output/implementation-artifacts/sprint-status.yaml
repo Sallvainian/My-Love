@@ -51,9 +51,9 @@ development_status:
 
   # Epic 2: Reflection & Daily Prayer Report
   epic-2: in-progress
-  2-1-per-step-reflection-system: review
-  2-2-end-of-session-reflection-summary: backlog
-  2-3-daily-prayer-report-send-and-view: backlog
+  2-1-per-step-reflection-system: done
+  2-2-end-of-session-reflection-summary: done
+  2-3-daily-prayer-report-send-and-view: ready-for-dev
   epic-2-retrospective: optional
 
   # Epic 3: Stats & Overview Dashboard
