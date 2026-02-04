@@ -33,6 +33,10 @@ import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useAutoSave } from '../../../hooks/useAutoSave';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { BookmarkFlag } from '../reading/BookmarkFlag';
+import { PerStepReflection } from '../reflection/PerStepReflection';
+import { scriptureReadingService } from '../../../services/scriptureReadingService';
+import { supabase } from '../../../api/supabaseClient';
 
 // Lavender Dreams design tokens (shared with ScriptureOverview)
 const scriptureTheme = {
@@ -41,8 +45,8 @@ const scriptureTheme = {
   surface: '#FAF5FF',
 };
 
-// Sub-view within a step: verse or response
-type StepSubView = 'verse' | 'response';
+// Sub-view within a step: verse, response, or reflection
+type StepSubView = 'verse' | 'response' | 'reflection';
 
 // Direction for slide animation
 type SlideDirection = 'left' | 'right';
@@ -87,6 +91,9 @@ export function SoloReadingFlow() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [slideDirection, setSlideDirection] = useState<SlideDirection>('left');
 
+  // Story 2.1: Bookmark state (optimistic toggle, per-step)
+  const [bookmarkedSteps, setBookmarkedSteps] = useState<Set<number>>(new Set());
+
   // Story 1.5: Screen reader announcement state (AC #2)
   const [announcement, setAnnouncement] = useState('');
 
@@ -119,12 +126,90 @@ export function SoloReadingFlow() {
     prevIsOnlineRef.current = isOnline;
   }, [isOnline, pendingRetry, retryFailedWrite]);
 
+  // Story 2.1: Load bookmarks for current session on mount/session change
+  useEffect(() => {
+    if (!session) return;
+    void (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) return;
+      const bookmarks = await scriptureReadingService.getBookmarksBySession(session.id);
+      const userBookmarks = bookmarks.filter((b) => b.userId === userId);
+      setBookmarkedSteps(new Set(userBookmarks.map((b) => b.stepIndex)));
+    })();
+  }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Story 2.1: Bookmark toggle handler (optimistic UI, write-through)
+  const handleBookmarkToggle = useCallback(async () => {
+    if (!session) return;
+    const stepIndex = session.currentStepIndex;
+
+    // Optimistic toggle
+    setBookmarkedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepIndex)) {
+        next.delete(stepIndex);
+      } else {
+        next.add(stepIndex);
+      }
+      return next;
+    });
+
+    // Write-through to server
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) return;
+      await scriptureReadingService.toggleBookmark(session.id, stepIndex, userId, false);
+    } catch {
+      // Revert on failure
+      setBookmarkedSteps((prev) => {
+        const next = new Set(prev);
+        if (next.has(stepIndex)) {
+          next.delete(stepIndex);
+        } else {
+          next.add(stepIndex);
+        }
+        return next;
+      });
+    }
+  }, [session]);
+
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
-  const handleNextVerse = useCallback(async () => {
-    setSlideDirection('left');
-    setSubView('verse');
-    await advanceStep();
-  }, [advanceStep]);
+  // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
+  const handleNextVerse = useCallback(() => {
+    setSubView('reflection');
+  }, []);
+
+  // Story 2.1: Handle reflection submission — save reflection then advance step
+  const handleReflectionSubmit = useCallback(
+    async (rating: number, notes: string) => {
+      if (!session) return;
+
+      // Advance step first (non-blocking UX)
+      setSlideDirection('left');
+      setSubView('verse');
+
+      // Save reflection in background (non-blocking per AC)
+      void (async () => {
+        try {
+          await scriptureReadingService.addReflection(
+            session.id,
+            session.currentStepIndex,
+            rating,
+            notes,
+            false // is_shared defaults to false
+          );
+        } catch {
+          // Non-blocking: reflection write failure shouldn't block advancement
+          // Retry handled via existing SyncToast pattern
+        }
+      })();
+
+      await advanceStep();
+    },
+    [session, advanceStep]
+  );
 
   const handleViewResponse = useCallback(() => {
     setSubView('response');
@@ -205,7 +290,7 @@ export function SoloReadingFlow() {
     prevStepIndexRef.current = session?.currentStepIndex;
   }, [session?.currentStepIndex, session]);
 
-  // Story 1.5: Screen reader announcements + focus management on sub-view change (AC #2, #3)
+  // Story 1.5 + 2.1: Screen reader announcements + focus management on sub-view change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
   useEffect(() => {
     if (prevSubViewRef.current !== subView) {
@@ -214,6 +299,16 @@ export function SoloReadingFlow() {
         setTimeout(() => setAnnouncement(msg), 100);
         requestAnimationFrame(() => {
           backToVerseRef.current?.focus();
+        });
+      } else if (subView === 'reflection') {
+        // Story 2.1: Focus reflection heading on transition
+        setTimeout(() => setAnnouncement('Reflect on this verse'), 100);
+        requestAnimationFrame(() => {
+          // Focus the reflection prompt heading via data-testid
+          const reflectionPrompt = document.querySelector<HTMLElement>(
+            '[data-testid="scripture-reflection-prompt"]'
+          );
+          reflectionPrompt?.focus();
         });
       } else if (prevSubViewRef.current === 'response') {
         setTimeout(
@@ -303,7 +398,7 @@ export function SoloReadingFlow() {
             You&apos;ve completed all {MAX_STEPS} scripture readings. Take a moment to reflect on
             what you&apos;ve read.
           </p>
-          <p className="text-sm text-purple-600">Reflection feature coming soon (Epic 2)</p>
+          <p className="text-sm text-purple-600">Reflection summary coming in Story 2.2</p>
           <button
             onClick={() => exitSession()}
             className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
@@ -380,21 +475,30 @@ export function SoloReadingFlow() {
             initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
             animate={subView === 'verse' ? 'center' : { opacity: 1 }}
             exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
-            transition={subView === 'verse' ? slide : crossfade}
+            transition={subView === 'reflection' ? { duration: 0.4 } : subView === 'verse' ? slide : crossfade}
             className="flex w-full flex-1 flex-col justify-center pb-32"
           >
             {subView === 'verse' ? (
               /* Verse Screen */
               <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
                 {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-600, tabIndex for focus management */}
-                <p
-                  ref={verseHeadingRef}
-                  tabIndex={-1}
-                  className="text-center text-xs font-medium tracking-wide text-purple-600"
-                  data-testid="scripture-verse-reference"
-                >
-                  {currentStep.verseReference}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div className="w-12" /> {/* Spacer for centering */}
+                  <p
+                    ref={verseHeadingRef}
+                    tabIndex={-1}
+                    className="text-center text-xs font-medium tracking-wide text-purple-600"
+                    data-testid="scripture-verse-reference"
+                  >
+                    {currentStep.verseReference}
+                  </p>
+                  {/* Story 2.1: Bookmark toggle (AC #1) */}
+                  <BookmarkFlag
+                    isBookmarked={bookmarkedSteps.has(session.currentStepIndex)}
+                    onToggle={handleBookmarkToggle}
+                    disabled={!isOnline}
+                  />
+                </div>
 
                 {/* Verse text - prominent display */}
                 <blockquote
@@ -406,7 +510,7 @@ export function SoloReadingFlow() {
                   </p>
                 </blockquote>
               </div>
-            ) : (
+            ) : subView === 'response' ? (
               /* Response Screen */
               <div className="flex w-full flex-col space-y-6" data-testid="response-screen">
                 {/* Verse reference (context) — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
@@ -426,6 +530,18 @@ export function SoloReadingFlow() {
                     {currentStep.responseText}
                   </p>
                 </div>
+              </div>
+            ) : (
+              /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
+              <div data-testid="reflection-subview">
+                {/* Story 2.1: aria-live announcement */}
+                <div className="sr-only" aria-live="polite" data-testid="reflection-announcer">
+                  Reflect on this verse
+                </div>
+                <PerStepReflection
+                  onSubmit={handleReflectionSubmit}
+                  disabled={isSyncing}
+                />
               </div>
             )}
           </motion.div>
@@ -511,6 +627,7 @@ export function SoloReadingFlow() {
         )}
 
         {/* Action buttons - bottom anchored for thumb-friendly access */}
+        {subView !== 'reflection' && (
         <div className="space-y-3 pt-4">
           {subView === 'verse' ? (
             <>
@@ -575,6 +692,7 @@ export function SoloReadingFlow() {
             </>
           )}
         </div>
+        )}
       </main>
 
       {/* Exit Confirmation Dialog */}

@@ -83,6 +83,27 @@ vi.mock('../../../hooks/useAutoSave', () => ({
   useAutoSave: (...args: unknown[]) => mockUseAutoSave(...args),
 }));
 
+// Story 2.1: Mock supabase client
+vi.mock('../../../api/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-456' } } }),
+    },
+  },
+}));
+
+// Story 2.1: Mock scriptureReadingService
+const mockGetBookmarksBySession = vi.fn().mockResolvedValue([]);
+const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
+const mockAddReflection = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../../services/scriptureReadingService', () => ({
+  scriptureReadingService: {
+    getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
+    toggleBookmark: (...args: unknown[]) => mockToggleBookmark(...args),
+    addReflection: (...args: unknown[]) => mockAddReflection(...args),
+  },
+}));
+
 // Mock Zustand store
 const mockAdvanceStep = vi.fn().mockResolvedValue(undefined);
 const mockSaveAndExit = vi.fn().mockResolvedValue(undefined);
@@ -306,17 +327,32 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Step Advancement', () => {
-    it('calls advanceStep when Next Verse is tapped on verse screen', () => {
+    it('shows reflection screen when Next Verse is tapped on verse screen', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reflection-subview')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-screen')).toBeDefined();
     });
 
-    it('calls advanceStep when Next Verse is tapped on response screen', () => {
+    it('shows reflection screen when Next Verse is tapped on response screen', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('scripture-view-response-button'));
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reflection-subview')).toBeDefined();
+    });
+
+    it('calls advanceStep after reflection Continue is submitted', async () => {
+      render(<SoloReadingFlow />);
+      // Go to reflection
+      fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
+      // Select a rating
+      fireEvent.click(screen.getByTestId('scripture-rating-3'));
+      // Submit reflection
+      fireEvent.click(screen.getByTestId('scripture-reflection-continue'));
+      // advanceStep is called after reflection submit
+      await vi.waitFor(() => {
+        expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('shows "Complete Reading" on last step instead of "Next Verse"', () => {
@@ -880,13 +916,21 @@ describe('SoloReadingFlow', () => {
       expect(document.activeElement).toBe(verseRef);
     });
 
-    it('focuses verse heading after Next Verse step advancement', () => {
-      // Start at step 0, advance to step 1
+    it('focuses verse heading after reflection submit advances step', async () => {
+      // Start at step 0, advance to step 1 after reflection
       mockAdvanceStep.mockImplementation(async () => {
         mockStoreState.session = createMockSession({ currentStepIndex: 1 });
       });
       const { rerender } = render(<SoloReadingFlow />);
+      // Go to reflection
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
+      // Select a rating and submit
+      fireEvent.click(screen.getByTestId('scripture-rating-3'));
+      fireEvent.click(screen.getByTestId('scripture-reflection-continue'));
+      // Wait for advanceStep to complete
+      await vi.waitFor(() => {
+        expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      });
       // Re-render to trigger effects with new step index
       mockStoreState.session = createMockSession({ currentStepIndex: 1 });
       rerender(<SoloReadingFlow />);
