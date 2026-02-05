@@ -1,16 +1,7 @@
 ---
 name: create-architecture
 description: Collaborative architectural decision facilitation for AI-agent consistency. Replaces template-driven architecture with intelligent, adaptive conversation that produces a decision-focused architecture document optimized for preventing agent conflicts.
-web_bundle: true
 ---
-
-## ContextStream Integration
-
-This workflow uses ContextStream for persistent memory and decision tracking:
-- **Init**: Call `mcp__contextstream__init()` at workflow start (step-01)
-- **Search**: Use `mcp__contextstream__search(mode="hybrid")` to find PRD and prior decisions
-- **Capture**: Save each architectural decision via `mcp__contextstream__session(action="capture", event_type="decision")`
-- **Save**: Save completed architecture doc to ContextStream via `mcp__contextstream__memory(action="create_doc", doc_type="spec")`
 
 # Architecture Workflow
 

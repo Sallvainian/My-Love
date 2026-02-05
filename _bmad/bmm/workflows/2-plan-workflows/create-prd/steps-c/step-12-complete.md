@@ -117,13 +117,6 @@ PRD complete. Read fully and follow: `_bmad/core/tasks/bmad-help.md` with argume
 ❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
 ❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
 
-### Save PRD to ContextStream
-
-After PRD is finalized:
-
-1. **Save as document**: Call `mcp__contextstream__memory(action="create_doc", title="PRD: {{project_name}}", doc_type="spec", content="{{prd_content}}")` to persist the PRD in ContextStream
-2. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="decision", title="PRD completed for {{project_name}}", content="PRD created with {{section_count}} sections covering {{scope_summary}}", importance="high", tags=["prd", "planning"])`
-
 ## FINAL REMINDER to give the user:
 
 The polished PRD serves as the foundation for all subsequent product development activities. All design, architecture, and development work should trace back to the requirements and vision documented in this PRD - update it also as needed as you continue planning.

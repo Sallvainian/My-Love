@@ -160,11 +160,6 @@ development_status:
 - Epics in-progress: {{in_progress_count}}
 - Stories done: {{done_count}}
 
-<!-- Save sprint plan to ContextStream -->
-<action>Call mcp__contextstream__session(action="capture_plan", title="Sprint Plan: {{project_name}}", description="Sprint status with {{epic_count}} epics and {{story_count}} stories", goals=["Track all epics and stories through development lifecycle"], steps=[{id: "epic-1", title: "Epic 1", order: 1}, ...for each epic], status="active", tags=["sprint-planning"])</action>
-<action>For each story: Call mcp__contextstream__memory(action="create_task", title="Story {{story_key}}", description="{{story_title}}", plan_id="{{sprint_plan_id}}", priority="medium", tags=["sprint", "epic-{{epic_num}}"])</action>
-<action>Call mcp__contextstream__session(action="capture", event_type="decision", title="Sprint plan generated", content="{{epic_count}} epics, {{story_count}} stories tracked in {{status_file}}", importance="high", tags=["sprint-planning"])</action>
-
 <action>Display completion summary to {user_name} in {communication_language}:</action>
 
 **Sprint Status Generated Successfully**

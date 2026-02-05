@@ -55,14 +55,3 @@ input_file_patterns:
     whole: "{planning_artifacts}/*epic*.md"
     sharded: "{planning_artifacts}/*epic*/*.md"
     load_strategy: "SELECTIVE_LOAD" # Only load needed epic
-
-# ContextStream integration
-contextstream:
-  init: true
-  context: true
-  search_inputs: true      # Search for epic context, prior story patterns
-  capture_decisions: true   # Capture story creation decisions
-  check_lessons: true       # Check lessons before story creation
-  update_tasks: true        # Save new story as plan + create task
-
-standalone: true

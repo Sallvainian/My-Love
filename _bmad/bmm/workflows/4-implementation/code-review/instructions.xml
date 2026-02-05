@@ -41,19 +41,12 @@
 
     <invoke-protocol name="discover_inputs" />
     <action>Load {project_context} for coding standards (if exists)</action>
-    <!-- ContextStream initialization -->
-    <action>Call mcp__contextstream__init(folder_path="{project-root}", context_hint="Code review for story {{story_key}}")</action>
-    <action>Call mcp__contextstream__session(action="get_lessons", query="code review common issues {{story_key}}")</action>
-    <action>Call mcp__contextstream__search(mode="hybrid", query="story {{story_key}} acceptance criteria architecture decisions") for supplemental review context</action>
   </step>
 
   <step n="2" goal="Build review attack plan">
     <action>Extract ALL Acceptance Criteria from story</action>
     <action>Extract ALL Tasks/Subtasks with completion status ([x] vs [ ])</action>
     <action>From Dev Agent Record → File List, compile list of claimed changes</action>
-
-    <!-- ContextStream: analyze change impact -->
-    <action>Call mcp__contextstream__graph(action="impact", target={type: "module", id: "{{primary_changed_file}}"}) to understand change ripple effects</action>
 
     <action>Create review plan:
       1. **AC Validation**: Verify each AC is actually implemented
@@ -173,9 +166,6 @@
       <action>Show detailed explanation with code examples</action>
       <action>Return to fix decision</action>
     </check>
-    <!-- Capture review findings in ContextStream -->
-    <action>For each HIGH finding: Call mcp__contextstream__session(action="capture", event_type="bug", title="[Review] {{finding_title}}", content="{{finding_details}}", importance="high", tags=["{{story_key}}", "code-review"])</action>
-    <action>For each insight discovered: Call mcp__contextstream__session(action="capture", event_type="insight", title="[Review] {{insight}}", content="{{details}}", tags=["{{story_key}}", "code-review"])</action>
   </step>
 
   <step n="5" goal="Update story status and sync sprint tracking">
@@ -189,12 +179,6 @@
       <action>Update story Status field to "in-progress"</action>
     </check>
     <action>Save story file</action>
-    <!-- Update ContextStream task status -->
-    <action>Call mcp__contextstream__memory(action="list_tasks") to find task matching story {{story_key}}</action>
-    <check if="matching task found AND {{new_status}} == 'done'">
-      <action>Call mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")</action>
-    </check>
-    <action>Call mcp__contextstream__session(action="capture", event_type="decision", title="Code review outcome for {{story_key}}: {{new_status}}", content="Issues found: {{high_count}} High, {{medium_count}} Medium, {{low_count}} Low. Fixed: {{fixed_count}}. Action items: {{action_count}}.", importance="high", tags=["{{story_key}}", "code-review", "{{new_status}}"])</action>
 
     <!-- Determine sprint tracking status -->
     <check if="{sprint_status} file exists">

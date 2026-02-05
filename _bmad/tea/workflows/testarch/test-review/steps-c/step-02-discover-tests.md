@@ -14,7 +14,6 @@ Collect test files in scope and parse structure/metadata.
 
 - 📖 Read the entire step file before acting
 - ✅ Speak in `{communication_language}`
-- ✅ Output terse bullet lists only — no formatted tables, no verbose summaries
 
 ---
 
@@ -45,23 +44,16 @@ Halt if no tests are found.
 
 ---
 
-## 2. Parse Metadata (per file — grep only, do NOT read full files)
+## 2. Parse Metadata (per file)
 
-**Use `wc -l` for line counts and grep/search for metadata.** Do NOT read full test files into orchestrator context — sub-agents handle that in Step 3.
+Collect:
 
-Collect via grep:
-
-- Line count (`wc -l`)
-- Framework: grep for `import.*from.*playwright` or similar
-- Test counts: grep for `test\(` or `it\(` and `describe\(`
-- Test IDs: grep for test ID patterns (e.g., `2.1-E2E-`, `2.1-API-`)
-- Priority markers: grep for `P0`, `P1`, `P2`, `P3`
-- Imports: grep for `^import`
-- Fixtures: grep for `{ page`, `supabaseAdmin`, `testSession`
-- Factories: grep for `createTestSession`, `cleanupTestSession`
-- Network: grep for `page.route`, `waitForResponse`
-- Hard waits: grep for `waitForTimeout`
-- Control flow: grep for `try {`, `catch`, `if (`
+- File size and line count
+- Test framework detected
+- Describe/test block counts
+- Test IDs and priority markers
+- Imports, fixtures, factories, network interception
+- Waits/timeouts and control flow (if/try/catch)
 
 Load next step: `{nextStepFile}`
 

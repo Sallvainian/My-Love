@@ -33,14 +33,6 @@ Run `/bmad:bmm:workflows:sprint-planning` to generate it, then rerun sprint-stat
   <action>Continue to Step 2</action>
 </step>
 
-<step n="1.5" goal="Initialize ContextStream and cross-reference state">
-  <action>Call mcp__contextstream__init(folder_path="{project-root}", context_hint="Sprint status check")</action>
-  <action>Call mcp__contextstream__context(user_message="Checking sprint status and progress")</action>
-  <action>Call mcp__contextstream__session(action="list_plans") to get ContextStream plan states</action>
-  <action>Call mcp__contextstream__memory(action="list_tasks") to get ContextStream task states</action>
-  <action>Note any discrepancies between ContextStream state and sprint-status.yaml for reporting in step 4</action>
-</step>
-
 <step n="2" goal="Read and parse sprint-status.yaml">
   <action>Read the FULL file: {sprint_status_file}</action>
   <action>Parse fields: generated, project, project_key, tracking_system, story_location</action>

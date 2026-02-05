@@ -26,15 +26,6 @@
 - Don't assume knowledge from other steps
 - Input document discovery happens in this step
 
-### ContextStream Initialization
-
-Before proceeding with architecture design:
-
-1. **Initialize session**: Call `mcp__contextstream__init(folder_path="{project-root}", context_hint="Creating architecture for {{project_name}}")`
-2. **Search for PRD**: Call `mcp__contextstream__search(mode="hybrid", query="PRD product requirements {{project_name}}")` to pull PRD from ContextStream instead of only relying on file glob
-3. **Check lessons**: Call `mcp__contextstream__session(action="get_lessons", query="architecture decisions common mistakes technology choices")`
-4. **Apply lessons**: If lessons found, review and apply preventive measures during architecture design
-
 ## YOUR TASK:
 
 Initialize the Architecture workflow by detecting continuation state, discovering input documents, and setting up the document for collaborative architectural decision making.

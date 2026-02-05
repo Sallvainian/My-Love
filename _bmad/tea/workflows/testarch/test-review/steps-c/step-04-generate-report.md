@@ -2,15 +2,13 @@
 name: 'step-04-generate-report'
 description: 'Create test-review report and validate'
 outputFile: '{output_folder}/test-review.md'
-templatePath: '{installed_path}/test-review-template.md'
-checklistPath: '{installed_path}/checklist.md'
 ---
 
 # Step 4: Generate Report & Validate
 
 ## STEP GOAL
 
-Produce the test-review report and validate against checklist. This step loads the template and checklist on demand (they are NOT pre-loaded by the orchestrator).
+Produce the test-review report and validate against checklist.
 
 ## MANDATORY EXECUTION RULES
 
@@ -23,55 +21,37 @@ Produce the test-review report and validate against checklist. This step loads t
 
 - 🎯 Follow the MANDATORY SEQUENCE exactly
 - 💾 Record outputs before proceeding
+- 📖 Load the next step only when instructed
 
 ## CONTEXT BOUNDARIES:
 
-- Available context: aggregated scores from Step 3F (JSON summary file)
-- Focus: report generation and validation only
-
-## RECOMMENDED: Run as Sub-Agent
-
-This step benefits from a fresh context. The orchestrator should launch a sub-agent with:
-- This step file as instructions
-- The aggregated summary JSON path from Step 3F
-- The template path: `{templatePath}`
-- The checklist path: `{checklistPath}`
-- The output path: `{outputFile}`
-
-The sub-agent reads the template, fills it with aggregated scores, validates against checklist, and writes the final report.
+- Available context: config, loaded artifacts, and knowledge fragments
+- Focus: this step's goal only
+- Limits: do not execute future steps
+- Dependencies: prior steps' outputs (if any)
 
 ## MANDATORY SEQUENCE
 
 **CRITICAL:** Follow this sequence exactly. Do not skip, reorder, or improvise.
 
-## 1. Load Template
+## 1. Report Generation
 
-Read `{templatePath}` (the test-review template).
+Use `test-review-template.md` to produce `{outputFile}` including:
 
-## 2. Load Aggregated Scores
-
-Read the summary JSON from Step 3F (`/tmp/tea-test-review-summary-*.json`).
-
-## 3. Report Generation
-
-Fill in the template with:
-
-- Score summary (overall + per-dimension)
-- Critical findings with fixes (from violations)
-- Warnings and recommendations (from top-10 recommendations)
+- Score summary
+- Critical findings with fixes
+- Warnings and recommendations
 - Context references (story/test-design if available)
 
-Write completed report to `{outputFile}`.
+---
+
+## 2. Validation
+
+Validate against `checklist.md` and fix any gaps.
 
 ---
 
-## 4. Validation
-
-Read `{checklistPath}` and validate the report against it. Fix any gaps.
-
----
-
-## 5. Completion Summary
+## 3. Completion Summary
 
 Report:
 
@@ -84,9 +64,7 @@ Report:
 
 ### ✅ SUCCESS:
 
-- Template loaded on demand (not pre-loaded by orchestrator)
-- Report generated and written to output file
-- Validated against checklist
+- Step completed in full with required outputs
 
 ### ❌ SYSTEM FAILURE:
 

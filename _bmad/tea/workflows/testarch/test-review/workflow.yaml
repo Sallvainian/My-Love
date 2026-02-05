@@ -15,14 +15,12 @@ date: system-generated
 installed_path: "{project-root}/_bmad/tea/workflows/testarch/test-review"
 instructions: "{installed_path}/instructions.md"
 validation: "{installed_path}/checklist.md"
-template: false # Deferred — step-04 loads template on demand to save orchestrator context
+template: "{installed_path}/test-review-template.md"
 
 # Variables and inputs
 variables:
   test_dir: "{project-root}/tests" # Root test directory
   review_scope: "single" # single (one file), directory (folder), suite (all tests)
-  template_path: "{installed_path}/test-review-template.md" # Loaded by step-04 only
-  checklist_path: "{installed_path}/checklist.md" # Loaded by step-04 only
 
 # Output configuration
 default_output_file: "{output_folder}/test-review.md"

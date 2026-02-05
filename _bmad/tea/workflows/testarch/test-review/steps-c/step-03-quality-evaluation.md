@@ -1,122 +1,157 @@
 ---
 name: 'step-03-quality-evaluation'
-description: 'Evaluate 5 quality dimensions via sub-agents with selective fragment loading'
+description: 'Orchestrate parallel quality dimension checks (5 subprocesses)'
 nextStepFile: './step-03f-aggregate-scores.md'
 ---
 
-# Step 3: Quality Evaluation
+# Step 3: Orchestrate Parallel Quality Evaluation
 
 ## STEP GOAL
 
-Evaluate test files across 5 quality dimensions using sub-agents that load only the fragments they need.
+Launch 5 parallel subprocesses to evaluate independent quality dimensions simultaneously for maximum performance.
 
 ## MANDATORY EXECUTION RULES
 
 - 📖 Read the entire step file before acting
 - ✅ Speak in `{communication_language}`
-- ✅ Output terse bullet lists only — no formatted tables, no verbose summaries
-- ✅ Evaluate ALL 5 quality dimensions
-- ✅ Write JSON output per dimension to `/tmp/`
-- ❌ Do NOT read subprocess step files into your own context
-- ❌ Do NOT load knowledge fragments into your own context
+- ✅ Launch FIVE subprocesses in PARALLEL
+- ✅ Wait for ALL subprocesses to complete
+- ❌ Do NOT evaluate quality sequentially (use subprocesses)
+- ❌ Do NOT proceed until all subprocesses finish
 
 ---
 
-## EXECUTION MODE SELECTION
+## EXECUTION PROTOCOLS:
 
-### Mode A: Sub-Agent Delegation (Default)
+- 🎯 Follow the MANDATORY SEQUENCE exactly
+- 💾 Wait for subprocess outputs
+- 📖 Load the next step only when instructed
 
-Launch sub-agents. Each sub-agent receives:
-1. Its rubric step file path (the sub-agent reads it)
-2. The test file paths (the sub-agent reads them)
-3. Fragment file paths from the fragment map (the sub-agent loads only these)
-4. The output JSON path to write to
+## CONTEXT BOUNDARIES:
 
-**The orchestrator stays lightweight.** It does not read rubrics or fragments itself.
-
-### Mode B: Inline Sequential (Fallback)
-
-If sub-agents are unavailable, evaluate dimensions yourself by reading each rubric step file and the test files. Only use this if Mode A fails.
+- Available context: test files from Step 2, knowledge fragments
+- Focus: subprocess orchestration only
+- Limits: do not evaluate quality directly (delegate to subprocesses)
 
 ---
 
 ## MANDATORY SEQUENCE
 
-### 1. Generate Timestamp
+### 1. Prepare Subprocess Inputs
+
+**Generate unique timestamp:**
 
 ```javascript
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 ```
 
-### 2. Determine Fragment Assignments
+**Prepare context for all subprocesses:**
 
-From the fragment map (Step 1 output), assign relevant fragments to each dimension:
-
-| Dimension | Always Gets | Also Gets (if in fragment map) |
-|---|---|---|
-| Determinism | `test-quality` | `timing-debugging` |
-| Isolation | `test-quality` | `data-factories`, `fixtures-composition` |
-| Maintainability | `test-quality` | `selector-resilience` |
-| Coverage | `test-quality` | (story file, test design doc) |
-| Performance | `test-quality` | `selective-testing` |
-
-### 3. Launch Sub-Agents
-
-For each dimension, launch a sub-agent with this prompt structure:
-
-```
-You are evaluating test quality for the "{dimension}" dimension.
-
-1. Read your rubric: {rubric_step_file_path}
-2. Read the test files: {test_file_paths}
-3. Read these knowledge fragments: {assigned_fragment_paths}
-4. Evaluate per the rubric criteria
-5. Write JSON output to: /tmp/tea-test-review-{dimension}-{timestamp}.json
-
-Use the JSON format specified in your rubric file.
-Scoring formula: score = 100 - sum(severity_weights) where HIGH=10, MEDIUM=5, LOW=2.
-Report the exact arithmetic result. Do NOT cap or override the score for any reason — no "capped at 50" rules. The only dimension with a score cap is Coverage (defined in its own rubric).
+```javascript
+const subprocessContext = {
+  test_files: /* from Step 2 */,
+  knowledge_fragments_loaded: ['test-quality'],
+  timestamp: timestamp
+};
 ```
 
-**Launch all 5 in parallel** for performance.
+---
 
-### 4. Wait and Verify
+### 2. Launch 5 Parallel Quality Subprocesses
 
-**Do NOT read TaskOutput content.** Sub-agents write JSON files; the aggregation agent reads them directly.
+**Subprocess A: Determinism Check**
 
-Poll for completion using bash:
-```bash
-# Check every 10s until all 5 files exist (up to 3 minutes)
-for i in $(seq 1 18); do
-  COUNT=$(ls /tmp/tea-test-review-*-{timestamp}.json 2>/dev/null | wc -l | tr -d ' ')
-  [ "$COUNT" -ge 5 ] && break
-  sleep 10
-done
-ls -l /tmp/tea-test-review-*-{timestamp}.json
+- File: `./step-03a-subprocess-determinism.md`
+- Output: `/tmp/tea-test-review-determinism-${timestamp}.json`
+- Status: Running in parallel... ⟳
+
+**Subprocess B: Isolation Check**
+
+- File: `./step-03b-subprocess-isolation.md`
+- Output: `/tmp/tea-test-review-isolation-${timestamp}.json`
+- Status: Running in parallel... ⟳
+
+**Subprocess C: Maintainability Check**
+
+- File: `./step-03c-subprocess-maintainability.md`
+- Output: `/tmp/tea-test-review-maintainability-${timestamp}.json`
+- Status: Running in parallel... ⟳
+
+**Subprocess D: Coverage Check**
+
+- File: `./step-03d-subprocess-coverage.md`
+- Output: `/tmp/tea-test-review-coverage-${timestamp}.json`
+- Status: Running in parallel... ⟳
+
+**Subprocess E: Performance Check**
+
+- File: `./step-03e-subprocess-performance.md`
+- Output: `/tmp/tea-test-review-performance-${timestamp}.json`
+- Status: Running in parallel... ⟳
+
+---
+
+### 3. Wait for All Subprocesses
+
+```
+⏳ Waiting for 5 quality subprocesses to complete...
+  ├── Subprocess A (Determinism): Running... ⟳
+  ├── Subprocess B (Isolation): Running... ⟳
+  ├── Subprocess C (Maintainability): Running... ⟳
+  ├── Subprocess D (Coverage): Running... ⟳
+  └── Subprocess E (Performance): Running... ⟳
+
+[... time passes ...]
+
+  ├── Subprocess A (Determinism): Complete ✅
+  ├── Subprocess B (Isolation): Complete ✅
+  ├── Subprocess C (Maintainability): Complete ✅
+  ├── Subprocess D (Coverage): Complete ✅
+  └── Subprocess E (Performance): Complete ✅
+
+✅ All 5 quality subprocesses completed successfully!
 ```
 
-Only check TaskOutput if files are missing after timeout (error diagnosis).
+---
 
-### 5. Launch Aggregation + Report Sub-Agent
+### 4. Verify All Outputs Exist
 
-**Do NOT load step 3F or step 4 yourself.** Launch a single sub-agent to handle aggregation and report generation with fresh context:
+```javascript
+const outputs = ['determinism', 'isolation', 'maintainability', 'coverage', 'performance'].map(
+  (dim) => `/tmp/tea-test-review-${dim}-${timestamp}.json`,
+);
 
-```
-You are completing the TEA test-review workflow (steps 3F + 4).
-
-1. Read step-03f-aggregate-scores.md: {step_03f_path}
-2. Read all 5 dimension JSON files from /tmp/tea-test-review-*.json
-3. Aggregate scores per the step-03f instructions
-4. Write summary JSON to /tmp/tea-test-review-summary-{timestamp}.json
-5. Read step-04-generate-report.md: {step_04_path}
-6. Read the template: {template_path}
-7. Fill template with aggregated scores and write to: {output_file}
-8. Read the checklist: {checklist_path}
-9. Validate report against checklist
-10. Report completion summary
+outputs.forEach((output) => {
+  if (!fs.existsSync(output)) {
+    throw new Error(`Subprocess output missing: ${output}`);
+  }
+});
 ```
 
-This sub-agent has fresh context for the template (390 lines) and checklist (472 lines).
+---
+
+### 5. Performance Report
+
+```
+🚀 Performance Report:
+- Execution Mode: PARALLEL (5 subprocesses)
+- Total Elapsed: ~max(all subprocesses) minutes
+- Sequential Would Take: ~sum(all subprocesses) minutes
+- Performance Gain: ~60-70% faster!
+```
+
+---
+
+### 6. Proceed to Aggregation
+
+Load next step: `{nextStepFile}`
+
+The aggregation step (3F) will:
+
+- Read all 5 subprocess outputs
+- Calculate weighted overall score (0-100)
+- Aggregate violations by severity
+- Generate review report with top suggestions
 
 ---
 
@@ -124,9 +159,11 @@ This sub-agent has fresh context for the template (390 lines) and checklist (472
 
 Proceed to Step 3F when:
 
-- ✅ All 5 dimensions evaluated
-- ✅ All output JSON files exist and are valid
-- ✅ Each file has: dimension, score, grade, violations[], recommendations[]
+- ✅ All 5 subprocesses completed successfully
+- ✅ All output files exist and are valid JSON
+- ✅ Performance metrics displayed
+
+**Do NOT proceed if any subprocess failed.**
 
 ---
 
@@ -134,12 +171,14 @@ Proceed to Step 3F when:
 
 ### ✅ SUCCESS:
 
-- All 5 quality dimensions evaluated via sub-agents
-- Orchestrator context stayed lightweight (no fragments loaded)
+- All 5 subprocesses launched and completed
 - Output files generated and valid
+- Parallel execution achieved ~60% performance gain
 
 ### ❌ FAILURE:
 
-- Orchestrator loaded fragments or rubrics into own context
-- Missing dimension evaluations
+- One or more subprocesses failed
 - Output files missing or invalid
+- Sequential evaluation instead of parallel
+
+**Master Rule:** Parallel subprocess execution is MANDATORY for performance.

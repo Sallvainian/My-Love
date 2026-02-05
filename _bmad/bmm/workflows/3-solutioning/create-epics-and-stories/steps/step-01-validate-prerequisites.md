@@ -60,16 +60,6 @@ To validate that all required input documents exist and extract all requirements
 
 ## REQUIREMENTS EXTRACTION PROCESS:
 
-### ContextStream Initialization
-
-Before proceeding with epic/story creation:
-
-1. **Initialize session**: Call `mcp__contextstream__init(folder_path="{project-root}", context_hint="Creating epics and stories from PRD and architecture")`
-2. **Search for PRD**: Call `mcp__contextstream__search(mode="hybrid", query="PRD product requirements scope")` to find PRD in ContextStream
-3. **Search for Architecture**: Call `mcp__contextstream__search(mode="hybrid", query="architecture decisions patterns technology stack")` to find architecture doc
-4. **Check lessons**: Call `mcp__contextstream__session(action="get_lessons", query="epic story creation acceptance criteria common mistakes")`
-5. **Apply lessons**: If lessons found, review and apply preventive measures
-
 ### 1. Welcome and Overview
 
 Welcome {user_name} to comprehensive epic and story creation!

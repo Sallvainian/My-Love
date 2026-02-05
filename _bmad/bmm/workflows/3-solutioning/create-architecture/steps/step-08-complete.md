@@ -69,13 +69,6 @@ Upon Completion of task output: offer to answer any questions about the Architec
 ❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
 ❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
 
-### Save Architecture to ContextStream
-
-After architecture document is finalized:
-
-1. **Save as document**: Call `mcp__contextstream__memory(action="create_doc", title="Architecture: {{project_name}}", doc_type="spec", content="{{architecture_content}}")` to persist in ContextStream
-2. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="decision", title="Architecture completed for {{project_name}}", content="Architecture document created with {{decision_count}} critical decisions", importance="high", tags=["architecture", "planning"])`
-
 ## WORKFLOW COMPLETE:
 
 This is the final step of the Architecture workflow. The user now has a complete, validated architecture document ready for AI agent implementation.

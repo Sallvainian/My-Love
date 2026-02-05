@@ -1,17 +1,7 @@
 ---
 name: create-epics-and-stories
 description: 'Transform PRD requirements and Architecture decisions into comprehensive stories organized by user value. This workflow requires completed PRD + Architecture documents (UX recommended if UI exists) and breaks down requirements into implementation-ready epics and user stories that incorporate all available technical and design context. Creates detailed, actionable stories with complete acceptance criteria for development teams.'
-web_bundle: true
 ---
-
-## ContextStream Integration
-
-This workflow uses ContextStream for persistent memory and decision tracking:
-- **Init**: Call `mcp__contextstream__init()` at workflow start (step-01)
-- **Search**: Use `mcp__contextstream__search(mode="hybrid")` to find PRD + architecture from ContextStream
-- **Capture**: Save each epic/story plan via `mcp__contextstream__session(action="capture_plan")`
-- **Tasks**: Create tasks for each story via `mcp__contextstream__memory(action="create_task")`
-- **Save**: Save epics doc to ContextStream via `mcp__contextstream__memory(action="create_doc")`
 
 # Create Epics and Stories
 

@@ -134,31 +134,6 @@
     <action if="incomplete task or subtask requirements ambiguous">ASK user to clarify or HALT</action>
   </step>
 
-  <step n="1.5" goal="Initialize ContextStream context and check lessons">
-    <critical>ContextStream provides persistent memory, decision tracking, and lessons from past mistakes</critical>
-
-    <!-- Initialize ContextStream session -->
-    <action>Call mcp__contextstream__init(folder_path="{project-root}", context_hint="Implementing story {{story_key}}: {{story_title}}")</action>
-    <action>Call mcp__contextstream__context(user_message="Starting implementation of story {{story_key}}")</action>
-
-    <!-- Check for lessons from past mistakes -->
-    <action>Call mcp__contextstream__session(action="get_lessons", query="implementing {{story_key}} story development common mistakes")</action>
-    <check if="lessons found">
-      <action>Review lessons and apply preventive measures during implementation</action>
-      <output>📚 **Lessons from Past Work:** Applying {{lesson_count}} lessons to avoid known pitfalls</output>
-    </check>
-
-    <!-- Search for story context in ContextStream -->
-    <action>Call mcp__contextstream__search(mode="hybrid", query="story {{story_key}} acceptance criteria architecture") to find relevant plans, docs, and decisions</action>
-    <action>Use ContextStream results to supplement story file context (do NOT replace story file — augment it)</action>
-
-    <!-- Update task status in ContextStream -->
-    <action>Call mcp__contextstream__memory(action="list_tasks") to find task matching story {{story_key}}</action>
-    <check if="matching task found">
-      <action>Call mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="in_progress")</action>
-    </check>
-  </step>
-
   <step n="2" goal="Load project context and story information">
     <critical>Load all available context to inform implementation</critical>
 
@@ -269,8 +244,6 @@
 
     <action if="new dependencies required beyond story specifications">HALT: "Additional dependencies need user approval"</action>
     <action if="3 consecutive implementation failures occur">HALT and request guidance</action>
-    <!-- Capture lessons on implementation failures -->
-    <action if="implementation approach failed or had unexpected issues">Call mcp__contextstream__session(action="capture_lesson", title="Implementation issue in {{story_key}}", trigger="{{what_went_wrong}}", impact="{{what_happened}}", prevention="{{how_to_avoid}}")</action>
     <action if="required configuration is missing">HALT: "Cannot proceed without necessary configuration files"</action>
 
     <critical>NEVER implement anything not mapped to a specific task/subtask in the story file</critical>
@@ -337,8 +310,6 @@
       <action>Add Change Log entry: "Addressed code review findings - {{resolved_count}} items resolved (Date: {{date}})"</action>
     </check>
 
-    <!-- Capture implementation decisions and progress in ContextStream -->
-    <action>Call mcp__contextstream__session(action="capture", event_type="implementation", title="Task completed: {{task_description}}", content="{{completion_notes}}", tags=["{{story_key}}", "implementation"])</action>
     <action>Save the story file</action>
     <action>Determine if more incomplete tasks remain</action>
     <action if="more tasks remain">
@@ -355,12 +326,6 @@
     <action>Confirm File List includes every changed file</action>
     <action>Execute enhanced definition-of-done validation</action>
     <action>Update the story Status to: "review"</action>
-    <!-- Update ContextStream task status to completed -->
-    <action>Call mcp__contextstream__memory(action="list_tasks") to find task matching story {{story_key}}</action>
-    <check if="matching task found">
-      <action>Call mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")</action>
-    </check>
-    <action>Call mcp__contextstream__session(action="capture", event_type="implementation", title="Story {{story_key}} complete — ready for review", content="All tasks complete, tests passing, status=review", importance="high", tags=["{{story_key}}", "story-complete"])</action>
 
     <!-- Enhanced Definition of Done Validation -->
     <action>Validate definition-of-done checklist with essential requirements:

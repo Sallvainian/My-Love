@@ -27,35 +27,31 @@ This is an **isolated subprocess** running in parallel with other quality dimens
 
 ### 1. Identify Coverage Violations
 
-Classify severity by AC (acceptance criteria) and test-design priority:
+**HIGH SEVERITY Violations**:
 
-**HIGH** — AC explicitly requires behavior AND no test exists (not even partial):
-- P0 functionality from AC with zero test coverage
-- API endpoint specified in AC without any test
-- Error handling required by AC but no negative test
+- Critical user paths not tested (P0 functionality missing)
+- API endpoints without tests
+- Error handling not tested (no negative test cases)
+- Missing authentication/authorization tests
 
-**MEDIUM** — AC behavior has only partial coverage, OR planned P0/P1 test missing:
-- AC behavior tested only on happy path (error scenarios missing)
-- Test-design planned test at P0/P1 not implemented
-- Assertion gap: test runs code path but doesn't verify AC-specified outcome
+**MEDIUM SEVERITY Violations**:
 
-**LOW** — Behavior implied but not explicitly in AC, or lower-priority gap:
-- Test-design planned test at P2/P3 not implemented
-- Behavior inferred from domain (not in AC text)
-- Testing at different level than planned (component vs E2E)
+- Edge cases not covered (boundary values, null/empty inputs)
+- Only happy path tested (no error scenarios)
+- Missing integration tests (only unit or only E2E)
+- Insufficient assertion coverage (tests don't verify important outcomes)
+
+**LOW SEVERITY Violations**:
+
+- Could benefit from additional test cases
+- Minor edge cases not covered
+- Documentation incomplete
 
 ### 2. Calculate Coverage Score
 
 ```javascript
-// Standard severity-weighted formula (matches all other dimensions)
-const severityWeights = { HIGH: 10, MEDIUM: 5, LOW: 2 };
-const totalPenalty = violations.reduce((sum, v) => sum + severityWeights[v.severity], 0);
-let score = Math.max(0, 100 - totalPenalty);
-
-// Cap at 50 if any HIGH violations exist (critical coverage gaps)
-if (violations.some((v) => v.severity === 'HIGH')) {
-  score = Math.min(score, 50);
-}
+const criticalGaps = violations.filter((v) => v.severity === 'HIGH').length;
+const score = criticalGaps === 0 ? Math.max(0, 100 - violations.length * 5) : Math.max(0, 50 - criticalGaps * 10); // Heavy penalty for critical gaps
 ```
 
 ---

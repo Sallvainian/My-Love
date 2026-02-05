@@ -36,13 +36,6 @@ required_tools:
   - search_repo # Find patterns
   - glob # Find files
 
-# ContextStream integration
-contextstream:
-  init: true
-  context: true
-  search_inputs: true
-  check_lessons: true
-
 tags:
   - qa
   - automation

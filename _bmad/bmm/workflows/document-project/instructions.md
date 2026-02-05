@@ -1,13 +1,5 @@
 # Document Project Workflow Router
 
-## ContextStream Integration
-
-Before documenting the project:
-
-1. Call `mcp__contextstream__init(folder_path="{project-root}", context_hint="Documenting project structure and patterns")`
-2. Call `mcp__contextstream__search(mode="hybrid", query="project documentation architecture patterns")` for existing docs
-3. After documentation: Call `mcp__contextstream__memory(action="create_doc", title="Project Documentation: {{project_name}}", doc_type="general", content="{{doc_content}}")` to save to ContextStream
-
 <critical>The workflow execution engine is governed by: {project-root}/_bmad/core/tasks/workflow.xml</critical>
 <critical>You MUST have already loaded and processed: {project-root}/_bmad/bmm/workflows/document-project/workflow.yaml</critical>
 <critical>Communicate all responses in {communication_language}</critical>

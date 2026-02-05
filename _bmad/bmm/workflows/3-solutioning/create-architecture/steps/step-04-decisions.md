@@ -187,12 +187,6 @@ Search the web: "{{technology}} production readiness"
 - Affects: {{components_or_epics}}
 - Provided by Starter: {{yes_if_from_starter}}
 
-### Capture Decisions in ContextStream
-
-For each architectural decision made in this step:
-
-- Call `mcp__contextstream__session(action="capture", event_type="decision", title="Architecture: {{decision_title}}", content="Choice: {{choice}}. Rationale: {{rationale}}. Alternatives considered: {{alternatives}}", importance="high", tags=["architecture", "decision"])`
-
 ### 4. Check for Cascading Implications
 
 After each major decision, identify related decisions:

@@ -21,10 +21,6 @@
     <check if="{{story_path}} is provided by user or user provided the epic and story number such as 2-4 or 1.6 or epic 1 story 5">
       <action>Parse user-provided story path: extract epic_num, story_num, story_title from format like "1-2-user-auth"</action>
       <action>Set {{epic_num}}, {{story_num}}, {{story_key}} from user input</action>
-      <!-- ContextStream: initialize and search for context -->
-      <action>Call mcp__contextstream__init(folder_path="{project-root}", context_hint="Creating story {{epic_num}}.{{story_num}} for epic {{epic_num}}")</action>
-      <action>Call mcp__contextstream__session(action="get_lessons", query="story creation common issues context quality")</action>
-      <action>Call mcp__contextstream__search(mode="hybrid", query="epic {{epic_num}} stories architecture decisions patterns") to pull context from ContextStream</action>
       <action>GOTO step 2a</action>
     </check>
 
@@ -327,10 +323,6 @@
       <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
     </check>
 
-    <!-- Save story as plan + task in ContextStream -->
-    <action>Call mcp__contextstream__session(action="capture_plan", title="Story {{story_id}}: {{story_title}}", description="{{story_description}}", goals={{story_goals}}, steps={{story_steps}}, status="active", tags=["epic-{{epic_num}}", "story-{{story_key}}", "ready-for-dev"])</action>
-    <action>Call mcp__contextstream__memory(action="create_task", title="Story {{story_id}}: {{story_title}}", description="Implement story {{story_key}} — ready for dev-story workflow", plan_id="{{plan_id}}", priority="high", tags=["epic-{{epic_num}}", "story-{{story_key}}"])</action>
-    <action>Call mcp__contextstream__session(action="capture", event_type="task", title="Story {{story_key}} created — ready-for-dev", content="Story file created at {{story_file}} with comprehensive context", importance="medium", tags=["story-created", "epic-{{epic_num}}"])</action>
     <action>Report completion</action>
     <output>**🎯 ULTIMATE BMad Method STORY CONTEXT CREATED, {user_name}!**
 

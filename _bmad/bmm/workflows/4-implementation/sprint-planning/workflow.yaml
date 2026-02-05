@@ -49,12 +49,3 @@ input_file_patterns:
 
 # Output configuration
 default_output_file: "{status_file}"
-
-# ContextStream integration
-contextstream:
-  init: true
-  context: true
-  capture_decisions: true  # Save sprint plan to ContextStream
-  update_tasks: true       # Create tasks for each story
-
-standalone: true

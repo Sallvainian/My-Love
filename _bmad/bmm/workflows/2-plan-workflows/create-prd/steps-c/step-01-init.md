@@ -57,15 +57,6 @@ Initialize the PRD workflow by detecting continuation state, discovering input d
 - Limits: Don't assume knowledge from other steps or create content yet
 - Dependencies: Configuration loaded from workflow.md initialization
 
-### ContextStream Initialization
-
-Before proceeding with PRD creation:
-
-1. **Initialize session**: Call `mcp__contextstream__init(folder_path="{project-root}", context_hint="Creating new PRD for {{project_name}}")`
-2. **Check lessons**: Call `mcp__contextstream__session(action="get_lessons", query="PRD creation common mistakes requirements gathering")`
-3. **Search for existing context**: Call `mcp__contextstream__search(mode="hybrid", query="product requirements brief research {{project_name}}")` to find any existing research or briefs
-4. **Apply lessons**: If lessons found, review and apply preventive measures during PRD creation
-
 ## Sequence of Instructions (Do not deviate, skip, or optimize)
 
 ### 1. Check for Existing Workflow State

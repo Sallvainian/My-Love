@@ -3,13 +3,6 @@ name: quick-dev
 description: 'Flexible development - execute tech-specs OR direct instructions with optional planning.'
 ---
 
-## ContextStream Integration
-
-- **Init**: Call `mcp__contextstream__init()` at workflow start for context retrieval
-- **Search**: Use `mcp__contextstream__search()` to find relevant code patterns and decisions
-- **Lessons**: Call `mcp__contextstream__session(action="get_lessons")` before implementation
-- **Capture**: Save decisions via `mcp__contextstream__session(action="capture")`
-
 # Quick Dev Workflow
 
 **Goal:** Execute implementation tasks efficiently, either from a tech-spec or direct user instructions.

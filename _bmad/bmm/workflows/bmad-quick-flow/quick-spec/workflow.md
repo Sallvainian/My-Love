@@ -2,20 +2,12 @@
 name: quick-spec
 description: Conversational spec engineering - ask questions, investigate code, produce implementation-ready tech-spec.
 main_config: '{project-root}/_bmad/bmm/config.yaml'
-web_bundle: true
 
 # Checkpoint handler paths
 advanced_elicitation: '{project-root}/_bmad/core/workflows/advanced-elicitation/workflow.xml'
 party_mode_exec: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 quick_dev_workflow: '{project-root}/_bmad/bmm/workflows/bmad-quick-flow/quick-dev/workflow.md'
 ---
-
-## ContextStream Integration
-
-- **Init**: Call `mcp__contextstream__init()` at workflow start
-- **Search**: Use `mcp__contextstream__search()` to find existing specs and architecture
-- **Capture**: Save spec decisions via `mcp__contextstream__session(action="capture", event_type="decision")`
-- **Save**: Save spec via `mcp__contextstream__memory(action="create_doc", doc_type="spec")`
 
 # Quick-Spec Workflow
 

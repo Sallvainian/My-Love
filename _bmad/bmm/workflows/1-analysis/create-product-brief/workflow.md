@@ -1,15 +1,7 @@
 ---
 name: create-product-brief
 description: Create comprehensive product briefs through collaborative step-by-step discovery as creative Business Analyst working with the user as peers.
-web_bundle: true
 ---
-
-## ContextStream Integration
-
-- **Init**: Call `mcp__contextstream__init()` at workflow start
-- **Search**: Use `mcp__contextstream__search()` to find existing research
-- **Capture**: Save decisions via `mcp__contextstream__session(action="capture", event_type="decision")`
-- **Save**: Save brief via `mcp__contextstream__memory(action="create_doc", doc_type="spec")`
 
 # Product Brief Workflow
 

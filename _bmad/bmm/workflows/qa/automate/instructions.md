@@ -4,15 +4,6 @@
 
 **Scope**: This workflow generates tests ONLY. It does **not** perform code review or story validation (use Code Review `CR` for that).
 
-## ContextStream Integration
-
-Before generating tests:
-
-1. Call `mcp__contextstream__init(folder_path="{project-root}", context_hint="Generating automated tests")`
-2. Call `mcp__contextstream__session(action="get_lessons", query="test automation patterns common issues test quality")` — apply lessons
-3. Call `mcp__contextstream__search(mode="hybrid", query="test patterns architecture testing standards")` for project test conventions
-4. After test generation: Call `mcp__contextstream__session(action="capture", event_type="implementation", title="Tests generated for {{feature}}", content="{{test_count}} tests created", tags=["testing", "qa"])`
-
 ## Instructions
 
 ### Step 0: Detect Test Framework

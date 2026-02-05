@@ -144,16 +144,6 @@ If all validations pass:
 
 When C is selected, the workflow is complete and the epics.md is ready for development.
 
-### Save Epics and Stories to ContextStream
-
-After all epics and stories are finalized:
-
-1. **Create project per epic**: For each epic, consider creating a ContextStream project via `mcp__contextstream__project(action="create", name="Epic {{epic_num}}: {{epic_title}}")` to organize epic-specific context
-2. **Save epic plans**: For each epic, call `mcp__contextstream__session(action="capture_plan", title="Epic {{epic_num}}: {{epic_title}}", description="{{epic_description}}", goals={{epic_goals}}, steps=[{id: "{{story_num}}", title: "Story {{story_id}}: {{story_title}}", order: {{order}}} for each story], status="draft", tags=["epic-{{epic_num}}"])`
-3. **Create story tasks**: For each story, call `mcp__contextstream__memory(action="create_task", title="Story {{story_id}}: {{story_title}}", description="{{story_description}}", plan_id="{{epic_plan_id}}", priority="medium", tags=["epic-{{epic_num}}", "story"])`
-4. **Save epics doc**: Call `mcp__contextstream__memory(action="create_doc", title="Epics & Stories: {{project_name}}", doc_type="spec", content="{{epics_content}}")` to persist in ContextStream
-5. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="plan", title="Epics and stories created for {{project_name}}", content="{{epic_count}} epics, {{story_count}} stories created with full acceptance criteria", importance="high", tags=["epics", "stories", "planning"])`
-
 Epics and Stories complete. Read fully and follow: `_bmad/core/tasks/bmad-help.md` with argument `Create Epics and Stories`.
 
 Upon Completion of task output: offer to answer any questions about the Epics and Stories.

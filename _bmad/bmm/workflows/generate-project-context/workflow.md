@@ -3,12 +3,6 @@ name: generate-project-context
 description: Creates a concise project-context.md file with critical rules and patterns that AI agents must follow when implementing code. Optimized for LLM context efficiency.
 ---
 
-## ContextStream Integration
-
-- **Init**: Call `mcp__contextstream__init()` at workflow start
-- **Search**: Use `mcp__contextstream__search()` to find existing project context and patterns
-- **Save**: Save project-context.md to ContextStream via `mcp__contextstream__memory(action="create_doc")`
-
 # Generate Project Context Workflow
 
 **Goal:** Create a concise, optimized `project-context.md` file containing critical rules, patterns, and guidelines that AI agents must follow when implementing code. This file focuses on unobvious details that LLMs need to be reminded of.
