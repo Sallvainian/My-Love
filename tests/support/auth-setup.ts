@@ -1,17 +1,16 @@
 /**
  * Playwright Auth Setup
  *
- * Authenticates as test user 1 via Supabase API and injects the session
- * into the browser's localStorage. Runs once before all chromium tests
- * via the 'setup' project dependency.
+ * Creates test user (if needed) via Supabase Admin API, authenticates
+ * via signInWithPassword, and injects the session into the browser's
+ * localStorage. Runs once before all chromium tests via the 'setup'
+ * project dependency.
  *
- * Uses API-based auth (not UI login) for speed and reliability —
- * avoids waiting for React to render the login form.
+ * Uses API-based auth (not UI login) for speed and reliability.
  *
- * Resolves Supabase connection details directly from `supabase status`
- * so it works regardless of env var propagation from playwright.config.ts.
- *
- * Requires test users to exist in local Supabase with known credentials.
+ * The scripture_seed_test_data RPC expects auth users to already exist
+ * (SELECT id FROM auth.users ORDER BY created_at LIMIT 1), so this
+ * setup ensures they do before any E2E test runs.
  */
 import { test as setup, expect } from '@playwright/test';
 import { execSync } from 'child_process';
@@ -19,9 +18,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const authFile = 'tests/.auth/user.json';
 
+const TEST_USER_EMAIL = 'testuser1@test.example.com';
+const TEST_USER_PASSWORD = 'testpassword123';
+
 /**
  * Parse `supabase status -o env` to get local Supabase connection details.
- * Returns a map of KEY=VALUE pairs. Throws if Supabase CLI is unavailable.
  */
 function getSupabaseLocalVars(): Record<string, string> {
   const output = execSync('supabase status -o env 2>/dev/null', {
@@ -35,47 +36,63 @@ function getSupabaseLocalVars(): Record<string, string> {
   return vars;
 }
 
+function isValidUrl(s?: string): boolean {
+  try {
+    return s ? /^https?:\/\//.test(s) && !!new URL(s) : false;
+  } catch {
+    return false;
+  }
+}
+
 setup('authenticate as test user 1', async ({ page }) => {
   // Resolve Supabase vars — prefer env, fall back to `supabase status`
   let url = process.env.SUPABASE_URL;
+  let serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   let anonKey = process.env.SUPABASE_ANON_KEY;
 
-  // Validate URL is actually usable (env might be unset or stale)
-  const isValidUrl = (s?: string) => {
-    try {
-      return s ? /^https?:\/\//.test(s) && !!new URL(s) : false;
-    } catch {
-      return false;
-    }
-  };
-
-  if (!isValidUrl(url) || !anonKey) {
+  if (!isValidUrl(url) || !serviceRoleKey || !anonKey) {
     const vars = getSupabaseLocalVars();
     url = vars.API_URL;
+    serviceRoleKey = vars.SERVICE_ROLE_KEY;
     anonKey = vars.ANON_KEY;
 
-    if (!isValidUrl(url) || !anonKey) {
+    if (!isValidUrl(url) || !serviceRoleKey || !anonKey) {
       throw new Error(
-        `Cannot resolve Supabase connection. Got URL=${JSON.stringify(url)}. ` +
+        `Cannot resolve Supabase connection. URL=${JSON.stringify(url)}. ` +
           'Ensure Supabase local is running: `supabase start`'
       );
     }
   }
 
-  // Authenticate via Supabase API (bypasses UI for reliability)
-  const supabase = createClient(url!, anonKey!, {
+  // Use admin client to ensure test user exists
+  const admin = createClient(url!, serviceRoleKey!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // Create test user (idempotent — ignore "already registered" error)
+  const { error: createError } = await admin.auth.admin.createUser({
+    email: TEST_USER_EMAIL,
+    password: TEST_USER_PASSWORD,
+    email_confirm: true,
+    user_metadata: { display_name: 'Test User 1' },
+  });
+
+  if (createError && !createError.message.includes('already been registered')) {
+    throw new Error(`Failed to create test user: ${createError.message}`);
+  }
+
+  // Sign in as test user with anon key (same permissions as the real app)
+  const client = createClient(url!, anonKey!, {
     auth: { persistSession: false },
   });
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: 'testuser1@test.example.com',
-    password: 'testpassword123',
+  const { data, error } = await client.auth.signInWithPassword({
+    email: TEST_USER_EMAIL,
+    password: TEST_USER_PASSWORD,
   });
 
   if (error) {
-    throw new Error(
-      `Auth setup failed: ${error.message}. Ensure test user exists in local Supabase.`
-    );
+    throw new Error(`Auth sign-in failed: ${error.message}`);
   }
 
   // Supabase JS stores session under: sb-<hostname>-auth-token
