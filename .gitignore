@@ -50,8 +50,6 @@ tests/.auth/
 .bmad
 !.bmad/
 .code
-_bmad/
-
 
 # IDE and AI tool configs
 .cursor/
@@ -80,7 +78,6 @@ AGENTS.md
 # Additional env files without dot prefix
 env.keys
 env.test
-_bmad/
 .agentvibes/
 .vscode/
 docs/99-Archive/
