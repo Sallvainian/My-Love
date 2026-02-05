@@ -95,14 +95,18 @@ setup('authenticate as test user 1', async ({ page }) => {
     throw new Error(`Auth sign-in failed: ${error.message}`);
   }
 
-  // Supabase JS stores session under: sb-<hostname>-auth-token
-  const storageKey = `sb-${new URL(url!).hostname}-auth-token`;
+  // Supabase JS stores session under: sb-<first-label-of-hostname>-auth-token
+  // e.g. http://127.0.0.1:54321 → sb-127-auth-token (NOT sb-127.0.0.1)
+  const storageKey = `sb-${new URL(url!).hostname.split('.')[0]}-auth-token`;
 
   // Load the app and inject the authenticated session into localStorage
   await page.goto('/');
   await page.evaluate(
     ({ key, session }) => {
       localStorage.setItem(key, JSON.stringify(session));
+      // Bypass the WelcomeSplash screen for E2E tests
+      // App shows splash if lastWelcomeView is missing or >60min old
+      localStorage.setItem('lastWelcomeView', Date.now().toString());
     },
     { key: storageKey, session: data.session },
   );

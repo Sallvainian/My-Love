@@ -28,6 +28,7 @@ const networkMonitorFixture = base.extend(
       /sentry\.io/,
       /analytics/,
       /supabase\.co\/rest\/v1\/rpc\/log/, // Exclude Supabase logging RPC
+      /\/rest\/v1\/users\?select=partner/, // Partner queries fail without partner data in test env
     ],
     maxTestsPerError: 3, // Prevent domino failures
   }),

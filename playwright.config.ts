@@ -18,9 +18,11 @@ if (!process.env.SUPABASE_URL) {
     process.env.SUPABASE_SERVICE_ROLE_KEY ??= vars.SERVICE_ROLE_KEY;
     process.env.SUPABASE_ANON_KEY ??= vars.ANON_KEY;
 
-    // Also set VITE_ variants so the Vite dev server connects to local Supabase
-    process.env.VITE_SUPABASE_URL ??= vars.API_URL;
-    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??= vars.ANON_KEY;
+    // Force-set VITE_ variants so the Vite dev server connects to local Supabase.
+    // Must use `=` (not `??=`) because direnv's `dotenv` injects encrypted values
+    // from .env into process.env, and Vite's loadEnv gives process.env highest priority.
+    process.env.VITE_SUPABASE_URL = vars.API_URL;
+    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = vars.ANON_KEY;
   } catch {
     // Supabase CLI unavailable — env vars must be set externally (CI)
   }
@@ -89,11 +91,11 @@ export default defineConfig({
   ],
 
   // Run local dev server before tests.
-  // VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY are set above
-  // from `supabase status`, so Vite picks them up from process.env without dotenvx.
-  // In CI, dotenvx decrypts .env for production credentials.
+  // --mode test makes Vite load .env.test (plain-text local Supabase values)
+  // which overrides the encrypted production credentials in .env.local.
+  // In CI, set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY directly.
   webServer: {
-    command: process.env.CI ? 'dotenvx run -- npx vite' : 'npx vite',
+    command: 'npx vite --mode test',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
