@@ -33,8 +33,9 @@ export interface SeedResult {
  * - mid_session: Session at step 7 in reading phase
  * - completed: Fully completed session
  * - with_help_flags: Session with help flags set
+ * - unlinked: Solo session at step 7 with NO partner (user2_id = NULL)
  */
-export type SeedPreset = 'mid_session' | 'completed' | 'with_help_flags';
+export type SeedPreset = 'mid_session' | 'completed' | 'with_help_flags' | 'unlinked';
 
 /**
  * Options for creating test sessions

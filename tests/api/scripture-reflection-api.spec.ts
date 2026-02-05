@@ -557,7 +557,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
 
 // ============================================================
 // Story 2.3: Daily Prayer Report — Send & View — API Tests
-// TDD Phase: RED — tests will fail until feature is implemented
+// TDD Phase: GREEN — implementation complete, tests activated
 // ============================================================
 
 test.describe('Scripture Reflection API - Story 2.3', () => {
@@ -569,7 +569,6 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
     test('[P0] linked user can insert a message and all fields are correctly persisted', async ({
       supabaseAdmin,
     }) => {
-      test.skip();
 
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -638,7 +637,6 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
     test('[P0] updating session to complete persists status and completedAt in database', async ({
       supabaseAdmin,
     }) => {
-      test.skip();
 
       // GIVEN: A session exists in 'in_progress' status
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -694,6 +692,111 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         const expectedCompletedAt = new Date(completedAt);
         const timeDiffMs = Math.abs(dbCompletedAt.getTime() - expectedCompletedAt.getTime());
         expect(timeDiffMs).toBeLessThan(5000); // within 5 seconds
+      } finally {
+        // Cleanup
+        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+      }
+    });
+  });
+
+  // ============================================
+  // 2.3-API-003: Asynchronous Report Viewing
+  // Validates: AC-4 — partner can query completed session data asynchronously
+  // ============================================
+  test.describe('2.3-API-003: Partner can view completed session data asynchronously', () => {
+    test('[P1] after User A completes a session, User B can query the session and messages asynchronously', async ({
+      supabaseAdmin,
+    }) => {
+
+      // GIVEN: A session exists with two linked users (User A and User B)
+      const seedResult = await createTestSession(supabaseAdmin, {
+        preset: 'mid_session',
+      });
+      const sessionId = seedResult.session_ids[0];
+      const userAId = seedResult.test_user1_id;
+      const userBId = seedResult.test_user2_id;
+
+      // Pre-condition: mid_session preset creates both users
+      expect(userBId).toBeTruthy();
+
+      const userAClient = await createUserClient(supabaseAdmin, userAId);
+      const userBClient = await createUserClient(supabaseAdmin, userBId!);
+
+      const messageText = `Praying for you today — ${generateReflectionNote('async-msg')}`;
+
+      try {
+        // WHEN: User A writes a message to the session
+        const { data: messageData, error: messageError } = await userAClient
+          .from('scripture_messages')
+          .insert({
+            session_id: sessionId,
+            sender_id: userAId,
+            message: messageText,
+          })
+          .select()
+          .single();
+
+        // THEN: Message insert succeeds
+        expect(messageError).toBeNull();
+        expect(messageData).toBeTruthy();
+        expect(messageData!.id).toBeTruthy();
+
+        // WHEN: User A marks the session as complete
+        const completedAt = new Date().toISOString();
+        const { error: updateError } = await userAClient
+          .from('scripture_sessions')
+          .update({
+            status: 'complete',
+            completed_at: completedAt,
+          })
+          .eq('id', sessionId)
+          .select()
+          .single();
+
+        // THEN: Session update succeeds
+        expect(updateError).toBeNull();
+
+        // WHEN: User B queries the session asynchronously (later)
+        const { data: sessionRow, error: sessionQueryError } = await userBClient
+          .from('scripture_sessions')
+          .select('id, status, completed_at')
+          .eq('id', sessionId)
+          .single();
+
+        // THEN: User B can see the session with status='complete'
+        expect(sessionQueryError).toBeNull();
+        expect(sessionRow).toBeTruthy();
+        expect(sessionRow!.status).toBe('complete');
+
+        // AND: completed_at is set and close to the timestamp User A wrote
+        expect(sessionRow!.completed_at).toBeTruthy();
+        const dbCompletedAt = new Date(sessionRow!.completed_at as string);
+        const expectedCompletedAt = new Date(completedAt);
+        const timeDiffMs = Math.abs(dbCompletedAt.getTime() - expectedCompletedAt.getTime());
+        expect(timeDiffMs).toBeLessThan(5000); // within 5 seconds
+
+        // WHEN: User B queries scripture_messages for this session
+        const { data: messages, error: messagesQueryError } = await userBClient
+          .from('scripture_messages')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: true });
+
+        // THEN: User B can see User A's message
+        expect(messagesQueryError).toBeNull();
+        expect(messages).toBeTruthy();
+        expect(messages!.length).toBeGreaterThanOrEqual(1);
+
+        // AND: The message content matches what User A wrote
+        const partnerMessage = messages!.find((m) => m.sender_id === userAId);
+        expect(partnerMessage).toBeTruthy();
+        expect(partnerMessage!.message).toBe(messageText);
+        expect(partnerMessage!.session_id).toBe(sessionId);
+        expect(partnerMessage!.sender_id).toBe(userAId);
+        expect(partnerMessage!.created_at).toBeTruthy();
+
+        // AND: The message ID matches the one originally inserted
+        expect(partnerMessage!.id).toBe(messageData!.id);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);

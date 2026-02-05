@@ -83,17 +83,23 @@ vi.mock('../../../hooks/useAutoSave', () => ({
   useAutoSave: (...args: unknown[]) => mockUseAutoSave(...args),
 }));
 
-// Story 2.1: Mock scriptureReadingService
+// Story 2.1 + 2.3: Mock scriptureReadingService
 const mockGetBookmarksBySession = vi.fn().mockResolvedValue([]);
 const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
 const mockAddReflection = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSession = vi.fn().mockResolvedValue(undefined);
+const mockAddMessage = vi.fn().mockResolvedValue({ id: 'msg-1', sessionId: 'session-123', senderId: 'user-456', message: 'test', createdAt: new Date() });
+const mockGetMessagesBySession = vi.fn().mockResolvedValue([]);
+const mockGetReflectionsBySession = vi.fn().mockResolvedValue([]);
 vi.mock('../../../services/scriptureReadingService', () => ({
   scriptureReadingService: {
     getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
     toggleBookmark: (...args: unknown[]) => mockToggleBookmark(...args),
     addReflection: (...args: unknown[]) => mockAddReflection(...args),
     updateSession: (...args: unknown[]) => mockUpdateSession(...args),
+    addMessage: (...args: unknown[]) => mockAddMessage(...args),
+    getMessagesBySession: (...args: unknown[]) => mockGetMessagesBySession(...args),
+    getReflectionsBySession: (...args: unknown[]) => mockGetReflectionsBySession(...args),
   },
 }));
 
@@ -123,6 +129,13 @@ interface MockPendingRetry {
   maxAttempts: number;
 }
 
+interface MockPartner {
+  id: string;
+  displayName: string;
+  email: string;
+  connectedAt: Date;
+}
+
 const mockStoreState: {
   session: MockSession | null;
   isSyncing: boolean;
@@ -134,6 +147,7 @@ const mockStoreState: {
   exitSession: typeof mockExitSession;
   retryFailedWrite: typeof mockRetryFailedWrite;
   updatePhase: typeof mockUpdatePhase;
+  partner: MockPartner | null;
 } = {
   session: null,
   isSyncing: false,
@@ -145,6 +159,7 @@ const mockStoreState: {
   exitSession: mockExitSession,
   retryFailedWrite: mockRetryFailedWrite,
   updatePhase: mockUpdatePhase,
+  partner: null,
 };
 
 // Create a function to get state for the useAppStore mock
@@ -182,6 +197,7 @@ describe('SoloReadingFlow', () => {
     mockStoreState.isSyncing = false;
     mockStoreState.scriptureError = null;
     mockStoreState.pendingRetry = null;
+    mockStoreState.partner = null;
     mockShouldReduceMotion = false;
     mockIsOnline = true;
   });
@@ -380,55 +396,60 @@ describe('SoloReadingFlow', () => {
       expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
     });
 
-    it('shows report placeholder when phase is report', () => {
+    it('shows unlinked completion screen when phase is report and no partner', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
         currentStepIndex: 16,
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('scripture-report-placeholder')).toBeDefined();
-      expect(screen.getByText('Reading Complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
+      expect(screen.getByText('Session complete')).toBeDefined();
     });
 
-    it('shows "Reading Complete" heading on report phase', () => {
+    it('shows "Session complete" heading on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByText('Reading Complete')).toBeDefined();
+      expect(screen.getByText('Session complete')).toBeDefined();
     });
 
-    it('shows completion message with step count on report phase', () => {
+    it('shows reflections saved message on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
       expect(
-        screen.getByText(/completed all 17 scripture readings/i)
+        screen.getByText(/Your reflections have been saved/i)
       ).toBeDefined();
     });
 
-    it('shows Return to Overview button on report phase', () => {
+    it('shows Return to Overview button on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('return-to-overview')).toHaveTextContent(
+      expect(screen.getByTestId('scripture-unlinked-return-btn')).toHaveTextContent(
         'Return to Overview'
       );
     });
 
-    it('calls exitSession when Return to Overview is tapped on report phase', () => {
+    it('calls exitSession when Return to Overview is tapped on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('return-to-overview'));
+      fireEvent.click(screen.getByTestId('scripture-unlinked-return-btn'));
       expect(mockExitSession).toHaveBeenCalledTimes(1);
     });
 
@@ -896,15 +917,16 @@ describe('SoloReadingFlow', () => {
       expect(verseRef.getAttribute('tabindex')).toBe('-1');
     });
 
-    it('completion heading has tabIndex={-1} and data-testid="completion-heading"', () => {
+    it('unlinked completion heading has tabIndex={-1}', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      const heading = screen.getByTestId('completion-heading');
+      const heading = screen.getByTestId('scripture-unlinked-complete-heading');
       expect(heading.getAttribute('tabindex')).toBe('-1');
-      expect(heading).toHaveTextContent('Reading Complete');
+      expect(heading).toHaveTextContent('Session complete');
     });
 
     it('focuses Back to Verse button after View Response click', () => {
@@ -1090,18 +1112,19 @@ describe('SoloReadingFlow', () => {
       globalThis.requestAnimationFrame = origRAF;
     });
 
-    it('shows report placeholder when phase is report (2.2-CMP-013)', () => {
+    it('shows unlinked completion when phase is report and no partner (2.2-CMP-013)', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
         currentStepIndex: 16,
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      // Should show the Story 2.3 report placeholder
-      expect(screen.getByTestId('scripture-report-placeholder')).toBeDefined();
-      expect(screen.getByText(/Daily Prayer Report coming in Story 2.3/)).toBeDefined();
-      // Should still have Return to Overview button
-      expect(screen.getByTestId('return-to-overview')).toBeDefined();
+      // Should show unlinked completion (placeholder replaced by Story 2.3)
+      expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
+      expect(screen.getByText('Session complete')).toBeDefined();
+      // Should have Return to Overview button
+      expect(screen.getByTestId('scripture-unlinked-return-btn')).toBeDefined();
       // Should NOT show the ReflectionSummary
       expect(screen.queryByTestId('scripture-reflection-summary-screen')).toBeNull();
     });
@@ -1112,24 +1135,15 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Story 2.3: Daily Prayer Report', () => {
-    // Partner mock for linked user tests
-    let mockPartner: { id: string; displayName: string; email: string; connectedAt: Date } | null = null;
+    const linkedPartner: MockPartner = {
+      id: 'partner-1',
+      displayName: 'Sarah',
+      email: 'sarah@example.com',
+      connectedAt: new Date('2026-01-15'),
+    };
 
-    // Mock addMessage service method (Story 2.3)
-    const mockAddMessage = vi.fn().mockResolvedValue(undefined);
-
-    beforeEach(() => {
-      mockPartner = null;
-      mockAddMessage.mockClear();
-    });
-
-    it.skip('shows MessageCompose when phase is report and partner exists (2.3-INT-002)', () => {
-      mockPartner = {
-        id: 'partner-1',
-        displayName: 'Sarah',
-        email: 'sarah@example.com',
-        connectedAt: new Date('2026-01-15'),
-      };
+    it('shows MessageCompose when phase is report and partner exists (2.3-INT-002)', () => {
+      mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
@@ -1138,12 +1152,12 @@ describe('SoloReadingFlow', () => {
       render(<SoloReadingFlow />);
       // Should show MessageCompose screen instead of placeholder
       expect(screen.getByTestId('scripture-message-compose-screen')).toBeDefined();
-      // Should NOT show the old placeholder
-      expect(screen.queryByTestId('scripture-report-placeholder')).toBeNull();
+      // Should NOT show unlinked completion
+      expect(screen.queryByTestId('scripture-unlinked-complete-screen')).toBeNull();
     });
 
-    it.skip('shows unlinked completion screen when phase is report and no partner (2.3-INT-001)', () => {
-      mockPartner = null;
+    it('shows unlinked completion screen when phase is report and no partner (2.3-INT-001)', () => {
+      mockStoreState.partner = null;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
@@ -1156,13 +1170,8 @@ describe('SoloReadingFlow', () => {
       expect(screen.queryByTestId('scripture-message-compose-screen')).toBeNull();
     });
 
-    it.skip('sending message calls addMessage service (2.3-INT-003)', async () => {
-      mockPartner = {
-        id: 'partner-1',
-        displayName: 'Sarah',
-        email: 'sarah@example.com',
-        connectedAt: new Date('2026-01-15'),
-      };
+    it('sending message calls addMessage service (2.3-INT-003)', async () => {
+      mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
@@ -1183,13 +1192,8 @@ describe('SoloReadingFlow', () => {
       });
     });
 
-    it.skip('skipping message still marks session complete (2.3-INT-004)', async () => {
-      mockPartner = {
-        id: 'partner-1',
-        displayName: 'Sarah',
-        email: 'sarah@example.com',
-        connectedAt: new Date('2026-01-15'),
-      };
+    it('skipping message still marks session complete (2.3-INT-004)', async () => {
+      mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
@@ -1206,13 +1210,8 @@ describe('SoloReadingFlow', () => {
       });
     });
 
-    it.skip('DailyPrayerReport appears after send/skip (2.3-INT-005)', async () => {
-      mockPartner = {
-        id: 'partner-1',
-        displayName: 'Sarah',
-        email: 'sarah@example.com',
-        connectedAt: new Date('2026-01-15'),
-      };
+    it('DailyPrayerReport appears after send/skip (2.3-INT-005)', async () => {
+      mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
@@ -1229,8 +1228,8 @@ describe('SoloReadingFlow', () => {
       });
     });
 
-    it.skip('session marked complete after report phase entry for unlinked user (2.3-INT-006)', async () => {
-      mockPartner = null;
+    it('session marked complete after report phase entry for unlinked user (2.3-INT-006)', async () => {
+      mockStoreState.partner = null;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',
@@ -1246,13 +1245,8 @@ describe('SoloReadingFlow', () => {
       });
     });
 
-    it.skip('Return to Overview calls exitSession (2.3-INT-007)', async () => {
-      mockPartner = {
-        id: 'partner-1',
-        displayName: 'Sarah',
-        email: 'sarah@example.com',
-        connectedAt: new Date('2026-01-15'),
-      };
+    it('Return to Overview calls exitSession (2.3-INT-007)', async () => {
+      mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
         status: 'in_progress',

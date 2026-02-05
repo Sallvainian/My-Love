@@ -13,12 +13,13 @@
  * - Return to Overview button calls onReturn
  * - Report heading has tabIndex -1 for programmatic focus
  *
- * TDD Phase: RED — component does not exist yet
+ * TDD Phase: GREEN — component implemented
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
+import { SCRIPTURE_STEPS } from '../../../data/scriptureSteps';
 
 describe('DailyPrayerReport', () => {
   const allRatings = Array.from({ length: 17 }, (_, i) => ({
@@ -48,7 +49,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('User Ratings', () => {
-    it.skip('renders user step-by-step ratings for all 17 steps', () => {
+    it('renders user step-by-step ratings for all 17 steps', () => {
       render(<DailyPrayerReport {...defaultProps} />);
       for (let n = 0; n < 17; n++) {
         expect(screen.getByTestId(`scripture-report-rating-step-${n}`)).toBeDefined();
@@ -61,7 +62,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('Bookmarked Verses', () => {
-    it.skip('renders bookmarked verses with amber indicator', () => {
+    it('renders bookmarked verses with amber indicator', () => {
       render(<DailyPrayerReport {...defaultProps} />);
       // Bookmarked steps should have amber indicator
       for (const bookmarkedStep of [2, 7, 14]) {
@@ -80,7 +81,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('Standout Verses', () => {
-    it.skip('renders standout verse selections', () => {
+    it('renders standout verse selections', () => {
       render(<DailyPrayerReport {...defaultProps} />);
       const standoutSection = screen.getByTestId('scripture-report-standout-verses');
       expect(standoutSection).toBeDefined();
@@ -92,7 +93,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('Partner Message', () => {
-    it.skip('reveals partner message in Dancing Script font', () => {
+    it('reveals partner message in Dancing Script font', () => {
       render(
         <DailyPrayerReport
           {...defaultProps}
@@ -113,7 +114,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('Partner Waiting State', () => {
-    it.skip('shows waiting text when partner incomplete', () => {
+    it('shows waiting text when partner incomplete', () => {
       render(
         <DailyPrayerReport
           {...defaultProps}
@@ -132,7 +133,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('No Message Section', () => {
-    it.skip('does not render message section when no partner message and partner complete', () => {
+    it('does not render message section when no partner message and partner complete', () => {
       render(
         <DailyPrayerReport
           {...defaultProps}
@@ -151,7 +152,7 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('Return to Overview', () => {
-    it.skip('Return to Overview button calls onReturn', () => {
+    it('Return to Overview button calls onReturn', () => {
       const onReturn = vi.fn();
       render(<DailyPrayerReport {...defaultProps} onReturn={onReturn} />);
       fireEvent.click(screen.getByTestId('scripture-report-return-btn'));
@@ -164,10 +165,112 @@ describe('DailyPrayerReport', () => {
   // ============================================
 
   describe('Accessibility', () => {
-    it.skip('report heading has tabIndex -1 for programmatic focus', () => {
+    it('report heading has tabIndex -1 for programmatic focus', () => {
       render(<DailyPrayerReport {...defaultProps} />);
       const heading = screen.getByTestId('scripture-report-heading');
       expect(heading.getAttribute('tabindex')).toBe('-1');
+    });
+  });
+
+  // ============================================
+  // 2.3-RPT-009: Rating Values Displayed
+  // ============================================
+
+  describe('Rating Values', () => {
+    it('displays correct rating number for each step', () => {
+      render(<DailyPrayerReport {...defaultProps} />);
+      // Step 0 has rating (0 % 5) + 1 = 1
+      const step0 = screen.getByTestId('scripture-report-rating-step-0');
+      expect(step0).toHaveTextContent('1');
+      // Step 4 has rating (4 % 5) + 1 = 5
+      const step4 = screen.getByTestId('scripture-report-rating-step-4');
+      expect(step4).toHaveTextContent('5');
+    });
+
+    it('displays verse reference for each step', () => {
+      render(<DailyPrayerReport {...defaultProps} />);
+      const step0 = screen.getByTestId('scripture-report-rating-step-0');
+      expect(step0).toHaveTextContent(SCRIPTURE_STEPS[0].verseReference);
+    });
+  });
+
+  // ============================================
+  // 2.3-RPT-010: Partner Ratings Side-by-Side
+  // ============================================
+
+  describe('Partner Ratings Side-by-Side', () => {
+    const partnerRatings = Array.from({ length: 17 }, (_, i) => ({
+      stepIndex: i,
+      rating: 5 - (i % 5),
+    }));
+
+    it('renders partner rating circles alongside user ratings', () => {
+      render(
+        <DailyPrayerReport
+          {...defaultProps}
+          partnerRatings={partnerRatings}
+          partnerName="Sarah"
+          isPartnerComplete={true}
+        />
+      );
+      // Step 0: user rating = 1, partner rating = 5
+      const step0 = screen.getByTestId('scripture-report-rating-step-0');
+      expect(step0).toHaveTextContent('1');
+      expect(step0).toHaveTextContent('5');
+    });
+
+    it('does not render partner rating circles when partner data is null', () => {
+      render(<DailyPrayerReport {...defaultProps} />);
+      // With default props (partnerRatings: null), only user ratings should appear
+      const step0 = screen.getByTestId('scripture-report-rating-step-0');
+      // Should contain user rating 1 but not partner rating
+      const ratingCircles = step0.querySelectorAll('span.flex.h-7.w-7');
+      expect(ratingCircles.length).toBe(1); // Only user circle
+    });
+  });
+
+  // ============================================
+  // 2.3-RPT-011: Standout Verse Content
+  // ============================================
+
+  describe('Standout Verse Content', () => {
+    it('displays verse references for standout selections', () => {
+      render(<DailyPrayerReport {...defaultProps} />);
+      const standoutSection = screen.getByTestId('scripture-report-standout-verses');
+      expect(standoutSection).toHaveTextContent(SCRIPTURE_STEPS[2].verseReference);
+      expect(standoutSection).toHaveTextContent(SCRIPTURE_STEPS[14].verseReference);
+    });
+  });
+
+  // ============================================
+  // 2.3-RPT-012: Partner Message Label
+  // ============================================
+
+  describe('Partner Message Label', () => {
+    it('shows "A message from [Partner Name]" label above message', () => {
+      render(
+        <DailyPrayerReport
+          {...defaultProps}
+          partnerMessage="Praying for you"
+          partnerName="Sarah"
+          isPartnerComplete={true}
+        />
+      );
+      const messageCard = screen.getByTestId('scripture-report-partner-message');
+      expect(messageCard).toHaveTextContent('A message from Sarah');
+      expect(messageCard).toHaveTextContent('Praying for you');
+    });
+  });
+
+  // ============================================
+  // 2.3-RPT-013: Report Heading Text
+  // ============================================
+
+  describe('Report Heading', () => {
+    it('shows "Daily Prayer Report" heading', () => {
+      render(<DailyPrayerReport {...defaultProps} />);
+      const heading = screen.getByTestId('scripture-report-heading');
+      expect(heading).toHaveTextContent('Daily Prayer Report');
     });
   });
 });

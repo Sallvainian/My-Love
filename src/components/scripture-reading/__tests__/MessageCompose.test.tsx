@@ -14,7 +14,7 @@
  * - Textarea has correct aria-label
  * - Focus moves to textarea on mount
  *
- * TDD Phase: RED — component does not exist yet
+ * TDD Phase: GREEN — component implemented
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -46,7 +46,7 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Heading', () => {
-    it.skip('renders partner name in heading', () => {
+    it('renders partner name in heading', () => {
       render(<MessageCompose {...defaultProps} />);
       const heading = screen.getByTestId('scripture-message-compose-heading');
       expect(heading).toHaveTextContent('Write something for Sarah');
@@ -58,7 +58,7 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Textarea', () => {
-    it.skip('textarea accepts input up to 300 chars', () => {
+    it('textarea accepts input up to 300 chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       expect(textarea).toBeDefined();
@@ -77,7 +77,7 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Character Counter', () => {
-    it.skip('character counter visible at 250+ chars', () => {
+    it('character counter visible at 250+ chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       const longText = 'a'.repeat(260);
@@ -87,7 +87,7 @@ describe('MessageCompose', () => {
       expect(counter).toHaveTextContent('260/300');
     });
 
-    it.skip('character counter hidden below 250 chars', () => {
+    it('character counter hidden below 250 chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       const shortText = 'a'.repeat(100);
@@ -101,7 +101,7 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Send Button', () => {
-    it.skip('Send button calls onSend with message text', () => {
+    it('Send button calls onSend with message text', () => {
       const onSend = vi.fn();
       render(<MessageCompose {...defaultProps} onSend={onSend} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
@@ -118,7 +118,7 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Skip Button', () => {
-    it.skip('Skip button calls onSkip', () => {
+    it('Skip button calls onSkip', () => {
       const onSkip = vi.fn();
       render(<MessageCompose {...defaultProps} onSkip={onSkip} />);
       fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
@@ -131,7 +131,7 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Disabled State', () => {
-    it.skip('Send and Skip disabled when disabled prop is true', () => {
+    it('Send and Skip disabled when disabled prop is true', () => {
       render(<MessageCompose {...defaultProps} disabled={true} />);
       const sendBtn = screen.getByTestId('scripture-message-send-btn');
       const skipBtn = screen.getByTestId('scripture-message-skip-btn');
@@ -145,16 +145,92 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Accessibility', () => {
-    it.skip('textarea has correct aria-label', () => {
+    it('textarea has correct aria-label', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       expect(textarea.getAttribute('aria-label')).toBe('Message to partner');
     });
 
-    it.skip('focus moves to textarea on mount', () => {
+    it('focus moves to textarea on mount', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       expect(document.activeElement).toBe(textarea);
+    });
+  });
+
+  // ============================================
+  // 2.3-CMP-008: Send Button Empty Guard
+  // ============================================
+
+  describe('Empty Message Guard', () => {
+    it('send button is aria-disabled when textarea is empty', () => {
+      render(<MessageCompose {...defaultProps} />);
+      const sendBtn = screen.getByTestId('scripture-message-send-btn');
+      expect(sendBtn.getAttribute('aria-disabled')).toBe('true');
+    });
+
+    it('does not call onSend when message is empty', () => {
+      const onSend = vi.fn();
+      render(<MessageCompose {...defaultProps} onSend={onSend} />);
+      fireEvent.click(screen.getByTestId('scripture-message-send-btn'));
+      expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it('does not call onSend when message is whitespace only', () => {
+      const onSend = vi.fn();
+      render(<MessageCompose {...defaultProps} onSend={onSend} />);
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: '   ' } });
+      fireEvent.click(screen.getByTestId('scripture-message-send-btn'));
+      expect(onSend).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================
+  // 2.3-CMP-009: Character Counter Boundary
+  // ============================================
+
+  describe('Character Counter Boundary', () => {
+    it('character counter appears at exactly 250 chars', () => {
+      render(<MessageCompose {...defaultProps} />);
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'a'.repeat(250) } });
+      const counter = screen.getByTestId('scripture-message-char-count');
+      expect(counter).toHaveTextContent('250/300');
+    });
+
+    it('character counter shows correct count at max length', () => {
+      render(<MessageCompose {...defaultProps} />);
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'a'.repeat(300) } });
+      const counter = screen.getByTestId('scripture-message-char-count');
+      expect(counter).toHaveTextContent('300/300');
+    });
+
+    it('character counter hidden at 249 chars', () => {
+      render(<MessageCompose {...defaultProps} />);
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'a'.repeat(249) } });
+      expect(screen.queryByTestId('scripture-message-char-count')).toBeNull();
+    });
+
+    it('character counter has aria-live polite for screen readers', () => {
+      render(<MessageCompose {...defaultProps} />);
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'a'.repeat(260) } });
+      const counter = screen.getByTestId('scripture-message-char-count');
+      expect(counter.getAttribute('aria-live')).toBe('polite');
+    });
+  });
+
+  // ============================================
+  // 2.3-CMP-010: Skip Button Label
+  // ============================================
+
+  describe('Skip Button Label', () => {
+    it('skip button shows "Skip for now" (no-guilt language)', () => {
+      render(<MessageCompose {...defaultProps} />);
+      expect(screen.getByTestId('scripture-message-skip-btn')).toHaveTextContent('Skip for now');
     });
   });
 });

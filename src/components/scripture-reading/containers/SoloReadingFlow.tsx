@@ -36,6 +36,8 @@ import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { PerStepReflection } from '../reflection/PerStepReflection';
 import { ReflectionSummary } from '../reflection/ReflectionSummary';
+import { MessageCompose } from '../reflection/MessageCompose';
+import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
 import { scriptureReadingService } from '../../../services/scriptureReadingService';
 
 // Lavender Dreams design tokens (shared with ScriptureOverview)
@@ -48,6 +50,9 @@ const scriptureTheme = {
 // Sub-view within a step: verse, response, or reflection
 type StepSubView = 'verse' | 'response' | 'reflection';
 
+// Story 2.3: Sub-phase within report phase
+type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked';
+
 // Direction for slide animation
 type SlideDirection = 'left' | 'right';
 
@@ -58,7 +63,7 @@ export function SoloReadingFlow() {
   const { crossfade, slide } = useMotionConfig();
   const { isOnline } = useNetworkStatus();
 
-  // Scripture reading slice state
+  // Scripture reading slice state + partner slice
   const {
     session,
     isSyncing,
@@ -70,6 +75,7 @@ export function SoloReadingFlow() {
     exitSession,
     retryFailedWrite,
     updatePhase,
+    partner,
   } = useAppStore(
     useShallow((state) => ({
       session: state.session,
@@ -82,6 +88,7 @@ export function SoloReadingFlow() {
       exitSession: state.exitSession,
       retryFailedWrite: state.retryFailedWrite,
       updatePhase: state.updatePhase,
+      partner: state.partner,
     }))
   );
 
@@ -111,6 +118,21 @@ export function SoloReadingFlow() {
   const prevStepIndexRef = useRef<number | undefined>(undefined);
   const prevSubViewRef = useRef<StepSubView>('verse');
   const prevIsCompletedRef = useRef(false);
+
+  // Story 2.3: Report sub-phase state and data
+  const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>('compose');
+  const [reportData, setReportData] = useState<{
+    userRatings: { stepIndex: number; rating: number }[];
+    userBookmarks: number[];
+    userStandoutVerses: number[];
+    partnerMessage: string | null;
+  }>({
+    userRatings: [],
+    userBookmarks: [],
+    userStandoutVerses: [],
+    partnerMessage: null,
+  });
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
   const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -229,6 +251,128 @@ export function SoloReadingFlow() {
     },
     [session, updatePhase]
   );
+
+  // Story 2.3: Mark session complete helper
+  const markSessionComplete = useCallback(async () => {
+    if (!session) return;
+    try {
+      await scriptureReadingService.updateSession(session.id, {
+        status: 'complete',
+        completedAt: new Date(),
+      });
+    } catch {
+      // Non-blocking: session completion failure handled by eventual consistency
+    }
+    updatePhase('complete');
+  }, [session, updatePhase]);
+
+  // Story 2.3: Handle message send
+  const handleMessageSend = useCallback(
+    (message: string) => {
+      if (!session || isSendingMessage) return;
+      setIsSendingMessage(true);
+
+      // Fire-and-forget message write
+      void (async () => {
+        try {
+          await scriptureReadingService.addMessage(session.id, session.userId, message);
+        } catch {
+          // Non-blocking: message write failure shouldn't block session completion
+        }
+      })();
+
+      // Mark session complete and advance to report view
+      void markSessionComplete();
+      setReportSubPhase('report');
+      setIsSendingMessage(false);
+    },
+    [session, isSendingMessage, markSessionComplete]
+  );
+
+  // Story 2.3: Handle message skip
+  const handleMessageSkip = useCallback(() => {
+    if (!session || isSendingMessage) return;
+    setIsSendingMessage(true);
+
+    // Skip message, mark session complete, advance to report view
+    void markSessionComplete();
+    setReportSubPhase('report');
+    setIsSendingMessage(false);
+  }, [session, isSendingMessage, markSessionComplete]);
+
+  // Story 2.3: Handle return to overview from report
+  const handleReturnToOverview = useCallback(() => {
+    exitSession();
+  }, [exitSession]);
+
+  // Story 2.3: Determine initial report sub-phase and mark unlinked session complete
+  const isReportEntry = session?.currentPhase === 'report';
+  const hasPartner = partner !== null;
+  useEffect(() => {
+    if (!isReportEntry || !session) return;
+
+    if (!hasPartner) {
+      setReportSubPhase('complete-unlinked');
+      void markSessionComplete();
+    } else {
+      setReportSubPhase('compose');
+    }
+  }, [isReportEntry, hasPartner, session, markSessionComplete]);
+
+  // Story 2.3: Load report data when entering report phase
+  useEffect(() => {
+    if (!isReportEntry || !session) return;
+
+    void (async () => {
+      try {
+        const [reflections, bookmarks, messages] = await Promise.all([
+          scriptureReadingService.getReflectionsBySession(session.id),
+          scriptureReadingService.getBookmarksBySession(session.id),
+          scriptureReadingService.getMessagesBySession(session.id),
+        ]);
+
+        // Build user ratings from reflections (exclude session-level at MAX_STEPS, require rating)
+        const userReflections = reflections.filter(
+          (r) => r.userId === session.userId && r.stepIndex < MAX_STEPS && r.rating != null
+        );
+        const userRatings = userReflections.map((r) => ({
+          stepIndex: r.stepIndex,
+          rating: r.rating!,
+        }));
+
+        // User bookmarks
+        const userBookmarks = bookmarks
+          .filter((b) => b.userId === session.userId)
+          .map((b) => b.stepIndex);
+
+        // Extract standout verses from session-level reflection (stepIndex === MAX_STEPS)
+        const sessionReflection = reflections.find(
+          (r) => r.userId === session.userId && r.stepIndex === MAX_STEPS
+        );
+        let userStandoutVerses: number[] = [];
+        if (sessionReflection?.notes) {
+          try {
+            const parsed = JSON.parse(sessionReflection.notes) as { standoutVerses?: number[] };
+            userStandoutVerses = parsed.standoutVerses ?? [];
+          } catch {
+            // Invalid JSON in notes — proceed without standout verses
+          }
+        }
+
+        // Partner message (filter by sender !== current user)
+        const partnerMsg = messages.find((m) => m.senderId !== session.userId);
+
+        setReportData({
+          userRatings,
+          userBookmarks,
+          userStandoutVerses,
+          partnerMessage: partnerMsg?.message ?? null,
+        });
+      } catch {
+        // Non-blocking: report data loading failure uses empty defaults
+      }
+    })();
+  }, [isReportEntry, session]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
   // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
@@ -462,45 +606,99 @@ export function SoloReadingFlow() {
     );
   }
 
-  // Story 2.2: Report phase placeholder (Story 2.3 will implement the actual report)
+  // Story 2.3: Report phase — message compose, daily prayer report, or unlinked completion
   if (isReportPhase) {
+    // Unlinked user — show simple completion screen (Task 3, AC #2)
+    if (reportSubPhase === 'complete-unlinked') {
+      return (
+        <motion.div
+          className="flex min-h-screen flex-col p-4 pb-20"
+          style={{ backgroundColor: scriptureTheme.background }}
+          data-testid="scripture-unlinked-complete-screen"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={crossfade}
+        >
+          <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            {announcement}
+          </div>
+          <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-6 text-center">
+            <h2
+              className="font-serif text-2xl font-bold text-purple-900"
+              ref={completionHeadingRef}
+              tabIndex={-1}
+              data-testid="scripture-unlinked-complete-heading"
+            >
+              Session complete
+            </h2>
+            <p className="text-sm text-purple-600">
+              Your reflections have been saved
+            </p>
+            <button
+              onClick={() => exitSession()}
+              className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
+              data-testid="scripture-unlinked-return-btn"
+              type="button"
+            >
+              Return to Overview
+            </button>
+          </div>
+        </motion.div>
+      );
+    }
+
+    // Linked user — message compose phase (Task 4, AC #1)
+    if (reportSubPhase === 'compose') {
+      return (
+        <motion.div
+          className="flex min-h-screen flex-col p-4 pb-20"
+          style={{ backgroundColor: scriptureTheme.background }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={crossfade}
+        >
+          <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            {announcement}
+          </div>
+          <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+            <MessageCompose
+              partnerName={partner?.displayName ?? 'your partner'}
+              onSend={handleMessageSend}
+              onSkip={handleMessageSkip}
+              disabled={isSendingMessage}
+            />
+          </div>
+        </motion.div>
+      );
+    }
+
+    // Daily Prayer Report display (Task 4, AC #3, #4, #5)
     return (
-      <div
+      <motion.div
         className="flex min-h-screen flex-col p-4 pb-20"
         style={{ backgroundColor: scriptureTheme.background }}
-        data-testid="scripture-report-placeholder"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={crossfade}
       >
-        {/* Screen reader announcer */}
         <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
           {announcement}
         </div>
-
-        <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-6 text-center">
-          <div className="text-6xl" aria-hidden="true">
-            🙏
-          </div>
-          <h1
-            className="font-serif text-2xl font-bold text-purple-900"
-            ref={completionHeadingRef}
-            tabIndex={-1}
-            data-testid="completion-heading"
-          >
-            Reading Complete
-          </h1>
-          <p className="text-purple-700">
-            You&apos;ve completed all {MAX_STEPS} scripture readings and your reflection.
-          </p>
-          <p className="text-sm text-purple-600">Daily Prayer Report coming in Story 2.3</p>
-          <button
-            onClick={() => exitSession()}
-            className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
-            data-testid="return-to-overview"
-            type="button"
-          >
-            Return to Overview
-          </button>
+        <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+          <DailyPrayerReport
+            userRatings={reportData.userRatings}
+            userBookmarks={reportData.userBookmarks}
+            userStandoutVerses={reportData.userStandoutVerses}
+            partnerMessage={reportData.partnerMessage}
+            partnerName={partner?.displayName ?? null}
+            partnerRatings={null}
+            partnerBookmarks={null}
+            partnerStandoutVerses={null}
+            isPartnerComplete={false}
+            onReturn={handleReturnToOverview}
+          />
         </div>
-      </div>
+      </motion.div>
     );
   }
 

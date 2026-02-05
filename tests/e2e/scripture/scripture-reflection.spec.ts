@@ -674,9 +674,9 @@ test.describe('End-of-Session Reflection Summary', () => {
       await continueButton.click();
       await summaryResponse;
 
-      // THEN: Session advances to report phase — Story 2.3 placeholder appears
+      // THEN: Session advances to report phase — message compose screen appears (linked user)
       await expect(
-        page.getByTestId('scripture-report-placeholder')
+        page.getByTestId('scripture-message-compose-screen')
       ).toBeVisible();
 
       // AND: Reflection summary screen is no longer visible
@@ -765,9 +765,9 @@ test.describe('End-of-Session Reflection Summary', () => {
       await continueButton.click();
       await summaryResponse;
 
-      // THEN: Session advances to report phase
+      // THEN: Session advances to report phase — message compose screen appears (linked user)
       await expect(
-        page.getByTestId('scripture-report-placeholder')
+        page.getByTestId('scripture-message-compose-screen')
       ).toBeVisible();
 
       // AND: Session-level reflection is persisted with empty standoutVerses
@@ -789,7 +789,7 @@ test.describe('End-of-Session Reflection Summary', () => {
 
 // ============================================================
 // Story 2.3: Daily Prayer Report — Send & View — E2E Tests
-// TDD Phase: RED — tests will fail until feature is implemented
+// TDD Phase: GREEN — implementation complete, tests activated
 // ============================================================
 
 test.describe('Daily Prayer Report — Send & View', () => {
@@ -889,7 +889,6 @@ test.describe('Daily Prayer Report — Send & View', () => {
       supabaseAdmin,
       testSession,
     }) => {
-      test.skip(); // TDD RED: Story 2.3 not yet implemented
 
       // GIVEN: User has completed all 17 steps with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
@@ -987,51 +986,57 @@ test.describe('Daily Prayer Report — Send & View', () => {
     test('should skip message compose for unlinked user and show completion screen', async ({
       page,
       supabaseAdmin,
-      testSession,
     }) => {
-      test.skip(); // TDD RED: Story 2.3 not yet implemented
-      // NOTE: Fixture gap — the testSession fixture creates sessions via
-      // scripture_seed_test_data RPC which seeds a linked pair (test_user1 + test_user2).
-      // A dedicated unlinked-user seed preset (e.g., p_preset='unlinked') would be needed
-      // to properly test this path. For now this test documents the expected behavior.
+      // Seed an unlinked (solo, no partner) session inline instead of using the
+      // testSession fixture, which always creates a linked pair.
+      const { createTestSession, cleanupTestSession } = await import(
+        '../../support/factories'
+      );
+      const seedResult = await createTestSession(supabaseAdmin, {
+        preset: 'unlinked',
+      });
 
-      // GIVEN: User has completed all 17 steps (no bookmarks needed for this test)
-      await completeAllStepsToReflectionSummary(page, new Set([0]));
+      try {
+        // GIVEN: User has completed all 17 steps (no bookmarks needed for this test)
+        await completeAllStepsToReflectionSummary(page, new Set([0]));
 
-      // AND: User submits the reflection summary
-      await submitReflectionSummary(page);
+        // AND: User submits the reflection summary
+        await submitReflectionSummary(page);
 
-      // WHEN: Report phase begins for an unlinked user (no partner_id)
-      // THEN: Message composition screen is NOT shown
-      await expect(
-        page.getByTestId('scripture-message-compose-screen')
-      ).not.toBeVisible();
+        // WHEN: Report phase begins for an unlinked user (no partner_id)
+        // THEN: Message composition screen is NOT shown
+        await expect(
+          page.getByTestId('scripture-message-compose-screen')
+        ).not.toBeVisible();
 
-      // AND: Unlinked completion screen appears
-      await expect(
-        page.getByTestId('scripture-unlinked-complete-screen')
-      ).toBeVisible();
+        // AND: Unlinked completion screen appears
+        await expect(
+          page.getByTestId('scripture-unlinked-complete-screen')
+        ).toBeVisible();
 
-      // AND: Heading shows "Session complete"
-      const heading = page.getByTestId('scripture-unlinked-complete-heading');
-      await expect(heading).toBeVisible();
-      await expect(heading).toHaveText('Session complete');
+        // AND: Heading shows "Session complete"
+        const heading = page.getByTestId('scripture-unlinked-complete-heading');
+        await expect(heading).toBeVisible();
+        await expect(heading).toHaveText('Session complete');
 
-      // AND: "Return to Overview" button is visible
-      await expect(
-        page.getByTestId('scripture-unlinked-return-btn')
-      ).toBeVisible();
+        // AND: "Return to Overview" button is visible
+        await expect(
+          page.getByTestId('scripture-unlinked-return-btn')
+        ).toBeVisible();
 
-      // AND: Session is marked as complete in the database
-      const { data: sessions, error: sessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('status, completed_at')
-        .eq('id', testSession.session_ids[0]);
+        // AND: Session is marked as complete in the database
+        const { data: sessions, error: sessionError } = await supabaseAdmin
+          .from('scripture_sessions')
+          .select('status, completed_at')
+          .eq('id', seedResult.session_ids[0]);
 
-      expect(sessionError).toBeNull();
-      expect(sessions).toHaveLength(1);
-      expect(sessions![0].status).toBe('complete');
-      expect(sessions![0].completed_at).not.toBeNull();
+        expect(sessionError).toBeNull();
+        expect(sessions).toHaveLength(1);
+        expect(sessions![0].status).toBe('complete');
+        expect(sessions![0].completed_at).not.toBeNull();
+      } finally {
+        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+      }
     });
   });
 
@@ -1041,11 +1046,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
       supabaseAdmin,
       testSession,
     }) => {
-      test.skip(); // TDD RED: Story 2.3 not yet implemented
-      // NOTE: Fixture gap — this test requires pre-seeding a partner message
-      // into scripture_messages for the session before the user reaches the report.
-      // The seed RPC would need a p_include_messages=true preset that inserts
-      // a message from test_user2 for the session. For now this documents the behavior.
+      // Partner message is pre-seeded via supabaseAdmin below (line ~1056)
 
       // GIVEN: User has completed all 17 steps and the reflection summary
       await completeAllStepsToReflectionSummary(page, new Set([0, 5, 12]));
@@ -1084,10 +1085,8 @@ test.describe('Daily Prayer Report — Send & View', () => {
     test('should display waiting state when partner has not completed their session', async ({
       page,
     }) => {
-      test.skip(); // TDD RED: Story 2.3 not yet implemented
-      // NOTE: This test covers the default state when partner data is not yet
-      // available. The linked testSession fixture creates a partner but does not
-      // complete the partner's session, so the waiting state should be the default.
+      // Default state: linked testSession fixture creates a partner who has not
+      // completed their session, so the waiting state is the expected default.
 
       // GIVEN: User has completed all 17 steps and the reflection summary
       await completeAllStepsToReflectionSummary(page, new Set([0, 5, 12]));
