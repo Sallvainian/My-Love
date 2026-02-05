@@ -1117,4 +1117,133 @@ test.describe('Daily Prayer Report — Send & View', () => {
       ).not.toBeVisible();
     });
   });
+
+  test.describe('2.3-E2E-005 [P2]: Together mode report shows both users data side-by-side', () => {
+    test('should display partner ratings side-by-side and both messages when partner data is pre-seeded', async ({
+      page,
+      supabaseAdmin,
+      testSession,
+    }) => {
+      // The default testSession fixture creates a together-mode session with
+      // user1 and user2. We pre-seed partner (user2) reflections and message
+      // so the report can display side-by-side data after user1 completes.
+
+      const sessionId = testSession.session_ids[0];
+      const partnerId = testSession.test_user2_id!;
+
+      // Pre-condition: testSession has a partner (together mode)
+      expect(partnerId).toBeTruthy();
+
+      // GIVEN: Partner (user2) has already submitted reflections for steps 0-16
+      const partnerReflections = Array.from({ length: 17 }, (_, stepIndex) => ({
+        session_id: sessionId,
+        step_index: stepIndex,
+        user_id: partnerId,
+        rating: ((stepIndex + 2) % 5) + 1, // Rotating rating 1-5, offset from user's
+        notes: `Partner reflection step ${stepIndex}`,
+        is_shared: true,
+      }));
+
+      const { error: reflError } = await supabaseAdmin
+        .from('scripture_reflections')
+        .insert(partnerReflections);
+      expect(reflError).toBeNull();
+
+      // AND: Partner has submitted a session-level reflection (step 17) with standout verses
+      const { error: summaryError } = await supabaseAdmin
+        .from('scripture_reflections')
+        .insert({
+          session_id: sessionId,
+          step_index: 17,
+          user_id: partnerId,
+          rating: 5,
+          notes: JSON.stringify({ standoutVerses: [2, 8, 14] }),
+          is_shared: true,
+        });
+      expect(summaryError).toBeNull();
+
+      // AND: Partner has sent a message
+      const { error: msgError } = await supabaseAdmin
+        .from('scripture_messages')
+        .insert({
+          session_id: sessionId,
+          sender_id: partnerId,
+          message: 'You are my sunshine. Thank you for reading with me today.',
+        });
+      expect(msgError).toBeNull();
+
+      // AND: Partner has bookmarked some verses
+      const partnerBookmarks = [3, 7, 11].map((stepIndex) => ({
+        session_id: sessionId,
+        step_index: stepIndex,
+        user_id: partnerId,
+      }));
+
+      const { error: bookmarkError } = await supabaseAdmin
+        .from('scripture_bookmarks')
+        .insert(partnerBookmarks);
+      expect(bookmarkError).toBeNull();
+
+      // WHEN: User1 completes all 17 steps with bookmarks on steps 0, 5, 12
+      const bookmarkedStepIndices = new Set([0, 5, 12]);
+      await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
+
+      // AND: User1 submits the reflection summary
+      await submitReflectionSummary(page);
+
+      // AND: User1 sends a message to reach the report
+      await expect(
+        page.getByTestId('scripture-message-compose-screen')
+      ).toBeVisible();
+      const textarea = page.getByTestId('scripture-message-textarea');
+      await textarea.fill('Together in prayer, always.');
+
+      const messageResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/rest/v1/scripture_messages') &&
+          response.ok()
+      );
+      await page.getByTestId('scripture-message-send-btn').click();
+      await messageResponse;
+
+      // THEN: Daily Prayer Report screen appears
+      await expect(
+        page.getByTestId('scripture-report-screen')
+      ).toBeVisible();
+
+      // AND: User ratings section is visible
+      await expect(
+        page.getByTestId('scripture-report-user-ratings')
+      ).toBeVisible();
+
+      // AND: Partner ratings are displayed side-by-side (partner rating circles visible)
+      // Check a few steps where partner has known ratings
+      // Step 0: partner rating = ((0+2) % 5) + 1 = 3
+      const step0Row = page.getByTestId('scripture-report-rating-step-0');
+      await expect(step0Row).toBeVisible();
+      // The row should contain TWO rating circles (user + partner)
+      const step0Circles = step0Row.locator('span.rounded-full');
+      await expect(step0Circles).toHaveCount(2);
+
+      // AND: Partner message is revealed
+      const partnerMessage = page.getByTestId('scripture-report-partner-message');
+      await expect(partnerMessage).toBeVisible();
+      await expect(partnerMessage).toContainText(
+        'You are my sunshine. Thank you for reading with me today.'
+      );
+
+      // AND: Partner message uses Dancing Script font (font-cursive class)
+      await expect(partnerMessage).toHaveClass(/font-cursive/);
+
+      // AND: Report heading is visible
+      await expect(
+        page.getByTestId('scripture-report-heading')
+      ).toBeVisible();
+
+      // AND: Return to Overview button is present
+      await expect(
+        page.getByTestId('scripture-report-return-btn')
+      ).toBeVisible();
+    });
+  });
 });
