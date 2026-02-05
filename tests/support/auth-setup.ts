@@ -81,6 +81,19 @@ setup('authenticate as test user 1', async ({ page }) => {
     throw new Error(`Failed to create test user: ${createError.message}`);
   }
 
+  // Create a second test user so the seed RPC can find a partner for together-mode sessions.
+  // The scripture_seed_test_data RPC selects user2 as: SELECT id FROM auth.users WHERE id != user1 LIMIT 1.
+  const { error: createError2 } = await admin.auth.admin.createUser({
+    email: 'testuser2@test.example.com',
+    password: TEST_USER_PASSWORD,
+    email_confirm: true,
+    user_metadata: { display_name: 'Test User 2' },
+  });
+
+  if (createError2 && !createError2.message.includes('already been registered')) {
+    throw new Error(`Failed to create test user 2: ${createError2.message}`);
+  }
+
   // Sign in as test user with anon key (same permissions as the real app)
   const client = createClient(url!, anonKey!, {
     auth: { persistSession: false },

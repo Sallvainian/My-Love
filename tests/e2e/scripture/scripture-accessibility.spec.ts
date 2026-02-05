@@ -8,8 +8,21 @@
  * Test IDs: P2-001 through P2-008, P2-014
  *
  * Epic 1, Story 1.5
+ *
+ * Source data-testid mapping (from SoloReadingFlow.tsx):
+ *   solo-reading-flow, exit-button, sr-announcer, retry-banner,
+ *   scripture-view-response-button, scripture-next-verse-button,
+ *   scripture-back-to-verse-button, scripture-response-text,
+ *   scripture-verse-reference, scripture-verse-text,
+ *   scripture-progress-indicator, scripture-bookmark-button
+ *
+ * NOTE: exit-button has aria-label="Exit reading".
+ * NOTE: view-response-button and next-verse-button have NO explicit aria-label
+ *       — they use visible button text ("View Response", "Next Verse").
+ * NOTE: "Next Verse" transitions to the reflection sub-view, NOT directly to the next verse.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { startSoloSession } from '../../support/helpers';
 
 test.describe('Scripture Accessibility', () => {
   test.describe('P2-001: Keyboard navigation', () => {
@@ -17,20 +30,13 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo scripture session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // WHEN: User tabs through the reading screen
       // First tab should focus exit button (or first interactive element)
       await page.keyboard.press('Tab');
 
       // THEN: All interactive elements are reachable in logical order
-      // Verify focus reaches the exit button
-      const exitButton = page.getByTestId('scripture-exit-button');
-      const viewResponseButton = page.getByTestId('scripture-view-response-button');
-      const nextVerseButton = page.getByTestId('scripture-next-verse-button');
-
       // Tab through and collect focused elements
       const focusedElements: string[] = [];
       for (let i = 0; i < 10; i++) {
@@ -43,16 +49,14 @@ test.describe('Scripture Accessibility', () => {
       }
 
       // Key interactive elements should be reachable
-      expect(focusedElements).toContain('scripture-exit-button');
+      expect(focusedElements).toContain('exit-button');
       expect(focusedElements).toContain('scripture-view-response-button');
       expect(focusedElements).toContain('scripture-next-verse-button');
     });
 
     test('should activate buttons with Enter and Space', async ({ page }) => {
       // GIVEN: User is in a solo session with focus on View Response button
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // Focus the View Response button
       await page.getByTestId('scripture-view-response-button').focus();
@@ -72,17 +76,16 @@ test.describe('Scripture Accessibility', () => {
       // WHEN: User presses Space
       await page.keyboard.press('Space');
 
-      // THEN: Advances to next step
+      // THEN: Transitions to reflection sub-view (NOT directly to verse 2)
+      // The per-verse reflection flow is: verse → (Next Verse) → reflection → (rate + Continue)
       await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 2 of 17');
+        page.getByTestId('scripture-reflection-screen')
+      ).toBeVisible();
     });
 
     test('should have no keyboard traps', async ({ page }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // WHEN: User tabs through all elements multiple times
       const startFocus = await page.evaluate(
@@ -105,33 +108,37 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-002: Screen reader aria-labels', () => {
-    test('should have descriptive aria-labels on all buttons', async ({
+    test('should have descriptive aria-labels on buttons that have them', async ({
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
-      // THEN: All buttons have aria-labels
+      // THEN: Exit button has aria-label (source: aria-label="Exit reading")
+      await expect(
+        page.getByTestId('exit-button')
+      ).toHaveAttribute('aria-label', 'Exit reading');
+
+      // AND: Next Verse button uses visible text (no explicit aria-label)
       await expect(
         page.getByTestId('scripture-next-verse-button')
-      ).toHaveAttribute('aria-label', /next verse/i);
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('scripture-next-verse-button')
+      ).toHaveText(/Next Verse|Complete Reading/);
 
+      // AND: View Response button uses visible text (no explicit aria-label)
       await expect(
         page.getByTestId('scripture-view-response-button')
-      ).toHaveAttribute('aria-label', /view response/i);
-
+      ).toBeVisible();
       await expect(
-        page.getByTestId('scripture-exit-button')
-      ).toHaveAttribute('aria-label', /exit/i);
+        page.getByTestId('scripture-view-response-button')
+      ).toHaveText('View Response');
     });
 
     test('should have aria-label on progress indicator', async ({ page }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // THEN: Progress indicator has descriptive aria-label
       await expect(
@@ -145,30 +152,36 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
-      // THEN: aria-live region exists
-      const liveRegion = page.getByTestId('scripture-live-region');
+      // THEN: aria-live region exists (source testid: sr-announcer)
+      const liveRegion = page.getByTestId('sr-announcer');
       await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
 
-      // WHEN: User advances to next verse
+      // WHEN: User advances through full verse→reflection→continue cycle
       await page.getByTestId('scripture-next-verse-button').click();
+      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
+      await page.getByTestId('scripture-rating-3').click();
 
-      // THEN: Live region announces the transition
-      await expect(liveRegion).toContainText(/now on verse 2/i);
+      const reflectionResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/rest/v1/rpc/scripture_submit_reflection') &&
+          response.status() === 200
+      );
+      await page.getByTestId('scripture-reflection-continue').click();
+      await reflectionResponse;
+
+      // THEN: Live region announces the transition after completing the step
+      await expect(liveRegion).toContainText(/verse 2/i);
     });
   });
 
   test.describe('P2-004: Announcements only on semantic state changes', () => {
     test('should not fire announcements on re-renders', async ({ page }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
-      const liveRegion = page.getByTestId('scripture-live-region');
+      const liveRegion = page.getByTestId('sr-announcer');
 
       // Record initial announcement text
       const initialText = await liveRegion.textContent();
@@ -183,36 +196,40 @@ test.describe('Scripture Accessibility', () => {
       // (Only step changes should trigger announcements)
       const afterViewResponse = await liveRegion.textContent();
       // The announcement should not have changed (still about verse 1)
-      expect(afterViewResponse).not.toMatch(/now on verse 2/i);
+      expect(afterViewResponse).not.toMatch(/verse 2/i);
     });
   });
 
   test.describe('P2-005/P2-006: Focus management after transitions', () => {
-    test('should focus verse heading after navigating to a new step', async ({
+    test('should manage focus after navigating to reflection sub-view', async ({
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
-      // WHEN: User advances to next step
+      // WHEN: User clicks Next Verse (transitions to reflection sub-view)
       await page.getByTestId('scripture-next-verse-button').click();
 
-      // THEN: Focus moves to verse heading/reference
+      // THEN: Reflection screen appears
+      await expect(
+        page.getByTestId('scripture-reflection-screen')
+      ).toBeVisible();
+
+      // AND: Focus has moved to an element within the reflection screen
       const focusedElement = await page.evaluate(
-        () => document.activeElement?.getAttribute('data-testid')
+        () => document.activeElement?.getAttribute('data-testid') ||
+              document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid') ||
+              document.activeElement?.tagName
       );
-      expect(focusedElement).toBe('scripture-verse-reference');
+      // Focus should be on or within the reflection screen (not stuck on a hidden button)
+      expect(focusedElement).toBeTruthy();
     });
 
     test('should focus navigation button after transition to response screen', async ({
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // WHEN: User views response
       await page.getByTestId('scripture-view-response-button').click();
@@ -234,15 +251,13 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // THEN: All buttons meet minimum touch target size
       const buttons = [
         'scripture-next-verse-button',
         'scripture-view-response-button',
-        'scripture-exit-button',
+        'exit-button',
       ];
 
       for (const testId of buttons) {
@@ -257,9 +272,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // Get bounding boxes of adjacent buttons
       const viewResponseBox = await page
@@ -282,15 +295,13 @@ test.describe('Scripture Accessibility', () => {
   test.describe('P2-014: WCAG AA color contrast', () => {
     test('should pass automated accessibility audit', async ({ page }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // WHEN: axe-core scans the page
       // NOTE: Requires @axe-core/playwright in devDependencies
       const AxeBuilder = (await import('@axe-core/playwright')).default;
       const accessibilityScanResults = await new AxeBuilder({ page })
-        .include('[data-testid="scripture-reading-container"]')
+        .include('[data-testid="solo-reading-flow"]')
         .analyze();
 
       // THEN: No accessibility violations

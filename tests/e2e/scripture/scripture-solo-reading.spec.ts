@@ -16,44 +16,7 @@
  * checkForActiveSession to show the resume prompt instead of Start button.
  */
 import { test, expect } from '../../support/merged-fixtures';
-
-/**
- * Helper: Start a solo session from the scripture overview.
- * Navigates, waits for the overview to render, clicks Start → Solo,
- * and waits for the session creation API to complete.
- */
-async function startSoloSession(page: import('@playwright/test').Page) {
-  await page.goto('/scripture');
-
-  // Handle stale sessions from previous test runs: if the resume prompt
-  // is visible ("Continue where you left off?"), click "Start fresh"
-  // to abandon the old session before starting a new one.
-  const startFresh = page.getByTestId('resume-start-fresh');
-  const startButton = page.getByTestId('scripture-start-button');
-
-  // Wait for either the start button or the resume prompt
-  await expect(startButton.or(startFresh)).toBeVisible();
-
-  if (await startFresh.isVisible()) {
-    await startFresh.click();
-    await expect(startButton).toBeVisible();
-  }
-
-  // Set up waitForResponse BEFORE the click that triggers the API call
-  const sessionCreated = page.waitForResponse(
-    (resp) =>
-      resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-      resp.status() === 200
-  );
-
-  await page.getByTestId('scripture-start-button').click();
-  await page.getByTestId('scripture-mode-solo').click();
-
-  await sessionCreated;
-
-  // Wait for the reading flow to render
-  await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
-}
+import { startSoloSession } from '../../support/helpers';
 
 /**
  * Helper: Complete the per-verse reflection and advance to the next step.

@@ -12,6 +12,7 @@
  * TDD Phase: GREEN — all tests activated
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { ensureScriptureOverview, startSoloSession } from '../../support/helpers';
 
 test.describe('Per-Step Reflection System', () => {
   test.describe('2.1-E2E-001 [P0]: Submit per-step reflection with rating and note', () => {
@@ -21,9 +22,7 @@ test.describe('Per-Step Reflection System', () => {
       testSession,
     }) => {
       // GIVEN: User navigates to scripture and starts a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // AND: User is on the first verse screen
       await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
@@ -117,9 +116,7 @@ test.describe('Per-Step Reflection System', () => {
       testSession,
     }) => {
       // GIVEN: User is on a verse screen in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // AND: Bookmark button is visible with inactive state
@@ -200,9 +197,7 @@ test.describe('Per-Step Reflection System', () => {
       page,
     }) => {
       // GIVEN: User is on the reflection screen (after completing step 1)
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
       await page.getByTestId('scripture-next-verse-button').click();
 
       // AND: Reflection screen is displayed
@@ -251,9 +246,7 @@ test.describe('Per-Step Reflection System', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
 
       // AND: The reflection write endpoint is intercepted to fail
       // Set up route BEFORE the action that triggers the request
@@ -279,7 +272,7 @@ test.describe('Per-Step Reflection System', () => {
 
       // AND: Retry indicator/toast is visible (non-blocking)
       await expect(
-        page.getByTestId('scripture-reflection-retry')
+        page.getByTestId('retry-banner')
       ).toBeVisible();
 
       // AND: The retry UI does not block interaction with the next verse
@@ -294,9 +287,7 @@ test.describe('Per-Step Reflection System', () => {
       page,
     }) => {
       // GIVEN: User is on a verse screen in a solo session
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       const bookmarkButton = page.getByTestId('scripture-bookmark-button');
@@ -326,9 +317,7 @@ test.describe('Per-Step Reflection System', () => {
       page,
     }) => {
       // GIVEN: User is on the reflection screen
-      await page.goto('/scripture');
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
+      await startSoloSession(page);
       await page.getByTestId('scripture-next-verse-button').click();
       await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
 
@@ -379,10 +368,8 @@ test.describe('End-of-Session Reflection Summary', () => {
     page: import('@playwright/test').Page,
     bookmarkSteps: Set<number> = new Set([0, 5, 12])
   ): Promise<void> {
-    // Start solo session
-    await page.goto('/scripture');
-    await page.getByTestId('scripture-start-button').click();
-    await page.getByTestId('scripture-mode-solo').click();
+    // Start solo session (handles stale sessions from previous runs)
+    await startSoloSession(page);
 
     // Complete all 17 steps (indices 0-16)
     for (let step = 0; step < 17; step++) {
@@ -806,10 +793,8 @@ test.describe('Daily Prayer Report — Send & View', () => {
     page: import('@playwright/test').Page,
     bookmarkSteps: Set<number> = new Set([0, 5, 12])
   ): Promise<void> {
-    // Start solo session
-    await page.goto('/scripture');
-    await page.getByTestId('scripture-start-button').click();
-    await page.getByTestId('scripture-mode-solo').click();
+    // Start solo session (handles stale sessions from previous runs)
+    await startSoloSession(page);
 
     // Complete all 17 steps (indices 0-16)
     for (let step = 0; step < 17; step++) {
