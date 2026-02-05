@@ -54,8 +54,12 @@ _bmad/
 
 # IDE and AI tool configs
 .cursor/
+.cursorrules
 .gemini/
 .opencode/
+.codex/
+.contextstream/
+AGENTS.md
 
 # Claude OS (auto-generated, user-specific)
 .claude-os/tree_sitter_cache.db
