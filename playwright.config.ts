@@ -17,6 +17,10 @@ if (!process.env.SUPABASE_URL) {
     process.env.SUPABASE_URL ??= vars.API_URL;
     process.env.SUPABASE_SERVICE_ROLE_KEY ??= vars.SERVICE_ROLE_KEY;
     process.env.SUPABASE_ANON_KEY ??= vars.ANON_KEY;
+
+    // Also set VITE_ variants so the Vite dev server connects to local Supabase
+    process.env.VITE_SUPABASE_URL ??= vars.API_URL;
+    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??= vars.ANON_KEY;
   } catch {
     // Supabase CLI unavailable — env vars must be set externally (CI)
   }
@@ -60,10 +64,20 @@ export default defineConfig({
   outputDir: 'test-results',
 
   projects: [
+    // Auth setup — runs once, saves storageState for E2E tests
+    {
+      name: 'setup',
+      testMatch: /auth-setup\.ts/,
+      testDir: './tests/support',
+    },
     {
       name: 'chromium',
       testDir: './tests/e2e',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'tests/.auth/user.json',
+      },
+      dependencies: ['setup'],
     },
     {
       name: 'api',
@@ -74,10 +88,12 @@ export default defineConfig({
     // { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
 
-  // Run local dev server before tests
-  // Uses dotenvx to decrypt encrypted .env values (Supabase credentials)
+  // Run local dev server before tests.
+  // VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY are set above
+  // from `supabase status`, so Vite picks them up from process.env without dotenvx.
+  // In CI, dotenvx decrypts .env for production credentials.
   webServer: {
-    command: 'dotenvx run -- npx vite',
+    command: process.env.CI ? 'dotenvx run -- npx vite' : 'npx vite',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
