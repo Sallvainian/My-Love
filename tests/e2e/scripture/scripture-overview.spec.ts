@@ -97,6 +97,27 @@ test.describe('Scripture Navigation & Overview', () => {
     });
   });
 
+  test.describe('Helper Resilience', () => {
+    test('should tolerate ensureScriptureOverview when solo flow is already active', async ({
+      page,
+    }) => {
+      // GIVEN: A solo flow is already active
+      await startSoloSession(page);
+      await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
+
+      // WHEN: Helper re-checks scripture entry state
+      const entryState = await ensureScriptureOverview(page);
+
+      // THEN: Helper resolves a valid state without throwing
+      expect(['overview', 'active-flow']).toContain(entryState);
+      if (entryState === 'overview') {
+        await expect(page.getByTestId('scripture-start-button')).toBeVisible();
+      } else {
+        await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
+      }
+    });
+  });
+
   test.describe('P1-006: Mode selection - no partner disables Together', () => {
     test('should disable Together mode when user has no linked partner', async ({
       page,
