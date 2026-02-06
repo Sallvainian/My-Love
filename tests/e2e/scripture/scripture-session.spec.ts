@@ -122,7 +122,7 @@ test.describe('Scripture Session - Save & Resume', () => {
     });
   });
 
-  test.describe('P1-005: Server write failure shows retry UI', () => {
+  test.describe('P1-005: Server write failure shows retry UI', { annotation: [{ type: 'skipNetworkMonitoring' }] }, () => {
     test('should show retry UI when server write fails', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
