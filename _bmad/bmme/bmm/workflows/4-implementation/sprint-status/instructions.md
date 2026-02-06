@@ -235,12 +235,3 @@ If the command targets a story, set `story_key={{next_story_id}}` when prompted.
 </step>
 
 </workflow>
-
-## Update ContextStream Plan Task
-
-On workflow completion:
-
-1. **Search for matching task**: Call `mcp__contextstream__memory(action="list_tasks")` and find a task whose title matches this sprint status workflow (e.g., "Sprint Status Review" or project name)
-2. **If matching task found**: Call `mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")`
-3. **If no matching task**: Skip — not all workflow runs correspond to plan tasks
-4. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="implementation", title="Sprint status review completed", content="{{story_count}} stories reviewed, next workflow: {{next_workflow_id}}", importance="medium", tags=["sprint-status", "workflow-complete"])`

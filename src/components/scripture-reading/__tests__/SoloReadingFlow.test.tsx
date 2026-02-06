@@ -124,7 +124,7 @@ interface MockSession {
 }
 
 interface MockPendingRetry {
-  type: 'advanceStep' | 'saveSession';
+  type: 'advanceStep' | 'saveSession' | 'reflection';
   attempts: number;
   maxAttempts: number;
 }

@@ -77,12 +77,10 @@ export function ReflectionSummary({
       }
       return next;
     });
-    setShowValidation(false);
   }, []);
 
   const handleRatingSelect = useCallback((rating: number) => {
     setSelectedRating(rating);
-    setShowValidation(false);
   }, []);
 
   const handleKeyDown = useCallback(

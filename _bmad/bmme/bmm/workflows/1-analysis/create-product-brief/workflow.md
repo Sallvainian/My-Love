@@ -10,7 +10,6 @@ web_bundle: true
 - **Search**: Use `mcp__contextstream__search()` to find existing research
 - **Capture**: Save decisions via `mcp__contextstream__session(action="capture", event_type="decision")`
 - **Save**: Save brief via `mcp__contextstream__memory(action="create_doc", doc_type="spec")`
-- **Task Update**: On completion, search `list_tasks` for matching task and `update_task(completed)`
 
 # Product Brief Workflow
 

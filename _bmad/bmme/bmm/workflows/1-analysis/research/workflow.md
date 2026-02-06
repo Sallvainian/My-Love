@@ -10,7 +10,6 @@ web_bundle: true
 - **Search**: Use `mcp__contextstream__search()` to find existing research/briefs
 - **Capture**: Save research findings via `mcp__contextstream__session(action="capture", event_type="insight")`
 - **Remember**: Save quick insights via `mcp__contextstream__session(action="remember")`
-- **Task Update**: On completion, search `list_tasks` for matching task and `update_task(completed)`
 
 # Research Workflow
 

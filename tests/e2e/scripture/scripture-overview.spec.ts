@@ -80,7 +80,11 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: User has no linked partner (partner_id is null)
-      // NOTE: Test assumes user is logged in without a partner
+      // Intercept partner query to simulate no-partner state
+      await page.route('**/rest/v1/users?select=*partner*', (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      );
+
       await ensureScriptureOverview(page);
       await page.getByTestId('scripture-start-button').click();
 

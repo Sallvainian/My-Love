@@ -124,15 +124,6 @@ After PRD is finalized:
 1. **Save as document**: Call `mcp__contextstream__memory(action="create_doc", title="PRD: {{project_name}}", doc_type="spec", content="{{prd_content}}")` to persist the PRD in ContextStream
 2. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="decision", title="PRD completed for {{project_name}}", content="PRD created with {{section_count}} sections covering {{scope_summary}}", importance="high", tags=["prd", "planning"])`
 
-### Update ContextStream Plan Task
-
-On workflow completion:
-
-1. **Search for matching task**: Call `mcp__contextstream__memory(action="list_tasks")` and find a task whose title matches this PRD workflow (e.g., the project name or "Create PRD")
-2. **If matching task found**: Call `mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")`
-3. **If no matching task**: Skip — not all workflow runs correspond to plan tasks
-4. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="implementation", title="PRD workflow completed: {{project_name}}", content="PRD document finalized with all required sections", importance="medium", tags=["create-prd", "workflow-complete"])`
-
 ## FINAL REMINDER to give the user:
 
 The polished PRD serves as the foundation for all subsequent product development activities. All design, architecture, and development work should trace back to the requirements and vision documented in this PRD - update it also as needed as you continue planning.

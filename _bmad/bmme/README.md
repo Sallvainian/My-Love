@@ -1,6 +1,6 @@
 # BMM Enhanced: ContextStream Integration
 
-Extension module that adds [ContextStream](https://contextstream.io) MCP tool calls to all 15 BMM workflows + 1 TEA workflow. Provides persistent memory, semantic search, decision tracking, task updates, and lesson capture across AI agent sessions.
+Extension module that adds [ContextStream](https://contextstream.io) MCP tool calls to all 19 BMM workflows + 1 TEA workflow. Provides persistent memory, semantic search, decision tracking, and lesson capture across AI agent sessions.
 
 ## Why
 
@@ -19,13 +19,14 @@ _bmm-enhanced/
 ├── module.yaml                        # Extension module config (code: bmm)
 ├── README.md                          # This file
 ├── BRIEF.md                           # Original design brief
-├── bmm/workflows/                     # 15 ContextStream-integrated BMM workflows
+├── bmm/workflows/                     # 19 ContextStream-integrated BMM workflows
 │   ├── 1-analysis/                    # Research, product brief
 │   ├── 2-plan-workflows/              # PRD creation
 │   ├── 3-solutioning/                 # Architecture, epics & stories
 │   ├── 4-implementation/              # Dev, code review, sprint mgmt
 │   ├── bmad-quick-flow/               # Quick dev, quick spec
 │   ├── document-project/              # Project documentation
+│   ├── excalidraw-diagrams/           # Dataflow, diagram, flowchart, wireframe
 │   ├── generate-project-context/      # Context generation
 │   └── qa/                            # Test automation
 └── tea/workflows/                     # 1 TEA workflow (test-review)
@@ -36,7 +37,7 @@ _bmm-enhanced/
 
 ## Integration Points
 
-All 16 workflows (15 BMM + 1 TEA) now include ContextStream task update integration:
+Each workflow uses a mix of these 6 integration points:
 
 | Point | Tool Call | Where |
 |-------|-----------|-------|
@@ -44,7 +45,7 @@ All 16 workflows (15 BMM + 1 TEA) now include ContextStream task update integrat
 | **Search** | `mcp__contextstream__search(mode="hybrid", query)` | Replace or supplement file glob discovery |
 | **Lessons** | `mcp__contextstream__session(action="get_lessons", query)` | Before risky operations |
 | **Capture** | `mcp__contextstream__session(action="capture", event_type="decision")` | At each decision point |
-| **Tasks** | `mcp__contextstream__memory(action="update_task", task_status="completed")` | On workflow completion (all 16 workflows) |
+| **Tasks** | `mcp__contextstream__memory(action="update_task", task_status)` | On story start/completion |
 | **Save** | `mcp__contextstream__memory(action="create_doc", doc_type="spec")` | Final step for doc output |
 
 ## Workflow Integration Depth
@@ -54,34 +55,36 @@ All 16 workflows (15 BMM + 1 TEA) now include ContextStream task update integrat
 - **dev-story** — init, search, lessons, capture decisions, capture lessons on failure, update tasks
 - **code-review** — init, search AC, graph impact analysis, capture findings, update tasks
 - **create-story** — init, search epic context, capture plan + create task
-- **sprint-status** — init, list plans/tasks, compare with local YAML, **update tasks on completion**
+- **sprint-status** — init, list plans/tasks, compare with local YAML
 - **sprint-planning** — init, capture plan, create tasks per story
 
-### Phase 2 — Planning (init + search + capture decisions + save docs + update tasks)
+### Phase 2 — Planning (init + search + capture decisions + save docs)
 
-- **create-prd** — workflow.md + step-01-init + step-12-complete + **task update**
-- **create-architecture** — workflow.md + step-01-init + step-04-decisions + step-08-complete + **task update**
+- **create-prd** — workflow.md + step-01-init + step-12-complete
+- **create-architecture** — workflow.md + step-01-init + step-04-decisions + step-08-complete
 - **create-epics-and-stories** — workflow.md + step-01-validate + step-04-final-validation
 
-### Phase 3 — Test (init + search + lessons + update tasks)
+### Phase 3 — Test
 
-- **qa/automate** — init, search, lessons, **update tasks on completion**
+- **qa/automate** — init, search, lessons
 
-### Phase 4 — Analysis (init + search + capture + update tasks)
+### Phase 4 — Analysis (init + search + capture)
 
-- **research** — workflow.md entry point, **task update on completion**
-- **create-product-brief** — workflow.md entry point, **task update on completion**
+- **research** — workflow.md entry point only
+- **create-product-brief** — workflow.md entry point only
 
-### Phase 5 — Utility (init + search + save + update tasks)
+### Phase 5 — Utility (init + search + save)
 
-- **quick-dev**, **quick-spec**, **generate-project-context** — workflow.md entry point, **task update on completion**
-- **document-project** — workflow.yaml + instructions.md, **update tasks on completion**
+- **quick-dev**, **quick-spec**, **generate-project-context** — workflow.md entry point only
+- **document-project** — workflow.yaml + instructions.md
 
-### TEA — Test Architecture (update tasks on completion)
+### Phase 6 — Excalidraw Diagrams (init + search, YAML-only)
 
-- **testarch/test-review** — workflow.yaml + 6 step files (context optimization, scoring formula fix, **task update in step-04**)
+- **create-dataflow**, **create-diagram**, **create-flowchart**, **create-wireframe**
 
-**Note:** Excalidraw diagram workflows (create-dataflow, create-diagram, create-flowchart, create-wireframe) were removed in BMAD v6.0.0-Beta.6 (Feb 4, 2026) and are no longer included in this module.
+### TEA — Test Architecture
+
+- **testarch/test-review** — workflow.yaml + 6 step files (context optimization, scoring formula fix)
 
 ## Installation
 

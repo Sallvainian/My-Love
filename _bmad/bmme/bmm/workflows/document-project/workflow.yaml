@@ -30,6 +30,5 @@ contextstream:
   init: true
   context: true
   search_inputs: true
-  update_tasks: true
 
 standalone: true

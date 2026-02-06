@@ -76,15 +76,6 @@ After architecture document is finalized:
 1. **Save as document**: Call `mcp__contextstream__memory(action="create_doc", title="Architecture: {{project_name}}", doc_type="spec", content="{{architecture_content}}")` to persist in ContextStream
 2. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="decision", title="Architecture completed for {{project_name}}", content="Architecture document created with {{decision_count}} critical decisions", importance="high", tags=["architecture", "planning"])`
 
-### Update ContextStream Plan Task
-
-On workflow completion:
-
-1. **Search for matching task**: Call `mcp__contextstream__memory(action="list_tasks")` and find a task whose title matches this architecture workflow (e.g., the project name or "Create Architecture")
-2. **If matching task found**: Call `mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")`
-3. **If no matching task**: Skip — not all workflow runs correspond to plan tasks
-4. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="implementation", title="Architecture workflow completed: {{project_name}}", content="Architecture document finalized with all critical decisions", importance="medium", tags=["create-architecture", "workflow-complete"])`
-
 ## WORKFLOW COMPLETE:
 
 This is the final step of the Architecture workflow. The user now has a complete, validated architecture document ready for AI agent implementation.

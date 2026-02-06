@@ -117,12 +117,3 @@ If the project needs:
 Save summary to: `{implementation_artifacts}/tests/test-summary.md`
 
 **Done!** Tests generated and verified.
-
-## Update ContextStream Plan Task
-
-On workflow completion:
-
-1. **Search for matching task**: Call `mcp__contextstream__memory(action="list_tasks")` and find a task whose title matches this test automation workflow (e.g., the feature name or "Generate Tests")
-2. **If matching task found**: Call `mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")`
-3. **If no matching task**: Skip — not all workflow runs correspond to plan tasks
-4. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="implementation", title="Test automation completed: {{feature}}", content="{{test_count}} tests generated and verified", importance="medium", tags=["qa-automate", "workflow-complete"])`

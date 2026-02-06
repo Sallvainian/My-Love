@@ -35,13 +35,6 @@ required_tools:
   - search_repo # Find tests by patterns
   - glob # Find test files matching patterns
 
-# ContextStream integration
-contextstream:
-  init: true
-  context: true
-  search_inputs: true
-  update_tasks: true
-
 tags:
   - qa
   - test-architect
