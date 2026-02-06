@@ -30,7 +30,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo scripture session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: User tabs through the reading screen
       // First tab should focus exit button (or first interactive element)
@@ -56,7 +56,7 @@ test.describe('Scripture Accessibility', () => {
 
     test('should activate buttons with Enter and Space', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session with focus on View Response button
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // Focus the View Response button
       await page.getByTestId('scripture-view-response-button').focus();
@@ -85,7 +85,7 @@ test.describe('Scripture Accessibility', () => {
 
     test('should have no keyboard traps', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: User tabs through all elements multiple times
       const startFocus = await page.evaluate(
@@ -112,7 +112,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // THEN: Exit button has aria-label (source: aria-label="Exit reading")
       await expect(
@@ -138,7 +138,7 @@ test.describe('Scripture Accessibility', () => {
 
     test('should have aria-label on progress indicator', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // THEN: Progress indicator has descriptive aria-label
       await expect(
@@ -152,7 +152,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // THEN: aria-live region exists (source testid: sr-announcer)
       const liveRegion = page.getByTestId('sr-announcer');
@@ -179,7 +179,7 @@ test.describe('Scripture Accessibility', () => {
   test.describe('P2-004: Announcements only on semantic state changes', () => {
     test('should not fire announcements on re-renders', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       const liveRegion = page.getByTestId('sr-announcer');
 
@@ -205,7 +205,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: User clicks Next Verse (transitions to reflection sub-view)
       await page.getByTestId('scripture-next-verse-button').click();
@@ -229,7 +229,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: User views response
       await page.getByTestId('scripture-view-response-button').click();
@@ -251,7 +251,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // THEN: All buttons meet minimum touch target size
       const buttons = [
@@ -272,7 +272,7 @@ test.describe('Scripture Accessibility', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // Get bounding boxes of adjacent buttons
       const viewResponseBox = await page
@@ -295,7 +295,7 @@ test.describe('Scripture Accessibility', () => {
   test.describe('P2-014: WCAG AA color contrast', () => {
     test('should pass automated accessibility audit', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: axe-core scans the page
       // NOTE: Requires @axe-core/playwright in devDependencies

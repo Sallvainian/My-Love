@@ -17,7 +17,29 @@
  *   The "Together" card is the second ModeCard in mode-selection.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { ensureScriptureOverview } from '../../support/helpers';
+import {
+  ensureScriptureOverview,
+  startSoloSession,
+  advanceOneStep,
+} from '../../support/helpers';
+import type { Page } from '@playwright/test';
+
+async function saveSoloSessionAtStep(page: Page, step: number): Promise<void> {
+  await startSoloSession(page);
+
+  for (let i = 1; i < step; i++) {
+    await advanceOneStep(page);
+  }
+
+  await page.getByTestId('exit-button').click();
+  await expect(page.getByTestId('exit-confirm-dialog')).toBeVisible();
+  await page.getByTestId('save-and-exit-button').click();
+  await expect(page.getByTestId('scripture-overview')).toBeVisible();
+
+  // Re-open without fresh=true so resume behavior is exercised.
+  await page.goto('/scripture');
+  await expect(page.getByTestId('scripture-overview')).toBeVisible();
+}
 
 test.describe('Scripture Navigation & Overview', () => {
   test.describe('Navigation', () => {
@@ -80,10 +102,21 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: User has no linked partner (partner_id is null)
-      // Intercept partner query to simulate no-partner state
-      await page.route('**/rest/v1/users?select=*partner*', (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
-      );
+      // Intercept partner lookup query to simulate no-partner state.
+      await page.route('**/rest/v1/users*', (route) => {
+        const url = route.request().url();
+        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              partner_id: null,
+              updated_at: new Date().toISOString(),
+            }),
+          });
+        }
+        return route.continue();
+      });
 
       await ensureScriptureOverview(page);
       await page.getByTestId('scripture-start-button').click();
@@ -109,8 +142,39 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: User has a linked partner (partner_id is not null)
-      // NOTE: This test requires a user with partner_id set
-      // TODO: Fixture needed for user with linked partner
+      const partnerId = '11111111-1111-4111-8111-111111111111';
+      await page.route('**/rest/v1/users*', (route) => {
+        const url = route.request().url();
+
+        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              partner_id: partnerId,
+              updated_at: new Date().toISOString(),
+            }),
+          });
+        }
+
+        if (
+          url.includes('select=id,email,display_name') ||
+          url.includes('select=id%2Cemail%2Cdisplay_name')
+        ) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              id: partnerId,
+              email: 'linked.partner@example.com',
+              display_name: 'Linked Partner',
+            }),
+          });
+        }
+
+        return route.continue();
+      });
+
       await ensureScriptureOverview(page);
       await page.getByTestId('scripture-start-button').click();
 
@@ -128,9 +192,7 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: User has an incomplete Solo session at step 7
-      // NOTE: This test requires seeding an in-progress session
-      // TODO: Navigate through session or seed via API first
-      await page.goto('/scripture');
+      await saveSoloSessionAtStep(page, 7);
 
       // WHEN: The overview page loads
       // THEN: Resume prompt is displayed
@@ -139,7 +201,7 @@ test.describe('Scripture Navigation & Overview', () => {
       // AND: Shows correct step info
       await expect(
         page.getByTestId('resume-prompt')
-      ).toContainText(/continue where you left off/i);
+      ).toContainText(/Continue where you left off\? \(Step 7 of 17\)/i);
 
       // AND: Continue button is available
       await expect(
@@ -156,12 +218,19 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: User has an incomplete session and sees the resume prompt
-      // TODO: Seed an in-progress session first
-      await page.goto('/scripture');
+      await saveSoloSessionAtStep(page, 5);
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
 
       // WHEN: User taps "Start fresh"
+      const sessionAbandoned = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.request().method() === 'PATCH' &&
+          resp.status() >= 200 &&
+          resp.status() < 300
+      );
       await page.getByTestId('resume-start-fresh').click();
+      await sessionAbandoned;
 
       // THEN: Start button appears (session was abandoned)
       await expect(page.getByTestId('scripture-start-button')).toBeVisible();

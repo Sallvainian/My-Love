@@ -15,17 +15,20 @@ import type { Page } from '@playwright/test';
 /**
  * Navigate to /scripture and ensure Start button is visible.
  *
- * Always navigates with ?fresh=true to bypass resume prompts and show
- * the Start button directly, avoiding conditional logic.
+ * Uses the fresh-start query param to bypass resume prompts and
+ * force the overview start state deterministically.
  *
  * @param page - Playwright page
  */
 export async function ensureScriptureOverview(page: Page) {
-  // Navigate with fresh parameter to always show Start button
+  // Defensive reset: a prior test may have toggled context offline.
+  await page.context().setOffline(false);
+
   await page.goto('/scripture?fresh=true');
 
   const startButton = page.getByTestId('scripture-start-button');
   await expect(startButton).toBeVisible();
+  await expect(startButton).toBeEnabled();
 }
 
 /**
@@ -43,6 +46,7 @@ export async function startSoloSession(page: Page): Promise<string> {
     (resp) => resp.url().includes('/rest/v1/rpc/scripture_create_session') && resp.status() === 200
   );
 
+  await expect(page.getByTestId('scripture-start-button')).toBeEnabled();
   await page.getByTestId('scripture-start-button').click();
   await page.getByTestId('scripture-mode-solo').click();
 

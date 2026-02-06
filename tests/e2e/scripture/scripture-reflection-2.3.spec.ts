@@ -26,10 +26,10 @@ test.describe('Daily Prayer Report — Send & View', () => {
     }) => {
       // GIVEN: User has completed all 17 steps with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
-      const sessionId = await completeAllStepsToReflectionSummary(page, interceptNetworkCall, bookmarkedStepIndices);
+      const sessionId = await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
 
       // AND: User submits the reflection summary (select verse, rating, click continue)
-      await submitReflectionSummary(page, interceptNetworkCall);
+      await submitReflectionSummary(page);
 
       // WHEN: Report phase begins (after reflection summary submission)
       // THEN: Message composition screen appears
@@ -58,10 +58,11 @@ test.describe('Daily Prayer Report — Send & View', () => {
       // WHEN: User types a message
       await textarea.fill('Praying for you today. You are loved.');
 
-      // AND: User clicks Send — wait for message persistence
+      // AND: User clicks Send — wait for the INSERT request (not report-data GETs)
       const messageResponse = page.waitForResponse(
         (response) =>
           response.url().includes('/rest/v1/scripture_messages') &&
+          response.request().method() === 'POST' &&
           response.ok()
       );
       await sendButton.click();
@@ -69,40 +70,46 @@ test.describe('Daily Prayer Report — Send & View', () => {
 
       // THEN: Daily Prayer Report screen appears
       await expect(
-        page.getByTestId('scripture-prayer-report-screen')
+        page.getByTestId('scripture-report-screen')
       ).toBeVisible();
 
-      // AND: Heading shows "Your Prayer Time"
-      const reportHeading = page.getByTestId('scripture-prayer-report-heading');
+      // AND: Heading shows "Daily Prayer Report"
+      const reportHeading = page.getByTestId('scripture-report-heading');
       await expect(reportHeading).toBeVisible();
-      await expect(reportHeading).toHaveText('Your Prayer Time');
+      await expect(reportHeading).toHaveText('Daily Prayer Report');
 
-      // AND: User completion card is visible with green checkmark
+      // AND: User report sections render
       await expect(
-        page.getByTestId('scripture-user-completion-card')
+        page.getByTestId('scripture-report-user-ratings')
       ).toBeVisible();
       await expect(
-        page.getByTestId('scripture-user-completion-icon')
+        page.getByTestId('scripture-report-standout-verses')
       ).toBeVisible();
 
-      // AND: Partner waiting card is visible with amber clock
+      // AND: Partner waiting state is visible
       await expect(
-        page.getByTestId('scripture-partner-waiting-card')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-partner-waiting-icon')
+        page.getByTestId('scripture-report-partner-waiting')
       ).toBeVisible();
 
       // AND: Message is persisted to the database
+      await expect.poll(async () => {
+        const { data, error } = await supabaseAdmin
+          .from('scripture_messages')
+          .select('*')
+          .eq('session_id', sessionId)
+          .eq('sender_id', testSession.test_user1_id);
+
+        expect(error).toBeNull();
+        return data?.length ?? 0;
+      }).toBe(1);
+
       const { data: messages, error } = await supabaseAdmin
         .from('scripture_messages')
         .select('*')
         .eq('session_id', sessionId)
-        .eq('user_id', testSession.test_user1_id);
-
+        .eq('sender_id', testSession.test_user1_id);
       expect(error).toBeNull();
-      expect(messages).toHaveLength(1);
-      expect(messages![0].message_text).toBe('Praying for you today. You are loved.');
+      expect(messages![0].message).toBe('Praying for you today. You are loved.');
     });
   });
 
@@ -110,20 +117,28 @@ test.describe('Daily Prayer Report — Send & View', () => {
     test('should show completion screen without partner card when user is unlinked', async ({
       page,
       supabaseAdmin,
-      testSession,
     }) => {
-      // GIVEN: User is unlinked (test user 1 has partner_id = null)
-      const { error } = await supabaseAdmin
-        .from('users')
-        .update({ partner_id: null })
-        .eq('id', testSession.test_user1_id);
-      expect(error).toBeNull();
+      // GIVEN: User is treated as unlinked in this test scope
+      await page.route('**/rest/v1/users*', (route) => {
+        const url = route.request().url();
+        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              partner_id: null,
+              updated_at: new Date().toISOString(),
+            }),
+          });
+        }
+        return route.continue();
+      });
 
       // AND: User has completed all 17 steps
       const sessionId = await completeAllStepsToReflectionSummary(page);
 
       // AND: User submits the reflection summary
-      await submitReflectionSummary(page, interceptNetworkCall);
+      await submitReflectionSummary(page);
 
       // THEN: Message compose screen is NOT shown
       await expect(
@@ -132,17 +147,17 @@ test.describe('Daily Prayer Report — Send & View', () => {
 
       // AND: Completion screen appears directly (no partner data)
       await expect(
-        page.getByTestId('scripture-prayer-report-screen')
+        page.getByTestId('scripture-unlinked-complete-screen')
       ).toBeVisible();
 
-      // AND: User completion card is visible
+      // AND: Return action is visible
       await expect(
-        page.getByTestId('scripture-user-completion-card')
+        page.getByTestId('scripture-unlinked-return-btn')
       ).toBeVisible();
 
-      // AND: Partner card is NOT visible (user is unlinked)
+      // AND: Report screen is not rendered in unlinked path
       await expect(
-        page.getByTestId('scripture-partner-waiting-card')
+        page.getByTestId('scripture-report-screen')
       ).not.toBeVisible();
 
       // AND: No message is persisted
@@ -161,31 +176,34 @@ test.describe('Daily Prayer Report — Send & View', () => {
       supabaseAdmin,
       testSession,
     }) => {
-      // GIVEN: Partner (test user 2) has completed a session with a message
-      const { data: partnerSessionData } = await supabaseAdmin
-        .rpc('scripture_create_session', {
-          p_user_id: testSession.test_user2_id,
-          p_is_together_mode: false,
+      // GIVEN: User 1 completes a session and reaches report compose phase
+      const sessionId = await completeAllStepsToReflectionSummary(page);
+      await submitReflectionSummary(page);
+
+      // AND: Partner contributes to the same shared session report
+      expect(testSession.test_user2_id).not.toBeNull();
+      const { error: partnerReflectionError } = await supabaseAdmin
+        .from('scripture_reflections')
+        .insert({
+          session_id: sessionId,
+          user_id: testSession.test_user2_id!,
+          step_index: 0,
+          rating: 5,
+          notes: 'Partner reflection',
+          is_shared: true,
         });
-      const partnerSessionId = partnerSessionData.id;
+      expect(partnerReflectionError).toBeNull();
 
-      // AND: Partner session is marked complete with reflection + message
-      await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'complete' })
-        .eq('id', partnerSessionId);
+      const { error: partnerMessageError } = await supabaseAdmin
+        .from('scripture_messages')
+        .insert({
+          session_id: sessionId,
+          sender_id: testSession.test_user2_id!,
+          message: 'Feeling grateful for your prayers. God is good.',
+        });
+      expect(partnerMessageError).toBeNull();
 
-      await supabaseAdmin.from('scripture_messages').insert({
-        session_id: partnerSessionId,
-        user_id: testSession.test_user2_id,
-        message_text: 'Feeling grateful for your prayers. God is good.',
-      });
-
-      // WHEN: User 1 completes their own session
-      await completeAllStepsToReflectionSummary(page);
-      await submitReflectionSummary(page, interceptNetworkCall);
-
-      // AND: User 1 sends their message
+      // WHEN: User 1 sends their own message
       await expect(
         page.getByTestId('scripture-message-compose-screen')
       ).toBeVisible();
@@ -196,23 +214,13 @@ test.describe('Daily Prayer Report — Send & View', () => {
 
       // THEN: Daily Prayer Report screen appears
       await expect(
-        page.getByTestId('scripture-prayer-report-screen')
-      ).toBeVisible();
-
-      // AND: Partner completion card is visible with green checkmark
-      await expect(
-        page.getByTestId('scripture-partner-completion-card')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-partner-completion-icon')
+        page.getByTestId('scripture-report-screen')
       ).toBeVisible();
 
       // AND: Partner message is displayed
-      const partnerMessage = page.getByTestId('scripture-partner-message-text');
+      const partnerMessage = page.getByTestId('scripture-report-partner-message');
       await expect(partnerMessage).toBeVisible();
-      await expect(partnerMessage).toHaveText(
-        'Feeling grateful for your prayers. God is good.'
-      );
+      await expect(partnerMessage).toContainText('Feeling grateful for your prayers. God is good.');
     });
   });
 
@@ -222,65 +230,48 @@ test.describe('Daily Prayer Report — Send & View', () => {
       supabaseAdmin,
       testSession,
     }) => {
-      // GIVEN: Both users start a together mode session
-      // Create together mode session for user 1
-      const { data: sessionData } = await supabaseAdmin
-        .rpc('scripture_create_session', {
-          p_user_id: testSession.test_user1_id,
-          p_is_together_mode: true,
-        });
-      const sessionId = sessionData.id;
+      // GIVEN: User reaches report compose phase
+      const sessionId = await completeAllStepsToReflectionSummary(page);
+      await submitReflectionSummary(page);
 
-      // Simulate both users completing the session
-      await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'complete' })
-        .eq('id', sessionId);
-
-      // Add reflections for both users
-      await supabaseAdmin.from('scripture_reflections').insert([
+      // AND: Partner contributes ratings to the same session
+      expect(testSession.test_user2_id).not.toBeNull();
+      const { error: partnerRatingsError } = await supabaseAdmin
+        .from('scripture_reflections')
+        .insert([
         {
           session_id: sessionId,
-          user_id: testSession.test_user1_id,
-          step_index: 0,
-          rating: 4,
-          notes: 'User 1 reflection',
-        },
-        {
-          session_id: sessionId,
-          user_id: testSession.test_user2_id,
+          user_id: testSession.test_user2_id!,
           step_index: 0,
           rating: 5,
-          notes: 'User 2 reflection',
+          notes: 'Partner step 1',
+          is_shared: true,
+        },
+        {
+          session_id: sessionId,
+          user_id: testSession.test_user2_id!,
+          step_index: 1,
+          rating: 4,
+          notes: 'Partner step 2',
+          is_shared: true,
         },
       ]);
+      expect(partnerRatingsError).toBeNull();
 
-      // WHEN: User navigates to the report (simulate completing all steps in together mode)
-      // For simplicity, we'll navigate directly to the report screen
-      // In a real together mode flow, both users would complete the session simultaneously
-      await page.goto('/scripture');
+      // WHEN: User skips message compose and enters report
+      await expect(page.getByTestId('scripture-message-compose-screen')).toBeVisible();
+      await page.getByTestId('scripture-message-skip-btn').click();
 
-      // Wait for report screen to load (assuming app routing handles this)
-      // This is a simplified version - real together mode has different navigation
+      // THEN: Report screen loads
       await expect(
-        page.getByTestId('scripture-prayer-report-screen')
-      ).toBeVisible({ timeout: 5000 });
-
-      // THEN: Both completion cards are visible
-      await expect(
-        page.getByTestId('scripture-user-completion-card')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-partner-completion-card')
+        page.getByTestId('scripture-report-screen')
       ).toBeVisible();
 
-      // AND: Both cards show green checkmarks
-      await expect(
-        page.getByTestId('scripture-user-completion-icon')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-partner-completion-icon')
-      ).toBeVisible();
+      // AND: Step rows show side-by-side ratings (user + partner circles)
+      await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('3');
+      await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('5');
+      await expect(page.getByTestId('scripture-report-rating-step-1')).toContainText('3');
+      await expect(page.getByTestId('scripture-report-rating-step-1')).toContainText('4');
     });
   });
 });

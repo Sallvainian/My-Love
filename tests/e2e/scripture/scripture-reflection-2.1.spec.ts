@@ -23,7 +23,7 @@ test.describe('Per-Step Reflection System', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User navigates to scripture and starts a solo session
-      const sessionId = await startSoloSession(page, interceptNetworkCall);
+      const sessionId = await startSoloSession(page);
 
       // AND: User is on the first verse screen
       await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
@@ -118,7 +118,7 @@ test.describe('Per-Step Reflection System', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is on a verse screen in a solo session
-      const sessionId = await startSoloSession(page, interceptNetworkCall);
+      const sessionId = await startSoloSession(page);
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // AND: Bookmark button is visible with inactive state
@@ -202,7 +202,7 @@ test.describe('Per-Step Reflection System', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is on the reflection screen (after completing step 1)
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
       await page.getByTestId('scripture-next-verse-button').click();
 
       // AND: Reflection screen is displayed
@@ -252,7 +252,7 @@ test.describe('Per-Step Reflection System', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // AND: The reflection write endpoint is intercepted to fail
       // Set up route BEFORE the action that triggers the request
@@ -294,7 +294,7 @@ test.describe('Per-Step Reflection System', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is on a verse screen in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       const bookmarkButton = page.getByTestId('scripture-bookmark-button');
@@ -325,7 +325,7 @@ test.describe('Per-Step Reflection System', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is on the reflection screen
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
       await page.getByTestId('scripture-next-verse-button').click();
       await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
 

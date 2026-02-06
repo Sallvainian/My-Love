@@ -20,7 +20,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     }) => {
       // GIVEN: User has completed all 17 steps with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
-      await completeAllStepsToReflectionSummary(page, interceptNetworkCall, bookmarkedStepIndices);
+      await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
 
       // THEN: Reflection summary screen is visible
       await expect(
@@ -103,7 +103,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     }) => {
       // GIVEN: User is on the reflection summary screen with bookmarks on steps 0 and 12
       const bookmarkedStepIndices = new Set([0, 12]);
-      await completeAllStepsToReflectionSummary(page, interceptNetworkCall, bookmarkedStepIndices);
+      await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
       await expect(
         page.getByTestId('scripture-reflection-summary-screen')
       ).toBeVisible();
@@ -229,7 +229,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     }) => {
       // GIVEN: User is on the reflection summary screen with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
-      const sessionId = await completeAllStepsToReflectionSummary(page, interceptNetworkCall, bookmarkedStepIndices);
+      const sessionId = await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
       await expect(
         page.getByTestId('scripture-reflection-summary-screen')
       ).toBeVisible();
@@ -322,7 +322,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       testSession,
     }) => {
       // GIVEN: User has completed all 17 steps WITHOUT bookmarking any verses
-      const sessionId = await completeAllStepsToReflectionSummary(page, interceptNetworkCall, new Set()); // empty bookmark set
+      const sessionId = await completeAllStepsToReflectionSummary(page, new Set()); // empty bookmark set
 
       // THEN: Reflection summary screen is visible
       await expect(

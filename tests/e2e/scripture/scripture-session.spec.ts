@@ -23,11 +23,11 @@ test.describe('Scripture Session - Save & Resume', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is in a solo session at step 5
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // Advance to step 5 (4 full verse→reflection cycles)
       for (let i = 0; i < 4; i++) {
-        await advanceOneStep(page, interceptNetworkCall);
+        await advanceOneStep(page);
       }
       await expect(
         page.getByTestId('scripture-progress-indicator')
@@ -54,13 +54,14 @@ test.describe('Scripture Session - Save & Resume', () => {
     test('should resume at correct step after save and exit', async ({
       page,
       interceptNetworkCall,
+      supabaseAdmin,
     }) => {
       // GIVEN: User saved a session at step 5
       // Start and advance to step 5
-      await startSoloSession(page, interceptNetworkCall);
+      const sessionId = await startSoloSession(page);
 
       for (let i = 0; i < 4; i++) {
-        await advanceOneStep(page, interceptNetworkCall);
+        await advanceOneStep(page);
       }
       await expect(
         page.getByTestId('scripture-progress-indicator')
@@ -71,8 +72,23 @@ test.describe('Scripture Session - Save & Resume', () => {
       await page.getByTestId('save-and-exit-button').click();
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
+      // Stabilize active-session selection under parallel workers by making
+      // this test's saved session the newest candidate for resume lookup.
+      const { error: prioritizeSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ started_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() })
+        .eq('id', sessionId);
+      expect(prioritizeSessionError).toBeNull();
+
+      // Re-open without `fresh=true` to exercise resume behavior.
+      await page.goto('/scripture');
+      await expect(page.getByTestId('scripture-overview')).toBeVisible();
+
       // WHEN: User returns and taps "Continue"
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
+      await expect(page.getByTestId('resume-prompt')).toContainText(
+        /Continue where you left off\? \(Step 5 of 17\)/i
+      );
       await page.getByTestId('resume-continue').click();
 
       // THEN: Session resumes at step 5
@@ -88,7 +104,7 @@ test.describe('Scripture Session - Save & Resume', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: User taps exit button
       await page.getByTestId('exit-button').click();
@@ -110,7 +126,7 @@ test.describe('Scripture Session - Save & Resume', () => {
 
     test('should dismiss exit dialog when user cancels', async ({ page, interceptNetworkCall }) => {
       // GIVEN: Exit dialog is showing
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
       await page.getByTestId('exit-button').click();
       await expect(page.getByTestId('exit-confirm-dialog')).toBeVisible();
 
@@ -128,7 +144,7 @@ test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P1-005: Server write failure shows retry UI', { annotation: [{ type: 'skipNetworkMonitoring' }] }, () => {
     test('should show retry UI when server write fails', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // Simulate network failure on step advancement
       await page.route('**/rest/v1/rpc/scripture_advance_phase', (route) =>
@@ -163,7 +179,7 @@ test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P2-009/P2-010: Offline handling', () => {
     test('should show offline indicator when offline', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
 
       // WHEN: User goes offline
       await page.context().setOffline(true);
@@ -179,7 +195,7 @@ test.describe('Scripture Session - Save & Resume', () => {
 
     test('should block step advancement when offline', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session, offline
-      await startSoloSession(page, interceptNetworkCall);
+      await startSoloSession(page);
       await page.context().setOffline(true);
 
       // WHEN: User tries to advance — Next Verse button should be disabled
