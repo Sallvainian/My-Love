@@ -77,8 +77,22 @@ setup('authenticate as test user 1', async ({ page }) => {
     user_metadata: { display_name: 'Test User 1' },
   });
 
-  if (createError && !createError.message.includes('already been registered')) {
-    throw new Error(`Failed to create test user: ${createError.message}`);
+  if (createError) {
+    if (!createError.message.includes('already been registered')) {
+      throw new Error(`Failed to create test user: ${createError.message}`);
+    }
+    // User already exists - update password to ensure it matches test expectations
+    const { data: users } = await admin.auth.admin.listUsers();
+    const existingUser = users.users.find((u) => u.email === TEST_USER_EMAIL);
+    if (existingUser) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
+        password: TEST_USER_PASSWORD,
+        email_confirm: true,
+      });
+      if (updateError) {
+        throw new Error(`Failed to update test user password: ${updateError.message}`);
+      }
+    }
   }
 
   // Create a second test user so the seed RPC can find a partner for together-mode sessions.
@@ -90,8 +104,22 @@ setup('authenticate as test user 1', async ({ page }) => {
     user_metadata: { display_name: 'Test User 2' },
   });
 
-  if (createError2 && !createError2.message.includes('already been registered')) {
-    throw new Error(`Failed to create test user 2: ${createError2.message}`);
+  if (createError2) {
+    if (!createError2.message.includes('already been registered')) {
+      throw new Error(`Failed to create test user 2: ${createError2.message}`);
+    }
+    // User already exists - update password to ensure it matches test expectations
+    const { data: users } = await admin.auth.admin.listUsers();
+    const existingUser = users.users.find((u) => u.email === 'testuser2@test.example.com');
+    if (existingUser) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
+        password: TEST_USER_PASSWORD,
+        email_confirm: true,
+      });
+      if (updateError) {
+        throw new Error(`Failed to update test user 2 password: ${updateError.message}`);
+      }
+    }
   }
 
   // Sign in as test user with anon key (same permissions as the real app)
