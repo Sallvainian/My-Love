@@ -55,7 +55,32 @@ export const test = base.extend<CustomFixtures>({
 
   testSession: async ({ supabaseAdmin }, use) => {
     const result = await createTestSession(supabaseAdmin);
+
+    // Link test users as partners for together-mode sessions
+    if (result.test_user2_id) {
+      await supabaseAdmin
+        .from('users')
+        .update({ partner_id: result.test_user2_id })
+        .eq('id', result.test_user1_id);
+      await supabaseAdmin
+        .from('users')
+        .update({ partner_id: result.test_user1_id })
+        .eq('id', result.test_user2_id);
+    }
+
     await use(result);
+
+    // Cleanup: unlink partners before removing session data
+    if (result.test_user2_id) {
+      await supabaseAdmin
+        .from('users')
+        .update({ partner_id: null })
+        .eq('id', result.test_user1_id);
+      await supabaseAdmin
+        .from('users')
+        .update({ partner_id: null })
+        .eq('id', result.test_user2_id);
+    }
     await cleanupTestSession(supabaseAdmin, result.session_ids);
   },
 });
