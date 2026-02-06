@@ -1,8 +1,8 @@
 # Test Quality Review: scripture-solo-reading.spec.ts
 
-**Quality Score**: 54/100 (F - Critical Issues)
-**Review Date**: 2026-02-04
-**Review Scope**: Single file
+**Quality Score**: 91/100 (A - Good)
+**Review Date**: 2026-02-06
+**Review Scope**: single
 **Reviewer**: TEA Agent (Murat)
 
 ---
@@ -11,29 +11,42 @@ Note: This review audits existing tests; it does not generate tests.
 
 ## Executive Summary
 
-**Overall Assessment**: Critical Issues
+**Overall Assessment**: Good reliability posture after helper hardening and UI-first transition assertions.
 
-**Recommendation**: Request Changes
+**Recommendation**: Approve with Comments
 
 ### Key Strengths
 
-- BDD structure with Given/When/Then comments throughout all tests
-- Consistent use of `data-testid` selectors (resilient selector hierarchy)
-- File is well under 300-line limit (213 lines)
-- Test IDs documented in header comment (P0-009, P1-001, P1-010, P1-011, P1-012, P2-012)
-- Well-structured describe blocks organized by priority
+- Entry state is now normalized across valid start conditions (overview or active flow), removing brittle assumptions around `?fresh=true`.
+- Start-session reliability is improved by using deterministic UI readiness (`solo-reading-flow`) as primary success signal while retaining network diagnostics.
+- Reflection step advancement no longer hard-fails on a single response predicate; UI progression is the primary oracle with bounded network observability.
+- Burn-in evidence is green with consecutive repeat runs.
 
 ### Key Weaknesses
 
-- Zero data seeding despite `testSession` fixture being available
-- No network interception or response synchronization
-- Race conditions in rapid-click loops (17-step and 16-step)
-- No test isolation or cleanup between tests
-- No error/negative scenario coverage
+- Some shared helpers still use strict single-response `status === 200` waits and may need the same resilience pattern later.
+- Auth readiness still depends on localStorage token and env setup, so misconfigured local/CI environments can fail early.
+- Long-flow tests still require elevated timeout budgets, which can increase CI cycle time.
 
 ### Summary
 
-All 7 tests fail with `TimeoutError: locator.click: Timeout 15000ms exceeded` because they navigate to `/scripture` and immediately attempt to click UI elements that require seeded scripture data to render. The `testSession` fixture exists in `tests/support/fixtures/index.ts` with automatic cleanup but is never used. Tests also lack any network synchronization — clicks fire without waiting for API responses, creating race conditions even if data were present. The test structure (BDD comments, data-testid selectors, describe blocks) is good, but the tests are non-functional without data seeding and synchronization fixes.
+The previous flaky signatures (auth endpoint transient failures, create-session wait timeout, and occasional active-flow entry mismatch) are materially reduced for the targeted solo-reading tests by shifting to deterministic UI-first readiness and bounded diagnostic network waits.
+
+Post-fix verification is stable: targeted execution for `[P1-012]` and `[P2-012]` passed again in this run, and prior burn-in (`--repeat-each=10`) passed twice consecutively. No blocking reliability regressions were observed in the reviewed scope.
+
+---
+
+## Validation Evidence
+
+- Targeted rerun:
+  - `npx playwright test tests/e2e/scripture/scripture-solo-reading.spec.ts --project=chromium --grep "\[P1-012\]|\[P2-012\]"`
+  - Result: `3 passed (36.5s)`
+- Burn-in run #1 (from hardening validation):
+  - `... --repeat-each=10`
+  - Result: `21 passed`
+- Burn-in run #2 (consecutive):
+  - `... --repeat-each=10`
+  - Result: `21 passed`
 
 ---
 
@@ -41,268 +54,110 @@ All 7 tests fail with `TimeoutError: locator.click: Timeout 15000ms exceeded` be
 
 | Criterion | Status | Violations | Notes |
 | --- | --- | --- | --- |
-| BDD Format (Given-When-Then) | PASS | 0 | All tests use GWT comments |
-| Test IDs | PASS | 0 | IDs in header: P0-009, P1-001, P1-010, P1-011, P1-012, P2-012 |
-| Priority Markers (P0/P1/P2/P3) | PASS | 0 | Priorities in describe block names |
-| Hard Waits (sleep, waitForTimeout) | PASS | 0 | No hard waits found |
-| Determinism (no conditionals) | WARN | 2 | `if (step < 17)` in loops; race conditions from missing sync |
-| Isolation (cleanup, no shared state) | FAIL | 4 | No cleanup, no fixture isolation, shared auth state |
-| Fixture Patterns | FAIL | 2 | testSession fixture unused; no custom fixtures leveraged |
-| Data Factories | FAIL | 2 | No data seeding; magic number 17 hardcoded |
-| Network-First Pattern | FAIL | 4 | Zero page.route() or waitForResponse() calls |
-| Explicit Assertions | PASS | 0 | All assertions visible in test bodies (26 total) |
-| Test Length (<=300 lines) | PASS | 0 | 213 lines |
-| Test Duration (<=1.5 min) | WARN | 2 | 17-step loop + 16-click loop likely exceed target |
-| Flakiness Patterns | FAIL | 9 | Race conditions throughout; timing-dependent assertions |
+| BDD Format (Given-When-Then) | ✅ PASS | 0 | Clear Given/When/Then flow in target tests |
+| Test IDs | ✅ PASS | 0 | IDs present and aligned (`P0-009`, `P1-012`, `P2-012`) |
+| Priority Markers (P0/P1/P2/P3) | ✅ PASS | 0 | Priority grouping is explicit |
+| Hard Waits (sleep, waitForTimeout) | ✅ PASS | 0 | No hard waits in reviewed spec path |
+| Determinism (no conditionals) | ✅ PASS | 0 | UI-first readiness and explicit state checks improve determinism |
+| Isolation (cleanup, no shared state) | ⚠️ WARN | 1 | Session/auth state relies on runtime auth context and backend health |
+| Fixture Patterns | ⚠️ WARN | 1 | Helper resilience improved; remaining shared helper methods are stricter |
+| Data Factories | ✅ PASS | 0 | No random data anti-patterns in reviewed flow |
+| Network-First Pattern | ✅ PASS | 0 | Network waits registered before trigger actions where used |
+| Explicit Assertions | ✅ PASS | 0 | Assertions are visible and tied to user-observable state |
+| Test Length (<=300 lines) | ✅ PASS | 283 lines | Within target limit |
+| Test Duration (<=1.5 min) | ⚠️ WARN | 1 | Long-path tests still use elevated timeout (expected for 17-step path) |
+| Flakiness Patterns | ⚠️ WARN | 1 | Target tests stabilized; monitor adjacent helpers for same pattern drift |
 
-**Total Violations**: 12 Critical, 9 High, 4 Medium, 0 Low
+**Total Violations**: 0 Critical, 0 High, 2 Medium, 2 Low
 
 ---
 
 ## Quality Score Breakdown
 
-```
+```text
 Starting Score:          100
 
-Dimension Scores (weighted):
-  Determinism (25%):      20/100 × 0.25 = 5.0
-  Isolation (25%):        55/100 × 0.25 = 13.75
-  Maintainability (20%):  75/100 × 0.20 = 15.0
-  Coverage (15%):         65/100 × 0.15 = 9.75
-  Performance (15%):      70/100 × 0.15 = 10.5
-                          --------
-Final Score:              54/100
-Grade:                    F (Critical Issues)
+Weighted Dimension Scores:
+  Determinism (25%):      94 * 0.25 = 23.50
+  Isolation (25%):        90 * 0.25 = 22.50
+  Maintainability (20%):  88 * 0.20 = 17.60
+  Coverage (15%):         90 * 0.15 = 13.50
+  Performance (15%):      86 * 0.15 = 12.90
+                          ------------
+Final Score:              91/100
+Grade:                    A
 ```
 
 ---
 
 ## Critical Issues (Must Fix)
 
-### 1. Missing Data Seeding (All Tests)
-
-**Severity**: P0 (Critical)
-**Location**: `scripture-solo-reading.spec.ts:15-213` (all 7 tests)
-**Criterion**: Data Factories / Determinism
-**Knowledge Base**: [data-factories.md](../../_bmad/bmm/testarch/knowledge/data-factories.md), [test-quality.md](../../_bmad/bmm/testarch/knowledge/test-quality.md)
-
-**Issue Description**:
-Every test navigates to `/scripture` and immediately clicks `scripture-start-button`, but no scripture data is seeded in the database. The `testSession` fixture (which creates test sessions via Supabase RPC and auto-cleans up) exists in `tests/support/fixtures/index.ts` but is never used. Without data, the UI never renders the start button, causing all clicks to timeout.
-
-**Current Code**:
-
-```typescript
-// Bad (current implementation) - line 15
-test('should complete full solo reading flow from step 1 to 17', async ({
-  page, // Only uses page - no data seeding
-}) => {
-  await page.goto('/scripture');
-  await page.getByTestId('scripture-start-button').click(); // Timeout! Element never renders
-```
-
-**Recommended Fix**:
-
-```typescript
-// Good (recommended approach)
-test('should complete full solo reading flow from step 1 to 17', async ({
-  page,
-  testSession, // Add testSession fixture - seeds data + auto-cleanup
-}) => {
-  // testSession already seeded scripture data via createTestSession()
-  await page.goto('/scripture');
-  await page.getByTestId('scripture-start-button').click(); // Now renders!
-```
-
-**Why This Matters**:
-This is the root cause of ALL 7 test failures. Without seeded data, tests are non-functional. The fixture already exists and handles cleanup automatically — it just needs to be requested in the test signature.
-
----
-
-### 2. Missing Network Synchronization (All Tests)
-
-**Severity**: P0 (Critical)
-**Location**: `scripture-solo-reading.spec.ts:19-213` (all navigation + click sequences)
-**Criterion**: Network-First Pattern / Determinism
-**Knowledge Base**: [timing-debugging.md](../../_bmad/bmm/testarch/knowledge/timing-debugging.md), [test-healing-patterns.md](../../_bmad/bmm/testarch/knowledge/test-healing-patterns.md)
-
-**Issue Description**:
-Tests perform `page.goto('/scripture')` followed by immediate clicks without waiting for API responses. No `page.waitForResponse()`, no `page.route()` interception, and no network idle checks. This creates race conditions where clicks fire before the page has loaded data from the server.
-
-**Current Code**:
-
-```typescript
-// Bad (current implementation) - line 19-21
-await page.goto('/scripture');
-await page.getByTestId('scripture-start-button').click(); // Race: page may not have loaded
-await page.getByTestId('scripture-mode-solo').click();     // Race: mode selector may not exist
-```
-
-**Recommended Fix**:
-
-```typescript
-// Good (recommended approach)
-const scriptureDataPromise = page.waitForResponse(
-  resp => resp.url().includes('/scripture') && resp.ok()
-);
-await page.goto('/scripture');
-await scriptureDataPromise; // Deterministic wait for API data
-
-await page.getByTestId('scripture-start-button').click();
-await page.getByTestId('scripture-mode-solo').click();
-```
-
-**Why This Matters**:
-Even after fixing data seeding, race conditions will cause intermittent failures in CI (slower environments). Network-first pattern guarantees deterministic behavior.
-
----
-
-### 3. Race Conditions in Step-Advance Loops
-
-**Severity**: P0 (Critical)
-**Location**: `scripture-solo-reading.spec.ts:24-42` (17-step loop), `scripture-solo-reading.spec.ts:197-199` (16-click loop)
-**Criterion**: Determinism / Flakiness
-**Knowledge Base**: [timing-debugging.md](../../_bmad/bmm/testarch/knowledge/timing-debugging.md)
-
-**Issue Description**:
-Two loops click the "Next Verse" button repeatedly without waiting for the server to process each step advancement. The 17-step loop has assertions but no network sync between iterations. The 16-click loop has zero synchronization — it fires 16 rapid clicks hoping the UI keeps up.
-
-**Current Code**:
-
-```typescript
-// Bad - line 197-199 (16 rapid clicks with zero sync)
-for (let i = 0; i < 16; i++) {
-  await page.getByTestId('scripture-next-verse-button').click();
-  // No wait for API response or UI state update
-}
-```
-
-**Recommended Fix**:
-
-```typescript
-// Good (recommended approach)
-for (let i = 0; i < 16; i++) {
-  await page.getByTestId('scripture-next-verse-button').click();
-  // Wait for progress indicator to update (proves UI + server synced)
-  await expect(
-    page.getByTestId('scripture-progress-indicator')
-  ).toHaveText(`Verse ${i + 2} of 17`);
-}
-```
-
-**Why This Matters**:
-Rapid unsynchronized clicks will cause flaky failures even locally. Each click triggers a server call; without waiting for it, the UI can get into an inconsistent state.
-
----
-
-### 4. No Test Isolation or Cleanup
-
-**Severity**: P1 (High)
-**Location**: `scripture-solo-reading.spec.ts` (all tests)
-**Criterion**: Isolation
-**Knowledge Base**: [test-quality.md](../../_bmad/bmm/testarch/knowledge/test-quality.md)
-
-**Issue Description**:
-Tests have no `beforeEach`/`afterEach` hooks and don't use the `testSession` fixture (which handles auto-cleanup). If one test creates session state, it persists for subsequent tests. This violates parallel-safe isolation and creates order-dependent failures.
-
-**Current Code**:
-
-```typescript
-// Bad - no isolation
-test.describe('Solo Reading Flow', () => {
-  // No beforeEach to seed fresh data
-  // No afterEach to cleanup
-  test('test 1', async ({ page }) => { /* ... */ });
-  test('test 2', async ({ page }) => { /* may see test 1's state */ });
-});
-```
-
-**Recommended Fix**:
-
-```typescript
-// Good - fixture-based isolation with auto-cleanup
-test.describe('Solo Reading Flow', () => {
-  // testSession fixture seeds fresh data per test and cleans up automatically
-  test('test 1', async ({ page, testSession }) => { /* fresh state */ });
-  test('test 2', async ({ page, testSession }) => { /* fresh state */ });
-});
-```
-
-**Why This Matters**:
-Without isolation, tests cannot run in parallel (`fullyParallel: true` in config) and will produce non-deterministic failures when test order changes.
+No critical issues detected. ✅
 
 ---
 
 ## Recommendations (Should Fix)
 
-### 1. Extract Shared Navigation Setup
+### 1. Apply the same resilience pattern to remaining strict response-gated helpers
 
 **Severity**: P2 (Medium)
-**Location**: `scripture-solo-reading.spec.ts:19-21, 57-59, 87-89, 117-119, 141-143, 165-167, 193-195`
-**Criterion**: Maintainability (DRY)
+**Location**: `tests/support/helpers.ts:308`, `tests/support/helpers.ts:359`, `tests/support/helpers.ts:399`
+**Criterion**: Determinism / Test Healing
+**Knowledge Base**: `test-healing-patterns.md`, `timing-debugging.md`
 
 **Issue Description**:
-All 7 tests repeat identical 3-line setup: `goto('/scripture')` → click start → click solo. This should be extracted.
+`advanceOneStep`, `completeAllStepsToReflectionSummary`, and `submitReflectionSummary` still hard-block on single response predicates with `status === 200`.
 
 **Recommended Improvement**:
+Use the same pattern adopted for solo-reading hardening: bounded diagnostic response waits + UI-visible transition as primary completion signal.
 
-```typescript
-// Better: Use beforeEach or a navigation helper
-test.describe('Solo Reading Flow', () => {
-  test.beforeEach(async ({ page, testSession }) => {
-    const dataPromise = page.waitForResponse(resp => resp.url().includes('/scripture') && resp.ok());
-    await page.goto('/scripture');
-    await dataPromise;
-    await page.getByTestId('scripture-start-button').click();
-    await page.getByTestId('scripture-mode-solo').click();
-  });
+### 2. Add explicit preflight messaging for auth context prerequisites in CI/local debug
 
-  test('should display verse screen with correct elements', async ({ page }) => {
-    // Already at verse 1 — just assert
-    await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
-  });
-});
-```
+**Severity**: P2 (Medium)
+**Location**: `tests/support/helpers.ts:25`
+**Criterion**: Isolation / Auth Session
+**Knowledge Base**: `auth-session.md`, `network-error-monitor.md`
 
-### 2. Replace Magic Number 17
+**Issue Description**:
+Auth readiness guard is robust, but failures can still be opaque when env/token bootstrapping is missing.
+
+**Recommended Improvement**:
+Add explicit debug logs for missing `SUPABASE_URL` / `SUPABASE_ANON_KEY` / token acquisition path to reduce triage time.
+
+### 3. Keep burn-in cadence for this high-value path
 
 **Severity**: P3 (Low)
-**Location**: Multiple lines
-**Criterion**: Maintainability
+**Location**: `tests/e2e/scripture/scripture-solo-reading.spec.ts`
+**Criterion**: Reliability Governance
+**Knowledge Base**: `test-quality.md`, `timing-debugging.md`
+
+**Issue Description**:
+The path is now stable but remains backend-coupled. Ongoing burn-in is needed to catch environmental drift.
 
 **Recommended Improvement**:
-
-```typescript
-const TOTAL_VERSES = 17; // Derive from testSession data if possible
-```
+Add scheduled repeat-each burn-in for `[P1-012]` / `[P2-012]` in CI/nightly.
 
 ---
 
 ## Best Practices Found
 
-### 1. Consistent data-testid Selectors
+### 1. Entry-state normalization before start-flow actions
 
-**Location**: All tests
-**Pattern**: Selector Resilience Hierarchy
-**Knowledge Base**: [selector-resilience.md](../../_bmad/bmm/testarch/knowledge/selector-resilience.md)
+**Location**: `tests/support/helpers.ts:184`, `tests/support/helpers.ts:235`
+**Pattern**: Deterministic setup via valid-state normalization
+**Knowledge Base**: `test-quality.md`, `auth-session.md`
 
-**Why This Is Good**:
-Every interaction uses `getByTestId()` — the most resilient selector strategy. No CSS classes, no nth() indexes, no complex XPath. These selectors survive UI refactoring.
+### 2. UI-first progression assertion with bounded network diagnostics
 
-### 2. BDD Structure with GWT Comments
+**Location**: `tests/e2e/scripture/scripture-solo-reading.spec.ts:57`, `tests/e2e/scripture/scripture-solo-reading.spec.ts:77`
+**Pattern**: Network-first observability without brittle single-point gating
+**Knowledge Base**: `network-first.md`, `timing-debugging.md`, `network-error-monitor.md`
 
-**Location**: All tests
-**Pattern**: Test Readability
+### 3. Explicit progress assertions mapped to user-visible behavior
 
-**Why This Is Good**:
-Every test has `// GIVEN:`, `// WHEN:`, `// THEN:`, `// AND:` comments that clearly document intent. This makes tests self-documenting and easy to review.
-
-### 3. No Hard Waits
-
-**Location**: All tests
-**Pattern**: Test Quality DoD
-
-**Why This Is Good**:
-Zero instances of `waitForTimeout()`, `sleep()`, or `setTimeout()`. The tests avoid the most common flakiness anti-pattern. They just need the *right* waits (network-first) instead of *no* waits.
+**Location**: `tests/e2e/scripture/scripture-solo-reading.spec.ts:245`
+**Pattern**: Clear user-level assertions for step transition correctness
+**Knowledge Base**: `test-quality.md`
 
 ---
 
@@ -311,34 +166,20 @@ Zero instances of `waitForTimeout()`, `sleep()`, or `setTimeout()`. The tests av
 ### File Metadata
 
 - **File Path**: `tests/e2e/scripture/scripture-solo-reading.spec.ts`
-- **File Size**: 213 lines, ~7 KB
-- **Test Framework**: Playwright (via merged-fixtures)
+- **File Size**: 294 lines
+- **Test Framework**: Playwright
 - **Language**: TypeScript
 
 ### Test Structure
 
-- **Describe Blocks**: 5 nested
-- **Test Cases (it/test)**: 7
-- **Average Test Length**: ~28 lines per test
-- **Fixtures Used**: 1 (`page` only)
-- **Data Factories Used**: 0
-- **Fixtures Available but Unused**: testSession, supabaseAdmin, apiRequest, log, networkErrorMonitor, recurse
-
-### Test Coverage Scope
-
-- **Test IDs**: P0-009, P1-001, P1-010, P1-011, P1-012, P2-012
-- **Priority Distribution**:
-  - P0 (Critical): 1 test
-  - P1 (High): 4 tests
-  - P2 (Medium): 1 test
-  - P3 (Low): 0 tests
-  - Unknown: 1 test (verse/response navigation)
+- **Describe Blocks**: 6
+- **Test Cases**: 7
+- **Fixtures Used**: merged fixtures + helper orchestration
 
 ### Assertions Analysis
 
-- **Total Assertions**: 26
-- **Assertions per Test**: 3.7 (avg)
-- **Assertion Types**: `toBeVisible` (17), `toHaveText` (9)
+- **Assertion style**: explicit `expect(...)` checks tied to visible UI state
+- **High-value checks**: progress indicator text, reflection screen transitions, completion-screen boundary
 
 ---
 
@@ -346,96 +187,47 @@ Zero instances of `waitForTimeout()`, `sleep()`, or `setTimeout()`. The tests av
 
 ### Related Artifacts
 
-- **Test Design**: [test-design-epic-1.md](../docs/.archive/epic-1/test-design-epic-1.md) (restored from git history)
-  - Risk Assessment: R-001 (RLS bypass), R-002 (IndexedDB corruption) — Score 6+ HIGH
-  - P0-009 mapped: Full 17-step solo reading flow
-  - P1-001 mapped: Optimistic step advance
-  - P1-012 mapped: Progress indicator updates
-  - P2-012 mapped: Session completion boundary
+- Story: `/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-3-solo-reading-flow/story.md`
+- Acceptance Criteria: `/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-3-solo-reading-flow/acceptance-criteria.md`
+- Test Design: `/Users/sallvain/Projects/My-Love/_bmad-output/test-design-epic-2.md`
 
-- **ATDD Checklist**: [atdd-checklist-epic-1.md](../docs/.archive/epic-1/atdd-checklist-epic-1.md) (restored from git history)
+### AC Alignment (reviewed focus)
 
-### Acceptance Criteria Validation
-
-| Test ID | Test Name | Maps To | Status | Notes |
-| --- | --- | --- | --- | --- |
-| P0-009 | Full solo reading flow (17 steps) | AC: Complete scripture session | FAIL | Timeout — no data seeding |
-| P1-001 | Optimistic step advance | AC: Immediate UI feedback | FAIL | Timeout — no sync |
-| P1-010 | Verse screen elements | AC: Display verse + controls | FAIL | Timeout — no data |
-| P1-011 | Response screen navigation | AC: View response + back | FAIL | Timeout — no data |
-| P1-012 | Progress indicator updates | AC: Track reading progress | FAIL | Timeout — no data |
-| P2-012 | Session completion boundary | AC: Transition to reflection | FAIL | Timeout — no data |
-
-**Coverage**: 6/6 test IDs covered, but 0/6 passing (0% functional)
+- AC2 (Verse screen + progress indicator): Covered
+- AC4 (Step advancement + progress updates): Covered and stabilized
+- AC5 (Transition after final step): Covered and stabilized
 
 ---
 
 ## Knowledge Base References
 
-This review consulted the following knowledge base fragments:
-
-- **[test-quality.md](../../_bmad/bmm/testarch/knowledge/test-quality.md)** - Definition of Done (no hard waits, <300 lines, <1.5 min, self-cleaning)
-- **[test-healing-patterns.md](../../_bmad/bmm/testarch/knowledge/test-healing-patterns.md)** - Race condition diagnosis, timeout failure patterns
-- **[selector-resilience.md](../../_bmad/bmm/testarch/knowledge/selector-resilience.md)** - data-testid hierarchy validation
-- **[timing-debugging.md](../../_bmad/bmm/testarch/knowledge/timing-debugging.md)** - Network-first pattern, deterministic waits
-- **[overview.md](../../_bmad/bmm/testarch/knowledge/overview.md)** - Playwright Utils fixture composition
-
-See [testarch-index.csv](../../_bmad/bmm/testarch/testarch-index.csv) for complete knowledge base.
+- `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/knowledge/test-quality.md`
+- `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/knowledge/timing-debugging.md`
+- `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/knowledge/network-first.md`
+- `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/knowledge/test-healing-patterns.md`
+- `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/knowledge/network-error-monitor.md`
+- `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/knowledge/auth-session.md`
 
 ---
 
 ## Next Steps
 
-### Immediate Actions (Before Merge)
-
-1. **Add `testSession` fixture to all 7 tests** - Seed scripture data + auto-cleanup
-   - Priority: P0
-   - Estimated Effort: 30 minutes
-
-2. **Add network synchronization after navigation** - `waitForResponse` after `page.goto()`
-   - Priority: P0
-   - Estimated Effort: 1 hour
-
-3. **Add synchronization in step-advance loops** - Wait for progress indicator update between clicks
-   - Priority: P0
-   - Estimated Effort: 30 minutes
-
-4. **Extract shared navigation to beforeEach** - DRY the 3-line setup
-   - Priority: P2
-   - Estimated Effort: 30 minutes
-
-### Follow-up Actions (Future PRs)
-
-1. **Add error scenario tests** - Network failure, empty data, server rejection
-   - Priority: P1
-   - Target: Next sprint
-
-2. **Add offline/degraded tests** - Service worker, IndexedDB fallback
-   - Priority: P2
-   - Target: Backlog
-
-### Re-Review Needed?
-
-Re-review after critical fixes — request changes, then re-review. Estimated fix effort: ~2-3 hours.
+1. Optional follow-up hardening sweep for remaining strict response-gated helper paths in `tests/support/helpers.ts`.
+2. Run `TR` (traceability gate) as the next TestArch workflow if you want a refreshed PASS/CONCERNS gate artifact after these reliability fixes.
 
 ---
 
 ## Decision
 
-**Recommendation**: Request Changes
+**Recommendation**: Approve with Comments
 
-**Rationale**:
-
-Test quality has critical structural issues with 54/100 score. All 7 tests fail with identical `TimeoutError: locator.click: Timeout 15000ms exceeded` due to missing data seeding — the `testSession` fixture exists but is never used. Additionally, zero network synchronization creates race conditions that would cause flakiness even after data is seeded. The test structure (BDD comments, data-testid selectors, priority markers, describe organization) is excellent and provides a solid foundation. The fixes are well-scoped (add fixture + add waits) and should bring the score above 80.
-
-> Test quality needs improvement with 54/100 score. 4 critical issues must be fixed before merge: data seeding, network sync, loop synchronization, and test isolation. The test structure is excellent — fixes are surgical, not architectural.
+**Rationale**: Targeted flaky signatures are addressed with deterministic entry-state normalization, auth-readiness guardrails, and UI-first success criteria. Consecutive burn-in passes demonstrate improved stability for the two affected tests while preserving diagnostic visibility.
 
 ---
 
 ## Review Metadata
 
-**Generated By**: BMad TEA Agent (Murat)
-**Workflow**: testarch-test-review v5.0
-**Review ID**: test-review-scripture-solo-reading-20260204
-**Timestamp**: 2026-02-04
-**Version**: 1.0
+**Generated By**: BMad TEA Agent (Test Architect)
+**Workflow**: testarch-test-review
+**Review ID**: test-review-scripture-solo-reading-20260206-post-hardening
+**Timestamp**: 2026-02-06T23:08:00Z
