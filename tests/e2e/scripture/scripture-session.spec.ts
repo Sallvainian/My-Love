@@ -20,13 +20,14 @@ test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P0-010: Session save on exit', () => {
     test('should persist step index to server when saving and exiting', async ({
       page,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User is in a solo session at step 5
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // Advance to step 5 (4 full verse→reflection cycles)
       for (let i = 0; i < 4; i++) {
-        await advanceOneStep(page);
+        await advanceOneStep(page, interceptNetworkCall);
       }
       await expect(
         page.getByTestId('scripture-progress-indicator')
@@ -52,13 +53,14 @@ test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P0-011: Session resume loads correct step', () => {
     test('should resume at correct step after save and exit', async ({
       page,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User saved a session at step 5
       // Start and advance to step 5
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       for (let i = 0; i < 4; i++) {
-        await advanceOneStep(page);
+        await advanceOneStep(page, interceptNetworkCall);
       }
       await expect(
         page.getByTestId('scripture-progress-indicator')
@@ -83,9 +85,10 @@ test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P2-011: Exit confirmation dialog', () => {
     test('should show exit confirmation with save option', async ({
       page,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // WHEN: User taps exit button
       await page.getByTestId('exit-button').click();
@@ -105,9 +108,9 @@ test.describe('Scripture Session - Save & Resume', () => {
       ).toBeVisible();
     });
 
-    test('should dismiss exit dialog when user cancels', async ({ page }) => {
+    test('should dismiss exit dialog when user cancels', async ({ page, interceptNetworkCall }) => {
       // GIVEN: Exit dialog is showing
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
       await page.getByTestId('exit-button').click();
       await expect(page.getByTestId('exit-confirm-dialog')).toBeVisible();
 
@@ -123,9 +126,9 @@ test.describe('Scripture Session - Save & Resume', () => {
   });
 
   test.describe('P1-005: Server write failure shows retry UI', { annotation: [{ type: 'skipNetworkMonitoring' }] }, () => {
-    test('should show retry UI when server write fails', async ({ page }) => {
+    test('should show retry UI when server write fails', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // Simulate network failure on step advancement
       await page.route('**/rest/v1/rpc/scripture_advance_phase', (route) =>
@@ -158,9 +161,9 @@ test.describe('Scripture Session - Save & Resume', () => {
   });
 
   test.describe('P2-009/P2-010: Offline handling', () => {
-    test('should show offline indicator when offline', async ({ page }) => {
+    test('should show offline indicator when offline', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // WHEN: User goes offline
       await page.context().setOffline(true);
@@ -174,9 +177,9 @@ test.describe('Scripture Session - Save & Resume', () => {
       await page.context().setOffline(false);
     });
 
-    test('should block step advancement when offline', async ({ page }) => {
+    test('should block step advancement when offline', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session, offline
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
       await page.context().setOffline(true);
 
       // WHEN: User tries to advance — Next Verse button should be disabled

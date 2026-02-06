@@ -13,10 +13,12 @@ import { test as base, mergeTests } from '@playwright/test';
 import { test as apiRequestFixture } from '@seontechnologies/playwright-utils/api-request/fixtures';
 import { test as recurseFixture } from '@seontechnologies/playwright-utils/recurse/fixtures';
 import { test as logFixture } from '@seontechnologies/playwright-utils/log/fixtures';
+import { test as interceptFixture } from '@seontechnologies/playwright-utils/intercept-network-call/fixtures';
 import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures';
 
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
+import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -53,8 +55,10 @@ export const test = mergeTests(
   apiRequestFixture,
   recurseFixture,
   logFixture,
+  interceptFixture,
   networkMonitorFixture,
   customFixtures,
+  scriptureNavFixture,
 );
 
 export { expect } from '@playwright/test';

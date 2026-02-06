@@ -8,9 +8,14 @@
  * @see _bmad/bmm/testarch/knowledge/fixture-architecture.md
  */
 import { test as base } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
-import { createTestSession, cleanupTestSession, SeedResult, TypedSupabaseClient } from '../factories';
-import type { Database } from '../../../src/types/database.types';
+import {
+  createTestSession,
+  cleanupTestSession,
+  linkTestPartners,
+  SeedResult,
+  TypedSupabaseClient,
+} from '../factories';
+import { createSupabaseAdminClient } from '../helpers/supabase';
 
 /**
  * Custom fixture types for My-Love project
@@ -43,12 +48,7 @@ export const test = base.extend<CustomFixtures>({
       );
     }
 
-    const client = createClient<Database>(url, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    const client = createSupabaseAdminClient(url, serviceRoleKey);
 
     await use(client);
   },
@@ -58,14 +58,7 @@ export const test = base.extend<CustomFixtures>({
 
     // Link test users as partners for together-mode sessions
     if (result.test_user2_id) {
-      await supabaseAdmin
-        .from('users')
-        .update({ partner_id: result.test_user2_id })
-        .eq('id', result.test_user1_id);
-      await supabaseAdmin
-        .from('users')
-        .update({ partner_id: result.test_user1_id })
-        .eq('id', result.test_user2_id);
+      await linkTestPartners(supabaseAdmin, result.test_user1_id, result.test_user2_id);
     }
 
     await use(result);

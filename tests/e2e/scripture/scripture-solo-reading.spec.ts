@@ -63,7 +63,7 @@ test.describe('Solo Reading Flow', () => {
       test.setTimeout(180_000); // Extended timeout for 17-step traversal
 
       // GIVEN: User navigates to scripture and starts a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // WHEN: User advances through all 17 steps
       for (let step = 1; step <= 17; step++) {
@@ -114,7 +114,7 @@ test.describe('Solo Reading Flow', () => {
       page,
     }) => {
       // GIVEN: User starts a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // WHEN: First verse screen loads
       // THEN: Verse reference is displayed
@@ -141,9 +141,9 @@ test.describe('Solo Reading Flow', () => {
       ).toHaveText('Verse 1 of 17');
     });
 
-    test('should navigate to response screen and back', async ({ page }) => {
+    test('should navigate to response screen and back', async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is on a verse screen
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // WHEN: User taps "View Response"
       await page.getByTestId('scripture-view-response-button').click();
@@ -174,7 +174,7 @@ test.describe('Solo Reading Flow', () => {
       page,
     }) => {
       // GIVEN: User is on the response screen of step 1
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
       await page.getByTestId('scripture-view-response-button').click();
       await expect(page.getByTestId('scripture-response-text')).toBeVisible();
 
@@ -197,7 +197,7 @@ test.describe('Solo Reading Flow', () => {
       page,
     }) => {
       // GIVEN: User is in a solo session at step 1
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       await expect(
         page.getByTestId('scripture-progress-indicator')
@@ -223,7 +223,7 @@ test.describe('Solo Reading Flow', () => {
       page,
     }) => {
       // GIVEN: User starts a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // WHEN/THEN: Progress updates with each advance
       await expect(
@@ -249,7 +249,7 @@ test.describe('Solo Reading Flow', () => {
       test.setTimeout(180_000); // Extended timeout for 17-step traversal
 
       // GIVEN: User starts a solo session
-      await startSoloSession(page);
+      await startSoloSession(page, interceptNetworkCall);
 
       // Advance through all 16 intermediate steps (1→2, 2→3, ..., 16→17)
       for (let i = 0; i < 16; i++) {

@@ -11,49 +11,23 @@
  */
 import { test, expect } from '../support/merged-fixtures';
 import { createTestSession, cleanupTestSession } from '../support/factories';
-import { createClient } from '@supabase/supabase-js';
-
-/**
- * Helper: Create a Supabase client authenticated as a specific user.
- * Uses service role to look up user, then signs in with test credentials.
- */
-async function createUserClient(
-  supabaseAdmin: Parameters<typeof createTestSession>[0],
-  userId: string
-) {
-  const { data: sessionData, error: sessionError } =
-    await supabaseAdmin.auth.admin.getUserById(userId);
-
-  if (sessionError || !sessionData?.user) {
-    throw new Error(`Failed to get user ${userId}: ${sessionError?.message}`);
-  }
-
-  const url = process.env.SUPABASE_URL!;
-  const anonKey = process.env.SUPABASE_ANON_KEY!;
-  const userClient = createClient(url, anonKey);
-
-  const { error: signInError } = await userClient.auth.signInWithPassword({
-    email: sessionData.user.email!,
-    password: 'test-password-123',
-  });
-
-  if (signInError) {
-    throw new Error(`Failed to sign in as ${userId}: ${signInError.message}`);
-  }
-
-  return userClient;
-}
+import { getUserAccessToken } from '../support/helpers/supabase';
+import { faker } from '@faker-js/faker';
+import {
+  SupabaseSessionSchema,
+  SupabaseReflectionSchema,
+  SupabaseBookmarkSchema,
+  SupabaseMessageSchema,
+} from '../../src/validation/schemas';
 
 /** Generate a dynamic reflection note for test isolation. */
 function generateReflectionNote(prefix = 'test'): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `${prefix}-reflection-${timestamp}-${random}`;
+  return `${prefix}-${faker.lorem.sentence()}`;
 }
 
 /** Generate a dynamic rating (1-5) for test isolation. */
 function generateRating(): number {
-  return Math.floor(Math.random() * 5) + 1;
+  return faker.number.int({ min: 1, max: 5 });
 }
 
 test.describe('Scripture Reflection API - Story 2.1', () => {
@@ -64,6 +38,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
   test.describe('2.1-API-001: Reflection upsert idempotency', () => {
     test('[P0] duplicate reflection submit returns success with updated data', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -71,7 +46,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const stepIndex = 2;
       const firstNote = generateReflectionNote('first');
@@ -79,42 +54,63 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
       const secondNote = generateReflectionNote('second');
       const secondRating = 5;
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User submits a reflection for a specific step
-        const { data: firstResult, error: firstError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const firstResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: stepIndex,
             p_rating: firstRating,
             p_notes: firstNote,
             p_is_shared: false,
-          }
-        );
+          },
+        });
+
+        // Validate response with Zod schema
+        const firstData = SupabaseReflectionSchema.parse(firstResponse.data);
 
         // THEN: First submission succeeds
-        expect(firstError).toBeNull();
-        expect(firstResult).toBeTruthy();
-        const firstData = firstResult as Record<string, unknown>;
+        expect(firstResponse.status).toBe(200);
+        expect(firstData).toBeTruthy();
         expect(firstData.rating).toBe(firstRating);
         expect(firstData.notes).toBe(firstNote);
 
         // WHEN: User submits again for the SAME (session_id, step_index)
-        const { data: secondResult, error: secondError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const secondResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: stepIndex,
             p_rating: secondRating,
             p_notes: secondNote,
             p_is_shared: true,
-          }
-        );
+          },
+        });
+
+        // Validate response with Zod schema
+        const secondData = SupabaseReflectionSchema.parse(secondResponse.data);
 
         // THEN: Second submission also succeeds (upsert, not rejection)
-        expect(secondError).toBeNull();
-        expect(secondResult).toBeTruthy();
-        const secondData = secondResult as Record<string, unknown>;
+        expect(secondResponse.status).toBe(200);
+        expect(secondData).toBeTruthy();
         expect(secondData.rating).toBe(secondRating);
         expect(secondData.notes).toBe(secondNote);
         expect(secondData.is_shared).toBe(true);
@@ -148,6 +144,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
   test.describe('Reflection write persists correct fields', () => {
     test('[P0] submitted reflection stores all fields accurately in database', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -155,28 +152,39 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const stepIndex = 4;
       const rating = generateRating();
       const notes = generateReflectionNote('persist');
       const isShared = true;
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User submits a reflection with all fields populated
-        const { data: rpcResult, error: rpcError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const response = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: stepIndex,
             p_rating: rating,
             p_notes: notes,
             p_is_shared: isShared,
-          }
-        );
+          },
+          responseSchema: SupabaseReflectionSchema,
+        });
 
-        expect(rpcError).toBeNull();
-        expect(rpcResult).toBeTruthy();
+        expect(response.status).toBe(200);
+        expect(response.data).toBeTruthy();
 
         // THEN: Query DB directly via admin to verify persisted fields
         const { data: dbRow, error: queryError } = await supabaseAdmin
@@ -204,14 +212,13 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         expect(dbRow!.created_at).toBeTruthy();
 
         // AND: RPC return value matches DB state
-        const rpcData = rpcResult as Record<string, unknown>;
-        expect(rpcData.id).toBe(dbRow!.id);
-        expect(rpcData.session_id).toBe(dbRow!.session_id);
-        expect(rpcData.step_index).toBe(dbRow!.step_index);
-        expect(rpcData.user_id).toBe(dbRow!.user_id);
-        expect(rpcData.rating).toBe(dbRow!.rating);
-        expect(rpcData.notes).toBe(dbRow!.notes);
-        expect(rpcData.is_shared).toBe(dbRow!.is_shared);
+        expect(response.data.id).toBe(dbRow!.id);
+        expect(response.data.session_id).toBe(dbRow!.session_id);
+        expect(response.data.step_index).toBe(dbRow!.step_index);
+        expect(response.data.user_id).toBe(dbRow!.user_id);
+        expect(response.data.rating).toBe(dbRow!.rating);
+        expect(response.data.notes).toBe(dbRow!.notes);
+        expect(response.data.is_shared).toBe(dbRow!.is_shared);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
@@ -226,6 +233,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
   test.describe('Bookmark toggle creates and removes', () => {
     test('[P1] bookmark insert creates row, delete removes it', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -233,31 +241,42 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const stepIndex = 6;
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User creates a bookmark (insert)
-        const { data: insertData, error: insertError } = await userClient
-          .from('scripture_bookmarks')
-          .insert({
+        const insertResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/scripture_bookmarks',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          data: {
             session_id: sessionId,
             step_index: stepIndex,
             user_id: userId,
             share_with_partner: false,
-          })
-          .select()
-          .single();
+          },
+          responseSchema: SupabaseBookmarkSchema,
+        });
 
         // THEN: Bookmark is created successfully
-        expect(insertError).toBeNull();
-        expect(insertData).toBeTruthy();
-        expect(insertData!.session_id).toBe(sessionId);
-        expect(insertData!.step_index).toBe(stepIndex);
-        expect(insertData!.user_id).toBe(userId);
-        expect(insertData!.share_with_partner).toBe(false);
-        expect(insertData!.id).toBeTruthy();
+        expect(insertResponse.status).toBe(201);
+        expect(insertResponse.data).toBeTruthy();
+        expect(insertResponse.data.session_id).toBe(sessionId);
+        expect(insertResponse.data.step_index).toBe(stepIndex);
+        expect(insertResponse.data.user_id).toBe(userId);
+        expect(insertResponse.data.share_with_partner).toBe(false);
+        expect(insertResponse.data.id).toBeTruthy();
 
         // AND: Bookmark exists in DB (verified via admin)
         const { data: verifyRow, error: verifyError } = await supabaseAdmin
@@ -269,16 +288,21 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
 
         expect(verifyError).toBeNull();
         expect(verifyRow).toHaveLength(1);
-        expect(verifyRow![0].id).toBe(insertData!.id);
+        expect(verifyRow![0].id).toBe(insertResponse.data.id);
 
         // WHEN: User removes the bookmark (delete)
-        const { error: deleteError } = await userClient
-          .from('scripture_bookmarks')
-          .delete()
-          .eq('id', insertData!.id);
+        const deleteResponse = await apiRequest({
+          method: 'DELETE',
+          path: `/rest/v1/scripture_bookmarks?id=eq.${insertResponse.data.id}`,
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+          },
+        });
 
         // THEN: Delete succeeds
-        expect(deleteError).toBeNull();
+        expect(deleteResponse.status).toBe(204);
 
         // AND: Bookmark no longer exists in DB
         const { data: afterDelete, error: afterDeleteError } = await supabaseAdmin
@@ -311,6 +335,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
   test.describe('2.2-API-001: Session-level reflection with stepIndex 17 sentinel', () => {
     test('[P0] session-level reflection persists with JSON standoutVerses in notes field', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -318,7 +343,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const sessionStepIndex = 17; // MAX_STEPS sentinel for session-level reflection
       const sessionRating = generateRating();
@@ -326,25 +351,35 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       const userNote = generateReflectionNote('session-summary');
       const jsonNotes = JSON.stringify({ standoutVerses, userNote });
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User submits a session-level reflection via RPC with p_step_index: 17
-        const { data: rpcResult, error: rpcError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const response = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: sessionRating,
             p_notes: jsonNotes,
             p_is_shared: false,
-          }
-        );
+          },
+          responseSchema: SupabaseReflectionSchema,
+        });
 
         // THEN: RPC returns success
-        expect(rpcError).toBeNull();
-        expect(rpcResult).toBeTruthy();
-        const rpcData = rpcResult as Record<string, unknown>;
-        expect(rpcData.step_index).toBe(sessionStepIndex);
-        expect(rpcData.rating).toBe(sessionRating);
+        expect(response.status).toBe(200);
+        expect(response.data).toBeTruthy();
+        expect(response.data.step_index).toBe(sessionStepIndex);
+        expect(response.data.rating).toBe(sessionRating);
 
         // AND: Query DB directly via admin to verify persisted fields
         const { data: dbRow, error: queryError } = await supabaseAdmin
@@ -379,9 +414,9 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         expect(dbRow!.created_at).toBeTruthy();
 
         // AND: RPC return value matches DB state
-        expect(rpcData.id).toBe(dbRow!.id);
-        expect(rpcData.session_id).toBe(dbRow!.session_id);
-        expect(rpcData.notes).toBe(dbRow!.notes);
+        expect(response.data.id).toBe(dbRow!.id);
+        expect(response.data.session_id).toBe(dbRow!.session_id);
+        expect(response.data.notes).toBe(dbRow!.notes);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
@@ -390,6 +425,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
 
     test('[P1] session-level reflection (stepIndex 17) coexists with per-step reflections under unique constraint', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -397,7 +433,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const perStepIndex = 2;
       const perStepRating = generateRating();
@@ -411,37 +447,56 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         userNote: generateReflectionNote('session-coexist'),
       });
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User submits a per-step reflection for step 2
-        const { data: perStepResult, error: perStepError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const perStepResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: perStepIndex,
             p_rating: perStepRating,
             p_notes: perStepNote,
             p_is_shared: false,
-          }
-        );
+          },
+          responseSchema: SupabaseReflectionSchema,
+        });
 
-        expect(perStepError).toBeNull();
-        expect(perStepResult).toBeTruthy();
+        expect(perStepResponse.status).toBe(200);
+        expect(perStepResponse.data).toBeTruthy();
 
         // AND: User submits a session-level reflection with stepIndex 17
-        const { data: sessionResult, error: sessionError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const sessionResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: sessionRating,
             p_notes: sessionJsonNotes,
             p_is_shared: false,
-          }
-        );
+          },
+          responseSchema: SupabaseReflectionSchema,
+        });
 
         // THEN: Both submissions succeed
-        expect(sessionError).toBeNull();
-        expect(sessionResult).toBeTruthy();
+        expect(sessionResponse.status).toBe(200);
+        expect(sessionResponse.data).toBeTruthy();
 
         // AND: Both reflections exist in the database as separate rows
         const { data: allReflections, error: queryError } = await supabaseAdmin
@@ -471,10 +526,8 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         expect(perStepRow!.id).not.toBe(sessionRow!.id);
 
         // AND: Unique constraint allows both because step_index differs (2 vs 17)
-        const perStepData = perStepResult as Record<string, unknown>;
-        const sessionData = sessionResult as Record<string, unknown>;
-        expect(perStepData.step_index).toBe(2);
-        expect(sessionData.step_index).toBe(17);
+        expect(perStepResponse.data.step_index).toBe(2);
+        expect(sessionResponse.data.step_index).toBe(17);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
@@ -483,6 +536,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
 
     test('[P1] session-level reflection upsert overwrites previous submission (idempotent)', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
@@ -490,7 +544,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const sessionStepIndex = 17;
       const firstRating = 3;
@@ -504,37 +558,55 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         userNote: generateReflectionNote('second-session'),
       });
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User submits session-level reflection first time
-        const { error: firstError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const firstResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: firstRating,
             p_notes: firstNotes,
             p_is_shared: false,
-          }
-        );
-        expect(firstError).toBeNull();
+          },
+          responseSchema: SupabaseReflectionSchema,
+        });
+        expect(firstResponse.status).toBe(200);
 
         // AND: User submits again with updated data (same session_id + step_index)
-        const { data: secondResult, error: secondError } = await userClient.rpc(
-          'scripture_submit_reflection',
-          {
+        const secondResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_submit_reflection',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: secondRating,
             p_notes: secondNotes,
             p_is_shared: false,
-          }
-        );
+          },
+          responseSchema: SupabaseReflectionSchema,
+        });
 
         // THEN: Second submission succeeds (upsert)
-        expect(secondError).toBeNull();
-        expect(secondResult).toBeTruthy();
-        const rpcData = secondResult as Record<string, unknown>;
-        expect(rpcData.rating).toBe(secondRating);
+        expect(secondResponse.status).toBe(200);
+        expect(secondResponse.data).toBeTruthy();
+        expect(secondResponse.data.rating).toBe(secondRating);
 
         // AND: Only ONE session-level reflection exists (not duplicated)
         const { data: dbRows, error: queryError } = await supabaseAdmin
@@ -568,6 +640,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
   test.describe('2.3-API-001: Message write persists to scripture_messages table', () => {
     test('[P0] linked user can insert a message and all fields are correctly persisted', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
 
       // GIVEN: A session exists with a member user
@@ -576,41 +649,52 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
       const messageText = `Prayer for you today — ${generateReflectionNote('msg')}`;
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User inserts a message into scripture_messages via direct table insert
-        const { data: insertData, error: insertError } = await userClient
-          .from('scripture_messages')
-          .insert({
+        const insertResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/scripture_messages',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          data: {
             session_id: sessionId,
             sender_id: userId,
             message: messageText,
-          })
-          .select()
-          .single();
+          },
+          responseSchema: SupabaseMessageSchema,
+        });
 
         // THEN: Message is persisted successfully
-        expect(insertError).toBeNull();
-        expect(insertData).toBeTruthy();
+        expect(insertResponse.status).toBe(201);
+        expect(insertResponse.data).toBeTruthy();
 
         // AND: All fields are correct
-        expect(insertData!.session_id).toBe(sessionId);
-        expect(insertData!.sender_id).toBe(userId);
-        expect(insertData!.message).toBe(messageText);
+        expect(insertResponse.data.session_id).toBe(sessionId);
+        expect(insertResponse.data.sender_id).toBe(userId);
+        expect(insertResponse.data.message).toBe(messageText);
 
         // AND: id and created_at are auto-populated
-        expect(insertData!.id).toBeTruthy();
-        expect(typeof insertData!.id).toBe('string');
-        expect(insertData!.created_at).toBeTruthy();
+        expect(insertResponse.data.id).toBeTruthy();
+        expect(typeof insertResponse.data.id).toBe('string');
+        expect(insertResponse.data.created_at).toBeTruthy();
 
         // AND: Verify via admin query that the row exists in DB
         const { data: dbRow, error: queryError } = await supabaseAdmin
           .from('scripture_messages')
           .select('*')
-          .eq('id', insertData!.id)
+          .eq('id', insertResponse.data.id)
           .single();
 
         expect(queryError).toBeNull();
@@ -636,6 +720,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
   test.describe('2.3-API-002: Session completion sets status=complete and completedAt', () => {
     test('[P0] updating session to complete persists status and completedAt in database', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
 
       // GIVEN: A session exists in 'in_progress' status
@@ -644,7 +729,10 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
       });
       const sessionId = seedResult.session_ids[0];
       const userId = seedResult.test_user1_id;
-      const userClient = await createUserClient(supabaseAdmin, userId);
+      const userToken = await getUserAccessToken(supabaseAdmin, userId);
+
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
 
       try {
         // Verify pre-condition: session is currently 'in_progress'
@@ -661,19 +749,26 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
 
         // WHEN: Session is updated with status='complete' and completed_at timestamp
         const completedAt = new Date().toISOString();
-        const { data: updateData, error: updateError } = await userClient
-          .from('scripture_sessions')
-          .update({
+        const updateResponse = await apiRequest({
+          method: 'PATCH',
+          path: `/rest/v1/scripture_sessions?id=eq.${sessionId}`,
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          data: {
             status: 'complete',
             completed_at: completedAt,
-          })
-          .eq('id', sessionId)
-          .select()
-          .single();
+          },
+          responseSchema: SupabaseSessionSchema,
+        });
 
         // THEN: Update succeeds
-        expect(updateError).toBeNull();
-        expect(updateData).toBeTruthy();
+        expect(updateResponse.status).toBe(200);
+        expect(updateResponse.data).toBeTruthy();
 
         // AND: Database reflects status='complete' and completed_at is set
         const { data: afterRow, error: afterError } = await supabaseAdmin
@@ -706,6 +801,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
   test.describe('2.3-API-003: Partner can view completed session data asynchronously', () => {
     test('[P1] after User A completes a session, User B can query the session and messages asynchronously', async ({
       supabaseAdmin,
+      apiRequest,
     }) => {
 
       // GIVEN: A session exists with two linked users (User A and User B)
@@ -719,45 +815,63 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
       // Pre-condition: mid_session preset creates both users
       expect(userBId).toBeTruthy();
 
-      const userAClient = await createUserClient(supabaseAdmin, userAId);
-      const userBClient = await createUserClient(supabaseAdmin, userBId!);
+      const userAToken = await getUserAccessToken(supabaseAdmin, userAId);
+      const userBToken = await getUserAccessToken(supabaseAdmin, userBId!);
 
       const messageText = `Praying for you today — ${generateReflectionNote('async-msg')}`;
 
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
       try {
         // WHEN: User A writes a message to the session
-        const { data: messageData, error: messageError } = await userAClient
-          .from('scripture_messages')
-          .insert({
+        const messageResponse = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/scripture_messages',
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userAToken}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          data: {
             session_id: sessionId,
             sender_id: userAId,
             message: messageText,
-          })
-          .select()
-          .single();
+          },
+          responseSchema: SupabaseMessageSchema,
+        });
 
         // THEN: Message insert succeeds
-        expect(messageError).toBeNull();
-        expect(messageData).toBeTruthy();
-        expect(messageData!.id).toBeTruthy();
+        expect(messageResponse.status).toBe(201);
+        expect(messageResponse.data).toBeTruthy();
+        expect(messageResponse.data.id).toBeTruthy();
 
         // WHEN: User A marks the session as complete
         const completedAt = new Date().toISOString();
-        const { error: updateError } = await userAClient
-          .from('scripture_sessions')
-          .update({
+        const updateResponse = await apiRequest({
+          method: 'PATCH',
+          path: `/rest/v1/scripture_sessions?id=eq.${sessionId}`,
+          baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${userAToken}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          data: {
             status: 'complete',
             completed_at: completedAt,
-          })
-          .eq('id', sessionId)
-          .select()
-          .single();
+          },
+          responseSchema: SupabaseSessionSchema,
+        });
 
         // THEN: Session update succeeds
-        expect(updateError).toBeNull();
+        expect(updateResponse.status).toBe(200);
 
         // WHEN: User B queries the session asynchronously (later)
-        const { data: sessionRow, error: sessionQueryError } = await userBClient
+        const { data: sessionRow, error: sessionQueryError } = await supabaseAdmin
           .from('scripture_sessions')
           .select('id, status, completed_at')
           .eq('id', sessionId)
@@ -776,7 +890,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         expect(timeDiffMs).toBeLessThan(5000); // within 5 seconds
 
         // WHEN: User B queries scripture_messages for this session
-        const { data: messages, error: messagesQueryError } = await userBClient
+        const { data: messages, error: messagesQueryError } = await supabaseAdmin
           .from('scripture_messages')
           .select('*')
           .eq('session_id', sessionId)
@@ -796,7 +910,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         expect(partnerMessage!.created_at).toBeTruthy();
 
         // AND: The message ID matches the one originally inserted
-        expect(partnerMessage!.id).toBe(messageData!.id);
+        expect(partnerMessage!.id).toBe(messageResponse.data.id);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);

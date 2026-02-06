@@ -8,6 +8,7 @@
  */
 
 import type { Page, Locator } from '@playwright/test';
+import { faker } from '@faker-js/faker';
 
 /**
  * Wait for a condition with polling
@@ -35,9 +36,7 @@ export async function waitFor(
  * Generate a unique test email
  */
 export function generateTestEmail(prefix = 'test'): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(7);
-  return `${prefix}-${timestamp}-${random}@test.example.com`;
+  return faker.internet.email({ firstName: prefix });
 }
 
 /**
@@ -143,17 +142,9 @@ export async function expectToast(
 /**
  * Generate a random string for test data
  * @param length - Length of random string (default: 8)
- * @param charset - Character set to use (default: alphanumeric)
  */
-export function randomString(
-  length = 8,
-  charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-): string {
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return result;
+export function randomString(length = 8): string {
+  return faker.string.alphanumeric(length);
 }
 
 /**
