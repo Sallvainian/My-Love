@@ -58,14 +58,14 @@ type ScriptureNavFixtures = {
  * Requires page and interceptNetworkCall fixtures.
  */
 export const test = base.extend<ScriptureNavFixtures>({
-  scriptureNav: async ({ page, interceptNetworkCall }, use) => {
+  scriptureNav: async ({ page }, use) => {
     const fixture: ScriptureNavFixture = {
       ensureOverview: async () => ensureScriptureOverview(page),
-      startSoloSession: async () => startSoloSession(page, interceptNetworkCall),
-      advanceOneStep: async (rating = 3) => advanceOneStep(page, interceptNetworkCall, rating),
+      startSoloSession: async () => startSoloSession(page),
+      advanceOneStep: async (rating = 3) => advanceOneStep(page, rating),
       completeAllSteps: async (bookmarkSteps = new Set([0, 5, 12])) =>
-        completeAllStepsToReflectionSummary(page, interceptNetworkCall, bookmarkSteps),
-      submitSummary: async () => submitReflectionSummary(page, interceptNetworkCall),
+        completeAllStepsToReflectionSummary(page, bookmarkSteps),
+      submitSummary: async () => submitReflectionSummary(page),
     };
 
     await use(fixture);

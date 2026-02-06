@@ -84,6 +84,7 @@ export default defineConfig({
     {
       name: 'api',
       testDir: './tests/api',
+      dependencies: ['setup'],
     },
     // Uncomment for cross-browser testing
     // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },

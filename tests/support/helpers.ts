@@ -11,7 +11,6 @@
  */
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import type { InterceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call/fixtures';
 
 /**
  * Navigate to /scripture and ensure Start button is visible.
@@ -36,22 +35,18 @@ export async function ensureScriptureOverview(page: Page) {
  * and waits for the session creation API to complete.
  *
  * @param page - Playwright page
- * @param interceptNetworkCall - Network interception fixture from playwright-utils
  */
-export async function startSoloSession(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCall
-): Promise<string> {
+export async function startSoloSession(page: Page): Promise<string> {
   await ensureScriptureOverview(page);
 
-  const response = await interceptNetworkCall(
-    page,
-    '/rest/v1/rpc/scripture_create_session',
-    async () => {
-      await page.getByTestId('scripture-start-button').click();
-      await page.getByTestId('scripture-mode-solo').click();
-    }
+  const responsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/rest/v1/rpc/scripture_create_session') && resp.status() === 200
   );
+
+  await page.getByTestId('scripture-start-button').click();
+  await page.getByTestId('scripture-mode-solo').click();
+
+  const response = await responsePromise;
 
   // Wait for the reading flow to render
   await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
@@ -68,14 +63,9 @@ export async function startSoloSession(
  * This helper completes one full cycle: clicks Next Verse, rates, and submits.
  *
  * @param page - Playwright page
- * @param interceptNetworkCall - Network interception fixture from playwright-utils
  * @param rating - Rating to select (1-5), defaults to 3
  */
-export async function advanceOneStep(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCall,
-  rating: number = 3
-) {
+export async function advanceOneStep(page: Page, rating: number = 3) {
   // Click Next Verse → transitions to reflection sub-view
   await page.getByTestId('scripture-next-verse-button').click();
 
@@ -86,9 +76,13 @@ export async function advanceOneStep(
   await page.getByTestId(`scripture-rating-${rating}`).click();
 
   // Wait for reflection submission to complete
-  await interceptNetworkCall(page, '/rest/v1/rpc/scripture_submit_reflection', async () => {
-    await page.getByTestId('scripture-reflection-continue').click();
-  });
+  const responsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+  );
+
+  await page.getByTestId('scripture-reflection-continue').click();
+
+  await responsePromise;
 
   // Wait for next verse screen to appear
   await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
@@ -101,17 +95,15 @@ export async function advanceOneStep(
  * Optionally bookmarks specific steps along the way.
  *
  * @param page - Playwright page
- * @param interceptNetworkCall - Network interception fixture from playwright-utils
  * @param bookmarkSteps - Set of step indices (0-16) to bookmark during navigation
  * @returns Session ID
  */
 export async function completeAllStepsToReflectionSummary(
   page: Page,
-  interceptNetworkCall: InterceptNetworkCall,
   bookmarkSteps: Set<number> = new Set([0, 5, 12])
 ): Promise<string> {
   // Start solo session (handles stale sessions from previous runs)
-  const sessionId = await startSoloSession(page, interceptNetworkCall);
+  const sessionId = await startSoloSession(page);
 
   // Complete all 17 steps (indices 0-16)
   for (let step = 0; step < 17; step++) {
@@ -135,9 +127,13 @@ export async function completeAllStepsToReflectionSummary(
     await page.getByTestId('scripture-rating-3').click();
 
     // Wait for reflection submission to complete
-    await interceptNetworkCall(page, '/rest/v1/rpc/scripture_submit_reflection', async () => {
-      await page.getByTestId('scripture-reflection-continue').click();
-    });
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+    );
+
+    await page.getByTestId('scripture-reflection-continue').click();
+
+    await responsePromise;
   }
 
   // After step 17 (index 16) reflection, the reflection summary should appear
@@ -152,12 +148,8 @@ export async function completeAllStepsToReflectionSummary(
  * need to reach the report phase (post-reflection-summary).
  *
  * @param page - Playwright page
- * @param interceptNetworkCall - Network interception fixture from playwright-utils
  */
-export async function submitReflectionSummary(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCall
-): Promise<void> {
+export async function submitReflectionSummary(page: Page): Promise<void> {
   await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
 
   // Select a standout verse (step 0)
@@ -175,7 +167,11 @@ export async function submitReflectionSummary(
   );
 
   // Submit the reflection summary — wait for server response
-  await interceptNetworkCall(page, '/rest/v1/rpc/scripture_submit_reflection', async () => {
-    await page.getByTestId('scripture-reflection-summary-continue').click();
-  });
+  const responsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+  );
+
+  await page.getByTestId('scripture-reflection-summary-continue').click();
+
+  await responsePromise;
 }

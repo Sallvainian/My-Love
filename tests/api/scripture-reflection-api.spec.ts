@@ -62,13 +62,13 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         const firstResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: stepIndex,
             p_rating: firstRating,
@@ -78,7 +78,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         });
 
         // Validate response with Zod schema
-        const firstData = SupabaseReflectionSchema.parse(firstResponse.data);
+        const firstData = SupabaseReflectionSchema.parse(firstResponse.body);
 
         // THEN: First submission succeeds
         expect(firstResponse.status).toBe(200);
@@ -90,13 +90,13 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         const secondResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: stepIndex,
             p_rating: secondRating,
@@ -106,7 +106,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         });
 
         // Validate response with Zod schema
-        const secondData = SupabaseReflectionSchema.parse(secondResponse.data);
+        const secondData = SupabaseReflectionSchema.parse(secondResponse.body);
 
         // THEN: Second submission also succeeds (upsert, not rejection)
         expect(secondResponse.status).toBe(200);
@@ -167,13 +167,13 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         const response = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: stepIndex,
             p_rating: rating,
@@ -184,7 +184,7 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         });
 
         expect(response.status).toBe(200);
-        expect(response.data).toBeTruthy();
+        expect(response.body).toBeTruthy();
 
         // THEN: Query DB directly via admin to verify persisted fields
         const { data: dbRow, error: queryError } = await supabaseAdmin
@@ -212,13 +212,13 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         expect(dbRow!.created_at).toBeTruthy();
 
         // AND: RPC return value matches DB state
-        expect(response.data.id).toBe(dbRow!.id);
-        expect(response.data.session_id).toBe(dbRow!.session_id);
-        expect(response.data.step_index).toBe(dbRow!.step_index);
-        expect(response.data.user_id).toBe(dbRow!.user_id);
-        expect(response.data.rating).toBe(dbRow!.rating);
-        expect(response.data.notes).toBe(dbRow!.notes);
-        expect(response.data.is_shared).toBe(dbRow!.is_shared);
+        expect(response.body.id).toBe(dbRow!.id);
+        expect(response.body.session_id).toBe(dbRow!.session_id);
+        expect(response.body.step_index).toBe(dbRow!.step_index);
+        expect(response.body.user_id).toBe(dbRow!.user_id);
+        expect(response.body.rating).toBe(dbRow!.rating);
+        expect(response.body.notes).toBe(dbRow!.notes);
+        expect(response.body.is_shared).toBe(dbRow!.is_shared);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
@@ -253,14 +253,14 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
         const insertResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/scripture_bookmarks',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
             Prefer: 'return=representation',
           },
-          data: {
+          body: {
             session_id: sessionId,
             step_index: stepIndex,
             user_id: userId,
@@ -271,12 +271,12 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
 
         // THEN: Bookmark is created successfully
         expect(insertResponse.status).toBe(201);
-        expect(insertResponse.data).toBeTruthy();
-        expect(insertResponse.data.session_id).toBe(sessionId);
-        expect(insertResponse.data.step_index).toBe(stepIndex);
-        expect(insertResponse.data.user_id).toBe(userId);
-        expect(insertResponse.data.share_with_partner).toBe(false);
-        expect(insertResponse.data.id).toBeTruthy();
+        expect(insertResponse.body).toBeTruthy();
+        expect(insertResponse.body[0].session_id).toBe(sessionId);
+        expect(insertResponse.body[0].step_index).toBe(stepIndex);
+        expect(insertResponse.body[0].user_id).toBe(userId);
+        expect(insertResponse.body[0].share_with_partner).toBe(false);
+        expect(insertResponse.body[0].id).toBeTruthy();
 
         // AND: Bookmark exists in DB (verified via admin)
         const { data: verifyRow, error: verifyError } = await supabaseAdmin
@@ -288,13 +288,13 @@ test.describe('Scripture Reflection API - Story 2.1', () => {
 
         expect(verifyError).toBeNull();
         expect(verifyRow).toHaveLength(1);
-        expect(verifyRow![0].id).toBe(insertResponse.data.id);
+        expect(verifyRow![0].id).toBe(insertResponse.body[0].id);
 
         // WHEN: User removes the bookmark (delete)
         const deleteResponse = await apiRequest({
           method: 'DELETE',
-          path: `/rest/v1/scripture_bookmarks?id=eq.${insertResponse.data.id}`,
-          baseURL,
+          path: `/rest/v1/scripture_bookmarks?id=eq.${insertResponse.body[0].id}`,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
@@ -359,13 +359,13 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         const response = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: sessionRating,
@@ -377,9 +377,9 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
 
         // THEN: RPC returns success
         expect(response.status).toBe(200);
-        expect(response.data).toBeTruthy();
-        expect(response.data.step_index).toBe(sessionStepIndex);
-        expect(response.data.rating).toBe(sessionRating);
+        expect(response.body).toBeTruthy();
+        expect(response.body.step_index).toBe(sessionStepIndex);
+        expect(response.body.rating).toBe(sessionRating);
 
         // AND: Query DB directly via admin to verify persisted fields
         const { data: dbRow, error: queryError } = await supabaseAdmin
@@ -414,9 +414,9 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         expect(dbRow!.created_at).toBeTruthy();
 
         // AND: RPC return value matches DB state
-        expect(response.data.id).toBe(dbRow!.id);
-        expect(response.data.session_id).toBe(dbRow!.session_id);
-        expect(response.data.notes).toBe(dbRow!.notes);
+        expect(response.body.id).toBe(dbRow!.id);
+        expect(response.body.session_id).toBe(dbRow!.session_id);
+        expect(response.body.notes).toBe(dbRow!.notes);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
@@ -455,13 +455,13 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         const perStepResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: perStepIndex,
             p_rating: perStepRating,
@@ -472,19 +472,19 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         });
 
         expect(perStepResponse.status).toBe(200);
-        expect(perStepResponse.data).toBeTruthy();
+        expect(perStepResponse.body).toBeTruthy();
 
         // AND: User submits a session-level reflection with stepIndex 17
         const sessionResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: sessionRating,
@@ -496,7 +496,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
 
         // THEN: Both submissions succeed
         expect(sessionResponse.status).toBe(200);
-        expect(sessionResponse.data).toBeTruthy();
+        expect(sessionResponse.body).toBeTruthy();
 
         // AND: Both reflections exist in the database as separate rows
         const { data: allReflections, error: queryError } = await supabaseAdmin
@@ -526,8 +526,8 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         expect(perStepRow!.id).not.toBe(sessionRow!.id);
 
         // AND: Unique constraint allows both because step_index differs (2 vs 17)
-        expect(perStepResponse.data.step_index).toBe(2);
-        expect(sessionResponse.data.step_index).toBe(17);
+        expect(perStepResponse.body.step_index).toBe(2);
+        expect(sessionResponse.body.step_index).toBe(17);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
@@ -566,13 +566,13 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         const firstResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: firstRating,
@@ -587,13 +587,13 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         const secondResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
           },
-          data: {
+          body: {
             p_session_id: sessionId,
             p_step_index: sessionStepIndex,
             p_rating: secondRating,
@@ -605,8 +605,8 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
 
         // THEN: Second submission succeeds (upsert)
         expect(secondResponse.status).toBe(200);
-        expect(secondResponse.data).toBeTruthy();
-        expect(secondResponse.data.rating).toBe(secondRating);
+        expect(secondResponse.body).toBeTruthy();
+        expect(secondResponse.body.rating).toBe(secondRating);
 
         // AND: Only ONE session-level reflection exists (not duplicated)
         const { data: dbRows, error: queryError } = await supabaseAdmin
@@ -661,14 +661,14 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         const insertResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/scripture_messages',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
             Prefer: 'return=representation',
           },
-          data: {
+          body: {
             session_id: sessionId,
             sender_id: userId,
             message: messageText,
@@ -678,23 +678,23 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
 
         // THEN: Message is persisted successfully
         expect(insertResponse.status).toBe(201);
-        expect(insertResponse.data).toBeTruthy();
+        expect(insertResponse.body).toBeTruthy();
 
         // AND: All fields are correct
-        expect(insertResponse.data.session_id).toBe(sessionId);
-        expect(insertResponse.data.sender_id).toBe(userId);
-        expect(insertResponse.data.message).toBe(messageText);
+        expect(insertResponse.body[0].session_id).toBe(sessionId);
+        expect(insertResponse.body[0].sender_id).toBe(userId);
+        expect(insertResponse.body[0].message).toBe(messageText);
 
         // AND: id and created_at are auto-populated
-        expect(insertResponse.data.id).toBeTruthy();
-        expect(typeof insertResponse.data.id).toBe('string');
-        expect(insertResponse.data.created_at).toBeTruthy();
+        expect(insertResponse.body[0].id).toBeTruthy();
+        expect(typeof insertResponse.body[0].id).toBe('string');
+        expect(insertResponse.body[0].created_at).toBeTruthy();
 
         // AND: Verify via admin query that the row exists in DB
         const { data: dbRow, error: queryError } = await supabaseAdmin
           .from('scripture_messages')
           .select('*')
-          .eq('id', insertResponse.data.id)
+          .eq('id', insertResponse.body[0].id)
           .single();
 
         expect(queryError).toBeNull();
@@ -752,14 +752,14 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         const updateResponse = await apiRequest({
           method: 'PATCH',
           path: `/rest/v1/scripture_sessions?id=eq.${sessionId}`,
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userToken}`,
             'Content-Type': 'application/json',
             Prefer: 'return=representation',
           },
-          data: {
+          body: {
             status: 'complete',
             completed_at: completedAt,
           },
@@ -768,7 +768,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
 
         // THEN: Update succeeds
         expect(updateResponse.status).toBe(200);
-        expect(updateResponse.data).toBeTruthy();
+        expect(updateResponse.body).toBeTruthy();
 
         // AND: Database reflects status='complete' and completed_at is set
         const { data: afterRow, error: afterError } = await supabaseAdmin
@@ -828,14 +828,14 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         const messageResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/scripture_messages',
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userAToken}`,
             'Content-Type': 'application/json',
             Prefer: 'return=representation',
           },
-          data: {
+          body: {
             session_id: sessionId,
             sender_id: userAId,
             message: messageText,
@@ -845,22 +845,22 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
 
         // THEN: Message insert succeeds
         expect(messageResponse.status).toBe(201);
-        expect(messageResponse.data).toBeTruthy();
-        expect(messageResponse.data.id).toBeTruthy();
+        expect(messageResponse.body).toBeTruthy();
+        expect(messageResponse.body[0].id).toBeTruthy();
 
         // WHEN: User A marks the session as complete
         const completedAt = new Date().toISOString();
         const updateResponse = await apiRequest({
           method: 'PATCH',
           path: `/rest/v1/scripture_sessions?id=eq.${sessionId}`,
-          baseURL,
+          baseUrl: baseURL,
           headers: {
             apikey: anonKey,
             Authorization: `Bearer ${userAToken}`,
             'Content-Type': 'application/json',
             Prefer: 'return=representation',
           },
-          data: {
+          body: {
             status: 'complete',
             completed_at: completedAt,
           },
@@ -910,7 +910,7 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
         expect(partnerMessage!.created_at).toBeTruthy();
 
         // AND: The message ID matches the one originally inserted
-        expect(partnerMessage!.id).toBe(messageResponse.data.id);
+        expect(partnerMessage!.id).toBe(messageResponse.body[0].id);
       } finally {
         // Cleanup
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
