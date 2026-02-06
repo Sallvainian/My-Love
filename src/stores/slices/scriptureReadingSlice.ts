@@ -41,9 +41,16 @@ function isScriptureError(value: unknown): value is ScriptureError {
 // ============================================
 
 export interface PendingRetry {
-  type: 'advanceStep' | 'saveSession';
+  type: 'advanceStep' | 'saveSession' | 'reflection';
   attempts: number;
   maxAttempts: number;
+  reflectionData?: {
+    sessionId: string;
+    stepIndex: number;
+    rating: number;
+    notes: string;
+    isShared: boolean;
+  };
 }
 
 // ============================================
@@ -238,7 +245,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           currentPhase: 'reflection' as SessionPhase,
           currentStepIndex: MAX_STEPS - 1,
         });
-        set({ isSyncing: false, pendingRetry: null });
+        set((state) => ({
+          isSyncing: false,
+          pendingRetry: state.pendingRetry?.type === 'reflection' ? state.pendingRetry : null,
+        }));
       } catch (error) {
         const scriptureError: ScriptureError = isScriptureError(error)
           ? error
@@ -267,7 +277,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         await scriptureReadingService.updateSession(session.id, {
           currentStepIndex: nextStep,
         });
-        set({ isSyncing: false, pendingRetry: null });
+        set((state) => ({
+          isSyncing: false,
+          pendingRetry: state.pendingRetry?.type === 'reflection' ? state.pendingRetry : null,
+        }));
       } catch (error) {
         const scriptureError: ScriptureError = isScriptureError(error)
           ? error
@@ -376,11 +389,16 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isSyncing: true, scriptureError: null });
 
     try {
-      await scriptureReadingService.updateSession(session.id, {
-        currentStepIndex: session.currentStepIndex,
-        currentPhase: session.currentPhase,
-        status: session.status,
-      });
+      if (pendingRetry.type === 'reflection' && pendingRetry.reflectionData) {
+        const { sessionId, stepIndex, rating, notes, isShared } = pendingRetry.reflectionData;
+        await scriptureReadingService.addReflection(sessionId, stepIndex, rating, notes, isShared);
+      } else {
+        await scriptureReadingService.updateSession(session.id, {
+          currentStepIndex: session.currentStepIndex,
+          currentPhase: session.currentPhase,
+          status: session.status,
+        });
+      }
       set({ isSyncing: false, pendingRetry: null, scriptureError: null });
     } catch (error) {
       const newAttempts = pendingRetry.attempts + 1;

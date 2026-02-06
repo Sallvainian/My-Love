@@ -327,9 +327,9 @@ export function SoloReadingFlow() {
     }
   }, [isReportEntry, hasPartner, session, markSessionComplete]);
 
-  // Story 2.3: Load report data when entering report phase
+  // Story 2.3: Load report data when report view is actually displayed
   useEffect(() => {
-    if (!isReportEntry || !session) return;
+    if ((reportSubPhase !== 'report' && reportSubPhase !== 'complete-unlinked') || !session) return;
 
     void (async () => {
       try {
@@ -410,7 +410,7 @@ export function SoloReadingFlow() {
         // Non-blocking: report data loading failure uses empty defaults
       }
     })();
-  }, [isReportEntry, session]);
+  }, [reportSubPhase, session]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
   // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
@@ -438,8 +438,20 @@ export function SoloReadingFlow() {
             false // is_shared defaults to false
           );
         } catch {
-          // Non-blocking: reflection write failure shouldn't block advancement
-          // Retry handled via existing SyncToast pattern
+          useAppStore.setState({
+            pendingRetry: {
+              type: 'reflection',
+              attempts: 1,
+              maxAttempts: 3,
+              reflectionData: {
+                sessionId: session.id,
+                stepIndex: session.currentStepIndex,
+                rating,
+                notes,
+                isShared: false,
+              },
+            },
+          });
         }
       })();
 
@@ -759,7 +771,7 @@ export function SoloReadingFlow() {
         <button
           ref={exitButtonRef}
           onClick={handleExitRequest}
-          className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
+          className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
           aria-label="Exit reading"
           data-testid="exit-button"
           type="button"
@@ -794,7 +806,7 @@ export function SoloReadingFlow() {
       </header>
 
       {/* Main content area */}
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
         <AnimatePresence mode="wait" custom={slideDirection}>
           <motion.div
             key={`step-${session.currentStepIndex}-${subView}`}
@@ -940,7 +952,7 @@ export function SoloReadingFlow() {
             {pendingRetry.attempts < pendingRetry.maxAttempts && (
               <button
                 onClick={retryFailedWrite}
-                className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
+                className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
                 data-testid="retry-button"
                 type="button"
               >
@@ -1017,7 +1029,7 @@ export function SoloReadingFlow() {
           )}
         </div>
         )}
-      </main>
+      </div>
 
       {/* Exit Confirmation Dialog */}
       <AnimatePresence>

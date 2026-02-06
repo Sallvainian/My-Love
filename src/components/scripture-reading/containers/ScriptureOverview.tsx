@@ -275,7 +275,7 @@ export function ScriptureOverview() {
   }
 
   return (
-    <main
+    <div
       className="min-h-screen p-4"
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="scripture-overview"
@@ -450,6 +450,6 @@ export function ScriptureOverview() {
           )}
         </AnimatePresence>
       </div>
-    </main>
+    </div>
   );
 }
