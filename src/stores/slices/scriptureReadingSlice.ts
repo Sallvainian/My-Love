@@ -193,9 +193,9 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       }
 
       const sessions = await scriptureReadingService.getUserSessions(userId);
-      const incomplete = sessions.find(
-        (s) => s.status === 'in_progress' && s.mode === 'solo'
-      );
+      const incomplete = sessions
+        .filter((s) => s.status === 'in_progress' && s.mode === 'solo')
+        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
       set({ activeSession: incomplete ?? null, isCheckingSession: false });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)

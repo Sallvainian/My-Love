@@ -202,9 +202,13 @@ export function ScriptureOverview() {
   }, [loadPartner]);
 
   // Check for incomplete solo session on mount (AC #6)
+  // Re-check when session becomes null (e.g., after save-and-exit)
   useEffect(() => {
-    void checkForActiveSession();
-  }, [checkForActiveSession]);
+    if (!session) {
+      setShowModes(false); // Reset mode selection visibility
+      void checkForActiveSession();
+    }
+  }, [checkForActiveSession, session]);
 
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
   useEffect(() => {
