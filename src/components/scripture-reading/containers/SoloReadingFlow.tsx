@@ -126,11 +126,19 @@ export function SoloReadingFlow() {
     userBookmarks: number[];
     userStandoutVerses: number[];
     partnerMessage: string | null;
+    partnerRatings: { stepIndex: number; rating: number }[] | null;
+    partnerBookmarks: number[] | null;
+    partnerStandoutVerses: number[] | null;
+    isPartnerComplete: boolean;
   }>({
     userRatings: [],
     userBookmarks: [],
     userStandoutVerses: [],
     partnerMessage: null,
+    partnerRatings: null,
+    partnerBookmarks: null,
+    partnerStandoutVerses: null,
+    isPartnerComplete: false,
   });
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
@@ -253,6 +261,7 @@ export function SoloReadingFlow() {
   );
 
   // Story 2.3: Mark session complete helper
+  // Updates server status but keeps local phase as 'report' for UI rendering
   const markSessionComplete = useCallback(async () => {
     if (!session) return;
     try {
@@ -263,8 +272,7 @@ export function SoloReadingFlow() {
     } catch {
       // Non-blocking: session completion failure handled by eventual consistency
     }
-    updatePhase('complete');
-  }, [session, updatePhase]);
+  }, [session]);
 
   // Story 2.3: Handle message send
   const handleMessageSend = useCallback(
@@ -325,11 +333,9 @@ export function SoloReadingFlow() {
 
     void (async () => {
       try {
-        const [reflections, bookmarks, messages] = await Promise.all([
-          scriptureReadingService.getReflectionsBySession(session.id),
-          scriptureReadingService.getBookmarksBySession(session.id),
-          scriptureReadingService.getMessagesBySession(session.id),
-        ]);
+        // Use server-fresh data (not cache) to include partner contributions
+        const { reflections, bookmarks, messages } =
+          await scriptureReadingService.getSessionReportData(session.id);
 
         // Build user ratings from reflections (exclude session-level at MAX_STEPS, require rating)
         const userReflections = reflections.filter(
@@ -362,11 +368,43 @@ export function SoloReadingFlow() {
         // Partner message (filter by sender !== current user)
         const partnerMsg = messages.find((m) => m.senderId !== session.userId);
 
+        // Partner ratings (reflections from other user)
+        const partnerReflections = reflections.filter(
+          (r) => r.userId !== session.userId && r.stepIndex < MAX_STEPS && r.rating != null
+        );
+        const partnerRatings = partnerReflections.length > 0
+          ? partnerReflections.map((r) => ({ stepIndex: r.stepIndex, rating: r.rating! }))
+          : null;
+
+        // Partner bookmarks
+        const partnerBookmarkSteps = bookmarks
+          .filter((b) => b.userId !== session.userId)
+          .map((b) => b.stepIndex);
+        const partnerBookmarks = partnerBookmarkSteps.length > 0 ? partnerBookmarkSteps : null;
+
+        // Partner standout verses (from session-level reflection)
+        const partnerSessionReflection = reflections.find(
+          (r) => r.userId !== session.userId && r.stepIndex === MAX_STEPS
+        );
+        let partnerStandoutVerses: number[] | null = null;
+        if (partnerSessionReflection?.notes) {
+          try {
+            const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
+            partnerStandoutVerses = parsed.standoutVerses ?? null;
+          } catch {
+            // Invalid JSON in partner notes — proceed without standout verses
+          }
+        }
+
         setReportData({
           userRatings,
           userBookmarks,
           userStandoutVerses,
           partnerMessage: partnerMsg?.message ?? null,
+          partnerRatings,
+          partnerBookmarks,
+          partnerStandoutVerses,
+          isPartnerComplete: partnerReflections.length > 0,
         });
       } catch {
         // Non-blocking: report data loading failure uses empty defaults
@@ -691,10 +729,10 @@ export function SoloReadingFlow() {
             userStandoutVerses={reportData.userStandoutVerses}
             partnerMessage={reportData.partnerMessage}
             partnerName={partner?.displayName ?? null}
-            partnerRatings={null}
-            partnerBookmarks={null}
-            partnerStandoutVerses={null}
-            isPartnerComplete={false}
+            partnerRatings={reportData.partnerRatings}
+            partnerBookmarks={reportData.partnerBookmarks}
+            partnerStandoutVerses={reportData.partnerStandoutVerses}
+            isPartnerComplete={reportData.isPartnerComplete}
             onReturn={handleReturnToOverview}
           />
         </div>

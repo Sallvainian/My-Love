@@ -22,7 +22,7 @@ test.describe('Per-Step Reflection System', () => {
       testSession,
     }) => {
       // GIVEN: User navigates to scripture and starts a solo session
-      await startSoloSession(page);
+      const sessionId = await startSoloSession(page);
 
       // AND: User is on the first verse screen
       await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
@@ -98,7 +98,7 @@ test.describe('Per-Step Reflection System', () => {
       const { data: reflections, error } = await supabaseAdmin
         .from('scripture_reflections')
         .select('*')
-        .eq('session_id', testSession.session_ids[0])
+        .eq('session_id', sessionId)
         .eq('step_index', 0);
 
       expect(error).toBeNull();
@@ -116,7 +116,7 @@ test.describe('Per-Step Reflection System', () => {
       testSession,
     }) => {
       // GIVEN: User is on a verse screen in a solo session
-      await startSoloSession(page);
+      const sessionId = await startSoloSession(page);
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // AND: Bookmark button is visible with inactive state
@@ -138,6 +138,7 @@ test.describe('Per-Step Reflection System', () => {
       const bookmarkResponse = page.waitForResponse(
         (response) =>
           response.url().includes('/rest/v1/scripture_bookmarks') &&
+          response.request().method() === 'POST' &&
           response.ok()
       );
       await bookmarkButton.click();
@@ -156,7 +157,7 @@ test.describe('Per-Step Reflection System', () => {
       const { data: bookmarks, error } = await supabaseAdmin
         .from('scripture_bookmarks')
         .select('*')
-        .eq('session_id', testSession.session_ids[0])
+        .eq('session_id', sessionId)
         .eq('step_index', 0)
         .eq('user_id', testSession.test_user1_id);
 
@@ -167,6 +168,7 @@ test.describe('Per-Step Reflection System', () => {
       const deleteResponse = page.waitForResponse(
         (response) =>
           response.url().includes('/rest/v1/scripture_bookmarks') &&
+          response.request().method() === 'DELETE' &&
           response.ok()
       );
       await bookmarkButton.click();
@@ -184,7 +186,7 @@ test.describe('Per-Step Reflection System', () => {
       const { data: afterDelete } = await supabaseAdmin
         .from('scripture_bookmarks')
         .select('*')
-        .eq('session_id', testSession.session_ids[0])
+        .eq('session_id', sessionId)
         .eq('step_index', 0)
         .eq('user_id', testSession.test_user1_id);
 
@@ -367,9 +369,9 @@ test.describe('End-of-Session Reflection Summary', () => {
   async function completeAllStepsToReflectionSummary(
     page: import('@playwright/test').Page,
     bookmarkSteps: Set<number> = new Set([0, 5, 12])
-  ): Promise<void> {
+  ): Promise<string> {
     // Start solo session (handles stale sessions from previous runs)
-    await startSoloSession(page);
+    const sessionId = await startSoloSession(page);
 
     // Complete all 17 steps (indices 0-16)
     for (let step = 0; step < 17; step++) {
@@ -403,6 +405,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     }
 
     // After step 17 (index 16) reflection, the reflection summary should appear
+    return sessionId;
   }
 
   test.describe('2.2-E2E-001 [P0]: Reflection summary screen appears after step 17 with bookmarked verses', () => {
@@ -620,7 +623,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     }) => {
       // GIVEN: User is on the reflection summary screen with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
-      await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
+      const sessionId = await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
       await expect(
         page.getByTestId('scripture-reflection-summary-screen')
       ).toBeVisible();
@@ -675,7 +678,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       const { data: reflections, error } = await supabaseAdmin
         .from('scripture_reflections')
         .select('*')
-        .eq('session_id', testSession.session_ids[0])
+        .eq('session_id', sessionId)
         .eq('step_index', 17);
 
       expect(error).toBeNull();
@@ -695,7 +698,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       const { data: sessions, error: sessionError } = await supabaseAdmin
         .from('scripture_sessions')
         .select('current_phase, status')
-        .eq('id', testSession.session_ids[0]);
+        .eq('id', sessionId);
 
       expect(sessionError).toBeNull();
       expect(sessions).toHaveLength(1);
@@ -713,7 +716,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       testSession,
     }) => {
       // GIVEN: User has completed all 17 steps WITHOUT bookmarking any verses
-      await completeAllStepsToReflectionSummary(page, new Set()); // empty bookmark set
+      const sessionId = await completeAllStepsToReflectionSummary(page, new Set()); // empty bookmark set
 
       // THEN: Reflection summary screen is visible
       await expect(
@@ -761,7 +764,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       const { data: reflections, error } = await supabaseAdmin
         .from('scripture_reflections')
         .select('*')
-        .eq('session_id', testSession.session_ids[0])
+        .eq('session_id', sessionId)
         .eq('step_index', 17);
 
       expect(error).toBeNull();
@@ -792,9 +795,9 @@ test.describe('Daily Prayer Report — Send & View', () => {
   async function completeAllStepsToReflectionSummary(
     page: import('@playwright/test').Page,
     bookmarkSteps: Set<number> = new Set([0, 5, 12])
-  ): Promise<void> {
+  ): Promise<string> {
     // Start solo session (handles stale sessions from previous runs)
-    await startSoloSession(page);
+    const sessionId = await startSoloSession(page);
 
     // Complete all 17 steps (indices 0-16)
     for (let step = 0; step < 17; step++) {
@@ -828,6 +831,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
     }
 
     // After step 17 (index 16) reflection, the reflection summary should appear
+    return sessionId;
   }
 
   /**
@@ -877,7 +881,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
 
       // GIVEN: User has completed all 17 steps with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
-      await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
+      const sessionId = await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
 
       // AND: User submits the reflection summary (select verse, rating, click continue)
       await submitReflectionSummary(page);
@@ -947,7 +951,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
       const { data: sessions, error: sessionError } = await supabaseAdmin
         .from('scripture_sessions')
         .select('status, completed_at')
-        .eq('id', testSession.session_ids[0]);
+        .eq('id', sessionId);
 
       expect(sessionError).toBeNull();
       expect(sessions).toHaveLength(1);
@@ -958,7 +962,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
       const { data: messages, error: msgError } = await supabaseAdmin
         .from('scripture_messages')
         .select('*')
-        .eq('session_id', testSession.session_ids[0])
+        .eq('session_id', sessionId)
         .eq('sender_id', testSession.test_user1_id);
 
       expect(msgError).toBeNull();
@@ -972,56 +976,59 @@ test.describe('Daily Prayer Report — Send & View', () => {
       page,
       supabaseAdmin,
     }) => {
-      // Seed an unlinked (solo, no partner) session inline instead of using the
-      // testSession fixture, which always creates a linked pair.
-      const { createTestSession, cleanupTestSession } = await import(
-        '../../support/factories'
-      );
-      const seedResult = await createTestSession(supabaseAdmin, {
-        preset: 'unlinked',
+      // This test needs the app to see partner_id = null.
+      // Instead of modifying the DB (which races with parallel workers that
+      // re-link partners), intercept the partner lookup API at the network
+      // level so the app always sees no partner for this page.
+      await page.route('**/rest/v1/users?*select=partner_id*', async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        // Null out partner_id so the app thinks user is unlinked
+        if (Array.isArray(body)) {
+          body.forEach((row: Record<string, unknown>) => { row.partner_id = null; });
+        } else if (body && typeof body === 'object') {
+          (body as Record<string, unknown>).partner_id = null;
+        }
+        await route.fulfill({ response, json: body });
       });
 
-      try {
-        // GIVEN: User has completed all 17 steps (no bookmarks needed for this test)
-        await completeAllStepsToReflectionSummary(page, new Set([0]));
+      // GIVEN: User has completed all 17 steps (no bookmarks needed for this test)
+      const sessionId = await completeAllStepsToReflectionSummary(page, new Set([0]));
 
-        // AND: User submits the reflection summary
-        await submitReflectionSummary(page);
+      // AND: User submits the reflection summary
+      await submitReflectionSummary(page);
 
-        // WHEN: Report phase begins for an unlinked user (no partner_id)
-        // THEN: Message composition screen is NOT shown
-        await expect(
-          page.getByTestId('scripture-message-compose-screen')
-        ).not.toBeVisible();
+      // WHEN: Report phase begins for an unlinked user (no partner_id)
+      // THEN: Message composition screen is NOT shown
+      await expect(
+        page.getByTestId('scripture-message-compose-screen')
+      ).not.toBeVisible();
 
-        // AND: Unlinked completion screen appears
-        await expect(
-          page.getByTestId('scripture-unlinked-complete-screen')
-        ).toBeVisible();
+      // AND: Unlinked completion screen appears
+      await expect(
+        page.getByTestId('scripture-unlinked-complete-screen')
+      ).toBeVisible();
 
-        // AND: Heading shows "Session complete"
-        const heading = page.getByTestId('scripture-unlinked-complete-heading');
-        await expect(heading).toBeVisible();
-        await expect(heading).toHaveText('Session complete');
+      // AND: Heading shows "Session complete"
+      const heading = page.getByTestId('scripture-unlinked-complete-heading');
+      await expect(heading).toBeVisible();
+      await expect(heading).toHaveText('Session complete');
 
-        // AND: "Return to Overview" button is visible
-        await expect(
-          page.getByTestId('scripture-unlinked-return-btn')
-        ).toBeVisible();
+      // AND: "Return to Overview" button is visible
+      await expect(
+        page.getByTestId('scripture-unlinked-return-btn')
+      ).toBeVisible();
 
-        // AND: Session is marked as complete in the database
-        const { data: sessions, error: sessionError } = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('status, completed_at')
-          .eq('id', seedResult.session_ids[0]);
+      // AND: Session is marked as complete in the database
+      const { data: sessions, error: sessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('status, completed_at')
+        .eq('id', sessionId);
 
-        expect(sessionError).toBeNull();
-        expect(sessions).toHaveLength(1);
-        expect(sessions![0].status).toBe('complete');
-        expect(sessions![0].completed_at).not.toBeNull();
-      } finally {
-        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
-      }
+      expect(sessionError).toBeNull();
+      expect(sessions).toHaveLength(1);
+      expect(sessions![0].status).toBe('complete');
+      expect(sessions![0].completed_at).not.toBeNull();
     });
   });
 
@@ -1034,13 +1041,13 @@ test.describe('Daily Prayer Report — Send & View', () => {
       // Partner message is pre-seeded via supabaseAdmin below (line ~1056)
 
       // GIVEN: User has completed all 17 steps and the reflection summary
-      await completeAllStepsToReflectionSummary(page, new Set([0, 5, 12]));
+      const sessionId = await completeAllStepsToReflectionSummary(page, new Set([0, 5, 12]));
       await submitReflectionSummary(page);
 
       // AND: Partner has already sent a message for this session
       // (Pre-seed partner message via supabaseAdmin for test setup)
       await supabaseAdmin.from('scripture_messages').insert({
-        session_id: testSession.session_ids[0],
+        session_id: sessionId,
         sender_id: testSession.test_user2_id!,
         message: 'I am so grateful for you. Keep shining.',
       });
@@ -1109,17 +1116,19 @@ test.describe('Daily Prayer Report — Send & View', () => {
       supabaseAdmin,
       testSession,
     }) => {
-      // The default testSession fixture creates a together-mode session with
-      // user1 and user2. We pre-seed partner (user2) reflections and message
-      // so the report can display side-by-side data after user1 completes.
+      // testSession fixture links user1 ↔ user2 as partners.
+      // We start a solo session via the UI, capture its ID, then seed
+      // partner data on THAT session so the report shows it side-by-side.
 
-      const sessionId = testSession.session_ids[0];
       const partnerId = testSession.test_user2_id!;
 
-      // Pre-condition: testSession has a partner (together mode)
+      // Pre-condition: testSession has linked a partner
       expect(partnerId).toBeTruthy();
 
-      // GIVEN: Partner (user2) has already submitted reflections for steps 0-16
+      // WHEN: User1 starts a solo session (capture ID for partner data seeding)
+      const sessionId = await startSoloSession(page);
+
+      // GIVEN: Partner (user2) reflections are pre-seeded on the active session
       const partnerReflections = Array.from({ length: 17 }, (_, stepIndex) => ({
         session_id: sessionId,
         step_index: stepIndex,
@@ -1162,6 +1171,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
         session_id: sessionId,
         step_index: stepIndex,
         user_id: partnerId,
+        share_with_partner: true,
       }));
 
       const { error: bookmarkError } = await supabaseAdmin
@@ -1171,7 +1181,30 @@ test.describe('Daily Prayer Report — Send & View', () => {
 
       // WHEN: User1 completes all 17 steps with bookmarks on steps 0, 5, 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
-      await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
+      for (let step = 0; step < 17; step++) {
+        await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
+
+        if (bookmarkedStepIndices.has(step)) {
+          await page.getByTestId('scripture-bookmark-button').click();
+          await expect(page.getByTestId('scripture-bookmark-button')).toHaveAttribute(
+            'aria-pressed',
+            'true'
+          );
+        }
+
+        await page.getByTestId('scripture-next-verse-button').click();
+        await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
+
+        await page.getByTestId('scripture-rating-3').click();
+
+        const reflectionResponse = page.waitForResponse(
+          (response) =>
+            response.url().includes('/rest/v1/rpc/scripture_submit_reflection') &&
+            response.status() === 200
+        );
+        await page.getByTestId('scripture-reflection-continue').click();
+        await reflectionResponse;
+      }
 
       // AND: User1 submits the reflection summary
       await submitReflectionSummary(page);

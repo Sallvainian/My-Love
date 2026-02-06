@@ -44,7 +44,7 @@ export async function ensureScriptureOverview(page: Page) {
  *
  * @param page - Playwright page
  */
-export async function startSoloSession(page: Page) {
+export async function startSoloSession(page: Page): Promise<string> {
   await ensureScriptureOverview(page);
 
   // Set up waitForResponse BEFORE the click that triggers the API call
@@ -57,10 +57,14 @@ export async function startSoloSession(page: Page) {
   await page.getByTestId('scripture-start-button').click();
   await page.getByTestId('scripture-mode-solo').click();
 
-  await sessionCreated;
+  const response = await sessionCreated;
 
   // Wait for the reading flow to render
   await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
+
+  // Parse session ID from creation response
+  const data = await response.json();
+  return data.id;
 }
 
 /**

@@ -70,17 +70,9 @@ export const test = base.extend<CustomFixtures>({
 
     await use(result);
 
-    // Cleanup: unlink partners before removing session data
-    if (result.test_user2_id) {
-      await supabaseAdmin
-        .from('users')
-        .update({ partner_id: null })
-        .eq('id', result.test_user1_id);
-      await supabaseAdmin
-        .from('users')
-        .update({ partner_id: null })
-        .eq('id', result.test_user2_id);
-    }
+    // Cleanup: only remove session data, NOT partner linkage.
+    // Partner linkage is shared state across parallel workers — unlinking here
+    // would break other workers' tests that depend on hasPartner = true.
     await cleanupTestSession(supabaseAdmin, result.session_ids);
   },
 });
