@@ -8,6 +8,7 @@ description: Creates a concise project-context.md file with critical rules and p
 - **Init**: Call `mcp__contextstream__init()` at workflow start
 - **Search**: Use `mcp__contextstream__search()` to find existing project context and patterns
 - **Save**: Save project-context.md to ContextStream via `mcp__contextstream__memory(action="create_doc")`
+- **Task Update**: On completion, search `list_tasks` for matching task and `update_task(completed)`
 
 # Generate Project Context Workflow
 

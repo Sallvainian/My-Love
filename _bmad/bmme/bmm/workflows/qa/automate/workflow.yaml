@@ -42,6 +42,7 @@ contextstream:
   context: true
   search_inputs: true
   check_lessons: true
+  update_tasks: true
 
 tags:
   - qa

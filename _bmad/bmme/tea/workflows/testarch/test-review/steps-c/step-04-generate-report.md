@@ -80,6 +80,15 @@ Report:
 - Critical blockers
 - Next recommended workflow (e.g., `automate` or `trace`)
 
+### Update ContextStream Plan Task
+
+On workflow completion:
+
+1. **Search for matching task**: Call `mcp__contextstream__memory(action="list_tasks")` and find a task whose title matches this test review workflow (e.g., the story key or test file name)
+2. **If matching task found**: Call `mcp__contextstream__memory(action="update_task", task_id="{{task_id}}", task_status="completed")`
+3. **If no matching task**: Skip — not all workflow runs correspond to plan tasks
+4. **Capture completion**: Call `mcp__contextstream__session(action="capture", event_type="implementation", title="Test review completed: {{scope}}", content="Overall score: {{overall_score}}/100. {{critical_count}} critical issues found.", importance="medium", tags=["test-review", "workflow-complete"])`
+
 ## 🚨 SYSTEM SUCCESS/FAILURE METRICS:
 
 ### ✅ SUCCESS:

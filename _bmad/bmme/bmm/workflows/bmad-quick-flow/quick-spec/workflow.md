@@ -16,6 +16,7 @@ quick_dev_workflow: '{project-root}/_bmad/bmm/workflows/bmad-quick-flow/quick-de
 - **Search**: Use `mcp__contextstream__search()` to find existing specs and architecture
 - **Capture**: Save spec decisions via `mcp__contextstream__session(action="capture", event_type="decision")`
 - **Save**: Save spec via `mcp__contextstream__memory(action="create_doc", doc_type="spec")`
+- **Task Update**: On completion, search `list_tasks` for matching task and `update_task(completed)`
 
 # Quick-Spec Workflow
 

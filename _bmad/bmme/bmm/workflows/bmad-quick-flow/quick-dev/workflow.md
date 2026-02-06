@@ -9,6 +9,7 @@ description: 'Flexible development - execute tech-specs OR direct instructions w
 - **Search**: Use `mcp__contextstream__search()` to find relevant code patterns and decisions
 - **Lessons**: Call `mcp__contextstream__session(action="get_lessons")` before implementation
 - **Capture**: Save decisions via `mcp__contextstream__session(action="capture")`
+- **Task Update**: On completion, search `list_tasks` for matching task and `update_task(completed)`
 
 # Quick Dev Workflow
 

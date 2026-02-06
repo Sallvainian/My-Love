@@ -34,6 +34,7 @@ contextstream:
   init: true
   context: true
   search_inputs: true  # Compare ContextStream state with sprint-status.yaml
+  update_tasks: true
 
 # Standalone so IDE commands get generated
 standalone: true
