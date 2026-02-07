@@ -21,7 +21,11 @@ export default defineConfig({
     reporters: [
       'default',
       new VitestReporter(process.cwd()),
+      'junit',
     ],
+    outputFile: {
+      junit: 'test-results/vitest-junit.xml',
+    },
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       provider: 'v8',

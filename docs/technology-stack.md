@@ -1,7 +1,7 @@
 # Technology Stack
 
 > Complete technology inventory for My-Love project.
-> Last updated: 2026-02-01 | Scan level: Deep (Rescan)
+> Last updated: 2026-02-01 | Scan level: Deep (Rescan v2)
 
 ## Core Technologies
 
