@@ -89,8 +89,11 @@ const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
 const mockAddReflection = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSession = vi.fn().mockResolvedValue(undefined);
 const mockAddMessage = vi.fn().mockResolvedValue({ id: 'msg-1', sessionId: 'session-123', senderId: 'user-456', message: 'test', createdAt: new Date() });
-const mockGetMessagesBySession = vi.fn().mockResolvedValue([]);
-const mockGetReflectionsBySession = vi.fn().mockResolvedValue([]);
+const mockGetSessionReportData = vi.fn().mockResolvedValue({
+  reflections: [],
+  bookmarks: [],
+  messages: [],
+});
 vi.mock('../../../services/scriptureReadingService', () => ({
   scriptureReadingService: {
     getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
@@ -98,8 +101,7 @@ vi.mock('../../../services/scriptureReadingService', () => ({
     addReflection: (...args: unknown[]) => mockAddReflection(...args),
     updateSession: (...args: unknown[]) => mockUpdateSession(...args),
     addMessage: (...args: unknown[]) => mockAddMessage(...args),
-    getMessagesBySession: (...args: unknown[]) => mockGetMessagesBySession(...args),
-    getReflectionsBySession: (...args: unknown[]) => mockGetReflectionsBySession(...args),
+    getSessionReportData: (...args: unknown[]) => mockGetSessionReportData(...args),
   },
 }));
 
@@ -193,6 +195,11 @@ function createMockSession(overrides?: Partial<MockSession>): MockSession {
 describe('SoloReadingFlow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetSessionReportData.mockResolvedValue({
+      reflections: [],
+      bookmarks: [],
+      messages: [],
+    });
     mockStoreState.session = createMockSession();
     mockStoreState.isSyncing = false;
     mockStoreState.scriptureError = null;
@@ -1225,6 +1232,54 @@ describe('SoloReadingFlow', () => {
       // After send, report screen should appear
       await vi.waitFor(() => {
         expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+    });
+
+    it('shows report load error and retry when report fetch fails (2.3-INT-008)', async () => {
+      mockGetSessionReportData.mockRejectedValueOnce(new Error('fetch failed'));
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-error')).toBeDefined();
+        expect(screen.getByTestId('scripture-report-retry-btn')).toBeDefined();
+      });
+    });
+
+    it('retry triggers report refetch after failure (2.3-INT-009)', async () => {
+      mockGetSessionReportData
+        .mockRejectedValueOnce(new Error('fetch failed'))
+        .mockResolvedValueOnce({
+          reflections: [],
+          bookmarks: [],
+          messages: [],
+        });
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-error')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('scripture-report-retry-btn'));
+
+      await vi.waitFor(() => {
+        expect(mockGetSessionReportData).toHaveBeenCalledTimes(2);
+        expect(screen.queryByTestId('scripture-report-error')).toBeNull();
       });
     });
 

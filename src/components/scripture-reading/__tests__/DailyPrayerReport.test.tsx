@@ -34,8 +34,6 @@ describe('DailyPrayerReport', () => {
     partnerMessage: null as string | null,
     partnerName: null as string | null,
     partnerRatings: null as { stepIndex: number; rating: number }[] | null,
-    partnerBookmarks: null as number[] | null,
-    partnerStandoutVerses: null as number[] | null,
     isPartnerComplete: false,
     onReturn: vi.fn(),
   };

@@ -6,7 +6,7 @@ TEA employs "context engineering" -- automatically loading domain-specific stand
 
 ## Knowledge Base Structure
 
-The system comprises **33 specialized knowledge fragments** organized into nine categories:
+The system comprises **34 specialized knowledge fragments** organized into nine categories:
 
 ### Fragment Categories
 
@@ -30,7 +30,7 @@ The system comprises **33 specialized knowledge fragments** organized into nine 
 
 ## Manifest System
 
-The `tea-index.csv` manifest tracks all fragments with columns for ID, name, description, tags, and file paths. All 33 fragments reside in `src/bmm/testarch/knowledge/` with the manifest at `src/bmm/testarch/tea-index.csv`.
+The `tea-index.csv` manifest tracks all fragments with columns for ID, name, description, tags, and file paths. All 34 fragments reside in `_bmad/tea/testarch/knowledge/` with the manifest at `_bmad/tea/testarch/tea-index.csv`.
 
 ## Workflow-Specific Loading
 

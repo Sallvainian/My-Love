@@ -15,10 +15,11 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { getCharCounterThreshold } from './charCounter';
 
 const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
 const MAX_NOTE_LENGTH = 200;
-const CHAR_COUNTER_THRESHOLD = 150;
+const CHAR_COUNTER_THRESHOLD = getCharCounterThreshold(MAX_NOTE_LENGTH);
 
 interface PerStepReflectionProps {
   onSubmit: (rating: number, notes: string) => void;

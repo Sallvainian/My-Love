@@ -17,10 +17,12 @@ runs:
 
     - name: Start Supabase Local
       shell: bash
-      timeout-minutes: 5
       run: |
-        supabase start
-        supabase status --output json | jq -e '.DB_URL' > /dev/null
+        set -euo pipefail
+        timeout 300 bash -lc '
+          supabase start
+          supabase status --output json | jq -e ".DB_URL" > /dev/null
+        '
         echo "Supabase Local started successfully"
 
     - name: Apply database migrations
@@ -42,11 +44,3 @@ runs:
       run: |
         curl -sf "${SUPABASE_URL}/rest/v1/" -H "apikey: ${SUPABASE_ANON_KEY}" > /dev/null
         echo "Supabase API is reachable"
-
-    # Post-job cleanup (runs even if job fails)
-    - name: Stop Supabase Local
-      if: always()
-      shell: bash
-      run: |
-        supabase stop --no-backup
-        echo "✅ Supabase Local stopped and containers removed"

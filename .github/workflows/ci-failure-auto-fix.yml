@@ -10,7 +10,10 @@ jobs:
   auto-fix:
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.pull_requests[0] &&
+      github.event.workflow_run.pull_requests[0].head.repo.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].head.repo.fork == false &&
       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -25,7 +28,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           token: ${{ secrets.CLAUDE_PAT }}
 
@@ -36,8 +39,15 @@ jobs:
 
       - name: Create fix branch
         id: branch
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          BRANCH_NAME="claude-auto-fix-ci-${{ github.event.workflow_run.head_branch }}-${{ github.run_id }}"
+          SAFE_BRANCH=$(printf '%s' "$HEAD_BRANCH" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//' | cut -c1-80)
+          if [ -z "$SAFE_BRANCH" ]; then
+            SAFE_BRANCH="unknown-branch"
+          fi
+          BRANCH_NAME="claude-auto-fix-ci-${SAFE_BRANCH}-${RUN_ID}"
           git checkout -b "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
@@ -62,15 +72,44 @@ jobs:
 
             let errorLogs = [];
             for (const job of failedJobs) {
-              const logs = await github.rest.actions.downloadJobLogsForWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                job_id: job.id
-              });
-              errorLogs.push({
-                jobName: job.name,
-                logs: logs.data.substring(0, 10000)
-              });
+              try {
+                const logs = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  job_id: job.id
+                });
+                const payload = logs.data;
+                let logText = '';
+                if (Buffer.isBuffer(payload)) {
+                  logText = payload.toString('utf8');
+                } else if (typeof payload === 'string') {
+                  logText = payload;
+                } else if (payload instanceof ArrayBuffer) {
+                  logText = Buffer.from(payload).toString('utf8');
+                } else if (payload && typeof payload === 'object') {
+                  try {
+                    logText = JSON.stringify(payload);
+                  } catch {
+                    logText = String(payload);
+                  }
+                } else {
+                  logText = String(payload ?? '');
+                }
+
+                if (!logText.trim()) {
+                  logText = `No plain text logs available. Job URL: ${job.html_url}. Conclusion: ${job.conclusion}.`;
+                }
+
+                errorLogs.push({
+                  jobName: job.name,
+                  logs: logText.slice(0, 10000)
+                });
+              } catch (error) {
+                errorLogs.push({
+                  jobName: job.name,
+                  logs: `Failed to download logs for ${job.name}: ${error instanceof Error ? error.message : String(error)}`
+                });
+              }
             }
 
             return {

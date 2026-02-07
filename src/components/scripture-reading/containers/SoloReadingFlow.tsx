@@ -127,8 +127,6 @@ export function SoloReadingFlow() {
     userStandoutVerses: number[];
     partnerMessage: string | null;
     partnerRatings: { stepIndex: number; rating: number }[] | null;
-    partnerBookmarks: number[] | null;
-    partnerStandoutVerses: number[] | null;
     isPartnerComplete: boolean;
   }>({
     userRatings: [],
@@ -136,18 +134,20 @@ export function SoloReadingFlow() {
     userStandoutVerses: [],
     partnerMessage: null,
     partnerRatings: null,
-    partnerBookmarks: null,
-    partnerStandoutVerses: null,
     isPartnerComplete: false,
   });
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [reportLoadError, setReportLoadError] = useState<string | null>(null);
+  const [reportReloadKey, setReportReloadKey] = useState(0);
 
   // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
   const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   // Cleanup bookmark debounce on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (bookmarkDebounceRef.current) clearTimeout(bookmarkDebounceRef.current);
     };
   }, []);
@@ -205,6 +205,7 @@ export function SoloReadingFlow() {
           await scriptureReadingService.toggleBookmark(session.id, stepIndex, session.userId, false);
         } catch {
           // Revert on failure
+          if (!isMountedRef.current) return;
           setBookmarkedSteps((prev) => {
             const next = new Set(prev);
             if (next.has(stepIndex)) {
@@ -280,19 +281,24 @@ export function SoloReadingFlow() {
       if (!session || isSendingMessage) return;
       setIsSendingMessage(true);
 
-      // Fire-and-forget message write
       void (async () => {
         try {
-          await scriptureReadingService.addMessage(session.id, session.userId, message);
-        } catch {
-          // Non-blocking: message write failure shouldn't block session completion
+          try {
+            await scriptureReadingService.addMessage(session.id, session.userId, message);
+          } catch {
+            // Non-blocking: message write failure shouldn't block session completion
+          }
+
+          // Mark session complete and advance to report view
+          await markSessionComplete();
+          setReportLoadError(null);
+          setReportSubPhase('report');
+        } finally {
+          if (isMountedRef.current) {
+            setIsSendingMessage(false);
+          }
         }
       })();
-
-      // Mark session complete and advance to report view
-      void markSessionComplete();
-      setReportSubPhase('report');
-      setIsSendingMessage(false);
     },
     [session, isSendingMessage, markSessionComplete]
   );
@@ -302,16 +308,29 @@ export function SoloReadingFlow() {
     if (!session || isSendingMessage) return;
     setIsSendingMessage(true);
 
-    // Skip message, mark session complete, advance to report view
-    void markSessionComplete();
-    setReportSubPhase('report');
-    setIsSendingMessage(false);
+    void (async () => {
+      try {
+        // Skip message, mark session complete, advance to report view
+        await markSessionComplete();
+        setReportLoadError(null);
+        setReportSubPhase('report');
+      } finally {
+        if (isMountedRef.current) {
+          setIsSendingMessage(false);
+        }
+      }
+    })();
   }, [session, isSendingMessage, markSessionComplete]);
 
   // Story 2.3: Handle return to overview from report
   const handleReturnToOverview = useCallback(() => {
     exitSession();
   }, [exitSession]);
+
+  const handleRetryReportLoad = useCallback(() => {
+    setReportLoadError(null);
+    setReportReloadKey((prev) => prev + 1);
+  }, []);
 
   // Story 2.3: Determine initial report sub-phase and mark unlinked session complete
   const isReportEntry = session?.currentPhase === 'report';
@@ -330,6 +349,7 @@ export function SoloReadingFlow() {
   // Story 2.3: Load report data when report view is actually displayed
   useEffect(() => {
     if ((reportSubPhase !== 'report' && reportSubPhase !== 'complete-unlinked') || !session) return;
+    setReportLoadError(null);
 
     void (async () => {
       try {
@@ -376,41 +396,22 @@ export function SoloReadingFlow() {
           ? partnerReflections.map((r) => ({ stepIndex: r.stepIndex, rating: r.rating! }))
           : null;
 
-        // Partner bookmarks
-        const partnerBookmarkSteps = bookmarks
-          .filter((b) => b.userId !== session.userId)
-          .map((b) => b.stepIndex);
-        const partnerBookmarks = partnerBookmarkSteps.length > 0 ? partnerBookmarkSteps : null;
-
-        // Partner standout verses (from session-level reflection)
-        const partnerSessionReflection = reflections.find(
-          (r) => r.userId !== session.userId && r.stepIndex === MAX_STEPS
-        );
-        let partnerStandoutVerses: number[] | null = null;
-        if (partnerSessionReflection?.notes) {
-          try {
-            const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
-            partnerStandoutVerses = parsed.standoutVerses ?? null;
-          } catch {
-            // Invalid JSON in partner notes — proceed without standout verses
-          }
-        }
-
+        if (!isMountedRef.current) return;
         setReportData({
           userRatings,
           userBookmarks,
           userStandoutVerses,
           partnerMessage: partnerMsg?.message ?? null,
           partnerRatings,
-          partnerBookmarks,
-          partnerStandoutVerses,
           isPartnerComplete: partnerReflections.length > 0,
         });
       } catch {
-        // Non-blocking: report data loading failure uses empty defaults
+        if (isMountedRef.current) {
+          setReportLoadError('Unable to load your daily prayer report right now.');
+        }
       }
     })();
-  }, [reportSubPhase, session]);
+  }, [reportSubPhase, session, reportReloadKey]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
   // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
@@ -735,6 +736,23 @@ export function SoloReadingFlow() {
           {announcement}
         </div>
         <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+          {reportLoadError && (
+            <div
+              role="alert"
+              data-testid="scripture-report-error"
+              className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              <p>{reportLoadError}</p>
+              <button
+                type="button"
+                onClick={handleRetryReportLoad}
+                data-testid="scripture-report-retry-btn"
+                className={`mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 ${FOCUS_RING}`}
+              >
+                Retry
+              </button>
+            </div>
+          )}
           <DailyPrayerReport
             userRatings={reportData.userRatings}
             userBookmarks={reportData.userBookmarks}
@@ -742,8 +760,6 @@ export function SoloReadingFlow() {
             partnerMessage={reportData.partnerMessage}
             partnerName={partner?.displayName ?? null}
             partnerRatings={reportData.partnerRatings}
-            partnerBookmarks={reportData.partnerBookmarks}
-            partnerStandoutVerses={reportData.partnerStandoutVerses}
             isPartnerComplete={reportData.isPartnerComplete}
             onReturn={handleReturnToOverview}
           />

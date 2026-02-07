@@ -29,8 +29,6 @@ interface DailyPrayerReportProps {
   partnerMessage: string | null;
   partnerName: string | null;
   partnerRatings: StepRating[] | null;
-  partnerBookmarks: number[] | null;
-  partnerStandoutVerses: number[] | null;
   isPartnerComplete: boolean;
   onReturn: () => void;
 }
@@ -42,8 +40,6 @@ export function DailyPrayerReport({
   partnerMessage,
   partnerName,
   partnerRatings,
-  partnerBookmarks: _partnerBookmarks,
-  partnerStandoutVerses: _partnerStandoutVerses,
   isPartnerComplete,
   onReturn,
 }: DailyPrayerReportProps): ReactElement {

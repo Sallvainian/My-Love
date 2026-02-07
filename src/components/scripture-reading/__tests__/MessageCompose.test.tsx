@@ -6,8 +6,8 @@
  * Tests:
  * - Renders partner name in heading
  * - Textarea accepts input up to 300 chars
- * - Character counter visible at 250+ chars
- * - Character counter hidden below 250 chars
+ * - Character counter visible at 225+ chars
+ * - Character counter hidden below 225 chars
  * - Send button calls onSend with message text
  * - Skip button calls onSkip
  * - Send and Skip disabled when disabled prop is true
@@ -73,11 +73,11 @@ describe('MessageCompose', () => {
   });
 
   // ============================================
-  // 2.3-CMP-003: Character Counter Visibility
+  // 2.3-CMP-003: Character Counter Visibility (75% threshold)
   // ============================================
 
   describe('Character Counter', () => {
-    it('character counter visible at 250+ chars', () => {
+    it('character counter visible at 225+ chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       const longText = 'a'.repeat(260);
@@ -87,7 +87,7 @@ describe('MessageCompose', () => {
       expect(counter).toHaveTextContent('260/300');
     });
 
-    it('character counter hidden below 250 chars', () => {
+    it('character counter hidden below 225 chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
       const shortText = 'a'.repeat(100);
@@ -191,12 +191,12 @@ describe('MessageCompose', () => {
   // ============================================
 
   describe('Character Counter Boundary', () => {
-    it('character counter appears at exactly 250 chars', () => {
+    it('character counter appears at exactly 225 chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
-      fireEvent.change(textarea, { target: { value: 'a'.repeat(250) } });
+      fireEvent.change(textarea, { target: { value: 'a'.repeat(225) } });
       const counter = screen.getByTestId('scripture-message-char-count');
-      expect(counter).toHaveTextContent('250/300');
+      expect(counter).toHaveTextContent('225/300');
     });
 
     it('character counter shows correct count at max length', () => {
@@ -207,10 +207,10 @@ describe('MessageCompose', () => {
       expect(counter).toHaveTextContent('300/300');
     });
 
-    it('character counter hidden at 249 chars', () => {
+    it('character counter hidden at 224 chars', () => {
       render(<MessageCompose {...defaultProps} />);
       const textarea = screen.getByTestId('scripture-message-textarea');
-      fireEvent.change(textarea, { target: { value: 'a'.repeat(249) } });
+      fireEvent.change(textarea, { target: { value: 'a'.repeat(224) } });
       expect(screen.queryByTestId('scripture-message-char-count')).toBeNull();
     });
 

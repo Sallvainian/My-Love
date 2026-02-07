@@ -129,7 +129,11 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Run P0 tests
-        run: npx playwright test --grep "\[P0\]"
+        run: npx playwright test tests/e2e --project=chromium --grep "\[P0\]"
+
+      - name: Stop Supabase Local
+        if: always()
+        run: supabase stop --no-backup
 
       - name: Upload P0 test results
         uses: actions/upload-artifact@v4
@@ -188,7 +192,11 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/${{ matrix.total }})
-        run: npx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }} --config=tests/playwright.config.ts
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }} --config=playwright.config.ts
+
+      - name: Stop Supabase Local
+        if: always()
+        run: supabase stop --no-backup
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -261,7 +269,7 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "🔥 Burn-in iteration $i/5"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            npx playwright test --config=tests/playwright.config.ts ${{ steps.changed-tests.outputs.changed_specs }} || {
+            npx playwright test --config=playwright.config.ts ${{ steps.changed-tests.outputs.changed_specs }} || {
               echo "❌ Burn-in failed on iteration $i"
               exit 1
             }
@@ -274,6 +282,10 @@ jobs:
       - name: Skip burn-in (no test changes)
         if: steps.changed-tests.outputs.changed_specs == ''
         run: echo "✅ No test files changed. Burn-in skipped."
+
+      - name: Stop Supabase Local
+        if: always()
+        run: supabase stop --no-backup
 
       - name: Upload burn-in failure artifacts
         if: failure()

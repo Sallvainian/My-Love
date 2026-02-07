@@ -46,5 +46,5 @@ Optional next step: run `TR` only if a fresh formal trace artifact cycle is requ
 
 ## Artifact Links
 
-- Full traceability report: `/Users/sallvain/Projects/My-Love/_bmad-output/traceability-matrix-story-1-3-solo-reading.md`
-- JSON snapshot: `/Users/sallvain/Projects/My-Love/_bmad-output/traceability-gate-story-1-3.json`
+- Full traceability report: `_bmad-output/traceability-matrix-story-1-3-solo-reading.md`
+- JSON snapshot: `_bmad-output/traceability-gate-story-1-3.json`
