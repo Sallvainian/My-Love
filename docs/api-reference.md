@@ -1,101 +1,111 @@
 # API Reference
 
-> Complete API layer documentation for My-Love project.
-> Last updated: 2026-02-01 | Scan level: Deep (Rescan v2)
+Comprehensive reference for the My Love application API layer, service layer, Edge Functions, and Service Worker. All API and service interactions flow through typed interfaces with Zod validation at boundaries.
 
 ---
 
 ## Table of Contents
 
-- [API Services Overview](#api-services-overview)
-- [Supabase Client Configuration](#supabase-client-configuration)
-- [Auth Service](#auth-service)
-- [Error Handling](#error-handling)
-- [Interaction Service](#interaction-service)
-- [Mood API](#mood-api)
-- [Mood Sync Service](#mood-sync-service)
-- [Partner Service](#partner-service)
-- [Edge Functions](#edge-functions)
-- [Validation Schemas (Supabase)](#validation-schemas-supabase)
-- [Validation Schemas (Application)](#validation-schemas-application)
+1. [Supabase Client Configuration](#1-supabase-client-configuration)
+2. [Authentication API](#2-authentication-api)
+3. [Mood API](#3-mood-api)
+4. [Mood Sync Service](#4-mood-sync-service)
+5. [Interaction API](#5-interaction-api)
+6. [Partner Service](#6-partner-service)
+7. [Error Handling](#7-error-handling)
+8. [Validation Schemas](#8-validation-schemas)
+9. [Service Layer](#9-service-layer)
+10. [Edge Functions](#10-edge-functions)
+11. [Service Worker](#11-service-worker)
+12. [Real-time Subscriptions](#12-real-time-subscriptions)
 
 ---
 
-## API Services Overview
+## 1. Supabase Client Configuration
 
-The API layer uses Supabase as Backend-as-a-Service. Services are organized by domain, and all Supabase responses are validated at service boundaries using Zod schemas. Error handling follows a consistent pattern with typed error classes.
+**Module:** `src/api/supabaseClient.ts`
 
-| Service | File | Singleton | Responsibility |
-|---------|------|-----------|----------------|
-| `authService` | `src/api/authService.ts` | `authService` | Authentication, session management, OAuth |
-| `errorHandlers` | `src/api/errorHandlers.ts` | (utilities) | Error detection, transformation, retry logic |
-| `interactionService` | `src/api/interactionService.ts` | `interactionService` | Poke/kiss interactions, realtime subscriptions |
-| `moodApi` | `src/api/moodApi.ts` | `moodApi` | Validated CRUD for mood entries |
-| `moodSyncService` | `src/api/moodSyncService.ts` | `moodSyncService` | Mood sync, broadcast, batch pending sync |
-| `partnerService` | `src/api/partnerService.ts` | `partnerService` | Partner relationships, user search, requests |
+### Client Initialization
 
----
+The Supabase client is a singleton typed against the generated `Database` schema. It reads configuration from environment variables and throws immediately if they are missing.
 
-## Supabase Client Configuration
-
-**File**: `src/api/supabaseClient.ts`
-
-### Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
+| Environment Variable | Purpose |
+|---|---|
 | `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon (public) key |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon (publishable) key |
 
-Both variables are required at startup. The module throws an `Error` if either is missing.
-
-### Client Options
+**Client Options:**
 
 ```typescript
-createClient<Database>(supabaseUrl, supabaseAnonKey, {
+{
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,   // Enables OAuth callback detection
+    persistSession: true,        // Sessions survive page reload
+    autoRefreshToken: true,      // JWT auto-refresh before expiry
+    detectSessionInUrl: true,    // OAuth callback detection
   },
   realtime: {
     params: {
-      eventsPerSecond: 10,
+      eventsPerSecond: 10,       // Throttle realtime events
     },
   },
-});
+}
 ```
 
-- **`persistSession: true`** -- Session stored in `localStorage` across page reloads.
-- **`autoRefreshToken: true`** -- JWT automatically refreshed before expiry.
-- **`detectSessionInUrl: true`** -- Parses OAuth redirect tokens from URL hash.
-- **`eventsPerSecond: 10`** -- Rate limit for realtime channel events.
+### Exported Functions
 
-### Utility Functions
+#### `supabase`
 
-| Function | Signature | Returns | Description |
-|----------|-----------|---------|-------------|
-| `getPartnerId` | `() => Promise<string \| null>` | Partner UUID or `null` | Queries `users` table for current user's `partner_id`. Returns `null` on PGRST116 (no row). |
-| `getPartnerDisplayName` | `() => Promise<string \| null>` | Display name or `null` | Fetches partner's `display_name` from `users` table via `getPartnerId()`. |
-| `isSupabaseConfigured` | `() => boolean` | `boolean` | Returns `true` if both env vars are set. |
+```typescript
+export const supabase: SupabaseClient<Database>
+```
+
+Singleton client instance. Used by all API modules for database, auth, storage, and realtime operations.
 
 ---
 
-## Auth Service
+#### `getPartnerId()`
 
-**File**: `src/api/authService.ts`
-**Singleton**: `authService`
-**Underlying provider**: Supabase Auth (JWT-based)
+```typescript
+export const getPartnerId = async (): Promise<string | null>
+```
 
-### Overview
+- **Purpose:** Query the `users` table for the current user's `partner_id`.
+- **Returns:** Partner UUID, or `null` if not authenticated / not connected.
+- **Error handling:** Returns `null` on any failure. Handles `PGRST116` (no rows) gracefully.
 
-- JWT-based with session persisted in `localStorage`.
-- RLS policies verify `auth.uid()` on every database query.
-- Edge Functions validate JWT via the `Authorization` header.
-- On sign-in and token refresh, auth tokens are stored in **IndexedDB** (`sw-auth` store) for Background Sync access by the Service Worker.
-- All console errors use the `[AuthService]` prefix for filtering.
+---
 
-### Exported Interfaces
+#### `getPartnerDisplayName()`
+
+```typescript
+export const getPartnerDisplayName = async (): Promise<string | null>
+```
+
+- **Purpose:** Fetch the partner's `display_name` from the `users` table.
+- **Returns:** Display name string, or `null` if no partner or lookup fails.
+- **Depends on:** `getPartnerId()` internally.
+
+---
+
+#### `isSupabaseConfigured()`
+
+```typescript
+export const isSupabaseConfigured = (): boolean
+```
+
+- **Purpose:** Verify both environment variables are present.
+- **Returns:** `true` if URL and anon key are set.
+
+---
+
+## 2. Authentication API
+
+**Module:** `src/api/authService.ts`
+**Singleton export:** `authService`
+
+All methods are exported individually and also as properties of the `authService` singleton object.
+
+### Types
 
 ```typescript
 interface AuthCredentials {
@@ -116,97 +126,322 @@ interface AuthStatus {
 }
 ```
 
-### Functions
+### Methods
 
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `signIn` | `credentials: AuthCredentials` | `Promise<AuthResult>` | Email/password login. Stores token in IndexedDB on success. |
-| `signUp` | `credentials: AuthCredentials` | `Promise<AuthResult>` | Creates new account with email/password. |
-| `signOut` | -- | `Promise<void>` | Clears Supabase session and IndexedDB auth token. Throws on failure. |
-| `getSession` | -- | `Promise<Session \| null>` | Returns current session from Supabase (reads from local storage). |
-| `getUser` | -- | `Promise<User \| null>` | Returns current user (network-validated). |
-| `getCurrentUserId` | -- | `Promise<string \| null>` | Returns user UUID via `getUser()`. Preferred for database operations. |
-| `getCurrentUserIdOfflineSafe` | -- | `Promise<string \| null>` | Returns user UUID via `getSession()`. Works offline (reads local storage). |
-| `getAuthStatus` | -- | `Promise<AuthStatus>` | Returns `{ isAuthenticated, user, session }`. |
-| `onAuthStateChange` | `callback: (session: Session \| null) => void` | `() => void` | Subscribes to auth events (SIGNED_IN, TOKEN_REFRESHED, SIGNED_OUT). Returns unsubscribe function. Updates IndexedDB token on each event. |
-| `resetPassword` | `email: string` | `Promise<AuthError \| null>` | Sends password reset email. Redirects to `{origin}{BASE_URL}reset-password`. |
-| `signInWithGoogle` | -- | `Promise<AuthError \| null>` | Initiates Google OAuth redirect flow with `access_type: 'offline'` and `prompt: 'consent'`. |
+#### `signIn(credentials)`
 
-### Token Storage Lifecycle
+```typescript
+async signIn(credentials: AuthCredentials): Promise<AuthResult>
+```
 
-1. **Sign-in** -- `storeAuthToken()` called with `accessToken`, `refreshToken`, `expiresAt`, `userId`.
-2. **Token refresh** -- `onAuthStateChange` listener updates IndexedDB on `TOKEN_REFRESHED`.
-3. **Sign-out** -- `clearAuthToken()` called from both `signOut()` and the `SIGNED_OUT` event handler.
+- **Purpose:** Authenticate with email/password via `supabase.auth.signInWithPassword`.
+- **Side effects:** On success, stores auth token in IndexedDB for Background Sync access (`storeAuthToken`).
+- **Error handling:** Returns `{ user: null, session: null, error }` on failure; never throws.
 
 ---
 
-## Error Handling
-
-**File**: `src/api/errorHandlers.ts`
-
-### SupabaseServiceError Class
+#### `signUp(credentials)`
 
 ```typescript
-class SupabaseServiceError extends Error {
-  readonly code: string | undefined;
-  readonly details: string | undefined;
-  readonly hint: string | undefined;
-  readonly isNetworkError: boolean;
-}
+async signUp(credentials: AuthCredentials): Promise<AuthResult>
 ```
 
-Extends `Error` with structured properties for UI display and debugging.
-
-### Error Code Mappings
-
-`handleSupabaseError()` maps PostgrestError codes to user-friendly messages:
-
-| Code | User-Friendly Message |
-|------|----------------------|
-| `23505` | This record already exists |
-| `23503` | Referenced record not found |
-| `23502` | Required field is missing |
-| `42501` | Permission denied - check Row Level Security policies |
-| `42P01` | Table not found - database schema may be out of sync |
-| `PGRST116` | No rows found |
-| `PGRST301` | Invalid request parameters |
-
-Unrecognized codes fall back to: `Database error: {original message}`.
-
-### Utility Functions
-
-| Function | Signature | Returns | Description |
-|----------|-----------|---------|-------------|
-| `isOnline` | `() => boolean` | `boolean` | Checks `navigator.onLine`. |
-| `isPostgrestError` | `(error: unknown) => error is PostgrestError` | `boolean` | Type guard for Supabase Postgrest errors (checks `code`, `message`, `details` properties). |
-| `isSupabaseServiceError` | `(error: unknown) => error is SupabaseServiceError` | `boolean` | Type guard via `instanceof` check. |
-| `handleSupabaseError` | `(error: PostgrestError, context?: string) => SupabaseServiceError` | `SupabaseServiceError` | Transforms Postgrest error to typed error with user-friendly message and optional context prefix. |
-| `handleNetworkError` | `(error: unknown, context?: string) => SupabaseServiceError` | `SupabaseServiceError` | Wraps generic errors with `isNetworkError: true` and offline-friendly message. Code is set to `NETWORK_ERROR`. |
-| `logSupabaseError` | `(context: string, error: unknown) => void` | `void` | Context-aware `console.error` that formats output based on error type (SupabaseServiceError > PostgrestError > Error > unknown). |
-| `createOfflineMessage` | `(operation: string) => string` | `string` | Returns: `"You're offline. {operation} will sync automatically when you're back online."` |
-
-### Retry with Backoff
-
-```typescript
-interface RetryConfig {
-  maxAttempts: number;       // Default: 3
-  initialDelayMs: number;    // Default: 1000
-  maxDelayMs: number;        // Default: 30000
-  backoffMultiplier: number; // Default: 2
-}
-```
-
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `retryWithBackoff` | `<T>(operation: () => Promise<T>, config?: RetryConfig) => Promise<T>` | Executes async operation with exponential backoff. Default schedule: 1s, 2s, 4s delays across 3 attempts. Caps delay at 30s. Throws last error after all attempts exhausted. |
+- **Purpose:** Register a new user via `supabase.auth.signUp`.
+- **Error handling:** Same pattern as `signIn` -- returns error in result, never throws.
 
 ---
 
-## Interaction Service
+#### `signOut()`
 
-**File**: `src/api/interactionService.ts`
-**Singleton**: `interactionService`
-**Table**: `interactions`
+```typescript
+async signOut(): Promise<void>
+```
+
+- **Purpose:** End the session via `supabase.auth.signOut`.
+- **Side effects:** Clears auth token from IndexedDB (`clearAuthToken`).
+- **Error handling:** Throws on failure (callers must catch).
+
+---
+
+#### `getSession()`
+
+```typescript
+async getSession(): Promise<Session | null>
+```
+
+- **Purpose:** Read the cached session from local storage. Works offline.
+- **Returns:** Session object or `null`.
+
+---
+
+#### `getUser()`
+
+```typescript
+async getUser(): Promise<User | null>
+```
+
+- **Purpose:** Network-validated user lookup via `supabase.auth.getUser`.
+- **Returns:** User object or `null`.
+
+---
+
+#### `getCurrentUserId()`
+
+```typescript
+async getCurrentUserId(): Promise<string | null>
+```
+
+- **Purpose:** Convenience wrapper. Returns `user.id` from `getUser()`.
+- **Use case:** Database operations requiring server-validated identity.
+
+---
+
+#### `getCurrentUserIdOfflineSafe()`
+
+```typescript
+async getCurrentUserIdOfflineSafe(): Promise<string | null>
+```
+
+- **Purpose:** Uses cached session (no network call). Safe for offline IndexedDB writes.
+- **Returns:** User ID from session, or `null`.
+
+---
+
+#### `getAuthStatus()`
+
+```typescript
+async getAuthStatus(): Promise<AuthStatus>
+```
+
+- **Purpose:** Composite check returning `isAuthenticated`, `user`, and `session`.
+
+---
+
+#### `onAuthStateChange(callback)`
+
+```typescript
+onAuthStateChange(callback: (session: Session | null) => void): () => void
+```
+
+- **Purpose:** Subscribe to Supabase auth events (`SIGNED_IN`, `TOKEN_REFRESHED`, `SIGNED_OUT`).
+- **Side effects:** Automatically stores/clears auth token in IndexedDB on state transitions.
+- **Returns:** Unsubscribe function.
+
+---
+
+#### `resetPassword(email)`
+
+```typescript
+async resetPassword(email: string): Promise<AuthError | null>
+```
+
+- **Purpose:** Send password reset email via `supabase.auth.resetPasswordForEmail`.
+- **Redirect:** `{origin}{BASE_URL}reset-password`.
+- **Returns:** `AuthError` on failure, `null` on success.
+
+---
+
+#### `signInWithGoogle()`
+
+```typescript
+async signInWithGoogle(): Promise<AuthError | null>
+```
+
+- **Purpose:** Initiate Google OAuth flow via `supabase.auth.signInWithOAuth`.
+- **Parameters sent to Google:** `access_type: 'offline'`, `prompt: 'consent'`.
+- **Redirect:** `{origin}{BASE_URL}`.
+- **Returns:** `AuthError` on failure, `null` if redirect initiated.
+
+---
+
+## 3. Mood API
+
+**Module:** `src/api/moodApi.ts`
+**Singleton export:** `moodApi` (instance of `MoodApi`)
+
+All responses are validated against Zod schemas (`SupabaseMoodSchema`, `MoodArraySchema`) before being returned.
+
+### Custom Error Class
+
+```typescript
+class ApiValidationError extends Error {
+  public readonly validationErrors: ZodError | null;
+}
+```
+
+Thrown when Supabase returns data that does not match the Zod schema.
+
+### Methods
+
+#### `create(moodData)`
+
+```typescript
+async create(moodData: MoodInsert): Promise<SupabaseMood>
+```
+
+- **Purpose:** Insert a mood entry into the `moods` table.
+- **Validation:** Response validated via `SupabaseMoodSchema.parse()`.
+- **Throws:** `ApiValidationError` on schema mismatch, `SupabaseServiceError` on DB error, network error if offline.
+
+---
+
+#### `fetchByUser(userId, limit?)`
+
+```typescript
+async fetchByUser(userId: string, limit: number = 50): Promise<SupabaseMood[]>
+```
+
+- **Purpose:** Fetch moods for a user, ordered by `created_at` descending.
+- **Validation:** Response validated via `MoodArraySchema.parse()`.
+
+---
+
+#### `fetchByDateRange(userId, startDate, endDate)`
+
+```typescript
+async fetchByDateRange(
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<SupabaseMood[]>
+```
+
+- **Purpose:** Fetch moods within an ISO date range using `gte`/`lte` filters.
+
+---
+
+#### `fetchById(moodId)`
+
+```typescript
+async fetchById(moodId: string): Promise<SupabaseMood | null>
+```
+
+- **Purpose:** Fetch a single mood by UUID.
+- **Returns:** `null` if not found (`PGRST116`).
+
+---
+
+#### `update(moodId, updates)`
+
+```typescript
+async update(moodId: string, updates: Partial<MoodInsert>): Promise<SupabaseMood>
+```
+
+- **Purpose:** Partial update. Automatically sets `updated_at` to current time.
+- **Validation:** Response validated via `SupabaseMoodSchema.parse()`.
+
+---
+
+#### `delete(moodId)`
+
+```typescript
+async delete(moodId: string): Promise<void>
+```
+
+- **Purpose:** Delete a mood by UUID.
+
+---
+
+#### `getMoodHistory(userId, offset?, limit?)`
+
+```typescript
+async getMoodHistory(
+  userId: string,
+  offset: number = 0,
+  limit: number = 50
+): Promise<SupabaseMood[]>
+```
+
+- **Purpose:** Paginated mood history using `range()`.
+
+---
+
+## 4. Mood Sync Service
+
+**Module:** `src/api/moodSyncService.ts`
+**Singleton export:** `moodSyncService` (instance of `MoodSyncService`)
+
+Orchestrates sync between local IndexedDB mood entries and Supabase.
+
+### Types
+
+```typescript
+interface SyncResult {
+  synced: number;
+  failed: number;
+  errors: string[];
+}
+```
+
+### Methods
+
+#### `syncMood(mood)`
+
+```typescript
+async syncMood(mood: MoodEntry): Promise<SupabaseMoodRecord>
+```
+
+- **Purpose:** Upload a single local `MoodEntry` to Supabase.
+- **Transform:** Converts `MoodEntry` fields to snake_case `MoodInsert`. Supports multi-mood via `mood_types` array.
+- **Side effect:** After successful sync, broadcasts to partner's realtime channel (fire-and-forget).
+- **Throws:** On offline or API failure.
+
+---
+
+#### `syncPendingMoods()`
+
+```typescript
+async syncPendingMoods(): Promise<SyncResult>
+```
+
+- **Purpose:** Batch sync all unsynced moods from IndexedDB.
+- **Strategy:** Iterates each unsynced mood with retry logic (exponential backoff: 1s, 2s, 4s; max 3 retries per mood).
+- **On success per mood:** Marks as synced in IndexedDB via `moodService.markAsSynced()`.
+- **Error handling:** Continues syncing remaining moods on individual failure (partial failure tolerance).
+
+---
+
+#### `subscribeMoodUpdates(callback, onStatusChange?)`
+
+```typescript
+async subscribeMoodUpdates(
+  callback: (mood: SupabaseMoodRecord) => void,
+  onStatusChange?: (status: string) => void
+): Promise<() => void>
+```
+
+- **Purpose:** Subscribe to Broadcast API for partner mood notifications.
+- **Pattern:** Current user subscribes to their own channel (`mood-updates:{userId}`). Partner broadcasts to this channel.
+- **Why Broadcast, not postgres_changes:** RLS policies with partner subqueries prevent postgres_changes from working.
+- **Returns:** Unsubscribe function that removes the channel.
+
+---
+
+#### `fetchMoods(userId, limit?)`
+
+```typescript
+async fetchMoods(userId: string, limit: number = 50): Promise<SupabaseMoodRecord[]>
+```
+
+- **Purpose:** Fetch moods for any user. Delegates to `moodApi.fetchByUser()`.
+
+---
+
+#### `getLatestPartnerMood(userId)`
+
+```typescript
+async getLatestPartnerMood(userId: string): Promise<SupabaseMoodRecord | null>
+```
+
+- **Purpose:** Fetch the single most recent mood for a user.
+- **Error handling:** Returns `null` on failure (graceful degradation for reads).
+
+---
+
+## 5. Interaction API
+
+**Module:** `src/api/interactionService.ts`
+**Singleton export:** `interactionService` (instance of `InteractionService`)
 
 ### Types
 
@@ -223,113 +458,77 @@ interface Interaction {
 }
 ```
 
-### Functions
+### Methods
 
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `sendPoke` | `partnerId: string` | `Promise<SupabaseInteractionRecord>` | Inserts a `poke` interaction. Checks `isOnline()` first. |
-| `sendKiss` | `partnerId: string` | `Promise<SupabaseInteractionRecord>` | Inserts a `kiss` interaction. Checks `isOnline()` first. |
-| `subscribeInteractions` | `callback: (interaction: SupabaseInteractionRecord) => void` | `Promise<() => void>` | Subscribes to realtime INSERT events. Returns unsubscribe function. |
-| `getInteractionHistory` | `limit?: number (50), offset?: number (0)` | `Promise<Interaction[]>` | Fetches interactions where user is sender or recipient. Ordered by `created_at` DESC. |
-| `getUnviewedInteractions` | -- | `Promise<Interaction[]>` | Fetches interactions sent to current user where `viewed = false`. |
-| `markAsViewed` | `interactionId: string` | `Promise<void>` | Sets `viewed = true` on the specified interaction. |
-
-### Realtime Subscription
-
-- **Channel name**: `incoming-interactions`
-- **Event**: `postgres_changes` / `INSERT`
-- **Schema**: `public`
-- **Table**: `interactions`
-- **Filter**: `to_user_id=eq.{currentUserId}`
-- **Status logging**: Logs subscription status changes to console.
-
----
-
-## Mood API
-
-**File**: `src/api/moodApi.ts`
-**Singleton**: `moodApi`
-**Table**: `moods`
-
-### Validation
-
-All responses are validated using Zod schemas before being returned:
-
-- Single mood responses validated via `SupabaseMoodSchema.parse()`
-- Array responses validated via `MoodArraySchema.parse()`
-- Validation failures throw `ApiValidationError`
+#### `sendPoke(partnerId)`
 
 ```typescript
-class ApiValidationError extends Error {
-  readonly validationErrors: ZodError | null;
-}
+async sendPoke(partnerId: string): Promise<SupabaseInteractionRecord>
 ```
 
-### Functions
-
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `create` | `moodData: MoodInsert` | `Promise<SupabaseMood>` | Inserts mood entry. Response validated via `SupabaseMoodSchema`. |
-| `fetchByUser` | `userId: string, limit?: number (50)` | `Promise<SupabaseMood[]>` | Fetches user moods ordered by `created_at` DESC. Response validated via `MoodArraySchema`. |
-| `fetchByDateRange` | `userId: string, startDate: string, endDate: string` | `Promise<SupabaseMood[]>` | Fetches moods within ISO date range using `gte`/`lte` filters. Response validated via `MoodArraySchema`. |
-| `fetchById` | `moodId: string` | `Promise<SupabaseMood \| null>` | Single mood lookup. Returns `null` on PGRST116 (no rows). Response validated via `SupabaseMoodSchema`. |
-| `update` | `moodId: string, updates: Partial<MoodInsert>` | `Promise<SupabaseMood>` | Partial update. Automatically sets `updated_at` to current timestamp. Response validated via `SupabaseMoodSchema`. |
-| `delete` | `moodId: string` | `Promise<void>` | Hard delete by ID. No response validation needed. |
-| `getMoodHistory` | `userId: string, offset?: number (0), limit?: number (50)` | `Promise<SupabaseMood[]>` | Paginated fetch using `range(offset, offset + limit - 1)`. Ordered by `created_at` DESC. Response validated via `MoodArraySchema`. |
-
-All methods check `isOnline()` before making requests and throw `SupabaseServiceError` (via `handleNetworkError`) when offline.
+- **Purpose:** Insert a `poke` interaction targeting the partner.
 
 ---
 
-## Mood Sync Service
-
-**File**: `src/api/moodSyncService.ts`
-**Singleton**: `moodSyncService`
-**Dependencies**: `moodApi`, `moodService` (IndexedDB), `supabaseClient`
-
-### Types
+#### `sendKiss(partnerId)`
 
 ```typescript
-interface SyncResult {
-  synced: number;
-  failed: number;
-  errors: string[];
-}
+async sendKiss(partnerId: string): Promise<SupabaseInteractionRecord>
 ```
 
-### Functions
-
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `syncMood` | `mood: MoodEntry` | `Promise<SupabaseMoodRecord>` | Transforms local `MoodEntry` to `MoodInsert` format and calls `moodApi.create()`. Broadcasts to partner on success (fire-and-forget). |
-| `syncPendingMoods` | -- | `Promise<SyncResult>` | Fetches unsynced moods from IndexedDB via `moodService.getUnsyncedMoods()`, syncs each with retry logic, marks synced moods in IndexedDB. Returns detailed summary. |
-| `subscribeMoodUpdates` | `callback: (mood: SupabaseMoodRecord) => void, onStatusChange?: (status: string) => void` | `Promise<() => void>` | Subscribes to Broadcast API for incoming partner mood updates. Returns unsubscribe function. |
-| `fetchMoods` | `userId: string, limit?: number (50)` | `Promise<SupabaseMoodRecord[]>` | Delegates to `moodApi.fetchByUser()`. |
-| `getLatestPartnerMood` | `userId: string` | `Promise<SupabaseMoodRecord \| null>` | Fetches most recent mood (`limit: 1`). Returns `null` on failure (graceful degradation). |
-
-### Broadcast API
-
-Partner mood notifications use the Supabase Broadcast API (client-to-client) instead of `postgres_changes` because RLS policies on the `moods` table contain complex subqueries that cannot be evaluated by Supabase Realtime.
-
-- **Channel pattern**: `mood-updates:{userId}`
-- **Event**: `new_mood`
-- **Config**: `broadcast.self: false` (do not receive own broadcasts)
-- **Payload fields**: `id`, `user_id`, `mood_type`, `mood_types`, `note`, `created_at`
-
-### Retry Strategy (syncMoodWithRetry)
-
-- **Total attempts**: 4 (1 initial + 3 retries)
-- **Delay schedule**: 1s, 2s, 4s (exponential backoff)
-- **Network check**: Verified before each attempt
-- **On exhaustion**: Throws last error; calling code logs and continues to next mood
+- **Purpose:** Insert a `kiss` interaction targeting the partner.
 
 ---
 
-## Partner Service
+#### `subscribeInteractions(callback)`
 
-**File**: `src/api/partnerService.ts`
-**Singleton**: `partnerService`
-**Tables**: `users`, `partner_requests`
+```typescript
+async subscribeInteractions(
+  callback: (interaction: SupabaseInteractionRecord) => void
+): Promise<() => void>
+```
+
+- **Purpose:** Listen for realtime `INSERT` events on the `interactions` table filtered by `to_user_id=eq.{currentUserId}`.
+- **Uses:** `postgres_changes` (unlike moods which use Broadcast).
+- **Returns:** Unsubscribe function.
+
+---
+
+#### `getInteractionHistory(limit?, offset?)`
+
+```typescript
+async getInteractionHistory(limit: number = 50, offset: number = 0): Promise<Interaction[]>
+```
+
+- **Purpose:** Fetch interactions where the current user is sender or recipient.
+- **Transform:** Maps Supabase records to local `Interaction` type (camelCase, Date objects).
+
+---
+
+#### `getUnviewedInteractions()`
+
+```typescript
+async getUnviewedInteractions(): Promise<Interaction[]>
+```
+
+- **Purpose:** Fetch interactions sent to the current user where `viewed = false`.
+
+---
+
+#### `markAsViewed(interactionId)`
+
+```typescript
+async markAsViewed(interactionId: string): Promise<void>
+```
+
+- **Purpose:** Set `viewed = true` for a specific interaction.
+
+---
+
+## 6. Partner Service
+
+**Module:** `src/api/partnerService.ts`
+**Singleton export:** `partnerService` (instance of `PartnerService`)
 
 ### Types
 
@@ -360,350 +559,884 @@ interface PartnerRequest {
 }
 ```
 
-### Functions
+### Methods
 
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `getPartner` | -- | `Promise<PartnerInfo \| null>` | Fetches current user's `partner_id` from `users`, then fetches partner's `id`, `email`, `display_name`. Returns `null` if no partner. |
-| `searchUsers` | `query: string, limit?: number (10)` | `Promise<UserSearchResult[]>` | Searches `users` table by `email` or `display_name` (case-insensitive `ilike`). Minimum 2 characters. Excludes current user. |
-| `sendPartnerRequest` | `toUserId: string` | `Promise<void>` | Validates neither user has a partner, then inserts row into `partner_requests` with `status: 'pending'`. Detects duplicate request errors. |
-| `getPendingRequests` | -- | `Promise<{ sent: PartnerRequest[], received: PartnerRequest[] }>` | Fetches all pending requests involving current user. Enriches with user display names from `users` table. Separates into sent/received. |
-| `acceptPartnerRequest` | `requestId: string` | `Promise<void>` | Calls RPC `accept_partner_request(p_request_id)`. Atomically sets bidirectional `partner_id` and auto-declines other pending requests. |
-| `declinePartnerRequest` | `requestId: string` | `Promise<void>` | Calls RPC `decline_partner_request(p_request_id)`. Recipient-only status change to `'declined'`. |
-| `hasPartner` | -- | `Promise<boolean>` | Returns `true` if `getPartner()` returns non-null. |
+#### `getPartner()`
 
-### RPC Calls
+```typescript
+async getPartner(): Promise<PartnerInfo | null>
+```
 
-| RPC Function | Parameter | Behavior |
-|-------------|-----------|----------|
-| `accept_partner_request(p_request_id)` | Request UUID | SECURITY DEFINER. Sets `partner_id` bidirectionally on both users, marks request as `'accepted'`, auto-declines all other pending requests for both users. |
-| `decline_partner_request(p_request_id)` | Request UUID | SECURITY DEFINER. Recipient-only. Sets request status to `'declined'`. |
+- **Purpose:** Fetch the current user's partner info (ID, email, display name, connected timestamp).
+- **Returns:** `null` if no partner or not authenticated.
 
 ---
 
-## Edge Functions
+#### `searchUsers(query, limit?)`
 
-### upload-love-note-image
-
-**File**: `supabase/functions/upload-love-note-image/index.ts`
-**Runtime**: Deno (Supabase Edge Functions)
-**Bucket**: `love-notes-images` (private)
-
-#### Request
-
-```http
-POST /functions/v1/upload-love-note-image
-Authorization: Bearer {jwt_token}
-Content-Type: application/octet-stream
-[binary image data]
+```typescript
+async searchUsers(query: string, limit: number = 10): Promise<UserSearchResult[]>
 ```
 
-Also accepts `multipart/form-data` with a `file` field.
+- **Purpose:** Search users by display name or email using `ilike` matching.
+- **Constraints:** Minimum 2 characters. Excludes current user from results.
+- **Security:** Uses RLS-protected `users` table (no admin API).
 
-#### Validation Pipeline
+---
 
-| Step | Check | Failure Code |
-|------|-------|-------------|
-| 1 | HTTP method is POST | 405 |
-| 2 | Authorization header present | 401 |
-| 3 | JWT authentication (Supabase Auth) | 401 |
-| 4 | Rate limit (10 uploads/minute/user) | 429 |
-| 5 | File size (max 5 MB) | 413 |
-| 6 | MIME type via magic bytes | 415 |
+#### `sendPartnerRequest(toUserId)`
 
-#### MIME Detection (Magic Bytes)
+```typescript
+async sendPartnerRequest(toUserId: string): Promise<void>
+```
 
-| Format | Magic Bytes | Hex |
-|--------|-------------|-----|
-| JPEG | Bytes 0-2 | `FF D8 FF` |
-| PNG | Bytes 0-7 | `89 50 4E 47 0D 0A 1A 0A` |
-| WebP | Bytes 0-3 + 8-11 | `52 49 46 46 ... 57 45 42 50` |
-| GIF | Bytes 0-3 | `47 49 46 38` |
+- **Purpose:** Create a pending partner request.
+- **Validation:** Checks that neither user already has a partner. Detects duplicate requests.
+- **Throws:** On validation failure or DB error.
 
-#### Rate Limiting
+---
 
-- **Limit**: 10 uploads per minute per user
-- **Storage**: In-memory `Map<string, number[]>` (resets on cold start)
-- **Window**: 60 seconds (sliding)
+#### `getPendingRequests()`
 
-#### Success Response (200)
+```typescript
+async getPendingRequests(): Promise<{ sent: PartnerRequest[]; received: PartnerRequest[] }>
+```
 
-```json
-{
-  "success": true,
-  "storagePath": "{userId}/{timestamp}-{uuid}.jpg",
-  "size": 123456,
-  "mimeType": "image/jpeg",
-  "rateLimitRemaining": 9
+- **Purpose:** Fetch all pending requests involving the current user, enriched with user info.
+- **Returns:** Object with `sent` and `received` arrays.
+
+---
+
+#### `acceptPartnerRequest(requestId)`
+
+```typescript
+async acceptPartnerRequest(requestId: string): Promise<void>
+```
+
+- **Purpose:** Accept a partner request via Supabase RPC (`accept_partner_request`).
+- **Side effect:** Sets `partner_id` on both users in the database (server-side).
+
+---
+
+#### `declinePartnerRequest(requestId)`
+
+```typescript
+async declinePartnerRequest(requestId: string): Promise<void>
+```
+
+- **Purpose:** Decline a partner request via Supabase RPC (`decline_partner_request`).
+
+---
+
+#### `hasPartner()`
+
+```typescript
+async hasPartner(): Promise<boolean>
+```
+
+- **Purpose:** Convenience check. Returns `true` if `getPartner()` returns non-null.
+
+---
+
+## 7. Error Handling
+
+**Module:** `src/api/errorHandlers.ts`
+
+### Error Classes
+
+#### `SupabaseServiceError`
+
+```typescript
+class SupabaseServiceError extends Error {
+  public readonly code: string | undefined;
+  public readonly details: string | undefined;
+  public readonly hint: string | undefined;
+  public readonly isNetworkError: boolean;
 }
 ```
 
-Response headers include `X-RateLimit-Remaining`.
+Structured error used across all API modules. Carries Postgres error codes and a `isNetworkError` flag for UI differentiation.
 
-#### Error Responses
+### Utility Functions
 
-| Status | Meaning | Body Fields |
-|--------|---------|-------------|
-| 200 | Success | `success`, `storagePath`, `size`, `mimeType`, `rateLimitRemaining` |
-| 401 | Missing auth header or invalid JWT | `error` |
-| 405 | Method not allowed (not POST) | `error` |
-| 413 | File exceeds 5 MB | `error`, `message`, `maxSize`, `actualSize` |
-| 415 | Invalid MIME type | `error`, `message`, `detectedType` |
-| 429 | Rate limit exceeded | `error`, `message` + `Retry-After: 60` header |
-| 500 | Server error or upload failure | `error`, `message` |
+#### `isOnline()`
+
+```typescript
+const isOnline = (): boolean
+```
+
+Checks `navigator.onLine`. Called before every API operation.
 
 ---
 
-## Validation Schemas (Supabase)
+#### `handleSupabaseError(error, context?)`
 
-**File**: `src/api/validation/supabaseSchemas.ts`
-**Library**: Zod
-
-These schemas validate all data returned from Supabase API responses at service boundaries.
-
-### SupabaseMoodSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | Server-generated UUID |
-| `user_id` | `z.string().uuid()` | Owner user ID |
-| `mood_type` | `z.enum([...12 values])` | Legacy single mood (backward compat) |
-| `mood_types` | `z.array(MoodTypeEnum).nullable().optional()` | Multi-mood support; nullable for legacy records |
-| `note` | `z.string().nullable()` | Optional note |
-| `created_at` | `TimestampSchema.nullable()` | ISO 8601 timestamp |
-| `updated_at` | `TimestampSchema.nullable()` | ISO 8601 timestamp |
-
-### MoodInsertSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid().optional()` | Optional; server-generated if omitted |
-| `user_id` | `z.string().uuid()` | Required |
-| `mood_type` | `z.enum([...12 values])` | Required |
-| `mood_types` | `z.array(MoodTypeEnum).optional()` | Optional multi-mood array |
-| `note` | `z.string().max(200).nullable().optional()` | Max 200 characters |
-| `created_at` | `TimestampSchema.optional()` | Optional |
-| `updated_at` | `TimestampSchema.optional()` | Optional |
-
-### Mood Type Enum (12 values)
-
-```
-loved, happy, content, excited, thoughtful, grateful,
-sad, anxious, frustrated, angry, lonely, tired
+```typescript
+const handleSupabaseError = (error: PostgrestError, context?: string): SupabaseServiceError
 ```
 
-### SupabaseInteractionSchema
+Maps Postgres error codes to user-friendly messages:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | Server-generated UUID |
-| `type` | `z.enum(['poke', 'kiss'])` | Interaction type |
-| `from_user_id` | `z.string().uuid()` | Sender |
-| `to_user_id` | `z.string().uuid()` | Recipient |
-| `viewed` | `z.boolean().nullable()` | View status |
-| `created_at` | `TimestampSchema.nullable()` | ISO 8601 timestamp |
+| Code | Message |
+|---|---|
+| `23505` | This record already exists |
+| `23503` | Referenced record not found |
+| `23502` | Required field is missing |
+| `42501` | Permission denied -- check Row Level Security policies |
+| `42P01` | Table not found -- database schema may be out of sync |
+| `PGRST116` | No rows found |
+| `PGRST301` | Invalid request parameters |
 
-### SupabaseUserSchema
+---
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | User UUID |
-| `partner_name` | `z.string().nullable()` | Display name for partner |
-| `device_id` | `z.string().uuid().nullable()` | Device identifier |
-| `created_at` | `TimestampSchema.nullable()` | ISO 8601 timestamp |
-| `updated_at` | `TimestampSchema.nullable()` | ISO 8601 timestamp |
-| `partner_id` | `z.string().uuid().nullable().optional()` | Linked partner UUID |
-| `email` | `z.string().nullable().optional()` | User email |
-| `display_name` | `z.string().nullable().optional()` | User display name |
+#### `handleNetworkError(error, context?)`
+
+```typescript
+const handleNetworkError = (error: unknown, context?: string): SupabaseServiceError
+```
+
+Wraps any error as a `SupabaseServiceError` with `isNetworkError: true` and a user-facing message that mentions automatic sync.
+
+---
+
+#### `isPostgrestError(error)`
+
+```typescript
+const isPostgrestError = (error: unknown): error is PostgrestError
+```
+
+Type guard checking for `code`, `message`, and `details` properties.
+
+---
+
+#### `isSupabaseServiceError(error)`
+
+```typescript
+const isSupabaseServiceError = (error: unknown): error is SupabaseServiceError
+```
+
+Type guard using `instanceof`.
+
+---
+
+#### `logSupabaseError(context, error)`
+
+```typescript
+const logSupabaseError = (context: string, error: unknown): void
+```
+
+Logs structured error info to console with context prefix. Handles `SupabaseServiceError`, `PostgrestError`, and generic errors.
+
+---
+
+#### `retryWithBackoff(operation, config?)`
+
+```typescript
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  config?: RetryConfig
+): Promise<T>
+```
+
+Generic retry with exponential backoff.
+
+**Default config (`DEFAULT_RETRY_CONFIG`):**
+
+| Parameter | Value |
+|---|---|
+| `maxAttempts` | 3 |
+| `initialDelayMs` | 1000 |
+| `maxDelayMs` | 30000 |
+| `backoffMultiplier` | 2 |
+
+---
+
+#### `createOfflineMessage(operation)`
+
+```typescript
+const createOfflineMessage = (operation: string): string
+```
+
+Returns: `"You're offline. {operation} will sync automatically when you're back online."`
+
+---
+
+## 8. Validation Schemas
+
+**Module:** `src/api/validation/supabaseSchemas.ts`
+
+All schemas use [Zod](https://zod.dev) for runtime validation at API boundaries.
+
+### Common Schemas
+
+| Schema | Validates |
+|---|---|
+| `UUIDSchema` | UUID v4 format string |
+| `TimestampSchema` | ISO 8601 strings including PostgreSQL variants with microseconds and timezone offsets |
+
+### Entity Schemas
+
+#### User Schemas
+
+| Schema | Purpose | Key Fields |
+|---|---|---|
+| `SupabaseUserSchema` | Validate user rows | `id`, `partner_name`, `device_id`, `partner_id?`, `email?`, `display_name?` |
+| `UserInsertSchema` | Validate user inserts | `id` (required), `partner_name?`, `device_id?` |
+| `UserUpdateSchema` | Validate user updates | All fields optional |
+
+#### Mood Schemas
+
+| Schema | Purpose | Key Fields |
+|---|---|---|
+| `SupabaseMoodSchema` | Validate mood rows | `id`, `user_id`, `mood_type`, `mood_types?` (array), `note?`, `created_at`, `updated_at` |
+| `MoodInsertSchema` | Validate mood inserts | `user_id`, `mood_type` (required); `mood_types?`, `note?` (max 200 chars) |
+| `MoodUpdateSchema` | Validate mood updates | All fields optional |
+
+**Mood type enum:** `loved`, `happy`, `content`, `excited`, `thoughtful`, `grateful`, `sad`, `anxious`, `frustrated`, `angry`, `lonely`, `tired`
+
+#### Interaction Schemas
+
+| Schema | Purpose | Key Fields |
+|---|---|---|
+| `SupabaseInteractionSchema` | Validate interaction rows | `id`, `type` (`poke` or `kiss`), `from_user_id`, `to_user_id`, `viewed?`, `created_at` |
+| `InteractionInsertSchema` | Validate interaction inserts | `type`, `from_user_id`, `to_user_id` (required) |
+
+#### Message & Photo Schemas (placeholder)
+
+| Schema | Purpose |
+|---|---|
+| `SupabaseMessageSchema` | Future: messages with category, tags, 1-500 char text |
+| `SupabasePhotoSchema` | Future: photos with storage path, dimensions, MIME type |
 
 ### Array Schemas
 
-| Schema | Wraps | Purpose |
-|--------|-------|---------|
-| `MoodArraySchema` | `z.array(SupabaseMoodSchema)` | Batch mood responses |
-| `InteractionArraySchema` | `z.array(SupabaseInteractionSchema)` | Batch interaction responses |
-| `UserArraySchema` | `z.array(SupabaseUserSchema)` | Batch user responses |
+| Schema | Wraps |
+|---|---|
+| `MoodArraySchema` | `z.array(SupabaseMoodSchema)` |
+| `InteractionArraySchema` | `z.array(SupabaseInteractionSchema)` |
+| `UserArraySchema` | `z.array(SupabaseUserSchema)` |
 
 ### Exported Types
 
-All schemas export inferred TypeScript types: `SupabaseUser`, `SupabaseMood`, `SupabaseInteraction`, `SupabaseMessage`, `SupabasePhoto`, `UserInsert`, `UserUpdate`, `MoodInsert`, `MoodUpdate`, `InteractionInsert`, `InteractionUpdate`.
+All schemas export inferred TypeScript types: `SupabaseUser`, `SupabaseMood`, `SupabaseInteraction`, `MoodInsert`, `MoodUpdate`, `InteractionInsert`, `InteractionUpdate`, etc.
 
 ---
 
-## Validation Schemas (Application)
+## 9. Service Layer
 
-**File**: `src/validation/schemas.ts`
-**Library**: Zod
-**Purpose**: Runtime validation at service boundaries before IndexedDB writes.
+All services use IndexedDB for local persistence. Services extending `BaseIndexedDBService` share a common database (`my-love-db`, currently version 5).
 
-### Scripture Schemas
+### 9.1 BaseIndexedDBService
 
-Defined in `src/validation/schemas.ts` for validating Supabase RPC and query responses.
+**Module:** `src/services/BaseIndexedDBService.ts`
 
-#### SupabaseSessionSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | Session UUID |
-| `mode` | `z.enum(['solo', 'together'])` | Reading mode |
-| `user1_id` | `z.string().uuid()` | Session creator |
-| `user2_id` | `z.string().uuid().nullable()` | Partner (null for solo) |
-| `current_phase` | `z.enum(['lobby', 'countdown', 'reading', 'reflection', 'report', 'complete'])` | Session phase |
-| `current_step_index` | `z.number().int().min(0)` | Current reading step |
-| `status` | `z.enum(['pending', 'in_progress', 'complete', 'abandoned'])` | Session status |
-| `version` | `z.number().int().min(1)` | Optimistic concurrency version |
-| `snapshot_json` | `z.record(z.string(), z.unknown()).nullable().optional()` | Session state snapshot |
-| `started_at` | `z.string()` | ISO timestamp |
-| `completed_at` | `z.string().nullable()` | ISO timestamp or null |
-
-#### SupabaseReflectionSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | Reflection UUID |
-| `session_id` | `z.string().uuid()` | Parent session |
-| `step_index` | `z.number().int().min(0)` | Reading step index |
-| `user_id` | `z.string().uuid()` | Author |
-| `rating` | `z.number().int().min(1).max(5).nullable()` | 1-5 rating or null |
-| `notes` | `z.string().nullable()` | Free-text notes |
-| `is_shared` | `z.boolean()` | Shared with partner |
-| `created_at` | `z.string()` | ISO timestamp |
-
-#### SupabaseBookmarkSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | Bookmark UUID |
-| `session_id` | `z.string().uuid()` | Parent session |
-| `step_index` | `z.number().int().min(0)` | Reading step index |
-| `user_id` | `z.string().uuid()` | Author |
-| `share_with_partner` | `z.boolean()` | Visibility flag |
-| `created_at` | `z.string()` | ISO timestamp |
-
-#### SupabaseMessageSchema (Scripture)
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.string().uuid()` | Message UUID |
-| `session_id` | `z.string().uuid()` | Parent session |
-| `sender_id` | `z.string().uuid()` | Message author |
-| `message` | `z.string()` | Message content |
-| `created_at` | `z.string()` | ISO timestamp |
-
-### Message Schemas
-
-#### MessageSchema (existing messages from IndexedDB)
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.number().int().positive().optional()` | Auto-increment ID |
-| `text` | `z.string().min(1).max(MESSAGE_TEXT_MAX_LENGTH)` | Message content |
-| `category` | `z.enum(['reason', 'memory', 'affirmation', 'future', 'custom'])` | Message category |
-| `isCustom` | `z.boolean()` | User-created flag |
-| `active` | `z.boolean().default(true)` | Active/archived |
-| `createdAt` | `z.date()` | Creation date |
-| `isFavorite` | `z.boolean().optional()` | Favorite flag |
-| `updatedAt` | `z.date().optional()` | Last update date |
-| `tags` | `z.array(z.string()).optional()` | Tag array |
-
-#### CreateMessageInputSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `text` | `z.string().trim().min(1).max(MESSAGE_TEXT_MAX_LENGTH)` | Auto-trimmed |
-| `category` | `MessageCategorySchema` | Required |
-| `active` | `z.boolean().default(true)` | Defaults to active |
-| `tags` | `z.array(z.string()).optional()` | Optional |
-
-#### UpdateMessageInputSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.number().int().positive()` | Required for lookup |
-| `text` | `z.string().trim().min(1).max(MESSAGE_TEXT_MAX_LENGTH).optional()` | Optional partial update |
-| `category` | `MessageCategorySchema.optional()` | Optional |
-| `active` | `z.boolean().optional()` | Optional |
-| `tags` | `z.array(z.string()).optional()` | Optional |
-
-#### CustomMessagesExportSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `version` | `z.literal('1.0')` | Schema version |
-| `exportDate` | `z.string()` | ISO date string |
-| `messageCount` | `z.number().int().nonnegative()` | Total messages |
-| `messages` | `z.array(...)` | Array of `{ text, category, active, tags?, createdAt, updatedAt }` |
-
-### Photo Schemas
-
-#### PhotoSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `z.number().int().positive().optional()` | Auto-increment ID |
-| `imageBlob` | `z.instanceof(Blob)` | Image data |
-| `caption` | `z.string().max(500).optional()` | Max 500 characters |
-| `tags` | `z.array(z.string()).default([])` | Defaults to empty |
-| `uploadDate` | `z.date()` | Upload timestamp |
-| `originalSize` | `z.number().positive()` | Bytes before compression |
-| `compressedSize` | `z.number().positive()` | Bytes after compression |
-| `width` | `z.number().int().positive()` | Pixel width |
-| `height` | `z.number().int().positive()` | Pixel height |
-| `mimeType` | `z.enum(['image/jpeg', 'image/png', 'image/webp'])` | Supported formats |
-
-#### PhotoUploadInputSchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `file` | `z.instanceof(File)` | Required file input |
-| `caption` | `z.string().max(500).optional()` | Max 500 characters |
-| `tags` | `z.string().optional()` | Comma-separated string |
-
-### Mood Schemas
-
-#### MoodEntrySchema
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `date` | `IsoDateStringSchema` | YYYY-MM-DD with month/day validation |
-| `mood` | `z.enum([...12 values])` | Primary mood |
-| `moods` | `z.array(MoodTypeSchema).min(1).optional()` | Multi-mood support |
-| `note` | `z.string().max(200).optional().or(z.literal(''))` | Allows empty string |
-
-#### IsoDateStringSchema
+Abstract generic base class providing CRUD operations for IndexedDB stores.
 
 ```typescript
-z.string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine(/* validates month 1-12, day 1-31, and Date parse round-trip */)
+abstract class BaseIndexedDBService<
+  T extends { id?: number | string },
+  DBTypes extends DBSchema,
+  StoreName extends StoreNames<DBTypes>
+>
 ```
 
-### Settings Schema
+**Error Handling Strategy:**
+- Read operations (`get`, `getAll`, `getPage`): Return `null` or empty array on error (graceful degradation).
+- Write operations (`add`, `update`, `delete`, `clear`): Throw errors (data integrity).
 
-#### SettingsSchema
+#### Inherited Methods
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `themeName` | `z.enum(['sunset', 'ocean', 'lavender', 'rose'])` | Theme selection |
-| `notificationTime` | `TimeFormatSchema` | HH:MM with hour 00-23, minute 00-59 validation |
-| `relationship.startDate` | `IsoDateStringSchema` | YYYY-MM-DD |
-| `relationship.partnerName` | `z.string().min(1)` | Required |
-| `relationship.anniversaries` | `z.array(AnniversarySchema)` | `{ id, date, label, description? }` |
-| `customization.accentColor` | `z.string()` | CSS color value |
-| `customization.fontFamily` | `z.string()` | Font family name |
-| `notifications.enabled` | `z.boolean()` | Toggle |
-| `notifications.time` | `z.string()` | Time string |
+| Method | Signature | Description |
+|---|---|---|
+| `init()` | `async init(): Promise<void>` | Initialization guard preventing concurrent DB setup |
+| `add(item)` | `protected async add(item: Omit<T, 'id'>): Promise<T>` | Insert with auto-increment ID. Protected to enforce validation via `create()`. |
+| `get(id)` | `async get(id: number \| string): Promise<T \| null>` | Fetch by ID. Returns `null` on error. |
+| `getAll()` | `async getAll(): Promise<T[]>` | Fetch all items. Returns `[]` on error. |
+| `update(id, updates)` | `async update(id: number \| string, updates: Partial<T>): Promise<void>` | Merge updates into existing record. Throws if not found. |
+| `delete(id)` | `async delete(id: number \| string): Promise<void>` | Remove by ID. Throws on error. |
+| `clear()` | `async clear(): Promise<void>` | Remove all items from store. Throws on error. |
+| `getPage(offset, limit)` | `async getPage(offset: number, limit: number): Promise<T[]>` | Cursor-based pagination. O(offset + limit). Returns `[]` on error. |
 
-### Validation Error Utilities
+#### Abstract Methods (implemented by subclasses)
 
-**File**: `src/validation/errorMessages.ts`
-**Re-exported from**: `src/validation/index.ts`
+| Method | Description |
+|---|---|
+| `getStoreName()` | Returns the object store name |
+| `_doInit()` | Service-specific DB initialization |
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `ValidationError` | Class | Custom error with `fieldErrors: Map<string, string>`. Used by service layer. |
-| `formatZodError` | `(error: ZodError) => string` | Converts ZodError to comma-separated user-friendly message. |
-| `getFieldErrors` | `(error: ZodError) => Map<string, string>` | Returns map of field path to error message (first error per field). |
-| `createValidationError` | `(error: ZodError) => ValidationError` | Wraps ZodError into ValidationError with formatted messages and field map. |
-| `isValidationError` | `(error: unknown) => error is ValidationError` | Type guard for ValidationError. |
-| `isZodError` | `(error: unknown) => error is ZodError` | Type guard for ZodError. |
+---
+
+### 9.2 Database Schema
+
+**Module:** `src/services/dbSchema.ts`
+
+#### Constants
+
+| Constant | Value |
+|---|---|
+| `DB_NAME` | `'my-love-db'` |
+| `DB_VERSION` | `5` |
+
+#### Object Stores
+
+| Store Name | Key | Auto-increment | Indexes |
+|---|---|---|---|
+| `messages` | `id` (number) | Yes | `by-category` (string), `by-date` (Date) |
+| `photos` | `id` (number) | Yes | `by-date` (Date) |
+| `moods` | `id` (number) | Yes | `by-date` (string, unique) |
+| `sw-auth` | `id` ('current') | No | None |
+| `scripture-sessions` | `id` (string) | No | `by-user` (string) |
+| `scripture-reflections` | `id` (string) | No | `by-session` (string) |
+| `scripture-bookmarks` | `id` (string) | No | `by-session` (string) |
+| `scripture-messages` | `id` (string) | No | `by-session` (string) |
+
+#### `upgradeDb(db, oldVersion, newVersion)`
+
+Centralized migration function handling v1 through v5 schema upgrades. Called by all services during `openDB`.
+
+---
+
+### 9.3 StorageService
+
+**Module:** `src/services/storage.ts`
+**Singleton export:** `storageService`
+
+Legacy service providing direct IndexedDB operations for photos and messages. Predates `BaseIndexedDBService` extraction.
+
+#### Photo Operations
+
+| Method | Signature | Description |
+|---|---|---|
+| `addPhoto` | `(photo: Omit<Photo, 'id'>): Promise<number>` | Insert photo, return auto-generated ID |
+| `getPhoto` | `(id: number): Promise<Photo \| undefined>` | Fetch by ID |
+| `getAllPhotos` | `(): Promise<Photo[]>` | Fetch all photos |
+| `deletePhoto` | `(id: number): Promise<void>` | Remove by ID |
+| `updatePhoto` | `(id: number, updates: Partial<Photo>): Promise<void>` | Merge updates |
+
+#### Message Operations
+
+| Method | Signature | Description |
+|---|---|---|
+| `addMessage` | `(message: Omit<Message, 'id'>): Promise<number>` | Insert message |
+| `getMessage` | `(id: number): Promise<Message \| undefined>` | Fetch by ID |
+| `getAllMessages` | `(): Promise<Message[]>` | Fetch all messages |
+| `getMessagesByCategory` | `(category: string): Promise<Message[]>` | Filter by category index |
+| `updateMessage` | `(id: number, updates: Partial<Message>): Promise<void>` | Merge updates |
+| `deleteMessage` | `(id: number): Promise<void>` | Remove by ID |
+| `toggleFavorite` | `(messageId: number): Promise<void>` | Toggle `isFavorite` boolean |
+| `addMessages` | `(messages: Omit<Message, 'id'>[]): Promise<void>` | Bulk insert via transaction |
+
+#### Utility Operations
+
+| Method | Signature | Description |
+|---|---|---|
+| `clearAllData` | `(): Promise<void>` | Clear photos and messages stores |
+| `exportData` | `(): Promise<{ photos: Photo[]; messages: Message[] }>` | Export all data for backup |
+
+#### `localStorageHelper`
+
+Utility object for typed localStorage access with JSON serialization:
+
+| Method | Signature |
+|---|---|
+| `get<T>` | `(key: string, defaultValue: T): T` |
+| `set<T>` | `(key: string, value: T): void` |
+| `remove` | `(key: string): void` |
+| `clear` | `(): void` |
+
+---
+
+### 9.4 PhotoService (Supabase Storage)
+
+**Module:** `src/services/photoService.ts`
+**Singleton export:** `photoService`
+
+Manages photos in Supabase Storage (bucket: `photos`). RLS-enforced user-scoped storage paths (`{user_id}/{filename}`).
+
+#### Types
+
+```typescript
+interface SupabasePhoto {
+  id: string; user_id: string; storage_path: string; filename: string;
+  caption: string | null; mime_type: string; file_size: number;
+  width: number; height: number; created_at: string;
+}
+
+interface PhotoWithUrls extends SupabasePhoto {
+  signedUrl: string | null;
+  isOwn: boolean;
+}
+
+interface StorageQuota {
+  used: number; quota: number; percent: number;
+  warning: 'none' | 'approaching' | 'critical' | 'exceeded';
+}
+```
+
+#### Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `getSignedUrl` | `(storagePath: string, expiresIn?: number): Promise<string \| null>` | Generate 1-hour signed URL for private photo |
+| `getSignedUrls` | `(storagePaths: string[], expiresIn?: number): Promise<Map<string, string>>` | Parallel signed URL generation for multiple photos |
+| `checkStorageQuota` | `(): Promise<StorageQuota>` | Calculate storage usage from DB. Warning at 80%, critical at 95% |
+| `getPhotos` | `(limit?: number, offset?: number): Promise<PhotoWithUrls[]>` | Fetch user + partner photos with signed URLs. Sorted newest first |
+| `uploadPhoto` | `(input: PhotoUploadInput, onProgress?: (percent: number) => void): Promise<SupabasePhoto \| null>` | Upload to Storage + create metadata record. Rollback on DB failure. Quota checks. |
+| `deletePhoto` | `(photoId: string): Promise<boolean>` | Delete from Storage + DB. Verifies ownership. |
+| `getPhoto` | `(photoId: string): Promise<PhotoWithUrls \| null>` | Fetch single photo with signed URL |
+| `updatePhoto` | `(photoId: string, updates: Partial<SupabasePhoto>): Promise<boolean>` | Update caption only (other fields immutable) |
+
+---
+
+### 9.5 PhotoStorageService (IndexedDB)
+
+**Module:** `src/services/photoStorageService.ts`
+**Singleton export:** `photoStorageService`
+**Extends:** `BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'>`
+
+Local IndexedDB storage for photos with Zod validation and performance monitoring.
+
+#### Methods (beyond inherited)
+
+| Method | Signature | Description |
+|---|---|---|
+| `create` | `(photo: Omit<Photo, 'id'>): Promise<Photo>` | Zod-validated insert with performance measurement |
+| `getAll` | `(): Promise<Photo[]>` | Overrides base: uses `by-date` index, returns newest first |
+| `getPage` | `(offset?: number, limit?: number): Promise<Photo[]>` | Overrides base: descending cursor on `by-date` index |
+| `update` | `(id: number, updates: Partial<Photo>): Promise<void>` | Overrides base: adds Zod partial validation |
+| `getStorageSize` | `(): Promise<number>` | Sum of `compressedSize` across all photos |
+| `estimateQuotaRemaining` | `(): Promise<{ used, quota, remaining, percentUsed }>` | Uses `navigator.storage.estimate()` |
+
+---
+
+### 9.6 CustomMessageService
+
+**Module:** `src/services/customMessageService.ts`
+**Singleton export:** `customMessageService`
+**Extends:** `BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'>`
+
+#### Methods (beyond inherited)
+
+| Method | Signature | Description |
+|---|---|---|
+| `create` | `(input: CreateMessageInput): Promise<Message>` | Zod-validated insert. Sets `isCustom: true`, `isFavorite: false`. |
+| `updateMessage` | `(input: UpdateMessageInput): Promise<void>` | Zod-validated update. Auto-sets `updatedAt`. |
+| `getAll` | `(filter?: MessageFilter): Promise<Message[]>` | Overrides base: supports filtering by category, `isCustom`, `active`, `searchTerm`, `tags`. |
+| `getActiveCustomMessages` | `(): Promise<Message[]>` | Shortcut: `getAll({ isCustom: true, active: true })` |
+| `exportMessages` | `(): Promise<CustomMessagesExport>` | Export all custom messages as JSON with version and metadata |
+| `importMessages` | `(exportData: CustomMessagesExport): Promise<{ imported, skipped }>` | Import with Zod validation and duplicate detection (case-insensitive text match) |
+
+---
+
+### 9.7 MoodService (IndexedDB)
+
+**Module:** `src/services/moodService.ts`
+**Singleton export:** `moodService`
+**Extends:** `BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods'>`
+
+#### Methods (beyond inherited)
+
+| Method | Signature | Description |
+|---|---|---|
+| `create` | `(userId: string, moods: MoodEntry['mood'][], note?: string): Promise<MoodEntry>` | Creates mood entry with Zod validation. Sets `synced: false`. First mood in array is primary. |
+| `updateMood` | `(id: number, moods: MoodEntry['mood'][], note?: string): Promise<MoodEntry>` | Update mood and note. Resets `synced: false`. Zod-validated. |
+| `getMoodForDate` | `(date: Date): Promise<MoodEntry \| null>` | Lookup via `by-date` unique index. One mood per day constraint. |
+| `getMoodsInRange` | `(start: Date, end: Date): Promise<MoodEntry[]>` | Range query via `IDBKeyRange.bound` on `by-date` index. |
+| `getUnsyncedMoods` | `(): Promise<MoodEntry[]>` | Filter `getAll()` where `synced === false`. |
+| `markAsSynced` | `(id: number, supabaseId: string): Promise<void>` | Set `synced: true` and `supabaseId`. |
+
+---
+
+### 9.8 ScriptureReadingService
+
+**Module:** `src/services/scriptureReadingService.ts`
+**Singleton export:** `scriptureReadingService`
+**Extends:** `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>`
+
+Implements a **cache-first read, write-through** pattern for scripture reading sessions with four sub-entities: sessions, reflections, bookmarks, and messages.
+
+#### Error Handling
+
+```typescript
+enum ScriptureErrorCode {
+  VERSION_MISMATCH, SESSION_NOT_FOUND, UNAUTHORIZED,
+  SYNC_FAILED, OFFLINE, CACHE_CORRUPTED, VALIDATION_FAILED
+}
+```
+
+#### Session Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `createSession` | `(mode, partnerId?): Promise<ScriptureSession>` | RPC `scripture_create_session`. Caches locally. |
+| `getSession` | `(sessionId, onRefresh?): Promise<ScriptureSession \| null>` | Cache-first. Background refresh with optional callback. |
+| `getUserSessions` | `(userId): Promise<ScriptureSession[]>` | Cache-first by `by-user` index. |
+| `updateSession` | `(sessionId, updates): Promise<void>` | Write-through: server first, then cache. |
+
+#### Reflection Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `addReflection` | `(sessionId, stepIndex, rating, notes, isShared): Promise<ScriptureReflection>` | RPC `scripture_submit_reflection`. Caches locally. |
+| `getReflectionsBySession` | `(sessionId): Promise<ScriptureReflection[]>` | Cache-first with background refresh. |
+
+#### Bookmark Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `addBookmark` | `(sessionId, stepIndex, userId, shareWithPartner): Promise<ScriptureBookmark>` | Insert to `scripture_bookmarks`. Caches locally. |
+| `toggleBookmark` | `(sessionId, stepIndex, userId, shareWithPartner): Promise<{ added, bookmark }>` | Delete if exists, create if not. |
+| `getBookmarksBySession` | `(sessionId): Promise<ScriptureBookmark[]>` | Cache-first with background refresh. |
+
+#### Message Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `addMessage` | `(sessionId, senderId, message): Promise<ScriptureMessage>` | Insert to `scripture_messages`. Caches locally. |
+| `getMessagesBySession` | `(sessionId): Promise<ScriptureMessage[]>` | Cache-first with background refresh. |
+
+#### Cache Recovery
+
+| Method | Description |
+|---|---|
+| `recoverSessionCache()` | Clear all session cache |
+| `recoverReflectionCache(sessionId?)` | Clear reflection cache (optionally scoped to session) |
+| `recoverBookmarkCache(sessionId?)` | Clear bookmark cache (optionally scoped to session) |
+| `recoverMessageCache(sessionId?)` | Clear message cache (optionally scoped to session) |
+| `recoverAllCaches()` | Clear all scripture caches |
+
+---
+
+### 9.9 LoveNoteImageService
+
+**Module:** `src/services/loveNoteImageService.ts`
+
+Functions (not a class) for love note image uploads and signed URL management.
+
+#### Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `uploadLoveNoteImage` | `(file: File, _userId: string): Promise<UploadResult>` | Client-side validation + compression, then upload via Edge Function. Returns `{ storagePath, compressedSize }`. |
+| `uploadCompressedBlob` | `(blob: Blob, _userId: string): Promise<UploadResult>` | Upload pre-compressed blob (retry flows). |
+| `getSignedImageUrl` | `(storagePath: string, forceRefresh?: boolean): Promise<SignedUrlResult>` | Get signed URL with LRU cache and request deduplication. |
+| `needsUrlRefresh` | `(storagePath: string): boolean` | Check if cached URL needs refresh. |
+| `clearSignedUrlCache` | `(): void` | Clear the in-memory signed URL cache. |
+| `batchGetSignedUrls` | `(storagePaths: string[]): Promise<Map<string, SignedUrlResult \| null>>` | Batch fetch with cache optimization and parallel requests. |
+| `deleteLoveNoteImage` | `(storagePath: string): Promise<void>` | Remove image from storage bucket. |
+
+**Caching strategy:**
+- In-memory `Map<string, CachedUrl>` with LRU eviction
+- Configurable max cache size and refresh buffer
+- Request deduplication via `pendingRequests` map
+
+---
+
+### 9.10 ImageCompressionService
+
+**Module:** `src/services/imageCompressionService.ts`
+**Singleton export:** `imageCompressionService`
+
+Client-side image compression using Canvas API. No external dependencies.
+
+#### Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `compressImage` | `(file: File, options?: Partial<CompressionOptions>): Promise<CompressionResult>` | Resize to max 2048px, convert to JPEG at 80% quality. Strips EXIF. Fallback returns original on Canvas failure. |
+| `validateImageFile` | `(file: File): { valid, error?, warning? }` | Check MIME type (JPEG/PNG/WebP) and size (max 25MB). Warning for files > threshold. |
+| `estimateCompressedSize` | `(file: File): number` | Returns `file.size * 0.1` (10% estimate). |
+
+**Defaults:**
+- Max dimensions: 2048 x 2048
+- JPEG quality: 0.8
+- Typical compression: ~90% reduction (3-5MB to 300-500KB)
+- Performance target: < 3 seconds for 10MB input
+
+---
+
+### 9.11 SyncService
+
+**Module:** `src/services/syncService.ts`
+**Singleton export:** `syncService` (instance of `SyncService`)
+
+#### Types
+
+```typescript
+interface MoodSyncResult {
+  localId: number;
+  success: boolean;
+  supabaseId?: string;
+  error?: string;
+}
+
+interface SyncSummary {
+  total: number;
+  successful: number;
+  failed: number;
+  results: MoodSyncResult[];
+}
+```
+
+#### Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `syncPendingMoods` | `(): Promise<SyncSummary>` | Fetch unsynced moods from IndexedDB, upload each via `moodApi.create()`, mark as synced. Partial failure: continues on individual errors. |
+| `hasPendingSync` | `(): Promise<boolean>` | Check if any unsynced moods exist. |
+| `getPendingCount` | `(): Promise<number>` | Count of unsynced moods. |
+
+---
+
+### 9.12 PerformanceMonitor
+
+**Module:** `src/services/performanceMonitor.ts`
+**Singleton export:** `performanceMonitor`
+
+#### Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `measureAsync` | `<T>(name: string, operation: () => Promise<T>): Promise<T>` | Wrap an async operation with timing. Records metric on success. |
+| `recordMetric` | `(name: string, duration: number): void` | Manually record a metric value. Maintains min/max/avg/count/total. |
+| `getMetrics` | `(name: string): PerformanceMetric \| undefined` | Get metrics for a specific operation. |
+| `getAllMetrics` | `(): Map<string, PerformanceMetric>` | Get all recorded metrics. |
+| `clear` | `(): void` | Reset all metrics. |
+| `getReport` | `(): string` | Human-readable report sorted by total duration descending. |
+
+---
+
+## 10. Edge Functions
+
+### `upload-love-note-image`
+
+**Location:** `supabase/functions/upload-love-note-image/index.ts`
+**Runtime:** Deno (Supabase Edge Functions)
+**URL:** `{SUPABASE_URL}/functions/v1/upload-love-note-image`
+
+Server-side image upload handler with security validation that cannot be bypassed client-side.
+
+#### Request
+
+```
+POST /functions/v1/upload-love-note-image
+Authorization: Bearer {JWT}
+Content-Type: application/octet-stream  (or multipart/form-data)
+Body: raw image bytes
+```
+
+#### Configuration
+
+| Setting | Value |
+|---|---|
+| Max file size | 5MB (compressed images) |
+| Rate limit | 10 uploads per minute per user |
+| Allowed MIME types | JPEG, PNG, WebP, GIF |
+| Storage bucket | `love-notes-images` |
+| Storage path format | `{user_id}/{timestamp}-{uuid}.jpg` |
+
+#### Validation Pipeline
+
+1. **Authentication:** Verify JWT via `supabase.auth.getUser()`.
+2. **Rate limiting:** In-memory sliding window (10 uploads / 60 seconds per user). Resets on cold start.
+3. **File size:** Reject if > 5MB.
+4. **MIME type (magic bytes):** Inspect first 8-12 bytes for file signature. More secure than trusting `Content-Type` header.
+5. **Upload:** Store in `love-notes-images` bucket with `cacheControl: '3600'`.
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "storagePath": "{user_id}/{timestamp}-{uuid}.jpg",
+  "size": 123456,
+  "mimeType": "image/jpeg",
+  "rateLimitRemaining": 8
+}
+```
+
+**Error responses:**
+
+| Status | Cause |
+|---|---|
+| 401 | Missing/invalid authorization |
+| 405 | Non-POST method |
+| 413 | File too large (> 5MB) |
+| 415 | Invalid MIME type (magic bytes check) |
+| 429 | Rate limit exceeded. `Retry-After: 60` header. |
+| 500 | Upload failure or internal error |
+
+---
+
+## 11. Service Worker
+
+### Main Service Worker
+
+**Module:** `src/sw.ts`
+
+Custom service worker extending Workbox for PWA precaching and Background Sync.
+
+#### Caching Strategy
+
+| Resource | Strategy | Cache Name | Expiry |
+|---|---|---|---|
+| Precached assets | Precache (Workbox manifest) | Workbox default | Automatic cleanup |
+| JS / CSS | `NetworkOnly` | N/A | Always fresh |
+| Navigation (HTML) | `NetworkFirst` (3s timeout) | `navigation-cache` | Falls back to precache |
+| Images / Fonts | `CacheFirst` | `static-assets-v2` | 30 days, max 100 entries |
+| Google Fonts | `CacheFirst` | `google-fonts-v2` | 1 year, max 30 entries |
+
+#### Background Sync
+
+**Trigger:** `sync` event with tag `sync-pending-moods`.
+
+**Flow:**
+1. Read unsynced moods from IndexedDB via `getPendingMoods()`.
+2. Read auth token from IndexedDB via `getAuthToken()`.
+3. Validate token expiry (5-minute buffer).
+4. For each mood: call Supabase REST API directly via `fetch()` (no JS client).
+5. On success: mark mood synced via `markMoodSynced()`.
+6. Notify open clients via `postMessage({ type: 'BACKGROUND_SYNC_COMPLETED', successCount, failCount })`.
+7. If all fail: throw to trigger Background Sync API retry.
+
+**REST API call:**
+```
+POST {SUPABASE_URL}/rest/v1/moods
+Headers:
+  Content-Type: application/json
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {access_token}
+  Prefer: return=representation
+```
+
+#### Message Handler
+
+Listens for `SKIP_WAITING` messages to activate new service worker immediately.
+
+---
+
+### Service Worker Database Helpers
+
+**Module:** `src/sw-db.ts`
+
+IndexedDB operations designed for the service worker context (no window access).
+
+#### Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `getPendingMoods` | `(): Promise<StoredMoodEntry[]>` | Get all moods where `synced === false`. Opens/closes DB per call. |
+| `markMoodSynced` | `(localId: number, supabaseId: string): Promise<void>` | Set `synced: true` and `supabaseId` on a mood entry. |
+| `storeAuthToken` | `(token: Omit<StoredAuthToken, 'id'>): Promise<void>` | Store JWT + refresh token in `sw-auth` store for Background Sync. |
+| `getAuthToken` | `(): Promise<StoredAuthToken \| null>` | Read current auth token from `sw-auth` store. |
+| `clearAuthToken` | `(): Promise<void>` | Remove auth token (called on sign-out). |
+
+**`StoredAuthToken` shape:**
+```typescript
+{
+  id: 'current';       // Fixed key
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;   // Unix timestamp
+  userId: string;
+}
+```
+
+---
+
+## 12. Real-time Subscriptions
+
+**Module:** `src/services/realtimeService.ts`
+**Singleton export:** `realtimeService` (instance of `RealtimeService`)
+
+### Architecture
+
+The application uses two real-time patterns:
+
+| Pattern | Used For | Module |
+|---|---|---|
+| **Broadcast API** (client-to-client) | Mood updates between partners | `moodSyncService` |
+| **postgres_changes** (server-to-client) | Incoming interactions (poke/kiss) | `interactionService`, `realtimeService` |
+
+**Why two patterns?** RLS policies on the `moods` table use partner subqueries that Supabase Realtime cannot evaluate for `postgres_changes`. The Broadcast API bypasses this by having the sender explicitly broadcast to the partner's channel.
+
+### RealtimeService Methods
+
+#### `subscribeMoodChanges(userId, onMoodChange, onError?)`
+
+```typescript
+subscribeMoodChanges(
+  userId: string,
+  onMoodChange: MoodChangeCallback,
+  onError?: ErrorCallback
+): string
+```
+
+- **Purpose:** Watch for INSERT/UPDATE/DELETE on `moods` table filtered by `user_id`.
+- **Uses:** `postgres_changes` with `event: '*'`.
+- **Returns:** Channel ID string for unsubscribing.
+- **Deduplication:** Warns if already subscribed to same channel.
+
+---
+
+#### `unsubscribe(channelId)`
+
+```typescript
+async unsubscribe(channelId: string): Promise<void>
+```
+
+- **Purpose:** Remove a specific realtime channel.
+
+---
+
+#### `unsubscribeAll()`
+
+```typescript
+async unsubscribeAll(): Promise<void>
+```
+
+- **Purpose:** Cleanup all active channels (component unmount / logout).
+
+---
+
+#### `setErrorHandler(callback)`
+
+```typescript
+setErrorHandler(callback: ErrorCallback): void
+```
+
+- **Purpose:** Set a global error handler for all subscriptions (used when no per-subscription handler is provided).
+
+---
+
+#### `getActiveSubscriptions()`
+
+```typescript
+getActiveSubscriptions(): number
+```
+
+- **Purpose:** Return count of active channels (for monitoring/debugging).
+
+---
+
+### Mood Broadcast Flow
+
+1. User logs mood via `moodSyncService.syncMood()`.
+2. Mood is inserted into Supabase via `moodApi.create()`.
+3. `moodSyncService` looks up partner ID via `getPartnerId()`.
+4. Creates ephemeral channel `mood-updates:{partnerId}`.
+5. Broadcasts `{ type: 'broadcast', event: 'new_mood', payload: {...} }`.
+6. Removes the ephemeral channel.
+
+**Receiving side:**
+1. Partner calls `moodSyncService.subscribeMoodUpdates()`.
+2. This subscribes to `mood-updates:{ownUserId}` with `broadcast.self: false`.
+3. Callback fires when partner's broadcast arrives.
+
+### Interaction Realtime Flow
+
+1. User calls `interactionService.sendPoke()` or `sendKiss()`.
+2. Row is inserted into `interactions` table.
+3. Partner's `subscribeInteractions()` picks up the INSERT via `postgres_changes` filtered by `to_user_id`.
+4. Callback fires with the new interaction record.

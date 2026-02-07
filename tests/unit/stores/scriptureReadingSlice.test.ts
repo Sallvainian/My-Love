@@ -539,8 +539,9 @@ describe('scriptureReadingSlice', () => {
       await store.getState().advanceStep();
 
       expect(store.getState().session!.currentPhase).toBe('reflection');
-      expect(store.getState().session!.status).toBe('complete');
-      expect(store.getState().session!.completedAt).toBeDefined();
+      // Story 2.2: status stays 'in_progress' until Story 2.3 report phase
+      expect(store.getState().session!.status).toBe('in_progress');
+      expect(store.getState().session!.completedAt).toBeUndefined();
     });
 
     it('should do nothing when session is null', async () => {

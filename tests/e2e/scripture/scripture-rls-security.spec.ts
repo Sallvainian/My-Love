@@ -42,7 +42,7 @@ test.describe('Scripture RLS Security', () => {
     // The seeding RPC creates users with predictable credentials
     const { error: signInError } = await userClient.auth.signInWithPassword({
       email: sessionData.user.email!,
-      password: 'test-password-123',
+      password: 'testpassword123',
     });
 
     if (signInError) {
@@ -85,7 +85,7 @@ test.describe('Scripture RLS Security', () => {
       // Create a third user who is NOT a session member
       const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
         email: `outsider-${Date.now()}@test.example.com`,
-        password: 'test-password-123',
+        password: 'testpassword123',
         email_confirm: true,
       });
 
@@ -147,7 +147,7 @@ test.describe('Scripture RLS Security', () => {
       // Create outsider
       const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
         email: `outsider-refl-${Date.now()}@test.example.com`,
-        password: 'test-password-123',
+        password: 'testpassword123',
         email_confirm: true,
       });
 
@@ -180,7 +180,7 @@ test.describe('Scripture RLS Security', () => {
       const sessionId = testSession.session_ids[0];
       const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
         email: `outsider-ins-${Date.now()}@test.example.com`,
-        password: 'test-password-123',
+        password: 'testpassword123',
         email_confirm: true,
       });
 
@@ -215,7 +215,7 @@ test.describe('Scripture RLS Security', () => {
       const sessionId = testSession.session_ids[0];
       const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
         email: `outsider-bm-${Date.now()}@test.example.com`,
-        password: 'test-password-123',
+        password: 'testpassword123',
         email_confirm: true,
       });
 

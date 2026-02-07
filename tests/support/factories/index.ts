@@ -33,8 +33,9 @@ export interface SeedResult {
  * - mid_session: Session at step 7 in reading phase
  * - completed: Fully completed session
  * - with_help_flags: Session with help flags set
+ * - unlinked: Solo session at step 7 with NO partner (user2_id = NULL)
  */
-export type SeedPreset = 'mid_session' | 'completed' | 'with_help_flags';
+export type SeedPreset = 'mid_session' | 'completed' | 'with_help_flags' | 'unlinked';
 
 /**
  * Options for creating test sessions
@@ -80,6 +81,29 @@ export async function createTestSession(
   }
 
   return data as SeedResult;
+}
+
+/**
+ * Link two test users as partners.
+ *
+ * Updates the partner_id field for both users to establish a bidirectional
+ * partner relationship. Used for together-mode session testing.
+ *
+ * @param supabase - Supabase client (must have service role for admin access)
+ * @param user1Id - First user's UUID
+ * @param user2Id - Second user's UUID
+ * @throws Error if either update fails
+ *
+ * @example
+ * await linkTestPartners(supabase, result.test_user1_id, result.test_user2_id);
+ */
+export async function linkTestPartners(
+  supabase: TypedSupabaseClient,
+  user1Id: string,
+  user2Id: string
+): Promise<void> {
+  await supabase.from('users').update({ partner_id: user2Id }).eq('id', user1Id);
+  await supabase.from('users').update({ partner_id: user1Id }).eq('id', user2Id);
 }
 
 /**

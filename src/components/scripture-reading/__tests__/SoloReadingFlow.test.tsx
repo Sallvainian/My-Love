@@ -83,12 +83,35 @@ vi.mock('../../../hooks/useAutoSave', () => ({
   useAutoSave: (...args: unknown[]) => mockUseAutoSave(...args),
 }));
 
+// Story 2.1 + 2.3: Mock scriptureReadingService
+const mockGetBookmarksBySession = vi.fn().mockResolvedValue([]);
+const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
+const mockAddReflection = vi.fn().mockResolvedValue(undefined);
+const mockUpdateSession = vi.fn().mockResolvedValue(undefined);
+const mockAddMessage = vi.fn().mockResolvedValue({ id: 'msg-1', sessionId: 'session-123', senderId: 'user-456', message: 'test', createdAt: new Date() });
+const mockGetSessionReportData = vi.fn().mockResolvedValue({
+  reflections: [],
+  bookmarks: [],
+  messages: [],
+});
+vi.mock('../../../services/scriptureReadingService', () => ({
+  scriptureReadingService: {
+    getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
+    toggleBookmark: (...args: unknown[]) => mockToggleBookmark(...args),
+    addReflection: (...args: unknown[]) => mockAddReflection(...args),
+    updateSession: (...args: unknown[]) => mockUpdateSession(...args),
+    addMessage: (...args: unknown[]) => mockAddMessage(...args),
+    getSessionReportData: (...args: unknown[]) => mockGetSessionReportData(...args),
+  },
+}));
+
 // Mock Zustand store
 const mockAdvanceStep = vi.fn().mockResolvedValue(undefined);
 const mockSaveAndExit = vi.fn().mockResolvedValue(undefined);
 const mockSaveSession = vi.fn().mockResolvedValue(undefined);
 const mockExitSession = vi.fn();
 const mockRetryFailedWrite = vi.fn().mockResolvedValue(undefined);
+const mockUpdatePhase = vi.fn();
 
 interface MockSession {
   id: string;
@@ -103,9 +126,16 @@ interface MockSession {
 }
 
 interface MockPendingRetry {
-  type: 'advanceStep' | 'saveSession';
+  type: 'advanceStep' | 'saveSession' | 'reflection';
   attempts: number;
   maxAttempts: number;
+}
+
+interface MockPartner {
+  id: string;
+  displayName: string;
+  email: string;
+  connectedAt: Date;
 }
 
 const mockStoreState: {
@@ -118,6 +148,8 @@ const mockStoreState: {
   saveSession: typeof mockSaveSession;
   exitSession: typeof mockExitSession;
   retryFailedWrite: typeof mockRetryFailedWrite;
+  updatePhase: typeof mockUpdatePhase;
+  partner: MockPartner | null;
 } = {
   session: null,
   isSyncing: false,
@@ -128,6 +160,8 @@ const mockStoreState: {
   saveSession: mockSaveSession,
   exitSession: mockExitSession,
   retryFailedWrite: mockRetryFailedWrite,
+  updatePhase: mockUpdatePhase,
+  partner: null,
 };
 
 // Create a function to get state for the useAppStore mock
@@ -161,10 +195,16 @@ function createMockSession(overrides?: Partial<MockSession>): MockSession {
 describe('SoloReadingFlow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetSessionReportData.mockResolvedValue({
+      reflections: [],
+      bookmarks: [],
+      messages: [],
+    });
     mockStoreState.session = createMockSession();
     mockStoreState.isSyncing = false;
     mockStoreState.scriptureError = null;
     mockStoreState.pendingRetry = null;
+    mockStoreState.partner = null;
     mockShouldReduceMotion = false;
     mockIsOnline = true;
   });
@@ -306,17 +346,32 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Step Advancement', () => {
-    it('calls advanceStep when Next Verse is tapped on verse screen', () => {
+    it('shows reflection screen when Next Verse is tapped on verse screen', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reflection-subview')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-screen')).toBeDefined();
     });
 
-    it('calls advanceStep when Next Verse is tapped on response screen', () => {
+    it('shows reflection screen when Next Verse is tapped on response screen', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('scripture-view-response-button'));
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reflection-subview')).toBeDefined();
+    });
+
+    it('calls advanceStep after reflection Continue is submitted', async () => {
+      render(<SoloReadingFlow />);
+      // Go to reflection
+      fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
+      // Select a rating
+      fireEvent.click(screen.getByTestId('scripture-rating-3'));
+      // Submit reflection
+      fireEvent.click(screen.getByTestId('scripture-reflection-continue'));
+      // advanceStep is called after reflection submit
+      await vi.waitFor(() => {
+        expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('shows "Complete Reading" on last step instead of "Next Verse"', () => {
@@ -337,65 +392,82 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Session Completion', () => {
-    it('shows completion screen when session is complete', () => {
+    it('shows ReflectionSummary when phase is reflection', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
         currentPhase: 'reflection',
+        status: 'in_progress',
         currentStepIndex: 16,
-        completedAt: new Date(),
       });
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('scripture-completion-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
     });
 
-    it('shows "Reading Complete" heading on completion', () => {
+    it('shows unlinked completion screen when phase is report and no partner', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByText('Reading Complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
+      expect(screen.getByText('Session complete')).toBeDefined();
     });
 
-    it('shows completion message with step count', () => {
+    it('shows "Session complete" heading on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
+      mockStoreState.partner = null;
+      render(<SoloReadingFlow />);
+      expect(screen.getByText('Session complete')).toBeDefined();
+    });
+
+    it('shows reflections saved message on report phase for unlinked user', () => {
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+      });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
       expect(
-        screen.getByText(/completed all 17 scripture readings/i)
+        screen.getByText(/Your reflections have been saved/i)
       ).toBeDefined();
     });
 
-    it('shows Return to Overview button on completion', () => {
+    it('shows Return to Overview button on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByTestId('return-to-overview')).toHaveTextContent(
+      expect(screen.getByTestId('scripture-unlinked-return-btn')).toHaveTextContent(
         'Return to Overview'
       );
     });
 
-    it('calls exitSession when Return to Overview is tapped', () => {
+    it('calls exitSession when Return to Overview is tapped on report phase for unlinked user', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      fireEvent.click(screen.getByTestId('return-to-overview'));
+      fireEvent.click(screen.getByTestId('scripture-unlinked-return-btn'));
       expect(mockExitSession).toHaveBeenCalledTimes(1);
     });
 
-    it('shows completion for reflection phase even if status is not complete', () => {
+    it('shows ReflectionSummary for reflection phase with in_progress status', () => {
       mockStoreState.session = createMockSession({
         currentPhase: 'reflection',
         status: 'in_progress',
       });
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('scripture-completion-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
     });
   });
 
@@ -852,15 +924,16 @@ describe('SoloReadingFlow', () => {
       expect(verseRef.getAttribute('tabindex')).toBe('-1');
     });
 
-    it('completion heading has tabIndex={-1} and data-testid="completion-heading"', () => {
+    it('unlinked completion heading has tabIndex={-1}', () => {
       mockStoreState.session = createMockSession({
-        status: 'complete',
-        currentPhase: 'reflection',
+        currentPhase: 'report',
+        status: 'in_progress',
       });
+      mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      const heading = screen.getByTestId('completion-heading');
+      const heading = screen.getByTestId('scripture-unlinked-complete-heading');
       expect(heading.getAttribute('tabindex')).toBe('-1');
-      expect(heading).toHaveTextContent('Reading Complete');
+      expect(heading).toHaveTextContent('Session complete');
     });
 
     it('focuses Back to Verse button after View Response click', () => {
@@ -880,13 +953,21 @@ describe('SoloReadingFlow', () => {
       expect(document.activeElement).toBe(verseRef);
     });
 
-    it('focuses verse heading after Next Verse step advancement', () => {
-      // Start at step 0, advance to step 1
+    it('focuses verse heading after reflection submit advances step', async () => {
+      // Start at step 0, advance to step 1 after reflection
       mockAdvanceStep.mockImplementation(async () => {
         mockStoreState.session = createMockSession({ currentStepIndex: 1 });
       });
       const { rerender } = render(<SoloReadingFlow />);
+      // Go to reflection
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
+      // Select a rating and submit
+      fireEvent.click(screen.getByTestId('scripture-rating-3'));
+      fireEvent.click(screen.getByTestId('scripture-reflection-continue'));
+      // Wait for advanceStep to complete
+      await vi.waitFor(() => {
+        expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      });
       // Re-render to trigger effects with new step index
       mockStoreState.session = createMockSession({ currentStepIndex: 1 });
       rerender(<SoloReadingFlow />);
@@ -985,6 +1066,256 @@ describe('SoloReadingFlow', () => {
       expect(screen.getByTestId('verse-screen')).toBeDefined();
       expect(screen.getByTestId('scripture-verse-reference')).toBeDefined();
       expect(screen.getByTestId('scripture-next-verse-button')).toBeDefined();
+    });
+  });
+
+  // ============================================
+  // Story 2.2: Reflection Summary
+  // ============================================
+
+  describe('Story 2.2: Reflection Summary', () => {
+    it('shows ReflectionSummary when phase is reflection (2.2-CMP-012)', () => {
+      mockStoreState.session = createMockSession({
+        currentPhase: 'reflection',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show ReflectionSummary component instead of old placeholder
+      expect(screen.getByTestId('scripture-reflection-summary-screen')).toBeDefined();
+      expect(screen.getByTestId('scripture-reflection-summary-heading')).toHaveTextContent('Your Session');
+      // Should NOT show the old completion placeholder text
+      expect(screen.queryByText('Reflection summary coming in Story 2.2')).toBeNull();
+    });
+
+    it('calls updatePhase with report after reflection summary submission (2.2-CMP-018)', async () => {
+      // Mock requestAnimationFrame for focus tests
+      const origRAF = globalThis.requestAnimationFrame;
+      globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+
+      mockStoreState.session = createMockSession({
+        currentPhase: 'reflection',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      // Provide bookmarks so verse selection is available
+      mockGetBookmarksBySession.mockResolvedValue([
+        { stepIndex: 0, userId: 'user-456' },
+      ]);
+      render(<SoloReadingFlow />);
+      // Wait for async bookmark loading to complete
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-standout-verse-0')).toBeDefined();
+      });
+      // Select a standout verse
+      fireEvent.click(screen.getByTestId('scripture-standout-verse-0'));
+      // Select a session rating
+      fireEvent.click(screen.getByTestId('scripture-session-rating-4'));
+      // Submit the reflection summary
+      fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
+      // Verify updatePhase was called with 'report'
+      expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+
+      globalThis.requestAnimationFrame = origRAF;
+    });
+
+    it('shows unlinked completion when phase is report and no partner (2.2-CMP-013)', () => {
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      mockStoreState.partner = null;
+      render(<SoloReadingFlow />);
+      // Should show unlinked completion (placeholder replaced by Story 2.3)
+      expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
+      expect(screen.getByText('Session complete')).toBeDefined();
+      // Should have Return to Overview button
+      expect(screen.getByTestId('scripture-unlinked-return-btn')).toBeDefined();
+      // Should NOT show the ReflectionSummary
+      expect(screen.queryByTestId('scripture-reflection-summary-screen')).toBeNull();
+    });
+  });
+
+  // ============================================
+  // Story 2.3: Daily Prayer Report
+  // ============================================
+
+  describe('Story 2.3: Daily Prayer Report', () => {
+    const linkedPartner: MockPartner = {
+      id: 'partner-1',
+      displayName: 'Sarah',
+      email: 'sarah@example.com',
+      connectedAt: new Date('2026-01-15'),
+    };
+
+    it('shows MessageCompose when phase is report and partner exists (2.3-INT-002)', () => {
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show MessageCompose screen instead of placeholder
+      expect(screen.getByTestId('scripture-message-compose-screen')).toBeDefined();
+      // Should NOT show unlinked completion
+      expect(screen.queryByTestId('scripture-unlinked-complete-screen')).toBeNull();
+    });
+
+    it('shows unlinked completion screen when phase is report and no partner (2.3-INT-001)', () => {
+      mockStoreState.partner = null;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Should show unlinked completion screen
+      expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
+      // Should NOT show MessageCompose
+      expect(screen.queryByTestId('scripture-message-compose-screen')).toBeNull();
+    });
+
+    it('sending message calls addMessage service (2.3-INT-003)', async () => {
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Type a message
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'I love you' } });
+      // Click send
+      fireEvent.click(screen.getByTestId('scripture-message-send-btn'));
+      await vi.waitFor(() => {
+        expect(mockAddMessage).toHaveBeenCalledWith(
+          'session-123',
+          'user-456',
+          'I love you'
+        );
+      });
+    });
+
+    it('skipping message still marks session complete (2.3-INT-004)', async () => {
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Click skip
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+      await vi.waitFor(() => {
+        expect(mockUpdateSession).toHaveBeenCalledWith(
+          'session-123',
+          expect.objectContaining({ status: 'complete' })
+        );
+      });
+    });
+
+    it('DailyPrayerReport appears after send/skip (2.3-INT-005)', async () => {
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Type and send a message
+      const textarea = screen.getByTestId('scripture-message-textarea');
+      fireEvent.change(textarea, { target: { value: 'Thinking of you' } });
+      fireEvent.click(screen.getByTestId('scripture-message-send-btn'));
+      // After send, report screen should appear
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+    });
+
+    it('shows report load error and retry when report fetch fails (2.3-INT-008)', async () => {
+      mockGetSessionReportData.mockRejectedValueOnce(new Error('fetch failed'));
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-error')).toBeDefined();
+        expect(screen.getByTestId('scripture-report-retry-btn')).toBeDefined();
+      });
+    });
+
+    it('retry triggers report refetch after failure (2.3-INT-009)', async () => {
+      mockGetSessionReportData
+        .mockRejectedValueOnce(new Error('fetch failed'))
+        .mockResolvedValueOnce({
+          reflections: [],
+          bookmarks: [],
+          messages: [],
+        });
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-error')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('scripture-report-retry-btn'));
+
+      await vi.waitFor(() => {
+        expect(mockGetSessionReportData).toHaveBeenCalledTimes(2);
+        expect(screen.queryByTestId('scripture-report-error')).toBeNull();
+      });
+    });
+
+    it('session marked complete after report phase entry for unlinked user (2.3-INT-006)', async () => {
+      mockStoreState.partner = null;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Unlinked user skips compose, session should be marked complete on mount
+      await vi.waitFor(() => {
+        expect(mockUpdateSession).toHaveBeenCalledWith(
+          'session-123',
+          expect.objectContaining({ status: 'complete' })
+        );
+      });
+    });
+
+    it('Return to Overview calls exitSession (2.3-INT-007)', async () => {
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      render(<SoloReadingFlow />);
+      // Skip to get to report
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+      // Click return
+      fireEvent.click(screen.getByTestId('scripture-report-return-btn'));
+      expect(mockExitSession).toHaveBeenCalledTimes(1);
     });
   });
 });
