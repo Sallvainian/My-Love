@@ -87,6 +87,9 @@ docs/99-Archive/
 /playwright/.auth/
 supabase/.temp/
 
+# BMAD method files (local tooling)
+_bmad/
+
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
 CLAUDE.md

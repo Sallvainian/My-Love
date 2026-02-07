@@ -52,7 +52,7 @@ Determine what was just completed:
 
 ## EXECUTION
 
-1. **Load catalog** — Load `_bmad/_config/bmad-help.csv`
+1. **Load catalog** — Load `{project-root}/_bmad/_config/bmad-help.csv`
 
 2. **Resolve output locations** — Scan each folder under `_bmad/` (except `_config`) for `config.yaml`. For each workflow row, resolve its `output-location` variables against that module's config so artifact paths can be searched.
 
