@@ -1,0 +1,286 @@
+{
+  "workflow": "testarch-trace",
+  "story": {
+    "id": "1.3",
+    "title": "Solo Reading Flow"
+  },
+  "generated_at": "2026-02-07T00:00:00Z",
+  "scope": {
+    "authoritative_inputs": [
+      "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts",
+      "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts",
+      "/Users/sallvain/Projects/My-Love/_bmad-output/test-review.md",
+      "/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-3-solo-reading-flow/story.md",
+      "/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-3-solo-reading-flow/acceptance-criteria.md"
+    ]
+  },
+  "evidence": {
+    "commits_user_provided": [
+      "f9983b3",
+      "bcc26d2"
+    ],
+    "burn_in": {
+      "tests": [
+        "P1-012",
+        "P2-012"
+      ],
+      "status": "passed_consecutively",
+      "source": "/Users/sallvain/Projects/My-Love/_bmad-output/test-review.md:35"
+    }
+  },
+  "traceability_matrix": [
+    {
+      "criterion_id": "AC-1",
+      "priority": "P0",
+      "description": "Solo session starts correctly",
+      "mapped_test_ids": [
+        "P0-009"
+      ],
+      "test_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:96",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:103",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:111"
+      ],
+      "helper_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:235",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:242",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:246",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:258",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:130"
+      ],
+      "test_level": "e2e",
+      "coverage_status": "FULL",
+      "evidence_notes": "Visible flow readiness and first-verse assertions are explicit; helper path includes solo/in-progress session creation observability."
+    },
+    {
+      "criterion_id": "AC-2",
+      "priority": "P1",
+      "description": "Verse screen renders correctly",
+      "mapped_test_ids": [
+        "P0-009",
+        "UNSCOPED-ID-VERSE-SCREEN"
+      ],
+      "test_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:137",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:145",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:150",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:154",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:159",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:165"
+      ],
+      "helper_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:235"
+      ],
+      "test_level": "e2e",
+      "coverage_status": "FULL",
+      "evidence_notes": "All required UI elements and progress text are explicitly asserted."
+    },
+    {
+      "criterion_id": "AC-3",
+      "priority": "P1",
+      "description": "Response screen navigation",
+      "mapped_test_ids": [
+        "UNSCOPED-ID-RESP-NAV",
+        "UNSCOPED-ID-RESP-ADVANCE"
+      ],
+      "test_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:168",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:173",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:177",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:182",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:187",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:191",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:194",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:197",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:207"
+      ],
+      "helper_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:235"
+      ],
+      "test_level": "e2e",
+      "coverage_status": "FULL",
+      "evidence_notes": "Both response/back navigation and response-path advancement are directly asserted."
+    },
+    {
+      "criterion_id": "AC-4",
+      "priority": "P1",
+      "description": "Step advancement",
+      "mapped_test_ids": [
+        "P1-001",
+        "P1-012",
+        "P0-009"
+      ],
+      "test_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:219",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:231",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:241",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:245",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:257",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:260",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:265",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:42",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:67"
+      ],
+      "helper_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:297",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:308"
+      ],
+      "test_level": "e2e",
+      "coverage_status": "FULL",
+      "evidence_notes": "Progress and advancement are directly asserted with network observability and user-visible checks."
+    },
+    {
+      "criterion_id": "AC-5",
+      "priority": "P2",
+      "description": "Session completion boundary",
+      "mapped_test_ids": [
+        "P2-012",
+        "P0-009"
+      ],
+      "test_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:269",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:286",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:290",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:291",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:129",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:132"
+      ],
+      "helper_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:297"
+      ],
+      "test_level": "e2e",
+      "coverage_status": "FULL",
+      "evidence_notes": "Final-step transition is explicitly asserted at boundary conditions."
+    },
+    {
+      "criterion_id": "AC-6",
+      "priority": "P1",
+      "description": "Exit with save",
+      "mapped_test_ids": [
+        "N/A"
+      ],
+      "test_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:19"
+      ],
+      "helper_file_lines": [
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:147",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:150",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:151",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:152",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:153",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:238"
+      ],
+      "test_level": "e2e_helper_path",
+      "coverage_status": "PARTIAL",
+      "evidence_notes": "Behavior exists in conditional helper branch, but no explicit dedicated scenario asserts AC-6 persistence contract in scoped tests."
+    }
+  ],
+  "coverage_statistics": {
+    "total_requirements": 6,
+    "fully_covered": 5,
+    "partially_covered": 1,
+    "uncovered": 0,
+    "overall_full_coverage_percentage": 83,
+    "overall_covered_percentage": 100,
+    "priority_breakdown": {
+      "P0": {
+        "total": 1,
+        "fully_covered": 1,
+        "partially_covered": 0,
+        "uncovered": 0,
+        "full_coverage_percentage": 100
+      },
+      "P1": {
+        "total": 4,
+        "fully_covered": 3,
+        "partially_covered": 1,
+        "uncovered": 0,
+        "full_coverage_percentage": 75
+      },
+      "P2": {
+        "total": 1,
+        "fully_covered": 1,
+        "partially_covered": 0,
+        "uncovered": 0,
+        "full_coverage_percentage": 100
+      }
+    }
+  },
+  "gap_analysis": {
+    "critical_gaps": [],
+    "high_gaps": [],
+    "medium_gaps": [],
+    "low_gaps": [],
+    "partial_coverage_items": [
+      "AC-6"
+    ]
+  },
+  "gate_decision": {
+    "decision_mode": "deterministic",
+    "manual_waiver": false,
+    "decision": "CONCERNS",
+    "criteria": {
+      "p0_full_coverage_required": 100,
+      "overall_full_coverage_for_pass": 90,
+      "overall_full_coverage_for_concerns": 75,
+      "actual_p0_full_coverage": 100,
+      "actual_overall_full_coverage": 83
+    },
+    "rule_evaluation": [
+      "Rule1: P0<100 => FAIL (not triggered)",
+      "Rule2: overall>=90 => PASS (not met)",
+      "Rule3: overall>=75 => CONCERNS (triggered)",
+      "Rule4: overall<75 => FAIL (not triggered)",
+      "Rule5: waiver => WAIVED (not triggered)"
+    ],
+    "rationale": "P0 full coverage is met, but overall FULL coverage (83%) is below PASS threshold (90%) due to AC-6 remaining PARTIAL."
+  },
+  "residual_risk": [
+    {
+      "id": "R-1",
+      "title": "Backend/auth coupling",
+      "probability": "medium",
+      "impact": "medium",
+      "score": 6,
+      "evidence": [
+        "/Users/sallvain/Projects/My-Love/_bmad-output/test-review.md:27",
+        "/Users/sallvain/Projects/My-Love/_bmad-output/test-review.md:28",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:88"
+      ],
+      "mitigation": "Keep auth preflight diagnostics and enforce env/token setup in CI."
+    },
+    {
+      "id": "R-2",
+      "title": "Strict response-gated helper hotspots",
+      "probability": "medium",
+      "impact": "medium",
+      "score": 6,
+      "evidence": [
+        "/Users/sallvain/Projects/My-Love/_bmad-output/test-review.md:104",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:308",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:359",
+        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:399"
+      ],
+      "mitigation": "Apply UI-first + bounded network diagnostic pattern consistently."
+    },
+    {
+      "id": "R-3",
+      "title": "Long-path timeout sensitivity",
+      "probability": "low",
+      "impact": "medium",
+      "score": 4,
+      "evidence": [
+        "/Users/sallvain/Projects/My-Love/_bmad-output/test-review.md:29",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:100",
+        "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:273"
+      ],
+      "mitigation": "Keep burn-in cadence on critical subset and isolate long-path jobs."
+    }
+  ],
+  "recommendation": {
+    "close_gate": false,
+    "next_workflow": "TA",
+    "reason": "AC-6 is PARTIAL and needs explicit deterministic scenario coverage to reach FULL PASS threshold.",
+    "conditional_follow_up": "Run AT first if team wants stricter acceptance-level decomposition before automation expansion."
+  }
+}
