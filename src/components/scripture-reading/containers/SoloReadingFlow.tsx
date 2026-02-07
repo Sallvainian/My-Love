@@ -33,6 +33,12 @@ import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useAutoSave } from '../../../hooks/useAutoSave';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { BookmarkFlag } from '../reading/BookmarkFlag';
+import { PerStepReflection } from '../reflection/PerStepReflection';
+import { ReflectionSummary } from '../reflection/ReflectionSummary';
+import { MessageCompose } from '../reflection/MessageCompose';
+import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
+import { scriptureReadingService } from '../../../services/scriptureReadingService';
 
 // Lavender Dreams design tokens (shared with ScriptureOverview)
 const scriptureTheme = {
@@ -41,8 +47,11 @@ const scriptureTheme = {
   surface: '#FAF5FF',
 };
 
-// Sub-view within a step: verse or response
-type StepSubView = 'verse' | 'response';
+// Sub-view within a step: verse, response, or reflection
+type StepSubView = 'verse' | 'response' | 'reflection';
+
+// Story 2.3: Sub-phase within report phase
+type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked';
 
 // Direction for slide animation
 type SlideDirection = 'left' | 'right';
@@ -54,7 +63,7 @@ export function SoloReadingFlow() {
   const { crossfade, slide } = useMotionConfig();
   const { isOnline } = useNetworkStatus();
 
-  // Scripture reading slice state
+  // Scripture reading slice state + partner slice
   const {
     session,
     isSyncing,
@@ -65,6 +74,8 @@ export function SoloReadingFlow() {
     saveSession,
     exitSession,
     retryFailedWrite,
+    updatePhase,
+    partner,
   } = useAppStore(
     useShallow((state) => ({
       session: state.session,
@@ -76,6 +87,8 @@ export function SoloReadingFlow() {
       saveSession: state.saveSession,
       exitSession: state.exitSession,
       retryFailedWrite: state.retryFailedWrite,
+      updatePhase: state.updatePhase,
+      partner: state.partner,
     }))
   );
 
@@ -86,6 +99,9 @@ export function SoloReadingFlow() {
   const [subView, setSubView] = useState<StepSubView>('verse');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [slideDirection, setSlideDirection] = useState<SlideDirection>('left');
+
+  // Story 2.1: Bookmark state (optimistic toggle, per-step)
+  const [bookmarkedSteps, setBookmarkedSteps] = useState<Set<number>>(new Set());
 
   // Story 1.5: Screen reader announcement state (AC #2)
   const [announcement, setAnnouncement] = useState('');
@@ -103,6 +119,39 @@ export function SoloReadingFlow() {
   const prevSubViewRef = useRef<StepSubView>('verse');
   const prevIsCompletedRef = useRef(false);
 
+  // Story 2.3: Report sub-phase state and data
+  const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>('compose');
+  const [reportData, setReportData] = useState<{
+    userRatings: { stepIndex: number; rating: number }[];
+    userBookmarks: number[];
+    userStandoutVerses: number[];
+    partnerMessage: string | null;
+    partnerRatings: { stepIndex: number; rating: number }[] | null;
+    partnerBookmarks: number[] | null;
+    partnerStandoutVerses: number[] | null;
+    isPartnerComplete: boolean;
+  }>({
+    userRatings: [],
+    userBookmarks: [],
+    userStandoutVerses: [],
+    partnerMessage: null,
+    partnerRatings: null,
+    partnerBookmarks: null,
+    partnerStandoutVerses: null,
+    isPartnerComplete: false,
+  });
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
+  const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup bookmark debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (bookmarkDebounceRef.current) clearTimeout(bookmarkDebounceRef.current);
+    };
+  }, []);
+
   // Track previous isOnline to detect offline → online transitions
   const prevIsOnlineRef = useRef(isOnline);
 
@@ -119,12 +168,297 @@ export function SoloReadingFlow() {
     prevIsOnlineRef.current = isOnline;
   }, [isOnline, pendingRetry, retryFailedWrite]);
 
+  // Story 2.1: Load bookmarks for current session on mount/session change
+  useEffect(() => {
+    if (!session) return;
+    void (async () => {
+      const bookmarks = await scriptureReadingService.getBookmarksBySession(session.id);
+      const userBookmarks = bookmarks.filter((b) => b.userId === session.userId);
+      setBookmarkedSteps(new Set(userBookmarks.map((b) => b.stepIndex)));
+    })();
+  }, [session?.id, session?.userId]);
+
+  // Story 2.1: Bookmark toggle handler (optimistic UI immediate, debounced server write)
+  const handleBookmarkToggle = useCallback(() => {
+    if (!session) return;
+    const stepIndex = session.currentStepIndex;
+
+    // Optimistic toggle (instant per AC #1)
+    setBookmarkedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepIndex)) {
+        next.delete(stepIndex);
+      } else {
+        next.add(stepIndex);
+      }
+      return next;
+    });
+
+    // Debounce server write (300ms, last-write-wins)
+    if (bookmarkDebounceRef.current) {
+      clearTimeout(bookmarkDebounceRef.current);
+    }
+    bookmarkDebounceRef.current = setTimeout(() => {
+      bookmarkDebounceRef.current = null;
+      void (async () => {
+        try {
+          await scriptureReadingService.toggleBookmark(session.id, stepIndex, session.userId, false);
+        } catch {
+          // Revert on failure
+          setBookmarkedSteps((prev) => {
+            const next = new Set(prev);
+            if (next.has(stepIndex)) {
+              next.delete(stepIndex);
+            } else {
+              next.add(stepIndex);
+            }
+            return next;
+          });
+        }
+      })();
+    }, 300);
+  }, [session]);
+
+  // Story 2.2: Handle reflection summary submission — save session reflection then advance to report
+  const handleReflectionSummarySubmit = useCallback(
+    (data: { standoutVerses: number[]; rating: number; notes: string }) => {
+      if (!session) return;
+
+      // Save session-level reflection in background (non-blocking)
+      void (async () => {
+        try {
+          const jsonNotes = JSON.stringify({
+            standoutVerses: data.standoutVerses,
+            userNote: data.notes,
+          });
+          await scriptureReadingService.addReflection(
+            session.id,
+            MAX_STEPS, // sentinel value for session-level reflection
+            data.rating,
+            jsonNotes,
+            false
+          );
+        } catch {
+          // Non-blocking: reflection write failure shouldn't block phase advancement
+        }
+      })();
+
+      // Advance phase to 'report' optimistically via store
+      updatePhase('report');
+
+      // Persist phase change to server in background
+      void (async () => {
+        try {
+          await scriptureReadingService.updateSession(session.id, {
+            currentPhase: 'report',
+          });
+        } catch {
+          // Non-blocking: phase persistence failure handled by eventual consistency
+        }
+      })();
+    },
+    [session, updatePhase]
+  );
+
+  // Story 2.3: Mark session complete helper
+  // Updates server status but keeps local phase as 'report' for UI rendering
+  const markSessionComplete = useCallback(async () => {
+    if (!session) return;
+    try {
+      await scriptureReadingService.updateSession(session.id, {
+        status: 'complete',
+        completedAt: new Date(),
+      });
+    } catch {
+      // Non-blocking: session completion failure handled by eventual consistency
+    }
+  }, [session]);
+
+  // Story 2.3: Handle message send
+  const handleMessageSend = useCallback(
+    (message: string) => {
+      if (!session || isSendingMessage) return;
+      setIsSendingMessage(true);
+
+      // Fire-and-forget message write
+      void (async () => {
+        try {
+          await scriptureReadingService.addMessage(session.id, session.userId, message);
+        } catch {
+          // Non-blocking: message write failure shouldn't block session completion
+        }
+      })();
+
+      // Mark session complete and advance to report view
+      void markSessionComplete();
+      setReportSubPhase('report');
+      setIsSendingMessage(false);
+    },
+    [session, isSendingMessage, markSessionComplete]
+  );
+
+  // Story 2.3: Handle message skip
+  const handleMessageSkip = useCallback(() => {
+    if (!session || isSendingMessage) return;
+    setIsSendingMessage(true);
+
+    // Skip message, mark session complete, advance to report view
+    void markSessionComplete();
+    setReportSubPhase('report');
+    setIsSendingMessage(false);
+  }, [session, isSendingMessage, markSessionComplete]);
+
+  // Story 2.3: Handle return to overview from report
+  const handleReturnToOverview = useCallback(() => {
+    exitSession();
+  }, [exitSession]);
+
+  // Story 2.3: Determine initial report sub-phase and mark unlinked session complete
+  const isReportEntry = session?.currentPhase === 'report';
+  const hasPartner = partner !== null;
+  useEffect(() => {
+    if (!isReportEntry || !session) return;
+
+    if (!hasPartner) {
+      setReportSubPhase('complete-unlinked');
+      void markSessionComplete();
+    } else {
+      setReportSubPhase('compose');
+    }
+  }, [isReportEntry, hasPartner, session, markSessionComplete]);
+
+  // Story 2.3: Load report data when report view is actually displayed
+  useEffect(() => {
+    if ((reportSubPhase !== 'report' && reportSubPhase !== 'complete-unlinked') || !session) return;
+
+    void (async () => {
+      try {
+        // Use server-fresh data (not cache) to include partner contributions
+        const { reflections, bookmarks, messages } =
+          await scriptureReadingService.getSessionReportData(session.id);
+
+        // Build user ratings from reflections (exclude session-level at MAX_STEPS, require rating)
+        const userReflections = reflections.filter(
+          (r) => r.userId === session.userId && r.stepIndex < MAX_STEPS && r.rating != null
+        );
+        const userRatings = userReflections.map((r) => ({
+          stepIndex: r.stepIndex,
+          rating: r.rating!,
+        }));
+
+        // User bookmarks
+        const userBookmarks = bookmarks
+          .filter((b) => b.userId === session.userId)
+          .map((b) => b.stepIndex);
+
+        // Extract standout verses from session-level reflection (stepIndex === MAX_STEPS)
+        const sessionReflection = reflections.find(
+          (r) => r.userId === session.userId && r.stepIndex === MAX_STEPS
+        );
+        let userStandoutVerses: number[] = [];
+        if (sessionReflection?.notes) {
+          try {
+            const parsed = JSON.parse(sessionReflection.notes) as { standoutVerses?: number[] };
+            userStandoutVerses = parsed.standoutVerses ?? [];
+          } catch {
+            // Invalid JSON in notes — proceed without standout verses
+          }
+        }
+
+        // Partner message (filter by sender !== current user)
+        const partnerMsg = messages.find((m) => m.senderId !== session.userId);
+
+        // Partner ratings (reflections from other user)
+        const partnerReflections = reflections.filter(
+          (r) => r.userId !== session.userId && r.stepIndex < MAX_STEPS && r.rating != null
+        );
+        const partnerRatings = partnerReflections.length > 0
+          ? partnerReflections.map((r) => ({ stepIndex: r.stepIndex, rating: r.rating! }))
+          : null;
+
+        // Partner bookmarks
+        const partnerBookmarkSteps = bookmarks
+          .filter((b) => b.userId !== session.userId)
+          .map((b) => b.stepIndex);
+        const partnerBookmarks = partnerBookmarkSteps.length > 0 ? partnerBookmarkSteps : null;
+
+        // Partner standout verses (from session-level reflection)
+        const partnerSessionReflection = reflections.find(
+          (r) => r.userId !== session.userId && r.stepIndex === MAX_STEPS
+        );
+        let partnerStandoutVerses: number[] | null = null;
+        if (partnerSessionReflection?.notes) {
+          try {
+            const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
+            partnerStandoutVerses = parsed.standoutVerses ?? null;
+          } catch {
+            // Invalid JSON in partner notes — proceed without standout verses
+          }
+        }
+
+        setReportData({
+          userRatings,
+          userBookmarks,
+          userStandoutVerses,
+          partnerMessage: partnerMsg?.message ?? null,
+          partnerRatings,
+          partnerBookmarks,
+          partnerStandoutVerses,
+          isPartnerComplete: partnerReflections.length > 0,
+        });
+      } catch {
+        // Non-blocking: report data loading failure uses empty defaults
+      }
+    })();
+  }, [reportSubPhase, session]);
+
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
-  const handleNextVerse = useCallback(async () => {
-    setSlideDirection('left');
-    setSubView('verse');
-    await advanceStep();
-  }, [advanceStep]);
+  // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
+  const handleNextVerse = useCallback(() => {
+    setSubView('reflection');
+  }, []);
+
+  // Story 2.1: Handle reflection submission — save reflection then advance step
+  const handleReflectionSubmit = useCallback(
+    async (rating: number, notes: string) => {
+      if (!session) return;
+
+      // Advance step first (non-blocking UX)
+      setSlideDirection('left');
+      setSubView('verse');
+
+      // Save reflection in background (non-blocking per AC)
+      void (async () => {
+        try {
+          await scriptureReadingService.addReflection(
+            session.id,
+            session.currentStepIndex,
+            rating,
+            notes,
+            false // is_shared defaults to false
+          );
+        } catch {
+          useAppStore.setState({
+            pendingRetry: {
+              type: 'reflection',
+              attempts: 1,
+              maxAttempts: 3,
+              reflectionData: {
+                sessionId: session.id,
+                stepIndex: session.currentStepIndex,
+                rating,
+                notes,
+                isShared: false,
+              },
+            },
+          });
+        }
+      })();
+
+      await advanceStep();
+    },
+    [session, advanceStep]
+  );
 
   const handleViewResponse = useCallback(() => {
     setSubView('response');
@@ -205,7 +539,7 @@ export function SoloReadingFlow() {
     prevStepIndexRef.current = session?.currentStepIndex;
   }, [session?.currentStepIndex, session]);
 
-  // Story 1.5: Screen reader announcements + focus management on sub-view change (AC #2, #3)
+  // Story 1.5 + 2.1: Screen reader announcements + focus management on sub-view change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
   useEffect(() => {
     if (prevSubViewRef.current !== subView) {
@@ -214,6 +548,16 @@ export function SoloReadingFlow() {
         setTimeout(() => setAnnouncement(msg), 100);
         requestAnimationFrame(() => {
           backToVerseRef.current?.focus();
+        });
+      } else if (subView === 'reflection') {
+        // Story 2.1: Focus reflection heading on transition
+        setTimeout(() => setAnnouncement('Reflect on this verse'), 100);
+        requestAnimationFrame(() => {
+          // Focus the reflection prompt heading via data-testid
+          const reflectionPrompt = document.querySelector<HTMLElement>(
+            '[data-testid="scripture-reflection-prompt"]'
+          );
+          reflectionPrompt?.focus();
         });
       } else if (prevSubViewRef.current === 'response') {
         setTimeout(
@@ -231,15 +575,17 @@ export function SoloReadingFlow() {
   }, [subView, session?.currentStepIndex]);
 
   // Computed before guard for useEffect dependency
-  const isCompleted = session
-    ? session.status === 'complete' || session.currentPhase === 'reflection'
-    : false;
+  const isReflectionPhase = session ? session.currentPhase === 'reflection' : false;
+  const isReportPhase = session ? session.currentPhase === 'report' : false;
+  const isCompleted = isReflectionPhase || isReportPhase;
 
-  // Story 1.5: Completion screen announcement + focus (AC #2, #3)
+  // Story 1.5 + 2.2: Completion screen announcement + focus (AC #2, #3)
   useEffect(() => {
     if (isCompleted && !prevIsCompletedRef.current) {
       prevIsCompletedRef.current = true;
-      const msg = `Reading complete. All ${MAX_STEPS} verses finished.`;
+      const msg = isReflectionPhase
+        ? 'Review your session reflections'
+        : `Reading complete. All ${MAX_STEPS} verses finished.`;
       setTimeout(() => setAnnouncement(msg), 100);
       requestAnimationFrame(() => {
         completionHeadingRef.current?.focus();
@@ -247,7 +593,7 @@ export function SoloReadingFlow() {
       const timer = setTimeout(() => setAnnouncement(''), 1000);
       return () => clearTimeout(timer);
     }
-  }, [isCompleted]);
+  }, [isCompleted, isReflectionPhase]);
 
   // Guard: no session means we shouldn't be here
   if (!session) return null;
@@ -274,46 +620,135 @@ export function SoloReadingFlow() {
     }),
   };
 
-  // Completion screen (placeholder for Epic 2 reflection)
-  if (isCompleted) {
+  // Story 2.2: Reflection summary screen (after step 17 reflection completes)
+  if (isReflectionPhase) {
+    // Map bookmarkedSteps Set to array of verse data for ReflectionSummary
+    const bookmarkedVerses = Array.from(bookmarkedSteps)
+      .sort((a, b) => a - b)
+      .map((stepIndex) => ({
+        stepIndex,
+        verseReference: SCRIPTURE_STEPS[stepIndex].verseReference,
+        verseText: SCRIPTURE_STEPS[stepIndex].verseText,
+      }));
+
     return (
-      <div
+      <motion.div
         className="flex min-h-screen flex-col p-4 pb-20"
         style={{ backgroundColor: scriptureTheme.background }}
         data-testid="scripture-completion-screen"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={crossfade}
       >
-        {/* Story 1.5: Screen reader announcer (AC #2) */}
+        {/* Screen reader announcer */}
         <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
           {announcement}
         </div>
 
-        <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-6 text-center">
-          <div className="text-6xl" aria-hidden="true">
-            🙏
-          </div>
-          <h1
-            className="font-serif text-2xl font-bold text-purple-900"
-            ref={completionHeadingRef}
-            tabIndex={-1}
-            data-testid="completion-heading"
-          >
-            Reading Complete
-          </h1>
-          <p className="text-purple-700">
-            You&apos;ve completed all {MAX_STEPS} scripture readings. Take a moment to reflect on
-            what you&apos;ve read.
-          </p>
-          <p className="text-sm text-purple-600">Reflection feature coming soon (Epic 2)</p>
-          <button
-            onClick={() => exitSession()}
-            className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
-            data-testid="return-to-overview"
-            type="button"
-          >
-            Return to Overview
-          </button>
+        <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+          <ReflectionSummary
+            bookmarkedVerses={bookmarkedVerses}
+            onSubmit={handleReflectionSummarySubmit}
+            disabled={isSyncing}
+          />
         </div>
-      </div>
+      </motion.div>
+    );
+  }
+
+  // Story 2.3: Report phase — message compose, daily prayer report, or unlinked completion
+  if (isReportPhase) {
+    // Unlinked user — show simple completion screen (Task 3, AC #2)
+    if (reportSubPhase === 'complete-unlinked') {
+      return (
+        <motion.div
+          className="flex min-h-screen flex-col p-4 pb-20"
+          style={{ backgroundColor: scriptureTheme.background }}
+          data-testid="scripture-unlinked-complete-screen"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={crossfade}
+        >
+          <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            {announcement}
+          </div>
+          <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-6 text-center">
+            <h2
+              className="font-serif text-2xl font-bold text-purple-900"
+              ref={completionHeadingRef}
+              tabIndex={-1}
+              data-testid="scripture-unlinked-complete-heading"
+            >
+              Session complete
+            </h2>
+            <p className="text-sm text-purple-600">
+              Your reflections have been saved
+            </p>
+            <button
+              onClick={() => exitSession()}
+              className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
+              data-testid="scripture-unlinked-return-btn"
+              type="button"
+            >
+              Return to Overview
+            </button>
+          </div>
+        </motion.div>
+      );
+    }
+
+    // Linked user — message compose phase (Task 4, AC #1)
+    if (reportSubPhase === 'compose') {
+      return (
+        <motion.div
+          className="flex min-h-screen flex-col p-4 pb-20"
+          style={{ backgroundColor: scriptureTheme.background }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={crossfade}
+        >
+          <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            {announcement}
+          </div>
+          <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+            <MessageCompose
+              partnerName={partner?.displayName ?? 'your partner'}
+              onSend={handleMessageSend}
+              onSkip={handleMessageSkip}
+              disabled={isSendingMessage}
+            />
+          </div>
+        </motion.div>
+      );
+    }
+
+    // Daily Prayer Report display (Task 4, AC #3, #4, #5)
+    return (
+      <motion.div
+        className="flex min-h-screen flex-col p-4 pb-20"
+        style={{ backgroundColor: scriptureTheme.background }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={crossfade}
+      >
+        <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+          {announcement}
+        </div>
+        <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+          <DailyPrayerReport
+            userRatings={reportData.userRatings}
+            userBookmarks={reportData.userBookmarks}
+            userStandoutVerses={reportData.userStandoutVerses}
+            partnerMessage={reportData.partnerMessage}
+            partnerName={partner?.displayName ?? null}
+            partnerRatings={reportData.partnerRatings}
+            partnerBookmarks={reportData.partnerBookmarks}
+            partnerStandoutVerses={reportData.partnerStandoutVerses}
+            isPartnerComplete={reportData.isPartnerComplete}
+            onReturn={handleReturnToOverview}
+          />
+        </div>
+      </motion.div>
     );
   }
 
@@ -336,7 +771,7 @@ export function SoloReadingFlow() {
         <button
           ref={exitButtonRef}
           onClick={handleExitRequest}
-          className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
+          className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
           aria-label="Exit reading"
           data-testid="exit-button"
           type="button"
@@ -371,7 +806,7 @@ export function SoloReadingFlow() {
       </header>
 
       {/* Main content area */}
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
         <AnimatePresence mode="wait" custom={slideDirection}>
           <motion.div
             key={`step-${session.currentStepIndex}-${subView}`}
@@ -380,21 +815,30 @@ export function SoloReadingFlow() {
             initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
             animate={subView === 'verse' ? 'center' : { opacity: 1 }}
             exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
-            transition={subView === 'verse' ? slide : crossfade}
+            transition={subView === 'reflection' ? { duration: 0.4 } : subView === 'verse' ? slide : crossfade}
             className="flex w-full flex-1 flex-col justify-center pb-32"
           >
             {subView === 'verse' ? (
               /* Verse Screen */
               <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
                 {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-600, tabIndex for focus management */}
-                <p
-                  ref={verseHeadingRef}
-                  tabIndex={-1}
-                  className="text-center text-xs font-medium tracking-wide text-purple-600"
-                  data-testid="scripture-verse-reference"
-                >
-                  {currentStep.verseReference}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div className="w-12" /> {/* Spacer for centering */}
+                  <p
+                    ref={verseHeadingRef}
+                    tabIndex={-1}
+                    className="text-center text-xs font-medium tracking-wide text-purple-600"
+                    data-testid="scripture-verse-reference"
+                  >
+                    {currentStep.verseReference}
+                  </p>
+                  {/* Story 2.1: Bookmark toggle (AC #1) */}
+                  <BookmarkFlag
+                    isBookmarked={bookmarkedSteps.has(session.currentStepIndex)}
+                    onToggle={handleBookmarkToggle}
+                    disabled={!isOnline}
+                  />
+                </div>
 
                 {/* Verse text - prominent display */}
                 <blockquote
@@ -406,7 +850,7 @@ export function SoloReadingFlow() {
                   </p>
                 </blockquote>
               </div>
-            ) : (
+            ) : subView === 'response' ? (
               /* Response Screen */
               <div className="flex w-full flex-col space-y-6" data-testid="response-screen">
                 {/* Verse reference (context) — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
@@ -426,6 +870,14 @@ export function SoloReadingFlow() {
                     {currentStep.responseText}
                   </p>
                 </div>
+              </div>
+            ) : (
+              /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
+              <div data-testid="reflection-subview">
+                <PerStepReflection
+                  onSubmit={handleReflectionSubmit}
+                  disabled={isSyncing}
+                />
               </div>
             )}
           </motion.div>
@@ -500,7 +952,7 @@ export function SoloReadingFlow() {
             {pendingRetry.attempts < pendingRetry.maxAttempts && (
               <button
                 onClick={retryFailedWrite}
-                className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
+                className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
                 data-testid="retry-button"
                 type="button"
               >
@@ -511,6 +963,7 @@ export function SoloReadingFlow() {
         )}
 
         {/* Action buttons - bottom anchored for thumb-friendly access */}
+        {subView !== 'reflection' && (
         <div className="space-y-3 pt-4">
           {subView === 'verse' ? (
             <>
@@ -575,7 +1028,8 @@ export function SoloReadingFlow() {
             </>
           )}
         </div>
-      </main>
+        )}
+      </div>
 
       {/* Exit Confirmation Dialog */}
       <AnimatePresence>
