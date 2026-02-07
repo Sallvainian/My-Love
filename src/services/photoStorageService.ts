@@ -4,7 +4,7 @@ import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 import { PhotoSchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
-import { ZodError } from 'zod/v4';
+import { ZodError } from 'zod';
 import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../config/performance';
 import { performanceMonitor } from './performanceMonitor';
 

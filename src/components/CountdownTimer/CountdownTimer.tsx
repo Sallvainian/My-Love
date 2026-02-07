@@ -10,7 +10,7 @@
  */
 
 import { m as motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, Sparkles } from 'lucide-react';
 import type { Anniversary } from '../../types';
 import {
@@ -22,7 +22,6 @@ import {
   type TimeRemaining,
 } from '../../utils/countdownService';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
-import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 
 export interface CountdownTimerProps {
   anniversaries: Anniversary[];
@@ -42,10 +41,8 @@ export function CountdownTimer({
   className = '',
   maxDisplay = 3,
 }: CountdownTimerProps) {
-  const [tick, setTick] = useState(0);
+  const [countdowns, setCountdowns] = useState<AnniversaryWithCountdown[]>([]);
   const [celebratingId, setCelebratingId] = useState<number | null>(null);
-  const activeCelebrationRef = useRef<number | null>(null);
-  const celebrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get upcoming anniversaries with their countdowns
   const upcomingAnniversaries = useMemo(
@@ -53,8 +50,9 @@ export function CountdownTimer({
     [anniversaries, maxDisplay]
   );
 
-  const buildCountdowns = useCallback((_tick: number): AnniversaryWithCountdown[] => {
-    return upcomingAnniversaries.map((anniversary) => {
+  // Calculate countdowns for all upcoming anniversaries
+  const updateCountdowns = useCallback(() => {
+    const newCountdowns = upcomingAnniversaries.map((anniversary) => {
       const nextDate = getNextAnniversaryDate(anniversary.date);
       const timeRemaining = calculateTimeRemaining(nextDate);
       const shouldCelebrate = shouldTriggerCelebration(nextDate);
@@ -66,51 +64,33 @@ export function CountdownTimer({
         shouldCelebrate,
       };
     });
-  }, [upcomingAnniversaries]);
 
-  const countdowns = useMemo(() => buildCountdowns(tick), [buildCountdowns, tick]);
+    setCountdowns(newCountdowns);
 
-  const updateCelebration = useCallback(() => {
-    const celebrating = buildCountdowns(Date.now()).find((countdown) => countdown.shouldCelebrate);
-
-    if (celebrating) {
-      if (activeCelebrationRef.current !== celebrating.anniversary.id) {
-        activeCelebrationRef.current = celebrating.anniversary.id;
-        setCelebratingId(celebrating.anniversary.id);
-
-        if (celebrationTimeoutRef.current) {
-          clearTimeout(celebrationTimeoutRef.current);
-        }
-
-        celebrationTimeoutRef.current = setTimeout(() => {
-          setCelebratingId(null);
-        }, 3000);
-      }
-      return;
+    // Check if any anniversary should trigger celebration
+    const celebrating = newCountdowns.find((c) => c.shouldCelebrate);
+    if (celebrating && celebratingId !== celebrating.anniversary.id) {
+      setCelebratingId(celebrating.anniversary.id);
+      // Reset celebration after animation completes (3 seconds)
+      setTimeout(() => {
+        setCelebratingId(null);
+      }, 3000);
     }
-
-    activeCelebrationRef.current = null;
-  }, [buildCountdowns]);
+  }, [upcomingAnniversaries, celebratingId]);
 
   // Update countdowns every 1 minute (60000ms) - Story requirement
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Initial calculation and periodic updates; interval callback handles state updates
   useEffect(() => {
-    const kickoff = setTimeout(() => {
-      updateCelebration();
-    }, 0);
+    updateCountdowns(); // Initial calculation
 
     const interval = setInterval(() => {
-      updateCelebration();
-      setTick((current) => current + 1);
+      updateCountdowns();
     }, 60000); // 1 minute interval for battery optimization
 
     return () => {
-      clearTimeout(kickoff);
       clearInterval(interval); // Cleanup on unmount
-      if (celebrationTimeoutRef.current) {
-        clearTimeout(celebrationTimeoutRef.current);
-      }
     };
-  }, [updateCelebration]);
+  }, [updateCountdowns]);
 
   // No anniversaries to display
   if (countdowns.length === 0) {
@@ -257,7 +237,7 @@ function CelebrationAnimation() {
   // Memoize random X positions for render purity. Regenerates when heartCount
   // changes but stays stable within a session for consistent animation.
   const randomXPositions = useMemo(
-    () => generateDeterministicNumbers(`countdown-celebration-${heartCount}`, heartCount, 0, 100),
+    () => Array.from({ length: heartCount }, () => Math.random() * 100),
     [heartCount]
   );
 

@@ -102,35 +102,19 @@ function LoveNoteMessageComponent({
   }, [sanitizedContent, senderName]);
 
   // Fetch signed URL for server-stored images
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Async fetch of signed URL from message prop; state updates happen in async callback
   useEffect(() => {
-    let isMounted = true;
-
-    const scheduleStateUpdate = (update: () => void) => {
-      queueMicrotask(() => {
-        if (isMounted) {
-          update();
-        }
-      });
-    };
-
     // Use preview URL for optimistic display
     if (message.imagePreviewUrl) {
-      scheduleStateUpdate(() => {
-        setImageUrl(message.imagePreviewUrl);
-        setImageLoading(false);
-        setImageError(false);
-      });
-      return () => {
-        isMounted = false;
-      };
+      setImageUrl(message.imagePreviewUrl);
+      return;
     }
 
     // Fetch signed URL for server images
     if (message.image_url) {
-      scheduleStateUpdate(() => {
-        setImageLoading(true);
-        setImageError(false);
-      });
+      let isMounted = true;
+      setImageLoading(true);
+      setImageError(false);
 
       getSignedImageUrl(message.image_url)
         .then(({ url }) => {
@@ -151,16 +135,6 @@ function LoveNoteMessageComponent({
         isMounted = false;
       };
     }
-
-    scheduleStateUpdate(() => {
-      setImageUrl(null);
-      setImageLoading(false);
-      setImageError(false);
-    });
-
-    return () => {
-      isMounted = false;
-    };
   }, [message.image_url, message.imagePreviewUrl]);
 
   // Retry fetching signed URL on 403 error (force refresh to bypass cache)

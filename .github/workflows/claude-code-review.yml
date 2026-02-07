@@ -27,7 +27,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CLAUDE_PAT }}
         with:
-          github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: "dependabot,dependabot[bot]"
           # /review is a prebuilt skill optimized for PR code review
@@ -35,6 +34,5 @@ jobs:
           prompt: "/review"
           claude_args: |
             --model claude-opus-4-6
-            --max-turns 20
-            --allowedTools "Bash(git fetch:*)"
+            --max-turns 10
             --append-system-prompt "Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful. Focus on code quality, potential bugs, performance, security, and test coverage."

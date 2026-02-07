@@ -6,27 +6,27 @@
  * Features:
  * - "Write something for [Partner Name]" heading
  * - Textarea: max 300 chars, auto-grow, resize-none
- * - Character counter at 250+ chars
+ * - Character counter at 225+ chars (75% threshold)
  * - Send button (primary, full-width)
  * - Skip button (tertiary, no-guilt language)
  * - Keyboard handling: scroll into view on focus
  * - Disabled prop gates both buttons
- * - Focus moves to textarea on mount (configurable by parent)
+ * - Focus moves to textarea on mount
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ReactElement } from 'react';
+import { getCharCounterThreshold } from './charCounter';
 
 const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
 const MAX_MESSAGE_LENGTH = 300;
-const CHAR_COUNTER_THRESHOLD = 250;
+const CHAR_COUNTER_THRESHOLD = getCharCounterThreshold(MAX_MESSAGE_LENGTH);
 
 interface MessageComposeProps {
   partnerName: string;
   onSend: (message: string) => void;
   onSkip: () => void;
   disabled: boolean;
-  autoFocusTextarea?: boolean;
 }
 
 export function MessageCompose({
@@ -34,18 +34,16 @@ export function MessageCompose({
   onSend,
   onSkip,
   disabled,
-  autoFocusTextarea = true,
 }: MessageComposeProps): ReactElement {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus textarea on mount
   useEffect(() => {
-    if (!autoFocusTextarea) return;
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
     });
-  }, [autoFocusTextarea]);
+  }, []);
 
   // Auto-grow textarea
   useEffect(() => {

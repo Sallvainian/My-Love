@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-02-09'
+date: '2026-02-04'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 65
+rule_count: 48
 optimized_for_llm: true
 ---
 
@@ -18,23 +18,22 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ## Technology Stack & Versions
 
 - **Language:** TypeScript ~5.9.3 (strict mode, ES2022, verbatimModuleSyntax)
-- **UI Framework:** React ^19.2.4 (react-jsx transform)
+- **UI Framework:** React ^19.2.3 (react-jsx transform)
 - **Build:** Vite ^7.3.1 (bundler module resolution, manual chunk splitting)
-- **State:** Zustand ^5.0.11 (slice-based, persist middleware → localStorage)
-- **Backend:** Supabase ^2.93.3 (PostgreSQL + RLS + Realtime subscriptions + Storage)
+- **State:** Zustand ^5.0.10 (slice-based, persist middleware → localStorage)
+- **Backend:** Supabase ^2.90.1 (PostgreSQL + RLS + Realtime subscriptions + Storage)
 - **Local DB:** idb ^8.0.3 (IndexedDB for offline-first persistence)
-- **Validation:** Zod ^4.3.6 (schema validation at data boundaries)
+- **Validation:** Zod ^4.3.5 (schema validation at data boundaries)
 - **Styling:** Tailwind CSS ^4.1.17 (utility-first, PostCSS, class sorting via Prettier plugin)
-- **Animation:** Framer Motion ^12.29.3
-- **Icons:** Lucide React ^0.563.0 (tree-shakeable)
+- **Animation:** Framer Motion ^12.27.1
+- **Icons:** Lucide React ^0.562.0 (tree-shakeable)
 - **PWA:** vite-plugin-pwa ^1.2.0 (injectManifest strategy, custom sw.ts)
 - **Sanitization:** DOMPurify ^3.3.1 (XSS prevention for user content)
-- **Virtualization:** react-window ^2.2.6 + react-window-infinite-loader ^2.0.1
-- **SSE:** eventsource ^4.1.0
+- **Virtualization:** react-window ^2.2.5
 - **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 80% thresholds)
-- **E2E Tests:** Playwright ^1.58.2 (Chromium) + Currents ^1.21.1 (CI reporting)
-- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.54.0 (flat config)
-- **Formatting:** Prettier ^3.8.1 (100 char width, single quotes, trailing commas ES5)
+- **E2E Tests:** Playwright ^1.57.0 (Chromium)
+- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.53.1 (flat config)
+- **Formatting:** Prettier ^3.8.0 (100 char width, single quotes, trailing commas ES5)
 - **Package Manager:** npm (package-lock.json)
 - **Env Management:** dotenvx (encrypted .env, decrypted at build/runtime)
 
@@ -46,13 +45,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **No `any`:** ESLint enforces `@typescript-eslint/no-explicit-any: 'error'` — use `unknown`, specific types, or generics instead
 - **Explicit return types:** All exported functions must declare return types (components return `ReactElement`)
 - **Unused vars prefix:** Unused parameters/variables must be prefixed with `_` (e.g., `_event`, `_unused`)
-- **Path alias:** Use `@/` for imports from `src/` (e.g., `import { X } from '@/services/myService'`) — configured in vitest.config.ts only, NOT in vite.config.ts
+- **Path alias:** Use `@/` for imports from `src/` (e.g., `import { X } from '@/services/myService'`)
 - **Named exports only:** No default exports for components or services — use named exports + barrel files
 - **Import order:** Node built-ins → External packages → `@/` internal modules → Relative imports
 - **Error handling split:** Read operations return `null`/`[]` on failure; write operations throw `SupabaseServiceError`
 - **Env vars:** Access via `import.meta.env.VITE_*` — never use `process.env` in client code
 - **Module system:** ESM only (`"type": "module"` in package.json) — `.cjs` extension required for CommonJS scripts
-- **Dual validation:** Local schemas in `src/validation/schemas.ts` validate IndexedDB writes; API response schemas in `src/api/validation/supabaseSchemas.ts` validate Supabase responses — agents must use the correct schema layer
 
 ### Framework-Specific Rules (React + Zustand)
 
@@ -66,26 +64,18 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Lazy loading:** Heavy components (Supabase-dependent, photo gallery) must use `React.lazy()` + `<Suspense>`
 - **Error boundaries:** Wrap new feature areas with `<ViewErrorBoundary>` — top-level `<ErrorBoundary>` catches uncaught errors
 - **Unmount safety:** Use `isMountedRef` pattern in effects that set state after async operations
-- **Combined-effects rule:** Effects that share refs and trigger on the same dependency must be combined into a single effect to prevent race conditions.
 - **DOMPurify required:** All user-generated HTML content must be sanitized with `DOMPurify.sanitize()` before rendering
 - **PWA pitfall:** `vite-plugin-pwa` uses `injectManifest` — runtime caching is in `src/sw.ts`, NOT in vite config's workbox section (which is ignored)
-- **Two data models:** Most features are offline-first (IndexedDB primary, Supabase syncs). Scripture reading is the opposite — online-first (Supabase RPC is source of truth, IndexedDB is read cache). Agents must check which model a feature uses before implementing data layer code.
-- **PendingRetry pattern:** Scripture feature uses `isPendingLockIn`/`isPendingReflection` flags + `retryFailedWrite()` for graceful offline recovery of failed Supabase writes
-- **React 19 hooks lint rules:** `react-hooks/set-state-in-effect` and `react-hooks/purity` are set to `warn` (not error) — legitimate patterns like blob URL lifecycle and timer setup trigger these
 
 ### Testing Rules
 
 - **Unit tests (Vitest):** Environment is `happy-dom` — setup file at `tests/setup.ts` mocks `fake-indexeddb`, `window.matchMedia`, `IntersectionObserver`, `ResizeObserver`
 - **Test co-location:** Component tests go in `src/components/{feature}/__tests__/*.test.tsx`; service/util tests go in `tests/unit/`
 - **E2E tests (Playwright):** Organized by feature area under `tests/e2e/{feature}/` (auth, home, mood, notes, photos, scripture, offline, partner)
-- **E2E fixtures:** Always import `{ test, expect }` from `tests/support/merged-fixtures` — never from `@playwright/test` directly
-- **E2E auth setup:** Worker-isolated test users created via Supabase Admin API (`tests/support/auth-setup.ts`). Each parallel worker gets its own user pair. Auth state in `tests/.auth/worker-{n}.json`
 - **Coverage thresholds:** 80% minimum for lines, functions, branches, statements — builds fail below this
 - **TDD Guard:** `tdd-guard-vitest` reporter is active — follows TDD workflow enforcement
 - **Test env vars:** Vitest config injects mock `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` — do not use real credentials in tests
 - **Test file relaxations:** Test files allow `@ts-ignore`, unused vars, empty patterns, non-standard hook usage — see `eslint.config.js` test overrides
-- **Currents CI reporting:** Playwright uses `@currents/playwright` reporter for CI test result aggregation — configured in `playwright.config.ts`
-- **E2E local Supabase:** Playwright config auto-detects local Supabase via `supabase status -o env` and sets `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` — E2E tests require `supabase start` running locally
 
 ### Code Quality & Style Rules
 
@@ -96,7 +86,6 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Story annotations:** Components reference Story/AC numbers in JSDoc headers (e.g., `Story 2.1: AC-2.1.1`)
 - **Validation at boundaries:** Zod schemas in `src/validation/schemas.ts` validate data entering the app from Supabase — validate in the service layer before IndexedDB writes
 - **IndexedDB services:** All IndexedDB services extend `BaseIndexedDBService<T>` — call `await service.init()` before use; implements initialization guard against concurrent setup
-- **Per-feature ESLint overrides:** Scripture Reading files (`src/services/scriptureReadingService.ts`, `src/stores/slices/scriptureReadingSlice.ts`, `src/hooks/useScriptureBroadcast.ts`, `src/components/scripture-reading/**`) have their own strict `no-explicit-any` enforcement block in `eslint.config.js` — new features with similar strictness requirements should follow this pattern
 
 ### Development Workflow Rules
 
@@ -119,9 +108,6 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Offline-first:** The app must work offline — all features need graceful degradation when network is unavailable; use `isOnline()` checks and `SupabaseServiceError.isNetworkError`
 - **GitHub Pages base path:** Production builds use `/My-Love/` as base — all asset URLs must be relative or use the Vite `base` config; absolute paths will break on GH Pages
 - **Encrypted env:** `.env` is encrypted with dotenvx — `.env.keys` contains decryption key and is gitignored; never commit plaintext secrets
-- **Scripture is the exception:** Unlike every other feature, scripture reading is online-first — writes go to Supabase RPC first (throw on failure), IndexedDB is just a read cache. Do NOT apply the offline-first pattern to scripture code.
-- **Don't mix validation layers:** `src/validation/schemas.ts` is for local data entering IndexedDB; `src/api/validation/supabaseSchemas.ts` is for validating API responses from Supabase. Using the wrong layer will cause silent data corruption or false validation failures.
-- **E2E imports:** Always `import { test, expect } from 'tests/support/merged-fixtures'` in E2E tests — importing directly from `@playwright/test` will miss custom fixtures and auth setup
 
 ---
 
@@ -141,4 +127,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-02-10
+Last Updated: 2026-02-04

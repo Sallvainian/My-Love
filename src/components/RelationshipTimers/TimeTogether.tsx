@@ -16,23 +16,29 @@ import {
   type TimeDifference,
 } from '../../config/relationshipDates';
 
-function computeTimeTogetherState(): TimeDifference {
-  const now = new Date();
-  return calculateTimeDifference(RELATIONSHIP_DATES.datingStart, now);
-}
-
 export function TimeTogether() {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference>(() => computeTimeTogetherState());
+  const [timeDiff, setTimeDiff] = useState<TimeDifference | null>(null);
 
   const updateTime = useCallback(() => {
-    setTimeDiff(computeTimeTogetherState());
+    const now = new Date();
+    const diff = calculateTimeDifference(RELATIONSHIP_DATES.datingStart, now);
+    setTimeDiff(diff);
   }, []);
+
+  // Initial calculation on mount
+  useEffect(() => {
+    updateTime();
+  }, [updateTime]);
 
   // Update every second for real-time feel
   useEffect(() => {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, [updateTime]);
+
+  if (!timeDiff) {
+    return null;
+  }
 
   // Pluralize helper
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;

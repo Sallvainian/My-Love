@@ -1,203 +1,193 @@
-# CLAUDE.md
+## Git History Management
 
-## 🚨 MANDATORY RULE: DISPLAY AT START OF EVERY RESPONSE 🚨
+### Commit Organization
 
-## MANDATORY: Use td for Task Management
+Commits are organized **by story**. Each story gets its own commit(s) with a clear prefix.
 
-Run td usage --new-session at conversation start (or after /clear). This tells you what to work on next.
+**Commit message format:** `type(scope): brief description`
 
-Sessions are automatic (based on terminal/agent context). Optional:
-- td session "name" to label the current session
-- td session --new to force a new session in the same context
+| Prefix | Use |
+|--------|-----|
+| `feat(epic-N)` | New story implementation |
+| `fix(story-N.N)` | Bug fixes for a specific story |
+| `test(epic-N)` | QA passes, test additions |
+| `docs(epic-N)` | Documentation updates |
+| `chore(sprint)` | Sprint tracking, status updates |
+| `refactor` | Code restructuring without behavior change |
 
-Use td usage -q after first read.
+### Rules
 
-## Issue Tracking with Beads (`bd`)
+- **One story per commit.** Don't mix Story 1.2 and Story 1.3 work in the same commit.
+- **Group related changes.** Tests, implementation, and test-id alignment for the same story belong together unless they represent distinct phases (initial impl vs. fix pass).
+- **Separate docs from code.** Documentation-only changes get their own commit.
+- **Separate sprint tracking.** Status yaml updates get their own commit.
+- **Push by story.** Before pushing, ensure uncommitted changes are committed in story-grouped batches.
 
-Use `bd` (beads) for project-level issue tracking (bugs, features, tasks with dependencies). Issues persist in git across sessions.
+### Uncommitted Change Workflow
 
-**Session start:** `bd prime` is auto-injected via hooks. Check `bd ready` for available work.
+When uncommitted changes span multiple stories:
 
-**Workflow:**
-1. `bd ready` — find unblocked issues
-2. `bd show <id>` — review issue details
-3. `bd update <id> --status=in_progress` — claim it before coding
-4. Write code, commit
-5. `bd close <id>` — mark complete
-6. `bd sync` — sync beads changes with git
+1. Identify which files belong to which story
+2. Stage and commit each story group separately
+3. Commit docs and sprint tracking as separate commits
+4. Push all at once
 
-**Creating issues:** When you discover bugs, new features, or follow-up work during development:
-```bash
-bd create --title="Short description" --description="Context and what needs to be done" --type=task|bug|feature --priority=2
+### Branch Strategy
+
+- Feature branches: `feature/epic-N-description`
+- Base branch: `main`
+- All epic work stays on its feature branch until PR review
+
+<!-- BEGIN ContextStream -->
+# Claude Code Instructions
+# Workspace: My-Love
+# Workspace ID: cd177ea2-0b4c-4c3c-88f6-da8c2e65f623
+
+## 🚨 CRITICAL: CONTEXTSTREAM SEARCH FIRST 🚨
+
+**BEFORE using Glob, Grep, Search, Read (for discovery), Explore, or ANY local scanning:**
 ```
-Priority: 0-4 (0=critical, 4=backlog). Do NOT use "high"/"medium"/"low".
-
-**Dependencies:** `bd dep add <child> <parent>` — child depends on parent (parent blocks child).
-
-**Session close:** Before saying "done", run: `bd sync` then push.
-
-**WARNING:** Never use `bd edit` — it opens $EDITOR which blocks agents.
-
-**td vs bd:** Use `td` for session-level task management (what to work on right now). Use `bd` for persistent issue tracking (bugs, features, tasks that span sessions).
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-My Love is a PWA (Progressive Web App) for couples to exchange daily love messages, mood tracking, photo sharing, love notes chat, scripture reading, and partner interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
-
-Live URL: https://sallvainian.github.io/My-Love/
-
-## Commands
-
-### Development
-
-```bash
-npm run dev              # Start dev server (runs cleanup script wrapper)
-npm run dev:raw          # Start Vite dev server directly
-npm run preview          # Preview production build (dotenvx decrypts .env)
-npm run build            # Production build (dotenvx + tsc + vite)
-npm run typecheck        # tsc --noEmit
-npm run lint             # ESLint (src, tests, scripts)
-npm run lint:fix         # ESLint fix + Prettier
-npm run format           # Prettier write
-npm run format:check     # Prettier check
+STOP → Call search(mode="hybrid", query="...") FIRST
 ```
 
-### Testing
+**Claude Code:** Tools are `mcp__contextstream__search`, `mcp__contextstream__session_init`, etc.
 
-```bash
-# Unit tests (Vitest + happy-dom)
-npm run test:unit              # Run all unit tests
-npm run test:unit:watch        # Watch mode
-npm run test:unit:ui           # Vitest UI
-npm run test:unit:coverage     # With coverage (80% threshold)
+❌ **NEVER:** `Glob`, `Grep`, `Read` for discovery, `Task(Explore)`
+✅ **ALWAYS:** `search(mode="hybrid", query="...")` first, local tools ONLY if 0 results
 
-# E2E tests (Playwright, requires local Supabase running)
-npm run test:e2e               # All E2E tests (cleanup wrapper)
-npm run test:e2e:raw           # Playwright directly
-npm run test:e2e:ui            # Playwright UI mode
-npm run test:e2e:debug         # Debug mode
-npm run test:p0                # Priority 0 tests only
-npm run test:p1                # Priority 0+1 tests
+---
 
-# Run a single unit test file
-npx vitest run tests/unit/services/moodService.test.ts --silent
+## 🚨 AUTO-INDEXING 🚨
 
-# Run a single E2E test file
-npx playwright test tests/e2e/mood/mood-tracker.spec.ts
+**`session_init` auto-indexes your project.** No manual ingestion needed.
 
-# Run E2E tests matching a pattern
-npx playwright test --grep "mood tracker"
+If `indexing_status: "started"`: Search will work shortly. **DO NOT fall back to local tools.**
 
-# Database tests (pgTAP via Supabase CLI)
-npm run test:db                # supabase test db
+---
 
-# Smoke tests (post-build verification)
-npm run test:smoke
+## 🚨 LESSONS (PAST MISTAKES) - CRITICAL 🚨
+
+**After `session_init`:** Check for `lessons` field. If present, **READ and APPLY** before any work.
+
+**Before ANY risky work:** `session(action="get_lessons", query="<topic>")` — **MANDATORY**
+
+**When lessons found:** Summarize to user, state how you'll avoid past mistakes.
+
+---
+
+## ContextStream v0.4.x (Consolidated Domain Tools)
+
+v0.4.x uses ~11 consolidated domain tools for ~75% token reduction vs previous versions.
+Rules Version: 0.4.60
+
+### Required Every Message
+
+| Message | What to Call |
+|---------|--------------|
+| **1st message** | `session_init(folder_path="<cwd>", context_hint="<user_message>")`, then `context_smart(...)` |
+| **⚠️ After session_init** | **CHECK `lessons` field** — read and apply BEFORE any work |
+| **2nd+ messages** | `context_smart(user_message="<user_message>", format="minified", max_tokens=400)` |
+| **🔍 ANY code search** | `search(mode="hybrid", query="...")` — ALWAYS before Glob/Grep/Search/Read |
+| **⚠️ Before risky work** | `session(action="get_lessons", query="<topic>")` — **MANDATORY** |
+| **Capture decisions** | `session(action="capture", event_type="decision", title="...", content="...")` |
+| **On user frustration** | `session(action="capture_lesson", title="...", trigger="...", impact="...", prevention="...")` |
+
+**Context Pack (Pro+):** If enabled, use `context_smart(..., mode="pack", distill=true)` for code/file queries. If unavailable or disabled, omit `mode` and proceed with standard `context_smart` (the API will fall back).
+
+**Tool naming:** Use the exact tool names exposed by your MCP client. Claude Code typically uses `mcp__<server>__<tool>` where `<server>` matches your MCP config (often `contextstream`). If a tool call fails with "No such tool available", refresh rules and match the tool list.
+
+### Quick Reference: Domain Tools
+
+| Tool | Common Usage |
+|------|--------------|
+| `search` | `search(mode="semantic", query="...", limit=3)` — modes: semantic, hybrid, keyword, pattern |
+| `session` | `session(action="capture", ...)` — actions: capture, capture_lesson, get_lessons, recall, remember, user_context, summary, compress, delta, smart_search |
+| `memory` | `memory(action="list_events", ...)` — CRUD for events/nodes, search, decisions, timeline, summary |
+| `graph` | `graph(action="dependencies", ...)` — dependencies, impact, call_path, related, ingest |
+| `project` | `project(action="list", ...)` - list, get, create, update, index, overview, statistics, files, index_status, ingest_local |
+| `workspace` | `workspace(action="list", ...)` — list, get, associate, bootstrap |
+| `integration` | `integration(provider="github", action="search", ...)` — GitHub/Slack integration |
+| `help` | `help(action="tools")` — tools, auth, version, editor_rules |
+
+### Behavior Rules
+
+⚠️ **STOP: Before using Search/Glob/Grep/Read/Explore** → Call `search(mode="hybrid")` FIRST. Use local tools ONLY if ContextStream returns 0 results.
+
+**❌ WRONG workflow (wastes tokens, slow):**
+```
+Grep "function" → Read file1.ts → Read file2.ts → Read file3.ts → finally understand
 ```
 
-### Supabase
-
-```bash
-supabase start           # Start local Supabase (required for E2E tests)
-supabase stop            # Stop local Supabase
-supabase status          # Show connection URLs and keys
-supabase db reset        # Reset DB and re-run all migrations
-supabase migration new <name>  # Create new migration file
-supabase gen types typescript --local > src/types/database.types.ts  # Regenerate types
+**✅ CORRECT workflow (fast, complete):**
+```
+search(mode="hybrid", query="function implementation") → done (results include context)
 ```
 
-## Architecture
+**Why?** ContextStream search returns semantic matches + context + file locations in ONE call. Local tools require multiple round-trips.
 
-### State Management: Zustand Sliced Store
+- **First message**: Call `session_init` with context_hint, then `context_smart` before any other tool
+- **Every message**: Call `context_smart` BEFORE responding
+- **For discovery**: Use `search(mode="hybrid")` — **NEVER use local Glob/Grep/Read first**
+- **If search returns 0 results**: Retry once (indexing may be in progress), THEN try local tools
+- **For file lookups**: Use `search`/`graph` first; fall back to local ONLY if ContextStream returns nothing
+- **If ContextStream returns results**: Do NOT use local tools; Read ONLY for exact edits
+- **For code analysis**: `graph(action="dependencies")` or `graph(action="impact")`
+- **On [RULES_NOTICE]**: Use `generate_rules()` to update rules
+- **After completing work**: Capture with `session(action="capture")`
+- **On mistakes**: Capture with `session(action="capture_lesson")`
 
-Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices via the slice pattern:
+### Search Mode Selection
 
-- `appSlice` - initialization, loading states
-- `settingsSlice` - theme, relationship config
-- `navigationSlice` - current view routing
-- `messagesSlice` - daily love messages, favorites
-- `moodSlice` - mood tracking, partner mood sync
-- `interactionsSlice` - poke/kiss/fart interactions
-- `partnerSlice` - partner data, display name
-- `notesSlice` - love notes chat messages
-- `photosSlice` - photo gallery
-- `scriptureReadingSlice` - scripture reading sessions
+| Need | Mode | Example |
+|------|------|---------|
+| Find code by meaning | `hybrid` | "authentication logic", "error handling" |
+| Exact string/symbol | `keyword` | "UserAuthService", "API_KEY" |
+| File patterns | `pattern` | "*.sql", "test_*.py" |
+| ALL matches (grep-like) | `exhaustive` | "TODO", "FIXME" (find all occurrences) |
+| Symbol renaming | `refactor` | "oldFunctionName" (word-boundary matching) |
+| Conceptual search | `semantic` | "how does caching work" |
 
-State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`.
+### Token Efficiency
 
-### Data Layer: Offline-First with Cloud Sync
+Use `output_format` to reduce response size:
+- `full` (default): Full content for understanding code
+- `paths`: File paths only (80% token savings) - use for file listings
+- `minimal`: Compact format (60% savings) - use for refactoring
+- `count`: Match counts only (90% savings) - use for quick checks
 
-**Offline-first architecture** — UI reads/writes IndexedDB as the primary data store. Supabase is the sync and sharing layer, not the source of truth for local user data.
+**When to use `output_format=count`:**
+- User asks "how many X" or "count of X" → `search(..., output_format="count")`
+- Checking if something exists → count > 0 is sufficient
+- Large exhaustive searches → get count first, then fetch if needed
 
-- **IndexedDB** (via `idb` library): Primary local storage. Schema defined in `src/services/dbSchema.ts` (versioned, currently v5). Services extend `BaseIndexedDBService` for CRUD operations. Entries are created with `synced: false` and `supabaseId: null`.
-- **Supabase**: Cloud backend for cross-device sync, partner features (realtime mood, love notes, interactions), and data persistence. Client singleton in `src/api/supabaseClient.ts`.
-- **Sync strategy** (moods/photos/interactions): Three triggers — (1) immediate on creation, (2) periodic while app is open, (3) Background Sync API via service worker when app is closed. Partial failure handling: failed entries are retried on next sync pass.
-- **Scripture feature uses the opposite pattern**: Online-first with optimistic UI. Supabase is the source of truth; IndexedDB is a read cache. Writes go to Supabase RPC first and throw on failure (no offline queue). Reads use cache-first with fire-and-forget background refresh. The Zustand slice updates state optimistically before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
+**Auto-suggested formats:** Check `query_interpretation.suggested_output_format` in responses:
+- Symbol queries → suggests `minimal` (path + line + snippet)
+- Count queries → suggests `count`
+**USE the suggestion** for best efficiency.
 
-### Service Worker (`src/sw.ts`)
+**Example:** User asks "how many TODO comments?" →
+`search(mode="exhaustive", query="TODO", output_format="count")` returns `{total: 47}` (not 47 full results)
 
-Custom InjectManifest strategy (not GenerateSW). Handles:
-- Precaching static assets (images/fonts only - JS/CSS use NetworkFirst)
-- Background Sync for mood entries via direct IndexedDB + Supabase REST API calls
-- Cache strategies: NetworkFirst for navigation/API, CacheFirst for images/fonts
-- Database operations in `src/sw-db.ts` (separate from app IndexedDB code)
+### 🚨 Plans & Tasks - USE CONTEXTSTREAM, NOT FILE-BASED PLANS 🚨
 
-### Environment Variables
+**CRITICAL: When user requests planning, implementation plans, roadmaps, or task breakdowns:**
 
-Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git. The `.env.keys` file (gitignored) contains the decryption key.
+❌ **DO NOT** use built-in plan mode (EnterPlanMode) or write plan files
+✅ **ALWAYS** use ContextStream's plan/task system
 
-Key env vars:
-- `VITE_SUPABASE_URL` - Supabase project URL
-- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anon/public key
+**Trigger phrases (use ContextStream immediately):**
+- "plan", "roadmap", "milestones", "break down", "steps", "task list", "implementation strategy"
 
-For E2E tests, `.env.test` provides plain-text local Supabase values. Playwright config auto-detects local Supabase via `supabase status -o env`.
+**Create plans in ContextStream:**
+1. `session(action="capture_plan", title="...", description="...", goals=[...], steps=[{id: "1", title: "Step 1", order: 1}, ...])`
+2. `memory(action="create_task", title="...", plan_id="<plan_id>", priority="high|medium|low", description="...")`
 
-### Authentication
+**Manage plans/tasks:**
+- List plans: `session(action="list_plans")`
+- Get plan with tasks: `session(action="get_plan", plan_id="<uuid>", include_tasks=true)`
+- List tasks: `memory(action="list_tasks", plan_id="<uuid>")` or `memory(action="list_tasks")` for all
+- Update task status: `memory(action="update_task", task_id="<uuid>", task_status="pending|in_progress|completed|blocked")`
+- Delete: `memory(action="delete_task", task_id="<uuid>")`
 
-Email/password auth via Supabase Auth. The app expects exactly 2 users linked via `partner_id` in the `users` table. Partner detection is automatic.
-
-### Testing Architecture
-
-**Unit tests** (`tests/unit/`): Vitest + happy-dom + React Testing Library. Setup in `tests/setup.ts`. Uses `fake-indexeddb` for IndexedDB mocking.
-
-**E2E tests** (`tests/e2e/`): Playwright with merged fixtures from `@seontechnologies/playwright-utils` and custom fixtures (`tests/support/merged-fixtures.ts`). Always import `{ test, expect }` from `tests/support/merged-fixtures` in E2E tests.
-
-**Auth setup** (`tests/support/auth-setup.ts`): Creates worker-isolated test users via Supabase Admin API before tests run. Each parallel worker gets its own user pair (user + partner) to prevent cross-contamination. Auth state stored in `tests/.auth/worker-{n}.json`.
-
-**API tests** (`tests/api/`): Playwright-based API tests against Supabase endpoints.
-
-**Database tests** (`supabase/tests/database/`): pgTAP tests run via `supabase test db`.
-
-### Supabase Migrations
-
-Located in `supabase/migrations/`. Named as `YYYYMMDDHHmmss_description.sql`. Tables: `users`, `moods`, `interactions`, `photos`, `love_note_images`, `scripture_*` tables. All tables have RLS enabled.
-
-### Validation
-
-Zod schemas in `src/validation/schemas.ts` with user-facing error messages in `src/validation/errorMessages.ts`.
-
-### Routing
-
-No router library - navigation is managed via `navigationSlice` in Zustand store. `App.tsx` renders views conditionally based on `currentView` state.
-
-### Base Path
-
-Production builds use `/My-Love/` base path for GitHub Pages deployment. Development uses `/`. Configured in `vite.config.ts` via `mode === 'production'` check.
-
-## Key Conventions
-
-- Package manager: **npm** (see `package-lock.json`)
-- Node version: **v24.13.0** (see `.nvmrc`)
-- Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
-- Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
-- ESLint enforces `no-explicit-any` as error
-- Prettier with `tailwindcss` plugin for class sorting
-- CI workflows in `.github/workflows/`: deploy, test, migrations, code review
-
-## Retrospective Guardrails (Epic Carry-Over)
-
-- Catch blocks must never be empty. In scripture code, catch blocks must call `handleScriptureError()` or re-throw; outside scripture code, re-throw or map to the feature's error handler.
-- For scripture-reading container code and new architecture-conforming work, do not import `supabase` or service modules directly; go through Zustand slice actions (legacy exception: `scriptureReadingService` adapter until refactor).
-- New scope discovered during development must be captured as a follow-up story. Do not reopen a story in review unless there is a critical regression or security fix approved by the owner.
+Full docs: https://contextstream.io/docs/mcp/tools
+<!-- END ContextStream -->

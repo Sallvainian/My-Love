@@ -1,4 +1,4 @@
-import { ZodError, type ZodIssue } from 'zod/v4';
+import { ZodError, type ZodIssue } from 'zod';
 
 /**
  * Error message transformation utilities

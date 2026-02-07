@@ -94,7 +94,6 @@ jobs:
     needs: [lint]
     env:
       DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
-      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
       CI: true
     steps:
       - name: Checkout code
@@ -158,7 +157,6 @@ jobs:
         total: [2]
     env:
       DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
-      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
       CI: true
     steps:
       - name: Checkout code
@@ -223,7 +221,6 @@ jobs:
     needs: [e2e-tests] # Only burn-in if E2E passes
     env:
       DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
-      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
       CI: true
     steps:
       - name: Checkout code

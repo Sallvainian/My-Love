@@ -14,7 +14,7 @@
  */
 
 import { useState, type FormEvent } from 'react';
-import { getUser } from '../../api/auth/sessionService';
+import { authService } from '../../api/authService';
 import { supabase } from '../../api/supabaseClient';
 import './DisplayNameSetup.css';
 
@@ -52,7 +52,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
     setIsLoading(true);
 
     try {
-      const user = await getUser();
+      const user = await authService.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }

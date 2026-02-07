@@ -20,45 +20,40 @@ export interface BirthdayCountdownProps {
   birthday: BirthdayInfo;
 }
 
-function computeBirthdayCountdownState(birthday: BirthdayInfo): {
-  timeDiff: TimeDifference;
-  upcomingAge: number;
-  isBirthdayToday: boolean;
-} {
-  const nextBirthday = getNextBirthday(birthday);
-  const now = new Date();
-  const diff = calculateTimeDifference(now, nextBirthday);
-  const today = new Date();
-  const isToday = today.getMonth() === birthday.month - 1 && today.getDate() === birthday.day;
-
-  return {
-    timeDiff: diff,
-    upcomingAge: getUpcomingAge(birthday),
-    isBirthdayToday: isToday,
-  };
-}
-
 export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference>(() => computeBirthdayCountdownState(birthday).timeDiff);
-  const [upcomingAge, setUpcomingAge] = useState<number>(
-    () => computeBirthdayCountdownState(birthday).upcomingAge
-  );
-  const [isBirthdayToday, setIsBirthdayToday] = useState<boolean>(
-    () => computeBirthdayCountdownState(birthday).isBirthdayToday
-  );
+  const [timeDiff, setTimeDiff] = useState<TimeDifference | null>(null);
+  const [upcomingAge, setUpcomingAge] = useState<number>(0);
+  const [isBirthdayToday, setIsBirthdayToday] = useState(false);
 
   const updateCountdown = useCallback(() => {
-    const nextState = computeBirthdayCountdownState(birthday);
-    setTimeDiff(nextState.timeDiff);
-    setUpcomingAge(nextState.upcomingAge);
-    setIsBirthdayToday(nextState.isBirthdayToday);
+    const nextBirthday = getNextBirthday(birthday);
+    const now = new Date();
+    const diff = calculateTimeDifference(now, nextBirthday);
+
+    setTimeDiff(diff);
+    setUpcomingAge(getUpcomingAge(birthday));
+
+    // Check if birthday is today (within 24 hours and it's the actual day)
+    const today = new Date();
+    const isToday =
+      today.getMonth() === birthday.month - 1 && today.getDate() === birthday.day;
+    setIsBirthdayToday(isToday);
   }, [birthday]);
+
+  // Initial calculation on mount and when birthday changes
+  useEffect(() => {
+    updateCountdown();
+  }, [updateCountdown]);
 
   // Update every second for real-time countdown
   useEffect(() => {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, [updateCountdown]);
+
+  if (!timeDiff) {
+    return null;
+  }
 
   const totalDays = timeDiff.years * 365 + timeDiff.days;
 

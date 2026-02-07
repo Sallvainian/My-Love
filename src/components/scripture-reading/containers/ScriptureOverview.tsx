@@ -193,7 +193,7 @@ export function ScriptureOverview() {
   );
 
   // Local UI state
-  const [isModeSelectionRequested, setIsModeSelectionRequested] = useState(false);
+  const [showModes, setShowModes] = useState(false);
   const [freshStartRequested] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('fresh') === 'true';
@@ -201,7 +201,6 @@ export function ScriptureOverview() {
 
   // Story 1.5: Screen reader announcement state (AC #2)
   const [announcement, setAnnouncement] = useState('');
-  const showModes = isModeSelectionRequested && !session;
 
   // Load partner status on mount
   useEffect(() => {
@@ -212,6 +211,7 @@ export function ScriptureOverview() {
   // Re-check when session becomes null (e.g., after save-and-exit)
   useEffect(() => {
     if (!session) {
+      setShowModes(false); // Reset mode selection visibility
       if (freshStartRequested) {
         // Test helper path: bypass resume prompt without mutating server state.
         clearActiveSession();
@@ -224,14 +224,9 @@ export function ScriptureOverview() {
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
   useEffect(() => {
     if (activeSession && !isCheckingSession) {
-      const showTimer = setTimeout(() => {
-        setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
-      }, 0);
-      const clearTimer = setTimeout(() => setAnnouncement(''), 1000);
-      return () => {
-        clearTimeout(showTimer);
-        clearTimeout(clearTimer);
-      };
+      setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
+      const timer = setTimeout(() => setAnnouncement(''), 1000);
+      return () => clearTimeout(timer);
     }
   }, [activeSession, isCheckingSession]);
 
@@ -246,7 +241,7 @@ export function ScriptureOverview() {
 
   // Action handlers
   const handleStart = useCallback(() => {
-    setIsModeSelectionRequested(true);
+    setShowModes(true);
     clearScriptureError();
   }, [clearScriptureError]);
 
@@ -271,7 +266,7 @@ export function ScriptureOverview() {
     if (activeSession) {
       await abandonSession(activeSession.id);
     }
-    setIsModeSelectionRequested(false);
+    setShowModes(false);
   }, [activeSession, abandonSession]);
 
   const handleLinkPartner = useCallback(() => {
@@ -291,7 +286,7 @@ export function ScriptureOverview() {
   }
 
   return (
-    <main
+    <div
       className="min-h-screen p-4"
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="scripture-overview"
@@ -466,6 +461,6 @@ export function ScriptureOverview() {
           )}
         </AnimatePresence>
       </div>
-    </main>
+    </div>
   );
 }

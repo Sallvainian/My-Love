@@ -31,12 +31,9 @@ describe('DailyPrayerReport', () => {
     userRatings: allRatings,
     userBookmarks: [2, 7, 14],
     userStandoutVerses: [2, 14],
-    userMessage: null as string | null,
     partnerMessage: null as string | null,
     partnerName: null as string | null,
     partnerRatings: null as { stepIndex: number; rating: number }[] | null,
-    partnerBookmarks: null as number[] | null,
-    partnerStandoutVerses: null as number[] | null,
     isPartnerComplete: false,
     onReturn: vi.fn(),
   };
@@ -126,8 +123,6 @@ describe('DailyPrayerReport', () => {
       const waitingText = screen.getByTestId('scripture-report-partner-waiting');
       expect(waitingText).toBeDefined();
       expect(waitingText).toHaveTextContent("Waiting for Sarah's reflections");
-      expect(waitingText.className).toContain('motion-safe:animate-pulse');
-      expect(waitingText.className).toContain('motion-reduce:animate-none');
     });
   });
 
@@ -147,48 +142,6 @@ describe('DailyPrayerReport', () => {
       );
       expect(screen.queryByTestId('scripture-report-partner-message')).toBeNull();
       expect(screen.queryByTestId('scripture-report-partner-waiting')).toBeNull();
-    });
-  });
-
-  describe('AC5 Extended Data', () => {
-    it('renders partner standout verses when provided', () => {
-      render(
-        <DailyPrayerReport
-          {...defaultProps}
-          partnerName="Sarah"
-          partnerStandoutVerses={[1, 3]}
-          isPartnerComplete={true}
-        />
-      );
-      const section = screen.getByTestId('scripture-report-partner-standout-verses');
-      expect(section).toHaveTextContent("Sarah's Standout Verses");
-      expect(section).toHaveTextContent(SCRIPTURE_STEPS[1].verseReference);
-      expect(section).toHaveTextContent(SCRIPTURE_STEPS[3].verseReference);
-    });
-
-    it('renders partner shared bookmark indicators', () => {
-      render(<DailyPrayerReport {...defaultProps} partnerBookmarks={[2, 4]} isPartnerComplete={true} />);
-      expect(screen.getByTestId('scripture-report-partner-bookmark-indicator-2')).toBeDefined();
-      expect(screen.getByTestId('scripture-report-partner-bookmark-indicator-4')).toBeDefined();
-      expect(screen.queryByTestId('scripture-report-partner-bookmark-indicator-1')).toBeNull();
-    });
-
-    it('renders both partner and user message cards when both exist', () => {
-      render(
-        <DailyPrayerReport
-          {...defaultProps}
-          partnerName="Sarah"
-          partnerMessage="I prayed for you today"
-          userMessage="Thank you for your love"
-          isPartnerComplete={true}
-        />
-      );
-      expect(screen.getByTestId('scripture-report-partner-message')).toHaveTextContent(
-        'I prayed for you today'
-      );
-      expect(screen.getByTestId('scripture-report-user-message')).toHaveTextContent(
-        'Thank you for your love'
-      );
     });
   });
 

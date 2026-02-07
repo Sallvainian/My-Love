@@ -1,6 +1,6 @@
 # Story 2.3: Daily Prayer Report — Send & View
 
-Status: done
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -136,7 +136,7 @@ So that we can connect emotionally through shared vulnerability and encouragemen
   - [x]8.8 Test: "Return to Overview" calls exitSession
 
 - [x]Task 9: Update E2E and API test suites (AC: #1, #2, #3)
-  - [x]9.1 Add Story 2.3 E2E tests to `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`
+  - [x]9.1 Add Story 2.3 E2E tests to `tests/e2e/scripture/scripture-reflection.spec.ts`
   - [x]9.2 Add Story 2.3 API tests to `tests/api/scripture-reflection-api.spec.ts`
   - [x]9.3 Test IDs for E2E targeting listed in Testing Requirements below
 
@@ -288,7 +288,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 | `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | Replace report placeholder with MessageCompose/DailyPrayerReport flow; add partner detection; add session completion logic |
 | `src/components/scripture-reading/index.ts` | Add barrel exports for `MessageCompose`, `DailyPrayerReport` |
 | `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Update report phase tests for new components |
-| `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` | Add Story 2.3 E2E tests |
+| `tests/e2e/scripture/scripture-reflection.spec.ts` | Add Story 2.3 E2E tests |
 | `tests/api/scripture-reflection-api.spec.ts` | Add Story 2.3 API tests (message persistence) |
 
 ### Testing Requirements
@@ -347,7 +347,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - `src/components/scripture-reading/__tests__/MessageCompose.test.tsx`
 - `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx`
 - `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` (modified)
-- `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` (modified)
+- `tests/e2e/scripture/scripture-reflection.spec.ts` (modified)
 - `tests/api/scripture-reflection-api.spec.ts` (modified)
 
 ### Accessibility Checklist
@@ -450,37 +450,30 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Completion Notes List
 
-- Completion lifecycle fixed: session completion now retries once, returns success/failure, calls `updatePhase('complete')` on success, and blocks report transition on completion failure with explicit retry UI.
-- AC5 report data expanded: user + partner messages, partner standout verses, partner shared bookmarks, and refined partner completion inference using session-level reflection with legacy fallback.
-- Reflection sharing/bookmark sharing aligned: together-mode reflections now persist with `isShared=true`; reflection summary now captures `shareBookmarkedVerses` and persists session-scoped bookmark sharing preference via service method.
-- Accessibility/motion fixed: report/compose heading focus + aria-live transition announcements added; `MessageCompose` autofocus now parent-controlled; waiting animation respects reduced-motion.
-- Character counter requirement fixed: message counter now appears at `250+` for 300-char field.
-- Story artifacts and test references updated to `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`.
-- Validation run (post-fix):
-  - `npm run test:unit -- src/components/scripture-reading/__tests__/MessageCompose.test.tsx src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx tests/unit/services/scriptureReadingService.cache.test.ts` (184 passed)
-  - `npm run test:e2e:raw -- tests/e2e/scripture/scripture-reflection-2.3.spec.ts` (6 passed)
-  - `npm run test:e2e:raw -- tests/api/scripture-reflection-api.spec.ts` (11 passed)
-  - `npm run typecheck` (pass)
-  - `npx eslint ...[touched story files]` (pass)
+- **Task 1**: Created `MessageCompose.tsx` — textarea (300 char, auto-grow), send/skip buttons, partner name heading, keyboard handling, focus on mount. All 9 unit tests pass.
+- **Task 2**: Created `DailyPrayerReport.tsx` — 17-step ratings display, bookmark indicators, standout verse chips, partner message card (Dancing Script font), waiting state, return button. All 8 unit tests pass.
+- **Task 3**: Unlinked completion screen implemented inline in SoloReadingFlow — "Session complete" heading, reflections saved message, return button. Session marked complete on mount.
+- **Task 4**: Replaced report phase placeholder with multi-step report flow: compose → report (linked), or complete-unlinked (unlinked). Phase transitions, partner detection, message send/skip handlers, session completion logic.
+- **Task 5**: Partner data wired via `useAppStore(state => state.partner)` using `useShallow` selector. Report data loaded from service layer (reflections, bookmarks, messages). Standout verses parsed from session-level reflection JSON notes.
+- **Task 6**: MessageCompose unit tests enabled (9 tests: heading, textarea, char counter, send, skip, disabled, aria-label, focus).
+- **Task 7**: DailyPrayerReport unit tests enabled (8 tests: ratings, bookmarks, standout verses, partner message, waiting, no-message, return, heading accessibility).
+- **Task 8**: SoloReadingFlow integration tests updated: old placeholder tests replaced with unlinked completion tests; 7 new Story 2.3 integration tests enabled (linked/unlinked routing, addMessage, session complete, report display, exitSession).
+- **Task 9**: E2E and API test suites already contained Story 2.3 tests from story creation pass — verified present.
+- **Full regression**: 553 tests pass across 30 test files, zero failures. TypeScript compiles clean. Lint: 0 errors, 2 warnings (legitimate set-state-in-effect pattern).
 
 ### File List
 
+**New Files:**
+- `src/components/scripture-reading/reflection/MessageCompose.tsx` — Message composition presentational component
+- `src/components/scripture-reading/reflection/DailyPrayerReport.tsx` — Daily Prayer Report presentational component
+
 **Modified Files:**
-- `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
-- `src/components/scripture-reading/reflection/DailyPrayerReport.tsx`
-- `src/components/scripture-reading/reflection/ReflectionSummary.tsx`
-- `src/components/scripture-reading/reflection/MessageCompose.tsx`
-- `src/components/scripture-reading/__tests__/MessageCompose.test.tsx`
-- `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx`
-- `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx`
-- `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`
-- `src/services/scriptureReadingService.ts`
-- `tests/unit/services/scriptureReadingService.cache.test.ts`
-- `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`
-- `tests/api/scripture-reflection-api.spec.ts`
-- `tests/support/helpers.ts`
-- `_bmad-output/implementation-artifacts/2-3-daily-prayer-report-send-and-view.md`
+- `src/components/scripture-reading/containers/SoloReadingFlow.tsx` — Replaced report placeholder with MessageCompose/DailyPrayerReport flow; added partner detection, session completion, report data loading
+- `src/components/scripture-reading/index.ts` — Added barrel exports for MessageCompose and DailyPrayerReport
+- `src/components/scripture-reading/__tests__/MessageCompose.test.tsx` — Enabled 9 unit tests (removed `.skip`)
+- `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx` — Enabled 8 unit tests (removed `.skip`)
+- `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` — Updated report phase tests for new components; added partner mock; enabled 7 Story 2.3 integration tests
 
 ### Change Log
 
-- 2026-02-08: Implemented Story 2.3 remediation for AC5 conformance and review findings closure; updated completion semantics, report payload/rendering, sharing controls, accessibility/motion behavior, and test/doc artifacts.
+- 2026-02-04: Implemented Story 2.3 — Daily Prayer Report — Send & View. Created MessageCompose and DailyPrayerReport components, integrated into SoloReadingFlow with partner detection and session completion logic. All 553 tests pass.

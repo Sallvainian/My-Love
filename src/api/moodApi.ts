@@ -22,7 +22,7 @@ import {
   logSupabaseError,
   isPostgrestError,
 } from './errorHandlers';
-import { ZodError } from 'zod/v4';
+import { ZodError } from 'zod';
 
 /**
  * Custom error for API validation failures

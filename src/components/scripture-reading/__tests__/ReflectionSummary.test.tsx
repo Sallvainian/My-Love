@@ -302,7 +302,7 @@ describe('ReflectionSummary', () => {
   // ============================================
 
   describe('Submission', () => {
-    it('onSubmit called with correct data (standoutVerses, rating, notes, shareBookmarkedVerses)', () => {
+    it('onSubmit called with correct data (standoutVerses, rating, notes)', () => {
       const onSubmit = vi.fn();
       render(<ReflectionSummary {...defaultProps} onSubmit={onSubmit} />);
 
@@ -325,24 +325,6 @@ describe('ReflectionSummary', () => {
         standoutVerses: [0, 12],
         rating: 5,
         notes: 'Powerful session',
-        shareBookmarkedVerses: false,
-      });
-    });
-
-    it('includes shareBookmarkedVerses=true when toggle is enabled', () => {
-      const onSubmit = vi.fn();
-      render(<ReflectionSummary {...defaultProps} onSubmit={onSubmit} />);
-
-      fireEvent.click(screen.getByTestId('scripture-share-bookmarks-toggle'));
-      fireEvent.click(screen.getByTestId('scripture-standout-verse-0'));
-      fireEvent.click(screen.getByTestId('scripture-session-rating-5'));
-      fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
-
-      expect(onSubmit).toHaveBeenCalledWith({
-        standoutVerses: [0],
-        rating: 5,
-        notes: '',
-        shareBookmarkedVerses: true,
       });
     });
   });
@@ -432,7 +414,6 @@ describe('ReflectionSummary', () => {
         standoutVerses: [0],
         rating: 3,
         notes: '',
-        shareBookmarkedVerses: false,
       });
     });
   });
