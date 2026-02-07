@@ -13,10 +13,12 @@ import { test as base, mergeTests } from '@playwright/test';
 import { test as apiRequestFixture } from '@seontechnologies/playwright-utils/api-request/fixtures';
 import { test as recurseFixture } from '@seontechnologies/playwright-utils/recurse/fixtures';
 import { test as logFixture } from '@seontechnologies/playwright-utils/log/fixtures';
+import { test as interceptFixture } from '@seontechnologies/playwright-utils/intercept-network-call/fixtures';
 import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures';
 
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
+import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -28,6 +30,9 @@ const networkMonitorFixture = base.extend(
       /sentry\.io/,
       /analytics/,
       /supabase\.co\/rest\/v1\/rpc\/log/, // Exclude Supabase logging RPC
+      /\/rest\/v1\/users\?select=partner/, // Partner queries fail without partner data in test env
+      /\/auth\/v1\/token/, // Background auth token refresh — 400 expected when refresh token is stale
+      /\/rest\/v1\/rpc\/scripture_submit_reflection/, // Reflection write failures intentionally tested for retry UI
     ],
     maxTestsPerError: 3, // Prevent domino failures
   }),
@@ -50,8 +55,10 @@ export const test = mergeTests(
   apiRequestFixture,
   recurseFixture,
   logFixture,
+  interceptFixture,
   networkMonitorFixture,
   customFixtures,
+  scriptureNavFixture,
 );
 
 export { expect } from '@playwright/test';

@@ -30,6 +30,7 @@ coverage/
 /playwright/.cache/
 tests/e2e/.auth/storageState.json
 tests/e2e/.auth/auth-failure.png
+tests/.auth/
 
 # Editor directories and files
 .vscode/*
@@ -49,13 +50,15 @@ tests/e2e/.auth/auth-failure.png
 .bmad
 !.bmad/
 .code
-_bmad/
-
 
 # IDE and AI tool configs
 .cursor/
+.cursorrules
 .gemini/
 .opencode/
+.codex/
+.contextstream/
+AGENTS.md
 
 # Claude OS (auto-generated, user-specific)
 .claude-os/tree_sitter_cache.db
@@ -75,7 +78,6 @@ _bmad/
 # Additional env files without dot prefix
 env.keys
 env.test
-_bmad/
 .agentvibes/
 .vscode/
 docs/99-Archive/
@@ -84,3 +86,7 @@ docs/99-Archive/
 /blob-report/
 /playwright/.auth/
 supabase/.temp/
+
+# OpenMemory - IDE/Assistant specific rules
+.cursor/rules/openmemory.mdc
+CLAUDE.md
