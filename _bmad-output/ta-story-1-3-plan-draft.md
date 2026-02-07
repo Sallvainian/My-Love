@@ -1,9 +1,9 @@
 # TA Story 1.3 AC-6 Closure — Plan Draft
 
 ## Workflow Context
-- Engine: `/Users/sallvain/Projects/My-Love/_bmad/core/tasks/workflow.xml`
-- Workflow config: `/Users/sallvain/Projects/My-Love/_bmad/tea/workflows/testarch/automate/workflow.yaml`
-- Validation checklist: `/Users/sallvain/Projects/My-Love/_bmad/tea/workflows/testarch/automate/checklist.md`
+- Engine: `{project-root}/_bmad/core/tasks/workflow.xml`
+- Workflow config: `{project-root}/_bmad/tea/workflows/testarch/automate/workflow.yaml`
+- Validation checklist: `{project-root}/_bmad/tea/workflows/testarch/automate/checklist.md`
 - Story gate baseline: `CONCERNS` due to AC-6 = PARTIAL
 - Reliability evidence baseline: commits `f9983b3`, `bcc26d2`, plus green `[P1-012]` + `[P2-012]`
 

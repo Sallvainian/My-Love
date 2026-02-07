@@ -129,7 +129,7 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Run P0 tests
-        run: npx playwright test tests/e2e --project=chromium --grep "\[P0\]"
+        run: npx playwright test tests/e2e --project=chromium --config=playwright.config.ts --grep "\[P0\]"
 
       - name: Stop Supabase Local
         if: always()
