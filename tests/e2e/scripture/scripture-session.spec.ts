@@ -16,36 +16,6 @@
 import { test, expect } from '../../support/merged-fixtures';
 import { startSoloSession, advanceOneStep } from '../../support/helpers';
 
-async function clearClientScriptureCache(page: Parameters<typeof startSoloSession>[0]): Promise<void> {
-  await page.evaluate(async () => {
-    localStorage.removeItem('my-love-storage');
-
-    const factory = indexedDB as IDBFactory & {
-      databases?: () => Promise<Array<{ name?: string }>>;
-    };
-
-    const dbNames = new Set<string>(['my-love-db']);
-    if (typeof factory.databases === 'function') {
-      const databases = await factory.databases();
-      for (const db of databases) {
-        if (db.name) dbNames.add(db.name);
-      }
-    }
-
-    await Promise.all(
-      [...dbNames].map(
-        (dbName) =>
-          new Promise<void>((resolve) => {
-            const request = indexedDB.deleteDatabase(dbName);
-            request.onsuccess = () => resolve();
-            request.onerror = () => resolve();
-            request.onblocked = () => resolve();
-          })
-      )
-    );
-  });
-}
-
 test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P0-010: Session save on exit', () => {
     test('should persist step index to server when saving and exiting', async ({
@@ -102,33 +72,13 @@ test.describe('Scripture Session - Save & Resume', () => {
       await page.getByTestId('save-and-exit-button').click();
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
-      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(targetSessionError).toBeNull();
-
-      // Isolate this test's resume candidate for the worker user.
-      const { error: isolateSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'abandoned' })
-        .eq('user1_id', targetSession!.user1_id)
-        .eq('mode', 'solo')
-        .eq('status', 'in_progress')
-        .neq('id', sessionId);
-      expect(isolateSessionError).toBeNull();
-
       // Stabilize active-session selection under parallel workers by making
       // this test's saved session the newest candidate for resume lookup.
       const { error: prioritizeSessionError } = await supabaseAdmin
         .from('scripture_sessions')
-        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .update({ started_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() })
         .eq('id', sessionId);
       expect(prioritizeSessionError).toBeNull();
-
-      // Clear client-side cache so active-session lookup re-reads from server.
-      await clearClientScriptureCache(page);
 
       // Re-open without `fresh=true` to exercise resume behavior.
       await page.goto('/scripture');

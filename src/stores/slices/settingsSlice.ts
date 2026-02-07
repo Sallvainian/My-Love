@@ -19,11 +19,11 @@
 import type { AppStateCreator } from '../types';
 import type { Settings, ThemeName, Anniversary } from '../../types';
 import { storageService } from '../../services/storage';
-import { loadDefaultMessages } from '../../data/defaultMessagesLoader';
+import defaultMessages from '../../data/defaultMessages';
 import { APP_CONFIG } from '../../config/constants';
 import { SettingsSchema } from '../../validation/schemas';
 import { createValidationError, isZodError } from '../../validation/errorMessages';
-import { ZodError } from 'zod/v4';
+import { ZodError } from 'zod';
 
 export interface SettingsSlice {
   // State
@@ -123,7 +123,6 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
 
       // If no messages exist, populate with default messages
       if (storedMessages.length === 0) {
-        const defaultMessages = await loadDefaultMessages();
         const messagesToAdd = defaultMessages.map((msg) => ({
           ...msg,
           // Remove explicit ID - let IndexedDB autoIncrement generate IDs

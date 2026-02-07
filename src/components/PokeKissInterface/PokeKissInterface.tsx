@@ -116,6 +116,8 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
   }, []);
 
   // Subscribe to real-time interactions on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally runs once on mount.
+  // subscribeToInteractions is a stable store function; re-subscribing on every render would be wasteful.
   useEffect(() => {
     if (isSubscribingRef.current || subscriptionRef.current) {
       if (import.meta.env.DEV) {
@@ -147,7 +149,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
         console.log('[PokeKissInterface] Unsubscribed from interactions');
       }
     };
-  }, [subscribeToInteractions]);
+  }, []);
 
   // Handle Poke button click
   const handlePoke = async () => {

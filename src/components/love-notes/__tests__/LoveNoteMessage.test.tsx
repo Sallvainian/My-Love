@@ -9,24 +9,15 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { HTMLAttributes, ReactNode } from 'react';
 import { LoveNoteMessage } from '../LoveNoteMessage';
 import type { LoveNote } from '../../../types/models';
-
-type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
-
-interface FullScreenImageViewerMockProps {
-  imageUrl: string | null;
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 // Mock framer-motion
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: MotionDivProps) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   },
-  AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
 
 // Mock loveNoteImageService
@@ -37,7 +28,7 @@ vi.mock('../../../services/loveNoteImageService', () => ({
 
 // Mock FullScreenImageViewer
 vi.mock('../FullScreenImageViewer', () => ({
-  FullScreenImageViewer: ({ imageUrl, isOpen, onClose }: FullScreenImageViewerMockProps) =>
+  FullScreenImageViewer: ({ imageUrl, isOpen, onClose }: any) =>
     isOpen ? (
       <div data-testid="fullscreen-viewer" onClick={onClose}>
         <img src={imageUrl} alt="Fullscreen" />
@@ -211,10 +202,8 @@ describe('LoveNoteMessage', () => {
       );
 
       // Should show loading state (spinner with animate-spin class)
-      await waitFor(() => {
-        const loadingSpinner = document.querySelector('.animate-spin');
-        expect(loadingSpinner).toBeInTheDocument();
-      });
+      const loadingSpinner = document.querySelector('.animate-spin');
+      expect(loadingSpinner).toBeInTheDocument();
     });
 
     it('should show error state when image fails to load', async () => {

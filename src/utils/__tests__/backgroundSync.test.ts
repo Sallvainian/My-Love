@@ -25,17 +25,6 @@ interface MockServiceWorker {
   removeEventListener: ReturnType<typeof vi.fn>;
 }
 
-type MutableNavigator = Navigator & { serviceWorker?: MockServiceWorker };
-type MutableWindow = Window & typeof globalThis & { SyncManager?: unknown };
-
-function getMutableNavigator(): MutableNavigator {
-  return global.navigator as MutableNavigator;
-}
-
-function getMutableWindow(): MutableWindow {
-  return global.window as MutableWindow;
-}
-
 describe('backgroundSync utilities', () => {
   let originalNavigator: typeof navigator;
   let mockServiceWorker: MockServiceWorker;
@@ -97,22 +86,22 @@ describe('backgroundSync utilities', () => {
     });
 
     it('should return false when Service Worker is not available', () => {
-      const nav = getMutableNavigator();
+      const nav = global.navigator as any;
       delete nav.serviceWorker;
 
       expect(isBackgroundSyncSupported()).toBe(false);
     });
 
     it('should return false when SyncManager is not available', () => {
-      const win = getMutableWindow();
+      const win = global.window as any;
       delete win.SyncManager;
 
       expect(isBackgroundSyncSupported()).toBe(false);
     });
 
     it('should return false when neither Service Worker nor SyncManager is available', () => {
-      const nav = getMutableNavigator();
-      const win = getMutableWindow();
+      const nav = global.navigator as any;
+      const win = global.window as any;
       delete nav.serviceWorker;
       delete win.SyncManager;
 
@@ -141,14 +130,14 @@ describe('backgroundSync utilities', () => {
     });
 
     it('should not throw when Service Worker is not available', async () => {
-      const nav = getMutableNavigator();
+      const nav = global.navigator as any;
       delete nav.serviceWorker;
 
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
     });
 
     it('should not throw when SyncManager is not available', async () => {
-      const win = getMutableWindow();
+      const win = global.window as any;
       delete win.SyncManager;
 
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();

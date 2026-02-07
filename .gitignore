@@ -47,7 +47,7 @@ tests/.auth/
 .claude
 !.claude/commands/
 !.claude/rules/
-_bmad/
+.bmad
 !.bmad/
 .code
 
@@ -58,6 +58,7 @@ _bmad/
 .opencode/
 .codex/
 .contextstream/
+AGENTS.md
 
 # Claude OS (auto-generated, user-specific)
 .claude-os/tree_sitter_cache.db
@@ -86,12 +87,6 @@ docs/99-Archive/
 /playwright/.auth/
 supabase/.temp/
 
-# BMAD method files (local tooling)
-_bmad/
-.agents/
-skills/
-
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
-.todos/
-.sidecar/
+CLAUDE.md

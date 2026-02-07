@@ -17,9 +17,11 @@ vi.mock('../../api/supabaseClient', () => ({
   },
 }));
 
-// Mock auth session service
-vi.mock('../../api/auth/sessionService', () => ({
-  getCurrentUserId: vi.fn().mockResolvedValue('user-123'),
+// Mock auth service
+vi.mock('../../api/authService', () => ({
+  authService: {
+    getCurrentUserId: vi.fn().mockResolvedValue('user-123'),
+  },
 }));
 
 // Mock app store
@@ -57,9 +59,7 @@ describe('useRealtimeMessages', () => {
     };
 
     const { supabase } = await import('../../api/supabaseClient');
-    vi.mocked(supabase.channel).mockReturnValue(
-      mockChannel as ReturnType<typeof supabase.channel>
-    );
+    vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
     renderHook(() => useRealtimeMessages());
 
@@ -99,11 +99,11 @@ describe('useRealtimeMessages', () => {
   });
 
   it('should not subscribe when user is not authenticated', async () => {
-    const sessionService = await import('../../api/auth/sessionService');
+    const { authService } = await import('../../api/authService');
     const { supabase } = await import('../../api/supabaseClient');
 
     // Mock user not authenticated
-    vi.mocked(sessionService.getCurrentUserId).mockResolvedValueOnce(null);
+    vi.mocked(authService.getCurrentUserId).mockResolvedValueOnce(null);
 
     renderHook(() => useRealtimeMessages());
 
@@ -138,9 +138,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as ReturnType<typeof supabase.channel>
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -176,9 +174,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as ReturnType<typeof supabase.channel>
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -212,9 +208,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as ReturnType<typeof supabase.channel>
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -253,9 +247,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as ReturnType<typeof supabase.channel>
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -304,9 +296,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as ReturnType<typeof supabase.channel>
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
       let unmountFn: () => void;
       await act(async () => {
@@ -338,7 +328,7 @@ describe('useRealtimeMessages', () => {
       const { supabase } = await import('../../api/supabaseClient');
       const onNewMessage = vi.fn();
 
-      let broadcastCallback: ((payload: unknown) => void) | null = null;
+      let broadcastCallback: ((payload: any) => void) | null = null;
       const mockChannel = {
         on: vi.fn((type, options, callback) => {
           if (type === 'broadcast' && options.event === 'new_message') {
@@ -352,9 +342,7 @@ describe('useRealtimeMessages', () => {
         }),
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as ReturnType<typeof supabase.channel>
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as any);
 
       renderHook(() => useRealtimeMessages({ onNewMessage }));
 

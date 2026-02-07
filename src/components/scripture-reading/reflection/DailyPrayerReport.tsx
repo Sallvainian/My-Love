@@ -22,16 +22,13 @@ interface StepRating {
   rating: number;
 }
 
-export interface DailyPrayerReportProps {
+interface DailyPrayerReportProps {
   userRatings: StepRating[];
   userBookmarks: number[];
   userStandoutVerses: number[];
-  userMessage: string | null;
   partnerMessage: string | null;
   partnerName: string | null;
   partnerRatings: StepRating[] | null;
-  partnerBookmarks: number[] | null;
-  partnerStandoutVerses: number[] | null;
   isPartnerComplete: boolean;
   onReturn: () => void;
 }
@@ -40,17 +37,13 @@ export function DailyPrayerReport({
   userRatings,
   userBookmarks,
   userStandoutVerses,
-  userMessage,
   partnerMessage,
   partnerName,
   partnerRatings,
-  partnerBookmarks,
-  partnerStandoutVerses,
   isPartnerComplete,
   onReturn,
 }: DailyPrayerReportProps): ReactElement {
   const bookmarkSet = new Set(userBookmarks);
-  const partnerBookmarkSet = new Set(partnerBookmarks ?? []);
 
   // Build a map of stepIndex → rating for quick lookup
   const userRatingMap = new Map(userRatings.map((r) => [r.stepIndex, r.rating]));
@@ -82,7 +75,6 @@ export function DailyPrayerReport({
             const rating = userRatingMap.get(step.stepIndex);
             const isBookmarked = bookmarkSet.has(step.stepIndex);
             const partnerRating = partnerRatingMap?.get(step.stepIndex);
-            const isPartnerBookmarked = partnerBookmarkSet.has(step.stepIndex);
 
             return (
               <div
@@ -103,17 +95,6 @@ export function DailyPrayerReport({
                       </svg>
                     </span>
                   )}
-                  {isPartnerBookmarked && (
-                    <span
-                      className="text-amber-400"
-                      data-testid={`scripture-report-partner-bookmark-indicator-${step.stepIndex}`}
-                      aria-label="Partner shared bookmark"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M5 2h14a1 1 0 011 1v19.143a.5.5 0 01-.766.424L12 18.03l-7.234 4.536A.5.5 0 014 22.143V3a1 1 0 011-1z" />
-                      </svg>
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {/* User rating circle */}
@@ -124,10 +105,7 @@ export function DailyPrayerReport({
                   )}
                   {/* Partner rating (side-by-side) */}
                   {partnerRating != null && (
-                    <span
-                      className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-purple-300 bg-purple-100 text-xs font-semibold text-purple-700"
-                      data-testid={`scripture-report-partner-rating-step-${step.stepIndex}`}
-                    >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-purple-300 bg-purple-100 text-xs font-semibold text-purple-700">
                       {partnerRating}
                     </span>
                   )}
@@ -158,27 +136,6 @@ export function DailyPrayerReport({
         </div>
       </div>
 
-      {partnerStandoutVerses && partnerStandoutVerses.length > 0 && (
-        <div data-testid="scripture-report-partner-standout-verses">
-          <h3 className="mb-3 text-center text-sm font-medium text-purple-700">
-            {partnerName ? `${partnerName}'s Standout Verses` : 'Partner Standout Verses'}
-          </h3>
-          <div className="flex flex-wrap justify-center gap-2">
-            {partnerStandoutVerses.map((stepIndex) => {
-              const step = SCRIPTURE_STEPS[stepIndex];
-              return (
-                <span
-                  key={stepIndex}
-                  className="rounded-full border-2 border-purple-300 bg-purple-100 px-4 py-2 text-sm font-medium text-purple-700"
-                >
-                  {step?.verseReference ?? `Verse ${stepIndex + 1}`}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Partner Message section */}
       {partnerMessage && partnerName && (
         <div
@@ -194,22 +151,10 @@ export function DailyPrayerReport({
         </div>
       )}
 
-      {userMessage && (
-        <div
-          className="rounded-2xl border border-purple-200 bg-white p-6"
-          data-testid="scripture-report-user-message"
-        >
-          <p className="mb-2 text-sm text-purple-500">
-            {partnerName ? `Your message to ${partnerName}` : 'Your message'}
-          </p>
-          <p className="text-base leading-relaxed text-purple-900">{userMessage}</p>
-        </div>
-      )}
-
       {/* Waiting for partner */}
-      {partnerName && !isPartnerComplete && (
+      {partnerName && !isPartnerComplete && !partnerMessage && (
         <p
-          className="motion-safe:animate-pulse motion-reduce:animate-none text-center text-sm italic text-purple-400"
+          className="animate-pulse text-center text-sm italic text-purple-400"
           data-testid="scripture-report-partner-waiting"
           aria-live="polite"
         >

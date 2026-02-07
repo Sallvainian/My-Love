@@ -20,7 +20,7 @@ import type { MoodEntry } from '../../types';
 import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
-import { getCurrentUserIdOfflineSafe } from '../../api/auth/sessionService';
+import { authService } from '../../api/authService';
 
 export interface MoodSlice {
   // State
@@ -60,7 +60,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
     try {
       // Get authenticated user ID (offline-safe - uses cached session)
       // Story 5.2: AC-5.2.6 - Use offline-safe auth for local saves
-      const userId = await getCurrentUserIdOfflineSafe();
+      const userId = await authService.getCurrentUserIdOfflineSafe();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -95,10 +95,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
           }
         } catch (syncError) {
           // Don't fail the add if sync fails - background sync will retry
-          console.warn(
-            '[MoodSlice] Immediate sync failed, will retry via background sync:',
-            syncError
-          );
+          console.warn('[MoodSlice] Immediate sync failed, will retry via background sync:', syncError);
         }
       }
 
@@ -142,10 +139,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
           }
         } catch (syncError) {
           // Don't fail the update if sync fails - background sync will retry
-          console.warn(
-            '[MoodSlice] Immediate sync failed, will retry via background sync:',
-            syncError
-          );
+          console.warn('[MoodSlice] Immediate sync failed, will retry via background sync:', syncError);
         }
       }
 
@@ -237,12 +231,10 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // Also refresh partner moods to mimic realtime updates
       // This ensures partner's latest moods are fetched when sync completes
       if (navigator.onLine) {
-        get()
-          .fetchPartnerMoods(30)
-          .catch((err) => {
-            // Don't fail sync if partner fetch fails - it's a nice-to-have
-            console.warn('[MoodSlice] Failed to refresh partner moods after sync:', err);
-          });
+        get().fetchPartnerMoods(30).catch((err) => {
+          // Don't fail sync if partner fetch fails - it's a nice-to-have
+          console.warn('[MoodSlice] Failed to refresh partner moods after sync:', err);
+        });
       }
 
       // Update sync status after completion
@@ -323,10 +315,9 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         // Handle nullable created_at (shouldn't be null in practice, but types say it can be)
         const createdAt = record.created_at || new Date().toISOString();
         // Handle mood_types array (backward compat: use mood_type if mood_types is null)
-        const moods =
-          record.mood_types && record.mood_types.length > 0
-            ? record.mood_types
-            : [record.mood_type];
+        const moods = record.mood_types && record.mood_types.length > 0
+          ? record.mood_types
+          : [record.mood_type];
         return {
           id: undefined, // Partner moods don't have local IDB id
           userId: record.user_id,
