@@ -86,3 +86,7 @@ docs/99-Archive/
 /blob-report/
 /playwright/.auth/
 supabase/.temp/
+
+# OpenMemory - IDE/Assistant specific rules
+.cursor/rules/openmemory.mdc
+CLAUDE.md
