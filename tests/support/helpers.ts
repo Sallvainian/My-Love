@@ -14,6 +14,13 @@ import type { Page } from '@playwright/test';
 
 type ScriptureEntryState = 'overview' | 'active-flow';
 
+export type ScriptureSessionSnapshot = {
+  id: string;
+  status: string;
+  mode: string;
+  current_step_index: number;
+};
+
 const AUTH_READINESS_MAX_ATTEMPTS = 5;
 const AUTH_READINESS_RETRY_MS = 300;
 const NETWORK_DIAGNOSTIC_TIMEOUT_MS = 12_000;
@@ -142,6 +149,63 @@ async function getLatestInProgressSoloSessionId(page: Page): Promise<string | nu
 
   const payload = (await response.json()) as Array<{ id?: string }>;
   return typeof payload?.[0]?.id === 'string' ? payload[0].id : null;
+}
+
+export async function getScriptureSessionSnapshot(
+  page: Page,
+  sessionId: string
+): Promise<ScriptureSessionSnapshot | null> {
+  if (!sessionId) {
+    return null;
+  }
+
+  const authContext = await getSupabaseAuthContext(page);
+  if (!authContext) {
+    return null;
+  }
+
+  const response = await page.request
+    .get(
+      `${authContext.apiUrl}/rest/v1/scripture_sessions?select=id,status,mode,current_step_index&id=eq.${encodeURIComponent(
+        sessionId
+      )}&limit=1`,
+      {
+        headers: {
+          apikey: authContext.anonKey,
+          Authorization: `Bearer ${authContext.accessToken}`,
+        },
+      }
+    )
+    .catch(() => null);
+
+  if (!response?.ok()) {
+    return null;
+  }
+
+  const payload = (await response.json()) as Array<{
+    id?: string;
+    status?: string;
+    mode?: string;
+    current_step_index?: number;
+  }>;
+  const session = payload?.[0];
+
+  if (
+    !session ||
+    typeof session.id !== 'string' ||
+    typeof session.status !== 'string' ||
+    typeof session.mode !== 'string' ||
+    typeof session.current_step_index !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    id: session.id,
+    status: session.status,
+    mode: session.mode,
+    current_step_index: session.current_step_index,
+  };
 }
 
 async function normalizeOverviewFromActiveFlow(page: Page): Promise<void> {

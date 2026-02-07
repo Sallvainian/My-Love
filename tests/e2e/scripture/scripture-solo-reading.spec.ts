@@ -4,7 +4,7 @@
  * Core user journey: Navigate to scripture, start solo session,
  * read through 17 steps (verse → reflection → next verse), complete session.
  *
- * Test IDs: P0-009, P1-001, P1-010, P1-011, P1-012, P2-012
+ * Test IDs: P0-009, P1-001, P1-012, P1-013, P2-012
  *
  * Epic 1 & 2, Stories 1.2, 1.3, 2.1
  *
@@ -16,7 +16,7 @@
  * checkForActiveSession to show the resume prompt instead of Start button.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { startSoloSession } from '../../support/helpers';
+import { getScriptureSessionSnapshot, startSoloSession } from '../../support/helpers';
 
 /**
  * Helper: Complete the per-verse reflection and advance to the next step.
@@ -263,6 +263,71 @@ test.describe('Solo Reading Flow', () => {
       await expect(
         page.getByTestId('scripture-progress-indicator')
       ).toHaveText('Verse 3 of 17');
+    });
+  });
+
+  test.describe('[P1-013] Exit with Save persistence', () => {
+    test('should save progress and keep session in-progress when exiting solo reading', async ({
+      page,
+    }) => {
+      // GIVEN: User starts a solo session and advances to Verse 2
+      const sessionId = await startSoloSession(page);
+      await expect(
+        page.getByTestId('scripture-progress-indicator')
+      ).toHaveText('Verse 1 of 17');
+
+      await advanceStepWithReflection(page);
+      await expect(
+        page.getByTestId('scripture-progress-indicator')
+      ).toHaveText('Verse 2 of 17');
+
+      // WHEN: User opens exit dialog and chooses save
+      const savePromise = page
+        .waitForResponse(
+          (resp) =>
+            resp.url().includes('/rest/v1/scripture_sessions') &&
+            resp.request().method() === 'PATCH' &&
+            resp.status() >= 200 &&
+            resp.status() < 300,
+          { timeout: 15_000 }
+        )
+        .catch(() => null);
+
+      await page.getByTestId('exit-button').click();
+      const exitDialog = page.getByTestId('exit-confirm-dialog');
+      await expect(exitDialog).toBeVisible();
+      await expect(exitDialog).toContainText('Save your progress? You can continue later.');
+
+      await page.getByTestId('save-and-exit-button').click();
+      await savePromise;
+
+      // THEN: User returns to overview and server session remains in-progress
+      await expect(page.getByTestId('scripture-overview')).toBeVisible();
+
+      const sessionSnapshot = await getScriptureSessionSnapshot(page, sessionId);
+      expect(sessionSnapshot).not.toBeNull();
+      expect(sessionSnapshot?.status).toBe('in_progress');
+      expect(sessionSnapshot?.mode).toBe('solo');
+      expect(sessionSnapshot?.current_step_index ?? -1).toBeGreaterThanOrEqual(1);
+
+      // AND: Resume prompt is visible on revisit
+      await page.goto('/scripture');
+      await expect(page.getByTestId('resume-prompt')).toBeVisible();
+
+      // Cleanup: abandon resumed state so this test does not pollute later runs
+      const abandonPromise = page
+        .waitForResponse(
+          (resp) =>
+            resp.url().includes('/rest/v1/scripture_sessions') &&
+            resp.request().method() === 'PATCH' &&
+            resp.status() >= 200 &&
+            resp.status() < 300,
+          { timeout: 15_000 }
+        )
+        .catch(() => null);
+
+      await page.getByTestId('resume-start-fresh').click();
+      await abandonPromise;
     });
   });
 
