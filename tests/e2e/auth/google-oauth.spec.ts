@@ -7,14 +7,18 @@
 import { test, expect } from '../../support/merged-fixtures';
 
 test.describe('Google OAuth', () => {
+  // Auth tests must run WITHOUT the shared authenticated storage state
+  // so they can see the login screen (unauthenticated).
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('[P0] should display Google sign-in button on login screen', async ({ page }) => {
     // GIVEN: User is on login screen
     await page.goto('/');
 
     // WHEN: Login screen loads
 
-    // THEN: Google sign-in button is visible
-    await expect(page.locator('[data-testid="google-signin-button"]')).toBeVisible();
+    // THEN: Google sign-in button is visible (LoginScreen uses CSS classes, not data-testid)
+    await expect(page.locator('.google-signin-button')).toBeVisible();
   });
 
   test('[P0] should initiate OAuth redirect when Google button clicked', async ({ page }) => {

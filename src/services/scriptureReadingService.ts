@@ -837,6 +837,27 @@ class ScriptureReadingService extends BaseIndexedDBService<
   }
 
   // ============================================
+  // Report data (server-fresh, bypasses cache)
+  // ============================================
+
+  /**
+   * Fetch all session data directly from server for the Daily Prayer Report.
+   * Bypasses IndexedDB cache to ensure partner data is included.
+   */
+  async getSessionReportData(sessionId: string): Promise<{
+    reflections: ScriptureReflection[];
+    bookmarks: ScriptureBookmark[];
+    messages: ScriptureMessage[];
+  }> {
+    const [reflections, bookmarks, messages] = await Promise.all([
+      this.fetchAndCacheReflections(sessionId),
+      this.fetchAndCacheBookmarks(sessionId),
+      this.fetchAndCacheMessages(sessionId),
+    ]);
+    return { reflections, bookmarks, messages };
+  }
+
+  // ============================================
   // Helpers
   // ============================================
 

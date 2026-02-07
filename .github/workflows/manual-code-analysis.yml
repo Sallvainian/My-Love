@@ -1,0 +1,44 @@
+name: Claude Code Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      analysis_type:
+        description: "Type of analysis to perform"
+        required: true
+        type: choice
+        options:
+          - summarize-commit
+          - security-review
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Run Claude Code Analysis
+        uses: anthropics/claude-code-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.CLAUDE_PAT }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Analysis type: ${{ inputs.analysis_type }}
+
+            ${{ inputs.analysis_type == 'summarize-commit' && 'Analyze the latest commit. Provide a concise summary of the commit message, files changed, and the purpose of the changes.' || '' }}
+            ${{ inputs.analysis_type == 'security-review' && 'Review the latest commit for potential security vulnerabilities. Check for exposed secrets, insecure coding patterns, and dependency vulnerabilities.' || '' }}
+          claude_args: |
+            --model claude-opus-4-6
