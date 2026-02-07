@@ -173,6 +173,7 @@ export function ScriptureOverview() {
     createSession,
     loadSession,
     abandonSession,
+    clearActiveSession,
     clearScriptureError,
     checkForActiveSession,
   } = useAppStore(
@@ -185,6 +186,7 @@ export function ScriptureOverview() {
       createSession: state.createSession,
       loadSession: state.loadSession,
       abandonSession: state.abandonSession,
+      clearActiveSession: state.clearActiveSession,
       clearScriptureError: state.clearScriptureError,
       checkForActiveSession: state.checkForActiveSession,
     }))
@@ -192,6 +194,10 @@ export function ScriptureOverview() {
 
   // Local UI state
   const [showModes, setShowModes] = useState(false);
+  const [freshStartRequested] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('fresh') === 'true';
+  });
 
   // Story 1.5: Screen reader announcement state (AC #2)
   const [announcement, setAnnouncement] = useState('');
@@ -202,9 +208,18 @@ export function ScriptureOverview() {
   }, [loadPartner]);
 
   // Check for incomplete solo session on mount (AC #6)
+  // Re-check when session becomes null (e.g., after save-and-exit)
   useEffect(() => {
-    void checkForActiveSession();
-  }, [checkForActiveSession]);
+    if (!session) {
+      setShowModes(false); // Reset mode selection visibility
+      if (freshStartRequested) {
+        // Test helper path: bypass resume prompt without mutating server state.
+        clearActiveSession();
+        return;
+      }
+      void checkForActiveSession();
+    }
+  }, [checkForActiveSession, clearActiveSession, freshStartRequested, session]);
 
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
   useEffect(() => {
@@ -271,7 +286,7 @@ export function ScriptureOverview() {
   }
 
   return (
-    <main
+    <div
       className="min-h-screen p-4"
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="scripture-overview"
@@ -446,6 +461,6 @@ export function ScriptureOverview() {
           )}
         </AnimatePresence>
       </div>
-    </main>
+    </div>
   );
 }
