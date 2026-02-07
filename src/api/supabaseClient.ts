@@ -13,6 +13,17 @@ import type { Database } from '../types/database.types';
 // Re-export Database type for convenience
 export type { Database } from '../types/database.types';
 
+// Import authService dynamically to avoid circular dependency
+type AuthServiceModule = typeof import('./authService');
+
+let authServiceModule: AuthServiceModule | null = null;
+const getAuthService = async () => {
+  if (!authServiceModule) {
+    authServiceModule = await import('./authService');
+  }
+  return authServiceModule.authService;
+};
+
 /**
  * Supabase configuration from environment variables
  */
@@ -77,13 +88,10 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
  */
 export const getPartnerId = async (): Promise<string | null> => {
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    const currentUserId = sessionData.session?.user?.id ?? null;
+    const authService = await getAuthService();
+    const currentUserId = await authService.getCurrentUserId();
 
     if (!currentUserId) {
-      if (sessionError) {
-        console.error('[Supabase] Failed to get current session:', sessionError);
-      }
       console.error('[Supabase] Cannot get partner ID: User not authenticated');
       return null;
     }

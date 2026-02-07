@@ -2,7 +2,7 @@ import { customMessageService } from './customMessageService';
 import type { CustomMessage } from '../types';
 import { CreateMessageInputSchema } from '../validation/schemas';
 import { isZodError } from '../validation/errorMessages';
-import { ZodError } from 'zod/v4';
+import { ZodError } from 'zod';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 
 /**

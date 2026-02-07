@@ -32,28 +32,18 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Create preview URL from file with error handling
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Creating object URL from file prop with cleanup on unmount; side effect requires useEffect
   useEffect(() => {
-    let cancelled = false;
     let url: string | null = null;
-
-    const schedulePreviewUpdate = (nextUrl: string | null) => {
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setPreviewUrl(nextUrl);
-        }
-      });
-    };
-
     try {
       url = URL.createObjectURL(file);
-      schedulePreviewUpdate(url);
+      setPreviewUrl(url);
     } catch (error) {
       console.error('[ImagePreview] Failed to create preview URL:', error);
-      schedulePreviewUpdate(null);
+      setPreviewUrl(null);
     }
 
     return () => {
-      cancelled = true;
       if (url) {
         URL.revokeObjectURL(url);
       }

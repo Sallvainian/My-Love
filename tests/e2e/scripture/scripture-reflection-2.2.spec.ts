@@ -225,17 +225,11 @@ test.describe('End-of-Session Reflection Summary', () => {
     test('should save session-level reflection and advance to report phase', async ({
       page,
       supabaseAdmin,
+      testSession,
     }) => {
       // GIVEN: User is on the reflection summary screen with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
       const sessionId = await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
-      const { data: sessionRow, error: sessionLookupError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(sessionLookupError).toBeNull();
-      const activeUserId = sessionRow!.user1_id;
       await expect(
         page.getByTestId('scripture-reflection-summary-screen')
       ).toBeVisible();
@@ -296,7 +290,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       expect(error).toBeNull();
       expect(reflections).toHaveLength(1);
       expect(reflections![0].rating).toBe(5);
-      expect(reflections![0].user_id).toBe(activeUserId);
+      expect(reflections![0].user_id).toBe(testSession.test_user1_id);
 
       // AND: Notes contain standout verses and user note as JSON
       const notesData = JSON.parse(reflections![0].notes!);
@@ -325,6 +319,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     test('should show no-bookmarks message and enable Continue with just rating', async ({
       page,
       supabaseAdmin,
+      testSession,
     }) => {
       // GIVEN: User has completed all 17 steps WITHOUT bookmarking any verses
       const sessionId = await completeAllStepsToReflectionSummary(page, new Set()); // empty bookmark set

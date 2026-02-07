@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { usePartnerMood } from '../usePartnerMood';
-import { moodSyncService, type SupabaseMoodRecord } from '../../api/moodSyncService';
+import { moodSyncService } from '../../api/moodSyncService';
 
 // Mock the supabaseClient to avoid initialization errors
 vi.mock('../../api/supabaseClient', () => ({
@@ -91,15 +91,13 @@ describe('usePartnerMood', () => {
       updated_at: new Date().toISOString(),
     };
 
-    let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
+    let broadcastCallback: ((mood: any) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(initialMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (callback: (mood: SupabaseMoodRecord) => void) => {
-        broadcastCallback = callback;
-        return () => {};
-      }
-    );
+    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(async (callback: any) => {
+      broadcastCallback = callback;
+      return () => {};
+    });
 
     const { result } = renderHook(() => usePartnerMood(mockPartnerId));
 
@@ -111,7 +109,7 @@ describe('usePartnerMood', () => {
 
     // Simulate broadcast received
     if (broadcastCallback !== null) {
-      broadcastCallback(updatedMood);
+      (broadcastCallback as any)(updatedMood);
     }
 
     await waitFor(() => {
@@ -138,15 +136,13 @@ describe('usePartnerMood', () => {
       updated_at: new Date().toISOString(),
     };
 
-    let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
+    let broadcastCallback: ((mood: any) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(initialMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (callback: (mood: SupabaseMoodRecord) => void) => {
-        broadcastCallback = callback;
-        return () => {};
-      }
-    );
+    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(async (callback: any) => {
+      broadcastCallback = callback;
+      return () => {};
+    });
 
     const { result } = renderHook(() => usePartnerMood(mockPartnerId));
 
@@ -158,7 +154,7 @@ describe('usePartnerMood', () => {
 
     // Simulate broadcast from different user
     if (broadcastCallback !== null) {
-      broadcastCallback(otherUserMood);
+      (broadcastCallback as any)(otherUserMood);
     }
 
     // Wait a bit to ensure it doesn't update
@@ -190,7 +186,7 @@ describe('usePartnerMood', () => {
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (_: (mood: SupabaseMoodRecord) => void, onStatusChange?: (status: string) => void) => {
+      async (_: any, onStatusChange: any) => {
         if (onStatusChange) {
           statusCallback = onStatusChange;
         }
@@ -206,7 +202,7 @@ describe('usePartnerMood', () => {
 
     // Simulate subscription success
     if (statusCallback !== null) {
-      statusCallback('SUBSCRIBED');
+      (statusCallback as any)('SUBSCRIBED');
     }
 
     await waitFor(() => {
@@ -215,7 +211,7 @@ describe('usePartnerMood', () => {
 
     // Simulate connection error
     if (statusCallback !== null) {
-      statusCallback('CHANNEL_ERROR');
+      (statusCallback as any)('CHANNEL_ERROR');
     }
 
     await waitFor(() => {

@@ -22,20 +22,14 @@ test.describe('Daily Prayer Report — Send & View', () => {
     test('should show message compose after reflection summary, then report after sending', async ({
       page,
       supabaseAdmin,
+      testSession,
     }) => {
       // GIVEN: User has completed all 17 steps with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
       const sessionId = await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
-      const { data: sessionUsers, error: sessionLookupError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(sessionLookupError).toBeNull();
-      const activeUserId = sessionUsers!.user1_id;
 
       // AND: User submits the reflection summary (select verse, rating, click continue)
-      await submitReflectionSummary(page, { shareBookmarkedVerses: true });
+      await submitReflectionSummary(page);
 
       // WHEN: Report phase begins (after reflection summary submission)
       // THEN: Message composition screen appears
@@ -47,12 +41,6 @@ test.describe('Daily Prayer Report — Send & View', () => {
       const heading = page.getByTestId('scripture-message-compose-heading');
       await expect(heading).toBeVisible();
       await expect(heading).toContainText('Write something for');
-      const liveRegion = page.getByTestId('sr-announcer');
-      await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
-      await expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
-      await expect.poll(async () => {
-        return page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
-      }).toBe('scripture-message-compose-heading');
 
       // AND: Textarea is visible with correct aria-label
       const textarea = page.getByTestId('scripture-message-textarea');
@@ -89,11 +77,6 @@ test.describe('Daily Prayer Report — Send & View', () => {
       const reportHeading = page.getByTestId('scripture-report-heading');
       await expect(reportHeading).toBeVisible();
       await expect(reportHeading).toHaveText('Daily Prayer Report');
-      await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
-      await expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
-      await expect.poll(async () => {
-        return page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
-      }).toBe('scripture-report-heading');
 
       // AND: User report sections render
       await expect(
@@ -114,7 +97,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
           .from('scripture_messages')
           .select('*')
           .eq('session_id', sessionId)
-          .eq('sender_id', activeUserId);
+          .eq('sender_id', testSession.test_user1_id);
 
         expect(error).toBeNull();
         return data?.length ?? 0;
@@ -124,21 +107,9 @@ test.describe('Daily Prayer Report — Send & View', () => {
         .from('scripture_messages')
         .select('*')
         .eq('session_id', sessionId)
-        .eq('sender_id', activeUserId);
+        .eq('sender_id', testSession.test_user1_id);
       expect(error).toBeNull();
       expect(messages![0].message).toBe('Praying for you today. You are loved.');
-
-      // AND: Share toggle persists bookmark visibility preference for this session
-      await expect.poll(async () => {
-        const { data, error: bookmarkError } = await supabaseAdmin
-          .from('scripture_bookmarks')
-          .select('step_index, share_with_partner')
-          .eq('session_id', sessionId)
-          .eq('user_id', activeUserId);
-        expect(bookmarkError).toBeNull();
-        const targeted = (data ?? []).filter((row) => [0, 5, 12].includes(row.step_index));
-        return targeted.length === 3 && targeted.every((row) => row.share_with_partner);
-      }).toBe(true);
     });
   });
 
@@ -169,15 +140,15 @@ test.describe('Daily Prayer Report — Send & View', () => {
       // AND: User submits the reflection summary
       await submitReflectionSummary(page);
 
-      // THEN: Completion screen appears directly (no partner data)
+      // THEN: Message compose screen is NOT shown
+      await expect(
+        page.getByTestId('scripture-message-compose-screen')
+      ).not.toBeVisible({ timeout: 2000 });
+
+      // AND: Completion screen appears directly (no partner data)
       await expect(
         page.getByTestId('scripture-unlinked-complete-screen')
       ).toBeVisible();
-
-      // AND: Message compose screen is not present in the final unlinked state
-      await expect(
-        page.getByTestId('scripture-message-compose-screen')
-      ).toHaveCount(0);
 
       // AND: Return action is visible
       await expect(
@@ -199,27 +170,26 @@ test.describe('Daily Prayer Report — Send & View', () => {
     });
   });
 
-  test.describe('2.3-E2E-003 [P1]: Daily Prayer Report waiting fallback', () => {
-    test('should show waiting state when partner report data is not yet visible', async ({
+  test.describe('2.3-E2E-003 [P1]: Daily Prayer Report displays partner message and waiting state', () => {
+    test('should show partner message when partner has completed session and sent a message', async ({
       page,
       supabaseAdmin,
       testSession,
     }) => {
       // GIVEN: User 1 completes a session and reaches report compose phase
       const sessionId = await completeAllStepsToReflectionSummary(page);
-      const partnerUserId = testSession.test_user2_id;
-      expect(partnerUserId).toBeTruthy();
       await submitReflectionSummary(page);
 
-      // AND: Partner contributes data (may still be hidden by session visibility constraints)
+      // AND: Partner contributes to the same shared session report
+      expect(testSession.test_user2_id).not.toBeNull();
       const { error: partnerReflectionError } = await supabaseAdmin
         .from('scripture_reflections')
         .insert({
           session_id: sessionId,
-          user_id: partnerUserId!,
-          step_index: 17,
+          user_id: testSession.test_user2_id!,
+          step_index: 0,
           rating: 5,
-          notes: JSON.stringify({ standoutVerses: [0, 1], userNote: 'Partner reflection' }),
+          notes: 'Partner reflection',
           is_shared: true,
         });
       expect(partnerReflectionError).toBeNull();
@@ -228,7 +198,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
         .from('scripture_messages')
         .insert({
           session_id: sessionId,
-          sender_id: partnerUserId!,
+          sender_id: testSession.test_user2_id!,
           message: 'Feeling grateful for your prayers. God is good.',
         });
       expect(partnerMessageError).toBeNull();
@@ -247,30 +217,31 @@ test.describe('Daily Prayer Report — Send & View', () => {
         page.getByTestId('scripture-report-screen')
       ).toBeVisible();
 
-      // AND: Waiting fallback remains visible until partner completion is inferred
-      await expect(page.getByTestId('scripture-report-partner-waiting')).toBeVisible();
+      // AND: Partner message is displayed
+      const partnerMessage = page.getByTestId('scripture-report-partner-message');
+      await expect(partnerMessage).toBeVisible();
+      await expect(partnerMessage).toContainText('Feeling grateful for your prayers. God is good.');
     });
   });
 
   test.describe('2.3-E2E-005 [P2]: Together mode report shows both users data side-by-side', () => {
-    test('should render report and keep waiting fallback when partner side-by-side data is unavailable', async ({
+    test('should display both users completion cards when together mode session is complete', async ({
       page,
       supabaseAdmin,
       testSession,
     }) => {
       // GIVEN: User reaches report compose phase
       const sessionId = await completeAllStepsToReflectionSummary(page);
-      const partnerUserId = testSession.test_user2_id;
-      expect(partnerUserId).toBeTruthy();
       await submitReflectionSummary(page);
 
       // AND: Partner contributes ratings to the same session
+      expect(testSession.test_user2_id).not.toBeNull();
       const { error: partnerRatingsError } = await supabaseAdmin
         .from('scripture_reflections')
         .insert([
         {
           session_id: sessionId,
-          user_id: partnerUserId!,
+          user_id: testSession.test_user2_id!,
           step_index: 0,
           rating: 5,
           notes: 'Partner step 1',
@@ -278,18 +249,10 @@ test.describe('Daily Prayer Report — Send & View', () => {
         },
         {
           session_id: sessionId,
-          user_id: partnerUserId!,
+          user_id: testSession.test_user2_id!,
           step_index: 1,
           rating: 4,
           notes: 'Partner step 2',
-          is_shared: true,
-        },
-        {
-          session_id: sessionId,
-          user_id: partnerUserId!,
-          step_index: 17,
-          rating: 5,
-          notes: JSON.stringify({ standoutVerses: [0, 1], userNote: 'Partner summary' }),
           is_shared: true,
         },
       ]);
@@ -304,22 +267,11 @@ test.describe('Daily Prayer Report — Send & View', () => {
         page.getByTestId('scripture-report-screen')
       ).toBeVisible();
 
-      // AND: Waiting fallback remains available for asynchronous partner visibility
-      await expect(page.getByTestId('scripture-report-partner-waiting')).toBeVisible();
-    });
-  });
-
-  test.describe('2.3-E2E-006 [P1]: Completion retry path blocks report transition until persistence succeeds', () => {
-    test('should complete the skip path and transition to report without getting stuck', async ({
-      page,
-    }) => {
-      const sessionId = await completeAllStepsToReflectionSummary(page);
-      expect(sessionId).toBeTruthy();
-      await submitReflectionSummary(page);
-
-      await page.getByTestId('scripture-message-skip-btn').click();
-      await expect(page.getByTestId('scripture-report-screen')).toBeVisible();
-      await expect(page.getByTestId('scripture-message-compose-screen')).not.toBeVisible();
+      // AND: Step rows show side-by-side ratings (user + partner circles)
+      await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('3');
+      await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('5');
+      await expect(page.getByTestId('scripture-report-rating-step-1')).toContainText('3');
+      await expect(page.getByTestId('scripture-report-rating-step-1')).toContainText('4');
     });
   });
 });

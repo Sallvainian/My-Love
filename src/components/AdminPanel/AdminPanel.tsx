@@ -165,7 +165,6 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
         {/* Edit message modal */}
         {editingMessage && (
           <EditMessageForm
-            key={`${editingMessage.id}-${editingMessage.updatedAt ?? editingMessage.createdAt}`}
             message={editingMessage}
             isOpen={!!editingMessage}
             onClose={() => setEditingMessage(null)}

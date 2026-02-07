@@ -14,7 +14,7 @@
  */
 
 import { useState, type FormEvent } from 'react';
-import { signIn, signInWithGoogle } from '../../api/auth/actionService';
+import { authService } from '../../api/authService';
 import './LoginScreen.css';
 
 export interface LoginScreenProps {
@@ -61,7 +61,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const result = await signIn({ email, password });
+      const result = await authService.signIn({ email, password });
 
       if (result.error) {
         // Map Supabase error messages to user-friendly messages
@@ -89,7 +89,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setIsGoogleLoading(true);
 
     try {
-      const error = await signInWithGoogle();
+      const error = await authService.signInWithGoogle();
 
       if (error) {
         setError('Failed to initiate Google sign-in. Please try again.');
