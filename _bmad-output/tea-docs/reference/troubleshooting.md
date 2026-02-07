@@ -135,9 +135,9 @@ Tests contain JavaScript/TypeScript syntax problems
 Tests reference utilities but imports fail
 
 **Resolution**:
-1. Install package: `npm install @muratkeremozcan/playwright-utils`
-2. Verify installation: `npm ls @muratkeremozcan/playwright-utils`
-3. Validate import statements: Should use `import { expect, test } from '@muratkeremozcan/playwright-utils'`
+1. Install package: `npm install @seontechnologies/playwright-utils`
+2. Verify installation: `npm ls @seontechnologies/playwright-utils`
+3. Validate import statements: Should use `import { expect, test } from '@seontechnologies/playwright-utils'`
 
 ### MCP Enhancements Not Applying
 MCP variable enabled but features absent from outputs
