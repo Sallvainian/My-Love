@@ -1,4 +1,32 @@
+import { execSync } from 'child_process';
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Load Supabase local env vars for test fixtures.
+ * Parses `supabase status -o env` to set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+ * and SUPABASE_ANON_KEY. Falls back gracefully if Supabase CLI is unavailable (CI).
+ */
+if (!process.env.SUPABASE_URL) {
+  try {
+    const output = execSync('supabase status -o env 2>/dev/null', { encoding: 'utf-8' });
+    const vars: Record<string, string> = {};
+    for (const line of output.split('\n')) {
+      const match = line.match(/^(\w+)="(.+)"$/);
+      if (match) vars[match[1]] = match[2];
+    }
+    process.env.SUPABASE_URL ??= vars.API_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??= vars.SERVICE_ROLE_KEY;
+    process.env.SUPABASE_ANON_KEY ??= vars.ANON_KEY;
+
+    // Force-set VITE_ variants so the Vite dev server connects to local Supabase.
+    // Must use `=` (not `??=`) because direnv's `dotenv` injects encrypted values
+    // from .env into process.env, and Vite's loadEnv gives process.env highest priority.
+    process.env.VITE_SUPABASE_URL = vars.API_URL;
+    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = vars.ANON_KEY;
+  } catch {
+    // Supabase CLI unavailable — env vars must be set externally (CI)
+  }
+}
 
 /**
  * Playwright Test Configuration
@@ -8,7 +36,7 @@ import { defineConfig, devices } from '@playwright/test';
  * See tests/support/merged-fixtures.ts for fixture composition.
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -38,19 +66,37 @@ export default defineConfig({
   outputDir: 'test-results',
 
   projects: [
+    // Auth setup — runs once, saves storageState for E2E tests
+    {
+      name: 'setup',
+      testMatch: /auth-setup\.ts/,
+      testDir: './tests/support',
+    },
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      testDir: './tests/e2e',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'tests/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'api',
+      testDir: './tests/api',
+      dependencies: ['setup'],
     },
     // Uncomment for cross-browser testing
     // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     // { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
 
-  // Run local dev server before tests
-  // Uses dotenvx to decrypt encrypted .env values (Supabase credentials)
+  // Run local dev server before tests.
+  // --mode test makes Vite load .env.test (plain-text local Supabase values)
+  // which overrides the encrypted production credentials in .env.local.
+  // In CI, set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY directly.
   webServer: {
-    command: 'dotenvx run -- npx vite',
+    command: 'npx vite --mode test',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

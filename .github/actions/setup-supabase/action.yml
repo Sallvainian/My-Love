@@ -1,0 +1,52 @@
+name: 'Setup Supabase Local'
+description: 'Install Supabase CLI, start local instance, apply migrations, and export credentials'
+
+inputs:
+  supabase-version:
+    description: 'Supabase CLI version to install'
+    required: false
+    default: '2.72.7'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Supabase CLI
+      uses: supabase/setup-cli@v1
+      with:
+        version: ${{ inputs.supabase-version }}
+
+    - name: Start Supabase Local
+      shell: bash
+      timeout-minutes: 5
+      run: |
+        supabase start
+        supabase status --output json | jq -e '.DB_URL' > /dev/null
+        echo "Supabase Local started successfully"
+
+    - name: Apply database migrations
+      shell: bash
+      run: |
+        supabase db reset --linked=false
+        echo "Migrations applied"
+
+    - name: Export Supabase credentials
+      shell: bash
+      run: |
+        echo "SUPABASE_URL=$(supabase status --output json | jq -re '.API_URL')" >> $GITHUB_ENV
+        echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -re '.ANON_KEY')" >> $GITHUB_ENV
+        echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -re '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
+        echo "Supabase credentials exported"
+
+    - name: Verify Supabase connectivity
+      shell: bash
+      run: |
+        curl -sf "${SUPABASE_URL}/rest/v1/" -H "apikey: ${SUPABASE_ANON_KEY}" > /dev/null
+        echo "Supabase API is reachable"
+
+    # Post-job cleanup (runs even if job fails)
+    - name: Stop Supabase Local
+      if: always()
+      shell: bash
+      run: |
+        supabase stop --no-backup
+        echo "✅ Supabase Local stopped and containers removed"
