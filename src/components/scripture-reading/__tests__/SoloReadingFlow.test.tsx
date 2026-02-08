@@ -165,6 +165,7 @@ const mockStoreState: {
   retryFailedWrite: typeof mockRetryFailedWrite;
   updatePhase: typeof mockUpdatePhase;
   partner: MockPartner | null;
+  isLoadingPartner: boolean;
 } = {
   session: null,
   isSyncing: false,
@@ -177,6 +178,7 @@ const mockStoreState: {
   retryFailedWrite: mockRetryFailedWrite,
   updatePhase: mockUpdatePhase,
   partner: null,
+  isLoadingPartner: false,
 };
 
 // Create a function to get state for the useAppStore mock
@@ -218,6 +220,7 @@ describe('SoloReadingFlow', () => {
     mockStoreState.scriptureError = null;
     mockStoreState.pendingRetry = null;
     mockStoreState.partner = null;
+    mockStoreState.isLoadingPartner = false;
     mockShouldReduceMotion = false;
     mockIsOnline = true;
   });
@@ -1199,6 +1202,24 @@ describe('SoloReadingFlow', () => {
       expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
       // Should NOT show MessageCompose
       expect(screen.queryByTestId('scripture-message-compose-screen')).toBeNull();
+    });
+
+    it('waits for partner loading before treating report flow as unlinked', () => {
+      mockStoreState.partner = null;
+      mockStoreState.isLoadingPartner = true;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+
+      expect(screen.queryByTestId('scripture-unlinked-complete-screen')).toBeNull();
+      expect(mockUpdateSession).not.toHaveBeenCalledWith(
+        'session-123',
+        expect.objectContaining({ status: 'complete' })
+      );
     });
 
     it('sending message calls addMessage service (2.3-INT-003)', async () => {

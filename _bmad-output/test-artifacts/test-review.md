@@ -1,248 +1,372 @@
-# Test Quality Review: Chromium E2E Failure Subset (Scripture)
+# Test Quality Review: tests/e2e Directory
 
-**Quality Score**: 75/100 (C - Needs Improvement)
+**Quality Score**: 52/100 (F - Critical Issues)
 **Review Date**: 2026-02-08
-**Review Scope**: suite (failed tests from full Chromium run)
+**Review Scope**: directory
 **Reviewer**: Sallvain / TEA Agent
 
 ---
 
-Note: This review audits existing tests and current failures; it does not generate new tests.
+Note: This review audits existing tests; it does not generate tests.
 
 ## Executive Summary
 
-**Overall Assessment**: Needs Improvement
+**Overall Assessment**: Critical Issues
 
 **Recommendation**: Request Changes
 
 ### Key Strengths
 
-✅ Full Chromium suite executed end-to-end (`69 passed, 29 skipped, 3 failed`) with reproducible failures.
-✅ No `network-error-monitor` regression signature found (`Network errors detected`, `Failed requests`, `auth/v1/user 504`) in run logs or failure artifacts.
-✅ Core scripture helpers and tests already use deterministic patterns (`waitForResponse`, no hard waits).
+✅ Strong deterministic assertion patterns in implemented scripture specs (333 assertions total, heavy `toBeVisible`/`toHaveText`/`toHaveAttribute` usage).
+✅ Robust network synchronization patterns present (`waitForResponse`, `expect.poll`) in active scripture flows.
+✅ Good cleanup discipline in security tests via `cleanupTestSession(...)` and explicit user deletion.
+✅ Playwright CLI evidence capture completed (trace + screenshot + network logs) with session cleanup.
 
 ### Key Weaknesses
 
-❌ Isolation leak: shared in-progress session state across parallel tests leads to resume-step mismatch (`Step 1` vs expected `Step 7`).
-❌ Partner report tests assert UI before partner-complete backend preconditions are fully guaranteed.
-❌ Ambiguous text assertions on mixed-content containers (`Psalm 147:3`) create brittle pass/fail behavior.
+❌ 29 tests are skipped across 13 files, including multiple P0 flows, leaving critical paths effectively untested.
+❌ Determinism issues remain (`Date.now()`, `new Date()`, and one hard wait `waitForTimeout(300)`).
+❌ Maintainability risk: 6 scripture specs exceed 300 lines (max 403 lines), increasing review and change cost.
 
 ### Summary
 
-The current failures are not network-monitor regressions. They are state isolation and assertion precision problems in scripture E2E flows, plus missing readiness gating for partner-report scenarios. The suite health improved versus the prior run, but the remaining three failures are blocking for reliable green Chromium runs. Fixes should prioritize worker/session isolation and deterministic backend-readiness gates before UI assertions.
+The suite has two distinct quality levels: scripture scenarios are actively implemented with solid assertions and network-aware synchronization, while a large set of non-scripture E2E specs remain placeholder-style (`test.skip()`), producing major coverage and readiness gaps for core P0 user journeys.
+
+Weighted parallel-dimension scoring (determinism/isolation/maintainability/coverage/performance) resulted in **52/100**. Isolation and performance are strong, but determinism and especially effective coverage are below merge readiness due to skipped critical-path tests and time-dependent data generation patterns.
 
 ---
 
 ## Quality Criteria Assessment
 
-| Criterion | Status | Violations | Notes |
-| --- | --- | --- | --- |
-| BDD Format (Given-When-Then) | ⚠️ WARN | 0 | Behavioral naming is good, but assertions mix multiple branches in single tests |
-| Test IDs | ✅ PASS | 0 | Stable `data-testid` usage across failing specs |
-| Priority Markers (P0/P1/P2/P3) | ⚠️ WARN | 1 | Mixed use (`P1-008` in id text vs explicit `[P1]` markers) |
-| Hard Waits (sleep, waitForTimeout) | ✅ PASS | 0 | No hard waits detected |
-| Determinism (no conditionals) | ⚠️ WARN | 2 | Ambiguous text assertions and fixed-state assumptions |
-| Isolation (cleanup, no shared state) | ❌ FAIL | 3 | Shared user/session interference across parallel tests |
-| Fixture Patterns | ⚠️ WARN | 1 | Helper fallback can resolve to unrelated in-progress session |
-| Data Factories | ⚠️ WARN | 2 | Partner-complete fixtures are partial/inconsistent in failing tests |
-| Network-First Pattern | ✅ PASS | 0 | `waitForResponse` used; no network-monitor regression evidence |
-| Explicit Assertions | ⚠️ WARN | 2 | Container-level text checks hide branch intent |
-| Test Length (≤300 lines) | ✅ PASS | 0 | Both reviewed files are 278 lines |
-| Test Duration (≤1.5 min) | ❌ FAIL | 2 | Two failures exhausted 60s test timeout |
-| Flakiness Patterns | ❌ FAIL | 3 | Race between backend readiness and UI branch assertions |
+| Criterion                            | Status   | Violations | Notes |
+| ------------------------------------ | -------- | ---------- | ----- |
+| BDD Format (Given-When-Then)         | ✅ PASS  | 0          | Most files use clear Given/When/Then test narrative comments |
+| Test IDs                             | ✅ PASS  | 0          | 46 distinct IDs/markers found across suite |
+| Priority Markers (P0/P1/P2/P3)       | ⚠️ WARN | 5          | 5 tests are in files without explicit P-priority markers |
+| Hard Waits (sleep, waitForTimeout)   | ⚠️ WARN | 1          | One fixed wait at `scripture-accessibility.spec.ts:193` |
+| Determinism (no conditionals)        | ❌ FAIL  | 10         | `Date.now()` and dynamic `new Date()` usage in active tests |
+| Isolation (cleanup, no shared state) | ⚠️ WARN | 3          | A few data-write tests have cleanup strategy not immediately visible |
+| Fixture Patterns                     | ✅ PASS  | 0          | Shared merged fixtures and helper usage are consistent |
+| Data Factories                       | ⚠️ WARN | 4          | Dynamic timestamp-based identities instead of deterministic generators |
+| Network-First Pattern                | ✅ PASS  | 0          | Multiple tests register route/response guards before assertions |
+| Explicit Assertions                  | ❌ FAIL  | 11         | 11 files contain no executable assertions (placeholder skipped tests) |
+| Test Length (≤300 lines)             | ❌ FAIL  | 6          | 6 files exceed 300 lines |
+| Test Duration (≤1.5 min)             | ⚠️ WARN | 2          | Two tests use extended `test.setTimeout(180_000)` |
+| Flakiness Patterns                   | ⚠️ WARN | 5          | Hard wait + time-dependent values increase run variance |
 
-**Total Violations**: 0 Critical, 3 High, 9 Medium, 1 Low
+**Total Violations**: 0 Critical, 22 High, 6 Medium, 7 Low
 
 ---
 
 ## Quality Score Breakdown
 
 ```text
-Weighted Dimension Model (Step 3F):
-- Determinism:      84 × 0.25 = 21.00
-- Isolation:        68 × 0.25 = 17.00
-- Maintainability:  74 × 0.20 = 14.80
-- Coverage:         62 × 0.15 =  9.30
-- Performance:      86 × 0.15 = 12.90
+Parallel Weighted Dimension Model (Step 3F):
+- Determinism:      25 × 0.25 =  6.25
+- Isolation:        94 × 0.25 = 23.50
+- Maintainability:  40 × 0.20 =  8.00
+- Coverage:          0 × 0.15 =  0.00
+- Performance:      95 × 0.15 = 14.25
                               -------
-Final Score:                     75/100
-Grade:                           C
+Final Score:                     52/100
+Grade:                           F
 ```
+
+Dimension grades:
+- Determinism: F
+- Isolation: A
+- Maintainability: F
+- Coverage: F
+- Performance: A
 
 ---
 ## Critical Issues (Must Fix)
 
-### 1. Cross-Test Session Contamination in Resume Flow
+### 1. Critical-Path Tests Are Stubbed with `test.skip()`
 
 **Severity**: P0 (Critical)
-**Location**: `tests/e2e/scripture/scripture-overview.spec.ts:216`, `tests/support/helpers.ts:137`
-**Criterion**: Isolation
-**Knowledge Base**: [test-quality.md](../../../testarch/knowledge/test-quality.md), [auth-session.md](../../../testarch/knowledge/auth-session.md)
+**Location**: `tests/e2e/offline/network-status.spec.ts:17`, `tests/e2e/notes/love-notes.spec.ts:14` (and 11 additional files)
+**Criterion**: Coverage / Explicit Assertions
+**Knowledge Base**: [test-quality.md](../../../testarch/knowledge/test-quality.md), [test-levels-framework.md](../../../testarch/knowledge/test-levels-framework.md)
 
 **Issue Description**:
-The resume-step test writes and reads shared in-progress session state for the same authenticated account while Chromium runs tests in parallel workers. Helper fallback can pick a different in-progress session, resulting in nondeterministic resume prompt values (`Step 1` instead of `Step 7`).
+29 tests are currently skipped across 13 files. Several are labeled P0 and represent core journeys (auth/logout, offline status, notes, mood, routing, partner mood, photos, and home error handling). This yields false confidence because suite pass/fail does not represent actual feature verification.
 
 **Current Code**:
 
 ```typescript
 // ❌ Bad (current implementation)
-const response = await page.request.get(
-  `${authContext.apiUrl}/rest/v1/scripture_sessions?select=id,status,mode,current_step_index&status=eq.in_progress&mode=eq.solo&order=started_at.desc&limit=1`,
-  { headers: { apikey: authContext.anonKey, Authorization: `Bearer ${authContext.accessToken}` } }
-);
+test('[P0] should show offline indicator when network is disconnected', async ({ page, context }) => {
+  await context.setOffline(true);
+  test.skip();
+});
 ```
 
 **Recommended Fix**:
 
 ```typescript
 // ✅ Good (recommended approach)
-// 1) Capture session id deterministically from scripture_create_session response.
-// 2) Use that exact id for later state checks and resume assertions.
-const created = await response.json() as { id: string };
-const sessionId = created.id;
-
-const { data: session } = await supabaseAdmin
-  .from('scripture_sessions')
-  .select('id,current_step_index,status')
-  .eq('id', sessionId)
-  .single();
-
-expect(session.current_step_index).toBe(6); // Step 7 UI
+test('[P0] should show offline indicator when network is disconnected', async ({ page, context }) => {
+  await page.goto('/');
+  await context.setOffline(true);
+  await expect(page.getByTestId('offline-indicator')).toBeVisible();
+});
 ```
 
 **Why This Matters**:
-Without strict session identity, parallel runs stay flaky even when app behavior is correct.
+Skipped P0 tests remove quality gate value and can hide production regressions in core user flows.
+
+**Related Violations**:
+`tests/e2e/auth/display-name-setup.spec.ts`, `tests/e2e/auth/logout.spec.ts`, `tests/e2e/home/error-boundary.spec.ts`, `tests/e2e/home/welcome-splash.spec.ts`, `tests/e2e/mood/mood-tracker.spec.ts`, `tests/e2e/navigation/routing.spec.ts`, `tests/e2e/partner/partner-mood.spec.ts`, `tests/e2e/photos/photo-gallery.spec.ts`, `tests/e2e/photos/photo-upload.spec.ts`
 
 ---
 
-### 2. Partner Report Assertions Run Before Partner-Complete Preconditions
+### 2. Time-Dependent User Generation via `Date.now()`
 
-**Severity**: P0 (Critical)
-**Location**: `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:220`, `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:270`
-**Criterion**: Coverage / Flakiness
+**Severity**: P1 (High)
+**Location**: `tests/e2e/scripture/scripture-rls-security.spec.ts:87`
+**Criterion**: Determinism
+**Knowledge Base**: [test-quality.md](../../../testarch/knowledge/test-quality.md), [data-factories.md](../../../testarch/knowledge/data-factories.md)
+
+**Issue Description**:
+RLS tests generate outsider emails using `Date.now()`. This introduces time-based variability and can reduce reproducibility when debugging intermittent failures.
+
+**Current Code**:
+
+```typescript
+// ❌ Bad (current implementation)
+const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+  email: `outsider-${Date.now()}@test.example.com`,
+  password: 'testpassword123',
+  email_confirm: true,
+});
+```
+
+**Recommended Fix**:
+
+```typescript
+// ✅ Good (recommended approach)
+const runScopedId = `${test.info().workerIndex}-${test.info().repeatEachIndex}`;
+const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+  email: `outsider-${runScopedId}@test.example.com`,
+  password: 'testpassword123',
+  email_confirm: true,
+});
+```
+
+**Why This Matters**:
+Deterministic identities improve rerun reliability and simplify CI triage when failures are retried.
+
+**Related Violations**:
+`tests/e2e/scripture/scripture-rls-security.spec.ts:149`, `tests/e2e/scripture/scripture-rls-security.spec.ts:182`, `tests/e2e/scripture/scripture-rls-security.spec.ts:217`
+
+---
+
+### 3. Hard Wait in Accessibility Flow
+
+**Severity**: P1 (High)
+**Location**: `tests/e2e/scripture/scripture-accessibility.spec.ts:193`
+**Criterion**: Hard Waits / Flakiness
 **Knowledge Base**: [timing-debugging.md](../../../testarch/knowledge/timing-debugging.md), [test-healing-patterns.md](../../../testarch/knowledge/test-healing-patterns.md)
 
 **Issue Description**:
-The failing tests insert partial partner data and immediately assert partner-visible report UI. In the failing run, the page is in the documented waiting branch (`Waiting for Test User 2's reflections`) so partner message/side-by-side assertions time out.
+A fixed 300ms wait is used to observe announcer stability. Fixed sleeps are inherently brittle across slower CI workers and can mask real synchronization issues.
 
 **Current Code**:
 
 ```typescript
 // ❌ Bad (current implementation)
-await supabaseAdmin.from('scripture_reflections').insert({ /* partner row(s) */ });
-await supabaseAdmin.from('scripture_messages').insert({ /* partner message */ });
-await expect(page.getByTestId('scripture-report-partner-message')).toBeVisible();
+await page.getByTestId('scripture-view-response-button').click();
+await page.waitForTimeout(300);
+const afterViewResponse = await liveRegion.textContent();
 ```
 
 **Recommended Fix**:
 
 ```typescript
 // ✅ Good (recommended approach)
-await seedPartnerCompleteState(supabaseAdmin, sessionId, testSession.test_user2_id!);
-
-await expect.poll(async () => {
-  const { data } = await supabaseAdmin
-    .from('scripture_reflections')
-    .select('step_index')
-    .eq('session_id', sessionId)
-    .eq('user_id', testSession.test_user2_id!);
-  return data?.length ?? 0;
-}).toBeGreaterThan(0);
-
-await expect(page.getByTestId('scripture-report-partner-message')).toBeVisible();
+await page.getByTestId('scripture-view-response-button').click();
+await expect.poll(async () => liveRegion.textContent()).not.toMatch(/verse 2/i);
+const afterViewResponse = await liveRegion.textContent();
 ```
 
 **Why This Matters**:
-This is a classic readiness race. Deterministic precondition polling removes 60s timeout failures.
+Condition-driven waits improve determinism and reduce flaky timing assumptions across environments.
 
 ---
+## Recommendations (Should Fix)
 
-### 3. Ambiguous Rating Assertions on Mixed-Content Container
+### 1. Split Oversized Scripture Specs
 
-**Severity**: P1 (High)
-**Location**: `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:271`
-**Criterion**: Determinism / Explicit Assertions
-**Knowledge Base**: [selector-resilience.md](../../../testarch/knowledge/selector-resilience.md)
+**Severity**: P2 (Medium)
+**Location**: `tests/e2e/scripture/scripture-rls-security.spec.ts:1`
+**Criterion**: Test Length / Maintainability
+**Knowledge Base**: [test-quality.md](../../../testarch/knowledge/test-quality.md)
 
 **Issue Description**:
-`toContainText('3')` passes on verse text (`Psalm 147:3`) instead of rating-specific UI. This hides real branch/state issues and creates false positives.
+Six files exceed the 300-line threshold (`312`, `317`, `359`, `360`, `387`, `403`).
 
 **Current Code**:
 
 ```typescript
 // ⚠️ Could be improved (current implementation)
-await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('3');
-await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('5');
+// scripture-rls-security.spec.ts (403 lines)
+// scripture-reflection-2.2.spec.ts (387 lines)
 ```
 
 **Recommended Improvement**:
 
 ```typescript
 // ✅ Better approach (recommended)
-await expect(page.getByTestId('scripture-report-rating-step-0-user')).toHaveText('3');
-await expect(page.getByTestId('scripture-report-rating-step-0-partner')).toHaveText('5');
+// Split by scenario groups and test IDs, e.g.
+// scripture-rls-security-select.spec.ts
+// scripture-rls-security-insert.spec.ts
+// scripture-rls-security-rpc.spec.ts
 ```
 
-**Why This Matters**:
-Precision assertions are required for stable branch-level E2E confidence.
+**Benefits**:
+Smaller files reduce review load, simplify failure isolation, and lower merge-conflict risk.
+
+**Priority**:
+P2 because behavior is currently testable, but maintainability overhead is high.
 
 ---
 
-## Recommendations (Should Fix)
-
-### 1. Introduce Worker-Isolated Scripture Users
-
-**Severity**: P1 (High)
-**Location**: `tests/support/auth-setup.ts`, `tests/support/helpers.ts`
-**Criterion**: Isolation
-**Knowledge Base**: [auth-session.md](../../../testarch/knowledge/auth-session.md)
-
-Use worker-specific accounts or serialized execution for stateful scripture specs to prevent shared-session collisions.
-
-### 2. Split 2.3 Report Assertions by Branch
+### 2. Normalize Non-Critical Time Usage (`new Date()`)
 
 **Severity**: P2 (Medium)
-**Location**: `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`
-**Criterion**: Coverage
-**Knowledge Base**: [test-healing-patterns.md](../../../testarch/knowledge/test-healing-patterns.md)
+**Location**: `tests/e2e/scripture/scripture-overview.spec.ts:135`
+**Criterion**: Determinism
+**Knowledge Base**: [data-factories.md](../../../testarch/knowledge/data-factories.md)
 
-Create explicit tests for waiting branch vs partner-complete branch with strict setup gates.
+**Issue Description**:
+Several tests use `new Date().toISOString()` for generated payload fields in assertions and fixtures.
 
-### 3. Promote Retry/Timeout Constants to Config
+**Current Code**:
 
-**Severity**: P3 (Low)
-**Location**: `tests/support/helpers.ts:24`
-**Criterion**: Maintainability
-**Knowledge Base**: [timing-debugging.md](../../../testarch/knowledge/timing-debugging.md)
+```typescript
+// ⚠️ Could be improved (current implementation)
+updated_at: new Date().toISOString(),
+```
 
-Move helper retry constants to configurable env/test settings for easier CI tuning.
+**Recommended Improvement**:
+
+```typescript
+// ✅ Better approach (recommended)
+const FIXED_TS = '2026-01-01T00:00:00.000Z';
+updated_at: FIXED_TS,
+```
+
+**Benefits**:
+Improves replayability and log comparison consistency across reruns.
+
+**Priority**:
+P2 because these paths are not currently causing hard failures, but they add avoidable variance.
 
 ---
+
+### 3. Replace Placeholder Coverage with Actionable `fixme` Tracking
+
+**Severity**: P2 (Medium)
+**Location**: `tests/e2e/navigation/routing.spec.ts:14`
+**Criterion**: Coverage Governance
+**Knowledge Base**: [selective-testing.md](../../../testarch/knowledge/selective-testing.md), [test-priorities.md](../../../testarch/knowledge/test-priorities.md)
+
+**Issue Description**:
+Placeholder specs use `test.skip()` without explicit issue references, making debt hard to track.
+
+**Current Code**:
+
+```typescript
+// ⚠️ Could be improved (current implementation)
+test.skip();
+```
+
+**Recommended Improvement**:
+
+```typescript
+// ✅ Better approach (recommended)
+test.fixme('QA-1234: pending auth fixture bootstrap for offline banner assertions');
+```
+
+**Benefits**:
+Keeps debt explicit and enforceable without silently suppressing coverage accountability.
+
+**Priority**:
+P2 because this is governance/process quality rather than immediate runtime breakage.
+
+---
+
 ## Best Practices Found
 
-### 1. Network Monitor Guardrails Configured Correctly
+### 1. Response Listener Registered Before Action (Race Prevention)
 
-**Location**: `tests/support/merged-fixtures.ts:27`
-**Pattern**: Network Error Monitoring with targeted exclusions
-**Knowledge Base**: [network-error-monitor.md](../../../testarch/knowledge/network-error-monitor.md)
+**Location**: `tests/e2e/scripture/scripture-reflection-2.1.spec.ts:84`
+**Pattern**: Network-first response synchronization
+**Knowledge Base**: [network-first.md](../../../testarch/knowledge/network-first.md)
 
-The fixture composition includes `createNetworkErrorMonitorFixture` with explicit exclusions and `maxTestsPerError`, which prevents domino failures while keeping genuine backend regressions visible.
+**Why This Is Good**:
+The test sets `waitForResponse` before clicking Continue, preventing missed-network races.
 
-### 2. Deterministic API Wait Pattern in Helpers
+**Code Example**:
 
-**Location**: `tests/support/helpers.ts:372`, `tests/support/helpers.ts:423`
-**Pattern**: `waitForResponse` synchronization
+```typescript
+// ✅ Excellent pattern demonstrated in this test
+const reflectionResponse = page.waitForResponse(
+  (response) =>
+    response.url().includes('/rest/v1/rpc/scripture_submit_reflection') &&
+    response.status() === 200
+);
+await continueButton.click();
+await reflectionResponse;
+```
+
+**Use as Reference**:
+Apply this pre-listener pattern to remaining async mutation flows.
+
+---
+
+### 2. `expect.poll` for UI Readiness Instead of Sleeps
+
+**Location**: `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:47`
+**Pattern**: Condition-based asynchronous stabilization
 **Knowledge Base**: [timing-debugging.md](../../../testarch/knowledge/timing-debugging.md)
 
-The core scripture flow avoids hard waits and consistently gates progression on network confirmation.
+**Why This Is Good**:
+Polling DOM state avoids fixed delays and adapts to environment timing differences.
 
-### 3. Selector Contract Usage
+**Code Example**:
 
-**Location**: `tests/e2e/scripture/scripture-overview.spec.ts:220`, `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:217`
-**Pattern**: `data-testid` first
-**Knowledge Base**: [selector-resilience.md](../../../testarch/knowledge/selector-resilience.md)
+```typescript
+// ✅ Excellent pattern demonstrated in this test
+await expect.poll(async () => {
+  return page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+}).toBe('scripture-message-compose-heading');
+```
 
-Primary selectors are stable and intentional; remaining instability is mostly assertion granularity, not selector strategy.
+**Use as Reference**:
+Reuse this approach where tests currently rely on hard waits.
+
+---
+
+### 3. Explicit Data Cleanup in Security Tests
+
+**Location**: `tests/e2e/scripture/scripture-rls-security.spec.ts:135`
+**Pattern**: Fixture/data cleanup discipline
+**Knowledge Base**: [data-factories.md](../../../testarch/knowledge/data-factories.md)
+
+**Why This Is Good**:
+Cleanup calls reduce cross-test contamination and keep DB state predictable.
+
+**Code Example**:
+
+```typescript
+// ✅ Excellent pattern demonstrated in this test
+await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+```
+
+**Use as Reference**:
+Enforce explicit cleanup for every test that writes persistent data.
 
 ---
 
@@ -250,73 +374,89 @@ Primary selectors are stable and intentional; remaining instability is mostly as
 
 ### File Metadata
 
-- **Reviewed Files**:
-  - `tests/e2e/scripture/scripture-overview.spec.ts` (278 lines, 9.76 KB)
-  - `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` (278 lines, 10.00 KB)
+- **File Path**: `tests/e2e/` (directory scope)
+- **File Size**: 3,133 lines, 111.68 KB across 23 spec files
 - **Test Framework**: Playwright
 - **Language**: TypeScript
 
 ### Test Structure
 
-- **Describe Blocks**: 13 total
-- **Test Cases (it/test)**: 13 total
-- **Average Test Length**: 42.8 lines/test
-- **Fixtures Used**: `merged-fixtures`, shared scripture helpers
-- **Data Factories Used**: direct admin inserts; no dedicated partner-complete factory in failing scenarios
+- **Describe Blocks**: 72
+- **Test Cases (it/test)**: 101
+- **Average Test Length**: 31.02 lines per test
+- **Fixtures Used**: 4 (`context`, `page`, `supabaseAdmin`, `testSession`)
+- **Data Factories Used**: 4 (`createTestSession`, `createUser`, `createClient`, `createUserClient`)
 
 ### Test Coverage Scope
 
-- **Test IDs**: `P1-006`, `P1-007`, `P1-008`, `P1-009`, `2.3-E2E-001`, `2.3-E2E-002`, `2.3-E2E-003`, `2.3-E2E-005`
+- **Test IDs**: 46 distinct IDs/markers found
 - **Priority Distribution**:
-  - P0 (Critical): 2
-  - P1 (High): 5
-  - P2 (Medium): 1
-  - P3 (Low): 0
-  - Unknown/Unmarked: 5
+  - P0 (Critical): 75 tests
+  - P1 (High): 9 tests
+  - P2 (Medium): 12 tests
+  - P3 (Low): 0 tests
+  - Unknown: 5 tests
 
 ### Assertions Analysis
 
-- **Total Assertions**: 66
-- **Assertions per Test**: 5.1 average
-- **Assertion Types**: visibility, text content, DB persistence checks (`expect.poll`), response gating
+- **Total Assertions**: 333
+- **Assertions per Test**: 3.3 (avg)
+- **Assertion Types**: `toBeVisible`, `toHaveText`, `toHaveAttribute`, `toEqual`, `toBeNull`, `toContainText`, `toHaveLength`
 
 ---
-
 ## Context and Integration
 
 ### Related Artifacts
 
-- **Story 1.2 AC**: `/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-2-navigation-and-overview-page/acceptance-criteria.md`
-- **Story 2.3 Spec**: `/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/2-3-daily-prayer-report-send-and-view.md`
-- **Test Design Epic 2**: `/Users/sallvain/Projects/My-Love/_bmad-output/test-design-epic-2.md`
-- **Framework Config**: `/Users/sallvain/Projects/My-Love/playwright.config.ts`
+- **QA Design**: [`_bmad-output/test-design-qa.md`](/Users/sallvain/Projects/My-Love/_bmad-output/test-design-qa.md)
+- **Architecture Design**: [`_bmad-output/test-design-architecture.md`](/Users/sallvain/Projects/My-Love/_bmad-output/test-design-architecture.md)
+- **Epic 2 Design**: [`_bmad-output/test-design-epic-2.md`](/Users/sallvain/Projects/My-Love/_bmad-output/test-design-epic-2.md)
+- **Story Artifacts**:
+  - [`_bmad-output/implementation-artifacts/1-2-navigation-and-overview-page/story.md`](/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-2-navigation-and-overview-page/story.md)
+  - [`_bmad-output/implementation-artifacts/1-4-save-resume-and-optimistic-ui/story.md`](/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-4-save-resume-and-optimistic-ui/story.md)
+  - [`_bmad-output/implementation-artifacts/1-5-accessibility-foundations/story.md`](/Users/sallvain/Projects/My-Love/_bmad-output/implementation-artifacts/1-5-accessibility-foundations/story.md)
 
 ### Acceptance Criteria Validation
 
-| Acceptance Criterion | Test ID | Status | Notes |
-| --- | --- | --- | --- |
-| Story 1.2 AC#6 Resume prompt shows correct step | P1-008 | ❌ Failing | Shows `Step 1` instead of expected `Step 7` |
-| Story 2.3 AC#3 Daily report shows partner message when available | 2.3-E2E-003 | ❌ Failing | Stuck on waiting branch; partner message not visible |
-| Story 2.3 AC#5 Together mode side-by-side partner data | 2.3-E2E-005 | ❌ Failing | Rating container text mismatch due branch/assertion precision |
-| Story 2.3 AC#2 Unlinked flow skips compose | 2.3-E2E-002 | ✅ Covered | Passing in current run |
+Directory scope spans multiple stories/features, so AC mapping is summarized at feature level:
 
-**Coverage in this review scope**: 1/4 criteria passing (25%) for currently failing subset.
+| Acceptance Criterion Group | Test ID / File | Status | Notes |
+| -------------------------- | -------------- | ------ | ----- |
+| Epic 1 navigation + overview | `P1-006`..`P1-009` (`scripture-overview.spec.ts`) | ✅ Covered | Assertions active |
+| Epic 1 save/resume/exit | `P0-010`, `P0-011` (`scripture-session.spec.ts`) | ✅ Covered | Assertions active |
+| Epic 1 accessibility foundations | `P2-001`..`P2-014` (`scripture-accessibility.spec.ts`) | ✅ Covered | One hard wait to remove |
+| Epic 2 reflection/report | `2.1-E2E-*`, `2.2-E2E-*`, `2.3-E2E-*` | ✅ Covered | Assertions active, some long files |
+| Non-scripture P0 platform flows (auth/mood/photos/notes/offline/etc.) | Multiple skipped specs | ❌ Missing Effective Coverage | Tests present but skipped |
+
+**Coverage**: 4/5 major criterion groups effectively covered (80%)
 
 ---
 
 ## Knowledge Base References
 
-This review consulted:
+This review consulted the following knowledge base fragments:
 
-- [test-quality.md](../../../testarch/knowledge/test-quality.md)
-- [test-healing-patterns.md](../../../testarch/knowledge/test-healing-patterns.md)
-- [selector-resilience.md](../../../testarch/knowledge/selector-resilience.md)
-- [timing-debugging.md](../../../testarch/knowledge/timing-debugging.md)
-- [network-error-monitor.md](../../../testarch/knowledge/network-error-monitor.md)
-- [auth-session.md](../../../testarch/knowledge/auth-session.md)
-- [fixtures-composition.md](../../../testarch/knowledge/fixtures-composition.md)
+- **[test-quality.md](../../../testarch/knowledge/test-quality.md)** - Test DoD and quality thresholds
+- **[data-factories.md](../../../testarch/knowledge/data-factories.md)** - Deterministic data generation guidance
+- **[test-levels-framework.md](../../../testarch/knowledge/test-levels-framework.md)** - Coverage expectations per test level
+- **[selective-testing.md](../../../testarch/knowledge/selective-testing.md)** - Coverage governance and prioritization
+- **[test-healing-patterns.md](../../../testarch/knowledge/test-healing-patterns.md)** - Flakiness remediation patterns
+- **[selector-resilience.md](../../../testarch/knowledge/selector-resilience.md)** - Stable selector/assertion practices
+- **[timing-debugging.md](../../../testarch/knowledge/timing-debugging.md)** - Deterministic wait strategy
+- **[overview.md](../../../testarch/knowledge/overview.md)** - Playwright utils conventions
+- **[api-request.md](../../../testarch/knowledge/api-request.md)** - API test utilities and patterns
+- **[network-recorder.md](../../../testarch/knowledge/network-recorder.md)** - Network evidence collection patterns
+- **[auth-session.md](../../../testarch/knowledge/auth-session.md)** - Session isolation and auth concerns
+- **[intercept-network-call.md](../../../testarch/knowledge/intercept-network-call.md)** - Route interception guidance
+- **[recurse.md](../../../testarch/knowledge/recurse.md)** - Polling/retry patterns
+- **[log.md](../../../testarch/knowledge/log.md)** - Structured test logging
+- **[file-utils.md](../../../testarch/knowledge/file-utils.md)** - Artifact handling patterns
+- **[burn-in.md](../../../testarch/knowledge/burn-in.md)** - Burn-in reliability strategy
+- **[network-error-monitor.md](../../../testarch/knowledge/network-error-monitor.md)** - Request error monitoring
+- **[fixtures-composition.md](../../../testarch/knowledge/fixtures-composition.md)** - Fixture composition patterns
+- **[playwright-cli.md](../../../testarch/knowledge/playwright-cli.md)** - Browser automation CLI workflow
 
-See `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/tea-index.csv` for full index.
+See [`_bmad/tea/testarch/tea-index.csv`](/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/tea-index.csv) for the full index.
 
 ---
 
@@ -324,34 +464,34 @@ See `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/tea-index.csv` for full
 
 ### Immediate Actions (Before Merge)
 
-1. **Fix session isolation for resume flow**
+1. **Unskip and implement P0 placeholder tests**
    - Priority: P0
-   - Owner: E2E / QA
-   - Estimated Effort: 2-4 hours
+   - Owner: QA + Feature owners
+   - Estimated Effort: 2-4 days
 
-2. **Add partner-complete readiness gates in 2.3 tests**
-   - Priority: P0
-   - Owner: E2E / QA
-   - Estimated Effort: 2-4 hours
-
-3. **Replace ambiguous rating assertions with slot-level selectors**
+2. **Remove deterministic-risk time calls and hard waits**
    - Priority: P1
-   - Owner: Frontend + E2E
-   - Estimated Effort: 1-2 hours
+   - Owner: QA
+   - Estimated Effort: 3-6 hours
+
+3. **Break up oversized scripture specs**
+   - Priority: P2
+   - Owner: QA
+   - Estimated Effort: 1-2 days
 
 ### Follow-up Actions (Future PRs)
 
-1. **Add dedicated partner-complete data factory fixture**
+1. **Add burn-in profile for scripture E2E subset in CI**
    - Priority: P2
-   - Target: Next sprint
+   - Target: next sprint
 
-2. **Adopt worker-specific auth/session identities for stateful scripture flows**
-   - Priority: P2
-   - Target: Next sprint
+2. **Standardize placeholder policy (`fixme` + issue linkage)**
+   - Priority: P3
+   - Target: backlog
 
 ### Re-Review Needed?
 
-⚠️ Re-review after the three failing tests are fixed and Chromium suite is rerun.
+⚠️ Re-review after critical fixes - request changes, then re-review.
 
 ---
 
@@ -360,7 +500,10 @@ See `/Users/sallvain/Projects/My-Love/_bmad/tea/testarch/tea-index.csv` for full
 **Recommendation**: Request Changes
 
 **Rationale**:
-The failures are reproducible and not caused by network-monitor regressions. They come from test-state isolation and precondition readiness gaps in stateful scripture scenarios. Because these affect deterministic suite reliability, they should be addressed before considering the suite stable.
+
+Current suite quality is below release confidence threshold because critical-path coverage is materially reduced by skipped tests and determinism risks remain in active paths. While implemented scripture scenarios show strong engineering patterns, the overall suite cannot be treated as a reliable quality gate until P0 placeholders are converted into executable assertions and timing dependencies are cleaned up.
+
+> Test quality needs improvement with **52/100** score. Critical coverage violations must be fixed before merge. Active scripture quality is strong, but broad E2E readiness is currently blocked by skipped P0 scenarios.
 
 ---
 
@@ -369,26 +512,27 @@ The failures are reproducible and not caused by network-monitor regressions. The
 ### Violation Summary by Location
 
 | Line | Severity | Criterion | Issue | Fix |
-| --- | --- | --- | --- | --- |
-| `tests/support/helpers.ts:137` | P0 | Isolation | Unscoped fallback session lookup | Bind assertions to created session id |
-| `tests/e2e/scripture/scripture-overview.spec.ts:225` | P0 | Determinism | Fixed step assertion on shared state | Verify backend step for owned session before UI assertion |
-| `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:222` | P0 | Coverage/Timing | Partner message asserted before readiness | Add poll-based readiness gate |
-| `tests/e2e/scripture/scripture-reflection-2.3.spec.ts:271` | P1 | Explicit Assertions | Rating assertion on mixed-content container | Add slot-level rating test ids |
-
-### Quality Trends
-
-| Review Date | Scope | Score | Grade | Critical Issues | Trend |
-| --- | --- | --- | --- | --- | --- |
-| 2026-02-07 | Full Chromium suite (prior) | ~66 | D | 7 failing tests | baseline |
-| 2026-02-08 | Full Chromium suite (current) | 75 | C | 3 failing tests | ⬆️ Improved |
+| ---- | -------- | --------- | ----- | --- |
+| `tests/e2e/offline/network-status.spec.ts:17` | P0 | Coverage | P0 test skipped | Implement executable assertion flow |
+| `tests/e2e/notes/love-notes.spec.ts:14` | P0 | Coverage | P0 test skipped | Replace placeholder with working interaction assertions |
+| `tests/e2e/scripture/scripture-rls-security.spec.ts:87` | P1 | Determinism | `Date.now()` used for IDs | Use run-scoped deterministic identifier |
+| `tests/e2e/scripture/scripture-accessibility.spec.ts:193` | P1 | Flakiness | `waitForTimeout(300)` hard wait | Use `expect.poll` or response/locator condition |
+| `tests/e2e/scripture/scripture-reflection-2.2.spec.ts:1` | P2 | Maintainability | 387-line spec | Split by scenario cluster |
+| `tests/e2e/scripture/scripture-rls-security.spec.ts:1` | P2 | Maintainability | 403-line spec | Split by RLS operation group |
+| `tests/e2e/scripture/scripture-solo-reading.spec.ts:100` | P2 | Duration | Extended 180s timeout | Optimize flow; isolate long-path checks |
 
 ### Related Reviews
 
 | File | Score | Grade | Critical | Status |
-| --- | --- | --- | --- | --- |
-| `test-review-story-2.1.md` | 78 | C | 3 | Review complete |
-| `test-review-story-2.3.md` | 75 | C | 9 | Review complete |
-| `test-review.md` (this file) | 75 | C | 3 | Request Changes |
+| ---- | ----- | ----- | -------- | ------ |
+| `tests/e2e/scripture/scripture-reflection-2.1.spec.ts` | 74/100 | B | 0 | Approve with comments |
+| `tests/e2e/scripture/scripture-reflection-2.2.spec.ts` | 69/100 | C | 0 | Request changes |
+| `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` | 67/100 | C | 0 | Request changes |
+| `tests/e2e/scripture/scripture-rls-security.spec.ts` | 63/100 | C | 0 | Request changes |
+| `tests/e2e/offline/network-status.spec.ts` | 35/100 | F | 1 | Blocked (skipped) |
+| `tests/e2e/notes/love-notes.spec.ts` | 35/100 | F | 1 | Blocked (skipped) |
+
+**Suite Average**: 52/100 (F)
 
 ---
 
@@ -396,7 +540,29 @@ The failures are reproducible and not caused by network-monitor regressions. The
 
 **Generated By**: BMad TEA Agent (Test Architect)
 **Workflow**: testarch-test-review v5.0 (step-file architecture)
-**Review ID**: test-review-scripture-failures-20260208
-**Timestamp**: 2026-02-08T02:45:41Z
-**Subprocess Execution**: PARALLEL (5 quality dimensions)
+**Review ID**: test-review-tests-e2e-20260208
+**Timestamp**: 2026-02-08 02:48:00 -0500
+**Execution Mode**: Parallel subprocess evaluation (5 dimensions)
 **Version**: 1.0
+
+Artifacts:
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/tea-test-review-determinism-2026-02-08T07-45-43Z.json`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/tea-test-review-isolation-2026-02-08T07-45-43Z.json`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/tea-test-review-maintainability-2026-02-08T07-45-43Z.json`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/tea-test-review-coverage-2026-02-08T07-45-43Z.json`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/tea-test-review-performance-2026-02-08T07-45-43Z.json`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/tea-test-review-summary-2026-02-08T07-45-43Z.json`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/.playwright-cli/traces/trace-1770537097349.trace`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/.playwright-cli/page-2026-02-08T07-51-38-631Z.png`
+- `/Users/sallvain/Projects/My-Love/_bmad-output/test-artifacts/workflow-temp-2026-02-08T07-45-43Z/.playwright-cli/network-2026-02-08T07-51-39-690Z.log`
+
+---
+
+## Feedback on This Review
+
+1. Review patterns in knowledge base: `testarch/knowledge/`
+2. Inspect subprocess JSON artifacts for exact heuristic detection
+3. Request a focused re-review after P0 skipped tests are implemented
+4. Pair with QA engineer to split oversized scripture specs
+
+This review is guidance, not rigid rules. Context matters; if a pattern is justified, document the reason inline.

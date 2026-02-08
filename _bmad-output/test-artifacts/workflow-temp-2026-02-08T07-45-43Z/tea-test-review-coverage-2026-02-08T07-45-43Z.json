@@ -1,0 +1,142 @@
+{
+  "dimension": "coverage",
+  "score": 0,
+  "max_score": 100,
+  "grade": "F",
+  "violations": [
+    {
+      "file": "tests/e2e/auth/display-name-setup.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/auth/logout.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/home/error-boundary.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/home/welcome-splash.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/mood/mood-tracker.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/mood/mood-tracker.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "error-paths",
+      "description": "Primarily happy-path scenarios; limited negative-path signals.",
+      "suggestion": "Add at least one failure/edge-case assertion for each major flow."
+    },
+    {
+      "file": "tests/e2e/navigation/routing.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/notes/love-notes.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/notes/love-notes.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "error-paths",
+      "description": "Primarily happy-path scenarios; limited negative-path signals.",
+      "suggestion": "Add at least one failure/edge-case assertion for each major flow."
+    },
+    {
+      "file": "tests/e2e/offline/network-status.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/partner/partner-mood.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/photos/photo-gallery.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/photos/photo-gallery.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "error-paths",
+      "description": "Primarily happy-path scenarios; limited negative-path signals.",
+      "suggestion": "Add at least one failure/edge-case assertion for each major flow."
+    },
+    {
+      "file": "tests/e2e/photos/photo-upload.spec.ts",
+      "line": 1,
+      "severity": "HIGH",
+      "category": "missing-assertions",
+      "description": "Test file has no explicit assertions.",
+      "suggestion": "Add explicit `expect(...)` checks for each critical outcome."
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-seeding.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "error-paths",
+      "description": "Primarily happy-path scenarios; limited negative-path signals.",
+      "suggestion": "Add at least one failure/edge-case assertion for each major flow."
+    }
+  ],
+  "passed_checks": 169,
+  "failed_checks": 15,
+  "total_checks": 184,
+  "violation_summary": {
+    "HIGH": 11,
+    "MEDIUM": 0,
+    "LOW": 4
+  },
+  "recommendations": [
+    "Add explicit negative/error path tests for each critical flow.",
+    "Map each P0/P1 acceptance criterion to at least one assertion-backed test.",
+    "Expand edge-case assertions where only happy paths exist."
+  ],
+  "summary": "coverage analysis found 15 violation(s): 11 HIGH, 0 MEDIUM, 4 LOW."
+}
