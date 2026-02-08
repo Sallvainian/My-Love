@@ -55,12 +55,14 @@ Determine what needs to be tested and select appropriate test levels and priorit
 
 Use CLI to explore the application and identify testable pages/flows:
 
-1. `playwright-cli -s=tea-automate open <target_url>`
-2. `playwright-cli -s=tea-automate snapshot` → capture page structure and element refs
+1. `"{playwright_cli_path}" -s=tea-automate open <target_url>`
+2. `"{playwright_cli_path}" -s=tea-automate snapshot` → capture page structure and element refs
 3. Analyze snapshot output to identify testable elements and flows
-4. `playwright-cli -s=tea-automate close`
+4. `"{playwright_cli_path}" -s=tea-automate close`
 
-> **Session Hygiene:** Always close sessions using `playwright-cli -s=tea-automate close`. Do NOT use `close-all` — it kills every session on the machine and breaks parallel execution.
+> **Fallback:** If wrapper not found at `{playwright_cli_path}`, fall back to global `playwright-cli`.
+
+> **Session Hygiene:** Always close sessions using `"{playwright_cli_path}" -s=tea-automate close`. Do NOT use `close-all` — it kills every session on the machine and breaks parallel execution.
 
 ---
 

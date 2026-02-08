@@ -7,6 +7,7 @@ test_artifacts: "{project-root}/_bmad-output/test-artifacts"
 tea_use_playwright_utils: true
 tea_browser_automation: auto
 test_framework: playwright
+playwright_cli_path: "$HOME/.codex/skills/playwright/scripts/playwright_cli.sh"
 risk_threshold: p1
 test_design_output: _bmad-output/test-artifacts/_bmad-output/test-artifacts/test-design
 test_review_output: _bmad-output/test-artifacts/_bmad-output/test-artifacts/test-reviews

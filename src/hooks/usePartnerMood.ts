@@ -37,16 +37,14 @@ export interface UsePartnerMoodResult {
  */
 export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
   const [partnerMood, setPartnerMood] = useState<SupabaseMoodRecord | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(Boolean(partnerId));
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<
     'connecting' | 'connected' | 'disconnected'
-  >('connecting');
+  >(partnerId ? 'connecting' : 'disconnected');
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Early bailout when partnerId is empty; setting loading false is necessary for correct UI state
   useEffect(() => {
     if (!partnerId) {
-      setIsLoading(false);
       return;
     }
 
@@ -55,6 +53,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     // Load initial partner mood
     async function loadPartnerMood() {
       try {
+        setIsLoading(true);
         setError(null);
         const mood = await moodSyncService.getLatestPartnerMood(partnerId);
         setPartnerMood(mood);
@@ -69,6 +68,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     // Subscribe to partner mood updates via Broadcast
     async function subscribeToPartnerMoodUpdates() {
       try {
+        setConnectionStatus('connecting');
         unsubscribe = await moodSyncService.subscribeMoodUpdates(
           (newMood) => {
             // Only update if this mood is from our partner

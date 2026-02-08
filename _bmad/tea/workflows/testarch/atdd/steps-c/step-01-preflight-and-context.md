@@ -88,6 +88,7 @@ Use `{knowledgeIndex}` to load:
 **Playwright CLI (if tea_browser_automation is "cli" or "auto"):**
 
 - `playwright-cli.md`
+- **Prerequisite:** Verify `{playwright_cli_path}` exists (wrapper script) or that `playwright-cli` is on PATH. Verify `npx` is available before browser recording steps.
 
 **MCP Patterns (if tea_browser_automation is "mcp" or "auto"):**
 

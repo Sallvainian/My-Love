@@ -111,6 +111,7 @@ Use `{knowledgeIndex}` and load only what is required.
 **Playwright CLI (if tea_browser_automation is "cli" or "auto"):**
 
 - `playwright-cli.md`
+- **Prerequisite:** Verify `{playwright_cli_path}` exists (wrapper script) or that `playwright-cli` is on PATH. Verify `npx` is available before browser exploration steps.
 
 **MCP Patterns (if tea_browser_automation is "mcp" or "auto"):**
 

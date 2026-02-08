@@ -44,10 +44,12 @@ export function SyncToast({
   const [isVisible, setIsVisible] = useState(false);
 
   // Show toast when syncResult changes
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing visibility state from syncResult prop for toast animation
   useEffect(() => {
     if (syncResult) {
-      setIsVisible(true);
+      const showTimer = setTimeout(() => {
+        setIsVisible(true);
+      }, 0);
+      return () => clearTimeout(showTimer);
     }
   }, [syncResult]);
 

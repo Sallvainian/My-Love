@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { usePhotos } from '../../hooks/usePhotos';
@@ -66,6 +66,33 @@ export function PhotoUploader({
     clearError,
     clearStorageWarning,
   } = usePhotos(false); // Don't auto-load photos
+
+  const handleRetryFromErrorToast = useCallback(() => {
+    if (!retryUpload) return;
+    clearError();
+    retryUpload();
+    setRetryUpload(null);
+  }, [clearError, retryUpload]);
+
+  const externalToast: Toast | null = uploadError
+    ? {
+        type: 'error',
+        message: uploadError,
+        action: retryUpload
+          ? {
+              label: 'Retry',
+              onClick: handleRetryFromErrorToast,
+            }
+          : undefined,
+      }
+    : storageWarning
+      ? {
+          type: 'warning',
+          message: storageWarning,
+        }
+      : null;
+
+  const activeToast = toast ?? externalToast;
 
   // AC-6.1.3: Cleanup object URLs on unmount to prevent memory leaks
   useEffect(() => {
@@ -210,40 +237,11 @@ export function PhotoUploader({
     }
   };
 
-  // AC-6.2.9, AC-6.2.13: Show error toast when upload error occurs
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing toast state in response to uploadError from external hook
-  useEffect(() => {
-    if (uploadError) {
-      setToast({
-        type: 'error',
-        message: uploadError,
-        action: retryUpload
-          ? {
-              label: 'Retry',
-              onClick: () => {
-                clearError();
-                setToast(null);
-                retryUpload();
-                setRetryUpload(null);
-              },
-            }
-          : undefined,
-      });
-    }
-  }, [uploadError, retryUpload, clearError]);
-
-  // AC-6.2.10: Show storage warning toast
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing toast state in response to storageWarning from external hook
+  // AC-6.2.10: Auto-clear storage warning after 5 seconds
   useEffect(() => {
     if (storageWarning) {
-      setToast({
-        type: 'warning',
-        message: storageWarning,
-      });
-      // Auto-dismiss warning after 5 seconds
       const timer = setTimeout(() => {
         clearStorageWarning();
-        setToast(null);
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -425,38 +423,46 @@ export function PhotoUploader({
       )}
 
       {/* Toast Notification - AC-6.2.8, AC-6.2.9, AC-6.2.13 */}
-      {toast && (
+      {activeToast && (
         <div
           className={`fixed bottom-4 right-4 max-w-sm p-4 rounded-lg shadow-lg transition-all duration-300 ${
-            toast.type === 'success'
+            activeToast.type === 'success'
               ? 'bg-green-100 border border-green-200 text-green-800'
-              : toast.type === 'error'
+              : activeToast.type === 'error'
                 ? 'bg-red-100 border border-red-200 text-red-800'
                 : 'bg-yellow-100 border border-yellow-200 text-yellow-800'
           }`}
         >
           <div className="flex items-start gap-3">
-            {toast.type === 'success' ? (
+            {activeToast.type === 'success' ? (
               <CheckCircle size={20} className="shrink-0 mt-0.5" />
             ) : (
               <AlertCircle size={20} className="shrink-0 mt-0.5" />
             )}
             <div className="flex-1">
-              <p className="text-sm font-medium">{toast.message}</p>
-              {toast.action && (
+              <p className="text-sm font-medium">{activeToast.message}</p>
+              {activeToast.action && (
                 <button
-                  onClick={toast.action.onClick}
+                  onClick={activeToast.action.onClick}
                   className="mt-2 text-sm font-semibold underline hover:no-underline"
                 >
-                  {toast.action.label}
+                  {activeToast.action.label}
                 </button>
               )}
             </div>
             <button
               onClick={() => {
-                setToast(null);
-                if (toast.type === 'error') clearError();
-                if (toast.type === 'warning') clearStorageWarning();
+                if (toast) {
+                  setToast(null);
+                  return;
+                }
+                if (activeToast.type === 'error') {
+                  clearError();
+                  setRetryUpload(null);
+                }
+                if (activeToast.type === 'warning') {
+                  clearStorageWarning();
+                }
               }}
               className="p-1 rounded-full hover:bg-black/5"
               aria-label="Dismiss"

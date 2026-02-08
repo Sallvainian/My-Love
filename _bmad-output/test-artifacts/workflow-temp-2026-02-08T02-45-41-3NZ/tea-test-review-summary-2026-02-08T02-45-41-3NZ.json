@@ -1,0 +1,244 @@
+{
+  "timestamp": "2026-02-08T02-45-41-3NZ",
+  "overall_score": 75,
+  "overall_grade": "C",
+  "quality_assessment": "Acceptable",
+  "dimension_scores": {
+    "determinism": 84,
+    "isolation": 68,
+    "maintainability": 74,
+    "coverage": 62,
+    "performance": 86
+  },
+  "dimension_grades": {
+    "determinism": "B",
+    "isolation": "C",
+    "maintainability": "C",
+    "coverage": "D",
+    "performance": "B"
+  },
+  "violations_summary": {
+    "total": 13,
+    "HIGH": 3,
+    "MEDIUM": 9,
+    "LOW": 1
+  },
+  "all_violations": [
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 271,
+      "severity": "MEDIUM",
+      "category": "ambiguous-assertion",
+      "description": "`toContainText('3')` and `toContainText('5')` are asserted on a container that also includes verse reference text (e.g. 'Psalm 147:3'), which can produce false positives/negatives.",
+      "suggestion": "Assert on rating-chip specific test ids or regex-constrained text nodes (user vs partner rating slots).",
+      "code_snippet": "await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('3');",
+      "dimension": "determinism"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-overview.spec.ts",
+      "line": 225,
+      "severity": "MEDIUM",
+      "category": "fixed-state-assumption",
+      "description": "Test assumes the resume prompt must always show Step 7, but parallel suite state can surface another in-progress session step unless session identity is pinned.",
+      "suggestion": "Bind expectation to the created session id or verify current_step_index from API before asserting UI text.",
+      "code_snippet": "await expect(page.getByTestId('resume-prompt')).toContainText(/Step 7 of 17/i);",
+      "dimension": "determinism"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-overview.spec.ts",
+      "line": 216,
+      "severity": "HIGH",
+      "category": "shared-session-state",
+      "description": "Resume-step test writes to shared in-progress scripture sessions for the same authenticated account used by concurrently running tests.",
+      "suggestion": "Allocate worker-specific users/sessions or serialize this describe block.",
+      "code_snippet": "await saveSoloSessionAtStep(page, 7);",
+      "dimension": "isolation"
+    },
+    {
+      "file": "tests/support/helpers.ts",
+      "line": 137,
+      "severity": "HIGH",
+      "category": "unscoped-session-lookup",
+      "description": "Fallback lookup selects latest in-progress solo session and can pick a session created by another test in parallel.",
+      "suggestion": "Scope fallback query to an explicit per-test marker (session id from RPC response or unique metadata) and fail fast when mismatch occurs.",
+      "code_snippet": ".../scripture_sessions?status=eq.in_progress&mode=eq.solo&order=started_at.desc&limit=1",
+      "dimension": "isolation"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 185,
+      "severity": "MEDIUM",
+      "category": "incomplete-partner-state-setup",
+      "description": "Partner rows are inserted but partner completion/readiness state is not guaranteed before assertions run, leaving tests in waiting-state branch.",
+      "suggestion": "Insert full partner-complete session state and use `expect.poll` to verify backend readiness before asserting report UI.",
+      "code_snippet": "await supabaseAdmin.from('scripture_reflections').insert(...)",
+      "dimension": "isolation"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 220,
+      "severity": "MEDIUM",
+      "category": "assertion-precision",
+      "description": "Assertions target broad containers instead of semantically precise elements, reducing failure diagnosability.",
+      "suggestion": "Introduce dedicated test ids for partner/user rating cells and message card blocks.",
+      "code_snippet": "await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('5');",
+      "dimension": "maintainability"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-overview.spec.ts",
+      "line": 27,
+      "severity": "MEDIUM",
+      "category": "helper-side-effect-coupling",
+      "description": "Scenario correctness depends on helper internals (`saveSoloSessionAtStep` + shared helper state), making failures hard to localize.",
+      "suggestion": "Move setup to explicit fixture utilities returning the exact session id/step used for assertions.",
+      "code_snippet": "async function saveSoloSessionAtStep(page: Page, step: number): Promise<void>",
+      "dimension": "maintainability"
+    },
+    {
+      "file": "tests/support/helpers.ts",
+      "line": 24,
+      "severity": "LOW",
+      "category": "retry-magic-numbers",
+      "description": "Auth/session retry windows are embedded constants without environment tuning, making maintenance across CI environments harder.",
+      "suggestion": "Promote retry/timeouts to test config/env-driven values with documented defaults.",
+      "code_snippet": "const AUTH_READINESS_MAX_ATTEMPTS = 5;",
+      "dimension": "maintainability"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 173,
+      "severity": "HIGH",
+      "category": "missing-readiness-coverage",
+      "description": "Tests assume partner-complete report readiness but do not validate backend completion preconditions before asserting partner UI.",
+      "suggestion": "Add explicit readiness verification (session complete + partner shared payload persisted) before report assertions.",
+      "code_snippet": "// THEN: Partner message is displayed",
+      "dimension": "coverage"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-overview.spec.ts",
+      "line": 211,
+      "severity": "MEDIUM",
+      "category": "resume-source-coverage-gap",
+      "description": "No explicit assertion verifies that resume prompt binds to the session created in this test rather than another in-progress session.",
+      "suggestion": "Capture and assert resume session id/current_step_index through API before UI expectation.",
+      "code_snippet": "await saveSoloSessionAtStep(page, 7);",
+      "dimension": "coverage"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 270,
+      "severity": "MEDIUM",
+      "category": "branch-coverage-gap",
+      "description": "Together-mode side-by-side assertions do not cover waiting-state transitions explicitly, leading to ambiguous failure signals.",
+      "suggestion": "Split into two tests: waiting-state expected branch and partner-complete expected branch with strict preconditions.",
+      "code_snippet": "await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('5');",
+      "dimension": "coverage"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 142,
+      "severity": "MEDIUM",
+      "category": "long-timeout-retries",
+      "description": "Failure path consumes full 60s test timeout because readiness gating happens only through UI waits.",
+      "suggestion": "Short-circuit with backend readiness polling before entering 15s UI visibility assertions.",
+      "code_snippet": "Test timeout of 60000ms exceeded",
+      "dimension": "performance"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 188,
+      "severity": "MEDIUM",
+      "category": "late-fail-assertion",
+      "description": "Sequential text assertions on same locator delay failure discovery when partner state is not ready.",
+      "suggestion": "First assert branch marker (`partner complete`) then run per-row assertions.",
+      "code_snippet": "await expect(page.getByTestId('scripture-report-rating-step-0')).toContainText('5');",
+      "dimension": "performance"
+    }
+  ],
+  "high_severity_violations": [
+    {
+      "file": "tests/e2e/scripture/scripture-overview.spec.ts",
+      "line": 216,
+      "severity": "HIGH",
+      "category": "shared-session-state",
+      "description": "Resume-step test writes to shared in-progress scripture sessions for the same authenticated account used by concurrently running tests.",
+      "suggestion": "Allocate worker-specific users/sessions or serialize this describe block.",
+      "code_snippet": "await saveSoloSessionAtStep(page, 7);",
+      "dimension": "isolation"
+    },
+    {
+      "file": "tests/support/helpers.ts",
+      "line": 137,
+      "severity": "HIGH",
+      "category": "unscoped-session-lookup",
+      "description": "Fallback lookup selects latest in-progress solo session and can pick a session created by another test in parallel.",
+      "suggestion": "Scope fallback query to an explicit per-test marker (session id from RPC response or unique metadata) and fail fast when mismatch occurs.",
+      "code_snippet": ".../scripture_sessions?status=eq.in_progress&mode=eq.solo&order=started_at.desc&limit=1",
+      "dimension": "isolation"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 173,
+      "severity": "HIGH",
+      "category": "missing-readiness-coverage",
+      "description": "Tests assume partner-complete report readiness but do not validate backend completion preconditions before asserting partner UI.",
+      "suggestion": "Add explicit readiness verification (session complete + partner shared payload persisted) before report assertions.",
+      "code_snippet": "// THEN: Partner message is displayed",
+      "dimension": "coverage"
+    }
+  ],
+  "top_10_recommendations": [
+    {
+      "dimension": "isolation",
+      "recommendation": "Use worker-isolated auth/session fixtures for scripture E2E tests.",
+      "impact": "HIGH"
+    },
+    {
+      "dimension": "isolation",
+      "recommendation": "Eliminate non-deterministic fallback session lookups in helpers.",
+      "impact": "HIGH"
+    },
+    {
+      "dimension": "isolation",
+      "recommendation": "Gate UI assertions on explicit backend completion markers.",
+      "impact": "HIGH"
+    },
+    {
+      "dimension": "coverage",
+      "recommendation": "Add precondition probes in tests before UI expectations.",
+      "impact": "HIGH"
+    },
+    {
+      "dimension": "coverage",
+      "recommendation": "Decompose multi-branch expectations into deterministic branch-specific tests.",
+      "impact": "HIGH"
+    },
+    {
+      "dimension": "coverage",
+      "recommendation": "Use API assertions to validate state setup completeness.",
+      "impact": "HIGH"
+    },
+    {
+      "dimension": "determinism",
+      "recommendation": "Replace broad `toContainText` assertions with slot-level assertions for ratings.",
+      "impact": "MEDIUM"
+    },
+    {
+      "dimension": "determinism",
+      "recommendation": "Assert session identity and step index through deterministic API reads before UI checks.",
+      "impact": "MEDIUM"
+    },
+    {
+      "dimension": "determinism",
+      "recommendation": "Keep dynamic values deterministic by avoiding broad text matching on mixed-content containers.",
+      "impact": "MEDIUM"
+    },
+    {
+      "dimension": "maintainability",
+      "recommendation": "Refactor report assertions to semantic element-level checks.",
+      "impact": "MEDIUM"
+    }
+  ],
+  "subprocess_execution": "PARALLEL (5 quality dimensions)",
+  "performance_gain": "~60% faster than sequential"
+}
