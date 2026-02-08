@@ -89,6 +89,8 @@ supabase/.temp/
 
 # BMAD method files (local tooling)
 _bmad/
+.agents/
+skills/
 
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
