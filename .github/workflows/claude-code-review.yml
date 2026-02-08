@@ -34,5 +34,6 @@ jobs:
           prompt: "/review"
           claude_args: |
             --model claude-opus-4-6
-            --max-turns 10
+            --max-turns 20
+            --allowedTools "Bash(git fetch:*)"
             --append-system-prompt "Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful. Focus on code quality, potential bugs, performance, security, and test coverage."
