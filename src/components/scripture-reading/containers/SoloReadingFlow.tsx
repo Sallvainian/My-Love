@@ -26,7 +26,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, LazyMotion, m } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
@@ -36,6 +36,7 @@ import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { PerStepReflection } from '../reflection/PerStepReflection';
 import { ReflectionSummary } from '../reflection/ReflectionSummary';
+import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
 import { MessageCompose } from '../reflection/MessageCompose';
 import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
 import { scriptureReadingService } from '../../../services/scriptureReadingService';
@@ -51,13 +52,14 @@ const scriptureTheme = {
 type StepSubView = 'verse' | 'response' | 'reflection';
 
 // Story 2.3: Sub-phase within report phase
-type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked';
+type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked' | 'completion-error';
 
 // Direction for slide animation
 type SlideDirection = 'left' | 'right';
 
 // Shared focus ring classes (Story 1.5: AC #1)
 const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
 
 export function SoloReadingFlow() {
   const { crossfade, slide } = useMotionConfig();
@@ -120,25 +122,40 @@ export function SoloReadingFlow() {
   const prevIsCompletedRef = useRef(false);
 
   // Story 2.3: Report sub-phase state and data
-  const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>('compose');
+  const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>(() => {
+    if (partner === null) return 'complete-unlinked';
+    if (session?.currentPhase === 'complete' || session?.status === 'complete') return 'report';
+    return 'compose';
+  });
   const [reportData, setReportData] = useState<{
     userRatings: { stepIndex: number; rating: number }[];
     userBookmarks: number[];
     userStandoutVerses: number[];
+    userMessage: string | null;
     partnerMessage: string | null;
     partnerRatings: { stepIndex: number; rating: number }[] | null;
+    partnerBookmarks: number[] | null;
+    partnerStandoutVerses: number[] | null;
     isPartnerComplete: boolean;
   }>({
     userRatings: [],
     userBookmarks: [],
     userStandoutVerses: [],
+    userMessage: null,
     partnerMessage: null,
     partnerRatings: null,
+    partnerBookmarks: null,
+    partnerStandoutVerses: null,
     isPartnerComplete: false,
   });
+  const [isSubmittingSummary, setIsSubmittingSummary] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isRetryingCompletion, setIsRetryingCompletion] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   const [reportLoadError, setReportLoadError] = useState<string | null>(null);
   const [reportReloadKey, setReportReloadKey] = useState(0);
+  const completionRetryTargetRef = useRef<'report' | 'complete-unlinked'>('report');
+  const prevReportSubPhaseRef = useRef<ReportSubPhase | null>(null);
 
   // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
   const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,6 +171,8 @@ export function SoloReadingFlow() {
 
   // Track previous isOnline to detect offline → online transitions
   const prevIsOnlineRef = useRef(isOnline);
+  const sessionId = session?.id;
+  const sessionUserId = session?.userId;
 
   // Story 1.4: Auto-retry on reconnect (offline → online with pendingRetry)
   useEffect(() => {
@@ -170,13 +189,13 @@ export function SoloReadingFlow() {
 
   // Story 2.1: Load bookmarks for current session on mount/session change
   useEffect(() => {
-    if (!session) return;
+    if (!sessionId || !sessionUserId) return;
     void (async () => {
-      const bookmarks = await scriptureReadingService.getBookmarksBySession(session.id);
-      const userBookmarks = bookmarks.filter((b) => b.userId === session.userId);
+      const bookmarks = await scriptureReadingService.getBookmarksBySession(sessionId);
+      const userBookmarks = bookmarks.filter((b) => b.userId === sessionUserId);
       setBookmarkedSteps(new Set(userBookmarks.map((b) => b.stepIndex)));
     })();
-  }, [session?.id, session?.userId]);
+  }, [sessionId, sessionUserId]);
 
   // Story 2.1: Bookmark toggle handler (optimistic UI immediate, debounced server write)
   const handleBookmarkToggle = useCallback(() => {
@@ -202,7 +221,12 @@ export function SoloReadingFlow() {
       bookmarkDebounceRef.current = null;
       void (async () => {
         try {
-          await scriptureReadingService.toggleBookmark(session.id, stepIndex, session.userId, false);
+          await scriptureReadingService.toggleBookmark(
+            session.id,
+            stepIndex,
+            session.userId,
+            false
+          );
         } catch {
           // Revert on failure
           if (!isMountedRef.current) return;
@@ -222,12 +246,14 @@ export function SoloReadingFlow() {
 
   // Story 2.2: Handle reflection summary submission — save session reflection then advance to report
   const handleReflectionSummarySubmit = useCallback(
-    (data: { standoutVerses: number[]; rating: number; notes: string }) => {
-      if (!session) return;
+    (data: ReflectionSummarySubmission) => {
+      if (!session || isSubmittingSummary) return;
 
-      // Save session-level reflection in background (non-blocking)
+      setIsSubmittingSummary(true);
+
       void (async () => {
         try {
+          const isShared = session.mode === 'together';
           const jsonNotes = JSON.stringify({
             standoutVerses: data.standoutVerses,
             userNote: data.notes,
@@ -237,10 +263,20 @@ export function SoloReadingFlow() {
             MAX_STEPS, // sentinel value for session-level reflection
             data.rating,
             jsonNotes,
-            false
+            isShared
+          );
+
+          await scriptureReadingService.updateSessionBookmarkSharing(
+            session.id,
+            session.userId,
+            data.shareBookmarkedVerses
           );
         } catch {
-          // Non-blocking: reflection write failure shouldn't block phase advancement
+          // Non-blocking: failures here should not prevent report flow entry.
+        } finally {
+          if (isMountedRef.current) {
+            setIsSubmittingSummary(false);
+          }
         }
       })();
 
@@ -258,28 +294,38 @@ export function SoloReadingFlow() {
         }
       })();
     },
-    [session, updatePhase]
+    [isSubmittingSummary, session, updatePhase]
   );
 
   // Story 2.3: Mark session complete helper
-  // Updates server status but keeps local phase as 'report' for UI rendering
-  const markSessionComplete = useCallback(async () => {
-    if (!session) return;
-    try {
-      await scriptureReadingService.updateSession(session.id, {
-        status: 'complete',
-        completedAt: new Date(),
-      });
-    } catch {
-      // Non-blocking: session completion failure handled by eventual consistency
+  // Returns success/failure and retries once on transient failure.
+  const markSessionComplete = useCallback(async (): Promise<boolean> => {
+    if (!session) return false;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await scriptureReadingService.updateSession(session.id, {
+          status: 'complete',
+          completedAt: new Date(),
+          currentPhase: 'complete',
+        });
+        updatePhase('complete');
+        return true;
+      } catch {
+        // Controlled retry (max 1 retry)
+      }
     }
-  }, [session]);
+
+    return false;
+  }, [session, updatePhase]);
 
   // Story 2.3: Handle message send
   const handleMessageSend = useCallback(
     (message: string) => {
       if (!session || isSendingMessage) return;
       setIsSendingMessage(true);
+      setCompletionError(null);
+      completionRetryTargetRef.current = 'report';
 
       void (async () => {
         try {
@@ -289,10 +335,15 @@ export function SoloReadingFlow() {
             // Non-blocking: message write failure shouldn't block session completion
           }
 
-          // Mark session complete and advance to report view
-          await markSessionComplete();
-          setReportLoadError(null);
-          setReportSubPhase('report');
+          // Mark session complete and advance to report view only on success
+          const completionSucceeded = await markSessionComplete();
+          if (completionSucceeded) {
+            setReportLoadError(null);
+            setReportSubPhase('report');
+          } else if (isMountedRef.current) {
+            setCompletionError('Unable to complete this session. Retry to open your report.');
+            setReportSubPhase('completion-error');
+          }
         } finally {
           if (isMountedRef.current) {
             setIsSendingMessage(false);
@@ -307,13 +358,20 @@ export function SoloReadingFlow() {
   const handleMessageSkip = useCallback(() => {
     if (!session || isSendingMessage) return;
     setIsSendingMessage(true);
+    setCompletionError(null);
+    completionRetryTargetRef.current = 'report';
 
     void (async () => {
       try {
-        // Skip message, mark session complete, advance to report view
-        await markSessionComplete();
-        setReportLoadError(null);
-        setReportSubPhase('report');
+        // Skip message, mark session complete, advance to report view only on success
+        const completionSucceeded = await markSessionComplete();
+        if (completionSucceeded) {
+          setReportLoadError(null);
+          setReportSubPhase('report');
+        } else if (isMountedRef.current) {
+          setCompletionError('Unable to complete this session. Retry to open your report.');
+          setReportSubPhase('completion-error');
+        }
       } finally {
         if (isMountedRef.current) {
           setIsSendingMessage(false);
@@ -321,6 +379,36 @@ export function SoloReadingFlow() {
       }
     })();
   }, [session, isSendingMessage, markSessionComplete]);
+
+  const handleRetrySessionCompletion = useCallback(() => {
+    if (!session || isRetryingCompletion) return;
+    setIsRetryingCompletion(true);
+    setCompletionError(null);
+
+    void (async () => {
+      try {
+        const completionSucceeded = await markSessionComplete();
+        if (!completionSucceeded) {
+          if (isMountedRef.current) {
+            setCompletionError('Unable to complete this session. Please try again.');
+          }
+          return;
+        }
+
+        if (!isMountedRef.current) return;
+        if (completionRetryTargetRef.current === 'complete-unlinked') {
+          setReportSubPhase('complete-unlinked');
+        } else {
+          setReportLoadError(null);
+          setReportSubPhase('report');
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setIsRetryingCompletion(false);
+        }
+      }
+    })();
+  }, [isRetryingCompletion, markSessionComplete, session]);
 
   // Story 2.3: Handle return to overview from report
   const handleReturnToOverview = useCallback(() => {
@@ -333,16 +421,37 @@ export function SoloReadingFlow() {
   }, []);
 
   // Story 2.3: Determine initial report sub-phase and mark unlinked session complete
-  const isReportEntry = session?.currentPhase === 'report';
+  const isReportEntry = session?.currentPhase === 'report' || session?.currentPhase === 'complete';
   const hasPartner = partner !== null;
   useEffect(() => {
     if (!isReportEntry || !session) return;
 
     if (!hasPartner) {
       setReportSubPhase('complete-unlinked');
-      void markSessionComplete();
+      if (session.currentPhase === 'complete' || session.status === 'complete') {
+        setCompletionError(null);
+        return;
+      }
+
+      completionRetryTargetRef.current = 'complete-unlinked';
+      void (async () => {
+        const completionSucceeded = await markSessionComplete();
+        if (!isMountedRef.current) return;
+
+        if (completionSucceeded) {
+          setCompletionError(null);
+        } else {
+          setCompletionError('Unable to complete this session. Retry to continue.');
+        }
+      })();
     } else {
-      setReportSubPhase('compose');
+      if (session.currentPhase === 'complete' || session.status === 'complete') {
+        setCompletionError(null);
+        setReportSubPhase('report');
+      } else {
+        setCompletionError(null);
+        setReportSubPhase('compose');
+      }
     }
   }, [isReportEntry, hasPartner, session, markSessionComplete]);
 
@@ -385,25 +494,56 @@ export function SoloReadingFlow() {
           }
         }
 
-        // Partner message (filter by sender !== current user)
+        // Message perspectives
         const partnerMsg = messages.find((m) => m.senderId !== session.userId);
+        const userMsg = messages.find((m) => m.senderId === session.userId);
 
         // Partner ratings (reflections from other user)
         const partnerReflections = reflections.filter(
           (r) => r.userId !== session.userId && r.stepIndex < MAX_STEPS && r.rating != null
         );
-        const partnerRatings = partnerReflections.length > 0
-          ? partnerReflections.map((r) => ({ stepIndex: r.stepIndex, rating: r.rating! }))
-          : null;
+        const partnerRatings =
+          partnerReflections.length > 0
+            ? partnerReflections.map((r) => ({ stepIndex: r.stepIndex, rating: r.rating! }))
+            : null;
+
+        // Partner standout verses from session-level reflection notes JSON
+        const partnerSessionReflection = reflections.find(
+          (r) => r.userId !== session.userId && r.stepIndex === MAX_STEPS
+        );
+        let partnerStandoutVerses: number[] = [];
+        if (partnerSessionReflection?.notes) {
+          try {
+            const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
+            partnerStandoutVerses = parsed.standoutVerses ?? [];
+          } catch {
+            // Invalid JSON in partner notes — proceed without standout verses
+          }
+        }
+
+        // Partner bookmarks only if explicitly shared
+        const partnerBookmarks = bookmarks
+          .filter((b) => b.userId !== session.userId && b.shareWithPartner)
+          .map((b) => b.stepIndex);
+
+        // Completion inference:
+        // preferred: partner has session-level reflection row
+        // fallback: partner has reflections for every step (legacy sessions without summary row)
+        const partnerUniqueRatedSteps = new Set(partnerReflections.map((r) => r.stepIndex)).size;
+        const isPartnerComplete =
+          Boolean(partnerSessionReflection) || partnerUniqueRatedSteps >= MAX_STEPS;
 
         if (!isMountedRef.current) return;
         setReportData({
           userRatings,
           userBookmarks,
           userStandoutVerses,
+          userMessage: userMsg?.message ?? null,
           partnerMessage: partnerMsg?.message ?? null,
           partnerRatings,
-          isPartnerComplete: partnerReflections.length > 0,
+          partnerBookmarks: partnerBookmarks.length > 0 ? partnerBookmarks : null,
+          partnerStandoutVerses: partnerStandoutVerses.length > 0 ? partnerStandoutVerses : null,
+          isPartnerComplete,
         });
       } catch {
         if (isMountedRef.current) {
@@ -430,13 +570,14 @@ export function SoloReadingFlow() {
 
       // Save reflection in background (non-blocking per AC)
       void (async () => {
+        const isShared = session.mode === 'together';
         try {
           await scriptureReadingService.addReflection(
             session.id,
             session.currentStepIndex,
             rating,
             notes,
-            false // is_shared defaults to false
+            isShared
           );
         } catch {
           useAppStore.setState({
@@ -449,7 +590,7 @@ export function SoloReadingFlow() {
                 stepIndex: session.currentStepIndex,
                 rating,
                 notes,
-                isShared: false,
+                isShared,
               },
             },
           });
@@ -575,18 +716,54 @@ export function SoloReadingFlow() {
     }
   }, [subView, session?.currentStepIndex]);
 
+  // Story 2.3: Announcements + focus management for report transitions
+  useEffect(() => {
+    if (!isReportEntry) {
+      prevReportSubPhaseRef.current = null;
+      return;
+    }
+    if (prevReportSubPhaseRef.current === reportSubPhase) return;
+
+    let announcementText: string | null = null;
+    let headingSelector: string | null = null;
+
+    if (reportSubPhase === 'compose') {
+      announcementText = 'Write a message for your partner';
+      headingSelector = '[data-testid="scripture-message-compose-heading"]';
+    } else if (reportSubPhase === 'report') {
+      announcementText = 'Your Daily Prayer Report';
+      headingSelector = '[data-testid="scripture-report-heading"]';
+    } else if (reportSubPhase === 'complete-unlinked') {
+      announcementText = 'Session complete';
+      headingSelector = '[data-testid="scripture-unlinked-complete-heading"]';
+    }
+
+    if (announcementText) {
+      setTimeout(() => setAnnouncement(announcementText!), 100);
+      requestAnimationFrame(() => {
+        const heading = headingSelector
+          ? document.querySelector<HTMLElement>(headingSelector)
+          : null;
+        heading?.focus();
+      });
+    }
+
+    prevReportSubPhaseRef.current = reportSubPhase;
+    const timer = setTimeout(() => setAnnouncement(''), 1000);
+    return () => clearTimeout(timer);
+  }, [isReportEntry, reportSubPhase]);
+
   // Computed before guard for useEffect dependency
   const isReflectionPhase = session ? session.currentPhase === 'reflection' : false;
-  const isReportPhase = session ? session.currentPhase === 'report' : false;
-  const isCompleted = isReflectionPhase || isReportPhase;
+  const isReportPhase = session
+    ? session.currentPhase === 'report' || session.currentPhase === 'complete'
+    : false;
 
   // Story 1.5 + 2.2: Completion screen announcement + focus (AC #2, #3)
   useEffect(() => {
-    if (isCompleted && !prevIsCompletedRef.current) {
+    if (isReflectionPhase && !prevIsCompletedRef.current) {
       prevIsCompletedRef.current = true;
-      const msg = isReflectionPhase
-        ? 'Review your session reflections'
-        : `Reading complete. All ${MAX_STEPS} verses finished.`;
+      const msg = 'Review your session reflections';
       setTimeout(() => setAnnouncement(msg), 100);
       requestAnimationFrame(() => {
         completionHeadingRef.current?.focus();
@@ -594,7 +771,10 @@ export function SoloReadingFlow() {
       const timer = setTimeout(() => setAnnouncement(''), 1000);
       return () => clearTimeout(timer);
     }
-  }, [isCompleted, isReflectionPhase]);
+    if (!isReflectionPhase) {
+      prevIsCompletedRef.current = false;
+    }
+  }, [isReflectionPhase]);
 
   // Guard: no session means we shouldn't be here
   if (!session) return null;
@@ -633,27 +813,29 @@ export function SoloReadingFlow() {
       }));
 
     return (
-      <motion.div
-        className="flex min-h-screen flex-col p-4 pb-20"
-        style={{ backgroundColor: scriptureTheme.background }}
-        data-testid="scripture-completion-screen"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={crossfade}
-      >
-        {/* Screen reader announcer */}
-        <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
-          {announcement}
-        </div>
+      <LazyMotion features={loadMotionFeatures} strict>
+        <m.div
+          className="flex min-h-screen flex-col p-4 pb-20"
+          style={{ backgroundColor: scriptureTheme.background }}
+          data-testid="scripture-completion-screen"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={crossfade}
+        >
+          {/* Screen reader announcer */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            {announcement}
+          </div>
 
-        <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
-          <ReflectionSummary
-            bookmarkedVerses={bookmarkedVerses}
-            onSubmit={handleReflectionSummarySubmit}
-            disabled={isSyncing}
-          />
-        </div>
-      </motion.div>
+          <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+            <ReflectionSummary
+              bookmarkedVerses={bookmarkedVerses}
+              onSubmit={handleReflectionSummarySubmit}
+              disabled={isSyncing || isSubmittingSummary}
+            />
+          </div>
+        </m.div>
+      </LazyMotion>
     );
   }
 
@@ -662,46 +844,165 @@ export function SoloReadingFlow() {
     // Unlinked user — show simple completion screen (Task 3, AC #2)
     if (reportSubPhase === 'complete-unlinked') {
       return (
-        <motion.div
-          className="flex min-h-screen flex-col p-4 pb-20"
-          style={{ backgroundColor: scriptureTheme.background }}
-          data-testid="scripture-unlinked-complete-screen"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={crossfade}
-        >
-          <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
-            {announcement}
-          </div>
-          <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-6 text-center">
-            <h2
-              className="font-serif text-2xl font-bold text-purple-900"
-              ref={completionHeadingRef}
-              tabIndex={-1}
-              data-testid="scripture-unlinked-complete-heading"
+        <LazyMotion features={loadMotionFeatures} strict>
+          <m.div
+            className="flex min-h-screen flex-col p-4 pb-20"
+            style={{ backgroundColor: scriptureTheme.background }}
+            data-testid="scripture-unlinked-complete-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={crossfade}
+          >
+            <div
+              className="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="sr-announcer"
             >
-              Session complete
-            </h2>
-            <p className="text-sm text-purple-600">
-              Your reflections have been saved
-            </p>
-            <button
-              onClick={() => exitSession()}
-              className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
-              data-testid="scripture-unlinked-return-btn"
-              type="button"
-            >
-              Return to Overview
-            </button>
-          </div>
-        </motion.div>
+              {announcement}
+            </div>
+            <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-6 text-center">
+              <h2
+                className="font-serif text-2xl font-bold text-purple-900"
+                ref={completionHeadingRef}
+                tabIndex={-1}
+                data-testid="scripture-unlinked-complete-heading"
+              >
+                Session complete
+              </h2>
+              {completionError ? (
+                <div
+                  role="alert"
+                  data-testid="scripture-completion-error"
+                  className="w-full rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                >
+                  <p>{completionError}</p>
+                  <button
+                    type="button"
+                    onClick={handleRetrySessionCompletion}
+                    disabled={isRetryingCompletion}
+                    data-testid="scripture-completion-retry-btn"
+                    className={`mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-60 ${FOCUS_RING}`}
+                  >
+                    {isRetryingCompletion ? 'Retrying...' : 'Retry'}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-purple-600">Your reflections have been saved</p>
+              )}
+              <button
+                onClick={() => exitSession()}
+                disabled={Boolean(completionError)}
+                className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
+                data-testid="scripture-unlinked-return-btn"
+                type="button"
+              >
+                Return to Overview
+              </button>
+            </div>
+          </m.div>
+        </LazyMotion>
+      );
+    }
+
+    if (reportSubPhase === 'completion-error') {
+      return (
+        <LazyMotion features={loadMotionFeatures} strict>
+          <m.div
+            className="flex min-h-screen flex-col p-4 pb-20"
+            style={{ backgroundColor: scriptureTheme.background }}
+            data-testid="scripture-completion-error-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={crossfade}
+          >
+            <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+              {announcement}
+            </div>
+            <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-5 text-center">
+              <h2
+                className="font-serif text-2xl font-bold text-purple-900"
+                tabIndex={-1}
+                data-testid="scripture-completion-error-heading"
+              >
+                Couldn&apos;t finish this session
+              </h2>
+              <p
+                className="text-sm text-purple-700"
+                data-testid="scripture-completion-error-message"
+              >
+                {completionError ?? 'Please retry to continue.'}
+              </p>
+              <button
+                type="button"
+                onClick={handleRetrySessionCompletion}
+                disabled={isRetryingCompletion}
+                data-testid="scripture-completion-retry-btn"
+                className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+              >
+                {isRetryingCompletion ? 'Retrying...' : 'Retry'}
+              </button>
+            </div>
+          </m.div>
+        </LazyMotion>
       );
     }
 
     // Linked user — message compose phase (Task 4, AC #1)
     if (reportSubPhase === 'compose') {
       return (
-        <motion.div
+        <LazyMotion features={loadMotionFeatures} strict>
+          <m.div
+            className="flex min-h-screen flex-col p-4 pb-20"
+            style={{ backgroundColor: scriptureTheme.background }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={crossfade}
+          >
+            <div
+              className="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="sr-announcer"
+            >
+              {announcement}
+            </div>
+            <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
+              {completionError && (
+                <div
+                  role="alert"
+                  data-testid="scripture-completion-error"
+                  className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                >
+                  <p>{completionError}</p>
+                  <button
+                    type="button"
+                    onClick={handleRetrySessionCompletion}
+                    disabled={isRetryingCompletion}
+                    data-testid="scripture-completion-retry-btn"
+                    className={`mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-60 ${FOCUS_RING}`}
+                  >
+                    {isRetryingCompletion ? 'Retrying...' : 'Retry'}
+                  </button>
+                </div>
+              )}
+              <MessageCompose
+                partnerName={partner?.displayName ?? 'your partner'}
+                onSend={handleMessageSend}
+                onSkip={handleMessageSkip}
+                disabled={isSendingMessage}
+                autoFocusTextarea={false}
+              />
+            </div>
+          </m.div>
+        </LazyMotion>
+      );
+    }
+
+    // Daily Prayer Report display (Task 4, AC #3, #4, #5)
+    return (
+      <LazyMotion features={loadMotionFeatures} strict>
+        <m.div
           className="flex min-h-screen flex-col p-4 pb-20"
           style={{ backgroundColor: scriptureTheme.background }}
           initial={{ opacity: 0 }}
@@ -712,59 +1013,39 @@ export function SoloReadingFlow() {
             {announcement}
           </div>
           <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
-            <MessageCompose
-              partnerName={partner?.displayName ?? 'your partner'}
-              onSend={handleMessageSend}
-              onSkip={handleMessageSkip}
-              disabled={isSendingMessage}
+            {reportLoadError && (
+              <div
+                role="alert"
+                data-testid="scripture-report-error"
+                className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
+                <p>{reportLoadError}</p>
+                <button
+                  type="button"
+                  onClick={handleRetryReportLoad}
+                  data-testid="scripture-report-retry-btn"
+                  className={`mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 ${FOCUS_RING}`}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <DailyPrayerReport
+              userRatings={reportData.userRatings}
+              userBookmarks={reportData.userBookmarks}
+              userStandoutVerses={reportData.userStandoutVerses}
+              userMessage={reportData.userMessage}
+              partnerMessage={reportData.partnerMessage}
+              partnerName={partner?.displayName ?? null}
+              partnerRatings={reportData.partnerRatings}
+              partnerBookmarks={reportData.partnerBookmarks}
+              partnerStandoutVerses={reportData.partnerStandoutVerses}
+              isPartnerComplete={reportData.isPartnerComplete}
+              onReturn={handleReturnToOverview}
             />
           </div>
-        </motion.div>
-      );
-    }
-
-    // Daily Prayer Report display (Task 4, AC #3, #4, #5)
-    return (
-      <motion.div
-        className="flex min-h-screen flex-col p-4 pb-20"
-        style={{ backgroundColor: scriptureTheme.background }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={crossfade}
-      >
-        <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
-          {announcement}
-        </div>
-        <div className="mx-auto flex max-w-md flex-1 flex-col justify-center px-4">
-          {reportLoadError && (
-            <div
-              role="alert"
-              data-testid="scripture-report-error"
-              className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-            >
-              <p>{reportLoadError}</p>
-              <button
-                type="button"
-                onClick={handleRetryReportLoad}
-                data-testid="scripture-report-retry-btn"
-                className={`mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 ${FOCUS_RING}`}
-              >
-                Retry
-              </button>
-            </div>
-          )}
-          <DailyPrayerReport
-            userRatings={reportData.userRatings}
-            userBookmarks={reportData.userBookmarks}
-            userStandoutVerses={reportData.userStandoutVerses}
-            partnerMessage={reportData.partnerMessage}
-            partnerName={partner?.displayName ?? null}
-            partnerRatings={reportData.partnerRatings}
-            isPartnerComplete={reportData.isPartnerComplete}
-            onReturn={handleReturnToOverview}
-          />
-        </div>
-      </motion.div>
+        </m.div>
+      </LazyMotion>
     );
   }
 
@@ -772,336 +1053,346 @@ export function SoloReadingFlow() {
   if (!currentStep) return null;
 
   return (
-    <div
-      className="flex min-h-screen flex-col pb-20"
-      style={{ backgroundColor: scriptureTheme.background }}
-      data-testid="solo-reading-flow"
-    >
-      {/* Story 1.5: Screen reader announcer (AC #2) */}
-      <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
-        {announcement}
-      </div>
+    <LazyMotion features={loadMotionFeatures} strict>
+      <div
+        className="flex min-h-screen flex-col pb-20"
+        style={{ backgroundColor: scriptureTheme.background }}
+        data-testid="solo-reading-flow"
+      >
+        {/* Story 1.5: Screen reader announcer (AC #2) */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+          {announcement}
+        </div>
 
-      {/* Header with exit button and progress */}
-      <header className="mx-auto flex w-full max-w-md items-center justify-between p-4">
-        <button
-          ref={exitButtonRef}
-          onClick={handleExitRequest}
-          className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
-          aria-label="Exit reading"
-          data-testid="exit-button"
-          type="button"
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-
-        {/* Progress indicator (AC: "Verse X of 17" as text) */}
-        <span
-          className="text-sm font-medium text-purple-600"
-          aria-label={`Currently on verse ${session.currentStepIndex + 1} of ${MAX_STEPS}`}
-          aria-current="step"
-          data-testid="scripture-progress-indicator"
-        >
-          Verse {session.currentStepIndex + 1} of {MAX_STEPS}
-        </span>
-
-        {/* Section theme badge — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
-        <span
-          className="max-w-[100px] truncate text-right text-xs text-purple-600"
-          data-testid="section-theme"
-        >
-          {currentStep.sectionTheme}
-        </span>
-      </header>
-
-      {/* Main content area */}
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
-        <AnimatePresence mode="wait" custom={slideDirection}>
-          <motion.div
-            key={`step-${session.currentStepIndex}-${subView}`}
-            custom={slideDirection}
-            variants={subView === 'verse' ? slideVariants : undefined}
-            initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
-            animate={subView === 'verse' ? 'center' : { opacity: 1 }}
-            exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
-            transition={subView === 'reflection' ? { duration: 0.4 } : subView === 'verse' ? slide : crossfade}
-            className="flex w-full flex-1 flex-col justify-center pb-32"
+        {/* Header with exit button and progress */}
+        <header className="mx-auto flex w-full max-w-md items-center justify-between p-4">
+          <button
+            ref={exitButtonRef}
+            onClick={handleExitRequest}
+            className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
+            aria-label="Exit reading"
+            data-testid="exit-button"
+            type="button"
           >
-            {subView === 'verse' ? (
-              /* Verse Screen */
-              <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
-                {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-600, tabIndex for focus management */}
-                <div className="flex items-center justify-between">
-                  <div className="w-12" /> {/* Spacer for centering */}
-                  <p
-                    ref={verseHeadingRef}
-                    tabIndex={-1}
-                    className="text-center text-xs font-medium tracking-wide text-purple-600"
-                    data-testid="scripture-verse-reference"
-                  >
-                    {currentStep.verseReference}
-                  </p>
-                  {/* Story 2.1: Bookmark toggle (AC #1) */}
-                  <BookmarkFlag
-                    isBookmarked={bookmarkedSteps.has(session.currentStepIndex)}
-                    onToggle={handleBookmarkToggle}
-                    disabled={!isOnline}
-                  />
-                </div>
-
-                {/* Verse text - prominent display */}
-                <blockquote
-                  className="rounded-2xl border border-purple-200/50 bg-white/80 p-6 backdrop-blur-sm"
-                  data-testid="scripture-verse-text"
-                >
-                  <p className="font-serif text-xl leading-relaxed text-purple-900">
-                    {currentStep.verseText}
-                  </p>
-                </blockquote>
-              </div>
-            ) : subView === 'response' ? (
-              /* Response Screen */
-              <div className="flex w-full flex-col space-y-6" data-testid="response-screen">
-                {/* Verse reference (context) — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
-                <p
-                  className="text-center text-xs font-medium tracking-wide text-purple-600"
-                  data-testid="scripture-response-verse-reference"
-                >
-                  Response to {currentStep.verseReference}
-                </p>
-
-                {/* Response prayer text */}
-                <div
-                  className="rounded-2xl border border-purple-200/50 bg-white/80 p-6 backdrop-blur-sm"
-                  data-testid="scripture-response-text"
-                >
-                  <p className="text-base leading-relaxed text-purple-800">
-                    {currentStep.responseText}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
-              <div data-testid="reflection-subview">
-                <PerStepReflection
-                  onSubmit={handleReflectionSubmit}
-                  disabled={isSyncing}
-                />
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Story 1.4: Offline indicator (AC #4) */}
-        {!isOnline && (
-          <div
-            className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"
-            data-testid="offline-indicator"
-            role="status"
-            aria-live="polite"
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z"
+                d="M6 18L18 6M6 6l12 12"
               />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
             </svg>
-            <span>You&apos;re offline. Cached data shown. Connect to continue.</span>
-          </div>
-        )}
+          </button>
 
-        {/* Syncing indicator — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
-        {isSyncing && (
-          <div className="py-1 text-center text-xs text-purple-600" data-testid="sync-indicator">
-            Saving...
-          </div>
-        )}
-
-        {/* Error display — Story 1.5: warning icon for color independence (AC #5) */}
-        {scriptureError && !pendingRetry && (
-          <div
-            className="mb-2 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            data-testid="reading-error"
-            role="alert"
+          {/* Progress indicator (AC: "Verse X of 17" as text) */}
+          <span
+            className="text-sm font-medium text-purple-600"
+            aria-label={`Currently on verse ${session.currentStepIndex + 1} of ${MAX_STEPS}`}
+            aria-current="step"
+            data-testid="scripture-progress-indicator"
           >
-            <svg
-              className="h-4 w-4 shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              data-testid="error-icon"
+            Verse {session.currentStepIndex + 1} of {MAX_STEPS}
+          </span>
+
+          {/* Section theme badge — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
+          <span
+            className="max-w-[100px] truncate text-right text-xs text-purple-600"
+            data-testid="section-theme"
+          >
+            {currentStep.sectionTheme}
+          </span>
+        </header>
+
+        {/* Main content area */}
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
+          <AnimatePresence mode="wait" custom={slideDirection}>
+            <m.div
+              key={`step-${session.currentStepIndex}-${subView}`}
+              custom={slideDirection}
+              variants={subView === 'verse' ? slideVariants : undefined}
+              initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
+              animate={subView === 'verse' ? 'center' : { opacity: 1 }}
+              exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
+              transition={
+                subView === 'reflection'
+                  ? { duration: 0.4 }
+                  : subView === 'verse'
+                    ? slide
+                    : crossfade
+              }
+              className="flex w-full flex-1 flex-col justify-center pb-32"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-            <span>
-              {typeof scriptureError === 'string' ? scriptureError : scriptureError.message}
-            </span>
-          </div>
-        )}
+              {subView === 'verse' ? (
+                /* Verse Screen */
+                <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
+                  {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-600, tabIndex for focus management */}
+                  <div className="flex items-center justify-between">
+                    <div className="w-12" /> {/* Spacer for centering */}
+                    <p
+                      ref={verseHeadingRef}
+                      tabIndex={-1}
+                      className="text-center text-xs font-medium tracking-wide text-purple-600"
+                      data-testid="scripture-verse-reference"
+                    >
+                      {currentStep.verseReference}
+                    </p>
+                    {/* Story 2.1: Bookmark toggle (AC #1) */}
+                    <BookmarkFlag
+                      isBookmarked={bookmarkedSteps.has(session.currentStepIndex)}
+                      onToggle={handleBookmarkToggle}
+                      disabled={!isOnline}
+                    />
+                  </div>
 
-        {/* Story 1.4: Retry UI (AC #6) */}
-        {pendingRetry && (
-          <div
-            className="mb-2 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
-            data-testid="retry-banner"
-          >
-            <span className="text-sm text-amber-700">
-              {pendingRetry.attempts >= pendingRetry.maxAttempts
-                ? 'Save failed. Your progress is saved locally.'
-                : 'Save failed. Tap to retry.'}
-            </span>
-            {pendingRetry.attempts < pendingRetry.maxAttempts && (
-              <button
-                onClick={retryFailedWrite}
-                className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
-                data-testid="retry-button"
-                type="button"
-              >
-                Retry ({pendingRetry.attempts}/{pendingRetry.maxAttempts})
-              </button>
-            )}
-          </div>
-        )}
+                  {/* Verse text - prominent display */}
+                  <blockquote
+                    className="rounded-2xl border border-purple-200/50 bg-white/80 p-6 backdrop-blur-sm"
+                    data-testid="scripture-verse-text"
+                  >
+                    <p className="font-serif text-xl leading-relaxed text-purple-900">
+                      {currentStep.verseText}
+                    </p>
+                  </blockquote>
+                </div>
+              ) : subView === 'response' ? (
+                /* Response Screen */
+                <div className="flex w-full flex-col space-y-6" data-testid="response-screen">
+                  {/* Verse reference (context) — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
+                  <p
+                    className="text-center text-xs font-medium tracking-wide text-purple-600"
+                    data-testid="scripture-response-verse-reference"
+                  >
+                    Response to {currentStep.verseReference}
+                  </p>
 
-        {/* Action buttons - bottom anchored for thumb-friendly access */}
-        {subView !== 'reflection' && (
-        <div className="space-y-3 pt-4">
-          {subView === 'verse' ? (
-            <>
-              {/* View Response - secondary button */}
-              <button
-                onClick={handleViewResponse}
-                className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
-                data-testid="scripture-view-response-button"
-                type="button"
-              >
-                View Response
-              </button>
-
-              {/* Next Verse - primary button */}
-              <button
-                onClick={handleNextVerse}
-                disabled={isNextDisabled}
-                className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
-                data-testid="scripture-next-verse-button"
-                type="button"
-              >
-                {isLastStep ? 'Complete Reading' : 'Next Verse'}
-              </button>
-
-              {/* Story 1.5: Disabled reason text (AC #5) */}
-              {!isOnline && (
-                <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
-                  Connect to internet to continue
-                </p>
+                  {/* Response prayer text */}
+                  <div
+                    className="rounded-2xl border border-purple-200/50 bg-white/80 p-6 backdrop-blur-sm"
+                    data-testid="scripture-response-text"
+                  >
+                    <p className="text-base leading-relaxed text-purple-800">
+                      {currentStep.responseText}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
+                <div data-testid="reflection-subview">
+                  <PerStepReflection onSubmit={handleReflectionSubmit} disabled={isSyncing} />
+                </div>
               )}
-            </>
-          ) : (
-            <>
-              {/* Back to Verse - secondary button */}
-              <button
-                ref={backToVerseRef}
-                onClick={handleBackToVerse}
-                className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
-                data-testid="scripture-back-to-verse-button"
-                type="button"
-              >
-                Back to Verse
-              </button>
+            </m.div>
+          </AnimatePresence>
 
-              {/* Next Verse - primary button (also available on response screen) */}
-              <button
-                onClick={handleNextVerse}
-                disabled={isNextDisabled}
-                className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
-                data-testid="scripture-next-verse-button"
-                type="button"
+          {/* Story 1.4: Offline indicator (AC #4) */}
+          {!isOnline && (
+            <div
+              className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"
+              data-testid="offline-indicator"
+              role="status"
+              aria-live="polite"
+            >
+              <svg
+                className="h-4 w-4 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                {isLastStep ? 'Complete Reading' : 'Next Verse'}
-              </button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+              </svg>
+              <span>You&apos;re offline. Cached data shown. Connect to continue.</span>
+            </div>
+          )}
 
-              {/* Story 1.5: Disabled reason text (AC #5) */}
-              {!isOnline && (
-                <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
-                  Connect to internet to continue
-                </p>
+          {/* Syncing indicator — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
+          {isSyncing && (
+            <div className="py-1 text-center text-xs text-purple-600" data-testid="sync-indicator">
+              Saving...
+            </div>
+          )}
+
+          {/* Error display — Story 1.5: warning icon for color independence (AC #5) */}
+          {scriptureError && !pendingRetry && (
+            <div
+              className="mb-2 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              data-testid="reading-error"
+              role="alert"
+            >
+              <svg
+                className="h-4 w-4 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                data-testid="error-icon"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+              <span>
+                {typeof scriptureError === 'string' ? scriptureError : scriptureError.message}
+              </span>
+            </div>
+          )}
+
+          {/* Story 1.4: Retry UI (AC #6) */}
+          {pendingRetry && (
+            <div
+              className="mb-2 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
+              data-testid="retry-banner"
+            >
+              <span className="text-sm text-amber-700">
+                {pendingRetry.attempts >= pendingRetry.maxAttempts
+                  ? 'Save failed. Your progress is saved locally.'
+                  : 'Save failed. Tap to retry.'}
+              </span>
+              {pendingRetry.attempts < pendingRetry.maxAttempts && (
+                <button
+                  onClick={retryFailedWrite}
+                  className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
+                  data-testid="retry-button"
+                  type="button"
+                >
+                  Retry ({pendingRetry.attempts}/{pendingRetry.maxAttempts})
+                </button>
               )}
-            </>
+            </div>
+          )}
+
+          {/* Action buttons - bottom anchored for thumb-friendly access */}
+          {subView !== 'reflection' && (
+            <div className="space-y-3 pt-4">
+              {subView === 'verse' ? (
+                <>
+                  {/* View Response - secondary button */}
+                  <button
+                    onClick={handleViewResponse}
+                    className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
+                    data-testid="scripture-view-response-button"
+                    type="button"
+                  >
+                    View Response
+                  </button>
+
+                  {/* Next Verse - primary button */}
+                  <button
+                    onClick={handleNextVerse}
+                    disabled={isNextDisabled}
+                    className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+                    data-testid="scripture-next-verse-button"
+                    type="button"
+                  >
+                    {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                  </button>
+
+                  {/* Story 1.5: Disabled reason text (AC #5) */}
+                  {!isOnline && (
+                    <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
+                      Connect to internet to continue
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Back to Verse - secondary button */}
+                  <button
+                    ref={backToVerseRef}
+                    onClick={handleBackToVerse}
+                    className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
+                    data-testid="scripture-back-to-verse-button"
+                    type="button"
+                  >
+                    Back to Verse
+                  </button>
+
+                  {/* Next Verse - primary button (also available on response screen) */}
+                  <button
+                    onClick={handleNextVerse}
+                    disabled={isNextDisabled}
+                    className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+                    data-testid="scripture-next-verse-button"
+                    type="button"
+                  >
+                    {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                  </button>
+
+                  {/* Story 1.5: Disabled reason text (AC #5) */}
+                  {!isOnline && (
+                    <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
+                      Connect to internet to continue
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
-        )}
-      </div>
 
-      {/* Exit Confirmation Dialog */}
-      <AnimatePresence>
-        {showExitConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={crossfade}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-            data-testid="exit-confirm-overlay"
-            onClick={handleExitCancel}
-          >
-            <motion.div
-              ref={dialogRef}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+        {/* Exit Confirmation Dialog */}
+        <AnimatePresence>
+          {showExitConfirm && (
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={crossfade}
-              className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl"
-              data-testid="exit-confirm-dialog"
-              role="dialog"
-              aria-labelledby="exit-dialog-title"
-              aria-describedby="exit-dialog-desc"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+              data-testid="exit-confirm-overlay"
+              onClick={handleExitCancel}
             >
-              <h2 id="exit-dialog-title" className="text-lg font-semibold text-purple-900">
-                Save your progress?
-              </h2>
-              <p id="exit-dialog-desc" className="text-sm text-purple-700">
-                Save your progress? You can continue later.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleSaveAndExit}
-                  disabled={isSyncing}
-                  className={`min-h-[48px] flex-1 rounded-xl bg-linear-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 ${FOCUS_RING}`}
-                  data-testid="save-and-exit-button"
-                  type="button"
-                  autoFocus
-                >
-                  {isSyncing ? 'Saving...' : 'Save & Exit'}
-                </button>
-                <button
-                  onClick={handleExitCancel}
-                  className={`min-h-[48px] rounded-lg px-4 py-3 font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
-                  data-testid="cancel-exit-button"
-                  type="button"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+              <m.div
+                ref={dialogRef}
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={crossfade}
+                className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl"
+                data-testid="exit-confirm-dialog"
+                role="dialog"
+                aria-labelledby="exit-dialog-title"
+                aria-describedby="exit-dialog-desc"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 id="exit-dialog-title" className="text-lg font-semibold text-purple-900">
+                  Save your progress?
+                </h2>
+                <p id="exit-dialog-desc" className="text-sm text-purple-700">
+                  Save your progress? You can continue later.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSaveAndExit}
+                    disabled={isSyncing}
+                    className={`min-h-[48px] flex-1 rounded-xl bg-linear-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 ${FOCUS_RING}`}
+                    data-testid="save-and-exit-button"
+                    type="button"
+                    autoFocus
+                  >
+                    {isSyncing ? 'Saving...' : 'Save & Exit'}
+                  </button>
+                  <button
+                    onClick={handleExitCancel}
+                    className={`min-h-[48px] rounded-lg px-4 py-3 font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
+                    data-testid="cancel-exit-button"
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </m.div>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </LazyMotion>
   );
 }
