@@ -19,7 +19,7 @@
 import type { AppStateCreator } from '../types';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { InteractionService } from '../../api/interactionService';
-import { authService } from '../../api/authService';
+import { getCurrentUserId } from '../../api/auth/sessionService';
 import { validateInteraction, INTERACTION_ERRORS } from '../../utils/interactionValidation';
 
 // Initialize interaction service singleton
@@ -196,7 +196,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
   subscribeToInteractions: async () => {
     try {
-      const currentUserId = await authService.getCurrentUserId();
+      const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
         throw new Error('Cannot subscribe: User not authenticated');
       }

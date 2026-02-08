@@ -1,5 +1,5 @@
 import { openDB } from 'idb';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import {
   type MyLoveDBSchema,
@@ -183,10 +183,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
    * Create a new scripture session via Supabase RPC, then cache locally.
    * Write pattern: server first → update cache.
    */
-  async createSession(
-    mode: 'solo' | 'together',
-    partnerId?: string
-  ): Promise<ScriptureSession> {
+  async createSession(mode: 'solo' | 'together', partnerId?: string): Promise<ScriptureSession> {
     const { data, error } = await supabase.rpc('scripture_create_session', {
       p_mode: mode,
       ...(partnerId ? { p_partner_id: partnerId } : {}),
@@ -263,15 +260,22 @@ class ScriptureReadingService extends BaseIndexedDBService<
    */
   async updateSession(
     sessionId: string,
-    updates: Partial<Pick<ScriptureSession, 'currentPhase' | 'currentStepIndex' | 'status' | 'version' | 'completedAt'>>
+    updates: Partial<
+      Pick<
+        ScriptureSession,
+        'currentPhase' | 'currentStepIndex' | 'status' | 'version' | 'completedAt'
+      >
+    >
   ): Promise<void> {
     // Build snake_case update payload for Supabase
     const supabaseUpdates: Record<string, unknown> = {};
     if (updates.currentPhase !== undefined) supabaseUpdates.current_phase = updates.currentPhase;
-    if (updates.currentStepIndex !== undefined) supabaseUpdates.current_step_index = updates.currentStepIndex;
+    if (updates.currentStepIndex !== undefined)
+      supabaseUpdates.current_step_index = updates.currentStepIndex;
     if (updates.status !== undefined) supabaseUpdates.status = updates.status;
     if (updates.version !== undefined) supabaseUpdates.version = updates.version;
-    if (updates.completedAt !== undefined) supabaseUpdates.completed_at = updates.completedAt?.toISOString() ?? null;
+    if (updates.completedAt !== undefined)
+      supabaseUpdates.completed_at = updates.completedAt?.toISOString() ?? null;
 
     // Server first
     const { error } = await supabase
@@ -411,10 +415,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
 
     if (existing) {
       // Delete from server
-      const { error } = await supabase
-        .from('scripture_bookmarks')
-        .delete()
-        .eq('id', existing.id);
+      const { error } = await supabase.from('scripture_bookmarks').delete().eq('id', existing.id);
 
       if (error) {
         const scriptureErr = createScriptureError(
@@ -454,6 +455,49 @@ class ScriptureReadingService extends BaseIndexedDBService<
     }
 
     return this.fetchAndCacheBookmarks(sessionId);
+  }
+
+  /**
+   * Update share_with_partner flag for all current user's bookmarks in a session.
+   */
+  async updateSessionBookmarkSharing(
+    sessionId: string,
+    userId: string,
+    shareWithPartner: boolean
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('scripture_bookmarks')
+      .update({ share_with_partner: shareWithPartner })
+      .eq('session_id', sessionId)
+      .eq('user_id', userId);
+
+    if (error) {
+      const scriptureErr = createScriptureError(
+        ScriptureErrorCode.SYNC_FAILED,
+        `Failed to update bookmark sharing: ${error.message}`,
+        error
+      );
+      handleScriptureError(scriptureErr);
+      throw scriptureErr;
+    }
+
+    try {
+      await this.init();
+      const db = this.getTypedDB();
+      const bookmarks = await db.getAllFromIndex('scripture-bookmarks', 'by-session', sessionId);
+      const tx = db.transaction('scripture-bookmarks', 'readwrite');
+      for (const bookmark of bookmarks) {
+        if (bookmark.userId === userId) {
+          await tx.store.put({
+            ...bookmark,
+            shareWithPartner,
+          });
+        }
+      }
+      await tx.done;
+    } catch (cacheError) {
+      console.error('[ScriptureService] Failed to update bookmark sharing cache:', cacheError);
+    }
   }
 
   // ============================================
@@ -782,11 +826,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
       await this.init();
       const db = this.getTypedDB();
       if (sessionId) {
-        const bookmarks = await db.getAllFromIndex(
-          'scripture-bookmarks',
-          'by-session',
-          sessionId
-        );
+        const bookmarks = await db.getAllFromIndex('scripture-bookmarks', 'by-session', sessionId);
         const tx = db.transaction('scripture-bookmarks', 'readwrite');
         for (const b of bookmarks) {
           await tx.store.delete(b.id);
@@ -805,11 +845,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
       await this.init();
       const db = this.getTypedDB();
       if (sessionId) {
-        const messages = await db.getAllFromIndex(
-          'scripture-messages',
-          'by-session',
-          sessionId
-        );
+        const messages = await db.getAllFromIndex('scripture-messages', 'by-session', sessionId);
         const tx = db.transaction('scripture-messages', 'readwrite');
         for (const m of messages) {
           await tx.store.delete(m.id);
@@ -867,10 +903,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     userId: string
   ): Promise<ScriptureBookmark | null> {
     const bookmarks = await this.getBookmarksBySession(sessionId);
-    return (
-      bookmarks.find((b) => b.stepIndex === stepIndex && b.userId === userId) ??
-      null
-    );
+    return bookmarks.find((b) => b.stepIndex === stepIndex && b.userId === userId) ?? null;
   }
 }
 

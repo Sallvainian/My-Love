@@ -12,7 +12,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { supabase } from '../api/supabaseClient';
-import { authService } from '../api/authService';
+import { getCurrentUserId } from '../api/auth/sessionService';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { LoveNote } from '../types/models';
 
@@ -64,7 +64,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
     const setupSubscription = async () => {
       try {
-        const userId = await authService.getCurrentUserId();
+        const userId = await getCurrentUserId();
         if (!userId) {
           if (import.meta.env.DEV) {
             console.log('[useRealtimeMessages] No user ID, skipping subscription');
@@ -81,7 +81,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           .channel(`love-notes:${userId}`)
           .on('broadcast', { event: 'new_message' }, (payload) => {
             if (!subscriptionActive) return;
-            handleNewMessage(payload as unknown as { type: string; event: string; payload: { message: LoveNote } });
+            handleNewMessage(
+              payload as unknown as { type: string; event: string; payload: { message: LoveNote } }
+            );
           })
           .subscribe((status, err) => {
             if (import.meta.env.DEV) {

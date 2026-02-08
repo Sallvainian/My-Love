@@ -54,12 +54,14 @@ For performance and security categories, CLI can gather live evidence:
 
 **Performance evidence (page load, response times):**
 
-1. `playwright-cli -s=tea-nfr open <target_url>`
-2. `playwright-cli -s=tea-nfr network` → capture response times and payload sizes
-3. `playwright-cli -s=tea-nfr screenshot --filename={test_artifacts}/nfr/perf-<page>.png`
-4. `playwright-cli -s=tea-nfr close`
+1. `"{playwright_cli_path}" -s=tea-nfr open <target_url>`
+2. `"{playwright_cli_path}" -s=tea-nfr network` → capture response times and payload sizes
+3. `"{playwright_cli_path}" -s=tea-nfr screenshot --filename={test_artifacts}/nfr/perf-<page>.png`
+4. `"{playwright_cli_path}" -s=tea-nfr close`
 
-> **Session Hygiene:** Always close sessions using `playwright-cli -s=tea-nfr close`. Do NOT use `close-all` — it kills every session on the machine and breaks parallel execution.
+> **Fallback:** If wrapper not found at `{playwright_cli_path}`, fall back to global `playwright-cli`.
+
+> **Session Hygiene:** Always close sessions using `"{playwright_cli_path}" -s=tea-nfr close`. Do NOT use `close-all` — it kills every session on the machine and breaks parallel execution.
 
 Store artifacts under `{test_artifacts}/nfr/`
 

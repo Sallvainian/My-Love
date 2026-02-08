@@ -9,15 +9,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import userEvent from '@testing-library/user-event';
 import { MessageInput } from '../MessageInput';
+
+type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
 // Mock framer-motion
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: MotionDivProps) => <div {...props}>{children}</div>,
   },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
+  AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
 // Mock useLoveNotes hook
@@ -74,23 +77,21 @@ describe('MessageInput', () => {
     });
 
     it('should show character counter at 900+ characters', async () => {
-      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(905);
-      await user.type(textarea, longText);
+      fireEvent.change(textarea, { target: { value: longText } });
 
       expect(screen.getByText('905/1000')).toBeInTheDocument();
     });
 
     it('should show warning color at 950+ characters', async () => {
-      const user = userEvent.setup();
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(955);
-      await user.type(textarea, longText);
+      fireEvent.change(textarea, { target: { value: longText } });
 
       const counter = screen.getByText('955/1000');
       expect(counter).toHaveClass('text-yellow-600');

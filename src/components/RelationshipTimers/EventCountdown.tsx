@@ -45,6 +45,40 @@ const iconColors: Record<IconType, { bg: string; text: string; border: string }>
   },
 };
 
+function computeEventCountdownState(date: Date | null): {
+  timeDiff: TimeDifference | null;
+  calendarDays: number;
+  isEventToday: boolean;
+} {
+  if (!date) {
+    return {
+      timeDiff: null,
+      calendarDays: 0,
+      isEventToday: false,
+    };
+  }
+
+  const now = new Date();
+  const diff = calculateTimeDifference(now, date);
+
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysDiff = Math.round(
+    (targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  const isToday =
+    now.getFullYear() === date.getFullYear() &&
+    now.getMonth() === date.getMonth() &&
+    now.getDate() === date.getDate();
+
+  return {
+    timeDiff: diff,
+    calendarDays: daysDiff,
+    isEventToday: isToday,
+  };
+}
+
 export function EventCountdown({
   label,
   icon,
@@ -52,41 +86,22 @@ export function EventCountdown({
   description,
   placeholderText = 'Date TBD',
 }: EventCountdownProps) {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference | null>(null);
-  const [isEventToday, setIsEventToday] = useState(false);
-
-  // Calculate calendar days (not 24-hour periods) for more intuitive display
-  const [calendarDays, setCalendarDays] = useState<number>(0);
+  const [timeDiff, setTimeDiff] = useState<TimeDifference | null>(
+    () => computeEventCountdownState(date).timeDiff
+  );
+  const [isEventToday, setIsEventToday] = useState<boolean>(
+    () => computeEventCountdownState(date).isEventToday
+  );
+  const [calendarDays, setCalendarDays] = useState<number>(
+    () => computeEventCountdownState(date).calendarDays
+  );
 
   const updateCountdown = useCallback(() => {
-    if (!date) {
-      setTimeDiff(null);
-      setCalendarDays(0);
-      return;
-    }
-
-    const now = new Date();
-    const diff = calculateTimeDifference(now, date);
-    setTimeDiff(diff);
-
-    // Calculate calendar days: difference between date portions only
-    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const targetMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const daysDiff = Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
-    setCalendarDays(daysDiff);
-
-    // Check if event is today
-    const isToday =
-      now.getFullYear() === date.getFullYear() &&
-      now.getMonth() === date.getMonth() &&
-      now.getDate() === date.getDate();
-    setIsEventToday(isToday);
+    const nextState = computeEventCountdownState(date);
+    setTimeDiff(nextState.timeDiff);
+    setCalendarDays(nextState.calendarDays);
+    setIsEventToday(nextState.isEventToday);
   }, [date]);
-
-  // Initial calculation on mount and when date changes
-  useEffect(() => {
-    updateCountdown();
-  }, [updateCountdown]);
 
   // Update every second for real-time countdown
   useEffect(() => {

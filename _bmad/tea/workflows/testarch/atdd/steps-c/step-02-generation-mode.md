@@ -56,15 +56,15 @@ If `auto`:
 > **Note:** `${timestamp}` is a placeholder the agent should replace with a unique value (e.g., epoch seconds) for session isolation.
 
 - **Simple recording** (snapshot selectors, capture structure): Use CLI
-  - `playwright-cli -s=tea-atdd-${timestamp} open <url>` → `playwright-cli -s=tea-atdd-${timestamp} snapshot` → extract refs
+  - `"{playwright_cli_path}" -s=tea-atdd-${timestamp} open <url>` → `"{playwright_cli_path}" -s=tea-atdd-${timestamp} snapshot` → extract refs
 - **Complex recording** (drag/drop, wizards, multi-step state): Use MCP
   - Full browser automation with rich tool semantics
-- **Fallback:** If preferred tool unavailable, use the other; if neither, skip recording
+- **Fallback:** If preferred tool unavailable, use the other; if neither, skip recording. If wrapper not found at `{playwright_cli_path}`, fall back to global `playwright-cli`.
 
 If `cli`:
 
 - Use Playwright CLI for all recording
-- `playwright-cli -s=tea-atdd-${timestamp} open <url>`, `snapshot`, `screenshot`, `click <ref>`, etc.
+- `"{playwright_cli_path}" -s=tea-atdd-${timestamp} open <url>`, `snapshot`, `screenshot`, `click <ref>`, etc.
 
 If `mcp`:
 

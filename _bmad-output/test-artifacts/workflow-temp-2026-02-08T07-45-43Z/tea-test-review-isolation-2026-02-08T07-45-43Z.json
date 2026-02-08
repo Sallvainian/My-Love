@@ -1,0 +1,49 @@
+{
+  "dimension": "isolation",
+  "score": 94,
+  "max_score": 100,
+  "grade": "A",
+  "violations": [
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.1.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "cleanup-visibility",
+      "description": "Data-writing tests do not clearly show cleanup hooks.",
+      "suggestion": "Document cleanup strategy in afterEach/afterAll or fixture teardown.",
+      "code_snippet": "/**\n * P0/P1/P2 E2E: Scripture Reading - Per-Step Reflection System\n *\n * Story 2.1: Users bookmark verses during reading and submit\n * a reflection (rating + optional note) after each step.\n *"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.2.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "cleanup-visibility",
+      "description": "Data-writing tests do not clearly show cleanup hooks.",
+      "suggestion": "Document cleanup strategy in afterEach/afterAll or fixture teardown.",
+      "code_snippet": "/**\n * P0/P1/P2 E2E: Scripture Reading - End-of-Session Reflection Summary\n *\n * Story 2.2: After completing all 17 verses, users see a summary screen\n * with bookmarked verses, can select one, rate it, and write a final note.\n *"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 1,
+      "severity": "LOW",
+      "category": "cleanup-visibility",
+      "description": "Data-writing tests do not clearly show cleanup hooks.",
+      "suggestion": "Document cleanup strategy in afterEach/afterAll or fixture teardown.",
+      "code_snippet": "/**\n * P0/P1/P2 E2E: Scripture Reading - Daily Prayer Report\n *\n * Story 2.3: After submitting reflection summary, users compose a message\n * for their partner (if linked) and see a daily prayer report with their\n * activity and partner's status."
+    }
+  ],
+  "passed_checks": 181,
+  "failed_checks": 3,
+  "total_checks": 184,
+  "violation_summary": {
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 3
+  },
+  "recommendations": [
+    "Keep setup/teardown scoped to each test or describe block.",
+    "Document and minimize any required serial ordering.",
+    "Ensure data-writing tests always show explicit cleanup ownership."
+  ],
+  "summary": "isolation analysis found 3 violation(s): 0 HIGH, 0 MEDIUM, 3 LOW."
+}

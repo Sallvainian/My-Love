@@ -1,0 +1,49 @@
+{
+  "dimension": "isolation",
+  "score": 68,
+  "max_score": 100,
+  "grade": "C",
+  "violations": [
+    {
+      "file": "tests/e2e/scripture/scripture-overview.spec.ts",
+      "line": 216,
+      "severity": "HIGH",
+      "category": "shared-session-state",
+      "description": "Resume-step test writes to shared in-progress scripture sessions for the same authenticated account used by concurrently running tests.",
+      "suggestion": "Allocate worker-specific users/sessions or serialize this describe block.",
+      "code_snippet": "await saveSoloSessionAtStep(page, 7);"
+    },
+    {
+      "file": "tests/support/helpers.ts",
+      "line": 137,
+      "severity": "HIGH",
+      "category": "unscoped-session-lookup",
+      "description": "Fallback lookup selects latest in-progress solo session and can pick a session created by another test in parallel.",
+      "suggestion": "Scope fallback query to an explicit per-test marker (session id from RPC response or unique metadata) and fail fast when mismatch occurs.",
+      "code_snippet": ".../scripture_sessions?status=eq.in_progress&mode=eq.solo&order=started_at.desc&limit=1"
+    },
+    {
+      "file": "tests/e2e/scripture/scripture-reflection-2.3.spec.ts",
+      "line": 185,
+      "severity": "MEDIUM",
+      "category": "incomplete-partner-state-setup",
+      "description": "Partner rows are inserted but partner completion/readiness state is not guaranteed before assertions run, leaving tests in waiting-state branch.",
+      "suggestion": "Insert full partner-complete session state and use `expect.poll` to verify backend readiness before asserting report UI.",
+      "code_snippet": "await supabaseAdmin.from('scripture_reflections').insert(...)"
+    }
+  ],
+  "passed_checks": 7,
+  "failed_checks": 3,
+  "total_checks": 10,
+  "violation_summary": {
+    "HIGH": 2,
+    "MEDIUM": 1,
+    "LOW": 0
+  },
+  "recommendations": [
+    "Use worker-isolated auth/session fixtures for scripture E2E tests.",
+    "Eliminate non-deterministic fallback session lookups in helpers.",
+    "Gate UI assertions on explicit backend completion markers."
+  ],
+  "summary": "Isolation is the dominant weakness; shared user/session state is driving cross-test interference in parallel chromium runs."
+}

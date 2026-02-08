@@ -15,6 +15,33 @@ import {
   deleteLoveNoteImage,
 } from '../loveNoteImageService';
 
+type SessionResponse = Awaited<
+  ReturnType<(typeof import('../../api/supabaseClient'))['supabase']['auth']['getSession']>
+>;
+type StorageBucket = ReturnType<
+  (typeof import('../../api/supabaseClient'))['supabase']['storage']['from']
+>;
+
+function createSessionResponse(accessToken: string | null): SessionResponse {
+  return {
+    data: {
+      session: accessToken
+        ? ({ access_token: accessToken } as NonNullable<SessionResponse['data']['session']>)
+        : null,
+    },
+    error: null,
+  };
+}
+
+function createStorageBucket(overrides: Partial<StorageBucket> = {}): StorageBucket {
+  return {
+    upload: vi.fn(),
+    createSignedUrl: vi.fn(),
+    remove: vi.fn(),
+    ...overrides,
+  } as unknown as StorageBucket;
+}
+
 // Mock Supabase client
 vi.mock('../../api/supabaseClient', () => ({
   supabase: {
@@ -153,10 +180,7 @@ describe('loveNoteImageService', () => {
       const { imageCompressionService } = await import('../imageCompressionService');
 
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-      vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: null },
-        error: null,
-      } as any);
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse(null));
 
       const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
 
@@ -170,10 +194,7 @@ describe('loveNoteImageService', () => {
       const { imageCompressionService } = await import('../imageCompressionService');
 
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-      vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: { access_token: 'token' } },
-        error: null,
-      } as any);
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
         ok: false,
@@ -197,10 +218,7 @@ describe('loveNoteImageService', () => {
       const { imageCompressionService } = await import('../imageCompressionService');
 
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-      vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: { access_token: 'token' } },
-        error: null,
-      } as any);
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
         ok: false,
@@ -224,10 +242,7 @@ describe('loveNoteImageService', () => {
       const { imageCompressionService } = await import('../imageCompressionService');
 
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
-      vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: { access_token: 'token' } },
-        error: null,
-      } as any);
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
         ok: false,
@@ -251,10 +266,7 @@ describe('loveNoteImageService', () => {
     it('should upload pre-compressed blob via Edge Function', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
-      vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: { access_token: 'token' } },
-        error: null,
-      } as any);
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       const mockStoragePath = 'user-456/1705315800000-uuid.jpg';
       mockFetch.mockResolvedValue({
@@ -289,10 +301,7 @@ describe('loveNoteImageService', () => {
     it('should throw error on blob upload failure', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
-      vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: { access_token: 'token' } },
-        error: null,
-      } as any);
+      vi.mocked(supabase.auth.getSession).mockResolvedValue(createSessionResponse('token'));
 
       mockFetch.mockResolvedValue({
         ok: false,
@@ -322,11 +331,9 @@ describe('loveNoteImageService', () => {
         error: null,
       });
 
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: vi.fn(),
-        createSignedUrl: mockCreateSignedUrl,
-        remove: vi.fn(),
-      } as any);
+      vi.mocked(supabase.storage.from).mockReturnValue(
+        createStorageBucket({ createSignedUrl: mockCreateSignedUrl })
+      );
 
       const storagePath = 'user-123/1705315800000-uuid.jpg';
       const result = await getSignedImageUrl(storagePath);
@@ -352,11 +359,9 @@ describe('loveNoteImageService', () => {
         error: { message: 'Object not found' },
       });
 
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: vi.fn(),
-        createSignedUrl: mockCreateSignedUrl,
-        remove: vi.fn(),
-      } as any);
+      vi.mocked(supabase.storage.from).mockReturnValue(
+        createStorageBucket({ createSignedUrl: mockCreateSignedUrl })
+      );
 
       await expect(getSignedImageUrl('invalid-path')).rejects.toThrow(
         'Failed to get image URL: Object not found'
@@ -369,11 +374,7 @@ describe('loveNoteImageService', () => {
       const { supabase } = await import('../../api/supabaseClient');
 
       const mockRemove = vi.fn().mockResolvedValue({ error: null });
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: vi.fn(),
-        createSignedUrl: vi.fn(),
-        remove: mockRemove,
-      } as any);
+      vi.mocked(supabase.storage.from).mockReturnValue(createStorageBucket({ remove: mockRemove }));
 
       const storagePath = 'user-123/1705315800000-uuid.jpg';
       await deleteLoveNoteImage(storagePath);
@@ -389,11 +390,7 @@ describe('loveNoteImageService', () => {
         error: { message: 'Permission denied' },
       });
 
-      vi.mocked(supabase.storage.from).mockReturnValue({
-        upload: vi.fn(),
-        createSignedUrl: vi.fn(),
-        remove: mockRemove,
-      } as any);
+      vi.mocked(supabase.storage.from).mockReturnValue(createStorageBucket({ remove: mockRemove }));
 
       await expect(deleteLoveNoteImage('path')).rejects.toThrow(
         'Failed to delete image: Permission denied'
