@@ -27,6 +27,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CLAUDE_PAT }}
         with:
+          github_token: ${{ secrets.CLAUDE_PAT }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: "dependabot,dependabot[bot]"
           # /review is a prebuilt skill optimized for PR code review
