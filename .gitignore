@@ -47,7 +47,7 @@ tests/.auth/
 .claude
 !.claude/commands/
 !.claude/rules/
-.bmad
+_bmad/
 !.bmad/
 .code
 

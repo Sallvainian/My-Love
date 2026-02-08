@@ -1,5 +1,0 @@
-### Result
-Trace recording stopped.
-- [Trace](.playwright-cli/traces/trace-1770537097349.trace)
-- [Network log](.playwright-cli/traces/trace-1770537097349.network)
-- [Resources](.playwright-cli/traces/resources)
