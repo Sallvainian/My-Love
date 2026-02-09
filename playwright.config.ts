@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import { defineConfig, devices } from '@playwright/test';
+import { currentsReporter } from '@currents/playwright';
 
 /**
  * Load Supabase local env vars for test fixtures.
@@ -50,9 +51,9 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    trace: 'on',
+    screenshot: 'on',
+    video: 'on',
     actionTimeout: 15 * 1000, // Action timeout: 15s
     navigationTimeout: 30 * 1000, // Navigation timeout: 30s
   },
@@ -61,6 +62,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
+    currentsReporter(),
   ],
 
   outputDir: 'test-results',
@@ -77,7 +79,6 @@ export default defineConfig({
       testDir: './tests/e2e',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: 'tests/.auth/user.json',
       },
       dependencies: ['setup'],
     },

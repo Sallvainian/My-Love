@@ -19,6 +19,7 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
 import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
+import { test as workerAuthFixture } from './fixtures/worker-auth';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -60,6 +61,7 @@ export const test = mergeTests(
   networkMonitorFixture,
   customFixtures,
   scriptureNavFixture,
+  workerAuthFixture,
 );
 
 export { expect } from '@playwright/test';
