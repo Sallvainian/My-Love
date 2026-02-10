@@ -1,44 +1,24 @@
-# Architecture Reference - My Love PWA
+# Architecture Documentation
+
+Comprehensive architecture documentation for the **My-Love** PWA -- a couples app built with React 19, TypeScript, and Supabase.
 
 ## Table of Contents
 
-- [Architecture Reference - My Love PWA](#table-of-contents)
-  - [Executive Summary](./executive-summary.md)
-  - [Technology Stack](./technology-stack.md)
-  - [Architecture Pattern](./architecture-pattern.md)
-    - [Key Architectural Decisions](./architecture-pattern.md#key-architectural-decisions)
-  - [Source Directory Structure](./source-directory-structure.md)
-  - [Data Architecture](./data-architecture.md)
-    - [Supabase Tables (PostgreSQL with Row Level Security)](./data-architecture.md#supabase-tables-postgresql-with-row-level-security)
-    - [IndexedDB Schema (Local Storage)](./data-architecture.md#indexeddb-schema-local-storage)
-    - [localStorage (Zustand Hydration)](./data-architecture.md#localstorage-zustand-hydration)
-  - [State Management](./state-management.md)
-    - [Zustand Store Architecture](./state-management.md#zustand-store-architecture)
-    - [Custom Hooks](./state-management.md#custom-hooks)
-  - [Component Hierarchy](./component-hierarchy.md)
-  - [Authentication Flow](./authentication-flow.md)
-  - [Navigation System](./navigation-system.md)
-  - [Real-time Features](./real-time-features.md)
-  - [Offline Strategy](./offline-strategy.md)
-    - [1. Service Worker (sw.ts)](./offline-strategy.md#1-service-worker-swts)
-    - [2. IndexedDB Persistence](./offline-strategy.md#2-indexeddb-persistence)
-    - [3. App-Level Sync (App.tsx)](./offline-strategy.md#3-app-level-sync-apptsx)
-    - [Conflict Resolution](./offline-strategy.md#conflict-resolution)
-    - [Optimistic UI](./offline-strategy.md#optimistic-ui)
-  - [Security](./security.md)
-  - [Validation Architecture](./validation-architecture.md)
-  - [Deployment](./deployment.md)
-  - [Testing Strategy](./testing-strategy.md)
-    - [Unit and Integration Tests (Vitest)](./testing-strategy.md#unit-and-integration-tests-vitest)
-    - [End-to-End Tests (Playwright)](./testing-strategy.md#end-to-end-tests-playwright)
-    - [ATDD (Acceptance-Test-Driven Development)](./testing-strategy.md#atdd-acceptance-test-driven-development)
-    - [Test Execution Commands](./testing-strategy.md#test-execution-commands)
-  - [Performance Optimizations](./performance-optimizations.md)
-  - [Error Handling Strategy](./error-handling-strategy.md)
-    - [View-Level Error Boundaries](./error-handling-strategy.md#view-level-error-boundaries)
-    - [Service Layer Error Handling](./error-handling-strategy.md#service-layer-error-handling)
-    - [Network Error Handling](./error-handling-strategy.md#network-error-handling)
-    - [State Corruption Recovery](./error-handling-strategy.md#state-corruption-recovery)
-  - [Scalability Considerations](./scalability-considerations.md)
-    - [Current Design (2-User Scope)](./scalability-considerations.md#current-design-2-user-scope)
-    - [Growth Path (If Needed)](./scalability-considerations.md#growth-path-if-needed)
+1. [Executive Summary](./executive-summary.md) -- High-level architecture overview
+2. [Technology Stack](./technology-stack.md) -- Full technology table with versions and rationale
+3. [Architecture Pattern](./architecture-pattern.md) -- Layered architecture and key decisions
+4. [Source Directory Structure](./source-directory-structure.md) -- Annotated src/ tree
+5. [Data Architecture](./data-architecture.md) -- Dual storage: Supabase + IndexedDB
+6. [State Management](./state-management.md) -- Zustand overview (links to detailed section)
+7. [Component Hierarchy](./component-hierarchy.md) -- React component tree
+8. [Authentication Flow](./authentication-flow.md) -- Supabase email/password auth
+9. [Navigation System](./navigation-system.md) -- Zustand-based routing
+10. [Real-Time Features](./real-time-features.md) -- Supabase Realtime patterns
+11. [Offline Strategy](./offline-strategy.md) -- Service Worker, IndexedDB, Background Sync
+12. [Security](./security.md) -- RLS, auth model, input sanitization
+13. [Validation Architecture](./validation-architecture.md) -- Zod schemas and layers
+14. [Deployment](./deployment.md) -- GitHub Pages + CI/CD
+15. [Testing Strategy](./testing-strategy.md) -- Vitest, Playwright, pgTAP
+16. [Performance Optimizations](./performance-optimizations.md) -- Lazy loading, code splitting
+17. [Error Handling Strategy](./error-handling-strategy.md) -- Error boundaries, offline errors
+18. [Scalability Considerations](./scalability-considerations.md) -- 2-user scope and growth paths

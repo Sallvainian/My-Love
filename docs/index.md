@@ -1,6 +1,6 @@
 # My-Love — Project Documentation
 
-> **Auto-generated:** 2026-02-08 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA)
+> **Auto-generated:** 2026-02-09 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** 90 files, 12,495 lines
 
 ## Quick Reference
 
@@ -10,7 +10,7 @@
 | **State Management** | Zustand 5.0 (10 slices) |
 | **Backend** | Supabase (Auth, Postgres, Storage, Realtime, Edge Functions) |
 | **Styling** | Tailwind CSS 4.1 |
-| **Testing** | Vitest 4.0 + Playwright 1.57 |
+| **Testing** | Vitest 4.0 + Playwright 1.58 |
 | **Deployment** | PWA with Service Worker (Workbox) |
 
 ---

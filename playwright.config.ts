@@ -62,7 +62,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
-    currentsReporter(),
+    ...(process.env.CURRENTS_RECORD_KEY ? [currentsReporter()] : []),
   ],
 
   outputDir: 'test-results',

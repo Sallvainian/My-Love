@@ -2,74 +2,25 @@
 
 ## Table of Contents
 
-- [State Management](#table-of-contents)
-  - [Overview](./overview.md)
-    - [Technology Stack](./overview.md#technology-stack)
-  - [Store Configuration](./store-configuration.md)
-    - [Composition Order](./store-configuration.md#composition-order)
-    - [AppState Type](./store-configuration.md#appstate-type)
-    - [AppStateCreator Generic](./store-configuration.md#appstatecreator-generic)
-    - [E2E Testing](./store-configuration.md#e2e-testing)
-  - [Slice Details](./slice-details.md)
-    - [1. App Slice](./slice-details.md#1-app-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-      - [Cross-Slice Dependencies](./slice-details.md#cross-slice-dependencies)
-    - [2. Settings Slice](./slice-details.md#2-settings-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-      - [Cross-Slice Dependencies](./slice-details.md#cross-slice-dependencies)
-      - [Initialization Guards](./slice-details.md#initialization-guards)
-    - [3. Messages Slice](./slice-details.md#3-messages-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-      - [Map Serialization](./slice-details.md#map-serialization)
-    - [4. Navigation Slice](./slice-details.md#4-navigation-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-      - [Browser History Integration](./slice-details.md#browser-history-integration)
-    - [5. Mood Slice](./slice-details.md#5-mood-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-    - [6. Interactions Slice](./slice-details.md#6-interactions-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-    - [7. Photos Slice](./slice-details.md#7-photos-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-    - [8. Notes Slice](./slice-details.md#8-notes-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-      - [Memory Management](./slice-details.md#memory-management)
-    - [9. Partner Slice](./slice-details.md#9-partner-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-    - [10. Scripture Reading Slice](./slice-details.md#10-scripture-reading-slice)
-      - [State Shape](./slice-details.md#state-shape)
-      - [Actions](./slice-details.md#actions)
-      - [Persistence](./slice-details.md#persistence)
-  - [Data Flow](./data-flow.md)
-    - [Component to Store to Service](./data-flow.md#component-to-store-to-service)
-    - [Initialization Flow](./data-flow.md#initialization-flow)
-    - [Optimistic Update Pattern](./data-flow.md#optimistic-update-pattern)
-  - [Persistence Strategy](./persistence-strategy.md)
-    - [What Goes Where](./persistence-strategy.md#what-goes-where)
-    - [Partialize Configuration](./persistence-strategy.md#partialize-configuration)
-    - [Rehydration Safety](./persistence-strategy.md#rehydration-safety)
-    - [State Schema Versioning](./persistence-strategy.md#state-schema-versioning)
-  - [React Hooks](./react-hooks.md)
-    - [useLoveNotes](./react-hooks.md#uselovenotes)
-    - [useAutoSave](./react-hooks.md#useautosave)
-    - [useNetworkStatus](./react-hooks.md#usenetworkstatus)
-    - [useVibration](./react-hooks.md#usevibration)
-    - [useMotionConfig](./react-hooks.md#usemotionconfig)
-  - [Direct Store Access Pattern](./direct-store-access-pattern.md)
+1. [Overview](overview.md) -- Architecture philosophy and slice composition pattern
+2. [Store Configuration](store-configuration.md) -- `useAppStore.ts` setup, persist middleware, custom storage
+3. [Slice Details](slice-details.md) -- All 10 slices: state fields, actions, cross-slice dependencies
+4. [Data Flow](data-flow.md) -- Component -> Hook -> Store -> Service -> API flow
+5. [Persistence Strategy](persistence-strategy.md) -- localStorage vs IndexedDB, what gets persisted where
+6. [React Hooks](react-hooks.md) -- Custom hooks that wrap store access
+7. [Direct Store Access Pattern](direct-store-access-pattern.md) -- Selector patterns for optimal re-renders
+
+## Quick Reference
+
+| Slice | Key State | Persisted | Cross-Slice Deps |
+|---|---|---|---|
+| App | `isLoading`, `error`, `__isHydrated` | No | None |
+| Settings | `settings`, `isOnboarded` | Yes (localStorage) | None |
+| Navigation | `currentView` | No | None |
+| Messages | `messages`, `messageHistory`, `currentMessage`, `customMessages` | Partial (messageHistory) | Settings (via `get()`) |
+| Mood | `moods`, `partnerMoods`, `syncStatus` | Yes (moods in localStorage + IndexedDB) | None |
+| Interactions | `interactions`, `unviewedCount`, `isSubscribed` | No | None |
+| Partner | `partner`, `sentRequests`, `receivedRequests`, `searchResults` | No | None |
+| Notes | `notes`, `notesIsLoading`, `notesHasMore`, `sentMessageTimestamps` | No | None |
+| Photos | `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress` | No | None |
+| Scripture | `session`, `scriptureLoading`, `activeSession`, `pendingRetry` | No | None |

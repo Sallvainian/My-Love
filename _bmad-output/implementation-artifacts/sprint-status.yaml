@@ -50,11 +50,11 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: Reflection & Daily Prayer Report
-  epic-2: in-progress
+  epic-2: done
   2-1-per-step-reflection-system: done
   2-2-end-of-session-reflection-summary: done
   2-3-daily-prayer-report-send-and-view: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # Epic 3: Stats & Overview Dashboard
   epic-3: backlog

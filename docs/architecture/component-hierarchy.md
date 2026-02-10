@@ -1,55 +1,96 @@
 # Component Hierarchy
 
+## Root Tree
+
 ```
-App (root: auth gate + view router)
-  |
-  +-- [Auth Loading] -> heart pulse + "Loading..."
-  |
-  +-- [No Session] -> ErrorBoundary > LoginScreen
-  |
-  +-- [Needs Display Name] -> ErrorBoundary > DisplayNameSetup
-  |
-  +-- [App Loading] -> heart pulse + "Loading your data..."
-  |
-  +-- [Welcome Splash] -> ErrorBoundary > Suspense > WelcomeSplash
-  |
-  +-- [Admin Route] -> ErrorBoundary > Suspense > AdminPanel
-  |
-  +-- [Main App]
-        |
-        +-- NetworkStatusIndicator (offline/connecting banner)
-        +-- SyncToast (background sync completion feedback)
-        |
-        +-- <main>
-        |     |
-        |     +-- [home] TimeTogether, BirthdayCountdown(s),
-        |     |          EventCountdown(s), DailyMessage
-        |     |
-        |     +-- [non-home] ViewErrorBoundary > Suspense
-        |           +-- [photos]    PhotoGallery (lazy)
-        |           +-- [mood]      MoodTracker (lazy)
-        |           +-- [partner]   PartnerMoodView (lazy)
-        |           +-- [notes]     LoveNotes (lazy)
-        |           +-- [scripture] ScriptureOverview (lazy)
-        |                             +-> SoloReadingFlow
-        |                                   +-> BookmarkFlag
-        |                                   +-> PerStepReflection
-        |                                   +-> ReflectionSummary
-        |
-        +-- BottomNavigation (tab bar, always visible)
-        +-- PhotoUpload (modal, lazy)
-        +-- PhotoCarousel (modal, lazy)
+index.html
+  |-- main.tsx
+        |-- StrictMode
+              |-- LazyMotion (features={domAnimation})
+                    |-- App
 ```
 
-**Code Splitting Strategy:**
+## App.tsx Component Tree
 
-All non-home views and modal components are lazy-loaded via `React.lazy()` with `Suspense` fallback. The home view (`DailyMessage`, `RelationshipTimers`) is bundled in the main chunk for instant first paint.
+```
+App
+  |-- [Auth Loading] Loading spinner (inline)
+  |-- [Not Authenticated] ErrorBoundary > LoginScreen
+  |-- [Needs Display Name] ErrorBoundary > DisplayNameSetup
+  |-- [Data Loading] Loading spinner (inline)
+  |-- [Welcome Splash] ErrorBoundary > Suspense > WelcomeSplash (lazy)
+  |-- [Admin Route] ErrorBoundary > Suspense > AdminPanel (lazy)
+  |-- [Main App]
+        |-- NetworkStatusIndicator (showOnlyWhenOffline)
+        |-- SyncToast
+        |-- main#main-content
+        |   |-- [home view - inline, not lazy]
+        |   |     |-- TimeTogether
+        |   |     |-- BirthdayCountdown (frank)
+        |   |     |-- BirthdayCountdown (gracie)
+        |   |     |-- EventCountdown (wedding)
+        |   |     |-- EventCountdown (visits[])
+        |   |     |-- DailyMessage
+        |   |
+        |   |-- [non-home views - wrapped in ViewErrorBoundary > Suspense]
+        |         |-- PhotoGallery (lazy)
+        |         |-- MoodTracker (lazy)
+        |         |-- PartnerMoodView (lazy)
+        |         |-- LoveNotes (lazy)
+        |         |-- ScriptureOverview (lazy)
+        |
+        |-- BottomNavigation
+        |-- Suspense > PhotoUpload (lazy, modal)
+        |-- Suspense > PhotoCarousel (lazy, modal)
+```
 
-Manual chunks in `vite.config.ts`:
-- `vendor-react`: react, react-dom
-- `vendor-supabase`: @supabase/supabase-js
-- `vendor-state`: zustand, idb, zod
-- `vendor-animation`: framer-motion
-- `vendor-icons`: lucide-react
+## Lazy-Loaded Components
 
----
+All secondary views are code-split using `React.lazy` with named exports:
+
+```typescript
+const PhotoGallery = lazy(() =>
+  import('./components/PhotoGallery/PhotoGallery').then(m => ({ default: m.PhotoGallery }))
+);
+const MoodTracker = lazy(() =>
+  import('./components/MoodTracker/MoodTracker').then(m => ({ default: m.MoodTracker }))
+);
+const PartnerMoodView = lazy(() =>
+  import('./components/PartnerMoodView/PartnerMoodView').then(m => ({ default: m.PartnerMoodView }))
+);
+const LoveNotes = lazy(() =>
+  import('./components/love-notes').then(m => ({ default: m.LoveNotes }))
+);
+const ScriptureOverview = lazy(() =>
+  import('./components/scripture-reading').then(m => ({ default: m.ScriptureOverview }))
+);
+```
+
+Modal components (`WelcomeSplash`, `PhotoUpload`, `PhotoCarousel`) are also lazy-loaded but with `Suspense fallback={null}` to avoid visible loading spinners.
+
+## Error Boundary Strategy
+
+Two levels of error boundaries:
+
+1. **`ErrorBoundary`**: Top-level, wraps entire app phases (login, display name setup, welcome splash, admin). Shows full-page error with recovery.
+2. **`ViewErrorBoundary`**: Per-view boundary wrapping only the content area inside `<main>`. Keeps `BottomNavigation` visible so users can navigate away from a crashed view.
+
+```typescript
+<ViewErrorBoundary viewName={currentView} onNavigateHome={() => setView('home')}>
+  <Suspense fallback={<LoadingSpinner />}>
+    {currentView === 'photos' && <PhotoGallery />}
+    {currentView === 'mood' && <MoodTracker />}
+    {/* ... */}
+  </Suspense>
+</ViewErrorBoundary>
+```
+
+## View Routing
+
+Views are selected by `currentView` state from `navigationSlice`:
+
+```typescript
+type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
+```
+
+The home view is rendered inline (not lazy-loaded) to ensure it always works offline. Non-home views are wrapped in `Suspense` with a shared loading spinner.

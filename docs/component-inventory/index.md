@@ -1,54 +1,43 @@
-# Component Inventory
+# Component Inventory - My-Love PWA
 
-## Table of Contents
+> Exhaustive component inventory for the My-Love React 19 Progressive Web Application.
+> Generated from complete source code analysis of all component files.
 
-- [Component Inventory](#table-of-contents)
-  - [Table of Contents](./table-of-contents.md)
-  - [Component Hierarchy](./component-hierarchy.md)
-  - [Component Inventory Table](./component-inventory-table.md)
-    - [Layout Components](./component-inventory-table.md#layout-components)
-    - [Navigation Components](./component-inventory-table.md#navigation-components)
-    - [Error Handling Components](./component-inventory-table.md#error-handling-components)
-    - [Authentication Components](./component-inventory-table.md#authentication-components)
-    - [Feature Components -- Home](./component-inventory-table.md#feature-components-home)
-    - [Feature Components -- Photos](./component-inventory-table.md#feature-components-photos)
-    - [Feature Components -- Mood Tracking](./component-inventory-table.md#feature-components-mood-tracking)
-    - [Feature Components -- Partner](./component-inventory-table.md#feature-components-partner)
-    - [Feature Components -- Love Notes](./component-inventory-table.md#feature-components-love-notes)
-    - [Feature Components -- Scripture Reading](./component-inventory-table.md#feature-components-scripture-reading)
-    - [Admin Components](./component-inventory-table.md#admin-components)
-    - [Settings Components](./component-inventory-table.md#settings-components)
-    - [Shared / Utility Components](./component-inventory-table.md#shared-utility-components)
-  - [Feature Components](./feature-components.md)
-    - [Home View (Inline, Not Lazy-Loaded)](./feature-components.md#home-view-inline-not-lazy-loaded)
-    - [Photo Gallery and Management](./feature-components.md#photo-gallery-and-management)
-    - [Mood Tracking System](./feature-components.md#mood-tracking-system)
-    - [Partner View and Interactions](./feature-components.md#partner-view-and-interactions)
-    - [Love Notes (Real-Time Chat)](./feature-components.md#love-notes-real-time-chat)
-    - [Scripture Reading](./feature-components.md#scripture-reading)
-    - [Admin Panel](./feature-components.md#admin-panel)
-  - [Shared and Utility Components](./shared-and-utility-components.md)
-    - [NetworkStatusIndicator](./shared-and-utility-components.md#networkstatusindicator)
-    - [SyncToast](./shared-and-utility-components.md#synctoast)
-    - [LoadingSpinner](./shared-and-utility-components.md#loadingspinner)
-  - [Design Patterns](./design-patterns.md)
-    - [Barrel Exports](./design-patterns.md#barrel-exports)
-    - [Lazy Loading (Code Splitting)](./design-patterns.md#lazy-loading-code-splitting)
-    - [Error Boundaries](./design-patterns.md#error-boundaries)
-    - [Container / Presentational Pattern](./design-patterns.md#container-presentational-pattern)
-    - [Memoization](./design-patterns.md#memoization)
-    - [Virtualization (react-window)](./design-patterns.md#virtualization-react-window)
-    - [Animation Library](./design-patterns.md#animation-library)
-    - [Accessibility Patterns](./design-patterns.md#accessibility-patterns)
-  - [State Connections](./state-connections.md)
-    - [AppSlice](./state-connections.md#appslice)
-    - [MessagesSlice](./state-connections.md#messagesslice)
-    - [PhotosSlice](./state-connections.md#photosslice)
-    - [SettingsSlice](./state-connections.md#settingsslice)
-    - [NavigationSlice](./state-connections.md#navigationslice)
-    - [MoodSlice](./state-connections.md#moodslice)
-    - [InteractionsSlice](./state-connections.md#interactionsslice)
-    - [PartnerSlice](./state-connections.md#partnerslice)
-    - [NotesSlice](./state-connections.md#notesslice)
-    - [ScriptureReadingSlice](./state-connections.md#scripturereadingslice)
-  - [Component Statistics](./component-statistics.md)
+## Summary Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total Exported Components | 73 |
+| Total Internal/Sub-Components | 21 |
+| Feature Groups | 16 |
+| Shared/Utility Components | 4 (NetworkStatusIndicator, NetworkStatusDot, SyncToast, charCounter) |
+| Barrel Export Files (index.ts) | 9 |
+| Class Components | 2 (ErrorBoundary, ViewErrorBoundary) |
+| Memoized Components (React.memo) | 5 (CalendarDay, MoodCard, LoveNoteMessage, FullScreenImageViewer, ImagePreview) |
+| Lazy-Loaded Components | 9 |
+| Virtualized Lists (react-window) | 2 (MessageList, MoodHistoryTimeline) |
+
+## Tech Stack
+
+- **React** 19.2.4 with TypeScript 5.9
+- **State Management**: Zustand 5.0.11 (`useAppStore`) with `useShallow` selector
+- **Animations**: Framer Motion (imported as `m as motion` for tree-shaking; `LazyMotion` in scripture)
+- **Icons**: Lucide React (Heart, Camera, Upload, X, Sparkles, Calendar, Bookmark, etc.)
+- **Virtualization**: react-window v2 (`List`, `useListRef`) + react-window-infinite-loader (`useInfiniteLoader`)
+- **Backend**: Supabase (Auth with email/password + Google OAuth, Database, Realtime Broadcast)
+- **Styling**: Tailwind CSS 4.1 (utility-first, dark mode via class)
+- **Sanitization**: DOMPurify (XSS prevention in LoveNoteMessage)
+- **Image Processing**: imageCompressionService (client-side compression before upload)
+
+## Documentation Files
+
+| File | Description |
+|------|-------------|
+| [Table of Contents](./table-of-contents.md) | Full navigation index |
+| [Component Hierarchy](./component-hierarchy.md) | Visual component tree with parent-child relationships |
+| [Component Inventory Table](./component-inventory-table.md) | Every component with path, props, store connections, features |
+| [Feature Components](./feature-components.md) | Detailed documentation per feature group |
+| [Shared & Utility Components](./shared-and-utility-components.md) | Cross-cutting shared components |
+| [Design Patterns](./design-patterns.md) | Patterns found across the codebase |
+| [State Connections](./state-connections.md) | Zustand store slice usage matrix |
+| [Component Statistics](./component-statistics.md) | Total counts, LOC, categories |
