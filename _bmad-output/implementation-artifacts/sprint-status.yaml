@@ -1,4 +1,4 @@
-# generated: 2026-02-02
+# generated: 2026-02-10
 # project: My-Love
 # project_key: NOKEY
 # tracking_system: file-system
@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-02
+generated: 2026-02-10
 project: My-Love
 project_key: NOKEY
 tracking_system: file-system
@@ -67,3 +67,32 @@ development_status:
   4-2-synchronized-reading-with-lock-in: backlog
   4-3-reconnection-and-graceful-degradation: backlog
   epic-4-retrospective: optional
+
+retro_action_items:
+  # Carry-over from Epic 1 retrospective (must complete before Epic 3)
+  c1-claude-error-handling-rule:
+    status: done
+    owner: Charlie (Senior Dev)
+    source: epic-1-retro-2026-02-01
+  c2-claude-container-store-rule:
+    status: done
+    owner: Charlie (Senior Dev)
+    source: epic-1-retro-2026-02-01
+  c3-claude-scope-creep-rule:
+    status: done
+    owner: Bob (SM)
+    source: epic-1-retro-2026-02-01
+  c4-project-context-combined-effects-rule:
+    status: done
+    owner: Charlie (Senior Dev)
+    source: epic-1-retro-2026-02-01
+
+  # Epic 2 process improvements
+  p1-eslint-recurring-review-patterns:
+    status: done
+    owner: Amelia (Dev)
+    source: epic-2-retro-2026-02-10
+  p4-execute-retro-actions-immediately:
+    status: pending
+    owner: Bob (SM)
+    source: epic-2-retro-2026-02-10
