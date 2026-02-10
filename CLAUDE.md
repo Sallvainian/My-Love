@@ -155,3 +155,9 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 - ESLint enforces `no-explicit-any` as error
 - Prettier with `tailwindcss` plugin for class sorting
 - CI workflows in `.github/workflows/`: deploy, test, migrations, code review
+
+## Retrospective Guardrails (Epic Carry-Over)
+
+- Catch blocks must never be empty. In scripture code, catch blocks must call `handleScriptureError()` or re-throw; outside scripture code, re-throw or map to the feature's error handler.
+- For scripture-reading container code and new architecture-conforming work, do not import `supabase` or service modules directly; go through Zustand slice actions (legacy exception: `scriptureReadingService` adapter until refactor).
+- New scope discovered during development must be captured as a follow-up story. Do not reopen a story in review unless there is a critical regression or security fix approved by the owner.

@@ -5,7 +5,7 @@ date: '2026-02-09'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 64
+rule_count: 65
 optimized_for_llm: true
 ---
 
@@ -66,6 +66,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Lazy loading:** Heavy components (Supabase-dependent, photo gallery) must use `React.lazy()` + `<Suspense>`
 - **Error boundaries:** Wrap new feature areas with `<ViewErrorBoundary>` — top-level `<ErrorBoundary>` catches uncaught errors
 - **Unmount safety:** Use `isMountedRef` pattern in effects that set state after async operations
+- **Combined-effects rule:** Effects that share refs and trigger on the same dependency must be combined into a single effect to prevent race conditions.
 - **DOMPurify required:** All user-generated HTML content must be sanitized with `DOMPurify.sanitize()` before rendering
 - **PWA pitfall:** `vite-plugin-pwa` uses `injectManifest` — runtime caching is in `src/sw.ts`, NOT in vite config's workbox section (which is ignored)
 - **Two data models:** Most features are offline-first (IndexedDB primary, Supabase syncs). Scripture reading is the opposite — online-first (Supabase RPC is source of truth, IndexedDB is read cache). Agents must check which model a feature uses before implementing data layer code.
@@ -140,4 +141,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-02-09
+Last Updated: 2026-02-10
