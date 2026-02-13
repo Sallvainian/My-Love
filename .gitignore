@@ -93,3 +93,4 @@ _bmad/
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
 CLAUDE.md
+.todos/
