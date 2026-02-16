@@ -58,7 +58,6 @@ _bmad/
 .opencode/
 .codex/
 .contextstream/
-AGENTS.md
 
 # Claude OS (auto-generated, user-specific)
 .claude-os/tree_sitter_cache.db
@@ -92,6 +91,5 @@ _bmad/
 
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
-CLAUDE.md
 .todos/
 .sidecar/
