@@ -12,10 +12,13 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Required Variables](./environment-setup.md#required-variables)
   - [Modifying Encrypted Variables](./environment-setup.md#modifying-encrypted-variables)
   - [E2E Test Environment](./environment-setup.md#e2e-test-environment)
+  - [CI Environment](./environment-setup.md#ci-environment)
 - [Configuration Customization](./configuration-customization.md) -- Partner name, start date, feature flags
   - [APP_CONFIG](./configuration-customization.md#app_config)
   - [Vite Configuration](./configuration-customization.md#vite-configuration)
   - [Tailwind Theme](./configuration-customization.md#tailwind-theme)
+  - [TypeScript Configuration](./configuration-customization.md#typescript-configuration)
+  - [PostCSS Configuration](./configuration-customization.md#postcss-configuration)
 - [Available Scripts](./available-scripts.md) -- Every npm script with usage examples
   - [Development](./available-scripts.md#development)
   - [Build](./available-scripts.md#build)
@@ -31,18 +34,21 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Commit Message Format](./development-workflow.md#commit-message-format)
   - [Commit Rules](./development-workflow.md#commit-rules)
   - [Uncommitted Change Workflow](./development-workflow.md#uncommitted-change-workflow)
+  - [PR Review Process](./development-workflow.md#pr-review-process)
 - [Build Process](./build-process.md) -- Production build pipeline, code splitting, PWA generation
   - [Build Stages](./build-process.md#build-stages)
   - [Manual Chunks (Code Splitting)](./build-process.md#manual-chunks-code-splitting)
   - [PWA Manifest Generation](./build-process.md#pwa-manifest-generation)
   - [Service Worker](./build-process.md#service-worker)
   - [Bundle Analysis](./build-process.md#bundle-analysis)
+  - [Build Output Structure](./build-process.md#build-output-structure)
 - [Project Structure](./project-structure.md) -- Annotated directory layout
   - [Source Code (src/)](./project-structure.md#source-code-src)
   - [Tests (tests/)](./project-structure.md#tests-tests)
   - [Supabase (supabase/)](./project-structure.md#supabase-supabase)
   - [Scripts (scripts/)](./project-structure.md#scripts-scripts)
   - [CI/CD (.github/)](./project-structure.md#cicd-github)
+  - [Configuration Files (Root)](./project-structure.md#configuration-files-root)
 - [Testing](./testing.md) -- Unit, E2E, database, smoke, and burn-in tests
   - [Unit Tests (Vitest)](./testing.md#unit-tests-vitest)
   - [E2E Tests (Playwright)](./testing.md#e2e-tests-playwright)
@@ -52,6 +58,7 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Burn-In (Flaky Detection)](./testing.md#burn-in-flaky-detection)
   - [CI Test Pipeline](./testing.md#ci-test-pipeline)
   - [Priority Tags](./testing.md#priority-tags)
+  - [ATDD (Acceptance Test-Driven Development)](./testing.md#atdd-acceptance-test-driven-development)
 - [Code Style](./code-style.md) -- TypeScript, ESLint, Prettier, naming conventions
   - [TypeScript](./code-style.md#typescript)
   - [ESLint](./code-style.md#eslint)
@@ -63,10 +70,14 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Applying Migrations](./database-migrations.md#applying-migrations)
   - [Generating TypeScript Types](./database-migrations.md#generating-typescript-types)
   - [CI Migration Validation](./database-migrations.md#ci-migration-validation)
+  - [Database Tests](./database-migrations.md#database-tests)
+  - [Seed Data](./database-migrations.md#seed-data)
+  - [Supabase Configuration](./database-migrations.md#supabase-configuration-configtoml)
 - [Deployment](./deployment.md) -- CI/CD workflows, GitHub Pages, health checks
   - [Automatic Deployment](./deployment.md#automatic-deployment)
   - [CI/CD Workflows](./deployment.md#cicd-workflows)
   - [Required GitHub Secrets](./deployment.md#required-github-secrets)
   - [Manual Deployment](./deployment.md#manual-deployment)
   - [Post-Deploy Verification](./deployment.md#post-deploy-verification)
+  - [GitHub Pages Configuration](./deployment.md#github-pages-configuration)
 - [Troubleshooting](./troubleshooting.md) -- Common issues and solutions

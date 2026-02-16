@@ -1,14 +1,17 @@
-# State Management
+# State Management Documentation
+
+Zustand-based state management architecture for the **My-Love** PWA with 10 slices, localStorage persistence, and custom serialization.
 
 ## Table of Contents
 
-1. [Overview](overview.md) -- Architecture philosophy and slice composition pattern
-2. [Store Configuration](store-configuration.md) -- `useAppStore.ts` setup, persist middleware, custom storage
-3. [Slice Details](slice-details.md) -- All 10 slices: state fields, actions, cross-slice dependencies
-4. [Data Flow](data-flow.md) -- Component -> Hook -> Store -> Service -> API flow
-5. [Persistence Strategy](persistence-strategy.md) -- localStorage vs IndexedDB, what gets persisted where
-6. [React Hooks](react-hooks.md) -- Custom hooks that wrap store access
-7. [Direct Store Access Pattern](direct-store-access-pattern.md) -- Selector patterns for optimal re-renders
+1. [Store Configuration](./01-zustand-store-configuration.md) — Store creation, persist config, Map serialization, corruption recovery
+2. [Slice Details](./02-slice-details.md) — All 10 slices: state shapes, actions, validation, persistence
+3. [Cross-Slice Dependencies](./03-cross-slice-dependencies.md) — Dependency graph, initialization coordination
+4. [Data Flow Patterns](./04-data-flow.md) — 6 patterns: offline-first, online-first, realtime, cache, sync, hydration
+5. [Persistence Strategy](./05-persistence-strategy.md) — localStorage vs IndexedDB, quota monitoring
+6. [React Hooks](./06-react-hooks.md) — All 12 custom hooks with signatures and behavior
+7. [Direct Store Access](./07-direct-store-access.md) — getState(), setState(), subscribe(), E2E support
+8. [Index](./08-state-management-index.md) — Quick reference with file locations
 
 ## Quick Reference
 

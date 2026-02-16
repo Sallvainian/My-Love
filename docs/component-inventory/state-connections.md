@@ -83,13 +83,14 @@ Components access the store in two ways:
 
 **File**: `src/stores/slices/moodSlice.ts`
 
-**State**: `moods`, `syncStatus`
-**Actions**: `addMoodEntry`, `getMoodForDate`, `loadMoods`, `syncPendingMoods`, `updateSyncStatus`
+**State**: `moods`, `partnerMoods`, `syncStatus`
+**Actions**: `addMoodEntry`, `getMoodForDate`, `loadMoods`, `syncPendingMoods`, `updateSyncStatus`, `fetchPartnerMoods`, `getPartnerMoodForDate`
 
 | Component | Fields Used | Access Pattern |
 |-----------|-------------|----------------|
 | `App` | `syncPendingMoods`, `updateSyncStatus`, `syncStatus` | Direct destructure |
 | `MoodTracker` | `addMoodEntry`, `getMoodForDate`, `syncStatus`, `loadMoods`, `syncPendingMoods` | Direct |
+| `PartnerMoodView` | `partnerMoods`, `fetchPartnerMoods`, `syncStatus` | Direct (combined with PartnerSlice selectors) |
 
 ## InteractionsSlice
 
@@ -107,12 +108,12 @@ Components access the store in two ways:
 
 **File**: `src/stores/slices/partnerSlice.ts`
 
-**State**: `partner`, `isLoadingPartner`, `partnerMoods`, `sentRequests`, `receivedRequests`, `searchResults`, `isSearching`
-**Actions**: `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest`, `fetchPartnerMoods`
+**State**: `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `isLoadingRequests`, `searchResults`, `isSearching`
+**Actions**: `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest`, `hasPartner`
 
 | Component | Fields Used | Access Pattern |
 |-----------|-------------|----------------|
-| `PartnerMoodView` | `partner`, `isLoadingPartner`, `partnerMoods`, `fetchPartnerMoods`, `syncStatus`, `sentRequests`, `receivedRequests`, `searchResults`, `isSearching`, `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest` | Direct |
+| `PartnerMoodView` | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `searchResults`, `isSearching`, `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest` | Direct (combined with MoodSlice selectors) |
 | `ScriptureOverview` | `partner`, `isLoadingPartner`, `loadPartner` | `useShallow` |
 | `SoloReadingFlow` | `partner`, `isLoadingPartner` | `useShallow` |
 

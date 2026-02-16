@@ -1,0 +1,26 @@
+# Story 2.3: Daily Prayer Report — Send & View
+
+## Table of Contents
+
+- [Story 2.3: Daily Prayer Report — Send & View](#table-of-contents)
+  - [Story](./story.md)
+  - [Acceptance Criteria](./acceptance-criteria.md)
+  - [Tasks / Subtasks](./tasks-subtasks.md)
+  - [Dev Notes](./dev-notes.md)
+    - [What Already Exists (DO NOT Recreate)](./dev-notes.md#what-already-exists-do-not-recreate)
+    - [Architecture Constraints](./dev-notes.md#architecture-constraints)
+    - [UX / Design Requirements](./dev-notes.md#ux-design-requirements)
+    - [File Locations](./dev-notes.md#file-locations)
+    - [Testing Requirements](./dev-notes.md#testing-requirements)
+    - [Accessibility Checklist](./dev-notes.md#accessibility-checklist)
+    - [Previous Story Intelligence (Stories 2.1 & 2.2)](./dev-notes.md#previous-story-intelligence-stories-21-22)
+    - [Git Intelligence](./dev-notes.md#git-intelligence)
+    - [Cross-Story Context](./dev-notes.md#cross-story-context)
+    - [Project Structure Notes](./dev-notes.md#project-structure-notes)
+    - [References](./dev-notes.md#references)
+  - [Dev Agent Record](./dev-agent-record.md)
+    - [Agent Model Used](./dev-agent-record.md#agent-model-used)
+    - [Debug Log References](./dev-agent-record.md#debug-log-references)
+    - [Completion Notes List](./dev-agent-record.md#completion-notes-list)
+    - [File List](./dev-agent-record.md#file-list)
+    - [Change Log](./dev-agent-record.md#change-log)
