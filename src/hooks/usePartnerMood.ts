@@ -37,30 +37,36 @@ export interface UsePartnerMoodResult {
  */
 export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
   const [partnerMood, setPartnerMood] = useState<SupabaseMoodRecord | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(Boolean(partnerId));
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<
     'connecting' | 'connected' | 'disconnected'
-  >('connecting');
+  >(partnerId ? 'connecting' : 'disconnected');
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Early bailout when partnerId is empty; setting loading false is necessary for correct UI state
   useEffect(() => {
     if (!partnerId) {
+      setPartnerMood(null);
+      setError(null);
       setIsLoading(false);
+      setConnectionStatus('disconnected');
       return;
     }
 
+    let isMounted = true;
     let unsubscribe: (() => void) | null = null;
 
     // Load initial partner mood
     async function loadPartnerMood() {
       try {
+        setIsLoading(true);
         setError(null);
         const mood = await moodSyncService.getLatestPartnerMood(partnerId);
+        if (!isMounted) return;
         setPartnerMood(mood);
         setIsLoading(false);
       } catch (err) {
         console.error('[usePartnerMood] Failed to load partner mood:', err);
+        if (!isMounted) return;
         setError('Unable to load partner mood. Please try again later.');
         setIsLoading(false);
       }
@@ -69,7 +75,8 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     // Subscribe to partner mood updates via Broadcast
     async function subscribeToPartnerMoodUpdates() {
       try {
-        unsubscribe = await moodSyncService.subscribeMoodUpdates(
+        setConnectionStatus('connecting');
+        const unsubscribeFn = await moodSyncService.subscribeMoodUpdates(
           (newMood) => {
             // Only update if this mood is from our partner
             if (newMood.user_id === partnerId) {
@@ -89,8 +96,15 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
             }
           }
         );
+
+        if (!isMounted) {
+          unsubscribeFn();
+          return;
+        }
+        unsubscribe = unsubscribeFn;
       } catch (err) {
         console.error('[usePartnerMood] Failed to subscribe to mood updates:', err);
+        if (!isMounted) return;
         setConnectionStatus('disconnected');
         setError('Unable to connect to real-time updates.');
       }
@@ -102,6 +116,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
 
     // Cleanup on unmount
     return () => {
+      isMounted = false;
       if (unsubscribe) {
         unsubscribe();
       }

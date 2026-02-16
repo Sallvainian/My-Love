@@ -480,6 +480,79 @@ describe('scriptureReadingService — cache-first & write-through', () => {
   });
 
   // ------------------------------------------------------------------
+  // updateSessionBookmarkSharing — server + cache sync
+  // ------------------------------------------------------------------
+  describe('updateSessionBookmarkSharing', () => {
+    it('should update share_with_partner in Supabase and local cache for session bookmarks', async () => {
+      const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+      await db.put('scripture-bookmarks', {
+        id: BOOKMARK_UUID,
+        sessionId: SESSION_UUID,
+        stepIndex: 5,
+        userId: USER_UUID,
+        shareWithPartner: false,
+        createdAt: new Date(),
+      });
+      await db.put('scripture-bookmarks', {
+        id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        sessionId: SESSION_UUID,
+        stepIndex: 6,
+        userId: 'ffffffff-1111-4222-8333-444444444444',
+        shareWithPartner: false,
+        createdAt: new Date(),
+      });
+      db.close();
+
+      const updateFn = vi.fn();
+      const eqSessionFn = vi.fn();
+      const eqUserFn = vi.fn();
+      eqUserFn.mockResolvedValue({ data: null, error: null });
+      eqSessionFn.mockReturnValue({ eq: eqUserFn });
+      updateFn.mockReturnValue({ eq: eqSessionFn });
+      vi.mocked(supabase.from).mockReturnValue({
+        update: updateFn,
+      } as unknown as ReturnType<typeof supabase.from>);
+
+      await scriptureReadingService.updateSessionBookmarkSharing(SESSION_UUID, USER_UUID, true);
+
+      expect(supabase.from).toHaveBeenCalledWith('scripture_bookmarks');
+      expect(updateFn).toHaveBeenCalledWith({ share_with_partner: true });
+      expect(eqSessionFn).toHaveBeenCalledWith('session_id', SESSION_UUID);
+      expect(eqUserFn).toHaveBeenCalledWith('user_id', USER_UUID);
+
+      const dbAfter = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
+      const ownBookmark = await dbAfter.get('scripture-bookmarks', BOOKMARK_UUID);
+      const otherBookmark = await dbAfter.get(
+        'scripture-bookmarks',
+        'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+      );
+      dbAfter.close();
+
+      expect(ownBookmark!.shareWithPartner).toBe(true);
+      expect(otherBookmark!.shareWithPartner).toBe(false);
+    });
+
+    it('should throw ScriptureError when Supabase update fails', async () => {
+      const updateFn = vi.fn();
+      const eqSessionFn = vi.fn();
+      const eqUserFn = vi.fn();
+      eqUserFn.mockResolvedValue({
+        data: null,
+        error: { message: 'Update failed', code: '500', details: '', hint: '' },
+      });
+      eqSessionFn.mockReturnValue({ eq: eqUserFn });
+      updateFn.mockReturnValue({ eq: eqSessionFn });
+      vi.mocked(supabase.from).mockReturnValue({
+        update: updateFn,
+      } as unknown as ReturnType<typeof supabase.from>);
+
+      await expect(
+        scriptureReadingService.updateSessionBookmarkSharing(SESSION_UUID, USER_UUID, true)
+      ).rejects.toMatchObject({ code: 'SYNC_FAILED' });
+    });
+  });
+
+  // ------------------------------------------------------------------
   // toggleBookmark — toggle behavior
   // ------------------------------------------------------------------
   describe('toggleBookmark', () => {

@@ -12,7 +12,8 @@ import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { applyTheme } from './utils/themes';
 import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
-import { authService } from './api/authService';
+import { signOut } from './api/auth/actionService';
+import { getSession, onAuthStateChange } from './api/auth/sessionService';
 import type { Session } from '@supabase/supabase-js';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
@@ -52,8 +53,8 @@ const PhotoCarousel = lazy(() =>
 
 // Loading spinner component for Suspense fallback
 const LoadingSpinner = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+  <div className="flex min-h-screen items-center justify-center">
+    <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-pink-500"></div>
   </div>
 );
 
@@ -78,6 +79,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [needsDisplayName, setNeedsDisplayName] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Helper function to check if welcome splash should be shown
   const shouldShowWelcome = (): boolean => {
@@ -107,6 +109,22 @@ function App() {
 
   // Story 1.5: Sync completion feedback state (AC-1.5.4)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+
+  const handleSignOut = async () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('[App] Sign-out failed:', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   // Helper to get route path without base (handles both dev and production)
   const getRoutePath = (pathname: string): string => {
@@ -174,7 +192,7 @@ function App() {
 
     const checkAuth = async () => {
       try {
-        const currentSession = await authService.getSession();
+        const currentSession = await getSession();
         if (isMounted) {
           setSession(currentSession);
           setAuthLoading(false);
@@ -197,7 +215,7 @@ function App() {
     checkAuth();
 
     // Listen for auth state changes
-    const unsubscribe = authService.onAuthStateChange((newSession) => {
+    const unsubscribe = onAuthStateChange((newSession) => {
       if (isMounted) {
         setSession(newSession);
 
@@ -397,9 +415,9 @@ function App() {
   // Story 6.7: Show loading screen while checking authentication
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">💕</div>
+          <div className="mb-4 animate-pulse text-6xl">💕</div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -432,7 +450,7 @@ function App() {
           onComplete={() => {
             setNeedsDisplayName(false);
             // Refresh session to get updated user_metadata
-            authService.getSession().then((refreshedSession) => {
+            getSession().then((refreshedSession) => {
               if (refreshedSession) {
                 setSession(refreshedSession);
               }
@@ -446,9 +464,9 @@ function App() {
   // Show app loading screen while initializing data
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">💕</div>
+          <div className="mb-4 animate-pulse text-6xl">💕</div>
           <p className="text-gray-600">Loading your data...</p>
         </div>
       </div>
@@ -510,12 +528,12 @@ function App() {
       <main id="main-content">
         {/* Home view - inline, not lazy-loaded, always works offline */}
         {currentView === 'home' && (
-          <div className="max-w-4xl mx-auto px-4 py-4 space-y-6">
+          <div className="mx-auto max-w-4xl space-y-6 px-4 py-4">
             {/* Time Together - replaces Day 37 Together header */}
             <TimeTogether />
 
             {/* Countdown timers grid: Birthdays (left) | Wedding+Visits (right) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* Left column - Birthdays */}
               <div className="space-y-4">
                 <BirthdayCountdown birthday={RELATIONSHIP_DATES.birthdays.frank} />
@@ -569,7 +587,14 @@ function App() {
       </main>
 
       {/* Bottom navigation - always visible, outside error boundary */}
-      <BottomNavigation currentView={currentView} onViewChange={setView} />
+      <BottomNavigation
+        currentView={currentView}
+        onViewChange={setView}
+        onSignOut={() => {
+          void handleSignOut();
+        }}
+        signOutDisabled={isSigningOut}
+      />
 
       {/* Photo upload modal - Story 4.1 (lazy loaded) */}
       <Suspense fallback={null}>
@@ -580,7 +605,6 @@ function App() {
       <Suspense fallback={null}>
         <PhotoCarousel />
       </Suspense>
-
     </div>
   );
 }

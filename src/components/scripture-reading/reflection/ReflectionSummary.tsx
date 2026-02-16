@@ -25,10 +25,11 @@ interface BookmarkedVerse {
   verseText: string;
 }
 
-interface ReflectionSummarySubmission {
+export interface ReflectionSummarySubmission {
   standoutVerses: number[];
   rating: number;
   notes: string;
+  shareBookmarkedVerses: boolean;
 }
 
 interface ReflectionSummaryProps {
@@ -53,6 +54,7 @@ export function ReflectionSummary({
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
+  const [shareBookmarkedVerses, setShareBookmarkedVerses] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const ratingRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -118,8 +120,9 @@ export function ReflectionSummary({
       standoutVerses: Array.from(selectedVerses).sort((a, b) => a - b),
       rating: selectedRating!,
       notes,
+      shareBookmarkedVerses,
     });
-  }, [disabled, isComplete, selectedVerses, selectedRating, notes, onSubmit]);
+  }, [disabled, isComplete, selectedVerses, selectedRating, notes, onSubmit, shareBookmarkedVerses]);
 
   const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNotes(e.target.value);
@@ -197,6 +200,22 @@ export function ReflectionSummary({
           You didn&apos;t mark any verses — that&apos;s okay
         </p>
       )}
+
+      <label
+        className="flex items-center justify-between rounded-2xl border border-purple-200/60 bg-white/70 px-4 py-3 text-sm text-purple-800"
+        data-testid="scripture-share-bookmarks-toggle-label"
+      >
+        <span>Share bookmarked verses with your partner</span>
+        <input
+          type="checkbox"
+          checked={shareBookmarkedVerses}
+          onChange={(e) => setShareBookmarkedVerses(e.target.checked)}
+          disabled={disabled}
+          aria-label="Share bookmarked verses with your partner"
+          data-testid="scripture-share-bookmarks-toggle"
+          className="h-5 w-5 accent-purple-600"
+        />
+      </label>
 
       {/* Session Rating Scale */}
       <div className="flex flex-col items-center space-y-3">
