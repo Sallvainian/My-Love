@@ -442,7 +442,10 @@ export async function completeAllStepsToReflectionSummary(
  *
  * @param page - Playwright page
  */
-export async function submitReflectionSummary(page: Page): Promise<void> {
+export async function submitReflectionSummary(
+  page: Page,
+  options?: { shareBookmarkedVerses?: boolean }
+): Promise<void> {
   await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
 
   // Select a standout verse (step 0)
@@ -458,6 +461,11 @@ export async function submitReflectionSummary(page: Page): Promise<void> {
     'aria-checked',
     'true'
   );
+
+  if (options?.shareBookmarkedVerses) {
+    await page.getByTestId('scripture-share-bookmarks-toggle').click();
+    await expect(page.getByTestId('scripture-share-bookmarks-toggle')).toBeChecked();
+  }
 
   // Submit the reflection summary — wait for server response
   const responsePromise = page.waitForResponse(

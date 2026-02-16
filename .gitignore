@@ -47,7 +47,7 @@ tests/.auth/
 .claude
 !.claude/commands/
 !.claude/rules/
-.bmad
+_bmad/
 !.bmad/
 .code
 
@@ -58,7 +58,6 @@ tests/.auth/
 .opencode/
 .codex/
 .contextstream/
-AGENTS.md
 
 # Claude OS (auto-generated, user-specific)
 .claude-os/tree_sitter_cache.db
@@ -94,4 +93,5 @@ skills/
 
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
-CLAUDE.md
+.todos/
+.sidecar/
