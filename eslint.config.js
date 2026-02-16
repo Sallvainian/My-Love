@@ -63,6 +63,45 @@ export default tseslint.config(
       'no-useless-catch': 'off',
     },
   },
+  // React code guardrails for store access and submission controls
+  {
+    files: ['src/components/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'useAppStore',
+          property: 'getState',
+          message:
+            'Do not use useAppStore.getState() in React code. Use useAppStore with a useShallow selector.',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "VariableDeclarator[id.name='getState'][init.object.name='useAppStore'][init.property.name='getState']",
+          message:
+            'Do not assign getState from useAppStore. Use useAppStore with a useShallow selector.',
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='data-testid'][value.value='scripture-message-send-btn']):not(:has(JSXAttribute[name.name='disabled']))",
+          message: 'Submission controls must include a disabled prop.',
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='data-testid'][value.value='scripture-reflection-continue']):not(:has(JSXAttribute[name.name='disabled']))",
+          message: 'Submission controls must include a disabled prop.',
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='data-testid'][value.value='scripture-reflection-summary-continue']):not(:has(JSXAttribute[name.name='disabled']))",
+          message: 'Submission controls must include a disabled prop.',
+        },
+      ],
+    },
+  },
   // Special config for CommonJS files
   {
     files: ['**/*.cjs'],
@@ -90,6 +129,40 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
+      'no-restricted-syntax': 'off', // Tests may inspect store state directly
+      'no-restricted-properties': 'off', // Tests may inspect store state directly
+    },
+  },
+  // Scripture containers must not import Supabase clients directly
+  {
+    files: ['src/components/scripture-reading/containers/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@supabase/supabase-js',
+              message:
+                'Container components must use Zustand slice actions instead of direct Supabase imports.',
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                '**/api/supabaseClient',
+                '@/api/supabaseClient',
+                '**/services/*',
+                '@/services/*',
+                '!**/services/scriptureReadingService',
+                '!@/services/scriptureReadingService',
+              ],
+              message:
+                'Container components must use Zustand slice actions instead of importing Supabase or service modules directly.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Scripture Reading feature - strict no-explicit-any enforcement
