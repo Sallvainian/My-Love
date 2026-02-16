@@ -93,6 +93,6 @@ retro_action_items:
     owner: Amelia (Dev)
     source: epic-2-retro-2026-02-10
   p4-execute-retro-actions-immediately:
-    status: pending
+    status: done
     owner: Bob (SM)
     source: epic-2-retro-2026-02-10

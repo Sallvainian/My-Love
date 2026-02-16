@@ -201,3 +201,4 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 - Catch blocks must never be empty. In scripture code, catch blocks must call `handleScriptureError()` or re-throw; outside scripture code, re-throw or map to the feature's error handler.
 - For scripture-reading container code and new architecture-conforming work, do not import `supabase` or service modules directly; go through Zustand slice actions (legacy exception: `scriptureReadingService` adapter until refactor).
 - New scope discovered during development must be captured as a follow-up story. Do not reopen a story in review unless there is a critical regression or security fix approved by the owner.
+- After a retrospective, all action items (CLAUDE.md rules, documentation updates, process changes) must be executed in the same session — not deferred to "before next epic." Track each action item in `sprint-status.yaml` under `retro_action_items` with status tracking.
