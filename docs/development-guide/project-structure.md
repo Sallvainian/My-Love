@@ -8,6 +8,9 @@ Annotated layout of the full repository.
 src/
   api/                              # Supabase API integration layer
     supabaseClient.ts               # Supabase client singleton (createClient with VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
+    auth/                           # Authentication service modules
+      sessionService.ts             # getSession(), onAuthStateChange() -- session management
+      actionService.ts              # signOut() and other auth actions
     moodSyncService.ts              # Mood data sync between IndexedDB and Supabase
     interactionService.ts           # Poke/kiss/fart partner interaction API calls
     errorHandlers.ts                # Centralized error handling utilities for API responses
@@ -15,16 +18,31 @@ src/
   assets/                           # Static assets (SVGs, images, fonts)
 
   components/                       # React components organized by feature domain
+    AdminPanel/                     # Admin interface (lazy-loaded, accessed via /admin route)
     DailyMessage/                   # Main message card with daily rotation logic
+    DisplayNameSetup/               # Display name setup modal for new OAuth signups
+    ErrorBoundary/                  # Top-level error boundary (wraps LoginScreen, WelcomeSplash, AdminPanel)
+    LoginScreen/                    # Email/password authentication UI
     love-notes/                     # Real-time chat messaging between partners
-    MoodTracker/                    # Mood logging with emoji selection (5-emoji scale)
-    PartnerMoodView/                # Partner mood real-time display via Supabase Realtime
+    MoodTracker/                    # Mood logging with emoji selection (12 emoji options)
+    Navigation/                     # Bottom navigation bar (BottomNavigation component)
+    PartnerMoodView/                # Partner mood real-time display via Supabase Realtime + poke/kiss/fart
+    PhotoCarousel/                  # Photo carousel viewer (lazy-loaded modal)
+    PhotoGallery/                   # Photo grid with lazy loading (react-window) and Supabase Storage
+    PhotoUpload/                    # Photo upload dialog (lazy-loaded modal)
     PokeKissInterface/              # Playful partner interactions (poke, kiss, fart)
-    PhotoGallery/                   # Photo grid with lazy loading and Supabase Storage
+    RelationshipTimers/             # TimeTogether, BirthdayCountdown, EventCountdown components
     scripture-reading/              # Scripture reading flow (solo/together modes, reflection)
+      containers/                   # Container components (ESLint enforces no direct Supabase imports)
+    shared/                         # Shared UI components
+      NetworkStatusIndicator.tsx    # Offline/connecting banner
+      SyncToast.tsx                 # Background sync completion feedback toast
+    ViewErrorBoundary/              # Per-view error boundary (preserves BottomNavigation on errors)
+    WelcomeSplash/                  # Welcome splash screen (lazy-loaded, 60-minute display interval)
 
   config/
     constants.ts                    # APP_CONFIG (partner name, start date), USER_ID, PARTNER_NAME
+    relationshipDates.ts            # RELATIONSHIP_DATES (birthdays, wedding, visits)
 
   constants/                        # Additional constant values
 
@@ -33,11 +51,14 @@ src/
     defaultMessagesLoader.ts        # Lazy loader for default messages (code splitting)
     scriptureSteps.ts               # 17 scripture steps with NKJV verses and response prayers
 
-  hooks/                            # Custom React hooks (useScriptureBroadcast, etc.)
+  hooks/                            # Custom React hooks
+    useScriptureBroadcast.ts        # Supabase Realtime hook for scripture together mode
 
   services/
     BaseIndexedDBService.ts         # Base CRUD class for IndexedDB operations
     dbSchema.ts                     # IndexedDB schema definition (version 5)
+    migrationService.ts             # LocalStorage to IndexedDB migration (custom messages)
+    scriptureReadingService.ts      # Scripture reading API adapter (legacy Supabase exception)
     storage.ts                      # IndexedDB and localStorage utilities
 
   stores/
@@ -45,9 +66,9 @@ src/
     slices/
       appSlice.ts                   # App-level state (loading, errors, initialization)
       settingsSlice.ts              # User settings and preferences
-      navigationSlice.ts            # Navigation and routing state
+      navigationSlice.ts            # Navigation and routing state (setView, currentView)
       messagesSlice.ts              # Daily love message selection and rotation
-      moodSlice.ts                  # Mood tracking entries and history
+      moodSlice.ts                  # Mood tracking entries, history, sync
       interactionsSlice.ts          # Partner interactions (pokes, kisses, farts)
       partnerSlice.ts               # Partner data, status, and linking
       notesSlice.ts                 # Love notes chat messages
@@ -63,13 +84,18 @@ src/
     database.types.ts               # Auto-generated from Supabase schema (DO NOT EDIT MANUALLY)
 
   utils/
+    backgroundSync.ts               # Background sync utilities (isServiceWorkerSupported check)
     messageRotation.ts              # Daily message selection algorithm
-    themes.ts                       # Theme configurations (Sunset, Ocean, Lavender, Rose)
+    storageMonitor.ts               # Storage quota monitoring (logStorageQuota, development mode)
+    themes.ts                       # Theme configurations (Sunset, Ocean, Lavender, Rose) + applyTheme()
     dateHelpers.ts                  # Date formatting and calculation utilities
 
   validation/
     schemas.ts                      # Zod validation schemas for runtime data validation
     errorMessages.ts                # User-facing validation error messages
+
+  main.tsx                          # App entry point: StrictMode, LazyMotion (domAnimation), SW registration
+  App.tsx                           # Root component: auth gate, routing, lazy loading, sync orchestration
 ```
 
 ## Tests (`tests/`)
@@ -132,10 +158,13 @@ Key `config.toml` settings:
 | Postgres version | `17` |
 | Studio port | `54323` |
 | Inbucket (email) port | `54324` |
+| Analytics port | `54327` |
 | Storage file size limit | `50MiB` |
 | Auth: email/password | Enabled |
 | Auth: anonymous sign-ins | Disabled |
+| Auth: email confirmations | Disabled (development) |
 | Realtime | Enabled |
+| Edge Runtime | Deno 2 |
 
 ## Scripts (`scripts/`)
 
@@ -150,6 +179,7 @@ scripts/
   clear-caches.js                   # Browser console script to clear all caches (IndexedDB, localStorage, SW)
   validate-messages.cjs             # 365-message library validation (count, categories, duplicates)
   perf-bundle-report.mjs            # Bundle size analysis (raw + gzip, generates Markdown report)
+  inspect-db.sh                     # Database inspection utility for local Supabase
 ```
 
 ## CI/CD (`.github/`)

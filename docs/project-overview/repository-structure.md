@@ -34,6 +34,7 @@ My-Love/
 |   |-- ci-local.sh                   # Mirror CI pipeline locally (lint, unit, E2E, burn-in)
 |   |-- clear-caches.js              # Browser console script to clear all caches
 |   |-- dev-with-cleanup.sh          # Dev server with signal trapping and process cleanup
+|   |-- inspect-db.sh               # Database inspection utility for local Supabase
 |   |-- perf-bundle-report.mjs       # Bundle size analysis (raw + gzip, generates Markdown report)
 |   |-- post-deploy-check.cjs        # Live site health check (HTTP, manifest, service worker)
 |   |-- smoke-tests.cjs             # Pre-deploy build validation (dist/ structure, manifests, bundles)
@@ -43,32 +44,50 @@ My-Love/
 |-- src/
 |   |-- api/                         # Supabase API integration layer
 |   |   |-- supabaseClient.ts        # Client singleton
+|   |   |-- auth/                    # Auth service modules (sessionService, actionService)
 |   |   |-- moodSyncService.ts       # Mood sync service
 |   |   |-- interactionService.ts    # Poke/kiss/fart interactions
 |   |   +-- errorHandlers.ts         # Error handling utilities
 |   |-- assets/                      # Static assets (images, fonts)
 |   |-- components/                  # React components organized by feature
+|   |   |-- AdminPanel/              # Admin interface (lazy-loaded, /admin route)
 |   |   |-- DailyMessage/            # Main message card with rotation
+|   |   |-- DisplayNameSetup/        # OAuth display name setup modal
+|   |   |-- ErrorBoundary/           # Top-level error boundary
+|   |   |-- LoginScreen/             # Email/password login UI
 |   |   |-- love-notes/              # Real-time chat messaging
 |   |   |-- MoodTracker/             # Mood logging with emoji selection
-|   |   |-- PartnerMoodView/         # Partner mood real-time display
-|   |   |-- PokeKissInterface/       # Playful partner interactions
+|   |   |-- Navigation/              # Bottom navigation bar
+|   |   |-- PartnerMoodView/         # Partner mood real-time display + poke/kiss/fart
+|   |   |-- PhotoCarousel/           # Photo carousel viewer (lazy-loaded modal)
 |   |   |-- PhotoGallery/            # Photo grid with lazy loading
-|   |   +-- scripture-reading/       # Scripture reading flow (solo/together modes)
+|   |   |-- PhotoUpload/             # Photo upload dialog (lazy-loaded modal)
+|   |   |-- PokeKissInterface/       # Playful partner interactions
+|   |   |-- RelationshipTimers/      # TimeTogether, BirthdayCountdown, EventCountdown
+|   |   |-- scripture-reading/       # Scripture reading flow (solo/together modes)
+|   |   |   +-- containers/          # Container components (ESLint-enforced Supabase import ban)
+|   |   |-- shared/                  # Shared components (NetworkStatusIndicator, SyncToast)
+|   |   |-- ViewErrorBoundary/       # Per-view error boundary (preserves navigation)
+|   |   +-- WelcomeSplash/           # Welcome splash screen (lazy-loaded modal)
 |   |-- config/
-|   |   +-- constants.ts             # Partner name, start date, feature flags (APP_CONFIG)
+|   |   |-- constants.ts             # Partner name, start date, feature flags (APP_CONFIG)
+|   |   +-- relationshipDates.ts     # Birthday, wedding, and visit date configurations
 |   |-- constants/                   # Additional constant values
 |   |-- data/
 |   |   |-- defaultMessages.ts       # 365 pre-written love messages (5 categories, 73 each)
 |   |   |-- defaultMessagesLoader.ts # Lazy loader for default messages
 |   |   +-- scriptureSteps.ts        # 17 scripture steps with NKJV verses and response prayers
 |   |-- hooks/                       # Custom React hooks
+|   |   +-- useScriptureBroadcast.ts # Supabase Realtime hook for scripture together mode
 |   |-- services/
 |   |   |-- BaseIndexedDBService.ts  # Base CRUD class for IndexedDB operations
 |   |   |-- dbSchema.ts             # IndexedDB schema definition (v5)
+|   |   |-- migrationService.ts     # LocalStorage to IndexedDB migration
+|   |   |-- scriptureReadingService.ts # Scripture reading API adapter (legacy exception)
 |   |   +-- storage.ts              # IndexedDB and localStorage utilities
 |   |-- stores/
 |   |   +-- useAppStore.ts          # Zustand store composed from 10 slices
+|   |       +-- slices/             # Individual slice files (10 slices)
 |   |-- sw.ts                        # Custom service worker (InjectManifest strategy)
 |   |-- sw-db.ts                     # Service worker IndexedDB operations (isolated from app code)
 |   |-- sw-types.d.ts                # TypeScript declarations for service worker context
@@ -76,7 +95,9 @@ My-Love/
 |   |   |-- index.ts                # Application TypeScript type definitions
 |   |   +-- database.types.ts       # Auto-generated from Supabase schema (DO NOT EDIT)
 |   |-- utils/
+|   |   |-- backgroundSync.ts       # Background sync utilities (isServiceWorkerSupported)
 |   |   |-- messageRotation.ts      # Daily message selection algorithm
+|   |   |-- storageMonitor.ts       # Storage quota monitoring (development)
 |   |   |-- themes.ts               # Theme configurations
 |   |   +-- dateHelpers.ts          # Date formatting and calculation utilities
 |   +-- validation/
