@@ -9,15 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BottomNavigation } from '../BottomNavigation';
 
-// Mock authService to prevent actual signout
-vi.mock('../../../api/authService', () => ({
-  authService: {
-    signOut: vi.fn(),
-  },
-}));
-
 describe('BottomNavigation', () => {
   const mockOnViewChange = vi.fn();
+  const mockOnSignOut = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,7 +20,11 @@ describe('BottomNavigation', () => {
   describe('Scripture Tab Rendering', () => {
     it('should render Scripture tab', () => {
       render(
-        <BottomNavigation currentView="home" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       expect(screen.getByTestId('nav-scripture')).toBeInTheDocument();
@@ -35,7 +33,11 @@ describe('BottomNavigation', () => {
 
     it('should have correct aria-label for Scripture tab', () => {
       render(
-        <BottomNavigation currentView="home" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       const scriptureButton = screen.getByTestId('nav-scripture');
@@ -46,7 +48,11 @@ describe('BottomNavigation', () => {
   describe('Scripture Tab Navigation', () => {
     it('should call onViewChange with scripture when Scripture tab is clicked', () => {
       render(
-        <BottomNavigation currentView="home" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       const scriptureButton = screen.getByTestId('nav-scripture');
@@ -59,7 +65,11 @@ describe('BottomNavigation', () => {
   describe('Scripture Tab Active State', () => {
     it('should show purple active color when scripture view is active', () => {
       render(
-        <BottomNavigation currentView="scripture" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="scripture"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       const scriptureButton = screen.getByTestId('nav-scripture');
@@ -68,7 +78,11 @@ describe('BottomNavigation', () => {
 
     it('should show gray inactive color when scripture view is not active', () => {
       render(
-        <BottomNavigation currentView="home" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       const scriptureButton = screen.getByTestId('nav-scripture');
@@ -79,7 +93,11 @@ describe('BottomNavigation', () => {
   describe('All Navigation Tabs', () => {
     it('should render all expected navigation tabs', () => {
       render(
-        <BottomNavigation currentView="home" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       expect(screen.getByTestId('nav-home')).toBeInTheDocument();
@@ -93,7 +111,11 @@ describe('BottomNavigation', () => {
 
     it('should only highlight the current view', () => {
       render(
-        <BottomNavigation currentView="scripture" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="scripture"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       // Scripture should be active (purple)
@@ -109,13 +131,49 @@ describe('BottomNavigation', () => {
   describe('Touch Target Accessibility', () => {
     it('should have minimum touch target size for Scripture tab', () => {
       render(
-        <BottomNavigation currentView="home" onViewChange={mockOnViewChange} />
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
       );
 
       const scriptureButton = screen.getByTestId('nav-scripture');
       // Check for min-w and min-h classes (48px minimum per UX spec)
       expect(scriptureButton).toHaveClass('min-w-[48px]');
       expect(scriptureButton).toHaveClass('min-h-[48px]');
+    });
+  });
+
+  describe('Logout Action', () => {
+    it('should call onSignOut when logout is clicked', () => {
+      render(
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('nav-logout'));
+      expect(mockOnSignOut).toHaveBeenCalledTimes(1);
+    });
+
+    it('should disable logout action when signOutDisabled is true', () => {
+      render(
+        <BottomNavigation
+          currentView="home"
+          onViewChange={mockOnViewChange}
+          onSignOut={mockOnSignOut}
+          signOutDisabled
+        />
+      );
+
+      const logoutButton = screen.getByTestId('nav-logout');
+      expect(logoutButton).toBeDisabled();
+
+      fireEvent.click(logoutButton);
+      expect(mockOnSignOut).not.toHaveBeenCalled();
     });
   });
 });

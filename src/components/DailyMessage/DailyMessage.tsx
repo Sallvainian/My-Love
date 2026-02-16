@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { Heart, Share2, RefreshCw, AlertCircle } from 'lucide-react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { APP_CONFIG } from '../../config/constants';
+import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
 import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
 
@@ -28,15 +29,32 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [direction, setDirection] = useState<'left' | 'right'>('left'); // Story 3.2: Track swipe direction
 
-  // Memoize random positions once on mount (empty deps). Positions remain
-  // fixed for entire session to provide consistent floating hearts animation.
+  const floatingHeartCount = ANIMATION_VALUES.FLOATING_HEARTS_COUNT;
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
+
+  // Memoize deterministic positions once per viewport width. Positions stay
+  // stable for consistent floating hearts animation.
   const heartPositions = useMemo(
-    () =>
-      Array.from({ length: ANIMATION_VALUES.FLOATING_HEARTS_COUNT }, () => ({
-        initialX: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400),
-        animateX: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400),
-      })),
-    []
+    () => {
+      const initialPositions = generateDeterministicNumbers(
+        'daily-message-heart-initial',
+        floatingHeartCount,
+        0,
+        viewportWidth
+      );
+      const animatePositions = generateDeterministicNumbers(
+        'daily-message-heart-animate',
+        floatingHeartCount,
+        0,
+        viewportWidth
+      );
+
+      return initialPositions.map((initialX, index) => ({
+        initialX,
+        animateX: animatePositions[index],
+      }));
+    },
+    [floatingHeartCount, viewportWidth]
   );
 
   // Check if current message is favorited (source of truth: messageHistory.favoriteIds)

@@ -24,8 +24,8 @@ import {
 } from '../../support/helpers';
 import type { Page } from '@playwright/test';
 
-async function saveSoloSessionAtStep(page: Page, step: number): Promise<void> {
-  await startSoloSession(page);
+async function saveSoloSessionAtStep(page: Page, step: number): Promise<string> {
+  const sessionId = await startSoloSession(page);
 
   for (let i = 1; i < step; i++) {
     await advanceOneStep(page);
@@ -36,9 +36,37 @@ async function saveSoloSessionAtStep(page: Page, step: number): Promise<void> {
   await page.getByTestId('save-and-exit-button').click();
   await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
-  // Re-open without fresh=true so resume behavior is exercised.
-  await page.goto('/scripture');
-  await expect(page.getByTestId('scripture-overview')).toBeVisible();
+  return sessionId;
+}
+
+async function clearClientScriptureCache(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    localStorage.removeItem('my-love-storage');
+
+    const factory = indexedDB as IDBFactory & {
+      databases?: () => Promise<Array<{ name?: string }>>;
+    };
+
+    const dbNames = new Set<string>(['my-love-db']);
+    if (typeof factory.databases === 'function') {
+      const databases = await factory.databases();
+      for (const db of databases) {
+        if (db.name) dbNames.add(db.name);
+      }
+    }
+
+    await Promise.all(
+      [...dbNames].map(
+        (dbName) =>
+          new Promise<void>((resolve) => {
+            const request = indexedDB.deleteDatabase(dbName);
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+            request.onblocked = () => resolve();
+          })
+      )
+    );
+  });
 }
 
 test.describe('Scripture Navigation & Overview', () => {
@@ -211,9 +239,41 @@ test.describe('Scripture Navigation & Overview', () => {
   test.describe('P1-008: Resume prompt for incomplete session', () => {
     test('should show resume prompt with correct step number', async ({
       page,
+      supabaseAdmin,
     }) => {
       // GIVEN: User has an incomplete Solo session at step 7
-      await saveSoloSessionAtStep(page, 7);
+      const sessionId = await saveSoloSessionAtStep(page, 7);
+      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('user1_id')
+        .eq('id', sessionId)
+        .single();
+      expect(targetSessionError).toBeNull();
+
+      // Isolate this test's resume candidate for the worker user.
+      const { error: isolateSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ status: 'abandoned' })
+        .eq('user1_id', targetSession!.user1_id)
+        .eq('mode', 'solo')
+        .eq('status', 'in_progress')
+        .neq('id', sessionId);
+      expect(isolateSessionError).toBeNull();
+
+      // Stabilize active-session selection under parallel workers by making
+      // this test's saved session the newest candidate for resume lookup.
+      const { error: prioritizeSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .eq('id', sessionId);
+      expect(prioritizeSessionError).toBeNull();
+
+      // Clear client-side cache so active-session lookup re-reads from server.
+      await clearClientScriptureCache(page);
+
+      // Re-open once after prioritize update so session check reads the target row.
+      await page.goto('/scripture');
+      await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
       // WHEN: The overview page loads
       // THEN: Resume prompt is displayed
@@ -237,23 +297,71 @@ test.describe('Scripture Navigation & Overview', () => {
   test.describe('P1-009: Start fresh clears saved state', () => {
     test('should clear saved state and begin new session', async ({
       page,
+      supabaseAdmin,
     }) => {
       // GIVEN: User has an incomplete session and sees the resume prompt
-      await saveSoloSessionAtStep(page, 5);
+      const sessionId = await saveSoloSessionAtStep(page, 5);
+      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('user1_id')
+        .eq('id', sessionId)
+        .single();
+      expect(targetSessionError).toBeNull();
+
+      // Isolate this test's resume candidate for the worker user.
+      const { error: isolateSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ status: 'abandoned' })
+        .eq('user1_id', targetSession!.user1_id)
+        .eq('mode', 'solo')
+        .eq('status', 'in_progress')
+        .neq('id', sessionId);
+      expect(isolateSessionError).toBeNull();
+
+      // Stabilize active-session selection under parallel workers by making
+      // this test's saved session the newest candidate for resume lookup.
+      const { error: prioritizeSessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .eq('id', sessionId);
+      expect(prioritizeSessionError).toBeNull();
+
+      // Clear client-side cache so active-session lookup re-reads from server.
+      await clearClientScriptureCache(page);
+
+      // Re-open once after prioritize update so session check reads the target row.
+      await page.goto('/scripture');
+      await expect(page.getByTestId('scripture-overview')).toBeVisible();
+
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
+      await expect(page.getByTestId('resume-prompt')).toContainText(
+        /Continue where you left off\? \(Step 5 of 17\)/i
+      );
 
       // WHEN: User taps "Start fresh"
-      const sessionAbandoned = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.request().method() === 'PATCH' &&
-          resp.status() >= 200 &&
-          resp.status() < 300
-      );
       await page.getByTestId('resume-start-fresh').click();
-      await sessionAbandoned;
+      await expect(page.getByTestId('resume-prompt')).toBeHidden();
+      await expect(page.getByTestId('scripture-start-button')).toBeVisible();
 
-      // THEN: Start button appears (session was abandoned)
+      // THEN: The target session is abandoned server-side
+      await expect
+        .poll(
+          async () => {
+            const { data: abandonedSession, error: abandonedSessionError } = await supabaseAdmin
+              .from('scripture_sessions')
+              .select('status')
+              .eq('id', sessionId)
+              .single();
+            expect(abandonedSessionError).toBeNull();
+            return abandonedSession?.status ?? null;
+          },
+          { timeout: 15_000 }
+        )
+        .toBe('abandoned');
+
+      // AND: Fresh overview path is available (avoids cross-worker session collisions)
+      await page.goto('/scripture?fresh=true');
+      await expect(page.getByTestId('scripture-overview')).toBeVisible();
       await expect(page.getByTestId('scripture-start-button')).toBeVisible();
 
       // WHEN: User taps Start and selects Solo

@@ -7,8 +7,10 @@
     "dev": "./scripts/dev-with-cleanup.sh",
     "dev:raw": "vite",
     "build": "dotenvx run --overload -- bash -c 'tsc -b && vite build'",
+    "perf:build": "mkdir -p docs/performance && npm run typecheck && vite build 2>&1 | tee docs/performance/perf-build.log",
+    "perf:bundle-report": "npm run perf:build && node scripts/perf-bundle-report.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint src tests scripts --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**'",
     "preview": "dotenvx run --overload -- npx vite preview",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
@@ -29,7 +31,7 @@
     "postdeploy": "echo 'Deployment complete! Run: node scripts/post-deploy-check.cjs [YOUR_URL]'",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint:fix": "eslint . --fix && prettier --write ."
+    "lint:fix": "eslint src tests scripts --fix --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**' && prettier --write ."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.93.3",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
+    "@currents/playwright": "^1.21.1",
     "@dotenvx/dotenvx": "^1.52.0",
     "@eslint/js": "^9.39.2",
     "@faker-js/faker": "^10.3.0",
