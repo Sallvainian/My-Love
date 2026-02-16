@@ -81,6 +81,15 @@ Each step presents a Bible verse and a couple-focused response prayer. The readi
 
 Data is stored across `scripture_sessions`, `scripture_step_states`, `scripture_reflections`, `scripture_bookmarks`, and `scripture_messages` tables. Static verse data lives in `src/data/scriptureSteps.ts`.
 
+### Scripture Architecture Notes
+
+The scripture feature uses an **online-first** pattern (the inverse of the rest of the app):
+- **Supabase is the source of truth.** Writes go to Supabase RPC functions first and throw on failure (no offline queue).
+- **IndexedDB is a read cache.** Reads use cache-first with fire-and-forget background refresh.
+- **Optimistic UI.** The Zustand slice updates state before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
+
+ESLint enforces that scripture container components (`src/components/scripture-reading/containers/**`) must not import `@supabase/supabase-js`, `src/api/supabaseClient`, or service modules directly. They must go through Zustand slice actions. The sole legacy exception is `scriptureReadingService`.
+
 ## Settings and Configuration
 
 - Partner name configuration (displayed throughout the app)
@@ -112,9 +121,29 @@ Custom Tailwind extensions include:
 - **Animations**: float, fade-in, scale-in, slide-up, pulse-slow, heart-beat, shimmer
 - **Color palettes**: sunset, coral, ocean, lavender, rose (each with 50-900 shades)
 
+## Home View Components
+
+The home view is rendered inline in `App.tsx` (not lazy-loaded) to guarantee offline availability. It includes:
+
+- **TimeTogether** -- Real-time duration counter since the relationship start date
+- **BirthdayCountdown** -- Countdown timers to each partner's birthday (configured in `src/config/relationshipDates.ts`)
+- **EventCountdown** -- Countdown timers for wedding date and upcoming visits
+- **DailyMessage** -- The daily love message card with rotation and favorites
+
 ## Anniversary Countdown
 
-Real-time countdown timers to special dates with celebration animations powered by Framer Motion.
+Real-time countdown timers to special dates with celebration animations powered by Framer Motion. Event dates are configured in `src/config/relationshipDates.ts` via the `RELATIONSHIP_DATES` constant, which includes birthdays, wedding date, and visit schedules.
+
+## Welcome Splash
+
+A welcome screen displayed on first visit and after every 60 minutes of inactivity (controlled by the `WELCOME_DISPLAY_INTERVAL` constant in `App.tsx`). The splash timestamp is stored in `localStorage` under the `lastWelcomeView` key. The splash can also be triggered manually from the daily message card.
+
+## Network Status and Sync Feedback
+
+- **NetworkStatusIndicator** -- Shows a banner when the device is offline or reconnecting (`showOnlyWhenOffline` mode)
+- **SyncToast** -- Displays toast notifications after background sync completion, showing success and failure counts
+- **Auto-sync on reconnect** -- When the device comes back online, the app immediately triggers a sync of pending mood entries
+- **Service Worker Background Sync listener** -- Listens for `BACKGROUND_SYNC_COMPLETED` messages from the service worker and displays sync results
 
 ## PWA Support
 
@@ -124,6 +153,10 @@ Real-time countdown timers to special dates with celebration animations powered 
 - Runtime caching: NetworkFirst for navigation/API, CacheFirst for images/fonts
 - PWA manifest: theme color `#FF6B9D`, background color `#FFE5EC`, standalone display, portrait orientation
 - Auto-update registration via `workbox-window`
+
+## Admin Panel
+
+Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provides administrative controls for the application. The admin route is detected on initial load in `App.tsx` and renders outside the normal navigation flow.
 
 ## Privacy and Security
 

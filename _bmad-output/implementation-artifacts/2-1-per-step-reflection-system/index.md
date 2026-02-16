@@ -1,0 +1,25 @@
+# Story 2.1: Per-Step Reflection System
+
+## Table of Contents
+
+- [Story 2.1: Per-Step Reflection System](#table-of-contents)
+  - [Story](./story.md)
+  - [Acceptance Criteria](./acceptance-criteria.md)
+  - [Tasks / Subtasks](./tasks-subtasks.md)
+  - [Dev Notes](./dev-notes.md)
+    - [What Already Exists (DO NOT Recreate)](./dev-notes.md#what-already-exists-do-not-recreate)
+    - [Architecture Constraints](./dev-notes.md#architecture-constraints)
+    - [UX / Design Requirements](./dev-notes.md#ux-design-requirements)
+    - [File Locations](./dev-notes.md#file-locations)
+    - [Testing Requirements](./dev-notes.md#testing-requirements)
+    - [Accessibility Checklist](./dev-notes.md#accessibility-checklist)
+    - [Git Intelligence (Epic 1 Patterns)](./dev-notes.md#git-intelligence-epic-1-patterns)
+    - [Cross-Story Context](./dev-notes.md#cross-story-context)
+    - [Project Structure Notes](./dev-notes.md#project-structure-notes)
+    - [References](./dev-notes.md#references)
+  - [Dev Agent Record](./dev-agent-record.md)
+    - [Agent Model Used](./dev-agent-record.md#agent-model-used)
+    - [Debug Log References](./dev-agent-record.md#debug-log-references)
+    - [Completion Notes List](./dev-agent-record.md#completion-notes-list)
+    - [File List](./dev-agent-record.md#file-list)
+    - [Change Log](./dev-agent-record.md#change-log)
