@@ -496,7 +496,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
       }
       await tx.done;
     } catch (cacheError) {
-      console.error('[ScriptureService] Failed to update bookmark sharing cache:', cacheError);
+      handleScriptureError({
+        code: ScriptureErrorCode.CACHE_CORRUPTED,
+        message: 'Failed to update bookmark sharing cache',
+        details: cacheError,
+      });
     }
   }
 

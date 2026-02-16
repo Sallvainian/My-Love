@@ -39,7 +39,11 @@ import { ReflectionSummary } from '../reflection/ReflectionSummary';
 import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
 import { MessageCompose } from '../reflection/MessageCompose';
 import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
-import { scriptureReadingService } from '../../../services/scriptureReadingService';
+import {
+  scriptureReadingService,
+  handleScriptureError,
+  ScriptureErrorCode,
+} from '../../../services/scriptureReadingService';
 
 // Lavender Dreams design tokens (shared with ScriptureOverview)
 const scriptureTheme = {
@@ -228,8 +232,12 @@ export function SoloReadingFlow() {
             session.userId,
             false
           );
-        } catch {
-          // Revert on failure
+        } catch (error) {
+          handleScriptureError({
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Failed to toggle bookmark',
+            details: error,
+          });
           if (!isMountedRef.current) return;
           setBookmarkedSteps((prev) => {
             const next = new Set(prev);
@@ -272,8 +280,12 @@ export function SoloReadingFlow() {
             session.userId,
             data.shareBookmarkedVerses
           );
-        } catch {
-          // Non-blocking: failures here should not prevent report flow entry.
+        } catch (error) {
+          handleScriptureError({
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Failed to save reflection summary',
+            details: error,
+          });
         } finally {
           if (isMountedRef.current) {
             setIsSubmittingSummary(false);
@@ -290,8 +302,12 @@ export function SoloReadingFlow() {
           await scriptureReadingService.updateSession(session.id, {
             currentPhase: 'report',
           });
-        } catch {
-          // Non-blocking: phase persistence failure handled by eventual consistency
+        } catch (error) {
+          handleScriptureError({
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Failed to persist phase change',
+            details: error,
+          });
         }
       })();
     },
@@ -312,8 +328,13 @@ export function SoloReadingFlow() {
         });
         updatePhase('complete');
         return true;
-      } catch {
-        // Controlled retry (max 1 retry)
+      } catch (error) {
+        handleScriptureError({
+          code: ScriptureErrorCode.SYNC_FAILED,
+          message: 'Failed to mark session complete',
+          details: error,
+        });
+        if (attempt < 1) await new Promise((r) => setTimeout(r, 500));
       }
     }
 
@@ -522,8 +543,12 @@ export function SoloReadingFlow() {
           try {
             const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
             partnerStandoutVerses = parsed.standoutVerses ?? [];
-          } catch {
-            // Invalid JSON in partner notes — proceed without standout verses
+          } catch (error) {
+            handleScriptureError({
+              code: ScriptureErrorCode.CACHE_CORRUPTED,
+              message: 'Invalid JSON in partner reflection notes',
+              details: error,
+            });
           }
         }
 

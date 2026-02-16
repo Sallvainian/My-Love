@@ -118,6 +118,16 @@ vi.mock('../../../services/scriptureReadingService', () => ({
     addMessage: (...args: unknown[]) => mockAddMessage(...args),
     getSessionReportData: (...args: unknown[]) => mockGetSessionReportData(...args),
   },
+  handleScriptureError: vi.fn(),
+  ScriptureErrorCode: {
+    VERSION_MISMATCH: 'VERSION_MISMATCH',
+    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+    UNAUTHORIZED: 'UNAUTHORIZED',
+    SYNC_FAILED: 'SYNC_FAILED',
+    OFFLINE: 'OFFLINE',
+    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
+    VALIDATION_FAILED: 'VALIDATION_FAILED',
+  },
 }));
 
 // Mock Zustand store
