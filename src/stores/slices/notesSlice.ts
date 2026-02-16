@@ -19,7 +19,7 @@
 import type { AppStateCreator } from '../types';
 import type { LoveNote } from '../../types/models';
 import { supabase } from '../../api/supabaseClient';
-import { authService } from '../../api/authService';
+import { getCurrentUserId } from '../../api/auth/sessionService';
 import { getPartnerId } from '../../api/supabaseClient';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { uploadCompressedBlob } from '../../services/loveNoteImageService';
@@ -47,11 +47,7 @@ export interface NotesSlice {
   removeFailedMessage: (tempId: string) => void;
 }
 
-const {
-  PAGE_SIZE: NOTES_PAGE_SIZE,
-  RATE_LIMIT_MAX_MESSAGES,
-  RATE_LIMIT_WINDOW_MS,
-} = NOTES_CONFIG;
+const { PAGE_SIZE: NOTES_PAGE_SIZE, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_MS } = NOTES_CONFIG;
 
 /**
  * Helper: Revoke blob URLs from notes to prevent memory leaks
@@ -91,7 +87,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: true, notesError: null });
 
       // Get authenticated user ID
-      const userId = await authService.getCurrentUserId();
+      const userId = await getCurrentUserId();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -158,7 +154,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: true });
 
       // Get authenticated user ID
-      const userId = await authService.getCurrentUserId();
+      const userId = await getCurrentUserId();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -292,7 +288,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const { recentTimestamps, now } = get().checkRateLimit();
 
       // Get authenticated user ID and partner ID
-      const userId = await authService.getCurrentUserId();
+      const userId = await getCurrentUserId();
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -339,7 +335,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }));
 
       if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Sending note (optimistic):', { tempId, content, hasImage: !!imageFile });
+        console.log('[NotesSlice] Sending note (optimistic):', {
+          tempId,
+          content,
+          hasImage: !!imageFile,
+        });
       }
 
       // Handle image compression and upload if provided
@@ -354,9 +354,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           // Cache the compressed blob for retry flows
           set((state) => ({
             notes: state.notes.map((note) =>
-              note.tempId === tempId
-                ? { ...note, imageBlob }
-                : note
+              note.tempId === tempId ? { ...note, imageBlob } : note
             ),
           }));
 
@@ -510,11 +508,13 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }));
 
       if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Retrying failed message:', tempId, { hasImage: !!failedNote.imageBlob });
+        console.log('[NotesSlice] Retrying failed message:', tempId, {
+          hasImage: !!failedNote.imageBlob,
+        });
       }
 
       // Get user ID for retry
-      const userId = await authService.getCurrentUserId();
+      const userId = await getCurrentUserId();
       if (!userId) {
         throw new Error('User not authenticated');
       }

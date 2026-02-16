@@ -19,11 +19,17 @@ test.describe('Per-Step Reflection System', () => {
     test('should persist reflection data to scripture_reflections after submission', async ({
       page,
       supabaseAdmin,
-      testSession,
       interceptNetworkCall,
     }) => {
       // GIVEN: User navigates to scripture and starts a solo session
       const sessionId = await startSoloSession(page);
+      const { data: sessionRow, error: sessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('user1_id')
+        .eq('id', sessionId)
+        .single();
+      expect(sessionError).toBeNull();
+      const activeUserId = sessionRow!.user1_id;
 
       // AND: User is on the first verse screen
       await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
@@ -106,7 +112,7 @@ test.describe('Per-Step Reflection System', () => {
       expect(reflections).toHaveLength(1);
       expect(reflections![0].rating).toBe(4);
       expect(reflections![0].notes).toBe('This verse really spoke to me today.');
-      expect(reflections![0].user_id).toBe(testSession.test_user1_id);
+      expect(reflections![0].user_id).toBe(activeUserId);
     });
   });
 
@@ -114,11 +120,17 @@ test.describe('Per-Step Reflection System', () => {
     test('should toggle bookmark to filled amber when active and persist to DB', async ({
       page,
       supabaseAdmin,
-      testSession,
       interceptNetworkCall,
     }) => {
       // GIVEN: User is on a verse screen in a solo session
       const sessionId = await startSoloSession(page);
+      const { data: sessionRow, error: sessionError } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('user1_id')
+        .eq('id', sessionId)
+        .single();
+      expect(sessionError).toBeNull();
+      const activeUserId = sessionRow!.user1_id;
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // AND: Bookmark button is visible with inactive state
@@ -161,7 +173,7 @@ test.describe('Per-Step Reflection System', () => {
         .select('*')
         .eq('session_id', sessionId)
         .eq('step_index', 0)
-        .eq('user_id', testSession.test_user1_id);
+        .eq('user_id', activeUserId);
 
       expect(error).toBeNull();
       expect(bookmarks).toHaveLength(1);
@@ -190,7 +202,7 @@ test.describe('Per-Step Reflection System', () => {
         .select('*')
         .eq('session_id', sessionId)
         .eq('step_index', 0)
-        .eq('user_id', testSession.test_user1_id);
+        .eq('user_id', activeUserId);
 
       expect(afterDelete).toHaveLength(0);
     });

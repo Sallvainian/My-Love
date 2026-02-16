@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { m as motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
@@ -21,17 +21,6 @@ export function EditMessageForm({ message, isOpen, onClose }: EditMessageFormPro
   const [error, setError] = useState<string | null>(null);
   const [textError, setTextError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
-
-  // Reset form when message changes
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Resetting form state when message prop changes (controlled form reset pattern)
-  useEffect(() => {
-    setText(message.text);
-    setCategory(message.category);
-    setActive(message.active ?? true);
-    setError(null);
-    setTextError(null);
-    setCategoryError(null);
-  }, [message]);
 
   const maxLength = 500;
   const remainingChars = maxLength - text.length;

@@ -10,7 +10,7 @@
 
 import { supabase } from './supabaseClient';
 import type { Database } from './supabaseClient';
-import { authService } from './authService';
+import { getCurrentUserId } from './auth/sessionService';
 import {
   isOnline,
   handleSupabaseError,
@@ -122,7 +122,7 @@ export class InteractionService {
     }
 
     try {
-      const currentUserId = await authService.getCurrentUserId();
+      const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
         throw new Error('Cannot send interaction: User not authenticated');
       }
@@ -186,7 +186,7 @@ export class InteractionService {
   async subscribeInteractions(
     callback: (interaction: SupabaseInteractionRecord) => void
   ): Promise<() => void> {
-    const currentUserId = await authService.getCurrentUserId();
+    const currentUserId = await getCurrentUserId();
     if (!currentUserId) {
       throw new Error('Cannot subscribe to interactions: User not authenticated');
     }
@@ -239,7 +239,7 @@ export class InteractionService {
    */
   async getInteractionHistory(limit: number = 50, offset: number = 0): Promise<Interaction[]> {
     try {
-      const currentUserId = await authService.getCurrentUserId();
+      const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
         throw new Error('Cannot get interaction history: User not authenticated');
       }
@@ -293,7 +293,7 @@ export class InteractionService {
    */
   async getUnviewedInteractions(): Promise<Interaction[]> {
     try {
-      const currentUserId = await authService.getCurrentUserId();
+      const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
         throw new Error('Cannot get unviewed interactions: User not authenticated');
       }

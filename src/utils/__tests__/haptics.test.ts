@@ -12,7 +12,7 @@ import {
 } from '../haptics';
 
 describe('haptics utility', () => {
-  let vibrateMock: any;
+  let vibrateMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vibrateMock = vi.fn().mockReturnValue(true);
