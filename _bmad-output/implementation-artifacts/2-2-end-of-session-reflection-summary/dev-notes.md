@@ -1,97 +1,6 @@
-# Story 2.2: End-of-Session Reflection Summary
+# Dev Notes
 
-Status: done
-
-<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
-
-## Story
-
-As a user,
-I want to review my bookmarked verses and provide an overall session reflection after completing all 17 steps,
-So that I can process the experience as a whole before seeing the prayer report.
-
-## Acceptance Criteria
-
-1. **Transition to Reflection Summary After Step 17**
-   - **Given** the user has completed step 17's reflection
-   - **When** the session transitions to the reflection summary phase
-   - **Then** the screen displays a list of verses the user bookmarked during the session
-   - **And** bookmarked verses are highlighted; non-bookmarked verses are not shown
-   - **And** if no bookmarks exist, text reads "You didn't mark any verses — that's okay"
-   - **And** the transition uses fade-through-white animation (400ms, instant if reduced-motion)
-   - **And** focus moves to the reflection form heading
-
-2. **Reflection Summary Form Interaction**
-   - **Given** the reflection summary is displayed
-   - **When** the user interacts with the form
-   - **Then** they can select which verse "stood out" from the bookmarked list (uses MoodButton-style chip pattern with `aria-pressed`)
-   - **And** verse selection chips are minimum 48x48px touch targets
-   - **And** a session-level rating (1-5) is available with the same scale pattern as per-step reflections
-   - **And** an optional note textarea (max 200 chars) is available
-
-3. **Reflection Summary Submission**
-   - **Given** the user has completed the reflection summary
-   - **When** they tap "Continue"
-   - **Then** a verse selection and session rating are required (quiet validation, button disabled until complete)
-   - **And** the reflection summary data is saved to the server
-   - **And** the session phase advances to 'report'
-
-## Tasks / Subtasks
-
-- [x] Task 1: Create ReflectionSummary presentational component (AC: #1, #2)
-  - [x] 1.1 Create `ReflectionSummary.tsx` in `src/components/scripture-reading/reflection/`
-  - [x] 1.2 Accept props: `bookmarkedVerses` (array of `{stepIndex, verseReference, verseText}`), `onSubmit` callback, `disabled` flag
-  - [x] 1.3 Render bookmarked verse chips using MoodButton-style pattern (rounded pill, `aria-pressed`, 48x48px min touch target)
-  - [x] 1.4 If no bookmarks exist, display: "You didn't mark any verses — that's okay"
-  - [x] 1.5 Standout verse selection: multi-select from bookmarked list only (at least one required)
-  - [x] 1.6 Session-level rating scale: reuse same 1-5 numbered circle pattern from `PerStepReflection` (radiogroup, `aria-label`, end labels "A little" / "A lot")
-  - [x] 1.7 Optional note textarea: max 200 chars, auto-grow, `resize-none`, char counter at 150+, placeholder "Reflect on the session as a whole (optional)"
-  - [x] 1.8 Continue button: `aria-disabled` until both standout verse(s) and rating selected
-  - [x] 1.9 Quiet validation: "Please select a standout verse" and/or "Please select a rating" as helper text on Continue tap
-
-- [x] Task 2: Integrate ReflectionSummary into SoloReadingFlow completion screen (AC: #1, #3)
-  - [x] 2.1 Replace the completion screen placeholder ("Reflection summary coming in Story 2.2") with `ReflectionSummary` component
-  - [x] 2.2 Load bookmarks for current session via `scriptureReadingService.getBookmarksBySession()` (already loaded in `bookmarkedSteps` state)
-  - [x] 2.3 Map `bookmarkedSteps` Set to array of `{stepIndex, verseReference, verseText}` using `SCRIPTURE_STEPS` data
-  - [x] 2.4 Fade-through-white transition (400ms) when entering reflection summary, using existing `crossfade` from `useMotionConfig`
-  - [x] 2.5 Focus management: move focus to reflection summary heading on transition
-  - [x] 2.6 Screen reader announcement: `aria-live="polite"` — "Review your session reflections"
-  - [x] 2.7 On submit: save session-level reflection data, then advance phase to 'report'
-
-- [x] Task 3: Wire service layer for session-level reflection persistence (AC: #3)
-  - [x] 3.1 Save session-level reflection as a `ScriptureReflection` with `stepIndex: MAX_STEPS` (17) sentinel value (distinguishes session-level from per-step 0-16 reflections; must be >= 0 to pass Zod `min(0)` validation)
-  - [x] 3.2 Store standout verse selections in the reflection `notes` field as JSON: `{"standoutVerses": [0, 5, 12], "userNote": "..."}`
-  - [x] 3.3 Use existing `scriptureReadingService.addReflection()` with `stepIndex: MAX_STEPS`, session rating, JSON notes, `isShared: false`
-  - [x] 3.4 Write is non-blocking (same pattern as per-step reflections — don't block phase advancement)
-  - [x] 3.5 After reflection saved, update session phase from `'reflection'` to `'report'` via `updatePhase('report')` slice action
-
-- [x] Task 4: Update session phase transition logic (AC: #1, #3)
-  - [x] 4.1 In `advanceStep()` (scriptureReadingSlice): when step 17 reflection completes, set `currentPhase: 'reflection'` but keep `status: 'in_progress'` (NOT 'complete' — that happens after the report phase in Story 2.3)
-  - [x] 4.2 The completion screen `isCompleted` check must now trigger on `currentPhase === 'reflection'` (already does — see line 341 of SoloReadingFlow)
-  - [x] 4.3 Add new phase check: when `currentPhase === 'report'`, render Story 2.3 placeholder ("Daily Prayer Report coming in Story 2.3" + "Return to Overview" button)
-  - [x] 4.4 Persist phase change to server via `scriptureReadingService.updateSession()` after user submits reflection summary
-
-- [x] Task 5: Write unit tests for ReflectionSummary (AC: #1, #2, #3)
-  - [x] 5.1 Create `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx`
-  - [x] 5.2 Test: renders bookmarked verses as selectable chips
-  - [x] 5.3 Test: displays "You didn't mark any verses — that's okay" when no bookmarks
-  - [x] 5.4 Test: verse chips toggle `aria-pressed` on click
-  - [x] 5.5 Test: session rating scale renders 5 buttons with correct ARIA attributes
-  - [x] 5.6 Test: Continue disabled until verse selected AND rating selected
-  - [x] 5.7 Test: validation messages appear on Continue tap without required selections
-  - [x] 5.8 Test: character counter visible at 150+ chars
-  - [x] 5.9 Test: onSubmit called with correct data (standoutVerses array, rating, notes)
-  - [x] 5.10 Test: keyboard navigation within rating radiogroup (arrow keys)
-
-- [x] Task 6: Update SoloReadingFlow integration tests (AC: #1, #3)
-  - [x] 6.1 Update `SoloReadingFlow.test.tsx` — completion flow now shows ReflectionSummary instead of placeholder
-  - [x] 6.2 Test: after step 17 reflection submit, ReflectionSummary screen appears
-  - [x] 6.3 Test: bookmarked verses from reading session appear as chips
-  - [x] 6.4 Test: submitting reflection summary advances phase to 'report'
-
-## Dev Notes
-
-### What Already Exists (DO NOT Recreate)
+## What Already Exists (DO NOT Recreate)
 
 The following are already implemented from Story 2.1 and Epic 1. **Extend, don't duplicate:**
 
@@ -116,7 +25,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 | `bookmarkedSteps` state | `Set<number>` of step indices the user bookmarked — **already loaded on session mount** | `SoloReadingFlow.tsx` line 94 |
 | `isCompleted` check | `session.status === 'complete' || session.currentPhase === 'reflection'` | `SoloReadingFlow.tsx` line 341 |
 
-### Architecture Constraints
+## Architecture Constraints
 
 **State Management:**
 - Types co-located with `scriptureReadingSlice.ts` — do NOT create separate type files
@@ -156,7 +65,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Write failures: non-blocking toast via `SyncToast`, never block phase advancement
 - If reflection write fails, still advance to 'report' phase
 
-### UX / Design Requirements
+## UX / Design Requirements
 
 **Bookmarked Verse Chips:**
 - Display only bookmarked verses (NOT all 17)
@@ -209,7 +118,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Continue button (full-width, primary style)
 - Same max-width (`max-w-md`) and padding as reading flow
 
-### File Locations
+## File Locations
 
 | New File | Purpose |
 |---|---|
@@ -223,7 +132,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 | `src/stores/slices/scriptureReadingSlice.ts` | Fix `advanceStep()` to NOT set `status: 'complete'` at step 17 (keep `'in_progress'`) |
 | `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Update completion tests for new ReflectionSummary flow |
 
-### Testing Requirements
+## Testing Requirements
 
 **Unit Tests (ReflectionSummary.test.tsx):**
 - Renders bookmarked verses as selectable chips with correct verse references
@@ -260,7 +169,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx`
 - `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` (modified)
 
-### Accessibility Checklist
+## Accessibility Checklist
 
 - [ ] Reflection summary heading: `tabIndex={-1}` for programmatic focus, `data-testid="scripture-reflection-summary-heading"`
 - [ ] Verse chips: `aria-pressed` toggles on selection, `role="button"`
@@ -276,7 +185,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - [ ] All animations respect `prefers-reduced-motion` (uses `crossfade` from `useMotionConfig`)
 - [ ] No-bookmarks message is gentle, non-judgmental (UX principle 4)
 
-### Previous Story Intelligence (Story 2.1)
+## Previous Story Intelligence (Story 2.1)
 
 **Learnings from Story 2.1 implementation:**
 - `aria-disabled` pattern preferred over HTML `disabled` on Continue button — allows click events to fire for validation display
@@ -292,7 +201,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Avoid duplicate `aria-live` announcers — use the single dynamic announcer pattern
 - Always clean up debounce timers on unmount to prevent ghost writes
 
-### Git Intelligence
+## Git Intelligence
 
 Recent commits show established patterns:
 - Component files: PascalCase (`ReflectionSummary.tsx`)
@@ -302,14 +211,14 @@ Recent commits show established patterns:
 - Existing focus ring constant reused: `FOCUS_RING`
 - Container/presentational split: container in `containers/`, presentational in `reflection/`
 
-### Cross-Story Context
+## Cross-Story Context
 
 - **Story 2.1** (Per-Step Reflection) — completed. Provides: per-step reflections in DB, bookmark state in UI, reflection subview pattern.
 - **Story 2.3** (Daily Prayer Report) — depends on this story completing. Needs: session marked as `phase: 'report'`, reflection summary data available for report display. Story 2.3 will implement the `'report'` phase screen that replaces the placeholder created here.
 - Phase transition chain: `reading` → `reflection` (this story) → `report` (Story 2.3) → `complete` (Story 2.3)
 - Session `status: 'complete'` should NOT be set in this story. Keep `status: 'in_progress'` until Story 2.3 completes the report.
 
-### Project Structure Notes
+## Project Structure Notes
 
 - `ReflectionSummary.tsx` goes in `reflection/` subfolder (per architecture Decision 5 directory structure)
 - No new hooks needed — reuse `useMotionConfig` for transitions
@@ -318,7 +227,7 @@ Recent commits show established patterns:
 - No new DB migrations needed — reuse `scripture_reflections` table with `stepIndex: MAX_STEPS` (17) sentinel
 - No new IndexedDB stores needed — existing schema supports this
 
-### References
+## References
 
 - [Source: _bmad-output/planning-artifacts/epics/epic-2-reflection-daily-prayer-report.md#Story 2.2]
 - [Source: _bmad-output/planning-artifacts/architecture/core-architectural-decisions.md#Decision 1, Decision 4, Decision 5]
@@ -328,65 +237,3 @@ Recent commits show established patterns:
 - [Source: _bmad-output/planning-artifacts/ux-design-specification/core-user-experience.md#Experience Principles]
 - [Source: _bmad-output/planning-artifacts/ux-design-specification/user-journey-flows.md#Solo Mode Flow]
 - [Source: _bmad-output/implementation-artifacts/2-1-per-step-reflection-system.md#Dev Notes, Completion Notes, Code Review Fixes]
-
-## Dev Agent Record
-
-### Agent Model Used
-
-Claude Opus 4.5 (claude-opus-4-5-20251101)
-
-### Debug Log References
-
-None — clean implementation, no debugging required.
-
-### Completion Notes List
-
-- Created `ReflectionSummary.tsx` presentational component with bookmarked verse chips (multi-select, aria-pressed), session rating scale (1-5 radiogroup with arrow key navigation), optional note textarea with char counter, and quiet validation
-- Integrated into `SoloReadingFlow.tsx`: replaced placeholder completion screen with `ReflectionSummary` component when `currentPhase === 'reflection'`; added report phase placeholder when `currentPhase === 'report'`
-- Fixed `advanceStep()` in `scriptureReadingSlice.ts`: removed premature `status: 'complete'` and `completedAt` — session stays `in_progress` until Story 2.3
-- Wired service layer: `handleReflectionSummarySubmit` saves session-level reflection via `addReflection(sessionId, MAX_STEPS, rating, jsonNotes, false)` non-blocking, then advances phase to `'report'` via `updatePhase('report')` and persists to server
-- Refactored `isCompleted` guard into `isReflectionPhase` and `isReportPhase` for clear three-state routing
-- Added barrel export in `index.ts`
-- Unskipped all 12 ReflectionSummary unit tests and all 2 SoloReadingFlow Story 2.2 integration tests
-- Updated 7 existing Session Completion tests to match new phase-based routing (reflection → ReflectionSummary, report → placeholder)
-- Updated slice test to expect `status: 'in_progress'` instead of `'complete'` at last step
-- Cross-story: Refactored `BookmarkFlag.tsx` from internal debounce to pure presentational (debounce moved to `SoloReadingFlow` container)
-- Cross-story: Unskipped Story 2.1 API and E2E tests; added Story 2.2 API/E2E test suites
-- Cross-story: Updated Story 2.1 spec (status `complete` → `done`, file list corrections)
-- Full test suite: 529 passed, 0 failed across 28 test files
-
-### Code Review Fixes (AI)
-
-- [x] H1: Added `disabled` guard to `handleContinueClick` in `ReflectionSummary.tsx` — prevents submission while parent is syncing
-- [x] H2: Added `updatePhase` to `useShallow` selector in `SoloReadingFlow.tsx` — replaced direct `useAppStore.getState().updatePhase()` call; added missing test (2.2-CMP-018)
-- [x] H3: Updated File List below to include all 7 previously undocumented git-changed files
-- [x] M1: Documented BookmarkFlag cross-story refactor in Completion Notes above
-- [x] M2: Removed redundant `role="button"` from verse chip `<button>` elements in `ReflectionSummary.tsx`
-- [x] M3: Fixed screen reader announcement for reflection phase to say "Review your session reflections" instead of generic "Reading complete" message
-
-### Change Log
-
-- 2026-02-04: Implemented Story 2.2 — all 6 tasks complete, all ACs satisfied
-- 2026-02-04: Code review fixes — 3 HIGH, 3 MEDIUM issues resolved
-
-### File List
-
-**New:**
-- `src/components/scripture-reading/reflection/ReflectionSummary.tsx`
-
-**Modified (Story 2.2):**
-- `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
-- `src/components/scripture-reading/index.ts`
-- `src/stores/slices/scriptureReadingSlice.ts`
-- `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx`
-- `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`
-- `tests/unit/stores/scriptureReadingSlice.test.ts`
-- `_bmad-output/implementation-artifacts/sprint-status.yaml`
-
-**Modified (Cross-story — Story 2.1 cleanup):**
-- `src/components/scripture-reading/reading/BookmarkFlag.tsx` — Refactored to pure presentational (debounce moved to container)
-- `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx` — Updated tests for new presentational pattern
-- `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx` — Comment update (char counter threshold)
-- `tests/api/scripture-reflection-api.spec.ts` — Unskipped Story 2.1 tests, added Story 2.2 API tests
-- `tests/e2e/scripture/scripture-reflection.spec.ts` — Unskipped Story 2.1 tests, added Story 2.2 E2E tests
-- `_bmad-output/implementation-artifacts/2-1-per-step-reflection-system.md` — Status `complete` → `done`, file list corrections

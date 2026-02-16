@@ -1,148 +1,6 @@
-# Story 2.3: Daily Prayer Report — Send & View
+# Dev Notes
 
-Status: done
-
-<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
-
-## Story
-
-As a user,
-I want to send a message to my partner and view the Daily Prayer Report showing our reflections,
-So that we can connect emotionally through shared vulnerability and encouragement.
-
-## Acceptance Criteria
-
-1. **Message Composition Screen (Linked Users)**
-   - **Given** the user has completed the reflection summary (phase transitions from `'reflection'` to `'report'`)
-   - **When** the report phase begins
-   - **Then** a message composition screen appears: "Write something for [Partner Name]"
-   - **And** a textarea is available (max 300 characters, auto-grow, character counter at limit)
-   - **And** a "Skip" option is clearly available (tertiary button, no guilt language)
-   - **And** the keyboard overlap is handled (sticky CTA above keyboard or scroll into view on focus)
-
-2. **Unlinked User — Skip Message Composition**
-   - **Given** the user has no linked partner (`partner_id` is null / `session.partnerId` is undefined)
-   - **When** the report phase begins
-   - **Then** the message composition step is skipped entirely
-   - **And** the session is marked complete (`status: 'complete'`, `completedAt` set)
-   - **And** all reflections are still saved
-   - **And** a simple completion screen shows "Session complete" with a "Return to Overview" button
-
-3. **Daily Prayer Report Display (After Send/Skip)**
-   - **Given** the user sends a message or skips
-   - **When** the Daily Prayer Report screen loads
-   - **Then** the session is marked as complete (`status: 'complete'`, `completedAt` set)
-   - **And** the report shows the user's own step-by-step ratings and bookmarked verses
-   - **And** if the partner sent a message, it is revealed (Dancing Script font, 18px, card styling — like receiving a gift)
-   - **And** if the partner has not yet completed, their section shows "Waiting for [Partner Name]'s reflections"
-
-4. **Asynchronous Report Viewing (Solo Session, Linked User)**
-   - **Given** a Solo session is completed by a linked user
-   - **When** the partner opens Scripture Reading later
-   - **Then** the partner can view the Daily Prayer Report asynchronously
-   - **And** the report shows the sender's message and their own data when they complete
-
-5. **Together Mode Report Display**
-   - **Given** a Together mode session is completed
-   - **When** both partners have submitted reflections and messages
-   - **Then** the report shows both users' step-by-step ratings and bookmarks side-by-side
-   - **And** both partners' standout verse selections are shown
-   - **And** both messages are revealed
-   - **And** bookmark sharing respects the opt-in toggle from the reflection summary
-
-## Tasks / Subtasks
-
-- [x]Task 1: Create MessageCompose presentational component (AC: #1)
-  - [x]1.1 Create `MessageCompose.tsx` in `src/components/scripture-reading/reflection/`
-  - [x]1.2 Accept props: `partnerName: string`, `onSend: (message: string) => void`, `onSkip: () => void`, `disabled: boolean`
-  - [x]1.3 Heading: "Write something for [Partner Name]" (centered, serif, `text-purple-900`)
-  - [x]1.4 Textarea: max 300 chars, auto-grow to ~6 lines, `resize-none`, `enterKeyHint="send"`, placeholder "Share what's on your heart (optional)"
-  - [x]1.5 Character counter: visible at 250+ chars, muted style (`text-xs text-gray-400`), right-aligned below textarea
-  - [x]1.6 "Send" button: full-width primary style, `aria-disabled` when textarea is empty AND user hasn't chosen to skip
-  - [x]1.7 "Skip" button: tertiary text-only style below Send button, copy: "Skip for now" (no shame/guilt language)
-  - [x]1.8 Keyboard handling: scroll textarea into view on focus to avoid keyboard overlap
-  - [x]1.9 `disabled` prop gates both Send and Skip to prevent double-submission while parent is syncing
-  - [x]1.10 Accessibility: `aria-label="Message to partner"` on textarea, focus moves to textarea on mount
-
-- [x]Task 2: Create DailyPrayerReport presentational component (AC: #3, #4, #5)
-  - [x]2.1 Create `DailyPrayerReport.tsx` in `src/components/scripture-reading/reflection/`
-  - [x]2.2 Accept props: `userRatings: {stepIndex: number, rating: number}[]`, `userBookmarks: number[]`, `userStandoutVerses: number[]`, `partnerMessage: string | null`, `partnerName: string | null`, `partnerRatings: {stepIndex: number, rating: number}[] | null`, `partnerBookmarks: number[] | null`, `partnerStandoutVerses: number[] | null`, `isPartnerComplete: boolean`, `onReturn: () => void`
-  - [x]2.3 Section: "Your Journey" — list user's step-by-step ratings with bookmarked verses highlighted (amber bookmark icon next to bookmarked steps)
-  - [x]2.4 Section: "Verses That Stood Out" — display user's standout verse selections as chips
-  - [x]2.5 Section: "A Message for You" — reveal partner's message in Dancing Script font (`font-cursive text-lg leading-relaxed`), card styling with subtle background
-  - [x]2.6 If no partner message: do not render message section
-  - [x]2.7 If partner has not completed: show "Waiting for [Partner Name]'s reflections" (muted, gentle copy)
-  - [x]2.8 If partner complete (Together mode / async): show partner's ratings side-by-side with user's ratings
-  - [x]2.9 "Return to Overview" button: full-width primary style at bottom
-  - [x]2.10 Accessibility: `tabIndex={-1}` on report heading for programmatic focus, `aria-live="polite"` for partner data reveal
-
-- [x]Task 3: Create UnlinkedCompletionScreen presentational component (AC: #2)
-  - [x]3.1 Create inline within `SoloReadingFlow.tsx` (small enough to not warrant separate file — just a heading + button)
-  - [x]3.2 Display: "Session complete" heading (centered, serif, `text-purple-900`)
-  - [x]3.3 Subtext: "Your reflections have been saved" (muted, `text-sm text-purple-600`)
-  - [x]3.4 "Return to Overview" button: full-width primary style
-  - [x]3.5 On mount: mark session complete (`status: 'complete'`, `completedAt: new Date()`) via service
-
-- [x]Task 4: Integrate report phase into SoloReadingFlow container (AC: #1, #2, #3)
-  - [x]4.1 Replace the report phase placeholder ("Daily Prayer Report coming in Story 2.3") with multi-step report flow
-  - [x]4.2 Report sub-phases: `'compose'` → `'report'` (or `'complete-unlinked'` for unlinked users)
-  - [x]4.3 On report phase entry: check `partner` from `partnerSlice` — if null/no partner, skip to unlinked completion
-  - [x]4.4 Linked flow: show `MessageCompose` → on send/skip → save message (if any) → mark session complete → show `DailyPrayerReport`
-  - [x]4.5 `handleMessageSend(message: string)`: call `scriptureReadingService.addMessage(sessionId, userId, message)` non-blocking, then mark session complete and advance to report view
-  - [x]4.6 `handleMessageSkip()`: skip message, mark session complete, advance to report view
-  - [x]4.7 Mark session complete: call `updateSession(sessionId, { status: 'complete', completedAt: new Date() })` and `updatePhase('complete')` in slice
-  - [x]4.8 Load report data: fetch user's reflections via `getReflectionsBySession()`, bookmarks via `getBookmarksBySession()`, partner message via `getMessagesBySession()`
-  - [x]4.9 Fade-through-white transitions between compose → report subphases (400ms via `crossfade`)
-  - [x]4.10 Focus management: focus on compose heading on entry, focus on report heading after transition
-
-- [x]Task 5: Wire partner data for report display (AC: #3, #4, #5)
-  - [x]5.1 Access partner info via `useAppStore(state => state.partner)` from `partnerSlice`
-  - [x]5.2 For Solo mode: partner data may not exist yet (async) — show "Waiting for [Partner Name]'s reflections"
-  - [x]5.3 For Together mode: both users' data available in same session — fetch partner's reflections and bookmarks via service
-  - [x]5.4 Partner message: `getMessagesBySession()` returns all messages for session — filter by `senderId !== userId` to find partner's message
-  - [x]5.5 Parse session-level reflection (stepIndex === MAX_STEPS/17) to extract standout verses from JSON `notes` field: `JSON.parse(notes).standoutVerses`
-
-- [x]Task 6: Write unit tests for MessageCompose (AC: #1)
-  - [x]6.1 Create `src/components/scripture-reading/__tests__/MessageCompose.test.tsx`
-  - [x]6.2 Test: renders partner name in heading
-  - [x]6.3 Test: textarea accepts input up to 300 chars
-  - [x]6.4 Test: character counter visible at 250+ chars
-  - [x]6.5 Test: Send button calls onSend with message text
-  - [x]6.6 Test: Skip button calls onSkip
-  - [x]6.7 Test: Send and Skip disabled when `disabled` prop is true
-  - [x]6.8 Test: textarea has correct aria-label
-  - [x]6.9 Test: focus moves to textarea on mount
-
-- [x]Task 7: Write unit tests for DailyPrayerReport (AC: #3, #4, #5)
-  - [x]7.1 Create `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx`
-  - [x]7.2 Test: renders user's step-by-step ratings
-  - [x]7.3 Test: renders bookmarked verses with amber highlight
-  - [x]7.4 Test: renders standout verse selections
-  - [x]7.5 Test: reveals partner message in Dancing Script font (font-cursive class)
-  - [x]7.6 Test: shows "Waiting for [Partner Name]'s reflections" when partner incomplete
-  - [x]7.7 Test: does not render message section when no partner message
-  - [x]7.8 Test: shows partner ratings side-by-side when partner data available
-  - [x]7.9 Test: "Return to Overview" button calls onReturn
-  - [x]7.10 Test: report heading has tabIndex={-1} for programmatic focus
-
-- [x]Task 8: Update SoloReadingFlow integration tests (AC: #1, #2, #3)
-  - [x]8.1 Update `SoloReadingFlow.test.tsx` — report phase now shows MessageCompose/DailyPrayerReport instead of placeholder
-  - [x]8.2 Test: linked user sees MessageCompose after reflection summary
-  - [x]8.3 Test: unlinked user sees completion screen (skips message compose)
-  - [x]8.4 Test: sending message calls addMessage service method
-  - [x]8.5 Test: skipping message still marks session complete
-  - [x]8.6 Test: DailyPrayerReport appears after send/skip
-  - [x]8.7 Test: session marked complete (status + completedAt) after report phase entry
-  - [x]8.8 Test: "Return to Overview" calls exitSession
-
-- [x]Task 9: Update E2E and API test suites (AC: #1, #2, #3)
-  - [x]9.1 Add Story 2.3 E2E tests to `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`
-  - [x]9.2 Add Story 2.3 API tests to `tests/api/scripture-reflection-api.spec.ts`
-  - [x]9.3 Test IDs for E2E targeting listed in Testing Requirements below
-
-## Dev Notes
-
-### What Already Exists (DO NOT Recreate)
+## What Already Exists (DO NOT Recreate)
 
 The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend, don't duplicate:**
 
@@ -173,7 +31,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 | IndexedDB `scripture-messages` store | Configured with `by-session` index | `src/services/dbSchema.ts` (line 148) |
 | Dancing Script font | Imported in `index.css`, configured as `font-cursive` in Tailwind config | `src/index.css`, `tailwind.config.js` |
 
-### Architecture Constraints
+## Architecture Constraints
 
 **State Management:**
 - Types co-located with `scriptureReadingSlice.ts` — do NOT create separate type files
@@ -214,7 +72,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Session update failures: retry once, then show error toast and let user return to overview
 - If partner data fetch fails: show "Waiting for [Partner Name]'s reflections" fallback
 
-### UX / Design Requirements
+## UX / Design Requirements
 
 **Message Composition Screen:**
 - Heading: "Write something for [Partner Name]" (centered, serif `font-serif`, `text-purple-900`)
@@ -274,7 +132,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Content vertically scrollable if needed (report can be longer than viewport)
 - "Return to Overview" button sticky at bottom or at end of scroll content
 
-### File Locations
+## File Locations
 
 | New File | Purpose |
 |---|---|
@@ -291,7 +149,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 | `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` | Add Story 2.3 E2E tests |
 | `tests/api/scripture-reflection-api.spec.ts` | Add Story 2.3 API tests (message persistence) |
 
-### Testing Requirements
+## Testing Requirements
 
 **Unit Tests (MessageCompose.test.tsx):**
 - Renders partner name in heading
@@ -350,7 +208,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` (modified)
 - `tests/api/scripture-reflection-api.spec.ts` (modified)
 
-### Accessibility Checklist
+## Accessibility Checklist
 
 - [x]Message compose heading: `tabIndex={-1}` for programmatic focus
 - [x]Message textarea: `aria-label="Message to partner"`
@@ -369,7 +227,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - [x]All interactive elements meet 48x48px minimum touch target
 - [x]No-shame UX copy throughout (skip language, waiting language, unlinked language)
 
-### Previous Story Intelligence (Stories 2.1 & 2.2)
+## Previous Story Intelligence (Stories 2.1 & 2.2)
 
 **Learnings from Story 2.1 implementation:**
 - `aria-disabled` pattern preferred over HTML `disabled` on Continue/Send buttons — allows click events to fire for validation display
@@ -394,7 +252,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Add `disabled` guard to all submission handlers
 - Document all modified files in the File List (don't miss cross-story changes)
 
-### Git Intelligence
+## Git Intelligence
 
 Recent commits show established patterns:
 - Component files: PascalCase (`MessageCompose.tsx`, `DailyPrayerReport.tsx`)
@@ -405,7 +263,7 @@ Recent commits show established patterns:
 - Container/presentational split: container in `containers/`, presentational in `reflection/`
 - Commit prefix: `feat(epic-2): implement Story 2.3 daily prayer report`
 
-### Cross-Story Context
+## Cross-Story Context
 
 - **Story 2.1** (Per-Step Reflection) — completed. Provides: per-step reflections in DB, bookmark state in UI, reflection subview pattern.
 - **Story 2.2** (End-of-Session Reflection Summary) — completed. Provides: session-level reflection with standout verses, phase transitions (reading → reflection → report), `isReportPhase` guard in SoloReadingFlow.
@@ -413,7 +271,7 @@ Recent commits show established patterns:
 - **Epic 3** (Stats & Overview Dashboard) — depends on completed sessions. Ensure session `status: 'complete'` and `completedAt` are reliably set so aggregate queries work.
 - Phase transition chain: `reading` → `reflection` (Story 2.2) → `report` (this story) → `complete` (this story)
 
-### Project Structure Notes
+## Project Structure Notes
 
 - `MessageCompose.tsx` goes in `reflection/` subfolder (per architecture Decision 5 directory structure — reflection components live here)
 - `DailyPrayerReport.tsx` goes in `reflection/` subfolder (per architecture Decision 5: "DailyPrayerReport" listed in `reflection/`)
@@ -424,7 +282,7 @@ Recent commits show established patterns:
 - No new IndexedDB stores needed — `scripture-messages` store already configured
 - Dancing Script font already imported and configured as `font-cursive` in Tailwind
 
-### References
+## References
 
 - [Source: _bmad-output/planning-artifacts/epics/epic-2-reflection-daily-prayer-report.md#Story 2.3]
 - [Source: _bmad-output/planning-artifacts/architecture/core-architectural-decisions.md#Decision 1, Decision 4, Decision 5]
@@ -436,51 +294,3 @@ Recent commits show established patterns:
 - [Source: _bmad-output/implementation-artifacts/2-1-per-step-reflection-system.md#Dev Notes, Code Review Fixes]
 - [Source: _bmad-output/implementation-artifacts/2-2-end-of-session-reflection-summary.md#Dev Notes, Code Review Fixes, Completion Notes]
 - [Source: docs/project-context.md#Scripture Reading Feature Architecture]
-
-## Dev Agent Record
-
-### Agent Model Used
-
-Claude Opus 4.5 (claude-opus-4-5-20251101)
-
-### Debug Log References
-
-- DailyPrayerReport test font-cursive fix: Moved `font-cursive` class from inner `<p>` to outer card div to match test expectation on `data-testid` element
-- ESLint `set-state-in-effect` warnings (2): Legitimate pattern for initializing report sub-phase based on partner status in useEffect — warnings only, no errors
-
-### Completion Notes List
-
-- Completion lifecycle fixed: session completion now retries once, returns success/failure, calls `updatePhase('complete')` on success, and blocks report transition on completion failure with explicit retry UI.
-- AC5 report data expanded: user + partner messages, partner standout verses, partner shared bookmarks, and refined partner completion inference using session-level reflection with legacy fallback.
-- Reflection sharing/bookmark sharing aligned: together-mode reflections now persist with `isShared=true`; reflection summary now captures `shareBookmarkedVerses` and persists session-scoped bookmark sharing preference via service method.
-- Accessibility/motion fixed: report/compose heading focus + aria-live transition announcements added; `MessageCompose` autofocus now parent-controlled; waiting animation respects reduced-motion.
-- Character counter requirement fixed: message counter now appears at `250+` for 300-char field.
-- Story artifacts and test references updated to `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`.
-- Validation run (post-fix):
-  - `npm run test:unit -- src/components/scripture-reading/__tests__/MessageCompose.test.tsx src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx tests/unit/services/scriptureReadingService.cache.test.ts` (184 passed)
-  - `npm run test:e2e:raw -- tests/e2e/scripture/scripture-reflection-2.3.spec.ts` (6 passed)
-  - `npm run test:e2e:raw -- tests/api/scripture-reflection-api.spec.ts` (11 passed)
-  - `npm run typecheck` (pass)
-  - `npx eslint ...[touched story files]` (pass)
-
-### File List
-
-**Modified Files:**
-- `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
-- `src/components/scripture-reading/reflection/DailyPrayerReport.tsx`
-- `src/components/scripture-reading/reflection/ReflectionSummary.tsx`
-- `src/components/scripture-reading/reflection/MessageCompose.tsx`
-- `src/components/scripture-reading/__tests__/MessageCompose.test.tsx`
-- `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx`
-- `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx`
-- `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`
-- `src/services/scriptureReadingService.ts`
-- `tests/unit/services/scriptureReadingService.cache.test.ts`
-- `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`
-- `tests/api/scripture-reflection-api.spec.ts`
-- `tests/support/helpers.ts`
-- `_bmad-output/implementation-artifacts/2-3-daily-prayer-report-send-and-view.md`
-
-### Change Log
-
-- 2026-02-08: Implemented Story 2.3 remediation for AC5 conformance and review findings closure; updated completion semantics, report payload/rendering, sharing controls, accessibility/motion behavior, and test/doc artifacts.
