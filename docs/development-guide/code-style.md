@@ -43,6 +43,31 @@ ESLint 9 with flat config (`eslint.config.js`). No `.eslintrc` file.
 | `eslint-plugin-react-refresh` | `only-export-components` as warning, with `allowConstantExport: true` |
 | `typescript-eslint` | `no-explicit-any`: error. `no-unused-vars`: error with `_` prefix ignore pattern for args, vars, and caught errors. |
 
+### Architectural Guardrails (ESLint-Enforced)
+
+The ESLint configuration enforces several architectural rules that go beyond code style:
+
+**1. Store Access in React Code**
+
+Files in `src/components/**` and `src/hooks/**` must not call `useAppStore.getState()` directly. They must use `useAppStore` with a `useShallow` selector. This is enforced via `no-restricted-properties` and `no-restricted-syntax` rules.
+
+**2. Submission Control Safety**
+
+Specific button elements (identified by `data-testid` attributes for scripture message send, reflection continue, and reflection summary continue) must include a `disabled` prop. This prevents double-submission bugs.
+
+**3. Scripture Container Import Restrictions**
+
+Files in `src/components/scripture-reading/containers/**` must not import:
+- `@supabase/supabase-js`
+- `**/api/supabaseClient` or `@/api/supabaseClient`
+- `**/services/*` or `@/services/*` (except `scriptureReadingService` as a legacy exception)
+
+Container components must go through Zustand slice actions for all data operations. This is enforced via `no-restricted-imports`.
+
+**4. Catch Block Rule (Retrospective Guardrail)**
+
+In scripture code, catch blocks must call `handleScriptureError()` or re-throw. Outside scripture code, catch blocks must re-throw or map to the feature's error handler. Empty catch blocks are never allowed.
+
 ### Special Configurations
 
 **CommonJS files (`*.cjs`)**:
@@ -57,6 +82,9 @@ ESLint 9 with flat config (`eslint.config.js`). No `.eslintrc` file.
 - `ban-ts-comment` disabled (tests may need `@ts-ignore` for mocking)
 - `no-unused-vars` disabled (tests often have unused imports/mocks)
 - `no-global-assign` disabled (tests may mock global objects like `Date`)
+- `no-unused-expressions` disabled (tests may have expressions for side effects)
+- `no-restricted-syntax` disabled (tests may inspect store state directly)
+- `no-restricted-properties` disabled (tests may inspect store state directly)
 
 **Scripture Reading feature** (`src/services/scriptureReadingService.ts`, `src/stores/slices/scriptureReadingSlice.ts`, `src/hooks/useScriptureBroadcast.ts`, `src/components/scripture-reading/**`):
 - Strict `no-explicit-any` enforcement as error (reinforced for this feature domain)
@@ -169,13 +197,25 @@ Components are organized by feature domain under `src/components/`:
 
 ```
 components/
+  AdminPanel/          # Feature: admin interface
   DailyMessage/        # Feature: daily love messages
+  DisplayNameSetup/    # Feature: OAuth display name setup
+  ErrorBoundary/       # Shared: top-level error boundary
+  LoginScreen/         # Feature: authentication
   love-notes/          # Feature: real-time chat
   MoodTracker/         # Feature: mood logging
-  PartnerMoodView/     # Feature: partner mood display
-  PokeKissInterface/   # Feature: partner interactions
+  Navigation/          # Shared: bottom navigation bar
+  PartnerMoodView/     # Feature: partner mood display + interactions
+  PhotoCarousel/       # Feature: photo carousel viewer
   PhotoGallery/        # Feature: photo gallery
+  PhotoUpload/         # Feature: photo upload dialog
+  PokeKissInterface/   # Feature: partner interactions
+  RelationshipTimers/  # Feature: countdown timers
   scripture-reading/   # Feature: scripture reading flow
+    containers/        # ESLint-enforced: no direct Supabase imports
+  shared/              # Shared: NetworkStatusIndicator, SyncToast
+  ViewErrorBoundary/   # Shared: per-view error boundary
+  WelcomeSplash/       # Feature: welcome splash screen
 ```
 
 Each feature directory contains its components, styles, and feature-specific hooks.
