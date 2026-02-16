@@ -25,6 +25,17 @@ interface MockServiceWorker {
   removeEventListener: ReturnType<typeof vi.fn>;
 }
 
+type MutableNavigator = Navigator & { serviceWorker?: MockServiceWorker };
+type MutableWindow = Window & typeof globalThis & { SyncManager?: unknown };
+
+function getMutableNavigator(): MutableNavigator {
+  return global.navigator as MutableNavigator;
+}
+
+function getMutableWindow(): MutableWindow {
+  return global.window as MutableWindow;
+}
+
 describe('backgroundSync utilities', () => {
   let originalNavigator: typeof navigator;
   let mockServiceWorker: MockServiceWorker;
@@ -86,22 +97,22 @@ describe('backgroundSync utilities', () => {
     });
 
     it('should return false when Service Worker is not available', () => {
-      const nav = global.navigator as any;
+      const nav = getMutableNavigator();
       delete nav.serviceWorker;
 
       expect(isBackgroundSyncSupported()).toBe(false);
     });
 
     it('should return false when SyncManager is not available', () => {
-      const win = global.window as any;
+      const win = getMutableWindow();
       delete win.SyncManager;
 
       expect(isBackgroundSyncSupported()).toBe(false);
     });
 
     it('should return false when neither Service Worker nor SyncManager is available', () => {
-      const nav = global.navigator as any;
-      const win = global.window as any;
+      const nav = getMutableNavigator();
+      const win = getMutableWindow();
       delete nav.serviceWorker;
       delete win.SyncManager;
 
@@ -130,14 +141,14 @@ describe('backgroundSync utilities', () => {
     });
 
     it('should not throw when Service Worker is not available', async () => {
-      const nav = global.navigator as any;
+      const nav = getMutableNavigator();
       delete nav.serviceWorker;
 
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
     });
 
     it('should not throw when SyncManager is not available', async () => {
-      const win = global.window as any;
+      const win = getMutableWindow();
       delete win.SyncManager;
 
       await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
@@ -325,18 +336,22 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledTimes(3);
     });
 
-    it('should handle service worker registration timeout', async () => {
+    it('should not resolve registerBackgroundSync when service worker never becomes ready', async () => {
+      // When navigator.serviceWorker.ready never resolves, registerBackgroundSync
+      // blocks indefinitely. This test verifies that sync.register is NOT called
+      // in that scenario (the function is still pending).
       mockServiceWorker.ready = new Promise(() => {
-        // Never resolves - simulates timeout
+        // Intentionally never resolves — simulates a stuck service worker
       });
 
-      const timeoutPromise = Promise.race([
-        registerBackgroundSync('timeout-tag'),
-        new Promise((resolve) => setTimeout(() => resolve('timeout'), 100)),
-      ]);
+      // Start the registration (will hang on awaiting ready)
+      registerBackgroundSync('stuck-tag');
 
-      const result = await timeoutPromise;
-      expect(result).toBe('timeout');
+      // Give microtasks a chance to flush
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // sync.register should never be called because ready never resolved
+      expect(mockRegistration.sync.register).not.toHaveBeenCalled();
     });
 
     it('should preserve message event data integrity', async () => {
