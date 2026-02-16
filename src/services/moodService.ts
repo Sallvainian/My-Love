@@ -4,7 +4,7 @@ import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 import { MoodEntrySchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v4';
 
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking

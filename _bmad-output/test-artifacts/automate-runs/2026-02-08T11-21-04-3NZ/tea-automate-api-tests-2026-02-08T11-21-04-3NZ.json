@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "subprocess": "api-tests",
+  "tests": [],
+  "fixture_needs": [],
+  "knowledge_fragments_used": [
+    "api-request",
+    "data-factories",
+    "api-testing-patterns"
+  ],
+  "test_count": 0,
+  "summary": "No API test changes required for this UI live-region flake fix."
+}

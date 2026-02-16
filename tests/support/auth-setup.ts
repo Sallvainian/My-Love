@@ -13,13 +13,55 @@
  * setup ensures they do before any E2E test runs.
  */
 import { test as setup, expect } from '@playwright/test';
+import type { Browser } from '@playwright/test';
 import { execSync } from 'child_process';
 import { createClient } from '@supabase/supabase-js';
+import { mkdirSync } from 'fs';
+import { cpus } from 'os';
 
-const authFile = 'tests/.auth/user.json';
+const AUTH_DIR = 'tests/.auth';
+const LEGACY_AUTH_FILE = `${AUTH_DIR}/user.json`;
 
-const TEST_USER_EMAIL = 'testuser1@test.example.com';
 const TEST_USER_PASSWORD = 'testpassword123';
+const MIN_AUTH_POOL_SIZE = 8;
+
+const LEGACY_TEST_USERS = [
+  { email: 'testuser1@test.example.com', displayName: 'Test User 1' },
+  { email: 'testuser2@test.example.com', displayName: 'Test User 2' },
+];
+
+function getAuthPoolSize(): number {
+  const cpuCount = cpus().length;
+  const defaultAuthPoolSize = Number.isFinite(cpuCount)
+    ? Math.max(MIN_AUTH_POOL_SIZE, cpuCount)
+    : MIN_AUTH_POOL_SIZE;
+
+  const raw = process.env.PLAYWRIGHT_AUTH_POOL_SIZE;
+  if (!raw) return defaultAuthPoolSize;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return defaultAuthPoolSize;
+  }
+
+  return parsed;
+}
+
+function getWorkerEmail(workerIndex: number): string {
+  return `testworker${workerIndex}@test.example.com`;
+}
+
+function getWorkerPartnerEmail(workerIndex: number): string {
+  return `testworker${workerIndex}-partner@test.example.com`;
+}
+
+function getWorkerAuthFile(workerIndex: number): string {
+  return `${AUTH_DIR}/worker-${workerIndex}.json`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Parse `supabase status -o env` to get local Supabase connection details.
@@ -44,7 +86,157 @@ function isValidUrl(s?: string): boolean {
   }
 }
 
-setup('authenticate as test user 1', async ({ page }) => {
+async function ensureUser(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+  password: string,
+  displayName: string
+): Promise<void> {
+  const { error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: displayName },
+  });
+
+  if (!createError) {
+    return;
+  }
+
+  if (!/already.*registered/i.test(createError.message)) {
+    throw new Error(`Failed to create user ${email}: ${createError.message}`);
+  }
+
+  // Supabase listUsers is paginated; scan pages to avoid false negatives
+  // when projects accumulate many test users over time.
+  const perPage = 1000;
+  const maxPages = 10;
+  let existingUserId: string | null = null;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const { data, error: listError } = await admin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+    if (listError) {
+      throw new Error(`Failed to list users for ${email}: ${listError.message}`);
+    }
+
+    const users = data?.users ?? [];
+    const existingUser = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      existingUserId = existingUser.id;
+      break;
+    }
+
+    if (users.length < perPage) {
+      break;
+    }
+  }
+
+  if (!existingUserId) {
+    throw new Error(`User ${email} was expected to exist but was not found`);
+  }
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(existingUserId, {
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: displayName },
+  });
+  if (updateError) {
+    throw new Error(`Failed to update user ${email}: ${updateError.message}`);
+  }
+}
+
+async function getAppUserIdByEmail(
+  admin: ReturnType<typeof createClient>,
+  email: string
+): Promise<string> {
+  const maxAttempts = 10;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { data, error } = await admin.from('users').select('id').eq('email', email).single();
+
+    if (!error && data?.id) {
+      return data.id;
+    }
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `Could not resolve app user for ${email} after ${maxAttempts} attempts: ${error?.message ?? 'not found'}`
+      );
+    }
+
+    await sleep(250);
+  }
+
+  throw new Error(`Could not resolve app user for ${email}`);
+}
+
+async function linkUserPair(
+  admin: ReturnType<typeof createClient>,
+  firstEmail: string,
+  secondEmail: string
+): Promise<void> {
+  const firstUserId = await getAppUserIdByEmail(admin, firstEmail);
+  const secondUserId = await getAppUserIdByEmail(admin, secondEmail);
+
+  const { error: firstUpdateError } = await admin
+    .from('users')
+    .update({ partner_id: secondUserId })
+    .eq('id', firstUserId);
+  if (firstUpdateError) {
+    throw new Error(`Failed to link ${firstEmail} to ${secondEmail}: ${firstUpdateError.message}`);
+  }
+
+  const { error: secondUpdateError } = await admin
+    .from('users')
+    .update({ partner_id: firstUserId })
+    .eq('id', secondUserId);
+  if (secondUpdateError) {
+    throw new Error(`Failed to link ${secondEmail} to ${firstEmail}: ${secondUpdateError.message}`);
+  }
+}
+
+async function signInAndPersistStorageState(
+  browser: Browser,
+  url: string,
+  anonKey: string,
+  email: string,
+  password: string,
+  authPath: string
+): Promise<void> {
+  const client = createClient(url, anonKey, {
+    auth: { persistSession: false },
+  });
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.session) {
+    throw new Error(`Auth sign-in failed for ${email}: ${error?.message ?? 'missing session'}`);
+  }
+
+  const storageKey = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.evaluate(
+    ({ key, session }) => {
+      localStorage.setItem(key, JSON.stringify(session));
+      // Bypass WelcomeSplash for deterministic E2E entry.
+      localStorage.setItem('lastWelcomeView', Date.now().toString());
+    },
+    { key: storageKey, session: data.session }
+  );
+  await page.reload();
+  await expect(page.locator('.login-screen')).not.toBeVisible({ timeout: 15_000 });
+  await context.storageState({ path: authPath });
+  await context.close();
+}
+
+setup('authenticate worker test users', async ({ browser }) => {
   // Resolve Supabase vars — prefer env, fall back to `supabase status`
   let url = process.env.SUPABASE_URL;
   let serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -64,100 +256,64 @@ setup('authenticate as test user 1', async ({ page }) => {
     }
   }
 
-  // Use admin client to ensure test user exists
+  // Use admin client to ensure test users exist
   const admin = createClient(url!, serviceRoleKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Create test user (idempotent — ignore "already registered" error)
-  const { error: createError } = await admin.auth.admin.createUser({
-    email: TEST_USER_EMAIL,
-    password: TEST_USER_PASSWORD,
-    email_confirm: true,
-    user_metadata: { display_name: 'Test User 1' },
-  });
-
-  if (createError) {
-    if (!createError.message.includes('already been registered')) {
-      throw new Error(`Failed to create test user: ${createError.message}`);
-    }
-    // User already exists - update password to ensure it matches test expectations
-    const { data: users } = await admin.auth.admin.listUsers();
-    const existingUser = users.users.find((u) => u.email === TEST_USER_EMAIL);
-    if (existingUser) {
-      const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
-        password: TEST_USER_PASSWORD,
-        email_confirm: true,
-      });
-      if (updateError) {
-        throw new Error(`Failed to update test user password: ${updateError.message}`);
-      }
-    }
+  for (const user of LEGACY_TEST_USERS) {
+    await ensureUser(admin, user.email, TEST_USER_PASSWORD, user.displayName);
   }
 
-  // Create a second test user so the seed RPC can find a partner for together-mode sessions.
-  // The scripture_seed_test_data RPC selects user2 as: SELECT id FROM auth.users WHERE id != user1 LIMIT 1.
-  const { error: createError2 } = await admin.auth.admin.createUser({
-    email: 'testuser2@test.example.com',
-    password: TEST_USER_PASSWORD,
-    email_confirm: true,
-    user_metadata: { display_name: 'Test User 2' },
-  });
-
-  if (createError2) {
-    if (!createError2.message.includes('already been registered')) {
-      throw new Error(`Failed to create test user 2: ${createError2.message}`);
-    }
-    // User already exists - update password to ensure it matches test expectations
-    const { data: users } = await admin.auth.admin.listUsers();
-    const existingUser = users.users.find((u) => u.email === 'testuser2@test.example.com');
-    if (existingUser) {
-      const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
-        password: TEST_USER_PASSWORD,
-        email_confirm: true,
-      });
-      if (updateError) {
-        throw new Error(`Failed to update test user 2 password: ${updateError.message}`);
-      }
-    }
+  const authPoolSize = getAuthPoolSize();
+  for (let workerIndex = 0; workerIndex < authPoolSize; workerIndex++) {
+    await ensureUser(
+      admin,
+      getWorkerEmail(workerIndex),
+      TEST_USER_PASSWORD,
+      `Test Worker ${workerIndex}`
+    );
+    await ensureUser(
+      admin,
+      getWorkerPartnerEmail(workerIndex),
+      TEST_USER_PASSWORD,
+      `Test Worker ${workerIndex} Partner`
+    );
   }
 
-  // Sign in as test user with anon key (same permissions as the real app)
-  const client = createClient(url!, anonKey!, {
-    auth: { persistSession: false },
-  });
+  // Ensure default users are linked for tests that expect a partner by default.
+  await linkUserPair(admin, LEGACY_TEST_USERS[0].email, LEGACY_TEST_USERS[1].email);
 
-  const { data, error } = await client.auth.signInWithPassword({
-    email: TEST_USER_EMAIL,
-    password: TEST_USER_PASSWORD,
-  });
-
-  if (error) {
-    throw new Error(`Auth sign-in failed: ${error.message}`);
+  // Ensure each worker user has a dedicated linked partner account.
+  for (let workerIndex = 0; workerIndex < authPoolSize; workerIndex++) {
+    await linkUserPair(
+      admin,
+      getWorkerEmail(workerIndex),
+      getWorkerPartnerEmail(workerIndex)
+    );
   }
 
-  // Supabase JS stores session under: sb-<first-label-of-hostname>-auth-token
-  // e.g. http://127.0.0.1:54321 → sb-127-auth-token (NOT sb-127.0.0.1)
-  const storageKey = `sb-${new URL(url!).hostname.split('.')[0]}-auth-token`;
+  mkdirSync(AUTH_DIR, { recursive: true });
 
-  // Load the app and inject the authenticated session into localStorage
-  await page.goto('/');
-  await page.evaluate(
-    ({ key, session }) => {
-      localStorage.setItem(key, JSON.stringify(session));
-      // Bypass the WelcomeSplash screen for E2E tests
-      // App shows splash if lastWelcomeView is missing or >60min old
-      localStorage.setItem('lastWelcomeView', Date.now().toString());
-    },
-    { key: storageKey, session: data.session },
+  // Preserve legacy single-user auth state for compatibility.
+  await signInAndPersistStorageState(
+    browser,
+    url!,
+    anonKey!,
+    LEGACY_TEST_USERS[0].email,
+    TEST_USER_PASSWORD,
+    LEGACY_AUTH_FILE
   );
 
-  // Reload so the app's auth check picks up the session
-  await page.reload();
-
-  // Verify: login screen should not be visible (user is authenticated)
-  await expect(page.locator('.login-screen')).not.toBeVisible({ timeout: 15_000 });
-
-  // Save authenticated browser state for reuse by test projects
-  await page.context().storageState({ path: authFile });
+  // Generate worker-isolated auth states for parallel test safety.
+  for (let workerIndex = 0; workerIndex < authPoolSize; workerIndex++) {
+    await signInAndPersistStorageState(
+      browser,
+      url!,
+      anonKey!,
+      getWorkerEmail(workerIndex),
+      TEST_USER_PASSWORD,
+      getWorkerAuthFile(workerIndex)
+    );
+  }
 });

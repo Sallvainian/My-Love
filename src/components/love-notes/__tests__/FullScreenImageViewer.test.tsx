@@ -9,18 +9,21 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { FullScreenImageViewer } from '../FullScreenImageViewer';
+
+type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
 // Mock framer-motion
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, onClick, ...props }: any) => (
+    div: ({ children, onClick, ...props }: MotionDivProps) => (
       <div onClick={onClick} {...props}>
         {children}
       </div>
     ),
   },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
+  AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
 describe('FullScreenImageViewer', () => {

@@ -74,21 +74,43 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
   // Photo preview URL - handles both Photo (imageBlob) and PhotoWithUrls (signedUrl)
   const [imageUrl, setImageUrl] = useState('');
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing preview URL from photo prop with side effects (object URL creation/revocation)
   useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const scheduleUrlUpdate = (nextUrl: string) => {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setImageUrl(nextUrl);
+        }
+      });
+    };
+
     // PhotoWithUrls has signedUrl
     if ('signedUrl' in photo && photo.signedUrl) {
-      setImageUrl(photo.signedUrl);
-      return;
-    }
-    // Photo has imageBlob
-    if ('imageBlob' in photo && photo.imageBlob) {
-      const url = URL.createObjectURL(photo.imageBlob);
-      setImageUrl(url);
+      scheduleUrlUpdate(photo.signedUrl);
       return () => {
-        URL.revokeObjectURL(url);
+        cancelled = true;
       };
     }
+
+    // Photo has imageBlob
+    if ('imageBlob' in photo && photo.imageBlob) {
+      objectUrl = URL.createObjectURL(photo.imageBlob);
+      scheduleUrlUpdate(objectUrl);
+      return () => {
+        cancelled = true;
+        URL.revokeObjectURL(objectUrl);
+      };
+    }
+
+    scheduleUrlUpdate('');
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
   }, [photo]);
 
   // Check if form has changes
