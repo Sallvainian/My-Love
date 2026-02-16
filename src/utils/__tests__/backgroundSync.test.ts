@@ -336,18 +336,22 @@ describe('backgroundSync utilities', () => {
       expect(mockRegistration.sync.register).toHaveBeenCalledTimes(3);
     });
 
-    it('should handle service worker registration timeout', async () => {
+    it('should not resolve registerBackgroundSync when service worker never becomes ready', async () => {
+      // When navigator.serviceWorker.ready never resolves, registerBackgroundSync
+      // blocks indefinitely. This test verifies that sync.register is NOT called
+      // in that scenario (the function is still pending).
       mockServiceWorker.ready = new Promise(() => {
-        // Never resolves - simulates timeout
+        // Intentionally never resolves — simulates a stuck service worker
       });
 
-      const timeoutPromise = Promise.race([
-        registerBackgroundSync('timeout-tag'),
-        new Promise((resolve) => setTimeout(() => resolve('timeout'), 100)),
-      ]);
+      // Start the registration (will hang on awaiting ready)
+      registerBackgroundSync('stuck-tag');
 
-      const result = await timeoutPromise;
-      expect(result).toBe('timeout');
+      // Give microtasks a chance to flush
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // sync.register should never be called because ready never resolved
+      expect(mockRegistration.sync.register).not.toHaveBeenCalled();
     });
 
     it('should preserve message event data integrity', async () => {

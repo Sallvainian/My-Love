@@ -185,6 +185,47 @@ describe('usePartnerMood', () => {
     expect(unsubscribeMock).toHaveBeenCalled();
   });
 
+  it('sets error state when getLatestPartnerMood rejects', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(
+      new Error('Network failure')
+    );
+    vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
+
+    const { result } = renderHook(() => usePartnerMood(mockPartnerId));
+
+    expect(result.current.isLoading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Unable to load partner mood. Please try again later.');
+    expect(result.current.partnerMood).toBeNull();
+
+    consoleSpy.mockRestore();
+  });
+
+  it('sets disconnected status when subscribeMoodUpdates rejects', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
+    vi.mocked(moodSyncService.subscribeMoodUpdates).mockRejectedValue(
+      new Error('Subscription failed')
+    );
+
+    const { result } = renderHook(() => usePartnerMood(mockPartnerId));
+
+    await waitFor(() => {
+      expect(result.current.connectionStatus).toBe('disconnected');
+    });
+
+    expect(result.current.error).toBe('Unable to connect to real-time updates.');
+
+    consoleSpy.mockRestore();
+  });
+
   it('updates connection status based on subscription status', async () => {
     let statusCallback: ((status: string) => void) | null = null;
 

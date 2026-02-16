@@ -114,3 +114,75 @@
 
 1. `test-review` focused on `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` plus `tests/support/helpers.ts` timeout hotspots.
 2. `trace` on one failing non-P0 repeat case to isolate shared-state contention in `completeAllStepsToReflectionSummary`.
+
+---
+
+## Update: 2026-02-16 (PR #90 Coverage Gap Fill)
+
+- Workflow: `testarch-automate` (unit test gap fill)
+- Mode: Standalone
+- Scope: Fill 5 coverage gaps from PR #90 test review on branch `codex/finish-epic-2-development`
+
+### Step 1: Preflight & Context
+
+- **Framework**: Vitest + happy-dom + React Testing Library (unit)
+- **Config**: `vitest.config.ts`
+- **Test Dir**: `src/**/__tests__/`, `src/utils/__tests__/`
+- **TEA Config**: `tea_use_playwright_utils: true`, `tea_browser_automation: auto`
+- **Knowledge Loaded**: test-levels-framework, test-quality, test-priorities-matrix
+
+### Coverage Gaps (from PR #90 review)
+
+| # | Priority | Gap | File | Level |
+|---|----------|-----|------|-------|
+| 1 | HIGH/P1 | usePartnerMood error paths | src/hooks/__tests__/usePartnerMood.test.ts | Unit |
+| 2 | HIGH/P1 | Partner loading resolution transition | src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx | Unit |
+| 3 | MEDIUM/P2 | Malformed JSON in report notes parsing | src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx | Unit |
+| 4 | MEDIUM/P2 | Double-submit guard on reflection summary | src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx | Unit |
+| 5 | MEDIUM/P2 | backgroundSync timeout test fix | src/utils/__tests__/backgroundSync.test.ts | Unit |
+
+### Step 2: Targets Identified
+
+All 5 gaps are unit-level tests (Vitest + happy-dom). No E2E/API tests needed.
+
+- **P1**: Gaps 1-2 (error handling, state transition — core user journey reliability)
+- **P2**: Gaps 3-5 (edge cases, double-submit guard, misleading test fix)
+
+### Step 3-4: Tests Generated
+
+#### File 1: `src/hooks/__tests__/usePartnerMood.test.ts` (Gap 1)
+
+| Test | Priority | Description |
+|------|----------|-------------|
+| sets error state when getLatestPartnerMood rejects | P1 | Verifies error='Unable to load partner mood...', isLoading=false, partnerMood=null |
+| sets disconnected status when subscribeMoodUpdates rejects | P1 | Verifies connectionStatus='disconnected', error='Unable to connect...' |
+
+#### File 2: `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` (Gaps 2, 3, 4)
+
+| Test | Priority | Description |
+|------|----------|-------------|
+| transitions to compose when partner loading resolves with partner data | P1 | Renders isLoadingPartner=true, verifies no unlinked; rerenders with partner, verifies compose |
+| defaults user standout verses to empty array when notes contain invalid JSON | P2 | Malformed JSON in sessionReflection.notes → report renders, standout section absent |
+| defaults partner standout verses to empty array when partner notes contain invalid JSON | P2 | Malformed JSON in partner notes → report renders gracefully |
+| prevents concurrent reflection summary submissions | P2 | Double-submit guard: addReflection called once, second click blocked until first resolves |
+
+#### File 3: `src/utils/__tests__/backgroundSync.test.ts` (Gap 5)
+
+| Test | Priority | Description |
+|------|----------|-------------|
+| should not resolve registerBackgroundSync when service worker never becomes ready | P2 | Replaced misleading timeout/Promise.race test with correct assertion that sync.register is never called |
+
+### Step 5: Validation
+
+```
+3 test files, 143 tests, 0 failures
+- usePartnerMood.test.ts: 9 passed
+- backgroundSync.test.ts: 20 passed
+- SoloReadingFlow.test.tsx: 114 passed
+```
+
+### Priority Breakdown
+
+- P1: 3 tests (error handling + state transition)
+- P2: 4 tests (edge cases + guard + test fix)
+- Total: 7 new/modified tests

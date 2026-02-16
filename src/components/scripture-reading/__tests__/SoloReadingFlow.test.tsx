@@ -1232,6 +1232,35 @@ describe('SoloReadingFlow', () => {
       );
     });
 
+    it('transitions to compose when partner loading resolves with partner data', () => {
+      // Start with partner loading in progress
+      mockStoreState.partner = null;
+      mockStoreState.isLoadingPartner = true;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      const { rerender } = render(<SoloReadingFlow />);
+
+      // During loading: should NOT show unlinked completion and should NOT call markSessionComplete
+      expect(screen.queryByTestId('scripture-unlinked-complete-screen')).toBeNull();
+      expect(mockUpdateSession).not.toHaveBeenCalledWith(
+        'session-123',
+        expect.objectContaining({ status: 'complete' })
+      );
+
+      // Simulate partner loading completing with valid partner data
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.isLoadingPartner = false;
+      rerender(<SoloReadingFlow />);
+
+      // After partner resolution: should show compose (not unlinked)
+      expect(screen.getByTestId('scripture-message-compose-screen')).toBeDefined();
+      expect(screen.queryByTestId('scripture-unlinked-complete-screen')).toBeNull();
+    });
+
     it('sending message calls addMessage service (2.3-INT-003)', async () => {
       mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
@@ -1565,6 +1594,130 @@ describe('SoloReadingFlow', () => {
       // Click return
       fireEvent.click(screen.getByTestId('scripture-report-return-btn'));
       expect(mockExitSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults user standout verses to empty array when session reflection notes contain invalid JSON', async () => {
+      mockGetSessionReportData.mockResolvedValueOnce({
+        reflections: [
+          {
+            id: 'u-summary',
+            sessionId: 'session-123',
+            stepIndex: MAX_STEPS,
+            userId: 'user-456',
+            rating: 4,
+            notes: 'not json{',
+            isShared: false,
+            createdAt: new Date(),
+          },
+        ],
+        bookmarks: [],
+        messages: [],
+      });
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+      // Report should render without crashing — standout verses section absent or empty
+      expect(screen.queryByTestId('scripture-report-user-standout-verses')).toBeNull();
+    });
+
+    it('defaults partner standout verses to empty array when partner reflection notes contain invalid JSON', async () => {
+      mockGetSessionReportData.mockResolvedValueOnce({
+        reflections: [
+          {
+            id: 'p-summary',
+            sessionId: 'session-123',
+            stepIndex: MAX_STEPS,
+            userId: 'partner-1',
+            rating: 5,
+            notes: '{broken json!!!',
+            isShared: true,
+            createdAt: new Date(),
+          },
+        ],
+        bookmarks: [],
+        messages: [],
+      });
+      mockStoreState.partner = linkedPartner;
+      mockStoreState.session = createMockSession({
+        currentPhase: 'report',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+
+      render(<SoloReadingFlow />);
+      fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
+      });
+      // Report should render gracefully — partner standout verses absent or empty
+      expect(screen.queryByTestId('scripture-report-partner-standout-verses')).toBeNull();
+    });
+  });
+
+  // ============================================
+  // Story 2.2: Double-Submit Guard
+  // ============================================
+
+  describe('Story 2.2: Double-Submit Guard', () => {
+    it('prevents concurrent reflection summary submissions', async () => {
+      // Use a deferred promise to control when addReflection resolves
+      let resolveAddReflection!: () => void;
+      mockAddReflection.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveAddReflection = resolve;
+          })
+      );
+
+      mockStoreState.session = createMockSession({
+        currentPhase: 'reflection',
+        status: 'in_progress',
+        currentStepIndex: 16,
+      });
+      // Provide bookmarks so standout verse selection is available
+      mockGetBookmarksBySession.mockResolvedValue([{ stepIndex: 0, userId: 'user-456' }]);
+      render(<SoloReadingFlow />);
+
+      // Wait for bookmark loading
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('scripture-standout-verse-0')).toBeDefined();
+      });
+
+      // Select standout verse, rating, and submit
+      fireEvent.click(screen.getByTestId('scripture-standout-verse-0'));
+      fireEvent.click(screen.getByTestId('scripture-session-rating-4'));
+      fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
+
+      // addReflection should be called once (first submission)
+      expect(mockAddReflection).toHaveBeenCalledTimes(1);
+
+      // Attempt second submission before first resolves — button should be disabled
+      const continueBtn = screen.queryByTestId('scripture-reflection-summary-continue');
+      if (continueBtn) {
+        fireEvent.click(continueBtn);
+      }
+
+      // Still only one call — guard prevented the double submit
+      expect(mockAddReflection).toHaveBeenCalledTimes(1);
+
+      // Resolve the first submission
+      resolveAddReflection();
+
+      // Wait for submission to complete
+      await vi.waitFor(() => {
+        expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+      });
     });
   });
 });
