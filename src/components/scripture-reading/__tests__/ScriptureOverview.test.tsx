@@ -62,6 +62,8 @@ const mockClearScriptureError = vi.fn();
 const mockCheckForActiveSession = vi.fn().mockResolvedValue(undefined);
 const mockClearActiveSession = vi.fn();
 
+const mockLoadCoupleStats = vi.fn().mockResolvedValue(undefined);
+
 const mockStoreState = {
   partner: null as { id: string; displayName: string } | null,
   isLoadingPartner: false,
@@ -87,6 +89,9 @@ const mockStoreState = {
   clearScriptureError: mockClearScriptureError,
   checkForActiveSession: mockCheckForActiveSession,
   clearActiveSession: mockClearActiveSession,
+  coupleStats: null,
+  isStatsLoading: false,
+  loadCoupleStats: mockLoadCoupleStats,
 };
 
 vi.mock('../../../stores/useAppStore', () => ({

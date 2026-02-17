@@ -22,6 +22,8 @@ import {
   type SupabaseBookmark,
   type SupabaseMessage,
 } from '../validation/schemas';
+import { CoupleStatsSchema } from '../api/validation/supabaseSchemas';
+import type { CoupleStats } from '../stores/types';
 
 // ============================================
 // Scripture Error Handling (AC: #3, Subtask 2.10)
@@ -561,6 +563,31 @@ class ScriptureReadingService extends BaseIndexedDBService<
     }
 
     return this.fetchAndCacheMessages(sessionId);
+  }
+
+  // ============================================
+  // Stats (Story 3.1)
+  // ============================================
+
+  /**
+   * Get couple-aggregate stats via Supabase RPC.
+   * Read operation — returns null on failure (per project convention).
+   */
+  async getCoupleStats(): Promise<CoupleStats | null> {
+    try {
+      const { data, error } = await supabase.rpc('scripture_get_couple_stats');
+
+      if (error) {
+        console.warn('[ScriptureService] Failed to fetch couple stats:', error.message);
+        return null;
+      }
+
+      const validated = CoupleStatsSchema.parse(data);
+      return validated;
+    } catch (error) {
+      console.warn('[ScriptureService] Couple stats validation/fetch error:', error);
+      return null;
+    }
   }
 
   // ============================================
