@@ -111,7 +111,7 @@ retro_action_items:
     source: epic-3-retro-2026-02-17
     description: Treat project-structure-boundaries.md as dev-story exit criterion — new files in new directories trigger architecture doc update
   e3-t1-update-structure-boundaries-doc:
-    status: open
+    status: done
     owner: Amelia (Dev)
     priority: low
     source: epic-3-retro-2026-02-17
