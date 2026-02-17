@@ -14,3 +14,4 @@ export { PerStepReflection } from "./reflection/PerStepReflection";
 export { ReflectionSummary } from "./reflection/ReflectionSummary";
 export { MessageCompose } from "./reflection/MessageCompose";
 export { DailyPrayerReport } from "./reflection/DailyPrayerReport";
+export { StatsSection } from "./overview/StatsSection";

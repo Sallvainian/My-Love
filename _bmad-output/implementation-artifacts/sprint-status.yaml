@@ -1,4 +1,4 @@
-# generated: 2026-02-10
+# generated: 2026-02-16
 # project: My-Love
 # project_key: NOKEY
 # tracking_system: file-system
@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-10
+generated: 2026-02-16
 project: My-Love
 project_key: NOKEY
 tracking_system: file-system
@@ -57,9 +57,9 @@ development_status:
   epic-2-retrospective: done
 
   # Epic 3: Stats & Overview Dashboard
-  epic-3: backlog
-  3-1-couple-aggregate-stats-dashboard: backlog
-  epic-3-retrospective: optional
+  epic-3: done
+  3-1-couple-aggregate-stats-dashboard: done
+  epic-3-retrospective: done
 
   # Epic 4: Together Mode — Synchronized Reading
   epic-4: backlog
@@ -96,3 +96,23 @@ retro_action_items:
     status: done
     owner: Bob (SM)
     source: epic-2-retro-2026-02-10
+
+  # Epic 3 process improvements
+  e3-p1-pgtap-couple-relationship-checklist:
+    status: done
+    owner: Dana (QA)
+    priority: high
+    source: epic-3-retro-2026-02-17
+    description: Add couple FK relationship verification to pgTAP test design checklist — multi-table tests must confirm partner_id set before asserting security/aggregation
+  e3-p2-architecture-doc-as-exit-criterion:
+    status: done
+    owner: Charlie (Senior Dev)
+    priority: medium
+    source: epic-3-retro-2026-02-17
+    description: Treat project-structure-boundaries.md as dev-story exit criterion — new files in new directories trigger architecture doc update
+  e3-t1-update-structure-boundaries-doc:
+    status: done
+    owner: Amelia (Dev)
+    priority: low
+    source: epic-3-retro-2026-02-17
+    description: Add StatsSection.tsx to project-structure-boundaries.md for FR42-46 overview/ subfolder

@@ -18,6 +18,9 @@ import type { PartnerSlice } from './slices/partnerSlice';
 import type { NotesSlice } from './slices/notesSlice';
 import type { ScriptureSlice } from './slices/scriptureReadingSlice';
 
+// Re-export Zod-inferred CoupleStats type (single source of truth — Story 3.1)
+export type { CoupleStats } from '../api/validation/supabaseSchemas';
+
 /**
  * AppSlice interface - DEFINED HERE to avoid circular imports.
  * Owns core app state that was previously "root" fields.
