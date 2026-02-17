@@ -16,6 +16,8 @@ src/
 │       │   ├── RoleIndicator.tsx
 │       │   ├── BookmarkFlag.tsx
 │       │   └── PartnerPosition.tsx
+│       ├── overview/
+│       │   └── StatsSection.tsx            # Story 3.1 (FR42-46)
 │       ├── reflection/
 │       │   ├── ReflectionSummary.tsx
 │       │   └── DailyPrayerReport.tsx
@@ -137,7 +139,7 @@ tests/
 | **Together Mode Flow (FR14-29)** | `useScriptureBroadcast.ts`, `LobbyContainer.tsx`, `LockInButton.tsx`, `Countdown.tsx` |
 | **Reflection System (FR30-33)** | `ReflectionSummary.tsx`, `BookmarkFlag.tsx`, `ReflectionContainer.tsx` |
 | **Daily Prayer Report (FR34-41)** | `DailyPrayerReport.tsx`, `ReflectionContainer.tsx` |
-| **Stats & Progress (FR42-46)** | `scriptureReadingService.ts`, `scriptureReadingSlice.ts` |
+| **Stats & Progress (FR42-46)** | `scriptureReadingService.ts`, `scriptureReadingSlice.ts`, `overview/StatsSection.tsx`, `scripture_get_couple_stats` RPC |
 | **Accessibility (FR50-54)** | `useMotionConfig.ts`, all presentational components |
 
 **Cross-Cutting Concerns:**
