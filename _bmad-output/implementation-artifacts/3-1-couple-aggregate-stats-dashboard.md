@@ -70,7 +70,7 @@ So that I can see our progress without gamification pressure.
   - [x] 7.4 `ScriptureOverview` integration test — stats appear on overview page (mock updated)
 - [x] Task 8: Write E2E tests (AC: #1, #2, #3)
   - [x] 8.1 `3.1-E2E-001`: Overview shows stats after completing a session
-  - [x] 8.2 `3.1-E2E-002`: Overview shows zero-state when no completed sessions
+  - [x] 8.2 `3.1-E2E-002`: ~~Overview shows zero-state when no completed sessions~~ — Removed: duplicate coverage with UNIT-004 + pgTAP DB-003; not parallel-safe without mocking
 
 ### Review Follow-ups (AI)
 
