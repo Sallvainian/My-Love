@@ -99,13 +99,13 @@ retro_action_items:
 
   # Epic 3 process improvements
   e3-p1-pgtap-couple-relationship-checklist:
-    status: open
+    status: done
     owner: Dana (QA)
     priority: high
     source: epic-3-retro-2026-02-17
     description: Add couple FK relationship verification to pgTAP test design checklist — multi-table tests must confirm partner_id set before asserting security/aggregation
   e3-p2-architecture-doc-as-exit-criterion:
-    status: open
+    status: done
     owner: Charlie (Senior Dev)
     priority: medium
     source: epic-3-retro-2026-02-17
