@@ -271,7 +271,7 @@ export const UserArraySchema = z.array(SupabaseUserSchema);
 export const CoupleStatsSchema = z.object({
   totalSessions: z.number().int().min(0),
   totalSteps: z.number().int().min(0),
-  lastCompleted: z.string().nullable(),
+  lastCompleted: TimestampSchema.nullable(),
   avgRating: z.number().min(0).max(5),
   bookmarkCount: z.number().int().min(0),
 });

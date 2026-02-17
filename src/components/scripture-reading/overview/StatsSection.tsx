@@ -16,17 +16,21 @@ function formatRelativeDate(isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffSeconds = Math.floor(diffMs / 1000);
 
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return '1 day ago';
-  if (diffDays < 30) return `${diffDays} days ago`;
-  if (diffDays < 365) {
-    const months = Math.floor(diffDays / 30);
-    return months === 1 ? '1 month ago' : `${months} months ago`;
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+  if (Math.abs(diffSeconds) < 86400) return rtf.format(0, 'day'); // "today"
+  if (Math.abs(diffSeconds) < 2592000) {
+    const days = -Math.floor(diffSeconds / 86400);
+    return rtf.format(days, 'day');
   }
-  const years = Math.floor(diffDays / 365);
-  return years === 1 ? '1 year ago' : `${years} years ago`;
+  if (Math.abs(diffSeconds) < 31536000) {
+    const months = -Math.floor(diffSeconds / 2592000);
+    return rtf.format(months, 'month');
+  }
+  const years = -Math.floor(diffSeconds / 31536000);
+  return rtf.format(years, 'year');
 }
 
 function isZeroState(stats: CoupleStats): boolean {

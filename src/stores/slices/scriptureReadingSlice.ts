@@ -442,7 +442,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       } else {
         set({ isStatsLoading: false });
       }
-    } catch {
+    } catch (error) {
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.SYNC_FAILED,
+        message: error instanceof Error ? error.message : 'Failed to load couple stats',
+        details: error,
+      };
+      handleScriptureError(scriptureError);
       set({ isStatsLoading: false });
     }
   },

@@ -18,16 +18,8 @@ import type { PartnerSlice } from './slices/partnerSlice';
 import type { NotesSlice } from './slices/notesSlice';
 import type { ScriptureSlice } from './slices/scriptureReadingSlice';
 
-/**
- * Couple-aggregate scripture reading stats (Story 3.1).
- */
-export interface CoupleStats {
-  totalSessions: number;
-  totalSteps: number;
-  lastCompleted: string | null;
-  avgRating: number;
-  bookmarkCount: number;
-}
+// Re-export Zod-inferred CoupleStats type (single source of truth — Story 3.1)
+export type { CoupleStats } from '../api/validation/supabaseSchemas';
 
 /**
  * AppSlice interface - DEFINED HERE to avoid circular imports.

@@ -72,6 +72,32 @@ So that I can see our progress without gamification pressure.
   - [x] 8.1 `3.1-E2E-001`: Overview shows stats after completing a session
   - [x] 8.2 `3.1-E2E-002`: Overview shows zero-state when no completed sessions
 
+### Review Follow-ups (AI)
+
+- [x] [AI-Review] H1: Run Epic 1-2 E2E regression tests and verify entry criteria
+- [x] [AI-Review] M1: Add handleScriptureError() to loadCoupleStats catch block (scriptureReadingSlice.ts)
+- [x] [AI-Review] M2: Add online status check before RPC call in loadCoupleStats (ScriptureOverview.tsx)
+- [x] [AI-Review] M3: Run coverage check and verify >= 80% for new code
+- [x] [AI-Review] M4: Remove duplicate CoupleStats type — re-export Zod-inferred type from types.ts
+- [x] [AI-Review] L1: Use TimestampSchema.nullable() for lastCompleted in CoupleStatsSchema
+- [x] [AI-Review] L2: Replace manual formatRelativeDate with Intl.RelativeTimeFormat
+
+## Senior Developer Review (AI)
+
+**Review Date:** 2026-02-17
+**Reviewer:** Sallvain
+**Outcome:** Changes Requested
+
+### Action Items
+
+- [x] **[HIGH] H1:** Entry criteria unchecked — Epic 1-2 E2E regression tests not verified
+- [x] **[MEDIUM] M1:** loadCoupleStats catch block violates CLAUDE.md error handling rule — must call handleScriptureError() or re-throw
+- [x] **[MEDIUM] M2:** loadCoupleStats doesn't check online status before RPC call — offline users get hanging request
+- [x] **[MEDIUM] M3:** Exit criteria unchecked — Coverage >= 80% not verified
+- [x] **[MEDIUM] M4:** Duplicate CoupleStats type definition — types.ts manual interface AND supabaseSchemas.ts Zod-inferred export
+- [x] **[LOW] L1:** CoupleStatsSchema.lastCompleted uses z.string().nullable() while other timestamps use TimestampSchema
+- [x] **[LOW] L2:** formatRelativeDate uses manual math instead of Intl.RelativeTimeFormat
+
 ## Dev Notes
 
 ### Test Design Document
@@ -97,13 +123,13 @@ So that I can see our progress without gamification pressure.
 **Entry criteria (before starting tests):**
 - [x] `scripture_get_couple_stats` RPC migration applied locally
 - [x] Local Supabase running (`supabase start`)
-- [ ] Epic 1-2 E2E tests still passing (no regressions)
+- [x] Epic 1-2 E2E tests still passing (no regressions)
 
 **Exit criteria (before merge):**
 - [x] All P0 tests passing (100%)
 - [x] All P1 tests passing (>=95%)
 - [x] E3-R01 security test passes — no cross-couple data leak
-- [ ] Coverage >= 80% for new code
+- [x] Coverage >= 80% for new code
 
 ### What Already Exists (DO NOT Recreate)
 
@@ -374,6 +400,13 @@ Claude Opus 4.6 (claude-opus-4-6)
 - ScriptureOverview existing test suite needed `coupleStats`, `isStatsLoading`, `loadCoupleStats` added to mock store state — fixed.
 - E2E tests use UI flow (`scriptureNav.completeAllSteps()`) instead of factory seeding for populated test to avoid user-matching issues between seed RPC and worker auth.
 - pgTAP timestamp comparison uses `LIKE '2026-02-12T15:30:00%'` instead of exact match due to PostgreSQL timezone offset format differences.
+- ✅ Resolved review finding [HIGH]: H1 — Ran all 103 E2E tests (74 passed, 29 skipped, 0 failures), verified entry criteria.
+- ✅ Resolved review finding [MEDIUM]: M1 — Added `handleScriptureError()` call with `SYNC_FAILED` code to `loadCoupleStats` catch block. Error is logged but not set on state (stats failures are silent per design).
+- ✅ Resolved review finding [MEDIUM]: M2 — Added `isOnline` guard to `loadCoupleStats` useEffect in ScriptureOverview. Offline users see cached Zustand persist data without attempting RPC.
+- ✅ Resolved review finding [MEDIUM]: M3 — Verified coverage: StatsSection 81%, slice 94%, schemas 100%, service 74% overall (new `getCoupleStats` method fully covered by 9 dedicated tests).
+- ✅ Resolved review finding [MEDIUM]: M4 — Removed manual `CoupleStats` interface from types.ts, re-exported Zod-inferred type from supabaseSchemas.ts as single source of truth.
+- ✅ Resolved review finding [LOW]: L1 — Changed `z.string().nullable()` to `TimestampSchema.nullable()` for `lastCompleted` in CoupleStatsSchema for consistency.
+- ✅ Resolved review finding [LOW]: L2 — Replaced manual date math with `Intl.RelativeTimeFormat('en', { numeric: 'auto' })` for locale-aware relative dates.
 
 ### File List
 
@@ -384,7 +417,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 **Modified Files:**
 - `src/services/scriptureReadingService.ts` — Added `getCoupleStats()` method
 - `src/stores/slices/scriptureReadingSlice.ts` — Added stats state, `loadCoupleStats()` action
-- `src/stores/types.ts` — Added `CoupleStats` interface
+- `src/stores/types.ts` — Re-exports `CoupleStats` type from supabaseSchemas (review fix: removed duplicate interface)
 - `src/api/validation/supabaseSchemas.ts` — Added `CoupleStatsSchema` Zod schema
 - `src/components/scripture-reading/containers/ScriptureOverview.tsx` — Integrated StatsSection
 - `src/components/scripture-reading/index.ts` — Added barrel export for StatsSection

@@ -216,11 +216,12 @@ export function ScriptureOverview() {
   }, [loadPartner]);
 
   // Story 3.1: Load couple stats on mount (after partner loading)
+  // Skip RPC call when offline — show cached stats from Zustand persist
   useEffect(() => {
-    if (!isLoadingPartner) {
+    if (!isLoadingPartner && isOnline) {
       void loadCoupleStats();
     }
-  }, [isLoadingPartner, loadCoupleStats]);
+  }, [isLoadingPartner, isOnline, loadCoupleStats]);
 
   // Check for incomplete solo session on mount (AC #6)
   // Re-check when session becomes null (e.g., after save-and-exit)

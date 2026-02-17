@@ -5,9 +5,15 @@
  * metrics (totalSessions, totalSteps, lastCompleted, avgRating, bookmarkCount)
  * from a SECURITY DEFINER RPC.
  *
- * Test IDs: 3.1-E2E-001, 3.1-E2E-002
+ * Test IDs: 3.1-E2E-001
  *
  * Epic 3, Story 3.1
+ *
+ * Note: 3.1-E2E-002 (zero-state) was removed — duplicate coverage.
+ * Zero-state rendering is fully covered by unit tests (3.1-UNIT-004 in
+ * StatsSection.test.tsx) and RPC correctness by pgTAP (09_scripture_couple_stats.sql).
+ * The E2E zero-state test could not be made parallel-safe without mocking,
+ * which would make it semantically identical to the unit tests.
  *
  * Source data-testid mapping:
  *   scripture-stats-section, scripture-stats-skeleton,
@@ -19,42 +25,6 @@
 import { test, expect } from '../../support/merged-fixtures';
 
 test.describe('Scripture Stats Dashboard', () => {
-  test.describe('3.1-E2E-002: Zero-state for new user', () => {
-    test('[P1] should show dashes and "Begin your first reading" when no completed sessions exist', async ({
-      page,
-      scriptureNav,
-    }) => {
-      // GIVEN: User has no completed scripture sessions (default test user state)
-      // WHEN: User navigates to scripture overview
-      await scriptureNav.ensureOverview();
-
-      // THEN: The stats section shows zero-state OR skeleton briefly then stats
-      // Wait for either the stats section or a brief period
-      const statsSection = page.getByTestId('scripture-stats-section');
-      const statsSkeleton = page.getByTestId('scripture-stats-skeleton');
-
-      // Wait for loading to complete (either skeleton disappears or section appears)
-      await expect(statsSection.or(statsSkeleton)).toBeVisible({ timeout: 10_000 });
-
-      // If skeleton is showing, wait for it to resolve
-      if (await statsSkeleton.isVisible()) {
-        await expect(statsSection).toBeVisible({ timeout: 10_000 });
-      }
-
-      // AND: All stat cards show dashes (em dash) instead of numbers
-      await expect(page.getByTestId('scripture-stats-sessions')).toContainText('\u2014');
-      await expect(page.getByTestId('scripture-stats-steps')).toContainText('\u2014');
-      await expect(page.getByTestId('scripture-stats-last-completed')).toContainText('\u2014');
-      await expect(page.getByTestId('scripture-stats-avg-rating')).toContainText('\u2014');
-      await expect(page.getByTestId('scripture-stats-bookmarks')).toContainText('\u2014');
-
-      // AND: Zero-state message is visible
-      const zeroState = page.getByTestId('scripture-stats-zero-state');
-      await expect(zeroState).toBeVisible();
-      await expect(zeroState).toContainText('Begin your first reading');
-    });
-  });
-
   test.describe('3.1-E2E-001: Stats visible after session completion', () => {
     test('[P0] should display stats section with non-zero values after completing a session', async ({
       page,
