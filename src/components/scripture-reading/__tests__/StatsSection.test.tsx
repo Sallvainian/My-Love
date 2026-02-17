@@ -275,12 +275,16 @@ describe('StatsSection', () => {
   });
 
   // ============================================
-  // Edge case: stats=null and isLoading=false renders nothing
+  // Edge case: stats=null and isLoading=false shows zero-state (L2 fix)
+  // When RPC fails and no cached data exists, show dashes instead of vanishing.
   // ============================================
   describe('Null state (no data, not loading)', () => {
-    it('should render nothing when stats is null and isLoading is false', () => {
-      const { container } = render(<StatsSection stats={null} isLoading={false} />);
-      expect(container.innerHTML).toBe('');
+    it('should show zero-state with dashes when stats is null and isLoading is false', () => {
+      render(<StatsSection stats={null} isLoading={false} />);
+      expect(screen.getByTestId('scripture-stats-section')).toBeInTheDocument();
+      expect(screen.getByTestId('scripture-stats-sessions')).toHaveTextContent('\u2014');
+      expect(screen.getByTestId('scripture-stats-zero-state')).toBeInTheDocument();
+      expect(screen.getByText('Begin your first reading')).toBeInTheDocument();
     });
   });
 });

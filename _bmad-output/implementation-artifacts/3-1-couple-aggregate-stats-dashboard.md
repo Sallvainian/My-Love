@@ -82,13 +82,22 @@ So that I can see our progress without gamification pressure.
 - [x] [AI-Review] L1: Use TimestampSchema.nullable() for lastCompleted in CoupleStatsSchema
 - [x] [AI-Review] L2: Replace manual formatRelativeDate with Intl.RelativeTimeFormat
 
+### Review Follow-ups Round 2 (AI)
+
+- [x] [AI-Review-R2] H1: Fix pgTAP test data to insert public.users with partner_id — validate actual couple aggregation
+- [x] [AI-Review-R2] M1: Combine RPC's 4 separate queries using CTE for performance
+- [x] [AI-Review-R2] M2: Hoist Intl.RelativeTimeFormat to module-level constant in StatsSection
+- [x] [AI-Review-R2] M3: Fix stale RED PHASE comment and DB-003 couple vs solo mismatch in pgTAP tests
+- [x] [AI-Review-R2] L1: Note architecture doc deviation (StatsSection not listed in project-structure-boundaries.md)
+- [x] [AI-Review-R2] L2: Handle null stats after failed load — show dashes instead of empty fragment
+
 ## Senior Developer Review (AI)
 
-**Review Date:** 2026-02-17
+### Review Round 1 (2026-02-17)
 **Reviewer:** Sallvain
-**Outcome:** Changes Requested
+**Outcome:** Changes Requested → All Resolved
 
-### Action Items
+#### Action Items (Round 1)
 
 - [x] **[HIGH] H1:** Entry criteria unchecked — Epic 1-2 E2E regression tests not verified
 - [x] **[MEDIUM] M1:** loadCoupleStats catch block violates CLAUDE.md error handling rule — must call handleScriptureError() or re-throw
@@ -97,6 +106,19 @@ So that I can see our progress without gamification pressure.
 - [x] **[MEDIUM] M4:** Duplicate CoupleStats type definition — types.ts manual interface AND supabaseSchemas.ts Zod-inferred export
 - [x] **[LOW] L1:** CoupleStatsSchema.lastCompleted uses z.string().nullable() while other timestamps use TimestampSchema
 - [x] **[LOW] L2:** formatRelativeDate uses manual math instead of Intl.RelativeTimeFormat
+
+### Review Round 2 (2026-02-17)
+**Reviewer:** Sallvain
+**Outcome:** Changes Requested → All Resolved
+
+#### Action Items (Round 2)
+
+- [x] **[HIGH] H1:** pgTAP tests don't validate couple aggregation — partner_id never set in test data, tests pass by coincidence
+- [x] **[MEDIUM] M1:** RPC performance — 4 separate sequential queries with identical WHERE; combine using CTE
+- [x] **[MEDIUM] M2:** Intl.RelativeTimeFormat allocated per-call in formatRelativeDate; hoist to module constant
+- [x] **[MEDIUM] M3:** pgTAP stale "RED PHASE" header + DB-003 tests solo user not couple zero-state
+- [x] **[LOW] L1:** project-structure-boundaries.md doesn't list StatsSection.tsx for FR42-46 (doc update, not code)
+- [x] **[LOW] L2:** StatsSection returns empty fragment <></> when stats=null && !isLoading — should show dashes
 
 ## Dev Notes
 
@@ -407,11 +429,18 @@ Claude Opus 4.6 (claude-opus-4-6)
 - ✅ Resolved review finding [MEDIUM]: M4 — Removed manual `CoupleStats` interface from types.ts, re-exported Zod-inferred type from supabaseSchemas.ts as single source of truth.
 - ✅ Resolved review finding [LOW]: L1 — Changed `z.string().nullable()` to `TimestampSchema.nullable()` for `lastCompleted` in CoupleStatsSchema for consistency.
 - ✅ Resolved review finding [LOW]: L2 — Replaced manual date math with `Intl.RelativeTimeFormat('en', { numeric: 'auto' })` for locale-aware relative dates.
+- ✅ [R2] Resolved review finding [HIGH]: H1 — pgTAP tests now set partner_id in public.users for all 3 test couples (A/B, C/D, E/F). Added DB-001e (user_b sees both couple A sessions via partner_id) and DB-001f (user_d sees couple C session with no own sessions). Plan 11→13.
+- ✅ [R2] Resolved review finding [MEDIUM]: M1 — Rewrote RPC to use CTE `couple_sessions`: filter completed sessions once, then aggregate all 5 metrics via sub-selects. Reduces 4 sequential queries to 1 CTE-based query.
+- ✅ [R2] Resolved review finding [MEDIUM]: M2 — Hoisted `Intl.RelativeTimeFormat` to module-level `relativeFormatter` constant in StatsSection.tsx. No per-call allocation.
+- ✅ [R2] Resolved review finding [MEDIUM]: M3 — Removed stale "RED PHASE" header from pgTAP test. DB-003 now tests proper couple (E+F) with partner_id set, not a solo user.
+- ✅ [R2] Resolved review finding [LOW]: L1 — Noted: `project-structure-boundaries.md` omits `StatsSection.tsx` from FR42-46 file list. Architecture doc update needed (out of dev-story scope).
+- ✅ [R2] Resolved review finding [LOW]: L2 — StatsSection now shows zero-state (dashes + "Begin your first reading") when stats is null and not loading, instead of returning empty fragment. Unit test updated to match.
 
 ### File List
 
 **New Files:**
 - `supabase/migrations/20260217150353_scripture_couple_stats.sql` — RPC + index
+- `supabase/migrations/20260217184551_optimize_couple_stats_rpc.sql` — R2-M1: CTE-optimized RPC (replaces 4 queries with 1)
 - `src/components/scripture-reading/overview/StatsSection.tsx` — Presentational stats component
 
 **Modified Files:**
@@ -425,7 +454,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 - `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` — Added mock state for stats
 
 **Test Files:**
-- `supabase/tests/database/09_scripture_couple_stats.sql` — 11 pgTAP tests (DB-001, DB-002, DB-003)
+- `supabase/tests/database/09_scripture_couple_stats.sql` — 13 pgTAP tests (DB-001 a-f, DB-002, DB-003)
 - `src/components/scripture-reading/__tests__/StatsSection.test.tsx` — 25 unit tests (UNIT-001 through UNIT-012)
 - `tests/unit/services/scriptureReadingService.stats.test.ts` — 9 unit tests (UNIT-005, UNIT-006, UNIT-013)
 - `tests/unit/stores/scriptureReadingSlice.stats.test.ts` — 6 unit tests (UNIT-007)

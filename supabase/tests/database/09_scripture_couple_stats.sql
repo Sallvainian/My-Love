@@ -3,9 +3,6 @@
 --
 -- Story 3.1: Couple-Aggregate Stats Dashboard
 -- Test IDs: 3.1-DB-001 (P0), 3.1-DB-002 (P0), 3.1-DB-003 (P2)
---
--- These tests are RED PHASE — the RPC does not exist yet.
--- They will fail with "function scripture_get_couple_stats does not exist".
 -- ============================================
 
 begin;
@@ -13,7 +10,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(11);
+select plan(13);
 
 -- ============================================
 -- Helpers (reuse existing pattern from 03_scripture_rpcs.sql)
@@ -36,9 +33,10 @@ begin
 end; $$;
 
 -- ============================================
--- Setup: Create two couples (A+B, C+D)
--- Couple A: user_a (sessions + reflections + bookmarks)
--- Couple C: user_c (no sessions — zero-state test)
+-- Setup: Create two couples (A+B, C+D) and a zero-state couple (E+F)
+-- Couple A: user_a + user_b (sessions + reflections + bookmarks)
+-- Couple C: user_c + user_d (1 session from user_c)
+-- Couple E: user_e + user_f (no sessions — zero-state test)
 -- ============================================
 do $$
 declare
@@ -46,6 +44,8 @@ declare
   v_user_b uuid;
   v_user_c uuid;
   v_user_d uuid;
+  v_user_e uuid;
+  v_user_f uuid;
   v_session_1 uuid;
   v_session_2 uuid;
   v_session_3 uuid;
@@ -54,15 +54,40 @@ begin
   v_user_a := tests.create_test_user('couple_stats_a@test.com');
   v_user_b := tests.create_test_user('couple_stats_b@test.com');
 
-  -- Create users for couple C (no sessions)
+  -- Create users for couple C
   v_user_c := tests.create_test_user('couple_stats_c@test.com');
   v_user_d := tests.create_test_user('couple_stats_d@test.com');
+
+  -- Create users for couple E (zero-state)
+  v_user_e := tests.create_test_user('couple_stats_e@test.com');
+  v_user_f := tests.create_test_user('couple_stats_f@test.com');
+
+  -- ============================================
+  -- Set partner_id linkage in public.users
+  -- The sync_user_profile() trigger already created rows when auth.users was inserted.
+  -- The RPC looks up partner_id from public.users to aggregate couple data.
+  -- Without partner_id set, v_partner_id is always NULL and couple aggregation is untested.
+  -- ============================================
+
+  -- Couple A: user_a <-> user_b
+  update public.users set partner_id = v_user_b where id = v_user_a;
+  update public.users set partner_id = v_user_a where id = v_user_b;
+
+  -- Couple C: user_c <-> user_d
+  update public.users set partner_id = v_user_d where id = v_user_c;
+  update public.users set partner_id = v_user_c where id = v_user_d;
+
+  -- Couple E: user_e <-> user_f (zero-state — no sessions)
+  update public.users set partner_id = v_user_f where id = v_user_e;
+  update public.users set partner_id = v_user_e where id = v_user_f;
 
   -- Store user IDs for later tests
   perform set_config('tests.stats_user_a', v_user_a::text, true);
   perform set_config('tests.stats_user_b', v_user_b::text, true);
   perform set_config('tests.stats_user_c', v_user_c::text, true);
   perform set_config('tests.stats_user_d', v_user_d::text, true);
+  perform set_config('tests.stats_user_e', v_user_e::text, true);
+  perform set_config('tests.stats_user_f', v_user_f::text, true);
 
   -- ============================================
   -- Seed data for couple A: 3 sessions, 2 completed
@@ -161,6 +186,8 @@ $$;
 -- 3.1-DB-001 (P0): RPC data isolation
 -- User A must NOT see couple C's stats.
 -- User C must NOT see couple A's stats.
+-- User B (partner of A) must see same couple A stats as user A.
+-- User D (partner of C) must see couple C stats via partner linkage.
 -- This is the highest-priority security test (E3-R01, risk score 6).
 -- ============================================
 
@@ -211,6 +238,45 @@ select is(
 select ok(
   abs((current_setting('tests.stats_result_c')::jsonb->>'avgRating')::numeric - 1.0) < 0.01,
   '3.1-DB-001d: User C avg rating is 1.0, not contaminated by couple A ratings'
+);
+
+-- Test: user_b (partner of A) should see BOTH couple A sessions via partner_id linkage
+-- This proves couple aggregation works — user_b sees user_a's solo session (session 1)
+-- even though user_b is NOT user1_id or user2_id on that session.
+select tests.authenticate_as(current_setting('tests.stats_user_b')::uuid);
+
+do $$
+declare
+  v_result jsonb;
+begin
+  v_result := scripture_get_couple_stats();
+  perform set_config('tests.stats_result_b', v_result::text, true);
+end;
+$$;
+
+select is(
+  (current_setting('tests.stats_result_b')::jsonb->>'totalSessions')::int,
+  2,
+  '3.1-DB-001e: User B (partner) sees both couple A sessions (2) via partner_id linkage'
+);
+
+-- Test: user_d (partner of C, has no own sessions) should see couple C's session
+-- This proves partner_id lookup works for users with no sessions of their own.
+select tests.authenticate_as(current_setting('tests.stats_user_d')::uuid);
+
+do $$
+declare
+  v_result jsonb;
+begin
+  v_result := scripture_get_couple_stats();
+  perform set_config('tests.stats_result_d', v_result::text, true);
+end;
+$$;
+
+select is(
+  (current_setting('tests.stats_result_d')::jsonb->>'totalSessions')::int,
+  1,
+  '3.1-DB-001f: User D (partner, no own sessions) sees couple C session (1) via partner_id'
 );
 
 -- ============================================
@@ -266,20 +332,9 @@ select is(
 
 -- ============================================
 -- 3.1-DB-003 (P2): Zero-state — couple with no sessions
--- User D (couple C/D) has no sessions of their own.
--- But user_c has sessions, so test with a brand new couple.
+-- Couple E (user_e + user_f) has partner_id set but no sessions.
+-- Both partners should see zero-state metrics.
 -- ============================================
-
--- Create a completely fresh couple with no data
-do $$
-declare
-  v_user_e uuid;
-begin
-  v_user_e := tests.create_test_user('couple_stats_e@test.com');
-  perform set_config('tests.stats_user_e', v_user_e::text, true);
-end;
-$$;
-
 select tests.authenticate_as(current_setting('tests.stats_user_e')::uuid);
 
 do $$
