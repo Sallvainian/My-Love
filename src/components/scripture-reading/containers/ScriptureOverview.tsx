@@ -32,6 +32,7 @@ import { MAX_STEPS } from '../../../data/scriptureSteps';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { SoloReadingFlow } from './SoloReadingFlow';
+import { StatsSection } from '../overview/StatsSection';
 
 // Lavender Dreams design tokens
 const scriptureTheme = {
@@ -176,6 +177,9 @@ export function ScriptureOverview() {
     clearActiveSession,
     clearScriptureError,
     checkForActiveSession,
+    coupleStats,
+    isStatsLoading,
+    loadCoupleStats,
   } = useAppStore(
     useShallow((state) => ({
       session: state.session,
@@ -189,6 +193,9 @@ export function ScriptureOverview() {
       clearActiveSession: state.clearActiveSession,
       clearScriptureError: state.clearScriptureError,
       checkForActiveSession: state.checkForActiveSession,
+      coupleStats: state.coupleStats,
+      isStatsLoading: state.isStatsLoading,
+      loadCoupleStats: state.loadCoupleStats,
     }))
   );
 
@@ -207,6 +214,14 @@ export function ScriptureOverview() {
   useEffect(() => {
     loadPartner();
   }, [loadPartner]);
+
+  // Story 3.1: Load couple stats on mount (after partner loading)
+  // Skip RPC call when offline — show cached stats from Zustand persist
+  useEffect(() => {
+    if (!isLoadingPartner && isOnline) {
+      void loadCoupleStats();
+    }
+  }, [isLoadingPartner, isOnline, loadCoupleStats]);
 
   // Check for incomplete solo session on mount (AC #6)
   // Re-check when session becomes null (e.g., after save-and-exit)
@@ -312,6 +327,9 @@ export function ScriptureOverview() {
           <h1 className="text-2xl font-bold text-purple-900 font-serif">Scripture Reading</h1>
           <p className="text-purple-700 mt-1">Read and reflect together</p>
         </header>
+
+        {/* Story 3.1: Stats Section */}
+        <StatsSection stats={coupleStats} isLoading={isStatsLoading} />
 
         {/* Partner Status Area */}
         <section className="space-y-4" aria-label="Partner status">

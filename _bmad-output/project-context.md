@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-02-09'
+date: '2026-02-17'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 65
+rule_count: 75
 optimized_for_llm: true
 ---
 
@@ -53,6 +53,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Env vars:** Access via `import.meta.env.VITE_*` — never use `process.env` in client code
 - **Module system:** ESM only (`"type": "module"` in package.json) — `.cjs` extension required for CommonJS scripts
 - **Dual validation:** Local schemas in `src/validation/schemas.ts` validate IndexedDB writes; API response schemas in `src/api/validation/supabaseSchemas.ts` validate Supabase responses — agents must use the correct schema layer
+- **Re-export Zod types via `stores/types.ts`:** Zod-inferred types from `src/api/validation/supabaseSchemas.ts` that are consumed by UI components must be re-exported through `src/stores/types.ts` using `export type { X } from '../api/validation/supabaseSchemas'` — this is the single source of truth; never import from `supabaseSchemas.ts` directly in components (Story 3.1: `CoupleStats` pattern)
 
 ### Framework-Specific Rules (React + Zustand)
 
@@ -72,6 +73,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Two data models:** Most features are offline-first (IndexedDB primary, Supabase syncs). Scripture reading is the opposite — online-first (Supabase RPC is source of truth, IndexedDB is read cache). Agents must check which model a feature uses before implementing data layer code.
 - **PendingRetry pattern:** Scripture feature uses `isPendingLockIn`/`isPendingReflection` flags + `retryFailedWrite()` for graceful offline recovery of failed Supabase writes
 - **React 19 hooks lint rules:** `react-hooks/set-state-in-effect` and `react-hooks/purity` are set to `warn` (not error) — legitimate patterns like blob URL lifecycle and timer setup trigger these
+- **Stats stale-cache preservation:** When a Zustand action loads stats via an RPC (e.g., `loadCoupleStats()`), only update state if the result is non-null — preserve cached data on failure. Always reset `isStatsLoading` in a `finally` block so loading state never gets stuck.
+- **Skeleton first-load pattern:** Use `showSkeleton = isLoading && !stats` — render the skeleton loader only when no cached data exists. If stale data is available, show it during refresh rather than a full skeleton.
+- **Zero-state fallback over empty fragment:** When an API returns null post-load, use `effectiveData = data ?? zeroStateObject` to render a zero-state display instead of returning an empty fragment or hiding the section. Pair with an `isZeroState(data)` guard to show the zero-state message.
 
 ### Testing Rules
 
@@ -86,6 +90,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Test file relaxations:** Test files allow `@ts-ignore`, unused vars, empty patterns, non-standard hook usage — see `eslint.config.js` test overrides
 - **Currents CI reporting:** Playwright uses `@currents/playwright` reporter for CI test result aggregation — configured in `playwright.config.ts`
 - **E2E local Supabase:** Playwright config auto-detects local Supabase via `supabase status -o env` and sets `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` — E2E tests require `supabase start` running locally
+- **pgTAP test ID format:** Database tests follow `{story}-DB-{N03d}` format (e.g., `3.1-DB-001`, `3.1-DB-001a`) — include the test ID in the `is()`/`ok()` message string so failures are traceable to stories
+- **pgTAP RPC isolation requirement:** Any pgTAP test for a SECURITY DEFINER RPC touching couple data must verify both directions: (a) User A cannot see Couple B's data, and (b) both partners see their shared couple aggregate (partner B sees partner A's solo sessions). Use `tests.authenticate_as()` + `set_config('request.jwt.claims', ...)` to simulate different auth contexts within a single test transaction.
+- **E2E zero-state removal rule:** Do NOT write E2E tests for zero-state UI rendering when the state requires a clean database and cannot be made parallel-safe without mocking. That scenario is covered by unit tests (component rendering) + pgTAP (RPC correctness). An E2E test with mocks is semantically identical to the unit test and adds no value.
 
 ### Code Quality & Style Rules
 
@@ -97,6 +104,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Validation at boundaries:** Zod schemas in `src/validation/schemas.ts` validate data entering the app from Supabase — validate in the service layer before IndexedDB writes
 - **IndexedDB services:** All IndexedDB services extend `BaseIndexedDBService<T>` — call `await service.init()` before use; implements initialization guard against concurrent setup
 - **Per-feature ESLint overrides:** Scripture Reading files (`src/services/scriptureReadingService.ts`, `src/stores/slices/scriptureReadingSlice.ts`, `src/hooks/useScriptureBroadcast.ts`, `src/components/scripture-reading/**`) have their own strict `no-explicit-any` enforcement block in `eslint.config.js` — new features with similar strictness requirements should follow this pattern
+- **`data-testid` for metric cards:** Stats/metrics cards use `{feature}-stats-{metric}` naming (e.g., `scripture-stats-sessions`, `scripture-stats-last-completed`, `scripture-stats-avg-rating`). The wrapping section uses `{feature}-stats-section` and the skeleton uses `{feature}-stats-skeleton`.
 
 ### Development Workflow Rules
 
@@ -122,6 +130,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Scripture is the exception:** Unlike every other feature, scripture reading is online-first — writes go to Supabase RPC first (throw on failure), IndexedDB is just a read cache. Do NOT apply the offline-first pattern to scripture code.
 - **Don't mix validation layers:** `src/validation/schemas.ts` is for local data entering IndexedDB; `src/api/validation/supabaseSchemas.ts` is for validating API responses from Supabase. Using the wrong layer will cause silent data corruption or false validation failures.
 - **E2E imports:** Always `import { test, expect } from 'tests/support/merged-fixtures'` in E2E tests — importing directly from `@playwright/test` will miss custom fixtures and auth setup
+- **SECURITY DEFINER RPC for couple-aggregate queries:** When a query must aggregate data across both partners in ways RLS can't express (e.g., user A seeing user B's solo sessions), use a `SECURITY DEFINER` RPC with `set search_path = ''`. Validate auth internally via `v_user_id := (select auth.uid())` and raise exception if null. Grant `execute` to `authenticated` role. Plain queries with RLS cannot satisfy this requirement.
+- **CTE-based RPC aggregation:** RPCs that compute multiple aggregates from the same base dataset must use a single CTE to filter once, then compute all metrics via sub-selects. Never write 4+ sequential queries against the same filtered rows — see `20260217184551_optimize_couple_stats_rpc.sql` for the established pattern.
 
 ---
 
@@ -141,4 +151,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-02-10
+Last Updated: 2026-02-17

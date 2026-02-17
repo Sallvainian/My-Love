@@ -95,3 +95,6 @@ skills/
 .cursor/rules/openmemory.mdc
 .todos/
 .sidecar/
+
+# Auto Claude data directory
+.auto-claude/
