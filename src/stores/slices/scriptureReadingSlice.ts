@@ -6,7 +6,7 @@
  * Follows StateCreator<AppState, AppMiddleware, [], ScriptureSlice> pattern.
  */
 
-import type { AppStateCreator } from '../types';
+import type { AppStateCreator, CoupleStats } from '../types';
 import { scriptureReadingService } from '../../services/scriptureReadingService';
 import type { ScriptureError } from '../../services/scriptureReadingService';
 import { ScriptureErrorCode, handleScriptureError } from '../../services/scriptureReadingService';
@@ -69,6 +69,9 @@ export interface ScriptureReadingState {
   isCheckingSession: boolean;
   // Story 1.4: Retry state
   pendingRetry: PendingRetry | null;
+  // Story 3.1: Couple stats
+  coupleStats: CoupleStats | null;
+  isStatsLoading: boolean;
 }
 
 // ============================================
@@ -90,6 +93,8 @@ export interface ScriptureSlice extends ScriptureReadingState {
   saveSession: () => Promise<void>;
   abandonSession: (sessionId: string) => Promise<void>;
   retryFailedWrite: () => Promise<void>;
+  // Story 3.1: Stats actions
+  loadCoupleStats: () => Promise<void>;
 }
 
 // ============================================
@@ -107,6 +112,8 @@ const initialScriptureState: ScriptureReadingState = {
   activeSession: null,
   isCheckingSession: false,
   pendingRetry: null,
+  coupleStats: null,
+  isStatsLoading: false,
 };
 
 // ============================================
@@ -421,6 +428,22 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           pendingRetry: { ...pendingRetry, attempts: newAttempts },
         });
       }
+    }
+  },
+
+  // Story 3.1: Load couple-aggregate stats from server
+  loadCoupleStats: async () => {
+    set({ isStatsLoading: true });
+
+    try {
+      const stats = await scriptureReadingService.getCoupleStats();
+      if (stats) {
+        set({ coupleStats: stats, isStatsLoading: false });
+      } else {
+        set({ isStatsLoading: false });
+      }
+    } catch {
+      set({ isStatsLoading: false });
     }
   },
 });

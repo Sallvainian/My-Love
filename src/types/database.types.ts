@@ -462,6 +462,7 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      get_my_partner_id: { Args: never; Returns: string }
       is_scripture_session_member: {
         Args: { p_session_id: string }
         Returns: boolean
@@ -470,6 +471,7 @@ export type Database = {
         Args: { p_mode: string; p_partner_id?: string }
         Returns: Json
       }
+      scripture_get_couple_stats: { Args: never; Returns: Json }
       scripture_seed_test_data: {
         Args: {
           p_include_messages?: boolean

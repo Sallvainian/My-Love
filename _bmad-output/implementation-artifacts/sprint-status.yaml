@@ -58,7 +58,7 @@ development_status:
 
   # Epic 3: Stats & Overview Dashboard
   epic-3: in-progress
-  3-1-couple-aggregate-stats-dashboard: backlog
+  3-1-couple-aggregate-stats-dashboard: review
   epic-3-retrospective: optional
 
   # Epic 4: Together Mode — Synchronized Reading
