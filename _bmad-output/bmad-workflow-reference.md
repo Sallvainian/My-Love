@@ -87,8 +87,8 @@ Epic End
 
 | Step | Command | Notes |
 |------|---------|-------|
-| TR | `/bmad_tea_trace` | Traceability matrix + gate decision. P0 requires 100% coverage, P1 ≥90% PASS, overall ≥80%. Two-phase: mapping then gate decision |
 | NR | `/bmad_tea_nfr-assess` | NFR validation (security, performance, reliability, maintainability). Evidence-based PASS/CONCERNS/FAIL with mitigation plans |
+| TR | `/bmad_tea_trace` | Traceability matrix + gate decision. P0 requires 100% coverage, P1 ≥90% PASS, overall ≥80%. Two-phase: mapping then gate decision |
 | ER | `/bmad-bmm-retrospective` | Lessons learned, plan next epic (optional) |
 
 #### Quick View — TEA Track
@@ -103,7 +103,7 @@ Epic Start
   │  (CC if scope changes)
   │
 Epic End
-  └─ TR → NR → ER
+  └─ NR → TR → ER
 ```
 
 ---
