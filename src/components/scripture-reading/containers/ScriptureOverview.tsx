@@ -32,6 +32,7 @@ import { MAX_STEPS } from '../../../data/scriptureSteps';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { SoloReadingFlow } from './SoloReadingFlow';
+import { LobbyContainer } from './LobbyContainer';
 import { StatsSection } from '../overview/StatsSection';
 
 // Lavender Dreams design tokens
@@ -67,15 +68,12 @@ interface ModeCardProps {
 }
 
 function ModeCard({ title, description, icon, onClick, disabled, variant, testId }: ModeCardProps) {
-  const baseClasses =
-    `w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm ${FOCUS_RING}`;
+  const baseClasses = `w-full p-6 rounded-2xl transition-all duration-200 text-left min-h-[120px] flex flex-col backdrop-blur-sm ${FOCUS_RING}`;
   const variantClasses =
     variant === 'primary'
       ? 'bg-purple-500/90 text-white hover:bg-purple-600/90 active:bg-purple-700/90 border border-purple-400/50'
       : 'bg-white/80 border border-purple-200/50 text-gray-800 hover:border-purple-400 active:bg-purple-50/80';
-  const disabledClasses = disabled
-    ? 'opacity-50 cursor-not-allowed'
-    : 'cursor-pointer';
+  const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
 
   return (
     <button
@@ -85,7 +83,7 @@ function ModeCard({ title, description, icon, onClick, disabled, variant, testId
       data-testid={testId}
       type="button"
     >
-      <div className="flex items-center gap-3 mb-2">
+      <div className="mb-2 flex items-center gap-3">
         {icon}
         <span className="text-lg font-semibold">{title}</span>
       </div>
@@ -99,8 +97,8 @@ function ModeCard({ title, description, icon, onClick, disabled, variant, testId
 function PartnerStatusSkeleton() {
   return (
     <div className="animate-pulse" data-testid="partner-status-skeleton">
-      <div className="h-4 bg-purple-200 rounded w-3/4 mb-2" />
-      <div className="h-3 bg-purple-100 rounded w-1/2" />
+      <div className="mb-2 h-4 w-3/4 rounded bg-purple-200" />
+      <div className="h-3 w-1/2 rounded bg-purple-100" />
     </div>
   );
 }
@@ -113,7 +111,7 @@ function PartnerLinkMessage({ onLinkPartner }: PartnerLinkMessageProps) {
   return (
     <button
       onClick={onLinkPartner}
-      className={`w-full p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-700 hover:bg-purple-100 transition-colors text-left ${FOCUS_RING}`}
+      className={`w-full rounded-xl border border-purple-200 bg-purple-50 p-4 text-left text-purple-700 transition-colors hover:bg-purple-100 ${FOCUS_RING}`}
       data-testid="link-partner-message"
       type="button"
     >
@@ -125,7 +123,7 @@ function PartnerLinkMessage({ onLinkPartner }: PartnerLinkMessageProps) {
 // Solo icon component
 function SoloIcon() {
   return (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -139,7 +137,7 @@ function SoloIcon() {
 // Together icon component
 function TogetherIcon() {
   return (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -305,6 +303,15 @@ export function ScriptureOverview() {
     return <SoloReadingFlow />;
   }
 
+  // Story 4.1: Route to LobbyContainer for together-mode lobby and countdown phases
+  if (
+    session &&
+    session.mode === 'together' &&
+    (session.currentPhase === 'lobby' || session.currentPhase === 'countdown')
+  ) {
+    return <LobbyContainer />;
+  }
+
   return (
     <main
       className="min-h-screen p-4"
@@ -312,20 +319,15 @@ export function ScriptureOverview() {
       data-testid="scripture-overview"
     >
       {/* Story 1.5: Screen reader announcer (AC #2) */}
-      <div
-        className="sr-only"
-        aria-live="polite"
-        aria-atomic="true"
-        data-testid="sr-announcer"
-      >
+      <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
         {announcement}
       </div>
 
-      <div className="max-w-md mx-auto space-y-6">
+      <div className="mx-auto max-w-md space-y-6">
         {/* Header with Playfair Display */}
-        <header className="text-center pt-4 pb-2">
-          <h1 className="text-2xl font-bold text-purple-900 font-serif">Scripture Reading</h1>
-          <p className="text-purple-700 mt-1">Read and reflect together</p>
+        <header className="pt-4 pb-2 text-center">
+          <h1 className="font-serif text-2xl font-bold text-purple-900">Scripture Reading</h1>
+          <p className="mt-1 text-purple-700">Read and reflect together</p>
         </header>
 
         {/* Story 3.1: Stats Section */}
@@ -340,18 +342,19 @@ export function ScriptureOverview() {
         {/* Resume Prompt (AC #6) */}
         {!isCheckingSession && activeSession && !showModes && (
           <section
-            className="bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-5 space-y-4"
+            className="space-y-4 rounded-2xl border border-purple-200/50 bg-white/80 p-5 backdrop-blur-sm"
             data-testid="resume-prompt"
             aria-label="Resume session"
           >
-            <p className="text-purple-900 font-medium">
-              Continue where you left off? (Step {activeSession.currentStepIndex + 1} of {MAX_STEPS})
+            <p className="font-medium text-purple-900">
+              Continue where you left off? (Step {activeSession.currentStepIndex + 1} of {MAX_STEPS}
+              )
             </p>
             <div className="flex gap-3">
               <button
                 onClick={handleContinue}
                 disabled={isSessionLoading}
-                className={`flex-1 py-3 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-medium hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[48px] ${FOCUS_RING}`}
+                className={`min-h-[48px] flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
                 data-testid="resume-continue"
                 type="button"
               >
@@ -359,7 +362,7 @@ export function ScriptureOverview() {
               </button>
               <button
                 onClick={handleStartFresh}
-                className={`py-3 px-4 text-purple-600 hover:text-purple-800 font-medium min-h-[48px] rounded-lg ${FOCUS_RING}`}
+                className={`min-h-[48px] rounded-lg px-4 py-3 font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
                 data-testid="resume-start-fresh"
                 type="button"
               >
@@ -372,14 +375,23 @@ export function ScriptureOverview() {
         {/* Story 1.4: Offline indicator for overview (AC #4) */}
         {!isOnline && (
           <div
-            className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm flex items-center gap-2"
+            className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"
             data-testid="offline-indicator"
             role="status"
             aria-live="polite"
           >
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z" />
+            <svg
+              className="h-4 w-4 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z"
+              />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
             </svg>
             <span>You&apos;re offline</span>
@@ -389,13 +401,23 @@ export function ScriptureOverview() {
         {/* Error Display — Story 1.5: warning icon for color independence (AC #5) */}
         {sessionError && (
           <div
-            className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm flex items-center gap-2"
+            className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
             data-testid="session-error"
             role="alert"
           >
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-testid="error-icon">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            <svg
+              className="h-4 w-4 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              data-testid="error-icon"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
             </svg>
             <span>{getErrorMessage(sessionError)}</span>
           </div>
@@ -406,7 +428,7 @@ export function ScriptureOverview() {
           <button
             onClick={handleStart}
             disabled={!isOnline}
-            className={`w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 min-h-[56px] shadow-lg shadow-purple-500/25 ${FOCUS_RING}`}
+            className={`min-h-[56px] w-full rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
             data-testid="scripture-start-button"
             type="button"
           >
@@ -417,7 +439,7 @@ export function ScriptureOverview() {
         {/* Loading skeleton while checking for active session */}
         {!showModes && isCheckingSession && (
           <div
-            className="w-full h-[56px] bg-purple-200/50 rounded-2xl animate-pulse"
+            className="h-[56px] w-full animate-pulse rounded-2xl bg-purple-200/50"
             data-testid="session-check-loading"
           />
         )}
@@ -436,10 +458,7 @@ export function ScriptureOverview() {
             >
               {/* Loading overlay during session creation */}
               {isSessionLoading && (
-                <div
-                  className="text-center text-purple-600 py-2"
-                  data-testid="session-loading"
-                >
+                <div className="py-2 text-center text-purple-600" data-testid="session-loading">
                   Creating session...
                 </div>
               )}
@@ -473,7 +492,7 @@ export function ScriptureOverview() {
               {partnerStatus === 'unlinked' && (
                 <button
                   onClick={handleLinkPartner}
-                  className={`w-full text-center text-purple-600 hover:text-purple-800 text-sm font-medium py-2 min-h-[44px] rounded-lg ${FOCUS_RING}`}
+                  className={`min-h-[44px] w-full rounded-lg py-2 text-center text-sm font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
                   data-testid="setup-partner-link"
                   type="button"
                 >

@@ -21,9 +21,41 @@ import { MAX_STEPS } from '../../data/scriptureSteps';
 // Re-export for consumer convenience
 export type { SessionPhase, SessionMode, ScriptureSession };
 
+// Story 4.1: Role type for together-mode lobby
+export type SessionRole = 'reader' | 'responder';
+
+// Story 4.1: Payload shape broadcast by server RPCs via 'state_updated' event
+export interface StateUpdatePayload {
+  sessionId: string;
+  currentPhase: SessionPhase;
+  version: number;
+  user1Role?: SessionRole | null;
+  user2Role?: SessionRole | null;
+  user1Ready: boolean;
+  user2Ready: boolean;
+  countdownStartedAt?: number | null; // Server UTC ms or null
+}
+
 // ============================================
 // Helpers
 // ============================================
+
+/**
+ * Type-safe wrapper for new lobby RPCs not yet registered in database.types.ts.
+ * Remove once `supabase gen types typescript --local` is run after migration.
+ */
+async function callLobbyRpc(
+  fn: string,
+  args: Record<string, unknown>
+): Promise<{ data: unknown; error: { message: string } | null }> {
+  // Cast required because these RPCs postdate the last types regeneration.
+  // This is safe — the RPC exists in the migration; types are stale, not wrong.
+  type UntypedRpc = (
+    fn: string,
+    args: Record<string, unknown>
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  return (supabase.rpc as unknown as UntypedRpc)(fn, args);
+}
 
 function isScriptureError(value: unknown): value is ScriptureError {
   return (
@@ -72,6 +104,12 @@ export interface ScriptureReadingState {
   // Story 3.1: Couple stats
   coupleStats: CoupleStats | null;
   isStatsLoading: boolean;
+  // Story 4.1: Lobby state
+  myRole: SessionRole | null;
+  partnerJoined: boolean;
+  myReady: boolean;
+  partnerReady: boolean;
+  countdownStartedAt: number | null; // Server UTC ms — stored as number (JSON-safe, not Date)
 }
 
 // ============================================
@@ -95,6 +133,14 @@ export interface ScriptureSlice extends ScriptureReadingState {
   retryFailedWrite: () => Promise<void>;
   // Story 3.1: Stats actions
   loadCoupleStats: () => Promise<void>;
+  // Story 4.1: Lobby actions
+  selectRole: (role: SessionRole) => Promise<void>;
+  toggleReady: (isReady: boolean) => Promise<void>;
+  convertToSolo: () => Promise<void>;
+  onPartnerJoined: () => void;
+  onPartnerReady: (isReady: boolean) => void;
+  onCountdownStarted: (startTs: number) => void;
+  onBroadcastReceived: (payload: StateUpdatePayload) => void;
 }
 
 // ============================================
@@ -114,6 +160,12 @@ const initialScriptureState: ScriptureReadingState = {
   pendingRetry: null,
   coupleStats: null,
   isStatsLoading: false,
+  // Story 4.1: Lobby initial state
+  myRole: null,
+  partnerJoined: false,
+  myReady: false,
+  partnerReady: false,
+  countdownStartedAt: null,
 };
 
 // ============================================
@@ -146,9 +198,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      const session = await scriptureReadingService.getSession(
-        sessionId,
-        (refreshed) => set({ session: refreshed })
+      const session = await scriptureReadingService.getSession(sessionId, (refreshed) =>
+        set({ session: refreshed })
       );
 
       if (!session) {
@@ -420,7 +471,11 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       if (newAttempts >= pendingRetry.maxAttempts) {
         // Max attempts reached — clear retry but keep error
-        set({ scriptureError, isSyncing: false, pendingRetry: { ...pendingRetry, attempts: newAttempts } });
+        set({
+          scriptureError,
+          isSyncing: false,
+          pendingRetry: { ...pendingRetry, attempts: newAttempts },
+        });
       } else {
         set({
           scriptureError,
@@ -451,5 +506,178 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       handleScriptureError(scriptureError);
       set({ isStatsLoading: false });
     }
+  },
+
+  // ============================================================
+  // Story 4.1: Lobby actions
+  // ============================================================
+
+  // Calls scripture_select_role RPC, updates local myRole, sets phase to 'lobby'
+  selectRole: async (role) => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    set({ scriptureLoading: true, scriptureError: null });
+
+    try {
+      const { data, error } = await callLobbyRpc('scripture_select_role', {
+        p_session_id: session.id,
+        p_role: role,
+      });
+
+      if (error) throw error;
+
+      const snapshot = data as unknown as StateUpdatePayload;
+      set({
+        myRole: role,
+        scriptureLoading: false,
+        session: {
+          ...session,
+          currentPhase: snapshot.currentPhase,
+          version: snapshot.version,
+        },
+      });
+    } catch (error) {
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.SYNC_FAILED,
+        message: error instanceof Error ? error.message : 'Failed to select role',
+        details: error,
+      };
+      handleScriptureError(scriptureError);
+      set({ scriptureError, scriptureLoading: false });
+    }
+  },
+
+  // Optimistically sets myReady, calls scripture_toggle_ready RPC, rolls back on error
+  toggleReady: async (isReady) => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    // Optimistic update
+    set({ myReady: isReady });
+
+    try {
+      const { data, error } = await callLobbyRpc('scripture_toggle_ready', {
+        p_session_id: session.id,
+        p_is_ready: isReady,
+      });
+
+      if (error) throw error;
+
+      const snapshot = data as unknown as StateUpdatePayload;
+      // Update session phase/version from server response
+      set((currentState) => ({
+        session: currentState.session
+          ? {
+              ...currentState.session,
+              currentPhase: snapshot.currentPhase,
+              version: snapshot.version,
+            }
+          : null,
+        // Update countdownStartedAt if server triggered countdown
+        countdownStartedAt:
+          snapshot.countdownStartedAt != null
+            ? snapshot.countdownStartedAt
+            : currentState.countdownStartedAt,
+      }));
+    } catch (error) {
+      // Roll back optimistic update on failure
+      set({ myReady: !isReady });
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.SYNC_FAILED,
+        message: error instanceof Error ? error.message : 'Failed to toggle ready state',
+        details: error,
+      };
+      handleScriptureError(scriptureError);
+      set({ scriptureError });
+    }
+  },
+
+  // Calls scripture_convert_to_solo RPC, resets lobby state, moves to solo reading
+  convertToSolo: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    set({ scriptureLoading: true, scriptureError: null });
+
+    try {
+      const { error } = await callLobbyRpc('scripture_convert_to_solo', {
+        p_session_id: session.id,
+      });
+
+      if (error) throw error;
+
+      set({
+        scriptureLoading: false,
+        myRole: null,
+        partnerJoined: false,
+        myReady: false,
+        partnerReady: false,
+        countdownStartedAt: null,
+        session: {
+          ...session,
+          mode: 'solo' as SessionMode,
+          currentPhase: 'reading' as SessionPhase,
+          status: 'in_progress',
+        },
+      });
+    } catch (error) {
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.SYNC_FAILED,
+        message: error instanceof Error ? error.message : 'Failed to convert to solo',
+        details: error,
+      };
+      handleScriptureError(scriptureError);
+      set({ scriptureError, scriptureLoading: false });
+    }
+  },
+
+  // Called when partner joins the broadcast channel
+  onPartnerJoined: () => {
+    set({ partnerJoined: true });
+  },
+
+  // Called when partner's ready state changes via broadcast
+  onPartnerReady: (isReady) => {
+    set({ partnerReady: isReady });
+  },
+
+  // Called when server starts the countdown (both users ready)
+  onCountdownStarted: (startTs) => {
+    const state = get();
+    const { session } = state;
+    set({
+      countdownStartedAt: startTs,
+      session: session ? { ...session, currentPhase: 'countdown' as SessionPhase } : null,
+    });
+  },
+
+  // Called when 'state_updated' broadcast received — version-checked snapshot update
+  onBroadcastReceived: (payload) => {
+    const state = get();
+    const { session } = state;
+
+    // Version check: only apply if received version is newer
+    if (session && payload.version <= session.version) return;
+
+    set((currentState) => ({
+      session: currentState.session
+        ? {
+            ...currentState.session,
+            currentPhase: payload.currentPhase,
+            version: payload.version,
+          }
+        : null,
+      // Update partner ready from snapshot (user2Ready tracks partner in most cases)
+      partnerReady: payload.user2Ready,
+      // Update countdownStartedAt if server set it
+      countdownStartedAt:
+        payload.countdownStartedAt != null
+          ? payload.countdownStartedAt
+          : currentState.countdownStartedAt,
+    }));
   },
 });
