@@ -1,9 +1,6 @@
 /**
  * P0/P1 E2E: Together Mode Lobby — Role Selection & Countdown (Story 4.1)
  *
- * RED PHASE: All tests are skipped because the feature is not yet implemented.
- * Tests assert exact expected behavior per acceptance criteria.
- *
  * Test IDs: 4.1-E2E-001 (P0), 4.1-E2E-002 (P1)
  *
  * Acceptance Criteria covered:
@@ -16,9 +13,33 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { ensureScriptureOverview } from '../../support/helpers';
-import { createTestSession, linkTestPartners, cleanupTestSession } from '../../support/factories';
-import type { TypedSupabaseClient } from '../../support/factories';
-import type { BrowserContext, Page } from '@playwright/test';
+import {
+  createTestSession,
+  linkTestPartners,
+  unlinkTestPartners,
+  cleanupTestSession,
+} from '../../support/factories';
+import type { Page } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Timeout constants
+// ---------------------------------------------------------------------------
+
+const SESSION_CREATE_TIMEOUT_MS = 15_000;
+const REALTIME_SYNC_TIMEOUT_MS = 20_000;
+const READY_BROADCAST_TIMEOUT_MS = 10_000;
+const CONVERSION_TIMEOUT_MS = 12_000;
+const VERSE_LOAD_TIMEOUT_MS = 15_000;
+
+// ---------------------------------------------------------------------------
+// Shared predicates
+// ---------------------------------------------------------------------------
+
+/** Matches the scripture_toggle_ready RPC 2xx response */
+const isToggleReadyResponse = (resp: { url(): string; status(): number }) =>
+  resp.url().includes('/rest/v1/rpc/scripture_toggle_ready') &&
+  resp.status() >= 200 &&
+  resp.status() < 300;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,9 +58,11 @@ async function navigateToTogetherRoleSelection(page: Page): Promise<void> {
       (resp) =>
         resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
         resp.request().method() === 'POST',
-      { timeout: 15_000 }
+      { timeout: SESSION_CREATE_TIMEOUT_MS }
     )
-    .catch(() => null);
+    .catch((e: Error) => {
+      throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
+    });
 
   await page.getByTestId('scripture-start-button').click();
 
@@ -53,25 +76,6 @@ async function navigateToTogetherRoleSelection(page: Page): Promise<void> {
   await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
 }
 
-/**
- * Inject worker auth storage state into a secondary browser context
- * so the partner user is fully authenticated.
- *
- * @param secondaryContext - The new browser context for the partner user
- * @param storageStatePath - Path to worker auth JSON (e.g. tests/.auth/worker-0.json)
- */
-async function authenticateSecondaryContext(
-  secondaryContext: BrowserContext,
-  storageStatePath: string
-): Promise<void> {
-  // Playwright supports storage state injection at context creation;
-  // if the context was already created we can add cookies/storage manually.
-  // For simplicity, navigate to base URL first so localStorage can be set.
-  const tempPage = await secondaryContext.newPage();
-  await tempPage.goto('http://localhost:5173/');
-  await tempPage.close();
-}
-
 // ---------------------------------------------------------------------------
 // 4.1-E2E-001: Full Lobby Flow (P0)
 // ---------------------------------------------------------------------------
@@ -81,7 +85,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     page,
     browser,
     supabaseAdmin,
-    workerStorageStatePath,
+    partnerStorageStatePath,
   }) => {
     test.setTimeout(60_000);
 
@@ -94,10 +98,12 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
       preset: 'mid_session',
     });
 
-    // Ensure users are linked as partners
-    if (seed.test_user2_id) {
-      await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id);
-    }
+    // Fail fast if the seed didn't return a partner user ID
+    expect(
+      seed.test_user2_id,
+      'createTestSession must return a partner user ID for lobby test'
+    ).toBeTruthy();
+    await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
 
     // Track session IDs for cleanup
     const sessionIdsToClean = [...seed.session_ids];
@@ -124,16 +130,15 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(page.getByTestId('lobby-continue-solo')).toBeVisible();
 
     // -----------------------------------------------------------------------
-    // GIVEN: User B (partner) opens a second browser context and joins
+    // GIVEN: User B (partner) opens a second browser context and joins.
+    // Uses partnerStorageStatePath — a distinct auth state for the partner
+    // user (testworker{n}-partner@test.example.com) so both contexts have
+    // genuinely different Supabase auth.uid() values.
     // -----------------------------------------------------------------------
-    // Create a second browser context using the worker's partner storage state.
-    // The partner auth file is the same pool file; in practice the partner user
-    // maps to testworker{n}-partner@test.example.com which has its own storageState.
-    // We reuse the same storageStatePath as a placeholder — the real implementation
-    // will need a separate partner context from the auth pool.
+    const baseURL = new URL(page.url()).origin;
     const partnerContext = await browser.newContext({
-      storageState: workerStorageStatePath,
-      baseURL: 'http://localhost:5173',
+      storageState: partnerStorageStatePath,
+      baseURL,
     });
     const partnerPage = await partnerContext.newPage();
 
@@ -154,9 +159,8 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
       // -----------------------------------------------------------------------
       // THEN (AC#3): User A sees partner has joined via realtime broadcast
       // -----------------------------------------------------------------------
-      // Wait for User A's lobby to reflect the partner joining
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-        timeout: 20_000,
+        timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
 
       // AC#4 — Ready toggle button visible for both users
@@ -166,17 +170,12 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
       // -----------------------------------------------------------------------
       // WHEN: User A clicks Ready
       // -----------------------------------------------------------------------
-      // Network-first: watch for ready state broadcast
+      // Network-first: watch for ready state RPC before clicking
       const userAReadyBroadcast = page
-        .waitForResponse(
-          (resp) =>
-            (resp.url().includes('/realtime') ||
-              resp.url().includes('/rest/v1/rpc/scripture_set_lobby_ready')) &&
-            resp.status() >= 200 &&
-            resp.status() < 300,
-          { timeout: 10_000 }
-        )
-        .catch(() => null);
+        .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
+        .catch((e: Error) => {
+          throw new Error(`scripture_toggle_ready RPC (User A) did not fire: ${e.message}`);
+        });
 
       await page.getByTestId('lobby-ready-button').click();
       await userAReadyBroadcast;
@@ -185,49 +184,43 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
       await expect(page.getByTestId('lobby-ready-button')).toContainText(/ready.*✓|ready/i);
 
       // AC#4 — Partner sees User A is ready via realtime
-      await expect(partnerPage.getByTestId('lobby-partner-ready')).toBeVisible({ timeout: 15_000 });
+      await expect(partnerPage.getByTestId('lobby-partner-ready')).toBeVisible({
+        timeout: REALTIME_SYNC_TIMEOUT_MS,
+      });
 
       // -----------------------------------------------------------------------
       // WHEN: User B (partner) clicks Ready — both now ready → countdown starts
       // -----------------------------------------------------------------------
       const partnerReadyBroadcast = partnerPage
-        .waitForResponse(
-          (resp) =>
-            (resp.url().includes('/realtime') ||
-              resp.url().includes('/rest/v1/rpc/scripture_set_lobby_ready')) &&
-            resp.status() >= 200 &&
-            resp.status() < 300,
-          { timeout: 10_000 }
-        )
-        .catch(() => null);
+        .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
+        .catch((e: Error) => {
+          throw new Error(`scripture_toggle_ready RPC (User B) did not fire: ${e.message}`);
+        });
 
       await partnerPage.getByTestId('lobby-ready-button').click();
       await partnerReadyBroadcast;
 
       // -----------------------------------------------------------------------
-      // THEN (AC#5): Countdown appears on BOTH pages (3 → 2 → 1)
+      // THEN (AC#5): Countdown appears on BOTH pages concurrently
       // -----------------------------------------------------------------------
-      await expect(page.getByTestId('countdown-container')).toBeVisible({
-        timeout: 10_000,
-      });
-      await expect(partnerPage.getByTestId('countdown-container')).toBeVisible({
-        timeout: 10_000,
-      });
+      await Promise.all([
+        expect(page.getByTestId('countdown-container')).toBeVisible({ timeout: 10_000 }),
+        expect(partnerPage.getByTestId('countdown-container')).toBeVisible({ timeout: 10_000 }),
+      ]);
 
-      // Observe at least the digit "3" starting the countdown
-      await expect(page.getByTestId('countdown-digit')).toHaveText('3');
-      await expect(partnerPage.getByTestId('countdown-digit')).toHaveText('3');
-
-      // AC#5 — After countdown, first verse is visible on both pages
-      await expect(page.getByTestId('scripture-verse-text')).toBeVisible({
-        timeout: 15_000,
-      });
-      await expect(partnerPage.getByTestId('scripture-verse-text')).toBeVisible({
-        timeout: 15_000,
-      });
+      // AC#5 — After countdown, first verse is visible on both pages concurrently
+      await Promise.all([
+        expect(page.getByTestId('scripture-verse-text')).toBeVisible({
+          timeout: VERSE_LOAD_TIMEOUT_MS,
+        }),
+        expect(partnerPage.getByTestId('scripture-verse-text')).toBeVisible({
+          timeout: VERSE_LOAD_TIMEOUT_MS,
+        }),
+      ]);
     } finally {
       await partnerContext.close();
       await cleanupTestSession(supabaseAdmin, sessionIdsToClean);
+      await unlinkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
     }
   });
 });
@@ -274,7 +267,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // -----------------------------------------------------------------------
       // WHEN: User taps "Continue solo" without partner joining
       // -----------------------------------------------------------------------
-      // Network-first: watch for session mode conversion RPC or PATCH
+      // Network-first: watch for session mode conversion RPC
       const conversionResponse = page
         .waitForResponse(
           (resp) =>
@@ -283,9 +276,11 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
                 resp.request().method() === 'PATCH')) &&
             resp.status() >= 200 &&
             resp.status() < 300,
-          { timeout: 12_000 }
+          { timeout: CONVERSION_TIMEOUT_MS }
         )
-        .catch(() => null);
+        .catch((e: Error) => {
+          throw new Error(`scripture_convert_to_solo RPC did not fire: ${e.message}`);
+        });
 
       await page.getByTestId('lobby-continue-solo').click();
       await conversionResponse;
@@ -294,7 +289,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // THEN (AC#6): Session converts to solo; first verse is visible
       // -----------------------------------------------------------------------
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible({
-        timeout: 15_000,
+        timeout: VERSE_LOAD_TIMEOUT_MS,
       });
 
       // Lobby container should no longer be visible

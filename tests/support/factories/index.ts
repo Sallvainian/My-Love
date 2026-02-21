@@ -107,6 +107,29 @@ export async function linkTestPartners(
 }
 
 /**
+ * Unlink two test users (remove bidirectional partner relationship).
+ *
+ * Reverses the effect of linkTestPartners by clearing partner_id for both
+ * users. Call in finally blocks to prevent partner state from leaking into
+ * subsequent tests within the same worker.
+ *
+ * @param supabase - Supabase client (must have service role for admin access)
+ * @param user1Id - First user's UUID
+ * @param user2Id - Second user's UUID
+ *
+ * @example
+ * await unlinkTestPartners(supabase, result.test_user1_id, result.test_user2_id);
+ */
+export async function unlinkTestPartners(
+  supabase: TypedSupabaseClient,
+  user1Id: string,
+  user2Id: string
+): Promise<void> {
+  await supabase.from('users').update({ partner_id: null }).eq('id', user1Id);
+  await supabase.from('users').update({ partner_id: null }).eq('id', user2Id);
+}
+
+/**
  * Clean up test scripture sessions and all related data.
  *
  * Deletes data in the correct order to respect foreign key constraints:

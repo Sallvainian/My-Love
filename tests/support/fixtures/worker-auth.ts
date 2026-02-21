@@ -3,6 +3,9 @@
  *
  * Provides worker-isolated storage state paths so parallel workers do not
  * share the same authenticated user/session data.
+ *
+ * Exposes both primary user and partner user storage states, enabling
+ * genuine two-user E2E tests (e.g. together-mode lobby).
  */
 import { test as base } from '@playwright/test';
 import { existsSync } from 'fs';
@@ -34,8 +37,15 @@ function getWorkerAuthPath(workerIndex: number): string {
   return resolve(process.cwd(), 'tests', '.auth', `worker-${normalizedWorkerIndex}.json`);
 }
 
+function getWorkerPartnerAuthPath(workerIndex: number): string {
+  const poolSize = getAuthPoolSize();
+  const normalizedWorkerIndex = ((workerIndex % poolSize) + poolSize) % poolSize;
+  return resolve(process.cwd(), 'tests', '.auth', `worker-${normalizedWorkerIndex}-partner.json`);
+}
+
 type WorkerAuthFixture = {
   workerStorageStatePath: string;
+  partnerStorageStatePath: string;
 };
 
 export const test = base.extend<WorkerAuthFixture>({
@@ -45,6 +55,20 @@ export const test = base.extend<WorkerAuthFixture>({
       if (!existsSync(authPath)) {
         throw new Error(
           `[worker-auth] Missing storage state file: ${authPath}. ` +
+            'Run the setup project to generate worker auth states.'
+        );
+      }
+      await use(authPath);
+    },
+    { scope: 'worker' },
+  ],
+
+  partnerStorageStatePath: [
+    async ({}, use, workerInfo) => {
+      const authPath = getWorkerPartnerAuthPath(workerInfo.workerIndex);
+      if (!existsSync(authPath)) {
+        throw new Error(
+          `[worker-auth] Missing partner storage state file: ${authPath}. ` +
             'Run the setup project to generate worker auth states.'
         );
       }
