@@ -1,0 +1,39 @@
+name: Bundle Size
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: bundle-size-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle-size:
+    name: Check Bundle Size
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Check compressed bundle size
+        uses: preactjs/compressed-size-action@v2
+        with:
+          build-script: build
+          pattern: './dist/**/*.{js,mjs,cjs,css}'
+          strip-hash: '\-[A-Za-z0-9_-]{8}\.'
+          compression: brotli
+          minimum-change-threshold: 100
