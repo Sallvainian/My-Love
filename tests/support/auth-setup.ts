@@ -59,6 +59,10 @@ function getWorkerAuthFile(workerIndex: number): string {
   return `${AUTH_DIR}/worker-${workerIndex}.json`;
 }
 
+function getWorkerPartnerAuthFile(workerIndex: number): string {
+  return `${AUTH_DIR}/worker-${workerIndex}-partner.json`;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -286,11 +290,7 @@ setup('authenticate worker test users', async ({ browser }) => {
 
   // Ensure each worker user has a dedicated linked partner account.
   for (let workerIndex = 0; workerIndex < authPoolSize; workerIndex++) {
-    await linkUserPair(
-      admin,
-      getWorkerEmail(workerIndex),
-      getWorkerPartnerEmail(workerIndex)
-    );
+    await linkUserPair(admin, getWorkerEmail(workerIndex), getWorkerPartnerEmail(workerIndex));
   }
 
   mkdirSync(AUTH_DIR, { recursive: true });
@@ -314,6 +314,15 @@ setup('authenticate worker test users', async ({ browser }) => {
       getWorkerEmail(workerIndex),
       TEST_USER_PASSWORD,
       getWorkerAuthFile(workerIndex)
+    );
+    // Generate partner auth state for multi-user (together-mode) tests.
+    await signInAndPersistStorageState(
+      browser,
+      url!,
+      anonKey!,
+      getWorkerPartnerEmail(workerIndex),
+      TEST_USER_PASSWORD,
+      getWorkerPartnerAuthFile(workerIndex)
     );
   }
 });

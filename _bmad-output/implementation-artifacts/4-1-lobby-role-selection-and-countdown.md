@@ -416,6 +416,7 @@ claude-sonnet-4-6
 
 ### Completion Notes List
 
+- ✅ Resolved TEA review findings (2026-02-21): Added `partnerStorageStatePath` fixture (auth-setup.ts generates worker-{n}-partner.json; worker-auth.ts exposes fixture); removed dead `authenticateSecondaryContext` function; replaced all 4 `.catch(() => null)` with error-throwing handlers; removed racy countdown-digit assertion (replaced with `Promise.all` container visible + verse visible); added `unlinkTestPartners` to finally block; narrowed `waitForResponse` to `scripture_toggle_ready` endpoint; extracted shared predicate; added timeout constants; removed stale RED PHASE header; added `unlinkTestPartners` to factories.
 - Implemented all 11 tasks in a single session (2026-02-20).
 - Tasks 1 & 2 combined in one migration file `20260220000001_scripture_lobby_and_roles.sql`: ENUM, ALTER TABLE (role/ready/countdown columns), realtime.messages RLS (SELECT+INSERT), and three RPCs (scripture_select_role, scripture_toggle_ready, scripture_convert_to_solo).
 - All RPCs use SECURITY INVOKER, set search_path = '', fully qualified table names, grant EXECUTE to authenticated.
@@ -429,6 +430,10 @@ claude-sonnet-4-6
 
 ### File List
 
+- tests/support/auth-setup.ts (modified — generates worker-{n}-partner.json auth states)
+- tests/support/fixtures/worker-auth.ts (modified — exposes partnerStorageStatePath fixture)
+- tests/support/factories/index.ts (modified — adds unlinkTestPartners function)
+- tests/e2e/scripture/scripture-lobby-4.1.spec.ts (modified — TEA review quality fixes)
 - supabase/migrations/20260220000001_scripture_lobby_and_roles.sql (new)
 - src/stores/slices/scriptureReadingSlice.ts (modified)
 - src/services/dbSchema.ts (modified)
@@ -450,4 +455,5 @@ claude-sonnet-4-6
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-02-21 | TEA review fix-up: added partnerStorageStatePath fixture (auth-setup.ts + worker-auth.ts), added unlinkTestPartners to factories, rewrote E2E spec with error-throwing .catch handlers, removed racy countdown-digit assertion, extracted shared predicate, used Promise.all for dual-page assertions, removed dead authenticateSecondaryContext function. | claude-sonnet-4-6 |
 | 2026-02-20 | Implemented all 11 tasks: DB migration (role ENUM, columns, RLS, 3 RPCs), slice lobby state/actions, useScriptureBroadcast hook, LobbyContainer (3 phases), Countdown component, ScriptureOverview routing, dbSchema types, pgTAP tests, unit tests, E2E tests. All 678 unit tests pass. | claude-sonnet-4-6 |
