@@ -31,7 +31,7 @@ So that we begin reading together with shared anticipation.
 **Given** a user toggles Ready
 **When** their ready state changes
 **Then** the broadcast sends the ready state to the partner
-**And** the button updates: "Ready" (primary) or "Not Ready" (secondary)
+**And** the button updates: "I'm Ready" (primary) when not ready, "Ready ✓" (secondary) when ready
 **And** the partner sees the updated state immediately
 **And** ready state is announced via aria-live="polite": "[Partner Name] is ready"
 
@@ -130,6 +130,23 @@ So that we begin reading together with shared anticipation.
 - [x] Task 11: E2E tests (AC: #1-#5)
   - [x] 11.1 `4.1-E2E-001`: Full lobby flow — user A selects Together → role selection → both select roles → lobby → both ready → countdown → reading starts (first verse visible)
   - [x] 11.2 `4.1-E2E-002`: Continue solo fallback — user A in lobby, no partner → tap "Continue solo" → enters solo reading flow
+
+### Review Follow-ups (AI)
+
+- [x] [AI-Review][HIGH] Fix partner readiness mapping for user2 clients; `onBroadcastReceived` currently copies `payload.user2Ready` for all clients, so user2 can see their own state as partner state. [src/stores/slices/scriptureReadingSlice.ts:675]
+- [x] [AI-Review][HIGH] Handle `session_converted` as a local transition on broadcast; current handler re-invokes `scripture_convert_to_solo`, which can fail for the removed partner after `user2_id` is nulled. [src/hooks/useScriptureBroadcast.ts:93]
+- [x] [AI-Review][MEDIUM] Send `partner_joined` payload with `user_id`; current payload is `{}` and does not satisfy the declared event contract. [src/hooks/useScriptureBroadcast.ts:107]
+- [x] [AI-Review][HIGH] Extend DB-004 to assert non-members cannot call `scripture_toggle_ready`, not just `scripture_select_role`. [supabase/tests/database/10_scripture_lobby.sql:205]
+- [x] [AI-Review][MEDIUM] Strengthen E2E ready assertions to verify semantic text (`is ready`) rather than visibility only, so partner-ready regressions are caught. [tests/e2e/scripture/scripture-lobby-4.1.spec.ts:144]
+- [x] [AI-Review][LOW] Align ready-toggle copy with story contract (`Ready` / `Not Ready`) or update the contract to match implemented copy (`I'm Ready` / `Ready ✓`). [src/components/scripture-reading/containers/LobbyContainer.tsx:231]
+- [x] [AI-Review][HIGH] Add lobby-phase guards to `scripture_select_role`; current implementation can set `current_phase = 'lobby'` from any phase and rewind active sessions. [supabase/migrations/20260220000001_scripture_lobby_and_roles.sql:148]
+- [x] [AI-Review][HIGH] Add lobby-phase guards to `scripture_toggle_ready` and `scripture_convert_to_solo`; both mutate lobby state without enforcing lobby phase, allowing out-of-phase countdown/conversion. [supabase/migrations/20260220000001_scripture_lobby_and_roles.sql:232]
+- [x] [AI-Review][HIGH] Reconcile `myReady`/`myRole` from authoritative snapshots; `onBroadcastReceived` updates `partnerReady` but not self-ready/role, so UI can drift after reconnect/reload. [src/stores/slices/scriptureReadingSlice.ts:680]
+- [x] [AI-Review][MEDIUM] Route broadcast auth/subscription failures through `handleScriptureError(SYNC_FAILED)`; current hook logs only in dev and has no catch around `setAuth/getUser`. [src/hooks/useScriptureBroadcast.ts:105]
+- [x] [AI-Review][MEDIUM] Tighten E2E self-ready assertion; `/ready.*✓|ready/i` matches `"I'm Ready"` and can pass before the state transition. [tests/e2e/scripture/scripture-lobby-4.1.spec.ts:141]
+- [x] [AI-Review][MEDIUM] Enforce errors in partner link factories; `linkTestPartners`/`unlinkTestPartners` currently ignore Supabase update errors despite docs promising throws. [tests/support/factories/index.ts:105]
+- [x] [AI-Review][HIGH] E2E test 4.1-E2E-001 asserts `scripture-verse-text` visibility after countdown but no together-mode reading route exists in Story 4.1 scope; assertion will timeout. Replace with countdown-completion assertion. [tests/e2e/scripture/scripture-lobby-4.1.spec.ts:174]
+- [x] [AI-Review][MEDIUM] 4 files changed on branch missing from story File List: `fix_function_search_paths.sql`, P2 E2E spec, API spec, E2E helper. [story File List]
 
 ## Dev Notes
 
@@ -406,17 +423,83 @@ src/services/
 - [Source: src/components/scripture-reading/containers/ScriptureOverview.tsx — routing pattern, scriptureTheme, FOCUS_RING]
 - [Source: _bmad-output/implementation-artifacts/3-1-couple-aggregate-stats-dashboard.md#Dev Notes — patterns to follow]
 
+## Senior Developer Review (AI)
+
+### Reviewer
+
+Sallvain (Codex GPT-5)
+
+### Date
+
+2026-02-21
+
+### Outcome
+
+Changes Requested
+
+### Summary
+
+- Issues found: 3 High, 2 Medium, 1 Low
+- Git vs Story discrepancies (source scope): 5 files changed but not in File List; 17 files in File List with no current working-tree diff (likely already committed)
+- Unit verification run: `npx vitest run tests/unit/hooks/useScriptureBroadcast.test.ts tests/unit/stores/scriptureReadingSlice.lobby.test.ts src/components/scripture-reading/__tests__/LobbyContainer.test.tsx` (34/34 tests passed)
+
+### Acceptance Criteria Validation
+
+- AC1: IMPLEMENTED
+- AC2: IMPLEMENTED
+- AC3: PARTIAL (partner-ready synchronization is incorrect for user2 path)
+- AC4: PARTIAL (same root cause as AC3)
+- AC5: IMPLEMENTED
+- AC6: PARTIAL (broadcasted `session_converted` handling can fail for partner client)
+
+### Follow-up Review (AI) — 2026-02-21
+
+- Reviewer: Sallvain (Codex GPT-5)
+- Outcome: Changes Requested
+- Issues found: 3 High, 3 Medium, 0 Low
+- Git vs Story discrepancies (current working tree): 0 files changed in git; 19 files listed in story File List with no current uncommitted diff
+- Workflow action path executed: create action items (no auto-fixes applied)
+
+#### Follow-up AC Validation
+
+- AC1: IMPLEMENTED
+- AC2: IMPLEMENTED
+- AC3: IMPLEMENTED
+- AC4: PARTIAL (self-ready state can drift because authoritative snapshots are not reconciling `myReady`)
+- AC5: IMPLEMENTED
+- AC6: PARTIAL (server RPC allows conversion outside lobby phase)
+
+### Review Round 3 (AI) — 2026-02-21
+
+- Reviewer: Sallvain (Claude Opus 4.6)
+- Outcome: Changes Requested (2 items — 1 test bug, 1 doc gap)
+- Initial findings: 3 High, 2 Medium, 2 Low
+- After validation: 1 High (real), 1 Medium (real), 5 non-issues
+- Non-issues breakdown: 2 scope boundaries (server phase stale, partnerJoined), 1 hallucinated risk (null data guard), 2 design choices (polling interval, documented tech debt)
+
+#### Round 3 AC Validation
+
+- AC1: IMPLEMENTED
+- AC2: IMPLEMENTED
+- AC3: IMPLEMENTED
+- AC4: IMPLEMENTED
+- AC5: IMPLEMENTED (countdown works; together-mode reading route is Story 4.2 scope)
+- AC6: IMPLEMENTED
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
-claude-sonnet-4-6
+claude-sonnet-4-6, claude-opus-4-6
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- ✅ Resolved round 3 review findings (2026-02-21): Replaced unreachable E2E verse assertion (`scripture-verse-text` only exists in SoloReadingFlow; together-mode reading route is Story 4.2 scope) with countdown-completion assertion (`countdown-container` not visible after countdown ends). Added 4 missing files to File List (fix_function_search_paths.sql, P2 E2E spec, API spec, E2E helper). 5 of 7 initial review findings were non-issues: server phase stale (intentional scope boundary — Story 4.2 handles), callLobbyRpc null guard (RPCs always return non-null jsonb), partnerJoined reconciliation (ephemeral signal — Story 4.3 presence), countdown polling (design choice), stale types (documented tech debt).
 - ✅ Resolved TEA review findings (2026-02-21): Added `partnerStorageStatePath` fixture (auth-setup.ts generates worker-{n}-partner.json; worker-auth.ts exposes fixture); removed dead `authenticateSecondaryContext` function; replaced all 4 `.catch(() => null)` with error-throwing handlers; removed racy countdown-digit assertion (replaced with `Promise.all` container visible + verse visible); added `unlinkTestPartners` to finally block; narrowed `waitForResponse` to `scripture_toggle_ready` endpoint; extracted shared predicate; added timeout constants; removed stale RED PHASE header; added `unlinkTestPartners` to factories.
+- ✅ Resolved AI code review findings round 2 (2026-02-21): Added lobby-phase guards to all 3 RPCs via new migration (scripture_select_role, scripture_toggle_ready, scripture_convert_to_solo — each raises if phase != 'lobby'); reconciled myReady/myRole in onBroadcastReceived from authoritative snapshots (prevents UI drift after reconnect/reload); routed broadcast auth/subscription failures through handleScriptureError(SYNC_FAILED) with try/catch wrapping setAuth chain; tightened E2E self-ready assertion to 'Ready ✓' (eliminates false-positive on "I'm Ready"); enforced errors in linkTestPartners/unlinkTestPartners factories; fixed pre-existing type errors in createTestSession. Added 3 new pgTAP phase-guard tests (plan 7→10), 7 new slice unit tests (myReady/myRole reconciliation), 3 new hook unit tests (error routing). 690 unit tests pass, 0 lint errors, 0 type errors.
+- ✅ Resolved AI code review findings (2026-02-21): Fixed partner readiness mapping (currentUserId in slice, isUser1 comparison in onBroadcastReceived); added applySessionConverted local transition replacing convertToSolo RPC call on session_converted broadcast; fixed partner_joined payload to include user_id; extended DB-004 pgTAP test to also assert scripture_toggle_ready non-member access; strengthened E2E ready assertion to verify semantic text "is ready"; aligned story AC ready-toggle copy with implementation ("I'm Ready" / "Ready ✓"). 683 unit tests pass, 0 lint errors.
 - Implemented all 11 tasks in a single session (2026-02-20).
 - Tasks 1 & 2 combined in one migration file `20260220000001_scripture_lobby_and_roles.sql`: ENUM, ALTER TABLE (role/ready/countdown columns), realtime.messages RLS (SELECT+INSERT), and three RPCs (scripture_select_role, scripture_toggle_ready, scripture_convert_to_solo).
 - All RPCs use SECURITY INVOKER, set search_path = '', fully qualified table names, grant EXECUTE to authenticated.
@@ -430,6 +513,7 @@ claude-sonnet-4-6
 
 ### File List
 
+- supabase/migrations/20260221211137_scripture_lobby_phase_guards.sql (new — phase guards for all 3 lobby RPCs)
 - tests/support/auth-setup.ts (modified — generates worker-{n}-partner.json auth states)
 - tests/support/fixtures/worker-auth.ts (modified — exposes partnerStorageStatePath fixture)
 - tests/support/factories/index.ts (modified — adds unlinkTestPartners function)
@@ -448,12 +532,27 @@ claude-sonnet-4-6
 - src/components/scripture-reading/__tests__/Countdown.test.tsx (modified — converted from skip stubs to active tests)
 - tests/unit/hooks/useScriptureBroadcast.test.ts (modified — converted from skip stubs to active tests)
 - tests/unit/stores/scriptureReadingSlice.lobby.test.ts (modified — converted from skip stubs to active tests)
-- tests/e2e/scripture/scripture-lobby-4.1.spec.ts (modified — removed test.skip wrappers)
+- tests/e2e/scripture/scripture-lobby-4.1.spec.ts (modified — removed test.skip wrappers; semantic ready assertion)
 - _bmad-output/implementation-artifacts/sprint-status.yaml (modified)
+- src/stores/slices/scriptureReadingSlice.ts (modified — currentUserId state field, fixed onBroadcastReceived partnerReady mapping, added applySessionConverted action)
+- src/hooks/useScriptureBroadcast.ts (modified — use applySessionConverted for session_converted, send user_id in partner_joined payload)
+- supabase/tests/database/10_scripture_lobby.sql (modified — DB-004b: scripture_toggle_ready non-member assertion)
+- tests/unit/hooks/useScriptureBroadcast.test.ts (modified — auth.getUser mock, applySessionConverted mock, payload and session_converted tests)
+- tests/unit/stores/scriptureReadingSlice.lobby.test.ts (modified — applySessionConverted test, partnerReady mapping tests for user1/user2)
+- supabase/migrations/20260221000001_fix_function_search_paths.sql (new — security fix: lock search_path on SECURITY DEFINER scripture functions)
+- tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts (new — P2 E2E tests for lobby flow)
+- tests/api/scripture-lobby-4.1.spec.ts (new — API-level tests for lobby RPCs)
+- tests/support/helpers/scripture-lobby.ts (new — shared E2E helpers for lobby tests)
 
 ## Change Log
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-02-21 | Addressed round 3 review findings (2 items): replaced unreachable E2E verse assertion with countdown-completion assertion (story 4.2 scope boundary), added 4 missing files to File List. Story re-submitted for review. | claude-opus-4-6 |
+| 2026-02-21 | Senior Developer Review Round 3 (AI): 2 real issues found (1 HIGH test bug, 1 MEDIUM doc gap); 5 of 7 original findings determined to be non-issues (scope boundaries or hallucinated risk). | claude-opus-4-6 |
+| 2026-02-21 | Addressed all 6 follow-up review findings: phase guards in 3 RPCs (new migration), myReady/myRole snapshot reconciliation, broadcast error routing through handleScriptureError, tightened E2E ready assertion, factory error enforcement. 690 unit tests pass. Story re-submitted for review. | claude-sonnet-4-6 |
+| 2026-02-21 | Senior Developer Follow-up Review (AI): created 6 new action items (3 High, 3 Medium), kept story in-progress, and synced sprint status to in-progress. | codex-gpt-5 |
+| 2026-02-21 | Addressed all 6 AI code review findings: fixed partnerReady mapping (user1/user2 aware), added applySessionConverted local transition, fixed partner_joined payload, extended DB-004 for toggle_ready, semantic E2E ready assertion, aligned AC copy with UX spec. 683 unit tests pass. Story re-submitted for review. | claude-sonnet-4-6 |
+| 2026-02-21 | Senior Developer Review (AI): changes requested; added 6 follow-up action items, set story status to in-progress, and synced sprint status back to in-progress. | codex-gpt-5 |
 | 2026-02-21 | TEA review fix-up: added partnerStorageStatePath fixture (auth-setup.ts + worker-auth.ts), added unlinkTestPartners to factories, rewrote E2E spec with error-throwing .catch handlers, removed racy countdown-digit assertion, extracted shared predicate, used Promise.all for dual-page assertions, removed dead authenticateSecondaryContext function. | claude-sonnet-4-6 |
 | 2026-02-20 | Implemented all 11 tasks: DB migration (role ENUM, columns, RLS, 3 RPCs), slice lobby state/actions, useScriptureBroadcast hook, LobbyContainer (3 phases), Countdown component, ScriptureOverview routing, dbSchema types, pgTAP tests, unit tests, E2E tests. All 678 unit tests pass. | claude-sonnet-4-6 |

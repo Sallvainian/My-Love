@@ -50,6 +50,9 @@ vi.mock('../../../src/api/supabaseClient', () => ({
     channel: mocks.channel,
     removeChannel: mocks.removeChannel,
     realtime: { setAuth: mocks.setAuth },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'current-user-id' } } }),
+    },
   },
 }));
 
@@ -63,19 +66,41 @@ import { supabase } from '../../../src/api/supabaseClient';
 const mockOnPartnerJoined = vi.fn();
 const mockOnPartnerReady = vi.fn();
 const mockOnBroadcastReceived = vi.fn();
-const mockConvertToSolo = vi.fn().mockResolvedValue(undefined);
+const mockApplySessionConverted = vi.fn();
 
 const mockStoreState = {
   onPartnerJoined: mockOnPartnerJoined,
   onPartnerReady: mockOnPartnerReady,
   onBroadcastReceived: mockOnBroadcastReceived,
-  convertToSolo: mockConvertToSolo,
+  applySessionConverted: mockApplySessionConverted,
 };
 
 vi.mock('../../../src/stores/useAppStore', () => ({
   useAppStore: vi.fn((selector: (state: typeof mockStoreState) => unknown) =>
     selector(mockStoreState)
   ),
+}));
+
+// ============================================
+// Mock scriptureReadingService for error routing tests
+// vi.hoisted() ensures the mock value is initialized before vi.mock() factory runs
+// ============================================
+
+const { mockHandleScriptureError } = vi.hoisted(() => ({
+  mockHandleScriptureError: vi.fn(),
+}));
+
+vi.mock('../../../src/services/scriptureReadingService', () => ({
+  ScriptureErrorCode: {
+    VERSION_MISMATCH: 'VERSION_MISMATCH',
+    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+    UNAUTHORIZED: 'UNAUTHORIZED',
+    SYNC_FAILED: 'SYNC_FAILED',
+    OFFLINE: 'OFFLINE',
+    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
+    VALIDATION_FAILED: 'VALIDATION_FAILED',
+  },
+  handleScriptureError: mockHandleScriptureError,
 }));
 
 // ============================================
@@ -103,7 +128,8 @@ describe('useScriptureBroadcast', () => {
     mocks.setAuth.mockResolvedValue(undefined);
     mocks.removeChannel.mockResolvedValue(undefined);
     mocks.send.mockResolvedValue(undefined);
-    mockConvertToSolo.mockResolvedValue(undefined);
+    mockApplySessionConverted.mockReset();
+    mockHandleScriptureError.mockReset();
   });
 
   test('[P1] does not join channel when sessionId is null', () => {
@@ -142,7 +168,7 @@ describe('useScriptureBroadcast', () => {
     expect(supabase.channel).toHaveBeenCalledTimes(1);
   });
 
-  test('[P1] broadcasts partner_joined event when SUBSCRIBED status fires', async () => {
+  test('[P1] broadcasts partner_joined event with user_id when SUBSCRIBED status fires', async () => {
     await act(async () => {
       renderHook(() => useScriptureBroadcast('session-abc'));
     });
@@ -155,8 +181,21 @@ describe('useScriptureBroadcast', () => {
       expect.objectContaining({
         type: 'broadcast',
         event: 'partner_joined',
+        payload: { user_id: 'current-user-id' },
       })
     );
+  });
+
+  test('[P1] calls applySessionConverted (not convertToSolo RPC) on session_converted event', async () => {
+    await act(async () => {
+      renderHook(() => useScriptureBroadcast('session-abc'));
+    });
+
+    broadcastHandlers['session_converted']?.({
+      payload: { mode: 'solo', session_id: 'session-abc' },
+    });
+
+    expect(mockApplySessionConverted).toHaveBeenCalledTimes(1);
   });
 
   test('[P1] calls onPartnerJoined when partner_joined event is received', async () => {
@@ -192,5 +231,47 @@ describe('useScriptureBroadcast', () => {
     unmount!();
 
     expect(supabase.removeChannel).toHaveBeenCalledWith(mocks.mockChannel);
+  });
+
+  test('[P1] calls handleScriptureError(SYNC_FAILED) when setAuth rejects', async () => {
+    mocks.setAuth.mockRejectedValueOnce(new Error('Auth token expired'));
+
+    await act(async () => {
+      renderHook(() => useScriptureBroadcast('session-abc'));
+    });
+
+    expect(mockHandleScriptureError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'SYNC_FAILED' })
+    );
+  });
+
+  test('[P1] calls handleScriptureError(SYNC_FAILED) on CHANNEL_ERROR status', async () => {
+    await act(async () => {
+      renderHook(() => useScriptureBroadcast('session-abc'));
+    });
+
+    await act(async () => {
+      subscribedCallback?.('CHANNEL_ERROR', new Error('WebSocket closed'));
+    });
+
+    expect(mockHandleScriptureError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'SYNC_FAILED' })
+    );
+  });
+
+  test('[P1] calls handleScriptureError(SYNC_FAILED) when getUser fails after setAuth', async () => {
+    const { supabase: mockSupa } = await import('../../../src/api/supabaseClient');
+    vi.mocked(mockSupa.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: 'Session expired', name: 'AuthError', status: 401 },
+    });
+
+    await act(async () => {
+      renderHook(() => useScriptureBroadcast('session-abc'));
+    });
+
+    expect(mockHandleScriptureError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'SYNC_FAILED' })
+    );
   });
 });

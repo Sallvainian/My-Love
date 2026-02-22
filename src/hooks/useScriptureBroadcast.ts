@@ -11,7 +11,7 @@
  *   partner_joined     → onPartnerJoined() slice action
  *   ready_state_changed → onPartnerReady(is_ready) slice action
  *   state_updated      → onBroadcastReceived(payload) slice action
- *   session_converted  → convertToSolo() slice action
+ *   session_converted  → applySessionConverted() slice action (local state only, no RPC)
  *
  * Cleanup: supabase.removeChannel(channel) on sessionId change or unmount.
  * Duplicate subscribe guard: checks channelRef.current?.state === 'subscribed'
@@ -24,6 +24,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { supabase } from '../api/supabaseClient';
 import { useAppStore } from '../stores/useAppStore';
 import type { StateUpdatePayload } from '../stores/slices/scriptureReadingSlice';
+import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
+import type { ScriptureError } from '../services/scriptureReadingService';
 
 interface PartnerJoinedPayload {
   user_id: string;
@@ -43,14 +45,15 @@ interface SessionConvertedPayload {
 export function useScriptureBroadcast(sessionId: string | null): void {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const { onPartnerJoined, onPartnerReady, onBroadcastReceived, convertToSolo } = useAppStore(
-    useShallow((state) => ({
-      onPartnerJoined: state.onPartnerJoined,
-      onPartnerReady: state.onPartnerReady,
-      onBroadcastReceived: state.onBroadcastReceived,
-      convertToSolo: state.convertToSolo,
-    }))
-  );
+  const { onPartnerJoined, onPartnerReady, onBroadcastReceived, applySessionConverted } =
+    useAppStore(
+      useShallow((state) => ({
+        onPartnerJoined: state.onPartnerJoined,
+        onPartnerReady: state.onPartnerReady,
+        onBroadcastReceived: state.onBroadcastReceived,
+        applySessionConverted: state.applySessionConverted,
+      }))
+    );
 
   useEffect(() => {
     if (!sessionId) return;
@@ -90,30 +93,52 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         'broadcast',
         { event: 'session_converted' },
         (_msg: { payload: SessionConvertedPayload }) => {
-          void convertToSolo();
+          // Apply local state transition only — do NOT call convertToSolo() RPC.
+          // The broadcasting partner already nulled user2_id; re-invoking the RPC
+          // would throw "Session not found or access denied" for the removed partner.
+          applySessionConverted();
         }
       );
 
     channelRef.current = channel;
 
-    // Set auth before subscribing (required for private channels)
-    void supabase.realtime.setAuth().then(() => {
-      channel.subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          // Broadcast our own join to notify partner
-          void channel.send({
-            type: 'broadcast',
-            event: 'partner_joined',
-            payload: {},
-          });
-        } else if (status === 'CHANNEL_ERROR') {
-          // Log subscription errors — do not swallow silently
-          if (import.meta.env.DEV) {
-            console.error('[useScriptureBroadcast] Channel error:', err);
-          }
+    // Set auth before subscribing (required for private channels).
+    // Fetch the current user's ID here so the partner_joined payload satisfies the event contract.
+    void supabase.realtime
+      .setAuth()
+      .then(async () => {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) {
+          throw authError;
         }
+        const userId = authData.user?.id ?? '';
+
+        channel.subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            // Broadcast our own join to notify partner — include user_id per event contract
+            void channel.send({
+              type: 'broadcast',
+              event: 'partner_joined',
+              payload: { user_id: userId },
+            });
+          } else if (status === 'CHANNEL_ERROR') {
+            const scriptureError: ScriptureError = {
+              code: ScriptureErrorCode.SYNC_FAILED,
+              message: `Broadcast channel subscription error`,
+              details: err,
+            };
+            handleScriptureError(scriptureError);
+          }
+        });
+      })
+      .catch((err: unknown) => {
+        const scriptureError: ScriptureError = {
+          code: ScriptureErrorCode.SYNC_FAILED,
+          message: err instanceof Error ? err.message : 'Failed to authenticate broadcast channel',
+          details: err,
+        };
+        handleScriptureError(scriptureError);
       });
-    });
 
     return () => {
       if (channelRef.current) {
@@ -121,5 +146,5 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         channelRef.current = null;
       }
     };
-  }, [sessionId, onPartnerJoined, onPartnerReady, onBroadcastReceived, convertToSolo]);
+  }, [sessionId, onPartnerJoined, onPartnerReady, onBroadcastReceived, applySessionConverted]);
 }

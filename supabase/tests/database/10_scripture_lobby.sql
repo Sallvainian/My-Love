@@ -9,7 +9,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(6);
+select plan(10);
 
 -- ============================================
 -- Helpers (re-create in each file — each runs in its own transaction)
@@ -76,9 +76,13 @@ declare
   v_user1 uuid;
   v_user2 uuid;
   v_user3 uuid;
-  v_session_role  uuid; -- Used for DB-001 and DB-004
-  v_session_ready uuid; -- Fresh session for DB-002 (both ready)
+  v_session_role    uuid; -- Used for DB-001 and DB-004
+  v_session_ready   uuid; -- Fresh session for DB-002 (both ready)
   v_session_partial uuid; -- Fresh session for DB-003 (partial ready)
+  -- Sessions in non-lobby phases for DB-005/006/007 phase guard tests
+  v_session_reading    uuid; -- For DB-005: select_role guard
+  v_session_countdown  uuid; -- For DB-006: toggle_ready guard
+  v_session_reading2   uuid; -- For DB-007: convert_to_solo guard
 begin
   v_user1 := tests.create_test_user('lobby_user1@test.com');
   v_user2 := tests.create_test_user('lobby_user2@test.com');
@@ -94,6 +98,10 @@ begin
   v_session_ready := tests.create_session_as_admin(v_user1, v_user2);
   -- Session for DB-003 partial-ready (no countdown) test
   v_session_partial := tests.create_session_as_admin(v_user1, v_user2);
+  -- Sessions in non-lobby phases for phase guard tests (DB-005, DB-006, DB-007)
+  v_session_reading   := tests.create_session_as_admin(v_user1, v_user2, 'together', 'in_progress', 'reading');
+  v_session_countdown := tests.create_session_as_admin(v_user1, v_user2, 'together', 'in_progress', 'countdown');
+  v_session_reading2  := tests.create_session_as_admin(v_user1, v_user2, 'together', 'in_progress', 'reading');
 
   perform set_config('tests.user1', v_user1::text, true);
   perform set_config('tests.user2', v_user2::text, true);
@@ -101,6 +109,9 @@ begin
   perform set_config('tests.session_role', v_session_role::text, true);
   perform set_config('tests.session_ready', v_session_ready::text, true);
   perform set_config('tests.session_partial', v_session_partial::text, true);
+  perform set_config('tests.session_reading', v_session_reading::text, true);
+  perform set_config('tests.session_countdown', v_session_countdown::text, true);
+  perform set_config('tests.session_reading2', v_session_reading2::text, true);
 end;
 $$;
 
@@ -211,6 +222,71 @@ select throws_ok(
   null,
   null,
   '4.1-DB-004: non-member user3 cannot call scripture_select_role on another user session'
+);
+
+-- Also verify non-member cannot call scripture_toggle_ready (not just scripture_select_role)
+select throws_ok(
+  format(
+    'select public.scripture_toggle_ready(%L::uuid, %L)',
+    current_setting('tests.session_role'),
+    'true'
+  ),
+  null,
+  null,
+  '4.1-DB-004b: non-member user3 cannot call scripture_toggle_ready on another user session'
+);
+
+-- ============================================
+-- 4.1-DB-005: Phase guard — scripture_select_role rejects when phase is not lobby
+-- A session in 'reading' phase cannot have roles selected (prevents rewinding session)
+-- ============================================
+
+select tests.authenticate_as(current_setting('tests.user1')::uuid);
+
+select throws_ok(
+  format(
+    'select public.scripture_select_role(%L::uuid, %L)',
+    current_setting('tests.session_reading'),
+    'reader'
+  ),
+  null,
+  null,
+  '4.1-DB-005: scripture_select_role rejects when session phase is reading (not lobby)'
+);
+
+-- ============================================
+-- 4.1-DB-006: Phase guard — scripture_toggle_ready rejects when phase is not lobby
+-- A session in 'countdown' phase cannot have ready state toggled
+-- ============================================
+
+select tests.authenticate_as(current_setting('tests.user1')::uuid);
+
+select throws_ok(
+  format(
+    'select public.scripture_toggle_ready(%L::uuid, %L)',
+    current_setting('tests.session_countdown'),
+    'true'
+  ),
+  null,
+  null,
+  '4.1-DB-006: scripture_toggle_ready rejects when session phase is countdown (not lobby)'
+);
+
+-- ============================================
+-- 4.1-DB-007: Phase guard — scripture_convert_to_solo rejects when phase is not lobby
+-- A session in 'reading' phase cannot be converted to solo via this RPC
+-- ============================================
+
+select tests.authenticate_as(current_setting('tests.user1')::uuid);
+
+select throws_ok(
+  format(
+    'select public.scripture_convert_to_solo(%L::uuid)',
+    current_setting('tests.session_reading2')
+  ),
+  null,
+  null,
+  '4.1-DB-007: scripture_convert_to_solo rejects when session phase is reading (not lobby)'
 );
 
 select * from finish();

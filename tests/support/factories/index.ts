@@ -73,14 +73,14 @@ export async function createTestSession(
     p_session_count: options?.sessionCount ?? 1,
     p_include_reflections: options?.includeReflections ?? false,
     p_include_messages: options?.includeMessages ?? false,
-    p_preset: options?.preset ?? null,
+    p_preset: options?.preset,
   });
 
   if (error) {
     throw new Error(`Seeding failed: ${error.message}`);
   }
 
-  return data as SeedResult;
+  return data as unknown as SeedResult;
 }
 
 /**
@@ -102,8 +102,17 @@ export async function linkTestPartners(
   user1Id: string,
   user2Id: string
 ): Promise<void> {
-  await supabase.from('users').update({ partner_id: user2Id }).eq('id', user1Id);
-  await supabase.from('users').update({ partner_id: user1Id }).eq('id', user2Id);
+  const { error: error1 } = await supabase
+    .from('users')
+    .update({ partner_id: user2Id })
+    .eq('id', user1Id);
+  if (error1) throw new Error(`Failed to link user1 (${user1Id}) as partner: ${error1.message}`);
+
+  const { error: error2 } = await supabase
+    .from('users')
+    .update({ partner_id: user1Id })
+    .eq('id', user2Id);
+  if (error2) throw new Error(`Failed to link user2 (${user2Id}) as partner: ${error2.message}`);
 }
 
 /**
@@ -125,8 +134,17 @@ export async function unlinkTestPartners(
   user1Id: string,
   user2Id: string
 ): Promise<void> {
-  await supabase.from('users').update({ partner_id: null }).eq('id', user1Id);
-  await supabase.from('users').update({ partner_id: null }).eq('id', user2Id);
+  const { error: error1 } = await supabase
+    .from('users')
+    .update({ partner_id: null })
+    .eq('id', user1Id);
+  if (error1) throw new Error(`Failed to unlink user1 (${user1Id}) partner: ${error1.message}`);
+
+  const { error: error2 } = await supabase
+    .from('users')
+    .update({ partner_id: null })
+    .eq('id', user2Id);
+  if (error2) throw new Error(`Failed to unlink user2 (${user2Id}) partner: ${error2.message}`);
 }
 
 /**
