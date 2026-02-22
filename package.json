@@ -52,7 +52,7 @@
     "@axe-core/playwright": "^4.11.1",
     "@currents/playwright": "^1.21.1",
     "@dotenvx/dotenvx": "^1.52.0",
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.3.0",
     "@playwright/test": "^1.58.2",
     "@seontechnologies/playwright-utils": "^3.13.1",
