@@ -34,12 +34,12 @@
     "lint:fix": "eslint src tests scripts --fix --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**' && prettier --write ."
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.95.3",
+    "@supabase/supabase-js": "^2.97.0",
     "dompurify": "^3.3.1",
     "eventsource": "^4.1.0",
-    "framer-motion": "^12.34.0",
+    "framer-motion": "^12.34.3",
     "idb": "^8.0.3",
-    "lucide-react": "^0.564.0",
+    "lucide-react": "^0.575.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-window": "^2.2.7",
