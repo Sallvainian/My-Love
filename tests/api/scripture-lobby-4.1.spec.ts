@@ -148,6 +148,64 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
       }
     });
+
+    test('[P1] user2 calling scripture_select_role sets user2_role and leaves user1_role null', async ({
+      supabaseAdmin,
+      apiRequest,
+    }) => {
+      // GIVEN: A session and two linked partners exist
+      const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
+      const sessionId = seedResult.session_ids[0];
+      const user1Id = seedResult.test_user1_id;
+      const user2Id = seedResult.test_user2_id!;
+
+      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
+
+      // Use user2's token — exercises the user2_id code path in the RPC
+      const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
+      const baseURL = process.env.SUPABASE_URL!;
+      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
+      try {
+        // WHEN: User2 calls scripture_select_role with role='responder'
+        const response = await apiRequest({
+          method: 'POST',
+          path: '/rest/v1/rpc/scripture_select_role',
+          baseUrl: baseURL,
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${user2Token}`,
+            'Content-Type': 'application/json',
+          },
+          body: {
+            p_session_id: sessionId,
+            p_role: 'responder',
+          },
+        });
+
+        // THEN: RPC returns 200
+        expect(response.status).toBe(200);
+
+        // AND: user2_role is persisted as 'responder'
+        const roleResult = await supabaseAdmin
+          .from('scripture_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single();
+        const dbRow = roleResult.data as unknown as ScriptureSessionLobbyRow | null;
+        const queryError = roleResult.error;
+
+        expect(queryError).toBeNull();
+        expect(dbRow).toBeTruthy();
+        expect(dbRow!.user2_role).toBe('responder');
+
+        // AND: user1_role is not affected by this call
+        expect(dbRow!.user1_role).toBeNull();
+      } finally {
+        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
+        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+      }
+    });
   });
 
   // ============================================

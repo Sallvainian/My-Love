@@ -110,6 +110,7 @@ export interface ScriptureReadingState {
   myReady: boolean;
   partnerReady: boolean;
   countdownStartedAt: number | null; // Server UTC ms — stored as number (JSON-safe, not Date)
+  currentUserId: string | null; // Logged-in user's auth ID — used to distinguish user1 vs user2 in broadcasts
 }
 
 // ============================================
@@ -137,6 +138,7 @@ export interface ScriptureSlice extends ScriptureReadingState {
   selectRole: (role: SessionRole) => Promise<void>;
   toggleReady: (isReady: boolean) => Promise<void>;
   convertToSolo: () => Promise<void>;
+  applySessionConverted: () => void;
   onPartnerJoined: () => void;
   onPartnerReady: (isReady: boolean) => void;
   onCountdownStarted: (startTs: number) => void;
@@ -166,6 +168,7 @@ const initialScriptureState: ScriptureReadingState = {
   myReady: false,
   partnerReady: false,
   countdownStartedAt: null,
+  currentUserId: null,
 };
 
 // ============================================
@@ -521,6 +524,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
+      // Capture current user ID now so onBroadcastReceived can distinguish user1 vs user2
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData.user?.id ?? null;
+
       const { data, error } = await callLobbyRpc('scripture_select_role', {
         p_session_id: session.id,
         p_role: role,
@@ -531,6 +538,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       const snapshot = data as unknown as StateUpdatePayload;
       set({
         myRole: role,
+        currentUserId,
         scriptureLoading: false,
         session: {
           ...session,
@@ -658,10 +666,16 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   // Called when 'state_updated' broadcast received — version-checked snapshot update
   onBroadcastReceived: (payload) => {
     const state = get();
-    const { session } = state;
+    const { session, currentUserId } = state;
 
     // Version check: only apply if received version is newer
     if (session && payload.version <= session.version) return;
+
+    // session.userId is always user1_id (set by toLocalSession).
+    // Compare current auth user to user1_id to correctly map partnerReady/myReady/myRole:
+    //   user1 client → self is user1 → myReady = user1Ready, partnerReady = user2Ready
+    //   user2 client → self is user2 → myReady = user2Ready, partnerReady = user1Ready
+    const isUser1 = currentUserId !== null && session?.userId === currentUserId;
 
     set((currentState) => ({
       session: currentState.session
@@ -671,13 +685,48 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             version: payload.version,
           }
         : null,
-      // Update partner ready from snapshot (user2Ready tracks partner in most cases)
-      partnerReady: payload.user2Ready,
+      partnerReady: isUser1 ? payload.user2Ready : payload.user1Ready,
+      // Reconcile self-ready from authoritative snapshot — prevents drift after reconnect/reload.
+      // Only update if currentUserId is known (skip if not yet authenticated in this session).
+      myReady:
+        currentUserId !== null
+          ? isUser1
+            ? payload.user1Ready
+            : payload.user2Ready
+          : currentState.myReady,
+      // Reconcile self-role from snapshot; fall back to local value if snapshot has no role yet.
+      myRole:
+        currentUserId !== null
+          ? ((isUser1 ? payload.user1Role : payload.user2Role) ?? currentState.myRole)
+          : currentState.myRole,
       // Update countdownStartedAt if server set it
       countdownStartedAt:
         payload.countdownStartedAt != null
           ? payload.countdownStartedAt
           : currentState.countdownStartedAt,
     }));
+  },
+
+  // Called when partner broadcasts 'session_converted' — apply local state transition only.
+  // Do NOT call scripture_convert_to_solo RPC: user2 has been removed from the session
+  // (user2_id is null after the RPC) so calling it again would throw an access-denied error.
+  applySessionConverted: () => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    set({
+      myRole: null,
+      partnerJoined: false,
+      myReady: false,
+      partnerReady: false,
+      countdownStartedAt: null,
+      session: {
+        ...session,
+        mode: 'solo' as SessionMode,
+        currentPhase: 'reading' as SessionPhase,
+        status: 'in_progress',
+      },
+    });
   },
 });

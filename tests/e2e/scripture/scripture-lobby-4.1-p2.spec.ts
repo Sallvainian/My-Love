@@ -9,66 +9,19 @@
  *   AC#2 — Language compliance: "Continue solo" exact text; non-accusatory waiting language
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { ensureScriptureOverview } from '../../support/helpers';
+import {
+  REALTIME_SYNC_TIMEOUT_MS,
+  READY_BROADCAST_TIMEOUT_MS,
+  COUNTDOWN_APPEAR_TIMEOUT_MS,
+  isToggleReadyResponse,
+  navigateToTogetherRoleSelection,
+} from '../../support/helpers/scripture-lobby';
 import {
   createTestSession,
   linkTestPartners,
   unlinkTestPartners,
   cleanupTestSession,
 } from '../../support/factories';
-import type { Page } from '@playwright/test';
-
-// ---------------------------------------------------------------------------
-// Timeout constants
-// ---------------------------------------------------------------------------
-
-const SESSION_CREATE_TIMEOUT_MS = 15_000;
-const REALTIME_SYNC_TIMEOUT_MS = 20_000;
-const READY_BROADCAST_TIMEOUT_MS = 10_000;
-const COUNTDOWN_APPEAR_TIMEOUT_MS = 10_000;
-
-// ---------------------------------------------------------------------------
-// Shared predicates
-// ---------------------------------------------------------------------------
-
-/** Matches the scripture_toggle_ready RPC 2xx response */
-const isToggleReadyResponse = (resp: { url(): string; status(): number }) =>
-  resp.url().includes('/rest/v1/rpc/scripture_toggle_ready') &&
-  resp.status() >= 200 &&
-  resp.status() < 300;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Navigate to /scripture and start Together mode.
- * Waits for the role selection screen to become visible.
- */
-async function navigateToTogetherRoleSelection(page: Page): Promise<void> {
-  await ensureScriptureOverview(page);
-
-  // Network-first: watch for the create-session RPC before clicking
-  const sessionResponse = page
-    .waitForResponse(
-      (resp) =>
-        resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-        resp.request().method() === 'POST',
-      { timeout: SESSION_CREATE_TIMEOUT_MS }
-    )
-    .catch((e: Error) => {
-      throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
-    });
-
-  await page.getByTestId('scripture-start-button').click();
-
-  await expect(page.getByTestId('scripture-mode-together')).toBeVisible();
-  await page.getByTestId('scripture-mode-together').click();
-
-  await sessionResponse;
-
-  await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
-}
 
 // ---------------------------------------------------------------------------
 // 4.1-E2E-003: Countdown aria-live announcements (P2)
