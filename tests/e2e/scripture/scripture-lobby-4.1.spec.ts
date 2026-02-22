@@ -12,69 +12,26 @@
  *   AC#6 — Continue solo fallback: session converts to solo when user taps "Continue solo"
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { ensureScriptureOverview } from '../../support/helpers';
+import {
+  REALTIME_SYNC_TIMEOUT_MS,
+  READY_BROADCAST_TIMEOUT_MS,
+  COUNTDOWN_APPEAR_TIMEOUT_MS,
+  isToggleReadyResponse,
+  navigateToTogetherRoleSelection,
+} from '../../support/helpers/scripture-lobby';
 import {
   createTestSession,
   linkTestPartners,
   unlinkTestPartners,
   cleanupTestSession,
 } from '../../support/factories';
-import type { Page } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
-// Timeout constants
+// Timeout constants (spec-local — not shared with P2 spec)
 // ---------------------------------------------------------------------------
 
-const SESSION_CREATE_TIMEOUT_MS = 15_000;
-const REALTIME_SYNC_TIMEOUT_MS = 20_000;
-const READY_BROADCAST_TIMEOUT_MS = 10_000;
 const CONVERSION_TIMEOUT_MS = 12_000;
 const VERSE_LOAD_TIMEOUT_MS = 15_000;
-
-// ---------------------------------------------------------------------------
-// Shared predicates
-// ---------------------------------------------------------------------------
-
-/** Matches the scripture_toggle_ready RPC 2xx response */
-const isToggleReadyResponse = (resp: { url(): string; status(): number }) =>
-  resp.url().includes('/rest/v1/rpc/scripture_toggle_ready') &&
-  resp.status() >= 200 &&
-  resp.status() < 300;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Navigate to /scripture (fresh) and start Together mode.
- * Waits for the role selection screen to become visible.
- */
-async function navigateToTogetherRoleSelection(page: Page): Promise<void> {
-  await ensureScriptureOverview(page);
-
-  // Network-first: watch for the create-session RPC before clicking
-  const sessionResponse = page
-    .waitForResponse(
-      (resp) =>
-        resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-        resp.request().method() === 'POST',
-      { timeout: SESSION_CREATE_TIMEOUT_MS }
-    )
-    .catch((e: Error) => {
-      throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
-    });
-
-  await page.getByTestId('scripture-start-button').click();
-
-  // Select Together mode (not Solo)
-  await expect(page.getByTestId('scripture-mode-together')).toBeVisible();
-  await page.getByTestId('scripture-mode-together').click();
-
-  await sessionResponse;
-
-  // Role selection screen must be visible
-  await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
-}
 
 // ---------------------------------------------------------------------------
 // 4.1-E2E-001: Full Lobby Flow (P0)
@@ -180,11 +137,12 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
       await page.getByTestId('lobby-ready-button').click();
       await userAReadyBroadcast;
 
-      // AC#4 — User A's button updates to "Ready ✓"
-      await expect(page.getByTestId('lobby-ready-button')).toContainText(/ready.*✓|ready/i);
+      // AC#4 — User A's button updates to "Ready ✓" (requires checkmark — /ready.*✓|ready/i was too
+      // loose and would match "I'm Ready" before the state transition)
+      await expect(page.getByTestId('lobby-ready-button')).toContainText('Ready ✓');
 
-      // AC#4 — Partner sees User A is ready via realtime
-      await expect(partnerPage.getByTestId('lobby-partner-ready')).toBeVisible({
+      // AC#4 — Partner sees User A is ready via realtime (semantic text, not just visibility)
+      await expect(partnerPage.getByTestId('lobby-partner-ready')).toContainText('is ready', {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
 
@@ -204,16 +162,22 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
       // THEN (AC#5): Countdown appears on BOTH pages concurrently
       // -----------------------------------------------------------------------
       await Promise.all([
-        expect(page.getByTestId('countdown-container')).toBeVisible({ timeout: 10_000 }),
-        expect(partnerPage.getByTestId('countdown-container')).toBeVisible({ timeout: 10_000 }),
+        expect(page.getByTestId('countdown-container')).toBeVisible({
+          timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
+        }),
+        expect(partnerPage.getByTestId('countdown-container')).toBeVisible({
+          timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
+        }),
       ]);
 
-      // AC#5 — After countdown, first verse is visible on both pages concurrently
+      // AC#5 — After countdown completes, countdown container disappears on both pages.
+      // Note: Together-mode reading view (scripture-verse-text) is Story 4.2 scope.
+      // Story 4.1 delivers the session in currentPhase='reading' after countdown.
       await Promise.all([
-        expect(page.getByTestId('scripture-verse-text')).toBeVisible({
+        expect(page.getByTestId('countdown-container')).not.toBeVisible({
           timeout: VERSE_LOAD_TIMEOUT_MS,
         }),
-        expect(partnerPage.getByTestId('scripture-verse-text')).toBeVisible({
+        expect(partnerPage.getByTestId('countdown-container')).not.toBeVisible({
           timeout: VERSE_LOAD_TIMEOUT_MS,
         }),
       ]);

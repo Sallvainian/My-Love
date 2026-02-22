@@ -23,8 +23,9 @@ Use `bd` (beads) for project-level issue tracking (bugs, features, tasks with de
 2. `bd show <id>` — review issue details
 3. `bd update <id> --status=in_progress` — claim it before coding
 4. Write code, commit
-5. `bd close <id>` — mark complete
-6. `bd sync` — sync beads changes with git
+5. **Run affected tests and confirm they pass** — `npx playwright test tests/api/<spec>.spec.ts --project=api --reporter=list` (or equivalent). Do NOT skip this. Migrations applying ≠ functions working end-to-end.
+6. `bd close <id>` — mark complete
+7. `bd sync` — sync beads changes with git
 
 **Creating issues:** When you discover bugs, new features, or follow-up work during development:
 ```bash
