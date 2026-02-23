@@ -1,46 +1,5 @@
 # CLAUDE.md
 
-## 🚨 MANDATORY RULE: DISPLAY AT START OF EVERY RESPONSE 🚨
-
-## MANDATORY: Use td for Task Management
-
-Run td usage --new-session at conversation start (or after /clear). This tells you what to work on next.
-
-Sessions are automatic (based on terminal/agent context). Optional:
-- td session "name" to label the current session
-- td session --new to force a new session in the same context
-
-Use td usage -q after first read.
-
-## Issue Tracking with Beads (`bd`)
-
-Use `bd` (beads) for project-level issue tracking (bugs, features, tasks with dependencies). Issues persist in git across sessions.
-
-**Session start:** `bd prime` is auto-injected via hooks. Check `bd ready` for available work.
-
-**Workflow:**
-1. `bd ready` — find unblocked issues
-2. `bd show <id>` — review issue details
-3. `bd update <id> --status=in_progress` — claim it before coding
-4. Write code, commit
-5. **Run affected tests and confirm they pass** — `npx playwright test tests/api/<spec>.spec.ts --project=api --reporter=list` (or equivalent). Do NOT skip this. Migrations applying ≠ functions working end-to-end.
-6. `bd close <id>` — mark complete
-7. `bd sync` — sync beads changes with git
-
-**Creating issues:** When you discover bugs, new features, or follow-up work during development:
-```bash
-bd create --title="Short description" --description="Context and what needs to be done" --type=task|bug|feature --priority=2
-```
-Priority: 0-4 (0=critical, 4=backlog). Do NOT use "high"/"medium"/"low".
-
-**Dependencies:** `bd dep add <child> <parent>` — child depends on parent (parent blocks child).
-
-**Session close:** Before saying "done", run: `bd sync` then push.
-
-**WARNING:** Never use `bd edit` — it opens $EDITOR which blocks agents.
-
-**td vs bd:** Use `td` for session-level task management (what to work on right now). Use `bd` for persistent issue tracking (bugs, features, tasks that span sessions).
-
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
