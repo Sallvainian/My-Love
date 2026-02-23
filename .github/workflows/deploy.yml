@@ -45,6 +45,8 @@ jobs:
         run: doppler run -- npm run build
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          SENTRY_RELEASE: my-love@${{ github.sha }}
+          VITE_SENTRY_RELEASE: my-love@${{ github.sha }}
 
       - name: Run smoke tests
         run: npm run test:smoke
