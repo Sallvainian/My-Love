@@ -106,7 +106,7 @@ supabase stop            # Stop local Supabase
 supabase status          # Show connection URLs and keys
 supabase db reset        # Reset DB and re-run all migrations
 supabase migration new <name>  # Create new migration file
-supabase gen types typescript --local > src/types/database.types.ts  # Regenerate types
+supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts  # Regenerate types
 ```
 
 ## Architecture
