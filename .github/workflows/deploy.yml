@@ -38,10 +38,13 @@ jobs:
             --project-id xojempkrugifnaveqtqc \
             > src/types/database.types.ts
 
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
       - name: Build application
-        run: npm run build
+        run: doppler run -- npm run build
         env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
 
       - name: Run smoke tests
         run: npm run test:smoke
@@ -74,8 +77,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
       - name: Install dependencies for health check
-        run: npm install --no-save @supabase/supabase-js @dotenvx/dotenvx
+        run: npm install --no-save @supabase/supabase-js
 
       - name: Wait for GitHub Pages propagation
         run: |
@@ -152,19 +158,14 @@ jobs:
 
       - name: Health Check - Supabase Connection
         env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
           echo "🔍 Checking Supabase connection..."
 
-          # Create health check script (dotenvx decrypts env vars at runtime)
+          # Create health check script (env vars injected by Doppler)
           cat > health-check-supabase.mjs << 'EOF'
           import { createClient } from '@supabase/supabase-js';
-          import { config } from '@dotenvx/dotenvx';
 
-          // Load decrypted environment variables
-          config();
-
-          // Validate environment variables
           const supabaseUrl = process.env.VITE_SUPABASE_URL;
           const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
@@ -206,8 +207,8 @@ jobs:
           }
           EOF
 
-          # Run health check script
-          node health-check-supabase.mjs
+          # Run health check script (Doppler injects env vars)
+          doppler run -- node health-check-supabase.mjs
 
       - name: Health Check Summary
         if: success()

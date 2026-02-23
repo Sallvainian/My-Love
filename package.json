@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "./scripts/dev-with-cleanup.sh",
     "dev:raw": "vite",
-    "build": "dotenvx run --overload -- bash -c 'tsc -b && vite build'",
+    "build": "tsc -b && vite build",
     "perf:build": "mkdir -p docs/performance && npm run typecheck && vite build 2>&1 | tee docs/performance/perf-build.log",
     "perf:bundle-report": "npm run perf:build && node scripts/perf-bundle-report.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests scripts --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**'",
-    "preview": "dotenvx run --overload -- npx vite preview",
+    "preview": "npx vite preview",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:unit:ui": "vitest --ui",
@@ -52,7 +52,7 @@
     "@axe-core/playwright": "^4.11.1",
     "@currents/mcp": "^2.2.6",
     "@currents/playwright": "^1.21.1",
-    "@dotenvx/dotenvx": "^1.52.0",
+
     "@eslint/js": "^9.39.2",
     "@faker-js/faker": "^10.3.0",
     "@playwright/test": "^1.58.2",
@@ -70,7 +70,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.17",
     "autoprefixer": "^10.4.24",
-    "dotenv": "^17.2.4",
+
     "eslint": "^9.39.2",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.0",
