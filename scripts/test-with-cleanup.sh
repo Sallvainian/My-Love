@@ -25,6 +25,6 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 # Run playwright tests
-# The webServer in playwright.config.ts handles dotenvx for the dev server
+# The webServer in playwright.config.ts handles the dev server
 echo "🧪 Running Playwright E2E tests..."
 npx playwright test "$@"
