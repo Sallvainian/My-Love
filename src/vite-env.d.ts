@@ -41,6 +41,18 @@ interface ImportMetaEnv {
    * Partner test user password for multi-user E2E tests (optional)
    */
   readonly VITE_TEST_PARTNER_PASSWORD?: string;
+
+  /**
+   * Sentry DSN for error tracking (optional — Sentry disabled when absent)
+   * Get from: Sentry → Project Settings → Client Keys (DSN)
+   */
+  readonly VITE_SENTRY_DSN?: string;
+
+  /**
+   * Sentry release identifier, set at build time (optional)
+   * Format: my-love@<commit-sha>
+   */
+  readonly VITE_SENTRY_RELEASE?: string;
 }
 
 interface ImportMeta {

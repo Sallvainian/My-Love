@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 
 interface ViewErrorFallbackProps {
   error: Error | null;
@@ -120,6 +121,10 @@ export class ViewErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error(`[ViewErrorBoundary] Error in ${this.props.viewName}:`, error, errorInfo);
+    Sentry.captureException(error, {
+      tags: { view: this.props.viewName },
+      contexts: { react: { componentStack: errorInfo.componentStack ?? '' } },
+    });
   }
 
   handleRetry = (): void => {
