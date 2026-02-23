@@ -56,8 +56,8 @@ Live URL: https://sallvainian.github.io/My-Love/
 ```bash
 npm run dev              # Start dev server (runs cleanup script wrapper)
 npm run dev:raw          # Start Vite dev server directly
-npm run preview          # Preview production build (dotenvx decrypts .env)
-npm run build            # Production build (dotenvx + tsc + vite)
+npm run preview          # Preview production build
+npm run build            # Production build (tsc + vite)
 npm run typecheck        # tsc --noEmit
 npm run lint             # ESLint (src, tests, scripts)
 npm run lint:fix         # ESLint fix + Prettier
@@ -147,7 +147,7 @@ Custom InjectManifest strategy (not GenerateSW). Handles:
 
 ### Environment Variables
 
-Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git. The `.env.keys` file (gitignored) contains the decryption key.
+Uses [Doppler](https://doppler.com) for secrets management. Locally, `.envrc` loads secrets via `doppler secrets download`. In CI, the `dopplerhq/cli-action` injects secrets via `DOPPLER_TOKEN`.
 
 Key env vars:
 - `VITE_SUPABASE_URL` - Supabase project URL

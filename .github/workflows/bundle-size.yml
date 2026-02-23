@@ -17,8 +17,6 @@ jobs:
     name: Check Bundle Size
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -28,6 +26,14 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Load secrets into environment
+        run: doppler secrets download --no-file --format env >> $GITHUB_ENV
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
 
       - name: Check compressed bundle size
         uses: preactjs/compressed-size-action@v2
