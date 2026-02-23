@@ -110,7 +110,7 @@ Configure in **Settings** → **Secrets and variables** → **Actions**:
 
 | Secret | Description |
 |--------|-------------|
-| `DOTENV_KEY` | Decryption key for `.env` file |
+| `DOPPLER_TOKEN` | Doppler service token for secrets injection |
 | `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types |
 
 ### GitHub Pages Setup
@@ -187,26 +187,26 @@ The app uses Supabase for real-time mood tracking and partner interactions. Foll
    - **Project URL**: `https://your-project-id.supabase.co`
    - **Anon/Public Key**: Long string starting with `eyJ...`
 
-### 3. Environment Variables (dotenvx Encrypted)
+### 3. Environment Variables (Doppler)
 
-This project uses [dotenvx](https://dotenvx.com) for encrypted environment variables. The `.env` file is encrypted and safely committed to the repository.
+This project uses [Doppler](https://doppler.com) for secrets management. Environment variables are managed in the Doppler dashboard and injected at runtime.
 
-**For local development**, you need the decryption key:
+**For local development**:
 
-1. Get the `DOTENV_KEY` from a team member or your password manager
-2. Create a `.env.keys` file in the project root:
-
-```bash
-echo "DOTENV_KEY='your-decryption-key-here'" > .env.keys
-```
-
-3. Run commands with dotenvx (automatically decrypts):
+1. Install the [Doppler CLI](https://docs.doppler.com/docs/install-cli) and authenticate:
 
 ```bash
-dotenvx run -- npm run dev
+doppler login
+doppler setup
 ```
 
-**Note**: The `.env.keys` file is gitignored for security. Never share or commit this file.
+2. Run commands with Doppler (automatically injects secrets):
+
+```bash
+doppler run -- npm run dev
+```
+
+**Note**: No local secret files or decryption keys needed. All secrets are managed in the [Doppler dashboard](https://dashboard.doppler.com).
 
 ### 4. Database Schema (✅ Already Executed)
 
@@ -254,8 +254,8 @@ The app uses email/password authentication. Create accounts for you and your par
 
 Test user credentials are already included in the encrypted `.env` file. If you need to add or change them:
 
-1. Decrypt and edit the `.env` file
-2. Re-encrypt with `dotenvx encrypt`
+1. Update the credentials in the [Doppler dashboard](https://dashboard.doppler.com)
+2. Changes take effect on the next `doppler run` invocation
 
 **Note**: Create this test user in Supabase Auth with the same credentials.
 
@@ -338,7 +338,7 @@ The app will now appear on your home screen like a native app!
 My-Love/
 ├── .env.example             # Template for environment variables
 ├── .env                     # Encrypted env vars (safe to commit)
-├── .env.keys                # Decryption key (gitignored - keep secret!)
+├── .envrc                   # Loads secrets via Doppler (direnv)
 ├── docs/
 │   └── migrations/          # SQL migration scripts for Supabase
 ├── public/
