@@ -1,6 +1,6 @@
 # Story 4.2: Synchronized Reading with Lock-In
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -57,9 +57,9 @@ so that we progress through scripture as a team without one partner rushing ahea
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: DB Migration — scripture_lock_in and scripture_undo_lock_in RPCs (AC: #3, #4, #5, #6, #7)
-  - [ ] 1.1 Create migration file `supabase/migrations/20260222000001_scripture_lock_in.sql`
-  - [ ] 1.2 `scripture_lock_in(p_session_id UUID, p_step_index INT, p_expected_version INT)` RPC:
+- [x] Task 1: DB Migration — scripture_lock_in and scripture_undo_lock_in RPCs (AC: #3, #4, #5, #6, #7)
+  - [x] 1.1 Create migration file `supabase/migrations/20260222000001_scripture_lock_in.sql`
+  - [x] 1.2 `scripture_lock_in(p_session_id UUID, p_step_index INT, p_expected_version INT)` RPC:
     - Validates: caller is session member (user1_id or user2_id), `current_phase = 'reading'`, `current_step_index = p_step_index`
     - On `session.version != p_expected_version`: RAISE EXCEPTION '409: version mismatch' (client catches and treats as 409)
     - Idempotent UPSERT into `scripture_step_states`: sets `user1_locked_at = now()` (if caller is user1) or `user2_locked_at = now()` (if caller is user2); uses `ON CONFLICT (session_id, step_index) DO UPDATE`
@@ -71,52 +71,52 @@ so that we progress through scripture as a team without one partner rushing ahea
       - Broadcasts `state_updated` on `scripture-session:{session_id}` with: `{ currentPhase, currentStepIndex, version, triggeredBy: 'lock_in' }`
     - If single lock set (partial): broadcasts `lock_in_status_changed` on `scripture-session:{session_id}` with: `{ step_index: p_step_index, user1_locked: bool, user2_locked: bool }`
     - Returns row from `scripture_sessions` (current snapshot)
-  - [ ] 1.3 `scripture_undo_lock_in(p_session_id UUID, p_step_index INT)` RPC:
+  - [x] 1.3 `scripture_undo_lock_in(p_session_id UUID, p_step_index INT)` RPC:
     - Validates: caller is session member, `current_phase = 'reading'`
     - Sets caller's lock column back to NULL (`user1_locked_at = NULL` or `user2_locked_at = NULL`)
     - Broadcasts `lock_in_status_changed` on `scripture-session:{session_id}`: `{ step_index: p_step_index, user1_locked: bool, user2_locked: bool }`
     - Returns current session row
-  - [ ] 1.4 Both RPCs: `SECURITY INVOKER`, `set search_path = ''`, fully qualified table names (`public.scripture_sessions`, `public.scripture_step_states`), `GRANT EXECUTE ON FUNCTION ... TO authenticated`
-  - [ ] 1.5 Add RLS policies for presence channel on `realtime.messages`:
+  - [x] 1.4 Both RPCs: `SECURITY INVOKER`, `set search_path = ''`, fully qualified table names (`public.scripture_sessions`, `public.scripture_step_states`), `GRANT EXECUTE ON FUNCTION ... TO authenticated`
+  - [x] 1.5 Add RLS policies for presence channel on `realtime.messages`:
     - SELECT: `topic LIKE 'scripture-presence:%' AND SPLIT_PART(topic, ':', 2)::uuid IN (SELECT id FROM public.scripture_sessions WHERE user1_id = (SELECT auth.uid()) OR user2_id = (SELECT auth.uid()))`
     - INSERT: same condition with WITH CHECK
 
-- [ ] Task 2: Extend ScriptureReadingState and StateUpdatePayload (AC: #3, #4, #5)
-  - [ ] 2.1 In `scriptureReadingSlice.ts`, extend `StateUpdatePayload` (add optional fields to avoid breaking Story 4.1 callers):
+- [x] Task 2: Extend ScriptureReadingState and StateUpdatePayload (AC: #3, #4, #5)
+  - [x] 2.1 In `scriptureReadingSlice.ts`, extend `StateUpdatePayload` (add optional fields to avoid breaking Story 4.1 callers):
     ```typescript
     currentStepIndex?: number;          // Added Story 4.2 — present when step advances
     triggeredBy?: 'lock_in' | 'phase_advance' | 'reconnect';  // Added Story 4.2
     ```
-  - [ ] 2.2 Add `partnerLocked: boolean` to `ScriptureReadingState` interface (default: false in `initialScriptureState`)
-  - [ ] 2.3 Add actions to `ScriptureSlice` interface:
+  - [x] 2.2 Add `partnerLocked: boolean` to `ScriptureReadingState` interface (default: false in `initialScriptureState`)
+  - [x] 2.3 Add actions to `ScriptureSlice` interface:
     - `lockIn(): Promise<void>`
     - `undoLockIn(): Promise<void>`
     - `onPartnerLockInChanged(locked: boolean): void`
 
-- [ ] Task 3: Implement lockIn, undoLockIn, onPartnerLockInChanged slice actions (AC: #3, #4, #5, #6)
-  - [ ] 3.1 `lockIn()`:
+- [x] Task 3: Implement lockIn, undoLockIn, onPartnerLockInChanged slice actions (AC: #3, #4, #5, #6)
+  - [x] 3.1 `lockIn()`:
     - Guard: no session, or `session.currentPhase !== 'reading'` → return early
     - Optimistic: `set({ isPendingLockIn: true, scriptureError: null })`
     - Call `callLobbyRpc('scripture_lock_in', { p_session_id: session.id, p_step_index: session.currentStepIndex, p_expected_version: session.version })`
     - On success (single lock): no further state update — `state_updated` or `lock_in_status_changed` broadcast will arrive via `useScriptureBroadcast`
     - On 409-like error (message includes '409'): rollback `isPendingLockIn: false`; call `scriptureReadingService.getSession(session.id)` to refetch; set refreshed session; set `scriptureError: { code: SYNC_FAILED, message: 'Session updated' }` (subtle toast)
     - On other error: rollback `isPendingLockIn: false`; `handleScriptureError`; set `scriptureError`
-  - [ ] 3.2 `undoLockIn()`:
+  - [x] 3.2 `undoLockIn()`:
     - Guard: no session
     - `set({ isPendingLockIn: false })` — optimistic
     - Call `callLobbyRpc('scripture_undo_lock_in', { p_session_id: session.id, p_step_index: session.currentStepIndex })`
     - On error: re-set `isPendingLockIn: true` (rollback); `handleScriptureError`
-  - [ ] 3.3 `onPartnerLockInChanged(locked: boolean)`: `set({ partnerLocked: locked })`
-  - [ ] 3.4 Extend `onBroadcastReceived` to handle step advance from lock-in:
+  - [x] 3.3 `onPartnerLockInChanged(locked: boolean)`: `set({ partnerLocked: locked })`
+  - [x] 3.4 Extend `onBroadcastReceived` to handle step advance from lock-in:
     - After existing version check and state update, additionally:
     - If `payload.currentStepIndex != null && session && payload.currentStepIndex !== session.currentStepIndex`:
       - Update `session.currentStepIndex = payload.currentStepIndex`
       - Clear `isPendingLockIn: false`, `partnerLocked: false`
     - The phase update (`payload.currentPhase`) already handled by existing `onBroadcastReceived` logic — ensures 'reflection' transition works
 
-- [ ] Task 4: Create useScripturePresence hook (AC: #2)
-  - [ ] 4.1 Create `src/hooks/useScripturePresence.ts`
-  - [ ] 4.2 Signature:
+- [x] Task 4: Create useScripturePresence hook (AC: #2)
+  - [x] 4.1 Create `src/hooks/useScripturePresence.ts`
+  - [x] 4.2 Signature:
     ```typescript
     interface PartnerPresenceInfo {
       view: 'verse' | 'response' | null;
@@ -129,19 +129,19 @@ so that we progress through scripture as a team without one partner rushing ahea
       view: 'verse' | 'response'
     ): PartnerPresenceInfo
     ```
-  - [ ] 4.3 On mount (sessionId non-null): call `supabase.realtime.setAuth()` then join `scripture-presence:{sessionId}` with `{ config: { broadcast: { self: false }, private: true } }`
-  - [ ] 4.4 On channel SUBSCRIBED: send own presence immediately: `{ type: 'broadcast', event: 'presence_update', payload: { user_id, step_index: stepIndex, view, ts: Date.now() } }`
-  - [ ] 4.5 Listen for `presence_update` events: store latest `PartnerPresenceInfo` in local `useRef` (NOT in Zustand — ephemeral); return it via `useState` for re-render
-  - [ ] 4.6 TTL: in `presence_update` listener, if `Date.now() - payload.ts > 20000` drop silently (don't update state)
-  - [ ] 4.7 Heartbeat: `setInterval` every 10s, re-send own presence with updated `ts`; clear interval on unmount
-  - [ ] 4.8 On `view` prop change: immediately re-send presence (useEffect dep on `[view]`)
-  - [ ] 4.9 On `stepIndex` prop change: re-send presence with new step; reset `partnerPresence` to null (stale from old step)
-  - [ ] 4.10 On unmount / sessionId change to null: call `supabase.removeChannel(channel)`, clear interval
-  - [ ] 4.11 Auth error handling: route through `handleScriptureError(ScriptureErrorCode.SYNC_FAILED, ...)`
-  - [ ] 4.12 Export from `src/hooks/index.ts`
+  - [x] 4.3 On mount (sessionId non-null): call `supabase.realtime.setAuth()` then join `scripture-presence:{sessionId}` with `{ config: { broadcast: { self: false }, private: true } }`
+  - [x] 4.4 On channel SUBSCRIBED: send own presence immediately: `{ type: 'broadcast', event: 'presence_update', payload: { user_id, step_index: stepIndex, view, ts: Date.now() } }`
+  - [x] 4.5 Listen for `presence_update` events: store latest `PartnerPresenceInfo` in local `useRef` (NOT in Zustand — ephemeral); return it via `useState` for re-render
+  - [x] 4.6 TTL: in `presence_update` listener, if `Date.now() - payload.ts > 20000` drop silently (don't update state)
+  - [x] 4.7 Heartbeat: `setInterval` every 10s, re-send own presence with updated `ts`; clear interval on unmount
+  - [x] 4.8 On `view` prop change: immediately re-send presence (useEffect dep on `[view]`)
+  - [x] 4.9 On `stepIndex` prop change: re-send presence with new step; reset `partnerPresence` to null (stale from old step)
+  - [x] 4.10 On unmount / sessionId change to null: call `supabase.removeChannel(channel)`, clear interval
+  - [x] 4.11 Auth error handling: route through `handleScriptureError(ScriptureErrorCode.SYNC_FAILED, ...)`
+  - [x] 4.12 Export from `src/hooks/index.ts`
 
-- [ ] Task 5: Extend useScriptureBroadcast for lock_in_status_changed (AC: #4)
-  - [ ] 5.1 Add `onPartnerLockInChanged`, `currentUserId`, `sessionUserId` to the `useShallow` selector:
+- [x] Task 5: Extend useScriptureBroadcast for lock_in_status_changed (AC: #4)
+  - [x] 5.1 Add `onPartnerLockInChanged`, `currentUserId`, `sessionUserId` to the `useShallow` selector:
     ```typescript
     const { ..., onPartnerLockInChanged, currentUserId, sessionUserId } = useAppStore(
       useShallow((state) => ({
@@ -152,7 +152,7 @@ so that we progress through scripture as a team without one partner rushing ahea
       }))
     );
     ```
-  - [ ] 5.2 Add event listener in the channel chain:
+  - [x] 5.2 Add event listener in the channel chain:
     ```typescript
     .on('broadcast', { event: 'lock_in_status_changed' }, (msg: { payload: LockInStatusChangedPayload }) => {
       const isUser1 = currentUserId !== null && currentUserId === sessionUserId;
@@ -160,7 +160,7 @@ so that we progress through scripture as a team without one partner rushing ahea
       onPartnerLockInChanged(partnerLocked);
     })
     ```
-  - [ ] 5.3 Add `LockInStatusChangedPayload` interface at top of file:
+  - [x] 5.3 Add `LockInStatusChangedPayload` interface at top of file:
     ```typescript
     interface LockInStatusChangedPayload {
       step_index: number;
@@ -168,11 +168,11 @@ so that we progress through scripture as a team without one partner rushing ahea
       user2_locked: boolean;
     }
     ```
-  - [ ] 5.4 Add `onPartnerLockInChanged`, `currentUserId`, `sessionUserId` to the `useEffect` dependency array
+  - [x] 5.4 Add `onPartnerLockInChanged`, `currentUserId`, `sessionUserId` to the `useEffect` dependency array
 
-- [ ] Task 6: Create LockInButton.tsx (AC: #3, #4)
-  - [ ] 6.1 Create `src/components/scripture-reading/session/LockInButton.tsx`
-  - [ ] 6.2 Props interface:
+- [x] Task 6: Create LockInButton.tsx (AC: #3, #4)
+  - [x] 6.1 Create `src/components/scripture-reading/session/LockInButton.tsx`
+  - [x] 6.2 Props interface:
     ```typescript
     interface LockInButtonProps {
       isLocked: boolean;       // User has pending lock-in
@@ -183,55 +183,55 @@ so that we progress through scripture as a team without one partner rushing ahea
       onUndoLockIn: () => void;
     }
     ```
-  - [ ] 6.3 Unlocked (isLocked=false): primary purple button "Ready for next verse" (`bg-purple-600 text-white`)
-  - [ ] 6.4 Locked (isLocked=true): secondary button "Waiting for [partnerName]..." + small link below "Tap to undo"
-  - [ ] 6.5 If `partnerLocked && !isLocked`: show "[PartnerName] is ready" with green check indicator above button (no pressure)
-  - [ ] 6.6 If `isPending`: button shows loading state (opacity-50, pointer-events-none)
-  - [ ] 6.7 Min 48px touch target on all interactive elements
-  - [ ] 6.8 `data-testid`: `lock-in-button`, `lock-in-undo`, `partner-locked-indicator`
-  - [ ] 6.9 `aria-label` on main button describing current state
+  - [x] 6.3 Unlocked (isLocked=false): primary purple button "Ready for next verse" (`bg-purple-600 text-white`)
+  - [x] 6.4 Locked (isLocked=true): secondary button "Waiting for [partnerName]..." + small link below "Tap to undo"
+  - [x] 6.5 If `partnerLocked && !isLocked`: show "[PartnerName] is ready" with green check indicator above button (no pressure)
+  - [x] 6.6 If `isPending`: button shows loading state (opacity-50, pointer-events-none)
+  - [x] 6.7 Min 48px touch target on all interactive elements
+  - [x] 6.8 `data-testid`: `lock-in-button`, `lock-in-undo`, `partner-locked-indicator`
+  - [x] 6.9 `aria-label` on main button describing current state
 
-- [ ] Task 7: Create RoleIndicator.tsx (AC: #1)
-  - [ ] 7.1 Create `src/components/scripture-reading/reading/RoleIndicator.tsx`
-  - [ ] 7.2 Props: `{ role: 'reader' | 'responder' }`
-  - [ ] 7.3 Reader: pill badge with `backgroundColor: '#A855F7'` (primary purple), white text: "You read this"
-  - [ ] 7.4 Responder: pill badge with `backgroundColor: '#C084FC'` (lighter purple), white text: "Partner reads this"
-  - [ ] 7.5 Rounded pill: `rounded-full px-3 py-1 text-sm font-medium`
-  - [ ] 7.6 `data-testid="role-indicator"`, `aria-label` describing the role
+- [x] Task 7: Create RoleIndicator.tsx (AC: #1)
+  - [x] 7.1 Create `src/components/scripture-reading/reading/RoleIndicator.tsx`
+  - [x] 7.2 Props: `{ role: 'reader' | 'responder' }`
+  - [x] 7.3 Reader: pill badge with `backgroundColor: '#A855F7'` (primary purple), white text: "You read this"
+  - [x] 7.4 Responder: pill badge with `backgroundColor: '#C084FC'` (lighter purple), white text: "Partner reads this"
+  - [x] 7.5 Rounded pill: `rounded-full px-3 py-1 text-sm font-medium`
+  - [x] 7.6 `data-testid="role-indicator"`, `aria-label` describing the role
 
-- [ ] Task 8: Create PartnerPosition.tsx (AC: #2)
-  - [ ] 8.1 Create `src/components/scripture-reading/reading/PartnerPosition.tsx`
-  - [ ] 8.2 Props: `{ partnerName: string; presence: PartnerPresenceInfo }` (import `PartnerPresenceInfo` from `useScripturePresence`)
-  - [ ] 8.3 When `presence.view === null`: render nothing (no stale indicator)
-  - [ ] 8.4 When `presence.view === 'verse'`: "[PartnerName] is reading the verse"
-  - [ ] 8.5 When `presence.view === 'response'`: "[PartnerName] is reading the response"
-  - [ ] 8.6 Muted styling: `text-purple-400 text-sm` with small eye icon
-  - [ ] 8.7 `data-testid="partner-position"`, `aria-live="polite"` for screen reader updates
+- [x] Task 8: Create PartnerPosition.tsx (AC: #2)
+  - [x] 8.1 Create `src/components/scripture-reading/reading/PartnerPosition.tsx`
+  - [x] 8.2 Props: `{ partnerName: string; presence: PartnerPresenceInfo }` (import `PartnerPresenceInfo` from `useScripturePresence`)
+  - [x] 8.3 When `presence.view === null`: render nothing (no stale indicator)
+  - [x] 8.4 When `presence.view === 'verse'`: "[PartnerName] is reading the verse"
+  - [x] 8.5 When `presence.view === 'response'`: "[PartnerName] is reading the response"
+  - [x] 8.6 Muted styling: `text-purple-400 text-sm` with small eye icon
+  - [x] 8.7 `data-testid="partner-position"`, `aria-live="polite"` for screen reader updates
 
-- [ ] Task 9: Create ReadingContainer.tsx (AC: all)
-  - [ ] 9.1 Create `src/components/scripture-reading/containers/ReadingContainer.tsx`
-  - [ ] 9.2 Zustand selector (useShallow): `session`, `myRole`, `isPendingLockIn`, `partnerLocked`, `lockIn`, `undoLockIn`
-  - [ ] 9.3 Also select `partner` from `partnerSlice` for `partnerName`
-  - [ ] 9.4 Local state: `localView: 'verse' | 'response'` (default: 'verse')
-  - [ ] 9.5 Call `useScripturePresence(session?.id ?? null, session?.currentStepIndex ?? 0, localView)` → `partnerPresence`
-  - [ ] 9.6 Effective role calculation:
+- [x] Task 9: Create ReadingContainer.tsx (AC: all)
+  - [x] 9.1 Create `src/components/scripture-reading/containers/ReadingContainer.tsx`
+  - [x] 9.2 Zustand selector (useShallow): `session`, `myRole`, `isPendingLockIn`, `partnerLocked`, `lockIn`, `undoLockIn`
+  - [x] 9.3 Also select `partner` from `partnerSlice` for `partnerName`
+  - [x] 9.4 Local state: `localView: 'verse' | 'response'` (default: 'verse')
+  - [x] 9.5 Call `useScripturePresence(session?.id ?? null, session?.currentStepIndex ?? 0, localView)` → `partnerPresence`
+  - [x] 9.6 Effective role calculation:
     ```typescript
     const effectiveRole: SessionRole = myRole === null ? 'reader' :
       (myRole === 'reader') === (session.currentStepIndex % 2 === 0)
         ? 'reader' : 'responder';
     ```
-  - [ ] 9.7 Current step data: `const step = SCRIPTURE_STEPS[session.currentStepIndex]`
-  - [ ] 9.8 Verse/response navigation: tabs or toggle buttons (`data-testid="reading-tab-verse"`, `data-testid="reading-tab-response"`)
-  - [ ] 9.9 Track previous `session.currentStepIndex` via `useRef` to detect step advance (triggers slide animation)
-  - [ ] 9.10 Framer Motion AnimatePresence: slide-left + fade on step change (300ms); `useMotionConfig().fade` for reduced-motion
-  - [ ] 9.11 Toast state: show "Session updated" for 3s when 409 error occurs (watch `scriptureError` for SYNC_FAILED with 'Session updated' message)
-  - [ ] 9.12 Reset `localView` to 'verse' on step advance
-  - [ ] 9.13 Data testids: `reading-container`, `reading-verse-text`, `reading-response-text`, `reading-step-progress`, `session-update-toast`
-  - [ ] 9.14 Do NOT call `useScriptureBroadcast` here — it is already mounted by LobbyContainer via ScriptureOverview routing and persists through the reading phase (see Architecture Constraint below)
+  - [x] 9.7 Current step data: `const step = SCRIPTURE_STEPS[session.currentStepIndex]`
+  - [x] 9.8 Verse/response navigation: tabs or toggle buttons (`data-testid="reading-tab-verse"`, `data-testid="reading-tab-response"`)
+  - [x] 9.9 Track previous `session.currentStepIndex` via `useRef` to detect step advance (triggers slide animation)
+  - [x] 9.10 Framer Motion AnimatePresence: slide-left + fade on step change (300ms); `useMotionConfig().fade` for reduced-motion
+  - [x] 9.11 Toast state: show "Session updated" for 3s when 409 error occurs (watch `scriptureError` for SYNC_FAILED with 'Session updated' message)
+  - [x] 9.12 Reset `localView` to 'verse' on step advance
+  - [x] 9.13 Data testids: `reading-container`, `reading-verse-text`, `reading-response-text`, `reading-step-progress`, `session-update-toast`
+  - [x] 9.14 Do NOT call `useScriptureBroadcast` here — it is already mounted by LobbyContainer via ScriptureOverview routing and persists through the reading phase (see Architecture Constraint below)
 
-- [ ] Task 10: Update ScriptureOverview.tsx routing (AC: #1)
-  - [ ] 10.1 Import `ReadingContainer` from containers
-  - [ ] 10.2 Add routing condition AFTER the LobbyContainer check and BEFORE the main overview render:
+- [x] Task 10: Update ScriptureOverview.tsx routing (AC: #1)
+  - [x] 10.1 Import `ReadingContainer` from containers
+  - [x] 10.2 Add routing condition AFTER the LobbyContainer check and BEFORE the main overview render:
     ```typescript
     // Story 4.2: Route to ReadingContainer for together-mode reading phase
     if (
@@ -242,47 +242,47 @@ so that we progress through scripture as a team without one partner rushing ahea
       return <ReadingContainer />;
     }
     ```
-  - [ ] 10.3 Verify existing reflection catch-all still handles together-mode reflection (it should — no change needed)
+  - [x] 10.3 Verify existing reflection catch-all still handles together-mode reflection (it should — no change needed)
 
-- [ ] Task 11: Update index.ts exports
-  - [ ] 11.1 `src/components/scripture-reading/index.ts`: export `LockInButton`, `RoleIndicator`, `PartnerPosition`, `ReadingContainer`
-  - [ ] 11.2 `src/hooks/index.ts`: export `useScripturePresence`
+- [x] Task 11: Update index.ts exports
+  - [x] 11.1 `src/components/scripture-reading/index.ts`: export `LockInButton`, `RoleIndicator`, `PartnerPosition`, `ReadingContainer`
+  - [x] 11.2 `src/hooks/index.ts`: export `useScripturePresence`
 
-- [ ] Task 12: pgTAP database tests (AC: #3, #6, #7)
-  - [ ] 12.1 New file: `supabase/tests/database/11_scripture_lockin.sql`
-  - [ ] 12.2 `4.2-DB-001`: Single lock-in — user1 calls `scripture_lock_in(session_id, 0, version)` → `user1_locked_at` IS NOT NULL, `user2_locked_at` IS NULL, `advanced_at` IS NULL, `current_step_index` = 0
-  - [ ] 12.3 `4.2-DB-002`: Both lock-in → advance — user1 + user2 both lock → `advanced_at` IS NOT NULL, `current_step_index` = 1, `version` incremented
-  - [ ] 12.4 `4.2-DB-003`: Version mismatch raises exception — calling with stale version throws
-  - [ ] 12.5 `4.2-DB-004`: RLS security — non-member cannot call `scripture_lock_in` (throws)
-  - [ ] 12.6 `4.2-DB-005`: Last step (step 16) — both lock → `current_phase = 'reflection'`, `status = 'complete'`
-  - [ ] 12.7 `4.2-DB-006`: Undo lock-in — user1 locks then calls `scripture_undo_lock_in` → `user1_locked_at` IS NULL
-  - [ ] **CRITICAL**: Set `partner_id` in `public.users` before asserting couple/security behavior (Epic 3 retro rule)
+- [x] Task 12: pgTAP database tests (AC: #3, #6, #7)
+  - [x] 12.1 New file: `supabase/tests/database/11_scripture_lockin.sql`
+  - [x] 12.2 `4.2-DB-001`: Single lock-in — user1 calls `scripture_lock_in(session_id, 0, version)` → `user1_locked_at` IS NOT NULL, `user2_locked_at` IS NULL, `advanced_at` IS NULL, `current_step_index` = 0
+  - [x] 12.3 `4.2-DB-002`: Both lock-in → advance — user1 + user2 both lock → `advanced_at` IS NOT NULL, `current_step_index` = 1, `version` incremented
+  - [x] 12.4 `4.2-DB-003`: Version mismatch raises exception — calling with stale version throws
+  - [x] 12.5 `4.2-DB-004`: RLS security — non-member cannot call `scripture_lock_in` (throws)
+  - [x] 12.6 `4.2-DB-005`: Last step (step 16) — both lock → `current_phase = 'reflection'`, `status = 'complete'`
+  - [x] 12.7 `4.2-DB-006`: Undo lock-in — user1 locks then calls `scripture_undo_lock_in` → `user1_locked_at` IS NULL
+  - [x] **CRITICAL**: Set `partner_id` in `public.users` before asserting couple/security behavior (Epic 3 retro rule)
 
-- [ ] Task 13: Unit tests (AC: all)
-  - [ ] 13.1 `src/components/scripture-reading/__tests__/LockInButton.test.tsx`:
+- [x] Task 13: Unit tests (AC: all)
+  - [x] 13.1 `src/components/scripture-reading/__tests__/LockInButton.test.tsx`:
     - Unlocked renders "Ready for next verse"
     - Locked renders waiting state + "Tap to undo" visible
     - `onLockIn` called on button click (unlocked state)
     - `onUndoLockIn` called on "Tap to undo" click
     - `partnerLocked=true` shows partner indicator
     - `isPending=true` disables button
-  - [ ] 13.2 `src/components/scripture-reading/__tests__/RoleIndicator.test.tsx`:
+  - [x] 13.2 `src/components/scripture-reading/__tests__/RoleIndicator.test.tsx`:
     - Reader renders "#A855F7" background and "You read this"
     - Responder renders "#C084FC" and "Partner reads this"
     - aria-label correct for both
-  - [ ] 13.3 `src/components/scripture-reading/__tests__/PartnerPosition.test.tsx`:
+  - [x] 13.3 `src/components/scripture-reading/__tests__/PartnerPosition.test.tsx`:
     - `view=null` renders nothing
     - `view='verse'` shows verse message
     - `view='response'` shows response message
     - `aria-live="polite"` present
-  - [ ] 13.4 `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx`:
+  - [x] 13.4 `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx`:
     - Renders role indicator with correct role
     - `lockIn` called when lock-in button clicked
     - `undoLockIn` called when undo clicked
     - `effectiveRole` = 'reader' on even step, 'responder' on odd step (when myRole='reader')
     - PartnerPosition receives presence data
     - Shows "Session updated" toast when SYNC_FAILED error present
-  - [ ] 13.5 `tests/unit/hooks/useScripturePresence.test.ts`:
+  - [x] 13.5 `tests/unit/hooks/useScripturePresence.test.ts`:
     - Channel joined on non-null sessionId
     - `setAuth` called before subscribe
     - Sends presence immediately on SUBSCRIBED
@@ -291,7 +291,7 @@ so that we progress through scripture as a team without one partner rushing ahea
     - Presence dropped if `ts` > 20s stale
     - Presence reset to null on stepIndex change
     - Cleanup removes channel and clears interval
-  - [ ] 13.6 `tests/unit/stores/scriptureReadingSlice.lockin.test.ts`:
+  - [x] 13.6 `tests/unit/stores/scriptureReadingSlice.lockin.test.ts`:
     - `lockIn()` sets `isPendingLockIn: true`
     - `undoLockIn()` sets `isPendingLockIn: false`
     - `onPartnerLockInChanged(true)` sets `partnerLocked: true`
@@ -300,14 +300,14 @@ so that we progress through scripture as a team without one partner rushing ahea
     - `lockIn()` error with '409' in message → rollback + scriptureError with 'Session updated'
     - `lockIn()` other error → rollback + SYNC_FAILED error
 
-- [ ] Task 14: E2E tests (AC: #1, #3, #4, #5, #6, #7)
-  - [ ] 14.1 New file: `tests/e2e/scripture/scripture-reading-4.2.spec.ts`
-  - [ ] 14.2 `4.2-E2E-001`: Full lock-in flow — both users in reading phase → user A taps "Ready for next verse" → user B sees "[PartnerName] is ready" → user B taps "Ready for next verse" → both advance to step 2 (verse text changes, role indicator updates)
-  - [ ] 14.3 `4.2-E2E-002`: Undo lock-in — user A locks → "Tap to undo" visible → user A taps undo → button reverts to "Ready for next verse"; user B's partner indicator disappears
-  - [ ] 14.4 `4.2-E2E-003`: Role alternation — user A (Reader on step 1) locks in with user B → step advances → user A shows "Partner reads this" (Responder); user B shows "You read this" (Reader)
-  - [ ] 14.5 `4.2-E2E-004`: Last step completion — navigate to step 17 (via repeated lock-ins or seed) → both lock in → reflection phase UI appears
-  - [ ] **Always import** `{ test, expect }` from `tests/support/merged-fixtures`
-  - [ ] **Use** `tests/support/helpers/scripture-lobby.ts` for shared lobby setup helpers (added in Story 4.1)
+- [x] Task 14: E2E tests (AC: #1, #3, #4, #5, #6, #7)
+  - [x] 14.1 New file: `tests/e2e/scripture/scripture-reading-4.2.spec.ts`
+  - [x] 14.2 `4.2-E2E-001`: Full lock-in flow — both users in reading phase → user A taps "Ready for next verse" → user B sees "[PartnerName] is ready" → user B taps "Ready for next verse" → both advance to step 2 (verse text changes, role indicator updates)
+  - [x] 14.3 `4.2-E2E-002`: Undo lock-in — user A locks → "Tap to undo" visible → user A taps undo → button reverts to "Ready for next verse"; user B's partner indicator disappears
+  - [x] 14.4 `4.2-E2E-003`: Role alternation — user A (Reader on step 1) locks in with user B → step advances → user A shows "Partner reads this" (Responder); user B shows "You read this" (Reader)
+  - [x] 14.5 `4.2-E2E-004`: Last step completion — navigate to step 17 (via repeated lock-ins or seed) → both lock in → reflection phase UI appears
+  - [x] **Always import** `{ test, expect }` from `tests/support/merged-fixtures`
+  - [x] **Use** `tests/support/helpers/scripture-lobby.ts` for shared lobby setup helpers (added in Story 4.1)
 
 ## Dev Notes
 
@@ -595,10 +595,69 @@ src/stores/slices/
 
 ### Agent Model Used
 
-claude-sonnet-4-6
+claude-opus-4-6
 
 ### Debug Log References
 
+- Error extraction fix: `String({ message: '...' })` returns `[object Object]` — added plain-object check in `lockIn()` error handler
+- Broadcast channel continuity: moved `useScriptureBroadcast` from `LobbyContainer` to `ScriptureOverview` to prevent channel teardown on lobby→reading transition
+
 ### Completion Notes List
 
+- All 14 tasks complete (1-14)
+- 735 unit tests passing (47 files), 0 failures
+- TypeScript clean (0 errors)
+- ESLint clean (0 errors, pre-existing warnings only)
+- pgTAP tests written (10 assertions) — require `supabase start` + migration apply to run
+- E2E tests written (4 tests) — `test.skip` markers removed, require local Supabase to run
+- `project-structure-boundaries.md` updated with new files (exit criterion met)
+- `useScriptureBroadcast` moved from LobbyContainer to ScriptureOverview (architecture constraint resolved)
+- Post-review fixes applied (2026-02-28): stale presence heartbeat, lock-in pending wiring, payload cleanup, reflection assertion, BookmarkFlag rendering
+
 ### File List
+
+**New files:**
+- `supabase/migrations/20260222000001_scripture_lock_in.sql` — lock-in RPCs + presence RLS
+- `src/hooks/useScripturePresence.ts` — ephemeral presence channel hook
+- `src/components/scripture-reading/session/LockInButton.tsx` — lock-in button (presentational)
+- `src/components/scripture-reading/reading/RoleIndicator.tsx` — role pill badge (presentational)
+- `src/components/scripture-reading/reading/PartnerPosition.tsx` — partner position display (presentational)
+- `src/components/scripture-reading/containers/ReadingContainer.tsx` — together-mode reading orchestrator
+- `supabase/tests/database/11_scripture_lockin.sql` — pgTAP tests (10 assertions)
+- `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` — slice lock-in unit tests (11 tests)
+- `tests/unit/hooks/useScripturePresence.test.ts` — presence hook unit tests (8 tests)
+- `src/components/scripture-reading/__tests__/LockInButton.test.tsx` — LockInButton unit tests (7 tests)
+- `src/components/scripture-reading/__tests__/RoleIndicator.test.tsx` — RoleIndicator unit tests
+- `src/components/scripture-reading/__tests__/PartnerPosition.test.tsx` — PartnerPosition unit tests
+- `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` — ReadingContainer unit tests (8 tests)
+- `tests/e2e/scripture/scripture-reading-4.2.spec.ts` — E2E tests (4 tests)
+
+**Modified files:**
+- `src/stores/slices/scriptureReadingSlice.ts` — added `partnerLocked` state, `lockIn`/`undoLockIn`/`onPartnerLockInChanged` actions, extended `onBroadcastReceived` for step advance
+- `src/hooks/useScriptureBroadcast.ts` — added `lock_in_status_changed` event listener, `LockInStatusChangedPayload` interface
+- `src/components/scripture-reading/containers/ScriptureOverview.tsx` — moved `useScriptureBroadcast` here, added `ReadingContainer` routing
+- `src/components/scripture-reading/containers/LobbyContainer.tsx` — removed `useScriptureBroadcast` call (moved to ScriptureOverview)
+- `src/components/scripture-reading/index.ts` — added exports for new components
+- `src/hooks/index.ts` — added `useScripturePresence` export
+- `tests/unit/hooks/useScriptureBroadcast.test.ts` — added lock-in mapping + identity re-render regression coverage
+- `_bmad-output/planning-artifacts/architecture/project-structure-boundaries.md` — added new files to structure
+
+### Change Log
+
+| Change | Reason |
+|--------|--------|
+| Created `scripture_lock_in` RPC | Implements mutual lock-in with OCC (version check), idempotent UPSERT, auto-advance on both locked |
+| Created `scripture_undo_lock_in` RPC | Allows clearing pending lock-in state |
+| Added presence RLS policies | Secures `scripture-presence:{sessionId}` private channel |
+| Extended `scriptureReadingSlice` | Added `partnerLocked` state and 3 new actions for lock-in lifecycle |
+| Extended `onBroadcastReceived` | Detects step advance from lock-in broadcast, clears lock flags |
+| Created `useScripturePresence` hook | Ephemeral presence channel with 10s heartbeat, 20s TTL, separate from session broadcast |
+| Extended `useScriptureBroadcast` | Added `lock_in_status_changed` listener for partner lock state |
+| Created `LockInButton` | Presentational: ready/waiting/undo states with partner indicator |
+| Created `RoleIndicator` | Presentational: reader/responder pill badge with role-appropriate colors |
+| Created `PartnerPosition` | Presentational: partner view position via presence data |
+| Created `ReadingContainer` | Orchestrator: connects store, manages view tabs, presence, step animation, toast |
+| Moved `useScriptureBroadcast` to ScriptureOverview | Prevents channel teardown on lobby→reading phase transition |
+| Added ReadingContainer route | Together-mode reading phase now routes to ReadingContainer |
+| Fixed error extraction in `lockIn()` | Plain object `{ message: '...' }` was rendering as `[object Object]` via `String()` |
+| Addressed Story 4.2 review findings (2026-02-28) | Fixed stale presence heartbeat, lock-in button pending behavior, state_updated payload bloat, undo SQL no-op, broadcast teardown risk, and strengthened reflection E2E assertion |

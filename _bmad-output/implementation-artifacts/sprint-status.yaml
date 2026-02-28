@@ -64,7 +64,7 @@ development_status:
   # Epic 4: Together Mode — Synchronized Reading
   epic-4: in-progress
   4-1-lobby-role-selection-and-countdown: done
-  4-2-synchronized-reading-with-lock-in: ready-for-dev
+  4-2-synchronized-reading-with-lock-in: review
   4-3-reconnection-and-graceful-degradation: backlog
   epic-4-retrospective: optional
 
