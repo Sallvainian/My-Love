@@ -51,6 +51,7 @@ tests/.auth/
 !.claude/commands/
 !.claude/rules/
 _bmad/
+_bmad-output/
 !.bmad/
 .code
 
