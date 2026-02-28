@@ -1,7 +1,7 @@
 ---
 stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 'step-03-generate-tests', 'step-03c-aggregate', 'step-04-validate-and-summarize']
 lastStep: 'step-04-validate-and-summarize'
-lastSaved: '2026-02-21'
+lastSaved: '2026-02-28'
 ---
 
 # Automation Summary
@@ -302,3 +302,104 @@ Subprocess B → `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` (P2 E2E te
 2. `npm run test:unit` — verify existing 678 unit tests still pass
 3. `npm run test:p1` — run P0+P1 tests (includes new API tests once Supabase running)
 4. `test-review` on new test files before merging to main
+
+---
+
+## Update: 2026-02-28 (Story 4.2 — Synchronized Reading with Lock-In — Coverage Expansion)
+
+- Workflow: `testarch-automate` (BMad-Integrated mode)
+- Scope: Expand automation coverage for Epic 4 Story 4.2 — fill edge case gaps beyond ATDD checklist
+
+### Step 1: Preflight & Context
+
+- **Framework**: Vitest + happy-dom + React Testing Library (unit/component), Playwright (E2E)
+- **Mode**: BMad-Integrated (story 4.2 artifact at `_bmad-output/implementation-artifacts/4-2-synchronized-reading-with-lock-in.md`)
+- **Story Status**: Review (implementation complete, 45 ATDD tests all GREEN)
+- **TEA Config**: `tea_use_playwright_utils: true`, `tea_browser_automation: auto`
+- **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, data-factories, selective-testing, ci-burn-in, test-quality, overview (playwright-utils), playwright-cli
+
+**Artifacts loaded:**
+- Story 4.2 implementation artifact (7 ACs, 14 tasks all complete)
+- ATDD checklist: `_bmad-output/test-artifacts/atdd-checklist-4.2.md` (45 tests, all GREEN)
+- Existing test files: 6 unit/component + 1 E2E spec (7 files total)
+
+### Step 2: Identify Automation Targets
+
+**Existing ATDD coverage (45 tests — no action needed):**
+
+| Level | File | Tests | Status |
+|-------|------|-------|--------|
+| Unit | `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | 11 | All passing |
+| Unit | `tests/unit/hooks/useScripturePresence.test.ts` | 10 | All passing |
+| Component | `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 7 | All passing |
+| Component | `src/components/scripture-reading/__tests__/RoleIndicator.test.tsx` | 4 | All passing |
+| Component | `src/components/scripture-reading/__tests__/PartnerPosition.test.tsx` | 4 | All passing |
+| Component | `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | 9 | All passing |
+| E2E | `tests/e2e/scripture/scripture-reading-4.2.spec.ts` | 4 | All passing |
+
+**Coverage gaps identified:**
+
+| # | Priority | Gap | File | Level |
+|---|----------|-----|------|-------|
+| 1 | P2 | `lockIn()` guard: no-op when session is null | `scriptureReadingSlice.lockin.test.ts` | Unit |
+| 2 | P2 | `lockIn()` guard: no-op when `currentPhase !== 'reading'` | `scriptureReadingSlice.lockin.test.ts` | Unit |
+| 3 | P2 | `undoLockIn()` guard: no-op when session is null | `scriptureReadingSlice.lockin.test.ts` | Unit |
+| 4 | P2 | Tab switching: Response tab shows response text | `ReadingContainer.test.tsx` | Component |
+| 5 | P2 | Tab switching: Verse tab returns to verse text | `ReadingContainer.test.tsx` | Component |
+| 6 | P2 | Null guard: returns null when session is null | `ReadingContainer.test.tsx` | Component |
+| 7 | P2 | Null guard: returns null when step data undefined | `ReadingContainer.test.tsx` | Component |
+| 8 | P2 | Combined state: partner indicator hidden when `isLocked && partnerLocked` | `LockInButton.test.tsx` | Component |
+| 9 | P2 | Undo button disabled when `isPending` in locked state | `LockInButton.test.tsx` | Component |
+
+**E2E gaps**: None — ATDD E2E tests cover all critical paths (P0 full flow, P1 undo, P1 role alternation, P1 last step reflection).
+
+### Step 3: Generation
+
+**Subprocess A** (Unit/Component — 9 tests, all P2):
+
+Generated expansion tests in 3 existing files. No new files created.
+
+| File | New Tests | Description |
+|------|-----------|-------------|
+| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | 3 | Guard conditions: null session, wrong phase |
+| `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | 4 | Tab nav, null guards |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 2 | Combined state edge cases |
+
+**Subprocess B** (E2E): No new E2E tests needed — ATDD coverage is complete.
+
+### Step 4: Validation
+
+```
+3 test files, 36 tests, 0 failures
+- scriptureReadingSlice.lockin.test.ts: 14 passed (was 11, +3 expansion)
+- ReadingContainer.test.tsx: 13 passed (was 9, +4 expansion)
+- LockInButton.test.tsx: 9 passed (was 7, +2 expansion)
+```
+
+### Files Updated
+
+| File | Action | Tests Added | Priority |
+|------|--------|-------------|----------|
+| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | **Updated** | 3 | P2 |
+| `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | **Updated** | 4 | P2 |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | **Updated** | 2 | P2 |
+| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+
+### Priority Breakdown
+
+- P0: 0 new tests (ATDD already covered)
+- P1: 0 new tests (ATDD already covered)
+- P2: 9 new tests (guard conditions, tab navigation, null guards, combined state edges)
+- **Total**: 9 expansion tests added to existing files
+- **Grand total Story 4.2 tests**: 54 (45 ATDD + 9 expansion)
+
+### Assumptions & Risks
+
+- All expansion tests are P2 edge cases — ATDD already covered all P0/P1 critical paths
+- No new E2E tests added because 4 existing E2E tests cover all 7 ACs
+- Guard condition tests verify early-return behavior without RPC calls (no mock setup needed)
+
+### Next Recommended Workflow
+
+1. `test-review` on Story 4.2 expanded tests before merging
+2. `trace` to confirm P0/P1 coverage alignment for Epic 4 stories 4.1 + 4.2
