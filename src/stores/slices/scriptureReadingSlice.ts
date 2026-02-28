@@ -31,9 +31,12 @@ export interface StateUpdatePayload {
   version: number;
   user1Role?: SessionRole | null;
   user2Role?: SessionRole | null;
-  user1Ready: boolean;
-  user2Ready: boolean;
+  user1Ready?: boolean;
+  user2Ready?: boolean;
   countdownStartedAt?: number | null; // Server UTC ms or null
+  currentStepIndex?: number; // Story 4.2: present when step advances via lock-in
+  triggeredBy?: 'lock_in' | 'phase_advance' | 'reconnect'; // Backward compatibility
+  triggered_by?: 'lock_in' | 'phase_advance' | 'reconnect'; // Architecture-aligned key
 }
 
 // ============================================
@@ -111,6 +114,8 @@ export interface ScriptureReadingState {
   partnerReady: boolean;
   countdownStartedAt: number | null; // Server UTC ms — stored as number (JSON-safe, not Date)
   currentUserId: string | null; // Logged-in user's auth ID — used to distinguish user1 vs user2 in broadcasts
+  // Story 4.2: Lock-in state
+  partnerLocked: boolean;
 }
 
 // ============================================
@@ -143,6 +148,10 @@ export interface ScriptureSlice extends ScriptureReadingState {
   onPartnerReady: (isReady: boolean) => void;
   onCountdownStarted: (startTs: number) => void;
   onBroadcastReceived: (payload: StateUpdatePayload) => void;
+  // Story 4.2: Lock-in actions
+  lockIn: () => Promise<void>;
+  undoLockIn: () => Promise<void>;
+  onPartnerLockInChanged: (locked: boolean) => void;
 }
 
 // ============================================
@@ -169,6 +178,8 @@ const initialScriptureState: ScriptureReadingState = {
   partnerReady: false,
   countdownStartedAt: null,
   currentUserId: null,
+  // Story 4.2: Lock-in initial state
+  partnerLocked: false,
 };
 
 // ============================================
@@ -677,22 +688,34 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     //   user2 client → self is user2 → myReady = user2Ready, partnerReady = user1Ready
     const isUser1 = currentUserId !== null && session?.userId === currentUserId;
 
+    // Story 4.2: Detect step advance from lock-in
+    const stepAdvanced =
+      payload.currentStepIndex != null &&
+      session &&
+      payload.currentStepIndex !== session.currentStepIndex;
+
     set((currentState) => ({
       session: currentState.session
         ? {
             ...currentState.session,
             currentPhase: payload.currentPhase,
             version: payload.version,
+            // Story 4.2: Update step index if advanced
+            ...(payload.currentStepIndex != null
+              ? { currentStepIndex: payload.currentStepIndex }
+              : {}),
           }
         : null,
-      partnerReady: isUser1 ? payload.user2Ready : payload.user1Ready,
+      partnerReady: isUser1
+        ? (payload.user2Ready ?? currentState.partnerReady)
+        : (payload.user1Ready ?? currentState.partnerReady),
       // Reconcile self-ready from authoritative snapshot — prevents drift after reconnect/reload.
       // Only update if currentUserId is known (skip if not yet authenticated in this session).
       myReady:
         currentUserId !== null
           ? isUser1
-            ? payload.user1Ready
-            : payload.user2Ready
+            ? (payload.user1Ready ?? currentState.myReady)
+            : (payload.user2Ready ?? currentState.myReady)
           : currentState.myReady,
       // Reconcile self-role from snapshot; fall back to local value if snapshot has no role yet.
       myRole:
@@ -704,6 +727,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         payload.countdownStartedAt != null
           ? payload.countdownStartedAt
           : currentState.countdownStartedAt,
+      // Story 4.2: Clear lock-in flags when step advances
+      ...(stepAdvanced ? { isPendingLockIn: false, partnerLocked: false } : {}),
     }));
   },
 
@@ -728,5 +753,101 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         status: 'in_progress',
       },
     });
+  },
+
+  // ============================================================
+  // Story 4.2: Lock-in actions
+  // ============================================================
+
+  lockIn: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session || session.currentPhase !== 'reading') return;
+
+    // Optimistic: set pending lock-in immediately
+    set({ isPendingLockIn: true, scriptureError: null });
+
+    try {
+      const { error } = await callLobbyRpc('scripture_lock_in', {
+        p_session_id: session.id,
+        p_step_index: session.currentStepIndex,
+        p_expected_version: session.version,
+      });
+
+      if (error) throw error;
+
+      // Success: no further state update needed —
+      // state_updated or lock_in_status_changed broadcast will arrive via useScriptureBroadcast
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+            ? String((error as { message: unknown }).message)
+            : String(error);
+
+      if (errorMessage.includes('409')) {
+        // Version mismatch: rollback, refetch session, show subtle toast
+        set({ isPendingLockIn: false });
+        try {
+          const refreshedSession = await scriptureReadingService.getSession(session.id, (s) =>
+            set({ session: s })
+          );
+          if (refreshedSession) {
+            set({ session: refreshedSession });
+          }
+        } catch {
+          // Refetch failed — proceed with stale state, error already shown
+        }
+        set({
+          scriptureError: {
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Session updated',
+          },
+        });
+      } else {
+        // Other error: rollback + standard error handling
+        set({ isPendingLockIn: false });
+        const scriptureError: ScriptureError = {
+          code: ScriptureErrorCode.SYNC_FAILED,
+          message: errorMessage,
+          details: error,
+        };
+        handleScriptureError(scriptureError);
+        set({ scriptureError });
+      }
+    }
+  },
+
+  undoLockIn: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session) return;
+
+    // Optimistic: clear pending lock-in immediately
+    set({ isPendingLockIn: false });
+
+    try {
+      const { error } = await callLobbyRpc('scripture_undo_lock_in', {
+        p_session_id: session.id,
+        p_step_index: session.currentStepIndex,
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      // Rollback: re-set pending lock-in
+      set({ isPendingLockIn: true });
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.SYNC_FAILED,
+        message: error instanceof Error ? error.message : 'Failed to undo lock-in',
+        details: error,
+      };
+      handleScriptureError(scriptureError);
+      set({ scriptureError });
+    }
+  },
+
+  onPartnerLockInChanged: (locked) => {
+    set({ partnerLocked: locked });
   },
 });

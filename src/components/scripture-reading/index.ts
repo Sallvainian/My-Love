@@ -10,8 +10,12 @@
 export { ScriptureOverview } from './containers/ScriptureOverview';
 export { SoloReadingFlow } from './containers/SoloReadingFlow';
 export { LobbyContainer } from './containers/LobbyContainer';
+export { ReadingContainer } from './containers/ReadingContainer';
 export { Countdown } from './session/Countdown';
+export { LockInButton } from './session/LockInButton';
 export { BookmarkFlag } from './reading/BookmarkFlag';
+export { RoleIndicator } from './reading/RoleIndicator';
+export { PartnerPosition } from './reading/PartnerPosition';
 export { PerStepReflection } from './reflection/PerStepReflection';
 export { ReflectionSummary } from './reflection/ReflectionSummary';
 export { MessageCompose } from './reflection/MessageCompose';

@@ -33,7 +33,9 @@ import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { SoloReadingFlow } from './SoloReadingFlow';
 import { LobbyContainer } from './LobbyContainer';
+import { ReadingContainer } from './ReadingContainer';
 import { StatsSection } from '../overview/StatsSection';
+import { useScriptureBroadcast } from '../../../hooks/useScriptureBroadcast';
 
 // Lavender Dreams design tokens
 const scriptureTheme = {
@@ -151,6 +153,13 @@ function TogetherIcon() {
 export function ScriptureOverview() {
   const { modeReveal } = useMotionConfig();
   const { isOnline } = useNetworkStatus();
+
+  // Story 4.2: Broadcast channel mounted here (NOT in LobbyContainer) so it persists
+  // across lobby → countdown → reading phase transitions without unmounting.
+  const broadcastSession = useAppStore((state) => state.session);
+  useScriptureBroadcast(
+    broadcastSession?.mode === 'together' ? broadcastSession?.id ?? null : null
+  );
 
   // Partner slice state
   const { partner, isLoadingPartner, loadPartner, setView } = useAppStore(
@@ -301,6 +310,15 @@ export function ScriptureOverview() {
   // Story 1.3: Also route to SoloReadingFlow for completion screen
   if (session && (session.status === 'complete' || session.currentPhase === 'reflection')) {
     return <SoloReadingFlow />;
+  }
+
+  // Story 4.2: Route to ReadingContainer for together-mode reading phase
+  if (
+    session &&
+    session.mode === 'together' &&
+    session.currentPhase === 'reading'
+  ) {
+    return <ReadingContainer />;
   }
 
   // Story 4.1: Route to LobbyContainer for together-mode lobby and countdown phases
