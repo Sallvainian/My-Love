@@ -67,12 +67,16 @@ const mockOnPartnerJoined = vi.fn();
 const mockOnPartnerReady = vi.fn();
 const mockOnBroadcastReceived = vi.fn();
 const mockApplySessionConverted = vi.fn();
+const mockOnPartnerLockInChanged = vi.fn();
 
 const mockStoreState = {
   onPartnerJoined: mockOnPartnerJoined,
   onPartnerReady: mockOnPartnerReady,
   onBroadcastReceived: mockOnBroadcastReceived,
   applySessionConverted: mockApplySessionConverted,
+  onPartnerLockInChanged: mockOnPartnerLockInChanged,
+  currentUserId: 'user-1',
+  session: { userId: 'user-1' },
 };
 
 vi.mock('../../../src/stores/useAppStore', () => ({
@@ -129,7 +133,12 @@ describe('useScriptureBroadcast', () => {
     mocks.removeChannel.mockResolvedValue(undefined);
     mocks.send.mockResolvedValue(undefined);
     mockApplySessionConverted.mockReset();
+    mockOnPartnerLockInChanged.mockReset();
     mockHandleScriptureError.mockReset();
+    Object.assign(mockStoreState, {
+      currentUserId: 'user-1',
+      session: { userId: 'user-1' },
+    });
   });
 
   test('[P1] does not join channel when sessionId is null', () => {
@@ -166,6 +175,25 @@ describe('useScriptureBroadcast', () => {
 
     // channel() only called once — re-renders with same sessionId should not re-subscribe
     expect(supabase.channel).toHaveBeenCalledTimes(1);
+  });
+
+  test('[P1] does not tear down/re-subscribe when identity fields change', async () => {
+    const { rerender } = renderHook(() => useScriptureBroadcast('session-abc'));
+
+    expect(supabase.channel).toHaveBeenCalledTimes(1);
+    expect(supabase.removeChannel).not.toHaveBeenCalled();
+
+    Object.assign(mockStoreState, {
+      currentUserId: 'user-2',
+      session: { userId: 'user-1' },
+    });
+
+    await act(async () => {
+      rerender();
+    });
+
+    expect(supabase.channel).toHaveBeenCalledTimes(1);
+    expect(supabase.removeChannel).not.toHaveBeenCalled();
   });
 
   test('[P1] broadcasts partner_joined event with user_id when SUBSCRIBED status fires', async () => {
@@ -218,6 +246,19 @@ describe('useScriptureBroadcast', () => {
     });
 
     expect(mockOnPartnerReady).toHaveBeenCalledWith(true);
+  });
+
+  test('[P1] maps lock_in_status_changed payload to partner lock state', async () => {
+    await act(async () => {
+      renderHook(() => useScriptureBroadcast('session-abc'));
+    });
+
+    // currentUserId == sessionUserId (user1), so partner lock is user2_locked
+    broadcastHandlers['lock_in_status_changed']?.({
+      payload: { step_index: 0, user1_locked: false, user2_locked: true },
+    });
+
+    expect(mockOnPartnerLockInChanged).toHaveBeenCalledWith(true);
   });
 
   test('[P1] calls removeChannel on unmount', async () => {
