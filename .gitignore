@@ -110,3 +110,5 @@ skills/
 .worktrees/
 .security-key
 logs/security/
+CLAUDE.md
+AGENTS.md
