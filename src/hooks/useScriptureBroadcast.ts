@@ -41,19 +41,45 @@ interface SessionConvertedPayload {
   sessionId: string;
 }
 
+// Story 4.2: Lock-in status broadcast payload
+interface LockInStatusChangedPayload {
+  step_index: number;
+  user1_locked: boolean;
+  user2_locked: boolean;
+}
+
 /** Side-effect hook: subscribes to the scripture session broadcast channel. Returns nothing. */
 export function useScriptureBroadcast(sessionId: string | null): void {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const { onPartnerJoined, onPartnerReady, onBroadcastReceived, applySessionConverted } =
-    useAppStore(
-      useShallow((state) => ({
-        onPartnerJoined: state.onPartnerJoined,
-        onPartnerReady: state.onPartnerReady,
-        onBroadcastReceived: state.onBroadcastReceived,
-        applySessionConverted: state.applySessionConverted,
-      }))
-    );
+  const {
+    onPartnerJoined,
+    onPartnerReady,
+    onBroadcastReceived,
+    applySessionConverted,
+    onPartnerLockInChanged,
+    currentUserId,
+    sessionUserId,
+  } = useAppStore(
+    useShallow((state) => ({
+      onPartnerJoined: state.onPartnerJoined,
+      onPartnerReady: state.onPartnerReady,
+      onBroadcastReceived: state.onBroadcastReceived,
+      applySessionConverted: state.applySessionConverted,
+      onPartnerLockInChanged: state.onPartnerLockInChanged,
+      currentUserId: state.currentUserId,
+      sessionUserId: state.session?.userId ?? null, // user1_id
+    }))
+  );
+
+  const identityRef = useRef<{ currentUserId: string | null; sessionUserId: string | null }>({
+    currentUserId,
+    sessionUserId,
+  });
+
+  useEffect(() => {
+    identityRef.current = { currentUserId, sessionUserId };
+  }, [currentUserId, sessionUserId]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -97,6 +123,19 @@ export function useScriptureBroadcast(sessionId: string | null): void {
           // The broadcasting partner already nulled user2_id; re-invoking the RPC
           // would throw "Session not found or access denied" for the removed partner.
           applySessionConverted();
+        }
+      )
+      .on(
+        'broadcast',
+        { event: 'lock_in_status_changed' },
+        (msg: { payload: LockInStatusChangedPayload }) => {
+          // Story 4.2: Determine which lock field represents the partner
+          const { currentUserId: latestCurrentUserId, sessionUserId: latestSessionUserId } =
+            identityRef.current;
+          const isUser1 =
+            latestCurrentUserId !== null && latestCurrentUserId === latestSessionUserId;
+          const partnerLocked = isUser1 ? msg.payload.user2_locked : msg.payload.user1_locked;
+          onPartnerLockInChanged(partnerLocked);
         }
       );
 
@@ -146,5 +185,12 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         channelRef.current = null;
       }
     };
-  }, [sessionId, onPartnerJoined, onPartnerReady, onBroadcastReceived, applySessionConverted]);
+  }, [
+    sessionId,
+    onPartnerJoined,
+    onPartnerReady,
+    onBroadcastReceived,
+    applySessionConverted,
+    onPartnerLockInChanged,
+  ]);
 }

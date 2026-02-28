@@ -9,7 +9,7 @@
  *   Phase C — Countdown: countdownStartedAt !== null
  *
  * Connects to scriptureReadingSlice for lobby state.
- * Calls useScriptureBroadcast for channel lifecycle.
+ * useScriptureBroadcast is called by ScriptureOverview (Story 4.2) to persist across phases.
  * Does NOT import supabase directly (broadcast handled by hook).
  */
 
@@ -19,7 +19,6 @@ import { BookOpen, MessageCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
-import { useScriptureBroadcast } from '../../../hooks/useScriptureBroadcast';
 import { Countdown } from '../session/Countdown';
 
 // Lavender Dreams design tokens (from ScriptureOverview)
@@ -62,8 +61,7 @@ export function LobbyContainer(): ReactElement {
     }))
   );
 
-  // Broadcast channel lifecycle — manages subscribe/unsubscribe
-  useScriptureBroadcast(session?.id ?? null);
+  // Story 4.2: useScriptureBroadcast moved to ScriptureOverview to persist across phase transitions
 
   const partnerName = partner?.displayName ?? 'your partner';
 
