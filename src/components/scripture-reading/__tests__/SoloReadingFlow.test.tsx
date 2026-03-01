@@ -93,15 +93,13 @@ const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
 const mockAddReflection = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSessionBookmarkSharing = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSession = vi.fn().mockResolvedValue(undefined);
-const mockAddMessage = vi
-  .fn()
-  .mockResolvedValue({
-    id: 'msg-1',
-    sessionId: 'session-123',
-    senderId: 'user-456',
-    message: 'test',
-    createdAt: new Date(),
-  });
+const mockAddMessage = vi.fn().mockResolvedValue({
+  id: 'msg-1',
+  sessionId: 'session-123',
+  senderId: 'user-456',
+  message: 'test',
+  createdAt: new Date(),
+});
 const mockGetSessionReportData = vi.fn().mockResolvedValue({
   reflections: [],
   bookmarks: [],
@@ -112,8 +110,7 @@ vi.mock('../../../services/scriptureReadingService', () => ({
     getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
     toggleBookmark: (...args: unknown[]) => mockToggleBookmark(...args),
     addReflection: (...args: unknown[]) => mockAddReflection(...args),
-    updateSessionBookmarkSharing: (...args: unknown[]) =>
-      mockUpdateSessionBookmarkSharing(...args),
+    updateSessionBookmarkSharing: (...args: unknown[]) => mockUpdateSessionBookmarkSharing(...args),
     updateSession: (...args: unknown[]) => mockUpdateSession(...args),
     addMessage: (...args: unknown[]) => mockAddMessage(...args),
     getSessionReportData: (...args: unknown[]) => mockGetSessionReportData(...args),

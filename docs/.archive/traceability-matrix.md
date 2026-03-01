@@ -12,12 +12,12 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### Coverage Summary
 
-| Priority  | Total Criteria | FULL Coverage | Coverage % | Status       |
-| --------- | -------------- | ------------- | ---------- | ------------ |
-| P0        | 0              | 0             | N/A        | N/A          |
-| P1        | 4              | 4             | 100%       | ✅ PASS      |
-| P2        | 1              | 1             | 100%       | ✅ PASS      |
-| **Total** | **5**          | **5**         | **100%**   | **✅ PASS**  |
+| Priority  | Total Criteria | FULL Coverage | Coverage % | Status      |
+| --------- | -------------- | ------------- | ---------- | ----------- |
+| P0        | 0              | 0             | N/A        | N/A         |
+| P1        | 4              | 4             | 100%       | ✅ PASS     |
+| P2        | 1              | 1             | 100%       | ✅ PASS     |
+| **Total** | **5**          | **5**         | **100%**   | **✅ PASS** |
 
 **Legend:**
 
@@ -37,15 +37,15 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
     - **Given:** User completes reflection summary (linked user)
     - **When:** Report phase begins
     - **Then:** Message compose screen appears with heading, textarea, send/skip buttons; after sending, Daily Prayer Report screen loads
-  - `2.3-INT-002` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1145
+  - `2.3-INT-002` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1145
     - **Given:** Phase is report and partner exists
     - **When:** SoloReadingFlow renders
     - **Then:** MessageCompose component is displayed
-  - `2.3-INT-003` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1173
+  - `2.3-INT-003` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1173
     - **Given:** User types message and clicks send
     - **When:** handleMessageSend fires
     - **Then:** addMessage service method is called with message text
-  - `MessageCompose.test.tsx (17 tests)` - src/components/scripture-reading/__tests__/MessageCompose.test.tsx
+  - `MessageCompose.test.tsx (17 tests)` - src/components/scripture-reading/**tests**/MessageCompose.test.tsx
     - **Given:** MessageCompose component rendered with props
     - **When:** User interacts with textarea, send/skip buttons
     - **Then:** Heading shows partner name, textarea accepts 300 chars, char counter at 250+, send/skip callbacks fire, disabled state works, aria-label correct, focus on mount
@@ -56,17 +56,17 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### AC-2: Unlinked User — Skip Message Composition (P1)
 
-- **Coverage:** FULL ✅ *(upgraded from PARTIAL in Run 2)*
+- **Coverage:** FULL ✅ _(upgraded from PARTIAL in Run 2)_
 - **Tests:**
   - `2.3-E2E-002` - tests/e2e/scripture/scripture-reflection.spec.ts:985
     - **Given:** User has no linked partner (seeded via `preset: 'unlinked'`)
     - **When:** Report phase begins
     - **Then:** Message compose skipped, completion screen shows "Session complete", session marked complete in DB
-  - `2.3-INT-001` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1159
+  - `2.3-INT-001` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1159
     - **Given:** Phase is report and no partner
     - **When:** SoloReadingFlow renders
     - **Then:** Unlinked completion screen displayed (not MessageCompose)
-  - `2.3-INT-006` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1231
+  - `2.3-INT-006` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1231
     - **Given:** Unlinked user enters report phase
     - **When:** Component mounts
     - **Then:** Session marked complete (status + completedAt)
@@ -93,15 +93,15 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
     - **Given:** Partner has not completed session
     - **When:** Report displays
     - **Then:** "Waiting for [Partner]'s reflections" text shown
-  - `2.3-INT-005` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1213
+  - `2.3-INT-005` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1213
     - **Given:** User sends or skips message
     - **When:** Phase transitions
     - **Then:** DailyPrayerReport component appears
-  - `2.3-INT-007` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1248
+  - `2.3-INT-007` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1248
     - **Given:** User clicks "Return to Overview"
     - **When:** Button clicked
     - **Then:** exitSession called
-  - `DailyPrayerReport.test.tsx (15 tests)` - src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx
+  - `DailyPrayerReport.test.tsx (15 tests)` - src/components/scripture-reading/**tests**/DailyPrayerReport.test.tsx
     - **Given:** DailyPrayerReport rendered with various props
     - **When:** Component displays
     - **Then:** Ratings (17 steps), bookmarks (amber), standout verses (chips), partner message (font-cursive), waiting state, no-message hides section, partner side-by-side, return button, heading tabIndex
@@ -112,7 +112,7 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### AC-4: Asynchronous Report Viewing (Solo Session, Linked User) (P1)
 
-- **Coverage:** FULL ✅ *(upgraded from PARTIAL in Run 2)*
+- **Coverage:** FULL ✅ _(upgraded from PARTIAL in Run 2)_
 - **Tests:**
   - `2.3-API-003` - tests/api/scripture-reflection-api.spec.ts:706 **(NEW in Run 3)**
     - **Given:** A session exists with two linked users (User A and User B, via `mid_session` preset)
@@ -126,7 +126,7 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
     - **Given:** Session in progress
     - **When:** Session completed
     - **Then:** `status=complete` and `completedAt` set
-  - `2.3-INT-004` - src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx:1195
+  - `2.3-INT-004` - src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx:1195
     - **Given:** User skips message
     - **When:** Skip handler fires
     - **Then:** Session still marked complete
@@ -139,13 +139,13 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### AC-5: Together Mode Report Display (P2)
 
-- **Coverage:** FULL ✅ *(upgraded from UNIT-ONLY in Run 3)*
+- **Coverage:** FULL ✅ _(upgraded from UNIT-ONLY in Run 3)_
 - **Tests:**
   - `2.3-E2E-005` - tests/e2e/scripture/scripture-reflection.spec.ts:1121 **(NEW in Run 4)**
     - **Given:** Together-mode session with partner reflections, bookmarks, standout verses, and message pre-seeded via supabaseAdmin
     - **When:** User1 completes all 17 steps, submits reflection summary, sends message
     - **Then:** Report shows partner ratings side-by-side (two rating circles per step row), partner message revealed in Dancing Script font, report heading and return button visible
-  - `DailyPrayerReport.test.tsx (partner side-by-side)` - src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx
+  - `DailyPrayerReport.test.tsx (partner side-by-side)` - src/components/scripture-reading/**tests**/DailyPrayerReport.test.tsx
     - **Given:** Partner data available (ratings, bookmarks, standout verses, message)
     - **When:** DailyPrayerReport renders
     - **Then:** Partner ratings shown side-by-side with user ratings
@@ -166,13 +166,13 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### High Priority Gaps (PR BLOCKER) ⚠️
 
-0 gaps found. **All P1 criteria now have FULL coverage.** *(was 2 gaps in Run 2)*
+0 gaps found. **All P1 criteria now have FULL coverage.** _(was 2 gaps in Run 2)_
 
 ---
 
 #### Medium Priority Gaps (Nightly) ⚠️
 
-0 gaps found. **AC-5 gap resolved in Run 4.** *(was 1 gap in Run 3)*
+0 gaps found. **AC-5 gap resolved in Run 4.** _(was 1 gap in Run 3)_
 
 ---
 
@@ -225,13 +225,13 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### Coverage by Test Level
 
-| Test Level    | Tests | Criteria Covered              | Coverage % |
-| ------------- | ----- | ----------------------------- | ---------- |
-| E2E           | 5     | AC-1, AC-2, AC-3, AC-5        | 80%        |
-| API           | 3     | AC-4                          | 20%        |
-| Integration   | 7     | AC-1, AC-2, AC-3, AC-4        | 80%        |
-| Unit          | ~32   | AC-1, AC-3, AC-5              | 60%        |
-| **Total**     | **~48** | **5/5**                     | **100% FULL** |
+| Test Level  | Tests   | Criteria Covered       | Coverage %    |
+| ----------- | ------- | ---------------------- | ------------- |
+| E2E         | 5       | AC-1, AC-2, AC-3, AC-5 | 80%           |
+| API         | 3       | AC-4                   | 20%           |
+| Integration | 7       | AC-1, AC-2, AC-3, AC-4 | 80%           |
+| Unit        | ~32     | AC-1, AC-3, AC-5       | 60%           |
+| **Total**   | **~48** | **5/5**                | **100% FULL** |
 
 ---
 
@@ -317,13 +317,13 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### P0 Criteria (Must ALL Pass)
 
-| Criterion             | Threshold | Actual     | Status              |
-| --------------------- | --------- | ---------- | ------------------- |
-| P0 Coverage           | 100%      | N/A (0 P0) | ✅ PASS (vacuous)   |
-| P0 Test Pass Rate     | 100%      | N/A        | ✅ PASS (vacuous)   |
-| Security Issues       | 0         | 0          | ✅ PASS             |
-| Critical NFR Failures | 0         | 0          | ✅ PASS             |
-| Flaky Tests           | 0         | 0          | ✅ PASS             |
+| Criterion             | Threshold | Actual     | Status            |
+| --------------------- | --------- | ---------- | ----------------- |
+| P0 Coverage           | 100%      | N/A (0 P0) | ✅ PASS (vacuous) |
+| P0 Test Pass Rate     | 100%      | N/A        | ✅ PASS (vacuous) |
+| Security Issues       | 0         | 0          | ✅ PASS           |
+| Critical NFR Failures | 0         | 0          | ✅ PASS           |
+| Flaky Tests           | 0         | 0          | ✅ PASS           |
 
 **P0 Evaluation**: ✅ ALL PASS (vacuously satisfied — no P0 acceptance criteria)
 
@@ -331,12 +331,12 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### P1 Criteria (Required for PASS, May Accept for CONCERNS)
 
-| Criterion              | Threshold | Actual | Status      |
-| ---------------------- | --------- | ------ | ----------- |
-| P1 Coverage            | ≥90%      | 100%   | ✅ PASS     |
-| P1 Test Pass Rate      | ≥95%      | 100%   | ✅ PASS     |
-| Overall Test Pass Rate | ≥95%      | 100%   | ✅ PASS     |
-| Overall FULL Coverage  | ≥75%      | 100%   | ✅ PASS     |
+| Criterion              | Threshold | Actual | Status  |
+| ---------------------- | --------- | ------ | ------- |
+| P1 Coverage            | ≥90%      | 100%   | ✅ PASS |
+| P1 Test Pass Rate      | ≥95%      | 100%   | ✅ PASS |
+| Overall Test Pass Rate | ≥95%      | 100%   | ✅ PASS |
+| Overall FULL Coverage  | ≥75%      | 100%   | ✅ PASS |
 
 **P1 Evaluation**: ✅ ALL PASS
 
@@ -344,9 +344,9 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### P2/P3 Criteria (Informational, Don't Block)
 
-| Criterion         | Actual | Notes                    |
-| ----------------- | ------ | ------------------------ |
-| P2 Test Pass Rate | 100%   | Tracked, doesn't block   |
+| Criterion         | Actual | Notes                  |
+| ----------------- | ------ | ---------------------- |
+| P2 Test Pass Rate | 100%   | Tracked, doesn't block |
 
 ---
 
@@ -361,6 +361,7 @@ All P0 criteria are vacuously satisfied (no P0 acceptance criteria). All P1 crit
 The decision is **PASS** because all acceptance criteria now have FULL multi-level coverage. AC-5 (Together Mode Report Display, P2) was the last remaining gap and has been resolved with `2.3-E2E-005`.
 
 **Key evidence:**
+
 - AC-1 and AC-3: Full multi-level coverage (E2E + Integration + Unit) — unchanged
 - AC-2: FULL — `unlinked` preset, E2E test active (resolved in Run 2→3)
 - AC-4: FULL — `2.3-API-003` validates async viewing (resolved in Run 2→3)
@@ -368,6 +369,7 @@ The decision is **PASS** because all acceptance criteria now have FULL multi-lev
 - All active tests pass — zero failures, zero flakiness, zero skips
 
 **Improvement from Run 3:** FULL coverage increased from 80% to 100% (+20 percentage points). One P2 gap resolved:
+
 1. AC-5 Together mode E2E test `2.3-E2E-005` → validates partner ratings side-by-side, partner message revealed
 
 ---
@@ -425,8 +427,8 @@ The decision is **PASS** because all acceptance criteria now have FULL multi-lev
 traceability_and_gate:
   # Phase 1: Traceability
   traceability:
-    story_id: "2.3"
-    date: "2026-02-04"
+    story_id: '2.3'
+    date: '2026-02-04'
     run: 4
     coverage:
       overall: 100%
@@ -444,13 +446,13 @@ traceability_and_gate:
       blocker_issues: 0
       warning_issues: 5
     recommendations:
-      - "Verify E2E tests pass with Supabase local"
+      - 'Verify E2E tests pass with Supabase local'
 
   # Phase 2: Gate Decision
   gate_decision:
-    decision: "PASS"
-    gate_type: "story"
-    decision_mode: "deterministic"
+    decision: 'PASS'
+    gate_type: 'story'
+    decision_mode: 'deterministic'
     criteria:
       p0_coverage: N/A
       p0_pass_rate: N/A
@@ -469,16 +471,16 @@ traceability_and_gate:
       min_overall_pass_rate: 95
       min_coverage: 75
     evidence:
-      test_results: "local_run"
-      traceability: "_bmad-output/traceability-matrix.md"
-      nfr_assessment: "not_assessed"
-      code_coverage: "not_assessed"
-    next_steps: "Verify E2E with Supabase local, merge PR"
+      test_results: 'local_run'
+      traceability: '_bmad-output/traceability-matrix.md'
+      nfr_assessment: 'not_assessed'
+      code_coverage: 'not_assessed'
+    next_steps: 'Verify E2E with Supabase local, merge PR'
     run_history:
-      run_1: { coverage: "0%", decision: "FAIL" }
-      run_2: { coverage: "40%", decision: "FAIL" }
-      run_3: { coverage: "80%", decision: "CONCERNS" }
-      run_4: { coverage: "100%", decision: "PASS" }
+      run_1: { coverage: '0%', decision: 'FAIL' }
+      run_2: { coverage: '40%', decision: 'FAIL' }
+      run_3: { coverage: '80%', decision: 'CONCERNS' }
+      run_4: { coverage: '100%', decision: 'PASS' }
 ```
 
 ---
@@ -519,6 +521,7 @@ traceability_and_gate:
 **Overall Status:** ✅ PASS
 
 **Run History:**
+
 - Run 1: 0% FULL → ❌ FAIL
 - Run 2: 40% FULL → ❌ FAIL (+40pp)
 - Run 3: 80% FULL → ⚠️ CONCERNS (+40pp)

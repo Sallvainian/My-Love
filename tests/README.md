@@ -157,7 +157,7 @@ Use `data-testid` attributes:
 
 ```tsx
 // Component
-<button data-testid="submit-button">Submit</button>
+<button data-testid="submit-button">Submit</button>;
 
 // Test
 await page.click('[data-testid="submit-button"]');
@@ -166,6 +166,7 @@ await page.click('[data-testid="submit-button"]');
 ### Test Isolation
 
 Each test should:
+
 1. Create its own data (via API, not UI)
 2. Clean up after itself
 3. Not depend on other tests
@@ -199,6 +200,7 @@ test('page load', async ({ page, networkErrorMonitor }) => {
 ## CI Integration
 
 Tests run in GitHub Actions with:
+
 - Single worker (`workers: 1` in CI)
 - Retries enabled (`retries: 2` in CI)
 - JUnit report for CI integration

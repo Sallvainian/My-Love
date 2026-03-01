@@ -64,10 +64,7 @@ test.describe('Per-Step Reflection System', () => {
       await page.getByTestId('scripture-rating-4').click();
 
       // THEN: Rating 4 is checked (aria-checked)
-      await expect(page.getByTestId('scripture-rating-4')).toHaveAttribute(
-        'aria-checked',
-        'true'
-      );
+      await expect(page.getByTestId('scripture-rating-4')).toHaveAttribute('aria-checked', 'true');
 
       // AND: Other ratings are unchecked
       for (const n of [1, 2, 3, 5]) {
@@ -97,9 +94,7 @@ test.describe('Per-Step Reflection System', () => {
 
       // THEN: Session advances to the next verse (step 2)
       await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 2 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
       // AND: Reflection data is persisted to the database
       const { data: reflections, error } = await supabaseAdmin
@@ -136,10 +131,7 @@ test.describe('Per-Step Reflection System', () => {
       // AND: Bookmark button is visible with inactive state
       const bookmarkButton = page.getByTestId('scripture-bookmark-button');
       await expect(bookmarkButton).toBeVisible();
-      await expect(bookmarkButton).toHaveAttribute(
-        'aria-label',
-        'Bookmark this verse'
-      );
+      await expect(bookmarkButton).toHaveAttribute('aria-label', 'Bookmark this verse');
       await expect(bookmarkButton).toHaveAttribute('aria-pressed', 'false');
 
       // AND: Bookmark button meets 48x48px minimum touch target
@@ -158,10 +150,7 @@ test.describe('Per-Step Reflection System', () => {
       await bookmarkButton.click();
 
       // THEN: BookmarkFlag toggles to filled amber instantly (optimistic)
-      await expect(bookmarkButton).toHaveAttribute(
-        'aria-label',
-        'Remove bookmark'
-      );
+      await expect(bookmarkButton).toHaveAttribute('aria-label', 'Remove bookmark');
       await expect(bookmarkButton).toHaveAttribute('aria-pressed', 'true');
 
       // AND: Bookmark persists to server
@@ -188,10 +177,7 @@ test.describe('Per-Step Reflection System', () => {
       await bookmarkButton.click();
 
       // THEN: BookmarkFlag toggles back to outlined inactive
-      await expect(bookmarkButton).toHaveAttribute(
-        'aria-label',
-        'Bookmark this verse'
-      );
+      await expect(bookmarkButton).toHaveAttribute('aria-label', 'Bookmark this verse');
       await expect(bookmarkButton).toHaveAttribute('aria-pressed', 'false');
 
       // AND: Bookmark is removed from the database
@@ -226,9 +212,7 @@ test.describe('Per-Step Reflection System', () => {
       await expect(continueButton).toHaveAttribute('aria-disabled', 'true');
 
       // AND: No validation message is visible yet (quiet validation)
-      await expect(
-        page.getByTestId('scripture-reflection-validation')
-      ).not.toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-validation')).not.toBeVisible();
 
       // WHEN: User taps Continue without selecting a rating
       // Note: clicking a disabled button — use force to simulate user intent
@@ -289,14 +273,10 @@ test.describe('Per-Step Reflection System', () => {
       await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
 
       // AND: Retry indicator/toast is visible (non-blocking)
-      await expect(
-        page.getByTestId('retry-banner')
-      ).toBeVisible();
+      await expect(page.getByTestId('retry-banner')).toBeVisible();
 
       // AND: The retry UI does not block interaction with the next verse
-      await expect(
-        page.getByTestId('scripture-next-verse-button')
-      ).toBeEnabled();
+      await expect(page.getByTestId('scripture-next-verse-button')).toBeEnabled();
     });
   });
 

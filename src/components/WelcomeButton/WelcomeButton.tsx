@@ -10,7 +10,7 @@ export function WelcomeButton({ onClick }: WelcomeButtonProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
-    <div className="fixed bottom-8 right-8 z-50">
+    <div className="fixed right-8 bottom-8 z-50">
       {/* Tooltip */}
       <AnimatePresence>
         {showTooltip && (
@@ -19,9 +19,9 @@ export function WelcomeButton({ onClick }: WelcomeButtonProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-full right-0 mb-3 hidden md:block pointer-events-none"
+            className="pointer-events-none absolute right-0 bottom-full mb-3 hidden md:block"
           >
-            <div className="bg-white/90 backdrop-blur-sm text-pink-600 px-4 py-2 rounded-full shadow-lg whitespace-nowrap text-sm font-medium">
+            <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium whitespace-nowrap text-pink-600 shadow-lg backdrop-blur-sm">
               View welcome message again
             </div>
           </motion.div>
@@ -43,10 +43,10 @@ export function WelcomeButton({ onClick }: WelcomeButtonProps) {
         onHoverStart={() => setShowTooltip(true)}
         onHoverEnd={() => setShowTooltip(false)}
         onClick={onClick}
-        className="w-14 h-14 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg hover:shadow-2xl transition-shadow duration-300 flex items-center justify-center group"
+        className="group flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow duration-300 hover:shadow-2xl"
         aria-label="View welcome message again"
       >
-        <Heart className="w-6 h-6 fill-white" />
+        <Heart className="h-6 w-6 fill-white" />
 
         {/* Subtle pulse animation */}
         <motion.div

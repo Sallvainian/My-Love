@@ -38,9 +38,10 @@ export function PhotoCarousel() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // AC-4.3.3: Derive image URL from current photo (no state needed - pure computation)
-  const imageUrl = (currentPhoto && 'signedUrl' in currentPhoto && currentPhoto.signedUrl)
-    ? currentPhoto.signedUrl
-    : '';
+  const imageUrl =
+    currentPhoto && 'signedUrl' in currentPhoto && currentPhoto.signedUrl
+      ? currentPhoto.signedUrl
+      : '';
 
   // AC-4.3.2: Navigation functions (with boundary checking)
   const navigateToNext = useCallback(() => {
@@ -157,7 +158,7 @@ export function PhotoCarousel() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={currentPhoto.id}
-          className="flex flex-col items-center justify-center h-full w-full px-4 pb-24"
+          className="flex h-full w-full flex-col items-center justify-center px-4 pb-24"
           drag="x"
           dragConstraints={dragConstraints}
           dragElastic={0.2}
@@ -173,11 +174,11 @@ export function PhotoCarousel() {
           data-testid="photo-carousel-image-container"
         >
           {/* AC-4.3.3: Photo displayed at optimal size (object-fit: contain) */}
-          <div className="flex items-center justify-center max-w-full max-h-[calc(100vh-12rem)]">
+          <div className="flex max-h-[calc(100vh-12rem)] max-w-full items-center justify-center">
             <img
               src={imageUrl}
               alt={currentPhoto.caption || `Photo ${currentPhoto.id}`}
-              className="max-w-full max-h-full object-contain"
+              className="max-h-full max-w-full object-contain"
               draggable={false}
               data-testid="photo-carousel-image"
             />
@@ -185,9 +186,9 @@ export function PhotoCarousel() {
 
           {/* AC-4.3.4: Caption below photo */}
           {currentPhoto.caption && (
-            <div className="mt-6 text-center max-w-4xl" data-testid="photo-carousel-metadata">
+            <div className="mt-6 max-w-4xl text-center" data-testid="photo-carousel-metadata">
               <h3
-                className="text-white text-xl font-medium mb-3"
+                className="mb-3 text-xl font-medium text-white"
                 data-testid="photo-carousel-caption"
               >
                 {currentPhoto.caption}
@@ -198,7 +199,7 @@ export function PhotoCarousel() {
       </AnimatePresence>
 
       {/* Navigation hint text */}
-      <div className="fixed bottom-4 left-0 right-0 text-center text-white/60 text-sm">
+      <div className="fixed right-0 bottom-4 left-0 text-center text-sm text-white/60">
         <p>← → Arrow keys or swipe to navigate • Esc to close • ↓ Swipe down to close</p>
       </div>
 

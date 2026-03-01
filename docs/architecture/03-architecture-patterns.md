@@ -127,6 +127,7 @@ All IndexedDB operations go through a `BaseIndexedDBService<T>` abstract class (
 - **Shared schema**: All services use `MyLoveDBSchema` from `src/services/dbSchema.ts` (version 5, 8 object stores).
 
 Concrete implementations:
+
 - `MoodService` extends `BaseIndexedDBService<MoodEntry>` -- adds Zod validation, date queries, sync state management
 - `CustomMessageService` extends `BaseIndexedDBService<Message>` -- adds Zod validation, filtering, import/export
 - `PhotoStorageService` extends `BaseIndexedDBService<Photo>` -- adds migration support, performance monitoring
@@ -156,6 +157,7 @@ The `ValidationError` class wraps Zod errors with a `fieldErrors: Map<string, st
 Two realtime patterns are used:
 
 **Broadcast API** (Love Notes, Partner Mood):
+
 ```typescript
 // src/hooks/useRealtimeMessages.ts
 channel.on('broadcast', { event: 'new_note' }, (payload) => {
@@ -164,13 +166,18 @@ channel.on('broadcast', { event: 'new_note' }, (payload) => {
 ```
 
 **postgres_changes** (Mood Realtime, legacy):
+
 ```typescript
 // src/services/realtimeService.ts
-channel.on('postgres_changes', {
-  event: 'INSERT',
-  schema: 'public',
-  table: 'moods',
-}, callback);
+channel.on(
+  'postgres_changes',
+  {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'moods',
+  },
+  callback
+);
 ```
 
 Both patterns include exponential backoff retry logic (max 5 retries, 1s-30s delay).

@@ -1,6 +1,7 @@
 # 5. Mood Sync Service
 
 **Sources:**
+
 - `src/api/moodSyncService.ts` (Supabase sync with broadcast)
 - `src/services/syncService.ts` (batch sync orchestration)
 
@@ -29,6 +30,7 @@ interface SyncResult {
 Uploads a single mood to Supabase with partner notification.
 
 **Flow:**
+
 1. Check `isOnline()` -- throw if offline
 2. Transform local `MoodEntry` to `MoodInsert` format (snake_case, ISO timestamps)
 3. Call `moodApi.create()` for validated insert
@@ -42,6 +44,7 @@ Uploads a single mood to Supabase with partner notification.
 Batch syncs all unsynced moods from IndexedDB.
 
 **Flow:**
+
 1. Check `isOnline()` -- return early with error if offline
 2. Call `moodService.getUnsyncedMoods()` from IndexedDB
 3. For each mood, call `syncMoodWithRetry()` (exponential backoff)
@@ -50,6 +53,7 @@ Batch syncs all unsynced moods from IndexedDB.
 6. Return detailed `SyncResult`
 
 **Retry logic (private `syncMoodWithRetry()`):**
+
 - Max 3 retries (4 total attempts)
 - Delays: 1000ms, 2000ms, 4000ms
 - Checks `isOnline()` before each attempt
@@ -118,6 +122,7 @@ Returns the count of unsynced moods.
 ## Hybrid Sync Strategy
 
 The app uses three complementary sync triggers:
+
 1. **Immediate sync** -- on mood creation (in-app)
 2. **Periodic sync** -- while app is open (in-app)
 3. **Background Sync** -- when app is closed (service worker, see Doc 11)

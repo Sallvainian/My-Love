@@ -34,18 +34,18 @@ The `AppSlice` interface is defined in `types.ts` (not in `appSlice.ts`) to prev
 
 ### Slice Inventory
 
-| Slice | File | Persisted | Cross-Slice Deps |
-|-------|------|-----------|-----------------|
-| `AppSlice` | `appSlice.ts` | No | None |
-| `SettingsSlice` | `settingsSlice.ts` | Yes (`settings`, `isOnboarded`) | MessagesSlice (initializeApp) |
-| `NavigationSlice` | `navigationSlice.ts` | No | None |
-| `MessagesSlice` | `messagesSlice.ts` | Yes (`messageHistory`) | SettingsSlice (read settings) |
-| `MoodSlice` | `moodSlice.ts` | Yes (`moods`) | None |
-| `InteractionsSlice` | `interactionsSlice.ts` | No | None |
-| `PartnerSlice` | `partnerSlice.ts` | No | None |
-| `NotesSlice` | `notesSlice.ts` | No | None |
-| `PhotosSlice` | `photosSlice.ts` | No | None |
-| `ScriptureReadingSlice` | `scriptureReadingSlice.ts` | No | None |
+| Slice                   | File                       | Persisted                       | Cross-Slice Deps              |
+| ----------------------- | -------------------------- | ------------------------------- | ----------------------------- |
+| `AppSlice`              | `appSlice.ts`              | No                              | None                          |
+| `SettingsSlice`         | `settingsSlice.ts`         | Yes (`settings`, `isOnboarded`) | MessagesSlice (initializeApp) |
+| `NavigationSlice`       | `navigationSlice.ts`       | No                              | None                          |
+| `MessagesSlice`         | `messagesSlice.ts`         | Yes (`messageHistory`)          | SettingsSlice (read settings) |
+| `MoodSlice`             | `moodSlice.ts`             | Yes (`moods`)                   | None                          |
+| `InteractionsSlice`     | `interactionsSlice.ts`     | No                              | None                          |
+| `PartnerSlice`          | `partnerSlice.ts`          | No                              | None                          |
+| `NotesSlice`            | `notesSlice.ts`            | No                              | None                          |
+| `PhotosSlice`           | `photosSlice.ts`           | No                              | None                          |
+| `ScriptureReadingSlice` | `scriptureReadingSlice.ts` | No                              | None                          |
 
 ### Persistence Configuration
 

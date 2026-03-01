@@ -26,9 +26,7 @@ import { startSoloSession } from '../../support/helpers';
 
 test.describe('Scripture Accessibility', () => {
   test.describe('P2-001: Keyboard navigation', () => {
-    test('should reach all interactive elements via Tab in logical order', async ({
-      page,
-    }) => {
+    test('should reach all interactive elements via Tab in logical order', async ({ page }) => {
       // GIVEN: User is in a solo scripture session
       await startSoloSession(page);
 
@@ -78,9 +76,7 @@ test.describe('Scripture Accessibility', () => {
 
       // THEN: Transitions to reflection sub-view (NOT directly to verse 2)
       // The per-verse reflection flow is: verse → (Next Verse) → reflection → (rate + Continue)
-      await expect(
-        page.getByTestId('scripture-reflection-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
     });
 
     test('should have no keyboard traps', async ({ page, interceptNetworkCall }) => {
@@ -88,9 +84,7 @@ test.describe('Scripture Accessibility', () => {
       await startSoloSession(page);
 
       // WHEN: User tabs through all elements multiple times
-      const startFocus = await page.evaluate(
-        () => document.activeElement?.tagName
-      );
+      const startFocus = await page.evaluate(() => document.activeElement?.tagName);
 
       // Tab 20 times
       for (let i = 0; i < 20; i++) {
@@ -108,32 +102,22 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-002: Screen reader aria-labels', () => {
-    test('should have descriptive aria-labels on buttons that have them', async ({
-      page,
-    }) => {
+    test('should have descriptive aria-labels on buttons that have them', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
       // THEN: Exit button has aria-label (source: aria-label="Exit reading")
-      await expect(
-        page.getByTestId('exit-button')
-      ).toHaveAttribute('aria-label', 'Exit reading');
+      await expect(page.getByTestId('exit-button')).toHaveAttribute('aria-label', 'Exit reading');
 
       // AND: Next Verse button uses visible text (no explicit aria-label)
-      await expect(
-        page.getByTestId('scripture-next-verse-button')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-next-verse-button')
-      ).toHaveText(/Next Verse|Complete Reading/);
+      await expect(page.getByTestId('scripture-next-verse-button')).toBeVisible();
+      await expect(page.getByTestId('scripture-next-verse-button')).toHaveText(
+        /Next Verse|Complete Reading/
+      );
 
       // AND: View Response button uses visible text (no explicit aria-label)
-      await expect(
-        page.getByTestId('scripture-view-response-button')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-view-response-button')
-      ).toHaveText('View Response');
+      await expect(page.getByTestId('scripture-view-response-button')).toBeVisible();
+      await expect(page.getByTestId('scripture-view-response-button')).toHaveText('View Response');
     });
 
     test('should have aria-label on progress indicator', async ({ page, interceptNetworkCall }) => {
@@ -141,16 +125,15 @@ test.describe('Scripture Accessibility', () => {
       await startSoloSession(page);
 
       // THEN: Progress indicator has descriptive aria-label
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveAttribute('aria-label', /currently on verse 1 of 17/i);
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveAttribute(
+        'aria-label',
+        /currently on verse 1 of 17/i
+      );
     });
   });
 
   test.describe('P2-003: aria-live region for verse transitions', () => {
-    test('should announce verse transitions via aria-live polite', async ({
-      page,
-    }) => {
+    test('should announce verse transitions via aria-live polite', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -201,9 +184,7 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-005/P2-006: Focus management after transitions', () => {
-    test('should manage focus after navigating to reflection sub-view', async ({
-      page,
-    }) => {
+    test('should manage focus after navigating to reflection sub-view', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -211,23 +192,20 @@ test.describe('Scripture Accessibility', () => {
       await page.getByTestId('scripture-next-verse-button').click();
 
       // THEN: Reflection screen appears
-      await expect(
-        page.getByTestId('scripture-reflection-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
 
       // AND: Focus has moved to an element within the reflection screen
       const focusedElement = await page.evaluate(
-        () => document.activeElement?.getAttribute('data-testid') ||
-              document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid') ||
-              document.activeElement?.tagName
+        () =>
+          document.activeElement?.getAttribute('data-testid') ||
+          document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid') ||
+          document.activeElement?.tagName
       );
       // Focus should be on or within the reflection screen (not stuck on a hidden button)
       expect(focusedElement).toBeTruthy();
     });
 
-    test('should focus navigation button after transition to response screen', async ({
-      page,
-    }) => {
+    test('should focus navigation button after transition to response screen', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -236,8 +214,8 @@ test.describe('Scripture Accessibility', () => {
 
       // THEN: Focus moves to the navigation button that was used
       // (or the back-to-verse button as logical target)
-      const focusedElement = await page.evaluate(
-        () => document.activeElement?.getAttribute('data-testid')
+      const focusedElement = await page.evaluate(() =>
+        document.activeElement?.getAttribute('data-testid')
       );
       expect(
         focusedElement === 'scripture-back-to-verse-button' ||
@@ -247,9 +225,7 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-008: Touch targets minimum 48x48px', () => {
-    test('should have buttons with minimum 48x48px touch targets', async ({
-      page,
-    }) => {
+    test('should have buttons with minimum 48x48px touch targets', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -268,9 +244,7 @@ test.describe('Scripture Accessibility', () => {
       }
     });
 
-    test('should have minimum 8px spacing between touch targets', async ({
-      page,
-    }) => {
+    test('should have minimum 8px spacing between touch targets', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -278,16 +252,13 @@ test.describe('Scripture Accessibility', () => {
       const viewResponseBox = await page
         .getByTestId('scripture-view-response-button')
         .boundingBox();
-      const nextVerseBox = await page
-        .getByTestId('scripture-next-verse-button')
-        .boundingBox();
+      const nextVerseBox = await page.getByTestId('scripture-next-verse-button').boundingBox();
 
       expect(viewResponseBox).toBeTruthy();
       expect(nextVerseBox).toBeTruthy();
 
       // THEN: Vertical spacing between buttons >= 8px
-      const verticalGap =
-        nextVerseBox!.y - (viewResponseBox!.y + viewResponseBox!.height);
+      const verticalGap = nextVerseBox!.y - (viewResponseBox!.y + viewResponseBox!.height);
       expect(verticalGap).toBeGreaterThanOrEqual(8);
     });
   });

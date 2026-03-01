@@ -4,18 +4,18 @@
 
 ### Compiler Settings
 
-| Setting | Value | Purpose |
-|---|---|---|
-| `target` | ES2022 | Modern JavaScript output |
-| `module` | ESNext | ES module syntax |
-| `moduleResolution` | bundler | Vite/Rollup compatible resolution |
-| `jsx` | react-jsx | React 19 automatic JSX transform |
-| `strict` | true | All strict type-checking options enabled |
-| `noUnusedLocals` | true | Error on unused local variables |
-| `noUnusedParameters` | true | Error on unused function parameters |
-| `noFallthroughCasesInSwitch` | true | Error on switch case fallthrough |
-| `verbatimModuleSyntax` | true | Enforce explicit `type` imports |
-| `noEmit` | true | Vite handles bundling; TypeScript only type-checks |
+| Setting                      | Value     | Purpose                                            |
+| ---------------------------- | --------- | -------------------------------------------------- |
+| `target`                     | ES2022    | Modern JavaScript output                           |
+| `module`                     | ESNext    | ES module syntax                                   |
+| `moduleResolution`           | bundler   | Vite/Rollup compatible resolution                  |
+| `jsx`                        | react-jsx | React 19 automatic JSX transform                   |
+| `strict`                     | true      | All strict type-checking options enabled           |
+| `noUnusedLocals`             | true      | Error on unused local variables                    |
+| `noUnusedParameters`         | true      | Error on unused function parameters                |
+| `noFallthroughCasesInSwitch` | true      | Error on switch case fallthrough                   |
+| `verbatimModuleSyntax`       | true      | Enforce explicit `type` imports                    |
+| `noEmit`                     | true      | Vite handles bundling; TypeScript only type-checks |
 
 ### Type Safety Rules
 
@@ -37,11 +37,11 @@ ESLint 9 with flat config (`eslint.config.js`). No `.eslintrc` file.
 
 ### Plugin Rules
 
-| Plugin | Key Rules |
-|---|---|
-| `eslint-plugin-react-hooks` | All recommended rules enabled. `set-state-in-effect` and `purity` downgraded to `warn` for legitimate patterns (blob URL lifecycle, timer setup, animation randomization). |
-| `eslint-plugin-react-refresh` | `only-export-components` as warning, with `allowConstantExport: true` |
-| `typescript-eslint` | `no-explicit-any`: error. `no-unused-vars`: error with `_` prefix ignore pattern for args, vars, and caught errors. |
+| Plugin                        | Key Rules                                                                                                                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eslint-plugin-react-hooks`   | All recommended rules enabled. `set-state-in-effect` and `purity` downgraded to `warn` for legitimate patterns (blob URL lifecycle, timer setup, animation randomization). |
+| `eslint-plugin-react-refresh` | `only-export-components` as warning, with `allowConstantExport: true`                                                                                                      |
+| `typescript-eslint`           | `no-explicit-any`: error. `no-unused-vars`: error with `_` prefix ignore pattern for args, vars, and caught errors.                                                        |
 
 ### Architectural Guardrails (ESLint-Enforced)
 
@@ -58,6 +58,7 @@ Specific button elements (identified by `data-testid` attributes for scripture m
 **3. Scripture Container Import Restrictions**
 
 Files in `src/components/scripture-reading/containers/**` must not import:
+
 - `@supabase/supabase-js`
 - `**/api/supabaseClient` or `@/api/supabaseClient`
 - `**/services/*` or `@/services/*` (except `scriptureReadingService` as a legacy exception)
@@ -71,11 +72,13 @@ In scripture code, catch blocks must call `handleScriptureError()` or re-throw. 
 ### Special Configurations
 
 **CommonJS files (`*.cjs`)**:
+
 - Node.js globals enabled
 - `sourceType: 'commonjs'`
 - `no-require-imports` disabled
 
-**Test files (`tests/**`, `*.test.*`, `*.spec.*`)**:
+**Test files (`tests/**`, `_.test._`, `_.spec._`)\*\*:
+
 - Both browser and Node globals enabled
 - `rules-of-hooks` disabled (test fixtures may use hooks unconventionally)
 - `no-empty-pattern` disabled (Playwright fixtures use empty destructuring)
@@ -87,16 +90,26 @@ In scripture code, catch blocks must call `handleScriptureError()` or re-throw. 
 - `no-restricted-properties` disabled (tests may inspect store state directly)
 
 **Scripture Reading feature** (`src/services/scriptureReadingService.ts`, `src/stores/slices/scriptureReadingSlice.ts`, `src/hooks/useScriptureBroadcast.ts`, `src/components/scripture-reading/**`):
+
 - Strict `no-explicit-any` enforcement as error (reinforced for this feature domain)
 
 ### Global Ignores
 
 ```javascript
 ignores: [
-  'dist/**', 'dev-dist/**', 'build/**', 'coverage/**', 'node_modules/**',
-  '.bmad/**', 'scripts/**', '**/*.config.js', '**/*.config.ts',
-  'vite.config.*', 'playwright.config.*', 'src/types/database.types.ts',
-]
+  'dist/**',
+  'dev-dist/**',
+  'build/**',
+  'coverage/**',
+  'node_modules/**',
+  '.bmad/**',
+  'scripts/**',
+  '**/*.config.js',
+  '**/*.config.ts',
+  'vite.config.*',
+  'playwright.config.*',
+  'src/types/database.types.ts',
+];
 ```
 
 ### Running

@@ -1,6 +1,21 @@
 ---
-description: "Activates the Tea agent persona."
-tools: ["changes","edit","fetch","githubRepo","problems","runCommands","runTasks","runTests","search","runSubagent","testFailure","todos","usages"]
+description: 'Activates the Tea agent persona.'
+tools:
+  [
+    'changes',
+    'edit',
+    'fetch',
+    'githubRepo',
+    'problems',
+    'runCommands',
+    'runTasks',
+    'runTests',
+    'search',
+    'runSubagent',
+    'testFailure',
+    'todos',
+    'usages',
+  ]
 ---
 
 # Tea Agent

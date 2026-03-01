@@ -1,6 +1,7 @@
 # 10. Validation Layer
 
 **Sources:**
+
 - `src/api/validation/supabaseSchemas.ts` (Supabase API response validation)
 - `src/validation/schemas.ts` (IndexedDB service boundary validation)
 - `src/validation/errorMessages.ts` (user-friendly error transformation)
@@ -9,10 +10,10 @@
 
 The app uses two layers of Zod validation at different boundaries:
 
-| Layer | Source | Purpose | Import Path |
-|-------|--------|---------|-------------|
-| **API validation** | `src/api/validation/supabaseSchemas.ts` | Validates Supabase responses before use | `zod/v4` |
-| **Service validation** | `src/validation/schemas.ts` | Validates data before IndexedDB writes | `zod/v4` |
+| Layer                  | Source                                  | Purpose                                 | Import Path |
+| ---------------------- | --------------------------------------- | --------------------------------------- | ----------- |
+| **API validation**     | `src/api/validation/supabaseSchemas.ts` | Validates Supabase responses before use | `zod/v4`    |
+| **Service validation** | `src/validation/schemas.ts`             | Validates data before IndexedDB writes  | `zod/v4`    |
 
 Both layers use Zod v4 imported as `zod/v4`.
 
@@ -27,10 +28,12 @@ Validates every response from Supabase to ensure type safety at the API boundary
 const UUIDSchema = z.string().uuid('Invalid UUID format');
 
 // ISO 8601 timestamp validation (accepts PostgreSQL format variations)
-const TimestampSchema = z.string().refine(
-  (val) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/.test(val),
-  { message: 'Invalid timestamp format' }
-);
+const TimestampSchema = z
+  .string()
+  .refine(
+    (val) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/.test(val),
+    { message: 'Invalid timestamp format' }
+  );
 ```
 
 The `TimestampSchema` accepts various PostgreSQL/ISO 8601 formats including microseconds, no timezone, UTC `Z`, and timezone offsets with or without colons.
@@ -58,7 +61,7 @@ export const SupabaseUserSchema = z.object({
 export const SupabaseMoodSchema = z.object({
   id: UUIDSchema,
   user_id: UUIDSchema,
-  mood_type: MoodTypeSchema,              // Legacy single mood
+  mood_type: MoodTypeSchema, // Legacy single mood
   mood_types: z.array(MoodTypeSchema).nullable().optional(), // Multi-mood support
   note: z.string().nullable(),
   created_at: TimestampSchema.nullable(),
@@ -85,14 +88,14 @@ export const SupabaseInteractionSchema = z.object({
 
 Each entity has corresponding `InsertSchema` and `UpdateSchema` variants with relaxed requirements (optional fields, no `id` required).
 
-| Schema | Purpose |
-|--------|---------|
-| `MoodInsertSchema` | Validates mood data before `moodApi.create()` |
-| `MoodUpdateSchema` | Validates partial updates before `moodApi.update()` |
-| `UserInsertSchema` | Validates user registration data |
-| `UserUpdateSchema` | Validates user profile updates |
-| `InteractionInsertSchema` | Validates interaction creation data |
-| `InteractionUpdateSchema` | Validates interaction updates |
+| Schema                    | Purpose                                             |
+| ------------------------- | --------------------------------------------------- |
+| `MoodInsertSchema`        | Validates mood data before `moodApi.create()`       |
+| `MoodUpdateSchema`        | Validates partial updates before `moodApi.update()` |
+| `UserInsertSchema`        | Validates user registration data                    |
+| `UserUpdateSchema`        | Validates user profile updates                      |
+| `InteractionInsertSchema` | Validates interaction creation data                 |
+| `InteractionUpdateSchema` | Validates interaction updates                       |
 
 ### Array Schemas
 
@@ -121,12 +124,12 @@ export type MoodUpdate = z.infer<typeof MoodUpdateSchema>;
 
 Defined in `src/validation/schemas.ts` (not in `supabaseSchemas.ts`):
 
-| Schema | Fields |
-|--------|--------|
-| `SupabaseSessionSchema` | `id`, `mode`, `user1_id`, `user2_id`, `current_phase`, `current_step_index`, `status`, `version`, `snapshot_json`, `started_at`, `completed_at` |
-| `SupabaseReflectionSchema` | `id`, `session_id`, `step_index`, `user_id`, `rating` (1-5), `notes`, `is_shared`, `created_at` |
-| `SupabaseBookmarkSchema` | `id`, `session_id`, `step_index`, `user_id`, `share_with_partner`, `created_at` |
-| `SupabaseMessageSchema` | `id`, `session_id`, `sender_id`, `message`, `created_at` |
+| Schema                     | Fields                                                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SupabaseSessionSchema`    | `id`, `mode`, `user1_id`, `user2_id`, `current_phase`, `current_step_index`, `status`, `version`, `snapshot_json`, `started_at`, `completed_at` |
+| `SupabaseReflectionSchema` | `id`, `session_id`, `step_index`, `user_id`, `rating` (1-5), `notes`, `is_shared`, `created_at`                                                 |
+| `SupabaseBookmarkSchema`   | `id`, `session_id`, `step_index`, `user_id`, `share_with_partner`, `created_at`                                                                 |
+| `SupabaseMessageSchema`    | `id`, `session_id`, `sender_id`, `message`, `created_at`                                                                                        |
 
 ## Service Validation Schemas (schemas.ts)
 
@@ -171,8 +174,8 @@ export const PhotoSchema = z.object({
 
 ```typescript
 export const MoodEntrySchema = z.object({
-  date: IsoDateStringSchema,  // YYYY-MM-DD with actual date validation
-  mood: MoodTypeSchema,       // Same 12 mood types as API schema
+  date: IsoDateStringSchema, // YYYY-MM-DD with actual date validation
+  mood: MoodTypeSchema, // Same 12 mood types as API schema
   moods: z.array(MoodTypeSchema).min(1).optional(),
   note: z.string().max(200).optional().or(z.literal('')),
 });
@@ -185,7 +188,7 @@ The `IsoDateStringSchema` validates both format (`/^\d{4}-\d{2}-\d{2}$/`) and ac
 ```typescript
 export const SettingsSchema = z.object({
   themeName: z.enum(['sunset', 'ocean', 'lavender', 'rose']),
-  notificationTime: TimeFormatSchema,  // HH:MM with range validation
+  notificationTime: TimeFormatSchema, // HH:MM with range validation
   relationship: z.object({
     startDate: IsoDateStringSchema,
     partnerName: z.string().min(1),
@@ -217,22 +220,23 @@ class ValidationError extends Error {
 
 Technical field paths are mapped to user-friendly names:
 
-| Technical Path | Display Name |
-|---------------|-------------|
-| `text` | Message |
-| `imageBlob` | Image |
-| `mimeType` | File type |
-| `relationship.startDate` | Relationship start date |
-| `relationship.partnerName` | Partner name |
-| `date` | Date |
-| `mood` | Mood |
-| `note` | Note |
+| Technical Path             | Display Name            |
+| -------------------------- | ----------------------- |
+| `text`                     | Message                 |
+| `imageBlob`                | Image                   |
+| `mimeType`                 | File type               |
+| `relationship.startDate`   | Relationship start date |
+| `relationship.partnerName` | Partner name            |
+| `date`                     | Date                    |
+| `mood`                     | Mood                    |
+| `note`                     | Note                    |
 
 ### Functions
 
 #### `formatZodError(error: ZodError): string`
 
 Formats all issues into a comma-separated string. Handles common error types:
+
 - `too_small`: `"{Field} cannot be empty"` or `"{Field} must be at least N characters"`
 - `too_big`: `"{Field} cannot exceed N characters"`
 - `invalid_value`: `"Invalid {field}. Please select a valid option."`
@@ -249,6 +253,6 @@ Convenience function combining `formatZodError` and `getFieldErrors` into a sing
 ### Type Guards
 
 ```typescript
-function isValidationError(error: unknown): error is ValidationError
-function isZodError(error: unknown): error is ZodError
+function isValidationError(error: unknown): error is ValidationError;
+function isZodError(error: unknown): error is ZodError;
 ```

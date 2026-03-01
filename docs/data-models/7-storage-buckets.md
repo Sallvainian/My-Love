@@ -1,29 +1,33 @@
 # 7. Storage Buckets
 
 **Sources:**
+
 - Migration `20251203190800_create_photos_table.sql` (photos bucket)
 - Migration `20251205000001_add_love_notes_images.sql` (love-notes-images bucket)
 - Migration `20251205000002_add_mime_validation.sql` (image upload policy)
 
 ## `photos` Bucket
 
-| Setting | Value |
-|---------|-------|
-| Public | No (private) |
-| File size limit | 10 MB |
-| Purpose | Photo gallery images |
-| Path pattern | `{user_id}/{uuid}.{ext}` |
+| Setting         | Value                    |
+| --------------- | ------------------------ |
+| Public          | No (private)             |
+| File size limit | 10 MB                    |
+| Purpose         | Photo gallery images     |
+| Path pattern    | `{user_id}/{uuid}.{ext}` |
 
 ### Storage RLS Policies
 
 **SELECT (download):**
+
 - Users can download files in their own folder (`(bucket_id = 'photos') AND (auth.uid()::text = (storage.foldername(name))[1])`)
 - Partners can download each other's photos (via `get_my_partner_id()`)
 
 **INSERT (upload):**
+
 - Users can upload only to their own folder (`auth.uid()::text = (storage.foldername(name))[1]`)
 
 **DELETE:**
+
 - Users can delete only files in their own folder
 
 ### Access Pattern
@@ -34,20 +38,22 @@
 
 ## `love-notes-images` Bucket
 
-| Setting | Value |
-|---------|-------|
-| Public | No (private) |
-| File size limit | Default (Supabase default) |
-| Purpose | Love note image attachments |
-| Path pattern | `{user_id}/{timestamp}-{uuid}.{ext}` |
+| Setting         | Value                                |
+| --------------- | ------------------------------------ |
+| Public          | No (private)                         |
+| File size limit | Default (Supabase default)           |
+| Purpose         | Love note image attachments          |
+| Path pattern    | `{user_id}/{timestamp}-{uuid}.{ext}` |
 
 ### Storage RLS Policies
 
 **SELECT (download):**
+
 - Users can view images in their own folder
 - Partners can view each other's images (via `get_my_partner_id()`)
 
 **INSERT (upload):**
+
 - Users can upload to their own folder with file extension validation
 - Accepted extensions: `.jpg`, `.jpeg`, `.png`, `.webp`
 - Policy uses `storage.extension(name)` to validate

@@ -178,9 +178,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
 
     await store.getState().endSession();
 
-    const { handleScriptureError } = await import(
-      '../../../src/services/scriptureReadingService'
-    );
+    const { handleScriptureError } = await import('../../../src/services/scriptureReadingService');
     expect(handleScriptureError).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'SYNC_FAILED' })
     );

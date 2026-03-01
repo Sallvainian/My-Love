@@ -108,10 +108,10 @@ Every push to `main` triggers the GitHub Actions workflow (`.github/workflows/de
 
 Configure in **Settings** → **Secrets and variables** → **Actions**:
 
-| Secret | Description |
-|--------|-------------|
-| `DOPPLER_TOKEN` | Doppler service token for secrets injection |
-| `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types |
+| Secret                  | Description                                 |
+| ----------------------- | ------------------------------------------- |
+| `DOPPLER_TOKEN`         | Doppler service token for secrets injection |
+| `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types             |
 
 ### GitHub Pages Setup
 

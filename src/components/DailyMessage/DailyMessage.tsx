@@ -34,28 +34,25 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
 
   // Memoize deterministic positions once per viewport width. Positions stay
   // stable for consistent floating hearts animation.
-  const heartPositions = useMemo(
-    () => {
-      const initialPositions = generateDeterministicNumbers(
-        'daily-message-heart-initial',
-        floatingHeartCount,
-        0,
-        viewportWidth
-      );
-      const animatePositions = generateDeterministicNumbers(
-        'daily-message-heart-animate',
-        floatingHeartCount,
-        0,
-        viewportWidth
-      );
+  const heartPositions = useMemo(() => {
+    const initialPositions = generateDeterministicNumbers(
+      'daily-message-heart-initial',
+      floatingHeartCount,
+      0,
+      viewportWidth
+    );
+    const animatePositions = generateDeterministicNumbers(
+      'daily-message-heart-animate',
+      floatingHeartCount,
+      0,
+      viewportWidth
+    );
 
-      return initialPositions.map((initialX, index) => ({
-        initialX,
-        animateX: animatePositions[index],
-      }));
-    },
-    [floatingHeartCount, viewportWidth]
-  );
+    return initialPositions.map((initialX, index) => ({
+      initialX,
+      animateX: animatePositions[index],
+    }));
+  }, [floatingHeartCount, viewportWidth]);
 
   // Check if current message is favorited (source of truth: messageHistory.favoriteIds)
   const isFavorited = currentMessage && messageHistory.favoriteIds.includes(currentMessage.id);
@@ -111,15 +108,15 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   if (!currentMessage || !settings) {
     if (loadingTimeout || error) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] gap-6 px-4">
-          <AlertCircle className="w-16 h-16 text-red-400" />
+        <div className="flex min-h-[400px] flex-col items-center justify-center gap-6 px-4">
+          <AlertCircle className="h-16 w-16 text-red-400" />
 
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-red-600 mb-2">
+            <h2 className="mb-2 text-xl font-semibold text-red-600">
               {error || 'Failed to load message'}
             </h2>
 
-            <p className="text-gray-600 text-sm max-w-md">
+            <p className="max-w-md text-sm text-gray-600">
               {!APP_CONFIG.isPreConfigured
                 ? 'Environment variables not configured. Please create a .env.development file with VITE_PARTNER_NAME and VITE_RELATIONSHIP_START_DATE.'
                 : 'Something went wrong during initialization. Please try refreshing the page.'}
@@ -131,13 +128,13 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
               setLoadingTimeout(false);
               initializeApp();
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-lg transition-shadow font-medium"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-6 py-3 font-medium text-white transition-shadow hover:shadow-lg"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="h-5 w-5" />
             Retry
           </button>
 
-          <div className="text-xs text-gray-400 text-center max-w-sm">
+          <div className="max-w-sm text-center text-xs text-gray-400">
             If the problem persists, try clearing your browser data or check the browser console for
             more details.
           </div>
@@ -147,9 +144,9 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
 
     // Still loading (within timeout window)
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <div className="text-6xl animate-pulse">💕</div>
-        <div className="text-pink-400 text-lg">Loading your daily message...</div>
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
+        <div className="animate-pulse text-6xl">💕</div>
+        <div className="text-lg text-pink-400">Loading your daily message...</div>
       </div>
     );
   }
@@ -179,11 +176,11 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto px-4 py-8" data-testid="daily-message">
+    <div className="relative mx-auto w-full max-w-2xl px-4 py-8" data-testid="daily-message">
       {/* Floating hearts animation */}
       <AnimatePresence>
         {showHearts && (
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
             {heartPositions.map((pos, i) => (
               <motion.div
                 key={i}
@@ -246,7 +243,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
         >
           <div className="card card-hover relative overflow-hidden" data-testid="message-card">
             {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50 pointer-events-none" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50" />
 
             {/* Content */}
             <div className="relative z-10">
@@ -255,10 +252,10 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: ANIMATION_TIMING.BADGE_FADE_DELAY, type: 'spring' }}
-                className="inline-block mb-4"
+                className="mb-4 inline-block"
               >
                 <span
-                  className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-medium rounded-full shadow-lg"
+                  className="rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-1.5 text-xs font-medium text-white shadow-lg"
                   data-testid="message-category-badge"
                 >
                   {currentMessage.category === 'reason' && '💖 Why I Love You'}
@@ -274,7 +271,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: ANIMATION_TIMING.TEXT_FADE_DELAY, duration: 0.8 }}
-                className="text-2xl md:text-3xl font-serif text-gray-800 leading-relaxed mb-8"
+                className="mb-8 font-serif text-2xl leading-relaxed text-gray-800 md:text-3xl"
                 data-testid="message-text"
               >
                 {currentMessage.text}
@@ -294,10 +291,10 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                   data-testid="message-favorite-button"
                 >
                   <Heart
-                    className={`w-6 h-6 transition-all duration-300 ${
+                    className={`h-6 w-6 transition-all duration-300 ${
                       isFavorited
-                        ? 'fill-pink-500 text-pink-500 animate-heart'
-                        : 'text-pink-400 group-hover:text-pink-500 group-hover:scale-110'
+                        ? 'animate-heart fill-pink-500 text-pink-500'
+                        : 'text-pink-400 group-hover:scale-110 group-hover:text-pink-500'
                     }`}
                   />
                 </button>
@@ -308,7 +305,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                   aria-label="Share message"
                   data-testid="message-share-button"
                 >
-                  <Share2 className="w-6 h-6 text-pink-400 group-hover:text-pink-500 transition-colors" />
+                  <Share2 className="h-6 w-6 text-pink-400 transition-colors group-hover:text-pink-500" />
                 </button>
               </motion.div>
             </div>
@@ -324,7 +321,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                 repeat: Infinity,
                 repeatType: 'reverse',
               }}
-              className="absolute -top-4 -right-4 text-6xl opacity-20 pointer-events-none"
+              className="pointer-events-none absolute -top-4 -right-4 text-6xl opacity-20"
             >
               💕
             </motion.div>
@@ -339,7 +336,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
                 repeatType: 'reverse',
                 delay: 1,
               }}
-              className="absolute -bottom-4 -left-4 text-5xl opacity-20 pointer-events-none"
+              className="pointer-events-none absolute -bottom-4 -left-4 text-5xl opacity-20"
             >
               💖
             </motion.div>
@@ -352,7 +349,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: ANIMATION_TIMING.HINT_FADE_DELAY }}
-        className="text-center mt-6 text-sm text-gray-400"
+        className="mt-6 text-center text-sm text-gray-400"
       >
         Swipe left or right to see other messages
       </motion.div>

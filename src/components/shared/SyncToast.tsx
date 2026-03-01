@@ -36,11 +36,7 @@ interface SyncToastProps {
  * />
  * ```
  */
-export function SyncToast({
-  syncResult,
-  onDismiss,
-  autoDismissMs = 5000,
-}: SyncToastProps) {
+export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncToastProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   // Show toast when syncResult changes
@@ -132,26 +128,19 @@ export function SyncToast({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className={`
-            fixed top-4 left-1/2 -translate-x-1/2 z-[100]
-            flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg
-            ${config.bgColor} ${config.borderColor} border
-            min-w-[280px] max-w-[90vw]
-          `}
+          className={`fixed top-4 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-lg px-4 py-3 shadow-lg ${config.bgColor} ${config.borderColor} max-w-[90vw] min-w-[280px] border`}
           role="alert"
           aria-live="polite"
           data-testid="sync-toast"
         >
-          <Icon className={`w-5 h-5 flex-shrink-0 ${config.iconColor}`} />
-          <span className={`flex-1 text-sm font-medium ${config.textColor}`}>
-            {config.message}
-          </span>
+          <Icon className={`h-5 w-5 flex-shrink-0 ${config.iconColor}`} />
+          <span className={`flex-1 text-sm font-medium ${config.textColor}`}>{config.message}</span>
           <button
             onClick={handleDismiss}
-            className={`p-1 rounded hover:bg-black/5 transition-colors ${config.textColor}`}
+            className={`rounded p-1 transition-colors hover:bg-black/5 ${config.textColor}`}
             aria-label="Dismiss notification"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </motion.div>
       )}

@@ -2,10 +2,10 @@
 
 ## Branch Strategy
 
-| Branch Pattern | Purpose |
-|---|---|
-| `main` | Production branch, deployed to GitHub Pages |
-| `feature/epic-N-description` | Feature branches for epic work |
+| Branch Pattern                    | Purpose                                       |
+| --------------------------------- | --------------------------------------------- |
+| `main`                            | Production branch, deployed to GitHub Pages   |
+| `feature/epic-N-description`      | Feature branches for epic work                |
 | `codex/finish-epic-N-development` | Development branches for completing epic work |
 
 All epic work stays on its feature branch until PR review. PRs target `main`.
@@ -72,14 +72,14 @@ type(scope): brief description
 
 ### Prefixes
 
-| Prefix | Use |
-|---|---|
-| `feat(epic-N)` | New story implementation |
-| `fix(story-N.N)` | Bug fix for a specific story |
-| `test(epic-N)` | Test additions or QA passes |
-| `docs(epic-N)` | Documentation updates |
-| `chore(sprint)` | Sprint tracking and status updates |
-| `refactor` | Code restructuring without behavior change |
+| Prefix           | Use                                        |
+| ---------------- | ------------------------------------------ |
+| `feat(epic-N)`   | New story implementation                   |
+| `fix(story-N.N)` | Bug fix for a specific story               |
+| `test(epic-N)`   | Test additions or QA passes                |
+| `docs(epic-N)`   | Documentation updates                      |
+| `chore(sprint)`  | Sprint tracking and status updates         |
+| `refactor`       | Code restructuring without behavior change |
 
 ### Examples
 
@@ -106,6 +106,7 @@ When uncommitted changes span multiple stories:
 
 1. Identify which files belong to which story
 2. Stage and commit each story group separately:
+
    ```bash
    git add src/components/scripture-reading/ReflectionScreen.tsx tests/e2e/scripture/reflection.spec.ts
    git commit -m "feat(epic-2): add per-step reflection system (Story 2.1)"
@@ -113,6 +114,7 @@ When uncommitted changes span multiple stories:
    git add src/components/scripture-reading/SessionSummary.tsx tests/e2e/scripture/session-summary.spec.ts
    git commit -m "feat(epic-2): add end-of-session reflection summary (Story 2.2)"
    ```
+
 3. Commit docs and sprint tracking as separate commits:
    ```bash
    git add docs/

@@ -29,12 +29,12 @@ export function PhotoCarouselControls({
 }: PhotoCarouselControlsProps) {
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-[51] bg-black/50 backdrop-blur-sm"
+      className="fixed top-0 right-0 left-0 z-[51] bg-black/50 backdrop-blur-sm"
       data-testid="photo-carousel-controls"
     >
       <div className="flex items-center justify-between px-4 py-3">
         {/* Left side: Photo counter */}
-        <div className="text-white text-sm font-medium" data-testid="photo-carousel-counter">
+        <div className="text-sm font-medium text-white" data-testid="photo-carousel-counter">
           {currentIndex + 1} / {totalPhotos}
         </div>
 
@@ -43,36 +43,33 @@ export function PhotoCarouselControls({
           {/* Story 4.4: AC-4.4.1 - Edit button (functional) */}
           <button
             onClick={onEdit}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white
-                       hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700"
             aria-label="Edit photo caption and tags"
             data-testid="photo-carousel-edit-button"
           >
-            <Edit className="w-4 h-4" />
+            <Edit className="h-4 w-4" />
             <span className="text-sm">Edit</span>
           </button>
 
           {/* Story 4.4: AC-4.4.4 - Delete button (functional) */}
           <button
             onClick={onDelete}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 text-white
-                       hover:bg-gray-600 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-gray-700 px-3 py-2 text-white transition-colors hover:bg-gray-600"
             aria-label="Delete this photo"
             data-testid="photo-carousel-delete-button"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="h-4 w-4" />
             <span className="text-sm">Delete</span>
           </button>
 
           {/* AC-4.3.5: Close button - functional */}
           <button
             onClick={onClose}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white
-                       hover:bg-red-700 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-white transition-colors hover:bg-red-700"
             aria-label="Close carousel"
             data-testid="photo-carousel-controls-close-button"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
             <span className="text-sm">Close</span>
           </button>
         </div>

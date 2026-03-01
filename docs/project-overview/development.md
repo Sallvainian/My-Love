@@ -23,41 +23,41 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 ### Development
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev server with dotenvx decryption and process cleanup |
-| `npm run dev:raw` | Start Vite dev server directly (no env decryption) |
-| `npm run preview` | Preview production build (dotenvx decrypts `.env`) |
-| `npm run build` | Production build: `dotenvx run --overload -- bash -c 'tsc -b && vite build'` |
-| `npm run typecheck` | TypeScript type check: `tsc --noEmit` |
+| Command             | Description                                                                  |
+| ------------------- | ---------------------------------------------------------------------------- |
+| `npm run dev`       | Start dev server with dotenvx decryption and process cleanup                 |
+| `npm run dev:raw`   | Start Vite dev server directly (no env decryption)                           |
+| `npm run preview`   | Preview production build (dotenvx decrypts `.env`)                           |
+| `npm run build`     | Production build: `dotenvx run --overload -- bash -c 'tsc -b && vite build'` |
+| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                        |
 
 ### Code Quality
 
-| Command | Description |
-|---|---|
-| `npm run lint` | ESLint on `src`, `tests`, `scripts` directories |
-| `npm run lint:fix` | ESLint fix + Prettier write |
-| `npm run format` | Prettier write on all files |
-| `npm run format:check` | Prettier check (no modifications) |
+| Command                | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| `npm run lint`         | ESLint on `src`, `tests`, `scripts` directories |
+| `npm run lint:fix`     | ESLint fix + Prettier write                     |
+| `npm run format`       | Prettier write on all files                     |
+| `npm run format:check` | Prettier check (no modifications)               |
 
 ### Testing
 
-| Command | Description |
-|---|---|
-| `npm run test:unit` | Run all unit tests (Vitest) |
-| `npm run test:unit:watch` | Vitest watch mode |
-| `npm run test:unit:ui` | Vitest interactive UI |
-| `npm run test:unit:coverage` | Unit tests with V8 coverage (80% threshold) |
-| `npm run test:e2e` | All E2E tests with process cleanup |
-| `npm run test:e2e:raw` | Playwright directly |
-| `npm run test:e2e:ui` | Playwright interactive UI mode |
-| `npm run test:e2e:debug` | Playwright debug mode |
-| `npm run test:p0` | Priority 0 (critical) tests only |
-| `npm run test:p1` | Priority 0 + Priority 1 tests |
-| `npm run test:db` | Database tests (pgTAP via `supabase test db`) |
-| `npm run test:smoke` | Post-build smoke tests against `dist/` |
-| `npm run test:burn-in` | Flaky test detection (10 iterations by default) |
-| `npm run test:ci-local` | Mirror CI pipeline locally (lint, unit, E2E, burn-in) |
+| Command                      | Description                                           |
+| ---------------------------- | ----------------------------------------------------- |
+| `npm run test:unit`          | Run all unit tests (Vitest)                           |
+| `npm run test:unit:watch`    | Vitest watch mode                                     |
+| `npm run test:unit:ui`       | Vitest interactive UI                                 |
+| `npm run test:unit:coverage` | Unit tests with V8 coverage (80% threshold)           |
+| `npm run test:e2e`           | All E2E tests with process cleanup                    |
+| `npm run test:e2e:raw`       | Playwright directly                                   |
+| `npm run test:e2e:ui`        | Playwright interactive UI mode                        |
+| `npm run test:e2e:debug`     | Playwright debug mode                                 |
+| `npm run test:p0`            | Priority 0 (critical) tests only                      |
+| `npm run test:p1`            | Priority 0 + Priority 1 tests                         |
+| `npm run test:db`            | Database tests (pgTAP via `supabase test db`)         |
+| `npm run test:smoke`         | Post-build smoke tests against `dist/`                |
+| `npm run test:burn-in`       | Flaky test detection (10 iterations by default)       |
+| `npm run test:ci-local`      | Mirror CI pipeline locally (lint, unit, E2E, burn-in) |
 
 ### Single Test File Execution
 
@@ -74,20 +74,20 @@ npx playwright test --grep "mood tracker"
 
 ### Supabase
 
-| Command | Description |
-|---|---|
-| `supabase start` | Start local Supabase (required for E2E tests) |
-| `supabase stop` | Stop local Supabase |
-| `supabase status` | Show connection URLs and keys |
-| `supabase db reset` | Reset DB and re-run all migrations |
-| `supabase migration new <name>` | Create new migration file |
+| Command                                                               | Description                                   |
+| --------------------------------------------------------------------- | --------------------------------------------- |
+| `supabase start`                                                      | Start local Supabase (required for E2E tests) |
+| `supabase stop`                                                       | Stop local Supabase                           |
+| `supabase status`                                                     | Show connection URLs and keys                 |
+| `supabase db reset`                                                   | Reset DB and re-run all migrations            |
+| `supabase migration new <name>`                                       | Create new migration file                     |
 | `supabase gen types typescript --local > src/types/database.types.ts` | Regenerate TypeScript types from local schema |
 
 ### Performance and Analysis
 
-| Command | Description |
-|---|---|
-| `npm run perf:build` | Typecheck + build with log capture |
+| Command                      | Description                            |
+| ---------------------------- | -------------------------------------- |
+| `npm run perf:build`         | Typecheck + build with log capture     |
 | `npm run perf:bundle-report` | Generate bundle size report (Markdown) |
 
 ## Key Conventions

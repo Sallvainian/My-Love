@@ -36,7 +36,7 @@ export function MessageRow({ message, onEdit, onDelete }: MessageRowProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="hover:bg-gray-50 transition-colors"
+      className="transition-colors hover:bg-gray-50"
       data-testid="admin-message-row"
     >
       {/* Message text */}
@@ -53,18 +53,18 @@ export function MessageRow({ message, onEdit, onDelete }: MessageRowProps) {
       <td className="px-4 py-4 text-sm" data-testid="message-row-type">
         <div className="flex items-center gap-2">
           {message.isCustom ? (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
+            <span className="inline-flex items-center rounded-full bg-pink-100 px-2.5 py-0.5 text-xs font-medium text-pink-800">
               Custom
             </span>
           ) : (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
               Default
             </span>
           )}
           {/* Draft badge (Story 3.5 AC-3.5.4) */}
           {message.isCustom && message.active === false && (
             <span
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
+              className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600"
               data-testid="message-draft-badge"
             >
               Draft
@@ -74,31 +74,31 @@ export function MessageRow({ message, onEdit, onDelete }: MessageRowProps) {
       </td>
 
       {/* Actions */}
-      <td className="px-4 py-4 text-sm text-right">
+      <td className="px-4 py-4 text-right text-sm">
         {message.isCustom ? (
           <div className="flex items-center justify-end gap-2">
             {/* Edit button */}
             <button
               onClick={() => onEdit(message)}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              className="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
               aria-label="Edit message"
               data-testid="message-row-edit-button"
             >
-              <Pencil className="w-4 h-4" />
+              <Pencil className="h-4 w-4" />
             </button>
 
             {/* Delete button */}
             <button
               onClick={() => onDelete(message)}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
               aria-label="Delete message"
               data-testid="message-row-delete-button"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         ) : (
-          <span className="text-gray-400 text-xs">Read-only</span>
+          <span className="text-xs text-gray-400">Read-only</span>
         )}
       </td>
     </motion.tr>

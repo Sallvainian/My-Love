@@ -1,12 +1,14 @@
 # Data Models -- Table of Contents
 
 ## 1. Database Schema Overview
+
 - Supabase table inventory (11 tables across core and scripture features)
 - Custom enum types: `scripture_session_mode`, `scripture_session_phase`, `scripture_session_status`
 - Storage buckets: `photos` (10 MB max, private), `love-notes-images` (5 MB max, private)
 - TEXT + CHECK constraint pattern (replaces original enum types after migration 20251206024345)
 
 ## 2. Supabase Tables
+
 - 2.1 `users` -- User profiles (id, partner_name, device_id, email, display_name, partner_id, timestamps)
 - 2.2 `moods` -- Mood tracking (12 mood types, 500-char note limit, `mood_types` array column)
 - 2.3 `love_notes` -- Partner messages (content 1-1000 chars, optional image_url, `different_users` check)
@@ -20,6 +22,7 @@
 - 2.11 `scripture_messages` -- Prayer report messages (session_id, sender_id, message text)
 
 ## 3. IndexedDB Stores
+
 - Database: `my-love-db`, version 5
 - 3.1 `messages` -- Custom love messages (keyPath: id, indexes: by-category, by-date)
 - 3.2 `photos` -- Compressed photo blobs (keyPath: id, index: by-date)
@@ -32,15 +35,18 @@
 - Version history: v1 (messages) -> v2 (photos) -> v3 (moods) -> v4 (sw-auth) -> v5 (scripture stores)
 
 ## 4. TypeScript Type Definitions
+
 - 4.1 Generated Supabase Types (`database.types.ts`) -- `Tables<T>`, `TablesInsert<T>`, `TablesUpdate<T>`, `Enums<T>` utility types
 - 4.2 Application Types (`types/index.ts`) -- ThemeName, MessageCategory, MoodType, Message, Photo, MoodEntry, Settings, AppState
 - 4.3 Supabase Model Types (`types/models.ts`) -- LoveNote (with client-side fields), LoveNotesState, Scripture re-exports
 
 ## 5. Zod Validation Schemas
+
 - 5.1 Local Validation (`validation/schemas.ts`) -- MessageSchema, PhotoSchema, MoodEntrySchema, SettingsSchema, CustomMessagesExportSchema, Scripture schemas
 - 5.2 Supabase API Validation (`api/validation/supabaseSchemas.ts`) -- User, Mood, Interaction Row/Insert/Update schemas, array schemas, UUID/Timestamp/MoodType common schemas
 
 ## 6. Supabase RPC Functions
+
 - 6.1 `get_partner_id(user_id UUID)` -> `UUID` -- SECURITY DEFINER, STABLE; deprecated in migration 20251206024345
 - 6.2 `accept_partner_request(p_request_id UUID)` -> `void` -- Atomic partner linking with partner-exists guard
 - 6.3 `decline_partner_request(p_request_id UUID)` -> `void` -- Validate pending + recipient before declining
@@ -52,10 +58,12 @@
 - `get_my_partner_id()` -> `UUID` -- SECURITY DEFINER helper to break RLS recursion (added in migration 20260205000001)
 
 ## 7. Storage Buckets
+
 - `photos` bucket -- 10 MB max, private, path-based folder isolation (`auth.uid()` = first folder segment)
 - `love-notes-images` bucket -- 5 MB max, private, extension validation (jpg, jpeg, png, webp) + folder isolation
 
 ## 8. RLS Policies
+
 - 8.1 `users` -- Self + partner SELECT (via `get_my_partner_id()` helper), safe UPDATE preventing `partner_id` manipulation
 - 8.2 `moods` -- Own + partner SELECT, own-only INSERT/UPDATE/DELETE
 - 8.3 `love_notes` -- Sender/recipient SELECT, sender-only INSERT
@@ -71,6 +79,7 @@
 - 8.13 `scripture_messages` -- Session member SELECT, sender INSERT
 
 ## 9. Migration History
+
 - 12 migrations from 2025-12-03 through 2026-02-06
 - Core schema, photos, love note images, MIME validation, remote schema sync, RLS fixes, security patches, scripture reading, RPCs, unlinked preset, RLS recursion fix, pgTAP extension
 

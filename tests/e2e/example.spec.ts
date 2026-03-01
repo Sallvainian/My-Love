@@ -30,7 +30,6 @@ test.describe('Homepage', () => {
     // Page loaded successfully - network errors would have been caught automatically
     await expect(page.locator('body')).toBeVisible();
   });
-
 });
 
 test.describe('Helper Functions Demo', () => {

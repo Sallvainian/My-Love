@@ -46,7 +46,7 @@ The photo feature spans 10 components across 6 folders:
   2. Preview: Image display with caption (500 chars) and tags (max 10) inputs
   3. Uploading: Progress bar with percentage
   4. Success/Error: Completion state with appropriate messaging
-  Uses `imageCompressionService` for client-side compression. Storage warning banner from store.
+     Uses `imageCompressionService` for client-side compression. Storage warning banner from store.
 
 - **PhotoCarousel** (`PhotoCarousel/PhotoCarousel.tsx`, 224 lines): Full-screen lightbox with spring physics (stiffness: 300, damping: 30). `drag="x"` with boundary constraints. Swipe threshold for navigation. Swipe-down-to-close. Integrates PhotoEditModal and PhotoDeleteConfirmation via state management.
 

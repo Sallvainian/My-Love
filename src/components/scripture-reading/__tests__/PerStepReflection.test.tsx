@@ -99,14 +99,18 @@ describe('PerStepReflection', () => {
         'Rating 5 of 5: A lot',
       ];
       for (let n = 1; n <= 5; n++) {
-        expect(screen.getByTestId(`scripture-rating-${n}`).getAttribute('aria-label')).toBe(labels[n - 1]);
+        expect(screen.getByTestId(`scripture-rating-${n}`).getAttribute('aria-label')).toBe(
+          labels[n - 1]
+        );
       }
     });
 
     it('all ratings are unchecked initially', () => {
       render(<PerStepReflection {...defaultProps} />);
       for (let n = 1; n <= 5; n++) {
-        expect(screen.getByTestId(`scripture-rating-${n}`).getAttribute('aria-checked')).toBe('false');
+        expect(screen.getByTestId(`scripture-rating-${n}`).getAttribute('aria-checked')).toBe(
+          'false'
+        );
       }
     });
   });
@@ -126,7 +130,9 @@ describe('PerStepReflection', () => {
       render(<PerStepReflection {...defaultProps} />);
       fireEvent.click(screen.getByTestId('scripture-rating-3'));
       for (const n of [1, 2, 4, 5]) {
-        expect(screen.getByTestId(`scripture-rating-${n}`).getAttribute('aria-checked')).toBe('false');
+        expect(screen.getByTestId(`scripture-rating-${n}`).getAttribute('aria-checked')).toBe(
+          'false'
+        );
       }
     });
 

@@ -126,7 +126,7 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
         >
           {(() => {
             const Icon = MOOD_CONFIG[mood.mood as MoodType].icon;
-            return <Icon className="w-4 h-4" />;
+            return <Icon className="h-4 w-4" />;
           })()}
         </motion.div>
       )}

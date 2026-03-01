@@ -78,9 +78,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('createSession', () => {
     it('should set scriptureLoading while creating session', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       // Make createSession hang so we can check loading state
       let resolveCreate: (value: unknown) => void;
@@ -120,9 +119,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set error on createSession failure', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockRejectedValue(
         new Error('Network error')
@@ -140,9 +138,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('loadSession', () => {
     it('should load an existing session', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.getSession).mockResolvedValue({
         id: 'session-1',
@@ -153,7 +150,6 @@ describe('scriptureReadingSlice', () => {
         userId: 'user-123',
         status: 'in_progress',
         startedAt: new Date(),
-
       });
 
       const store = createTestStore();
@@ -167,9 +163,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set error when session not found', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.getSession).mockResolvedValue(null);
 
@@ -183,13 +178,10 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set error on loadSession failure', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
-      vi.mocked(scriptureReadingService.getSession).mockRejectedValue(
-        new Error('DB error')
-      );
+      vi.mocked(scriptureReadingService.getSession).mockRejectedValue(new Error('DB error'));
 
       const store = createTestStore();
       await store.getState().loadSession('session-1');
@@ -201,9 +193,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('exitSession', () => {
     it('should reset all state to initial values', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -238,9 +229,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('updatePhase', () => {
     it('should update session phase', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -272,13 +262,10 @@ describe('scriptureReadingSlice', () => {
 
   describe('clearScriptureError', () => {
     it('should clear error state', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
-      vi.mocked(scriptureReadingService.createSession).mockRejectedValue(
-        new Error('fail')
-      );
+      vi.mocked(scriptureReadingService.createSession).mockRejectedValue(new Error('fail'));
 
       const store = createTestStore();
       await store.getState().createSession('solo');
@@ -296,9 +283,8 @@ describe('scriptureReadingSlice', () => {
       // Verify the types work at runtime through the slice
       const store = createTestStore();
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 's1',
@@ -321,7 +307,11 @@ describe('scriptureReadingSlice', () => {
       // Test all valid phases
       const phases = ['lobby', 'countdown', 'reading', 'reflection', 'report', 'complete'];
       for (const phase of phases) {
-        store.getState().updatePhase(phase as 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete');
+        store
+          .getState()
+          .updatePhase(
+            phase as 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete'
+          );
         expect(store.getState().session!.currentPhase).toBe(phase);
       }
     });
@@ -329,9 +319,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('checkForActiveSession', () => {
     it('should find and store an incomplete solo session', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
@@ -348,9 +337,7 @@ describe('scriptureReadingSlice', () => {
         startedAt: new Date(),
       };
 
-      vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
-        incompleteSession,
-      ]);
+      vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([incompleteSession]);
 
       const store = createTestStore();
       expect(store.getState().isCheckingSession).toBe(false);
@@ -363,9 +350,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set activeSession to null when no incomplete solo session found', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
@@ -406,9 +392,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should handle getUserSessions failure with proper error handling', async () => {
-      const { scriptureReadingService, handleScriptureError } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService, handleScriptureError } =
+        await import('../../../src/services/scriptureReadingService');
 
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
@@ -429,9 +414,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should ignore together mode sessions when finding active session', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
@@ -460,9 +444,8 @@ describe('scriptureReadingSlice', () => {
   // Story 1.3: Solo Reading Flow actions
   describe('advanceStep', () => {
     it('should increment currentStepIndex', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -489,9 +472,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should persist step to server via updateSession', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -510,16 +492,14 @@ describe('scriptureReadingSlice', () => {
       await store.getState().createSession('solo');
       await store.getState().advanceStep();
 
-      expect(scriptureReadingService.updateSession).toHaveBeenCalledWith(
-        'session-1',
-        { currentStepIndex: 1 }
-      );
+      expect(scriptureReadingService.updateSession).toHaveBeenCalledWith('session-1', {
+        currentStepIndex: 1,
+      });
     });
 
     it('should transition to reflection phase at last step (step 17)', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -545,9 +525,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should do nothing when session is null', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const store = createTestStore();
       await store.getState().advanceStep();
@@ -557,9 +536,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set error and pendingRetry on server update failure', async () => {
-      const { scriptureReadingService, handleScriptureError } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService, handleScriptureError } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -594,9 +572,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should clear pendingRetry on successful advanceStep', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -629,9 +606,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('saveAndExit', () => {
     it('should persist session and reset state', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -669,9 +645,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should do nothing when session is null', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const store = createTestStore();
       await store.getState().saveAndExit();
@@ -680,9 +655,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set error on save failure without clearing session', async () => {
-      const { scriptureReadingService, handleScriptureError } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService, handleScriptureError } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -695,9 +669,7 @@ describe('scriptureReadingSlice', () => {
         startedAt: new Date(),
       });
 
-      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(
-        new Error('Save failed')
-      );
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(new Error('Save failed'));
 
       const store = createTestStore();
       await store.getState().createSession('solo');
@@ -715,9 +687,8 @@ describe('scriptureReadingSlice', () => {
   // Story 1.4: saveSession
   describe('saveSession', () => {
     it('should persist to server without clearing state', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -754,9 +725,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set isSyncing true during save, false after', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       let resolveSave: () => void;
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
@@ -771,7 +741,9 @@ describe('scriptureReadingSlice', () => {
       });
 
       vi.mocked(scriptureReadingService.updateSession).mockReturnValue(
-        new Promise<void>((resolve) => { resolveSave = resolve; })
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        })
       );
 
       const store = createTestStore();
@@ -787,9 +759,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should handle server error', async () => {
-      const { scriptureReadingService, handleScriptureError } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService, handleScriptureError } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -818,9 +789,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should do nothing when session is null', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const store = createTestStore();
       await store.getState().saveSession();
@@ -832,19 +802,17 @@ describe('scriptureReadingSlice', () => {
   // Story 1.4: abandonSession
   describe('abandonSession', () => {
     it('should mark server session as abandoned and clear local state', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.updateSession).mockResolvedValue(undefined);
 
       const store = createTestStore();
       await store.getState().abandonSession('session-abc');
 
-      expect(scriptureReadingService.updateSession).toHaveBeenCalledWith(
-        'session-abc',
-        { status: 'abandoned' }
-      );
+      expect(scriptureReadingService.updateSession).toHaveBeenCalledWith('session-abc', {
+        status: 'abandoned',
+      });
 
       // State should be cleared
       expect(store.getState().session).toBeNull();
@@ -853,13 +821,10 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should handle server error on abandon', async () => {
-      const { scriptureReadingService, handleScriptureError } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService, handleScriptureError } =
+        await import('../../../src/services/scriptureReadingService');
 
-      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(
-        new Error('Server error')
-      );
+      vi.mocked(scriptureReadingService.updateSession).mockRejectedValue(new Error('Server error'));
 
       const store = createTestStore();
       await store.getState().abandonSession('session-abc');
@@ -871,13 +836,14 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should set scriptureLoading during abandon', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       let resolveAbandon: () => void;
       vi.mocked(scriptureReadingService.updateSession).mockReturnValue(
-        new Promise<void>((resolve) => { resolveAbandon = resolve; })
+        new Promise<void>((resolve) => {
+          resolveAbandon = resolve;
+        })
       );
 
       const store = createTestStore();
@@ -895,9 +861,8 @@ describe('scriptureReadingSlice', () => {
   // Story 1.4: retryFailedWrite
   describe('retryFailedWrite', () => {
     it('should retry and clear pendingRetry on success', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -930,9 +895,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should increment attempts on retry failure', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -963,9 +927,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should keep pendingRetry at max attempts after exhaustion', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.createSession).mockResolvedValue({
         id: 'session-1',
@@ -1002,9 +965,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should do nothing when pendingRetry is null', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const store = createTestStore();
       await store.getState().retryFailedWrite();
@@ -1013,9 +975,8 @@ describe('scriptureReadingSlice', () => {
     });
 
     it('should do nothing when session is null', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const store = createTestStore();
       // Force pendingRetry without session
@@ -1031,9 +992,8 @@ describe('scriptureReadingSlice', () => {
 
   describe('clearActiveSession', () => {
     it('should clear the active session', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },

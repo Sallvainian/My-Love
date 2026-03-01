@@ -37,7 +37,7 @@ The `useLoveNotes` hook (`src/hooks/useLoveNotes.ts`) composes `useRealtimeMessa
 ```typescript
 export function useLoveNotes() {
   const store = useAppStore();
-  useRealtimeMessages(partnerId);  // Realtime subscription
+  useRealtimeMessages(partnerId); // Realtime subscription
   // ... auto-fetch on mount, cleanup on unmount
 }
 ```
@@ -56,6 +56,7 @@ channel.on('broadcast', { event: 'mood_update' }, (payload) => {
 ### Connection Status
 
 The hook tracks connection status and exposes it for UI display:
+
 - `connected` -- Channel is active and receiving
 - `disconnected` -- Channel is closed or failed
 - `connecting` -- Channel is establishing connection
@@ -70,12 +71,16 @@ class RealtimeService {
 
   subscribe(table: string, filter: string, callback: Function) {
     const channel = supabase.channel(`${table}:${filter}`);
-    channel.on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table,
-      filter,
-    }, callback);
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table,
+        filter,
+      },
+      callback
+    );
     channel.subscribe();
     this.channels.set(channelKey, channel);
   }

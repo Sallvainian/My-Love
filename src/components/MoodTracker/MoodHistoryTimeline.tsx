@@ -27,10 +27,10 @@ interface MoodHistoryTimelineProps {
 function DateHeader({ date }: { date: string }) {
   return (
     <div
-      className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-900 px-4 py-2 border-b border-gray-200 dark:border-gray-700"
+      className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100 px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
       data-testid={`date-header-${date.toLowerCase().replace(/\s/g, '-')}`}
     >
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <h3 className="text-sm font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-300">
         {date}
       </h3>
     </div>
@@ -43,7 +43,7 @@ function DateHeader({ date }: { date: string }) {
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center" data-testid="loading-spinner">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-pink-500"></div>
     </div>
   );
 }
@@ -53,9 +53,9 @@ function LoadingSpinner() {
  */
 function EmptyMoodHistoryState() {
   return (
-    <div className="text-center py-12" data-testid="empty-mood-history-state">
-      <div className="text-6xl mb-4">📊</div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+    <div className="py-12 text-center" data-testid="empty-mood-history-state">
+      <div className="mb-4 text-6xl">📊</div>
+      <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
         No mood history yet
       </h3>
       <p className="text-gray-600 dark:text-gray-400">
@@ -169,9 +169,9 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
   // Show error state
   if (error) {
     return (
-      <div className="text-center py-12" data-testid="error-state">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+      <div className="py-12 text-center" data-testid="error-state">
+        <div className="mb-4 text-6xl">⚠️</div>
+        <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
           Failed to load mood history
         </h3>
         <p className="text-gray-600 dark:text-gray-400">{error}</p>
@@ -206,7 +206,7 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
   };
 
   return (
-    <div className="w-full h-full" data-testid="mood-history-timeline">
+    <div className="h-full w-full" data-testid="mood-history-timeline">
       <List
         rowCount={timelineItems.length}
         rowHeight={getRowHeight}
@@ -217,7 +217,7 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
       />
 
       {isLoading && (
-        <div className="text-center py-4">
+        <div className="py-4 text-center">
           <LoadingSpinner />
         </div>
       )}

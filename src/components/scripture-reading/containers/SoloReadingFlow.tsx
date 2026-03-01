@@ -130,7 +130,8 @@ export function SoloReadingFlow() {
   // Story 2.3: Report sub-phase state and data
   const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>(() => {
     if (session?.currentPhase === 'complete' || session?.status === 'complete') return 'report';
-    if (session?.currentPhase === 'report' && !partner && !isLoadingPartner) return 'complete-unlinked';
+    if (session?.currentPhase === 'report' && !partner && !isLoadingPartner)
+      return 'complete-unlinked';
     return 'compose';
   });
   const [reportData, setReportData] = useState<{
@@ -542,7 +543,9 @@ export function SoloReadingFlow() {
         let partnerStandoutVerses: number[] = [];
         if (partnerSessionReflection?.notes) {
           try {
-            const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
+            const parsed = JSON.parse(partnerSessionReflection.notes) as {
+              standoutVerses?: number[];
+            };
             partnerStandoutVerses = parsed.standoutVerses ?? [];
           } catch (error) {
             handleScriptureError({
@@ -956,7 +959,12 @@ export function SoloReadingFlow() {
             animate={{ opacity: 1 }}
             transition={crossfade}
           >
-            <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            <div
+              className="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="sr-announcer"
+            >
               {announcement}
             </div>
             <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-5 text-center">

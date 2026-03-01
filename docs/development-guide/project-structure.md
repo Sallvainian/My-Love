@@ -149,22 +149,22 @@ supabase/
 
 Key `config.toml` settings:
 
-| Setting | Value |
-|---|---|
-| Project ID | `My-Love` |
-| API port | `54321` |
-| DB port | `54322` |
-| Shadow DB port | `54320` |
-| Postgres version | `17` |
-| Studio port | `54323` |
-| Inbucket (email) port | `54324` |
-| Analytics port | `54327` |
-| Storage file size limit | `50MiB` |
-| Auth: email/password | Enabled |
-| Auth: anonymous sign-ins | Disabled |
+| Setting                   | Value                  |
+| ------------------------- | ---------------------- |
+| Project ID                | `My-Love`              |
+| API port                  | `54321`                |
+| DB port                   | `54322`                |
+| Shadow DB port            | `54320`                |
+| Postgres version          | `17`                   |
+| Studio port               | `54323`                |
+| Inbucket (email) port     | `54324`                |
+| Analytics port            | `54327`                |
+| Storage file size limit   | `50MiB`                |
+| Auth: email/password      | Enabled                |
+| Auth: anonymous sign-ins  | Disabled               |
 | Auth: email confirmations | Disabled (development) |
-| Realtime | Enabled |
-| Edge Runtime | Deno 2 |
+| Realtime                  | Enabled                |
+| Edge Runtime              | Deno 2                 |
 
 ## Scripts (`scripts/`)
 

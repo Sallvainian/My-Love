@@ -20,6 +20,7 @@
 - NONE: 0
 
 Priority breakdown:
+
 - P0: 1/1 FULL (100%)
 - P1: 4/4 FULL (100%)
 - P2: 1/1 FULL (100%)

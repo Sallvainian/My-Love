@@ -68,38 +68,26 @@ describe('LoveNoteMessage', () => {
 
   describe('Text Message Rendering', () => {
     it('should render message content', () => {
-      render(
-        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText('Hello love!')).toBeInTheDocument();
     });
 
     it('should render sender name and timestamp', () => {
-      render(
-        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText(/You/)).toBeInTheDocument();
     });
 
     it('should apply own message styling when isOwnMessage is true', () => {
-      render(
-        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-end');
     });
 
     it('should apply partner message styling when isOwnMessage is false', () => {
-      render(
-        <LoveNoteMessage
-          message={baseMessage}
-          isOwnMessage={false}
-          senderName="Partner"
-        />
-      );
+      render(<LoveNoteMessage message={baseMessage} isOwnMessage={false} senderName="Partner" />);
 
       const messageContainer = screen.getByTestId('love-note-message');
       expect(messageContainer).toHaveClass('items-start');
@@ -111,9 +99,7 @@ describe('LoveNoteMessage', () => {
         content: '<script>alert("xss")</script>Hello',
       };
 
-      render(
-        <LoveNoteMessage message={maliciousMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={maliciousMessage} isOwnMessage={true} senderName="You" />);
 
       // Script tags should be stripped
       expect(screen.queryByText('<script>')).not.toBeInTheDocument();
@@ -128,18 +114,10 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/1705315800000-uuid.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
-        expect(mockGetSignedImageUrl).toHaveBeenCalledWith(
-          'user-123/1705315800000-uuid.jpg'
-        );
+        expect(mockGetSignedImageUrl).toHaveBeenCalledWith('user-123/1705315800000-uuid.jpg');
       });
     });
 
@@ -149,22 +127,13 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         // Dynamic alt text includes sender name and message content
         const img = screen.getByRole('img', { name: /image from you/i });
         expect(img).toBeInTheDocument();
-        expect(img).toHaveAttribute(
-          'src',
-          'https://storage.example.com/signed-image.jpg'
-        );
+        expect(img).toHaveAttribute('src', 'https://storage.example.com/signed-image.jpg');
       });
     });
 
@@ -174,13 +143,7 @@ describe('LoveNoteMessage', () => {
         imagePreviewUrl: 'blob:http://localhost/preview-123',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithPreview}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithPreview} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         const img = screen.getByRole('img', { name: /image from you/i });
@@ -202,13 +165,7 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       // Should show loading state (spinner with animate-spin class)
       await waitFor(() => {
@@ -225,13 +182,7 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/missing.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         expect(screen.getByText('Failed to load image')).toBeInTheDocument();
@@ -245,13 +196,7 @@ describe('LoveNoteMessage', () => {
         imageUploading: true,
       };
 
-      render(
-        <LoveNoteMessage
-          message={uploadingMessage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText('Uploading...')).toBeInTheDocument();
     });
@@ -264,13 +209,7 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         expect(screen.getByRole('img', { name: /image from you/i })).toBeInTheDocument();
@@ -289,13 +228,7 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         expect(screen.getByRole('img', { name: /image from you/i })).toBeInTheDocument();
@@ -323,22 +256,14 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/missing.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         expect(screen.getByText('Failed to load image')).toBeInTheDocument();
       });
 
       // No image button should exist when there's an error
-      expect(
-        screen.queryByRole('button', { name: /view full size/i })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /view full size/i })).not.toBeInTheDocument();
     });
   });
 
@@ -349,9 +274,7 @@ describe('LoveNoteMessage', () => {
         sending: true,
       };
 
-      render(
-        <LoveNoteMessage message={sendingMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={sendingMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText('Sending...')).toBeInTheDocument();
     });
@@ -364,13 +287,7 @@ describe('LoveNoteMessage', () => {
         imagePreviewUrl: 'blob:preview',
       };
 
-      render(
-        <LoveNoteMessage
-          message={uploadingMessage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={uploadingMessage} isOwnMessage={true} senderName="You" />);
 
       // Should show "Uploading..." not "Sending..."
       expect(screen.getByText('Uploading...')).toBeInTheDocument();
@@ -384,9 +301,7 @@ describe('LoveNoteMessage', () => {
         error: true,
       };
 
-      render(
-        <LoveNoteMessage message={failedMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={failedMessage} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText(/Failed to send/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -424,19 +339,15 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithBoth}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithBoth} isOwnMessage={true} senderName="You" />);
 
       expect(screen.getByText('Check out this photo!')).toBeInTheDocument();
 
       await waitFor(() => {
         // Alt text includes the message caption
-        expect(screen.getByRole('img', { name: /image from you.*check out this photo/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole('img', { name: /image from you.*check out this photo/i })
+        ).toBeInTheDocument();
       });
     });
 
@@ -447,13 +358,7 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={imageOnlyMessage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={imageOnlyMessage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         // Image-only messages use generic alt text with sender name
@@ -464,8 +369,7 @@ describe('LoveNoteMessage', () => {
       const messageBubbles = screen.queryAllByText(/./);
       // Filter to just content paragraphs, not controls/timestamp
       const contentParagraphs = messageBubbles.filter(
-        (el) =>
-          el.tagName === 'P' && el.classList.contains('text-base') && el.textContent === ''
+        (el) => el.tagName === 'P' && el.classList.contains('text-base') && el.textContent === ''
       );
       expect(contentParagraphs).toHaveLength(0);
     });
@@ -473,9 +377,7 @@ describe('LoveNoteMessage', () => {
 
   describe('Accessibility', () => {
     it('should have proper aria-label with sender and time', () => {
-      render(
-        <LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />
-      );
+      render(<LoveNoteMessage message={baseMessage} isOwnMessage={true} senderName="You" />);
 
       const messageContainer = screen.getByRole('listitem');
       expect(messageContainer).toHaveAttribute(
@@ -490,13 +392,7 @@ describe('LoveNoteMessage', () => {
         image_url: 'user-123/image.jpg',
       };
 
-      render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
-      );
+      render(<LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />);
 
       await waitFor(() => {
         // Dynamic aria-label: "View full size: Image from [sender]: [caption]"
@@ -524,11 +420,7 @@ describe('LoveNoteMessage', () => {
       };
 
       const { unmount } = render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
+        <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
       );
 
       // Verify the fetch was initiated
@@ -573,11 +465,7 @@ describe('LoveNoteMessage', () => {
       };
 
       const { unmount } = render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
+        <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
       );
 
       // Wait for initial load
@@ -635,11 +523,7 @@ describe('LoveNoteMessage', () => {
       };
 
       const { unmount } = render(
-        <LoveNoteMessage
-          message={messageWithImage}
-          isOwnMessage={true}
-          senderName="You"
-        />
+        <LoveNoteMessage message={messageWithImage} isOwnMessage={true} senderName="You" />
       );
 
       // Unmount before rejection

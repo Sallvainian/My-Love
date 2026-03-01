@@ -20,12 +20,7 @@ import {
   isSelectRoleResponse,
   navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
-import {
-  createTestSession,
-  linkTestPartners,
-  unlinkTestPartners,
-  cleanupTestSession,
-} from '../../support/factories';
+import { createTestSession, cleanupTestSession } from '../../support/factories';
 
 // ---------------------------------------------------------------------------
 // Timeout constants (spec-local — not shared with P2 spec)
@@ -41,42 +36,9 @@ const VERSE_LOAD_TIMEOUT_MS = 15_000;
 test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
   test('[P0] should complete full lobby flow: role selection → both ready → countdown → verse', async ({
     page,
-    browser,
-    supabaseAdmin,
-    partnerStorageStatePath,
+    togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
-
-    // -----------------------------------------------------------------------
-    // SETUP: Create a together-mode session; users are already linked as
-    // partners via auth-setup.ts worker pair.
-    // -----------------------------------------------------------------------
-    const seed = await createTestSession(supabaseAdmin, {
-      sessionCount: 1,
-      preset: 'mid_session',
-    });
-
-    // Fail fast if the seed didn't return a partner user ID
-    expect(
-      seed.test_user2_id,
-      'createTestSession must return a partner user ID for lobby test'
-    ).toBeTruthy();
-    await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
-
-    // Track session IDs for cleanup
-    const sessionIdsToClean = [...seed.session_ids];
-
-    // End the seeded session so it doesn't interfere with the UI-created lobby session
-    await supabaseAdmin
-      .from('scripture_sessions')
-      .update({ status: 'complete', current_phase: 'complete' })
-      .in('id', seed.session_ids);
-
-    // -----------------------------------------------------------------------
-    // GIVEN: User A navigates to /scripture and starts Together mode
-    // -----------------------------------------------------------------------
-    const uiSession1 = await navigateToTogetherRoleSelection(page);
-    if (uiSession1) sessionIdsToClean.push(uiSession1);
 
     // AC#1 — Role selection screen present with Reader and Responder cards
     await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
@@ -97,108 +59,89 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(page.getByTestId('lobby-continue-solo')).toBeVisible();
 
     // -----------------------------------------------------------------------
-    // GIVEN: User B (partner) opens a second browser context and joins.
-    // Uses partnerStorageStatePath — a distinct auth state for the partner
-    // user (testworker{n}-partner@test.example.com) so both contexts have
-    // genuinely different Supabase auth.uid() values.
+    // GIVEN: User B (partner) is already on the role selection screen (fixture)
     // -----------------------------------------------------------------------
-    const baseURL = new URL(page.url()).origin;
-    const partnerContext = await browser.newContext({
-      storageState: partnerStorageStatePath,
-      baseURL,
+
+    // AC#1 — Partner also sees role selection
+    await expect(partnerPage.getByTestId('lobby-role-selection')).toBeVisible();
+    await expect(partnerPage.getByTestId('lobby-role-responder')).toBeVisible();
+
+    // Partner selects Responder role
+    const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
+    await partnerPage.getByTestId('lobby-role-responder').click();
+    await partnerSelectRole;
+
+    // Partner should see lobby waiting screen
+    await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
+
+    // -----------------------------------------------------------------------
+    // THEN (AC#3): User A sees partner has joined via realtime broadcast
+    // -----------------------------------------------------------------------
+    await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
     });
-    const partnerPage = await partnerContext.newPage();
 
-    try {
-      // Partner navigates to /scripture and enters Together mode
-      const uiSession1b = await navigateToTogetherRoleSelection(partnerPage);
-      if (uiSession1b && uiSession1b !== uiSession1) sessionIdsToClean.push(uiSession1b);
+    // AC#4 — Ready toggle button visible for both users
+    await expect(page.getByTestId('lobby-ready-button')).toBeVisible();
+    await expect(partnerPage.getByTestId('lobby-ready-button')).toBeVisible();
 
-      // AC#1 — Partner also sees role selection
-      await expect(partnerPage.getByTestId('lobby-role-selection')).toBeVisible();
-      await expect(partnerPage.getByTestId('lobby-role-responder')).toBeVisible();
-
-      // Partner selects Responder role
-      const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
-      await partnerPage.getByTestId('lobby-role-responder').click();
-      await partnerSelectRole;
-
-      // Partner should see lobby waiting screen
-      await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
-
-      // -----------------------------------------------------------------------
-      // THEN (AC#3): User A sees partner has joined via realtime broadcast
-      // -----------------------------------------------------------------------
-      await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-        timeout: REALTIME_SYNC_TIMEOUT_MS,
+    // -----------------------------------------------------------------------
+    // WHEN: User A clicks Ready
+    // -----------------------------------------------------------------------
+    // Network-first: watch for ready state RPC before clicking
+    const userAReadyBroadcast = page
+      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
+      .catch((e: Error) => {
+        throw new Error(`scripture_toggle_ready RPC (User A) did not fire: ${e.message}`);
       });
 
-      // AC#4 — Ready toggle button visible for both users
-      await expect(page.getByTestId('lobby-ready-button')).toBeVisible();
-      await expect(partnerPage.getByTestId('lobby-ready-button')).toBeVisible();
+    await page.getByTestId('lobby-ready-button').click();
+    await userAReadyBroadcast;
 
-      // -----------------------------------------------------------------------
-      // WHEN: User A clicks Ready
-      // -----------------------------------------------------------------------
-      // Network-first: watch for ready state RPC before clicking
-      const userAReadyBroadcast = page
-        .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-        .catch((e: Error) => {
-          throw new Error(`scripture_toggle_ready RPC (User A) did not fire: ${e.message}`);
-        });
+    // AC#4 — User A's button updates to "Ready ✓" (requires checkmark — /ready.*✓|ready/i was too
+    // loose and would match "I'm Ready" before the state transition)
+    await expect(page.getByTestId('lobby-ready-button')).toContainText('Ready ✓');
 
-      await page.getByTestId('lobby-ready-button').click();
-      await userAReadyBroadcast;
+    // AC#4 — Partner sees User A is ready via realtime (semantic text, not just visibility)
+    await expect(partnerPage.getByTestId('lobby-partner-ready')).toContainText('is ready', {
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
+    });
 
-      // AC#4 — User A's button updates to "Ready ✓" (requires checkmark — /ready.*✓|ready/i was too
-      // loose and would match "I'm Ready" before the state transition)
-      await expect(page.getByTestId('lobby-ready-button')).toContainText('Ready ✓');
-
-      // AC#4 — Partner sees User A is ready via realtime (semantic text, not just visibility)
-      await expect(partnerPage.getByTestId('lobby-partner-ready')).toContainText('is ready', {
-        timeout: REALTIME_SYNC_TIMEOUT_MS,
+    // -----------------------------------------------------------------------
+    // WHEN: User B (partner) clicks Ready — both now ready → countdown starts
+    // -----------------------------------------------------------------------
+    const partnerReadyBroadcast = partnerPage
+      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
+      .catch((e: Error) => {
+        throw new Error(`scripture_toggle_ready RPC (User B) did not fire: ${e.message}`);
       });
 
-      // -----------------------------------------------------------------------
-      // WHEN: User B (partner) clicks Ready — both now ready → countdown starts
-      // -----------------------------------------------------------------------
-      const partnerReadyBroadcast = partnerPage
-        .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-        .catch((e: Error) => {
-          throw new Error(`scripture_toggle_ready RPC (User B) did not fire: ${e.message}`);
-        });
+    await partnerPage.getByTestId('lobby-ready-button').click();
+    await partnerReadyBroadcast;
 
-      await partnerPage.getByTestId('lobby-ready-button').click();
-      await partnerReadyBroadcast;
+    // -----------------------------------------------------------------------
+    // THEN (AC#5): Countdown appears on BOTH pages concurrently
+    // -----------------------------------------------------------------------
+    await Promise.all([
+      expect(page.getByTestId('countdown-container')).toBeVisible({
+        timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
+      }),
+      expect(partnerPage.getByTestId('countdown-container')).toBeVisible({
+        timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
+      }),
+    ]);
 
-      // -----------------------------------------------------------------------
-      // THEN (AC#5): Countdown appears on BOTH pages concurrently
-      // -----------------------------------------------------------------------
-      await Promise.all([
-        expect(page.getByTestId('countdown-container')).toBeVisible({
-          timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
-        }),
-        expect(partnerPage.getByTestId('countdown-container')).toBeVisible({
-          timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
-        }),
-      ]);
-
-      // AC#5 — After countdown completes, countdown container disappears on both pages.
-      // Note: Together-mode reading view (scripture-verse-text) is Story 4.2 scope.
-      // Story 4.1 delivers the session in currentPhase='reading' after countdown.
-      await Promise.all([
-        expect(page.getByTestId('countdown-container')).not.toBeVisible({
-          timeout: VERSE_LOAD_TIMEOUT_MS,
-        }),
-        expect(partnerPage.getByTestId('countdown-container')).not.toBeVisible({
-          timeout: VERSE_LOAD_TIMEOUT_MS,
-        }),
-      ]);
-    } finally {
-      await partnerContext.close();
-      await cleanupTestSession(supabaseAdmin, sessionIdsToClean);
-      await unlinkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
-    }
+    // AC#5 — After countdown completes, countdown container disappears on both pages.
+    // Note: Together-mode reading view (scripture-verse-text) is Story 4.2 scope.
+    // Story 4.1 delivers the session in currentPhase='reading' after countdown.
+    await Promise.all([
+      expect(page.getByTestId('countdown-container')).not.toBeVisible({
+        timeout: VERSE_LOAD_TIMEOUT_MS,
+      }),
+      expect(partnerPage.getByTestId('countdown-container')).not.toBeVisible({
+        timeout: VERSE_LOAD_TIMEOUT_MS,
+      }),
+    ]);
   });
 });
 

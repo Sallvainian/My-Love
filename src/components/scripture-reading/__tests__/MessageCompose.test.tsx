@@ -34,7 +34,10 @@ describe('MessageCompose', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalRAF = globalThis.requestAnimationFrame;
-    globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    };
   });
 
   afterEach(() => {

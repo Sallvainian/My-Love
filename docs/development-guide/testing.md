@@ -4,11 +4,11 @@
 
 The project uses three testing layers:
 
-| Layer | Framework | Location | Environment |
-|---|---|---|---|
-| Unit tests | Vitest 4.0.17 | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom |
-| E2E tests | Playwright 1.58.2 | `tests/e2e/` | Real Chromium browser + local Supabase |
-| Database tests | pgTAP | `supabase/tests/database/` | Local Supabase Postgres 17 |
+| Layer          | Framework         | Location                                | Environment                            |
+| -------------- | ----------------- | --------------------------------------- | -------------------------------------- |
+| Unit tests     | Vitest 4.0.17     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
+| E2E tests      | Playwright 1.58.2 | `tests/e2e/`                            | Real Chromium browser + local Supabase |
+| Database tests | pgTAP             | `supabase/tests/database/`              | Local Supabase Postgres 17             |
 
 Additional test types: smoke tests (pre-deploy validation), burn-in (flaky detection), and API tests (Playwright against Supabase endpoints).
 
@@ -39,7 +39,9 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://xojempkrugifnaveqtqc.supabase.co'),
-    'import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY': JSON.stringify('test-anon-key-for-unit-tests'),
+    'import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY': JSON.stringify(
+      'test-anon-key-for-unit-tests'
+    ),
   },
   test: {
     globals: true,
@@ -52,7 +54,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/**/*.d.ts', 'src/main.tsx', 'src/vite-env.d.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+      ],
       thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
     },
   },
@@ -104,27 +112,27 @@ npx playwright test --grep "mood tracker"
 
 ### Configuration (`playwright.config.ts`)
 
-| Setting | Value |
-|---|---|
-| Test directory | `./tests` |
-| Fully parallel | Yes |
-| Retries | 0 locally, 2 in CI |
-| Workers | Unlimited locally, 1 in CI |
-| Test timeout | 60 seconds |
-| Assertion timeout | 15 seconds |
-| Action timeout | 15 seconds |
-| Navigation timeout | 30 seconds |
-| Traces | Always captured |
-| Screenshots | Always captured |
-| Video | Always captured |
+| Setting            | Value                      |
+| ------------------ | -------------------------- |
+| Test directory     | `./tests`                  |
+| Fully parallel     | Yes                        |
+| Retries            | 0 locally, 2 in CI         |
+| Workers            | Unlimited locally, 1 in CI |
+| Test timeout       | 60 seconds                 |
+| Assertion timeout  | 15 seconds                 |
+| Action timeout     | 15 seconds                 |
+| Navigation timeout | 30 seconds                 |
+| Traces             | Always captured            |
+| Screenshots        | Always captured            |
+| Video              | Always captured            |
 
 ### Projects
 
-| Project | Test Directory | Dependencies | Purpose |
-|---|---|---|---|
-| `setup` | `./tests/support` (matches `auth-setup.ts`) | None | Creates test users, authenticates, saves `storageState` |
-| `chromium` | `./tests/e2e` | `setup` | E2E tests in Desktop Chrome |
-| `api` | `./tests/api` | `setup` | API-level tests against Supabase endpoints |
+| Project    | Test Directory                              | Dependencies | Purpose                                                 |
+| ---------- | ------------------------------------------- | ------------ | ------------------------------------------------------- |
+| `setup`    | `./tests/support` (matches `auth-setup.ts`) | None         | Creates test users, authenticates, saves `storageState` |
+| `chromium` | `./tests/e2e`                               | `setup`      | E2E tests in Desktop Chrome                             |
+| `api`      | `./tests/api`                               | `setup`      | API-level tests against Supabase endpoints              |
 
 ### Web Server
 
@@ -154,16 +162,16 @@ webServer: {
 
 All E2E test files import `{ test, expect }` from this file, not from `@playwright/test` directly. It composes multiple fixture sources using Playwright's `mergeTests`:
 
-| Fixture Source | Provides |
-|---|---|
-| `@seontechnologies/playwright-utils/api-request` | Typed HTTP client with schema validation |
-| `@seontechnologies/playwright-utils/recurse` | Polling helper for async operations |
-| `@seontechnologies/playwright-utils/log` | Playwright report-integrated logging |
-| `@seontechnologies/playwright-utils/intercept-network-call` | Network request interception |
-| `@seontechnologies/playwright-utils/network-error-monitor` | Automatic HTTP 4xx/5xx detection |
-| Custom fixtures (`./fixtures`) | `supabaseAdmin`, `testSession` |
-| Scripture navigation fixtures | Scripture-specific page navigation helpers |
-| Worker auth fixtures | Worker-isolated auth for parallel test safety |
+| Fixture Source                                              | Provides                                      |
+| ----------------------------------------------------------- | --------------------------------------------- |
+| `@seontechnologies/playwright-utils/api-request`            | Typed HTTP client with schema validation      |
+| `@seontechnologies/playwright-utils/recurse`                | Polling helper for async operations           |
+| `@seontechnologies/playwright-utils/log`                    | Playwright report-integrated logging          |
+| `@seontechnologies/playwright-utils/intercept-network-call` | Network request interception                  |
+| `@seontechnologies/playwright-utils/network-error-monitor`  | Automatic HTTP 4xx/5xx detection              |
+| Custom fixtures (`./fixtures`)                              | `supabaseAdmin`, `testSession`                |
+| Scripture navigation fixtures                               | Scripture-specific page navigation helpers    |
+| Worker auth fixtures                                        | Worker-isolated auth for parallel test safety |
 
 ### Network Error Monitor Exclusions
 
@@ -292,12 +300,12 @@ New pushes to the same branch cancel in-progress test runs.
 
 E2E tests use priority tags in their test names for selective execution:
 
-| Tag | Meaning | When Run |
-|---|---|---|
-| `[P0]` | Critical path -- must never break | P0 gate (every push), full E2E |
-| `[P1]` | High priority -- core features | `npm run test:p1`, full E2E |
-| `[P2]` | Medium priority -- secondary features | Full E2E only |
-| `[P3]` | Low priority -- edge cases | Full E2E only |
+| Tag    | Meaning                               | When Run                       |
+| ------ | ------------------------------------- | ------------------------------ |
+| `[P0]` | Critical path -- must never break     | P0 gate (every push), full E2E |
+| `[P1]` | High priority -- core features        | `npm run test:p1`, full E2E    |
+| `[P2]` | Medium priority -- secondary features | Full E2E only                  |
+| `[P3]` | Low priority -- edge cases            | Full E2E only                  |
 
 Example test title:
 

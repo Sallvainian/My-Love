@@ -53,13 +53,13 @@ export const RELATIONSHIP_DATES: RelationshipDatesConfig = {
   birthdays: {
     casey: {
       name: 'Casey',
-      month: 8,  // August
+      month: 8, // August
       day: 14,
       birthYear: 1999,
     },
     harper: {
       name: 'Harper',
-      month: 5,  // May
+      month: 5, // May
       day: 20,
       birthYear: 2000,
     },

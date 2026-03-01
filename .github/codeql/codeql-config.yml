@@ -1,4 +1,4 @@
-name: "CodeQL Config"
+name: 'CodeQL Config'
 
 # Exclude auto-generated, third-party, and non-standard runtime code from analysis
 paths-ignore:

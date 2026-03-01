@@ -57,7 +57,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
 
   return (
     <div
-      className="group relative aspect-square overflow-hidden rounded-lg cursor-pointer hover:scale-105 transition-transform duration-200"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105"
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -73,7 +73,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
     >
       {/* AC-6.3.6: Blur placeholder while loading */}
       {!isLoaded && isVisible && (
-        <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+        <div className="absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700" />
       )}
 
       {/* Photo thumbnail with lazy loading */}
@@ -81,7 +81,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
         ref={imgRef}
         src={isVisible && photo.signedUrl ? photo.signedUrl : undefined}
         alt={photo.caption || 'Photo'}
-        className="w-full h-full object-cover transition-opacity duration-300"
+        className="h-full w-full object-cover transition-opacity duration-300"
         style={{ opacity: isLoaded ? 1 : 0 }}
         loading="lazy"
         onLoad={() => setIsLoaded(true)}
@@ -95,14 +95,12 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
       {/* AC-6.3.11: Owner badge */}
       <div className="absolute top-2 right-2">
         <div
-          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-            photo.isOwn
-              ? 'bg-pink-500/90 text-white'
-              : 'bg-blue-500/90 text-white'
+          className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
+            photo.isOwn ? 'bg-pink-500/90 text-white' : 'bg-blue-500/90 text-white'
           }`}
           data-testid="photo-grid-item-owner-badge"
         >
-          <User className="w-3 h-3" />
+          <User className="h-3 w-3" />
           <span>{photo.isOwn ? 'You' : 'Partner'}</span>
         </div>
       </div>
@@ -110,11 +108,10 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
       {/* Caption overlay on hover/tap */}
       {photo.caption && (
         <div
-          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent
-                     p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           data-testid="photo-grid-item-caption-overlay"
         >
-          <p className="text-white text-sm font-medium line-clamp-2">{photo.caption}</p>
+          <p className="line-clamp-2 text-sm font-medium text-white">{photo.caption}</p>
         </div>
       )}
     </div>

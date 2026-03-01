@@ -76,9 +76,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
   // ============================================
   describe('loadCoupleStats', () => {
     it('should set isStatsLoading=true while loading', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       // Make getCoupleStats hang so we can check loading state
       let resolveStats!: (value: unknown) => void;
@@ -112,9 +111,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should update coupleStats with service response on success', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const expectedStats = {
         totalSessions: 5,
@@ -134,9 +132,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should keep existing coupleStats when service returns null (silent failure)', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       // First, load some stats
       const initialStats = {
@@ -163,9 +160,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should call scriptureReadingService.getCoupleStats exactly once', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.getCoupleStats).mockResolvedValue(null);
 
@@ -176,9 +172,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should set isStatsLoading=false even when service throws', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.getCoupleStats).mockRejectedValue(
         new Error('Unexpected error')
