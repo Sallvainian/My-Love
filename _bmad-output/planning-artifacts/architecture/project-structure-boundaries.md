@@ -10,6 +10,7 @@ src/
 │   └── scripture-reading/              # NEW DIRECTORY
 │       ├── session/
 │       │   ├── Countdown.tsx
+│       │   ├── DisconnectionOverlay.tsx    # Story 4.3 (AC#1, #2, #3)
 │       │   ├── LockInButton.tsx
 │       │   └── SessionProgress.tsx
 │       ├── reading/
