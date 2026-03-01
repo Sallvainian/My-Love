@@ -101,4 +101,74 @@ describe('LockInButton', () => {
     const undoButton = screen.getByTestId('lock-in-undo');
     expect(undoButton).toBeDisabled();
   });
+
+  // ===========================================================================
+  // Story 4.3: Disconnected state tests
+  // ===========================================================================
+
+  test('[P1] isPartnerDisconnected=true renders "Holding your place" + "Reconnecting..."', () => {
+    render(<LockInButton {...defaultProps} isPartnerDisconnected={true} />);
+
+    const button = screen.getByTestId('lock-in-disconnected');
+    expect(button).toBeVisible();
+    expect(button).toHaveTextContent(/holding your place/i);
+    expect(screen.getByText(/reconnecting/i)).toBeVisible();
+  });
+
+  test('[P1] button is disabled when isPartnerDisconnected=true', () => {
+    render(<LockInButton {...defaultProps} isPartnerDisconnected={true} />);
+
+    const button = screen.getByTestId('lock-in-disconnected');
+    expect(button).toBeDisabled();
+  });
+
+  test('[P1] isPartnerDisconnected=true && isLocked=true shows undo still available', () => {
+    render(<LockInButton {...defaultProps} isPartnerDisconnected={true} isLocked={true} />);
+
+    // Should show waiting state with reconnecting note
+    expect(screen.getByTestId('lock-in-button')).toHaveTextContent(/waiting for jordan/i);
+    expect(screen.getByText(/reconnecting/i)).toBeVisible();
+    // Undo should still be available
+    expect(screen.getByTestId('lock-in-undo')).toBeVisible();
+  });
+
+  // ===========================================================================
+  // Expansion tests: edge cases (TEA Automate — Story 4.3)
+  // ===========================================================================
+
+  test('[P2] disconnected+unlocked state has accessible aria-label', () => {
+    render(<LockInButton {...defaultProps} isPartnerDisconnected={true} />);
+
+    const button = screen.getByTestId('lock-in-disconnected');
+    expect(button).toHaveAttribute('aria-label');
+    expect(button.getAttribute('aria-label')).toMatch(/holding|reconnect/i);
+  });
+
+  test('[P2] disconnected+locked state undo button calls onUndoLockIn', async () => {
+    const onUndoLockIn = vi.fn();
+    render(
+      <LockInButton
+        {...defaultProps}
+        isPartnerDisconnected={true}
+        isLocked={true}
+        onUndoLockIn={onUndoLockIn}
+      />
+    );
+
+    await userEvent.click(screen.getByTestId('lock-in-undo'));
+    expect(onUndoLockIn).toHaveBeenCalledTimes(1);
+  });
+
+  test('[P2] disconnected+locked+isPending disables undo button', () => {
+    render(
+      <LockInButton
+        {...defaultProps}
+        isPartnerDisconnected={true}
+        isLocked={true}
+        isPending={true}
+      />
+    );
+
+    expect(screen.getByTestId('lock-in-undo')).toBeDisabled();
+  });
 });
