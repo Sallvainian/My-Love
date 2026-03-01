@@ -15,6 +15,8 @@
 import { test, expect } from '../../support/merged-fixtures';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
+  READY_BROADCAST_TIMEOUT_MS,
+  isToggleReadyResponse,
   navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
 import {
@@ -23,6 +25,12 @@ import {
   unlinkTestPartners,
   cleanupTestSession,
 } from '../../support/factories';
+
+// ---------------------------------------------------------------------------
+// All tests in this file share the same test user pair and must run serially
+// to avoid session contamination via scripture_create_session reuse.
+// ---------------------------------------------------------------------------
+test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
 // Timeout constants
@@ -68,8 +76,15 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
     const sessionIdsToClean = [...seed.session_ids];
 
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
     // GIVEN: User A navigates to /scripture, starts Together mode, selects Reader
-    await navigateToTogetherRoleSelection(page);
+    const uiSessionId1 = await navigateToTogetherRoleSelection(page);
+    if (uiSessionId1) sessionIdsToClean.push(uiSessionId1);
     await page.getByTestId('lobby-role-reader').click();
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
@@ -82,7 +97,8 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSessionId1b = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSessionId1b && uiSessionId1b !== uiSessionId1) sessionIdsToClean.push(uiSessionId1b);
       await partnerPage.getByTestId('lobby-role-responder').click();
       await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
@@ -90,8 +106,12 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
+      const userAReadyResponse = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lobby-ready-button').click();
+      await userAReadyResponse;
+      const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await partnerPage.getByTestId('lobby-ready-button').click();
+      await partnerReadyResponse;
 
       // Wait for countdown to complete → reading container visible
       await expect(page.getByTestId('reading-container')).toBeVisible({
@@ -182,7 +202,14 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
     await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
     const sessionIdsToClean = [...seed.session_ids];
 
-    await navigateToTogetherRoleSelection(page);
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
+    const uiSessionId2 = await navigateToTogetherRoleSelection(page);
+    if (uiSessionId2) sessionIdsToClean.push(uiSessionId2);
     await page.getByTestId('lobby-role-reader').click();
 
     const baseURL = new URL(page.url()).origin;
@@ -193,21 +220,29 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSessionId2b = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSessionId2b && uiSessionId2b !== uiSessionId2) sessionIdsToClean.push(uiSessionId2b);
       await partnerPage.getByTestId('lobby-role-responder').click();
+      await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
       // Both ready → countdown → reading phase
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
+      const userAReadyResponse2 = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lobby-ready-button').click();
+      await userAReadyResponse2;
+      const partnerReadyResponse2 = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await partnerPage.getByTestId('lobby-ready-button').click();
+      await partnerReadyResponse2;
       await expect(page.getByTestId('reading-container')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
 
       // WHEN: User A locks in
+      const userALockInResponse2 = page.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lock-in-button').click();
+      await userALockInResponse2;
       await expect(page.getByTestId('lock-in-undo')).toBeVisible();
 
       // WHEN: User A taps "Tap to undo"
@@ -251,7 +286,14 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
     await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
     const sessionIdsToClean = [...seed.session_ids];
 
-    await navigateToTogetherRoleSelection(page);
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
+    const uiSessionId3 = await navigateToTogetherRoleSelection(page);
+    if (uiSessionId3) sessionIdsToClean.push(uiSessionId3);
     await page.getByTestId('lobby-role-reader').click();
 
     const baseURL = new URL(page.url()).origin;
@@ -262,15 +304,21 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSessionId3b = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSessionId3b && uiSessionId3b !== uiSessionId3) sessionIdsToClean.push(uiSessionId3b);
       await partnerPage.getByTestId('lobby-role-responder').click();
+      await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
       // Both ready → countdown → reading
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
+      const userAReadyResponse3 = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lobby-ready-button').click();
+      await userAReadyResponse3;
+      const partnerReadyResponse3 = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await partnerPage.getByTestId('lobby-ready-button').click();
+      await partnerReadyResponse3;
       await expect(page.getByTestId('reading-container')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
@@ -280,8 +328,12 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
       await expect(partnerPage.getByTestId('role-indicator')).toContainText('Partner reads this');
 
       // Both lock in → advance to step 2
+      const userALockIn3 = page.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lock-in-button').click();
+      await userALockIn3;
+      const partnerLockIn3 = partnerPage.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
       await partnerPage.getByTestId('lock-in-button').click();
+      await partnerLockIn3;
 
       // Wait for step advance
       await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 2 of 17/i, {
@@ -314,8 +366,7 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
   }) => {
     test.setTimeout(120_000);
 
-    // SETUP: Seed session at step 16 (last step = index 16, which is step 17)
-    // to avoid 16 rounds of lock-in
+    // SETUP: Seed to get user IDs for partner linking, then complete the seeded session
     const seed = await createTestSession(supabaseAdmin, {
       sessionCount: 1,
       preset: 'mid_session',
@@ -324,13 +375,14 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
     const sessionIdsToClean = [...seed.session_ids];
 
-    // Advance session to step 16 via direct DB update
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
     await supabaseAdmin
       .from('scripture_sessions')
-      .update({ current_step_index: 16, current_phase: 'reading', mode: 'together' })
-      .eq('id', seed.session_ids[0]);
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
 
-    await navigateToTogetherRoleSelection(page);
+    const uiSessionId4 = await navigateToTogetherRoleSelection(page);
+    if (uiSessionId4) sessionIdsToClean.push(uiSessionId4);
     await page.getByTestId('lobby-role-reader').click();
 
     const baseURL = new URL(page.url()).origin;
@@ -341,16 +393,44 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSessionId4b = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSessionId4b && uiSessionId4b !== uiSessionId4) sessionIdsToClean.push(uiSessionId4b);
       await partnerPage.getByTestId('lobby-role-responder').click();
+      await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
       // Both ready → countdown → reading
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
+      const userAReadyResponse4 = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lobby-ready-button').click();
+      await userAReadyResponse4;
+      const partnerReadyResponse4 = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
       await partnerPage.getByTestId('lobby-ready-button').click();
+      await partnerReadyResponse4;
       await expect(page.getByTestId('reading-container')).toBeVisible({
+        timeout: STEP_ADVANCE_TIMEOUT_MS,
+      });
+
+      // Advance the session to step 16 (last step) via DB, then reload into store.
+      // Use the UI-created session ID (already tracked for cleanup).
+      const sessionId = uiSessionId4;
+      await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ current_step_index: 16 })
+        .eq('id', sessionId);
+
+      // Reload session from DB into the Zustand store without page.reload()
+      // (reload loses together-mode state since checkForActiveSession only handles solo).
+      const loadSessionScript = (sid: string) =>
+        `import("/src/stores/useAppStore.ts").then(m => m.useAppStore.getState().loadSession("${sid}"))`;
+      await page.evaluate(loadSessionScript(sessionId));
+      await partnerPage.evaluate(loadSessionScript(sessionId));
+
+      await expect(page.getByTestId('reading-container')).toBeVisible({
+        timeout: STEP_ADVANCE_TIMEOUT_MS,
+      });
+      await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
 
@@ -358,18 +438,22 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
       await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 17 of 17/i);
 
       // Both lock in on last step → reflection phase
+      const userALockIn4 = page.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
       await page.getByTestId('lock-in-button').click();
+      await userALockIn4;
+      const partnerLockIn4 = partnerPage.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
       await partnerPage.getByTestId('lock-in-button').click();
+      await partnerLockIn4;
 
       // THEN: Both users see reflection phase UI
-      // Reflection flow uses SoloReadingFlow — verify scripture-overview routing
+      // Together-mode reflection routes to SoloReadingFlow → ReflectionSummary
       await expect(page.getByTestId('reading-container')).not.toBeVisible({
         timeout: REFLECTION_LOAD_TIMEOUT_MS,
       });
-      await expect(page.getByTestId('reflection-subview')).toBeVisible({
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible({
         timeout: REFLECTION_LOAD_TIMEOUT_MS,
       });
-      await expect(partnerPage.getByTestId('reflection-subview')).toBeVisible({
+      await expect(partnerPage.getByTestId('scripture-reflection-summary-screen')).toBeVisible({
         timeout: REFLECTION_LOAD_TIMEOUT_MS,
       });
     } finally {
