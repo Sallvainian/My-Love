@@ -14,11 +14,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // Use vi.hoisted() for mock values
-const {
-  mockChannel,
-  mockRemoveChannel,
-  mockStoreState,
-} = vi.hoisted(() => {
+const { mockChannel, mockRemoveChannel, mockStoreState } = vi.hoisted(() => {
   const mockChannel = {
     on: vi.fn().mockReturnThis(),
     subscribe: vi.fn(),
@@ -96,9 +92,7 @@ describe('useScriptureBroadcast — channel reconnection (Story 4.3)', () => {
     expect(subscribeCallback).toBeDefined();
     subscribeCallback('CHANNEL_ERROR', new Error('Connection lost'));
 
-    const { handleScriptureError } = await import(
-      '../../../src/services/scriptureReadingService'
-    );
+    const { handleScriptureError } = await import('../../../src/services/scriptureReadingService');
     expect(handleScriptureError).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'SYNC_FAILED' })
     );

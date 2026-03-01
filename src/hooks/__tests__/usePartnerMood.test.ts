@@ -188,9 +188,7 @@ describe('usePartnerMood', () => {
   it('sets error state when getLatestPartnerMood rejects', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(
-      new Error('Network failure')
-    );
+    vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(new Error('Network failure'));
     vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
 
     const { result } = renderHook(() => usePartnerMood(mockPartnerId));

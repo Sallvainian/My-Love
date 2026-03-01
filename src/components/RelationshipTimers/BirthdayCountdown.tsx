@@ -39,7 +39,9 @@ function computeBirthdayCountdownState(birthday: BirthdayInfo): {
 }
 
 export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
-  const [timeDiff, setTimeDiff] = useState<TimeDifference>(() => computeBirthdayCountdownState(birthday).timeDiff);
+  const [timeDiff, setTimeDiff] = useState<TimeDifference>(
+    () => computeBirthdayCountdownState(birthday).timeDiff
+  );
   const [upcomingAge, setUpcomingAge] = useState<number>(
     () => computeBirthdayCountdownState(birthday).upcomingAge
   );
@@ -64,26 +66,26 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
 
   return (
     <motion.div
-      className={`relative overflow-hidden rounded-2xl shadow-lg p-4 border-2 transition-all duration-300 ${
+      className={`relative overflow-hidden rounded-2xl border-2 p-4 shadow-lg transition-all duration-300 ${
         isBirthdayToday
-          ? 'bg-yellow-50 dark:bg-gray-900 border-yellow-400 dark:border-yellow-500'
-          : 'bg-white dark:bg-gray-900 border-purple-300 dark:border-purple-500'
+          ? 'border-yellow-400 bg-yellow-50 dark:border-yellow-500 dark:bg-gray-900'
+          : 'border-purple-300 bg-white dark:border-purple-500 dark:bg-gray-900'
       }`}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
       data-testid={`birthday-countdown-${birthday.name.toLowerCase()}`}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="mb-2 flex items-center gap-2">
         <div
-          className={`p-2 rounded-lg ${
+          className={`rounded-lg p-2 ${
             isBirthdayToday
               ? 'bg-yellow-100 dark:bg-yellow-900'
               : 'bg-purple-100 dark:bg-purple-900'
           }`}
         >
           <Cake
-            className={`w-5 h-5 ${
+            className={`h-5 w-5 ${
               isBirthdayToday
                 ? 'text-yellow-500 dark:text-yellow-300'
                 : 'text-purple-500 dark:text-purple-300'
@@ -101,7 +103,7 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
       </div>
 
       {/* Countdown Display */}
-      <div className="text-center py-2">
+      <div className="py-2 text-center">
         {isBirthdayToday ? (
           <motion.div
             initial={{ scale: 0.8 }}
@@ -117,7 +119,7 @@ export function BirthdayCountdown({ birthday }: BirthdayCountdownProps) {
             <p className="text-xl font-bold text-purple-500 dark:text-purple-300">
               {totalDays} {totalDays === 1 ? 'day' : 'days'}
             </p>
-            <div className="flex justify-center gap-2 mt-2 text-sm text-gray-600 dark:text-gray-300">
+            <div className="mt-2 flex justify-center gap-2 text-sm text-gray-600 dark:text-gray-300">
               <span className="font-mono">
                 {String(timeDiff.hours).padStart(2, '0')}:
                 {String(timeDiff.minutes).padStart(2, '0')}:

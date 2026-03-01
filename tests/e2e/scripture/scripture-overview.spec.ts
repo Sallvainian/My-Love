@@ -17,11 +17,7 @@
  *   The "Together" card is the second ModeCard in mode-selection.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import {
-  ensureScriptureOverview,
-  startSoloSession,
-  advanceOneStep,
-} from '../../support/helpers';
+import { ensureScriptureOverview, startSoloSession, advanceOneStep } from '../../support/helpers';
 import type { Page } from '@playwright/test';
 
 async function saveSoloSessionAtStep(page: Page, step: number): Promise<string> {
@@ -80,9 +76,7 @@ test.describe('Scripture Navigation & Overview', () => {
       await expect(page.getByTestId('nav-scripture')).toBeVisible();
     });
 
-    test('should navigate to scripture overview when tapping Scripture tab', async ({
-      page,
-    }) => {
+    test('should navigate to scripture overview when tapping Scripture tab', async ({ page }) => {
       // GIVEN: User is on the home page
       await page.goto('/');
 
@@ -147,9 +141,7 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-006: Mode selection - no partner disables Together', () => {
-    test('should disable Together mode when user has no linked partner', async ({
-      page,
-    }) => {
+    test('should disable Together mode when user has no linked partner', async ({ page }) => {
       // GIVEN: User has no linked partner (partner_id is null)
       // Intercept partner lookup query to simulate no-partner state.
       await page.route('**/rest/v1/users*', (route) => {
@@ -172,7 +164,9 @@ test.describe('Scripture Navigation & Overview', () => {
 
       // WHEN: Mode selection is shown
       // THEN: Together mode is grayed out
-      const togetherOption = page.getByTestId('mode-selection').getByRole('button', { name: /together/i });
+      const togetherOption = page
+        .getByTestId('mode-selection')
+        .getByRole('button', { name: /together/i });
       await expect(togetherOption).toBeVisible();
       await expect(togetherOption).toBeDisabled();
 
@@ -187,9 +181,7 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-007: Mode selection - partner enables both modes', () => {
-    test('should enable both modes when user has linked partner', async ({
-      page,
-    }) => {
+    test('should enable both modes when user has linked partner', async ({ page }) => {
       // GIVEN: User has a linked partner (partner_id is not null)
       const partnerId = '11111111-1111-4111-8111-111111111111';
       await page.route('**/rest/v1/users*', (route) => {
@@ -237,10 +229,7 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-008: Resume prompt for incomplete session', () => {
-    test('should show resume prompt with correct step number', async ({
-      page,
-      supabaseAdmin,
-    }) => {
+    test('should show resume prompt with correct step number', async ({ page, supabaseAdmin }) => {
       // GIVEN: User has an incomplete Solo session at step 7
       const sessionId = await saveSoloSessionAtStep(page, 7);
       const { data: targetSession, error: targetSessionError } = await supabaseAdmin
@@ -280,14 +269,12 @@ test.describe('Scripture Navigation & Overview', () => {
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
 
       // AND: Shows correct step info
-      await expect(
-        page.getByTestId('resume-prompt')
-      ).toContainText(/Continue where you left off\? \(Step 7 of 17\)/i);
+      await expect(page.getByTestId('resume-prompt')).toContainText(
+        /Continue where you left off\? \(Step 7 of 17\)/i
+      );
 
       // AND: Continue button is available
-      await expect(
-        page.getByTestId('resume-continue')
-      ).toBeVisible();
+      await expect(page.getByTestId('resume-continue')).toBeVisible();
 
       // AND: Start fresh option is available
       await expect(page.getByTestId('resume-start-fresh')).toBeVisible();
@@ -295,10 +282,7 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-009: Start fresh clears saved state', () => {
-    test('should clear saved state and begin new session', async ({
-      page,
-      supabaseAdmin,
-    }) => {
+    test('should clear saved state and begin new session', async ({ page, supabaseAdmin }) => {
       // GIVEN: User has an incomplete session and sees the resume prompt
       const sessionId = await saveSoloSessionAtStep(page, 5);
       const { data: targetSession, error: targetSessionError } = await supabaseAdmin
@@ -371,15 +355,12 @@ test.describe('Scripture Navigation & Overview', () => {
       // AND: After selecting Solo, session starts at step 1
       const sessionCreated = page.waitForResponse(
         (resp) =>
-          resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-          resp.status() === 200
+          resp.url().includes('/rest/v1/rpc/scripture_create_session') && resp.status() === 200
       );
       await page.getByTestId('scripture-mode-solo').click();
       await sessionCreated;
 
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 1 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
     });
   });
 });

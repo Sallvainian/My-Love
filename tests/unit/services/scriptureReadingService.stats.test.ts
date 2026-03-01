@@ -81,9 +81,8 @@ describe('scriptureReadingService — getCoupleStats', () => {
         statusText: 'OK',
       });
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const stats = await scriptureReadingService.getCoupleStats();
 
@@ -110,9 +109,8 @@ describe('scriptureReadingService — getCoupleStats', () => {
         statusText: 'OK',
       });
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const stats = await scriptureReadingService.getCoupleStats();
       expect(stats).toBeNull();
@@ -134,9 +132,8 @@ describe('scriptureReadingService — getCoupleStats', () => {
         statusText: 'Internal Server Error',
       });
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const stats = await scriptureReadingService.getCoupleStats();
 
@@ -148,9 +145,8 @@ describe('scriptureReadingService — getCoupleStats', () => {
 
       vi.mocked(supabase.rpc).mockRejectedValue(new Error('Network timeout'));
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const stats = await scriptureReadingService.getCoupleStats();
 
@@ -164,9 +160,7 @@ describe('scriptureReadingService — getCoupleStats', () => {
 // ============================================================================
 describe('CoupleStatsSchema — Zod validation', () => {
   it('should accept a valid CoupleStats response', async () => {
-    const { CoupleStatsSchema } = await import(
-      '../../../src/api/validation/supabaseSchemas'
-    );
+    const { CoupleStatsSchema } = await import('../../../src/api/validation/supabaseSchemas');
     const result = CoupleStatsSchema.safeParse({
       totalSessions: 12,
       totalSteps: 204,
@@ -178,9 +172,7 @@ describe('CoupleStatsSchema — Zod validation', () => {
   });
 
   it('should accept lastCompleted as null (zero-state)', async () => {
-    const { CoupleStatsSchema } = await import(
-      '../../../src/api/validation/supabaseSchemas'
-    );
+    const { CoupleStatsSchema } = await import('../../../src/api/validation/supabaseSchemas');
     const result = CoupleStatsSchema.safeParse({
       totalSessions: 0,
       totalSteps: 0,
@@ -192,9 +184,7 @@ describe('CoupleStatsSchema — Zod validation', () => {
   });
 
   it('should reject invalid types (string for totalSessions)', async () => {
-    const { CoupleStatsSchema } = await import(
-      '../../../src/api/validation/supabaseSchemas'
-    );
+    const { CoupleStatsSchema } = await import('../../../src/api/validation/supabaseSchemas');
     const result = CoupleStatsSchema.safeParse({
       totalSessions: 'twelve',
       totalSteps: 204,
@@ -206,17 +196,13 @@ describe('CoupleStatsSchema — Zod validation', () => {
   });
 
   it('should reject missing required fields', async () => {
-    const { CoupleStatsSchema } = await import(
-      '../../../src/api/validation/supabaseSchemas'
-    );
+    const { CoupleStatsSchema } = await import('../../../src/api/validation/supabaseSchemas');
     const result = CoupleStatsSchema.safeParse({ totalSessions: 12 });
     expect(result.success).toBe(false);
   });
 
   it('should reject negative numbers for count fields', async () => {
-    const { CoupleStatsSchema } = await import(
-      '../../../src/api/validation/supabaseSchemas'
-    );
+    const { CoupleStatsSchema } = await import('../../../src/api/validation/supabaseSchemas');
     const result = CoupleStatsSchema.safeParse({
       totalSessions: -1,
       totalSteps: 204,

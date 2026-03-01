@@ -42,9 +42,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 // In development: unregister stale SWs
 if (import.meta.env.DEV) {
-  navigator.serviceWorker?.getRegistrations().then(regs =>
-    regs.forEach(reg => reg.unregister())
-  );
+  navigator.serviceWorker
+    ?.getRegistrations()
+    .then((regs) => regs.forEach((reg) => reg.unregister()));
 }
 ```
 

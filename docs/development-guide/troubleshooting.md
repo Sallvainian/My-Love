@@ -87,7 +87,9 @@ supabase gen types typescript --local > src/types/database.types.ts
 
 ```typescript
 // vite.config.ts
-devOptions: { enabled: false }
+devOptions: {
+  enabled: false;
+}
 ```
 
 To test PWA behavior locally, you can temporarily set `devOptions.enabled: true` in `vite.config.ts`, but this is not recommended for normal development.

@@ -4,11 +4,11 @@
 
 Runtime validation uses Zod v4 schemas at service boundaries, complementing TypeScript's compile-time type checking. The validation layer is organized into three files:
 
-| File | Purpose |
-|------|---------|
-| `src/validation/schemas.ts` | Zod schema definitions for all data models |
+| File                              | Purpose                                         |
+| --------------------------------- | ----------------------------------------------- |
+| `src/validation/schemas.ts`       | Zod schema definitions for all data models      |
 | `src/validation/errorMessages.ts` | Error transformation and user-friendly messages |
-| `src/validation/index.ts` | Barrel exports for the validation module |
+| `src/validation/index.ts`         | Barrel exports for the validation module        |
 
 ## Schema Definitions (`schemas.ts`)
 
@@ -68,11 +68,22 @@ export const PhotoSchema = z.object({
 
 ```typescript
 const MoodTypeSchema = z.enum([
-  'loved', 'happy', 'content', 'excited', 'thoughtful', 'grateful',
-  'sad', 'anxious', 'frustrated', 'angry', 'lonely', 'tired',
+  'loved',
+  'happy',
+  'content',
+  'excited',
+  'thoughtful',
+  'grateful',
+  'sad',
+  'anxious',
+  'frustrated',
+  'angry',
+  'lonely',
+  'tired',
 ]);
 
-const IsoDateStringSchema = z.string()
+const IsoDateStringSchema = z
+  .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
   .refine((date) => {
     const [_year, month, day] = date.split('-').map(Number);
@@ -95,7 +106,8 @@ export const MoodEntrySchema = z.object({
 ```typescript
 const ThemeNameSchema = z.enum(['sunset', 'ocean', 'lavender', 'rose']);
 
-const TimeFormatSchema = z.string()
+const TimeFormatSchema = z
+  .string()
   .regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format')
   .refine((time) => {
     const [hour, minute] = time.split(':').map(Number);
@@ -183,13 +195,13 @@ const FIELD_NAME_MAP: Record<string, string> = {
 
 The `formatIssue()` function handles specific Zod issue codes:
 
-| Code | Handling |
-|------|----------|
-| `too_small` | "Field cannot be empty" or "Field must be at least N characters" |
-| `too_big` | "Field cannot exceed N characters" |
-| `invalid_value` | "Invalid field. Please select a valid option." |
-| `invalid_type` | "Field must be a valid date" or "Field has an invalid value" |
-| default | Uses schema-provided message or "Field is required" |
+| Code            | Handling                                                         |
+| --------------- | ---------------------------------------------------------------- |
+| `too_small`     | "Field cannot be empty" or "Field must be at least N characters" |
+| `too_big`       | "Field cannot exceed N characters"                               |
+| `invalid_value` | "Invalid field. Please select a valid option."                   |
+| `invalid_type`  | "Field must be a valid date" or "Field has an invalid value"     |
+| default         | Uses schema-provided message or "Field is required"              |
 
 ## Usage Patterns
 

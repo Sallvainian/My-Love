@@ -77,10 +77,7 @@ export function MessageCompose({
   const isEmpty = message.trim().length === 0;
 
   return (
-    <div
-      className="flex w-full flex-col space-y-6"
-      data-testid="scripture-message-compose-screen"
-    >
+    <div className="flex w-full flex-col space-y-6" data-testid="scripture-message-compose-screen">
       <h2
         className="text-center font-serif text-2xl font-bold text-purple-900"
         data-testid="scripture-message-compose-heading"
@@ -105,7 +102,7 @@ export function MessageCompose({
         />
         {message.length >= CHAR_COUNTER_THRESHOLD && (
           <span
-            className="absolute bottom-2 right-3 text-xs text-gray-400"
+            className="absolute right-3 bottom-2 text-xs text-gray-400"
             data-testid="scripture-message-char-count"
             aria-live="polite"
           >

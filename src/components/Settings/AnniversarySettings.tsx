@@ -61,23 +61,16 @@ export function AnniversarySettings() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             Anniversary Countdowns
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Manage special dates and milestones
           </p>
         </div>
 
         <button
           onClick={handleAdd}
-          className="
-            flex items-center gap-2
-            px-4 py-2
-            bg-pink-500 hover:bg-pink-600
-            text-white rounded-lg
-            transition-colors duration-200
-            shadow-md hover:shadow-lg
-          "
+          className="flex items-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white shadow-md transition-colors duration-200 hover:bg-pink-600 hover:shadow-lg"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Add Anniversary</span>
         </button>
       </div>
@@ -85,8 +78,8 @@ export function AnniversarySettings() {
       {/* Anniversary List */}
       <div className="space-y-3">
         {anniversaries.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <Calendar className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+          <div className="rounded-lg bg-gray-50 py-12 text-center dark:bg-gray-800/50">
+            <Calendar className="mx-auto mb-3 h-12 w-12 text-gray-400" />
             <p className="text-gray-600 dark:text-gray-400">
               No anniversaries yet. Add your first special date!
             </p>
@@ -99,23 +92,18 @@ export function AnniversarySettings() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="
-                  bg-white dark:bg-gray-800
-                  rounded-lg shadow-md
-                  p-4
-                  border border-gray-200 dark:border-gray-700
-                "
+                className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       {anniversary.label}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                       {formatDateLong(new Date(anniversary.date))}
                     </p>
                     {anniversary.description && (
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
                         {anniversary.description}
                       </p>
                     )}
@@ -124,27 +112,17 @@ export function AnniversarySettings() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEdit(anniversary)}
-                      className="
-                        p-2 rounded-lg
-                        text-purple-600 dark:text-purple-400
-                        hover:bg-purple-100 dark:hover:bg-purple-900/30
-                        transition-colors duration-200
-                      "
+                      className="rounded-lg p-2 text-purple-600 transition-colors duration-200 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30"
                       aria-label="Edit anniversary"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(anniversary.id)}
-                      className="
-                        p-2 rounded-lg
-                        text-red-600 dark:text-red-400
-                        hover:bg-red-100 dark:hover:bg-red-900/30
-                        transition-colors duration-200
-                      "
+                      className="rounded-lg p-2 text-red-600 transition-colors duration-200 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
                       aria-label="Delete anniversary"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -189,7 +167,7 @@ export function AnniversarySettings() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onClick={() => setDeleteConfirmId(null)}
           >
             <motion.div
@@ -197,41 +175,24 @@ export function AnniversarySettings() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="
-                bg-white dark:bg-gray-800
-                rounded-xl shadow-2xl
-                p-6 max-w-sm w-full
-                border border-gray-200 dark:border-gray-700
-              "
+              className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
             >
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Delete Anniversary?
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <p className="mb-6 text-gray-600 dark:text-gray-400">
                 This action cannot be undone. The countdown will be removed.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="
-                    flex-1 px-4 py-2
-                    bg-gray-200 dark:bg-gray-700
-                    text-gray-900 dark:text-gray-100
-                    rounded-lg
-                    transition-colors duration-200
-                    hover:bg-gray-300 dark:hover:bg-gray-600
-                  "
+                  className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors duration-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="
-                    flex-1 px-4 py-2
-                    bg-red-500 hover:bg-red-600
-                    text-white rounded-lg
-                    transition-colors duration-200
-                  "
+                  className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-600"
                 >
                   Delete
                 </button>
@@ -321,7 +282,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
       <motion.div
@@ -329,35 +290,25 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="
-          bg-white dark:bg-gray-800
-          rounded-xl shadow-2xl
-          p-6 max-w-md w-full
-          border border-gray-200 dark:border-gray-700
-        "
+        className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {isEditing ? 'Edit Anniversary' : 'Add Anniversary'}
           </h3>
           <button
             onClick={onClose}
-            className="
-              p-2 rounded-lg
-              text-gray-600 dark:text-gray-400
-              hover:bg-gray-100 dark:hover:bg-gray-700
-              transition-colors duration-200
-            "
+            className="rounded-lg p-2 text-gray-600 transition-colors duration-200 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
             aria-label="Close form"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* General Error */}
         {generalError && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+          <div className="mb-4 rounded-lg border border-red-300 bg-red-100 p-3 dark:border-red-700 dark:bg-red-900/30">
             <p className="text-sm text-red-700 dark:text-red-400">{generalError}</p>
           </div>
         )}
@@ -368,7 +319,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
           <div>
             <label
               htmlFor="anniversary-label"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Label <span className="text-red-500">*</span>
             </label>
@@ -377,15 +328,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className={`
-                w-full px-3 py-2 rounded-lg
-                bg-white dark:bg-gray-900
-                border ${errors.label ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}
-                text-gray-900 dark:text-gray-100
-                placeholder-gray-500
-                focus:outline-none focus:ring-2
-                ${errors.label ? 'focus:ring-red-500' : 'focus:ring-pink-500'}
-              `}
+              className={`w-full rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.label ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 placeholder-gray-500 focus:ring-2 focus:outline-none dark:text-gray-100 ${errors.label ? 'focus:ring-red-500' : 'focus:ring-pink-500'} `}
               placeholder="e.g., First Date Anniversary"
             />
             {errors.label && (
@@ -397,7 +340,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
           <div>
             <label
               htmlFor="anniversary-date"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Date <span className="text-red-500">*</span>
             </label>
@@ -406,14 +349,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`
-                w-full px-3 py-2 rounded-lg
-                bg-white dark:bg-gray-900
-                border ${errors.date ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}
-                text-gray-900 dark:text-gray-100
-                focus:outline-none focus:ring-2
-                ${errors.date ? 'focus:ring-red-500' : 'focus:ring-pink-500'}
-              `}
+              className={`w-full rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 ${errors.date ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} text-gray-900 focus:ring-2 focus:outline-none dark:text-gray-100 ${errors.date ? 'focus:ring-red-500' : 'focus:ring-pink-500'} `}
             />
             {errors.date && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.date}</p>
@@ -424,7 +360,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
           <div>
             <label
               htmlFor="anniversary-description"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Description (optional)
             </label>
@@ -433,15 +369,7 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="
-                w-full px-3 py-2 rounded-lg
-                bg-white dark:bg-gray-900
-                border border-gray-300 dark:border-gray-600
-                text-gray-900 dark:text-gray-100
-                placeholder-gray-500
-                focus:outline-none focus:ring-2 focus:ring-pink-500
-                resize-none
-              "
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-pink-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               placeholder="Add a note about this anniversary..."
             />
           </div>
@@ -451,30 +379,16 @@ function AnniversaryForm({ anniversary, onClose, onSave }: AnniversaryFormProps)
             <button
               type="button"
               onClick={onClose}
-              className="
-                flex-1 px-4 py-2
-                bg-gray-200 dark:bg-gray-700
-                text-gray-900 dark:text-gray-100
-                rounded-lg
-                transition-colors duration-200
-                hover:bg-gray-300 dark:hover:bg-gray-600
-                flex items-center justify-center gap-2
-              "
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors duration-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
               Cancel
             </button>
             <button
               type="submit"
-              className="
-                flex-1 px-4 py-2
-                bg-pink-500 hover:bg-pink-600
-                text-white rounded-lg
-                transition-colors duration-200
-                flex items-center justify-center gap-2
-              "
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2 text-white transition-colors duration-200 hover:bg-pink-600"
             >
-              <Check className="w-4 h-4" />
+              <Check className="h-4 w-4" />
               {isEditing ? 'Update' : 'Add'}
             </button>
           </div>

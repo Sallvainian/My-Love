@@ -68,7 +68,8 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
   );
 
   // Determine if file is large enough to show compression indicator
-  const showCompressionIndicator = originalSize > IMAGE_VALIDATION.COMPRESSION_INDICATOR_THRESHOLD_BYTES;
+  const showCompressionIndicator =
+    originalSize > IMAGE_VALIDATION.COMPRESSION_INDICATOR_THRESHOLD_BYTES;
 
   return (
     <motion.div
@@ -80,12 +81,12 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
       data-testid="image-preview"
     >
       {/* Image thumbnail */}
-      <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+      <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
         {previewUrl && (
           <img
             src={previewUrl}
             alt="Selected image preview"
-            className="max-w-[200px] max-h-[150px] object-cover"
+            className="max-h-[150px] max-w-[200px] object-cover"
           />
         )}
 
@@ -95,7 +96,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
           onClick={onRemove}
           disabled={isCompressing}
           aria-label="Remove selected image"
-          className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white"
+          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white transition-colors hover:bg-black/80 focus:ring-2 focus:ring-white focus:outline-none disabled:opacity-50"
         >
           <X size={16} aria-hidden="true" />
         </button>
@@ -103,11 +104,11 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
         {/* Compression/uploading overlay */}
         {isCompressing && (
           <div
-            className="absolute inset-0 bg-black/40 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center bg-black/40"
             role="status"
             aria-live="polite"
           >
-            <div className="flex items-center gap-2 text-white text-sm">
+            <div className="flex items-center gap-2 text-sm text-white">
               <Loader2 className="animate-spin" size={16} aria-hidden="true" />
               <span>Compressing...</span>
             </div>
@@ -116,7 +117,7 @@ function ImagePreviewComponent({ file, onRemove, isCompressing = false }: ImageP
       </div>
 
       {/* File size info */}
-      <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+      <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
         <span>{formatFileSize(originalSize)}</span>
         <span>→</span>
         <span className="text-green-600">~{formatFileSize(estimatedCompressedSize)}</span>

@@ -13,9 +13,9 @@ The Supabase client (`src/api/supabaseClient.ts`) is configured with:
 ```typescript
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,      // Session stored in localStorage
-    autoRefreshToken: true,     // JWT auto-refresh before expiry
-    detectSessionInUrl: true,   // OAuth callback detection
+    persistSession: true, // Session stored in localStorage
+    autoRefreshToken: true, // JWT auto-refresh before expiry
+    detectSessionInUrl: true, // OAuth callback detection
   },
 });
 ```
@@ -29,6 +29,7 @@ const { user, loading } = useAuth();
 ```
 
 It performs two operations:
+
 1. **Initial check**: Calls `supabase.auth.getUser()` on mount to verify the current session.
 2. **Listener**: Subscribes to `supabase.auth.onAuthStateChange()` for session changes (sign-in, sign-out, token refresh).
 
@@ -38,11 +39,11 @@ The hook returns the authenticated `User` object or `null` if not signed in.
 
 Authentication logic is split across three files in `src/api/auth/`:
 
-| File | Purpose |
-|------|---------|
+| File                | Purpose                                            |
+| ------------------- | -------------------------------------------------- |
 | `sessionService.ts` | Session management, offline-safe user ID retrieval |
-| `actionService.ts` | Sign-in, sign-up, sign-out actions |
-| `types.ts` | Auth-related type definitions |
+| `actionService.ts`  | Sign-in, sign-up, sign-out actions                 |
+| `types.ts`          | Auth-related type definitions                      |
 
 #### Offline-Safe Authentication
 
@@ -50,7 +51,9 @@ Authentication logic is split across three files in `src/api/auth/`:
 
 ```typescript
 export async function getCurrentUserIdOfflineSafe(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session?.user?.id ?? null;
 }
 ```
@@ -103,11 +106,7 @@ Has display name? -> Render main app + call initializeApp()
 The `getPartnerId()` function in `supabaseClient.ts` queries the `users` table for the current user's `partner_id`:
 
 ```typescript
-const { data } = await supabase
-  .from('users')
-  .select('partner_id')
-  .eq('id', currentUserId)
-  .single();
+const { data } = await supabase.from('users').select('partner_id').eq('id', currentUserId).single();
 return data?.partner_id ?? null;
 ```
 

@@ -33,10 +33,10 @@ try {
 
 `BaseIndexedDBService` follows a split error strategy:
 
-| Operation Type | Error Behavior | Rationale |
-|---------------|----------------|-----------|
-| Read (`getById`, `getAll`, `getPage`) | Return `null` or `[]` | Graceful degradation; missing data is recoverable |
-| Write (`add`, `update`, `delete`) | Throw | Data integrity; silent write failures cause corruption |
+| Operation Type                        | Error Behavior        | Rationale                                              |
+| ------------------------------------- | --------------------- | ------------------------------------------------------ |
+| Read (`getById`, `getAll`, `getPage`) | Return `null` or `[]` | Graceful degradation; missing data is recoverable      |
+| Write (`add`, `update`, `delete`)     | Throw                 | Data integrity; silent write failures cause corruption |
 
 ### API Layer (Supabase)
 
@@ -45,7 +45,7 @@ API calls use `errorHandlers.ts` for consistent error mapping:
 ```typescript
 // Supabase error codes -> user-friendly messages
 const errorMap = {
-  'PGRST116': 'Record not found',
+  PGRST116: 'Record not found',
   '23505': 'Duplicate entry',
   // ...
 };
@@ -123,6 +123,7 @@ if (state.pendingRetry) {
 ### Silent Retry (Background Sync)
 
 Mood sync failures are silently retried via three tiers:
+
 1. Immediate retry on creation
 2. Periodic retry every 5 minutes
 3. Background Sync API retry when connectivity returns

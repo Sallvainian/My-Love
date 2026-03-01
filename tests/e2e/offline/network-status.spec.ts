@@ -7,7 +7,10 @@
 import { test, expect } from '../../support/merged-fixtures';
 
 test.describe('Network Status', () => {
-  test('[P0] should show offline indicator when network is disconnected', async ({ page, context }) => {
+  test('[P0] should show offline indicator when network is disconnected', async ({
+    page,
+    context,
+  }) => {
     // GIVEN: User is authenticated and online
     // WHEN: Network connection is lost
     await context.setOffline(true);

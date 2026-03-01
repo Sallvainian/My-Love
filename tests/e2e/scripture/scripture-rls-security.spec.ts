@@ -90,10 +90,7 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // WHEN: A non-member queries the session
-      const outsiderClient = await createUserClient(
-        supabaseAdmin,
-        newUser!.user!.id
-      );
+      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
       const { data, error } = await outsiderClient
         .from('scripture_sessions')
         .select('*')
@@ -109,9 +106,7 @@ test.describe('Scripture RLS Security', () => {
   });
 
   test.describe('P0-002: SELECT scripture_reflections - members only', () => {
-    test('should return reflections for session member', async ({
-      supabaseAdmin,
-    }) => {
+    test('should return reflections for session member', async ({ supabaseAdmin }) => {
       // GIVEN: A session with reflections exists
       const seedResult = await createTestSession(supabaseAdmin, {
         includeReflections: true,
@@ -135,9 +130,7 @@ test.describe('Scripture RLS Security', () => {
       await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
     });
 
-    test('should return empty for non-member querying reflections', async ({
-      supabaseAdmin,
-    }) => {
+    test('should return empty for non-member querying reflections', async ({ supabaseAdmin }) => {
       // GIVEN: A session with reflections exists
       const seedResult = await createTestSession(supabaseAdmin, {
         includeReflections: true,
@@ -152,10 +145,7 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // WHEN: Non-member queries reflections
-      const outsiderClient = await createUserClient(
-        supabaseAdmin,
-        newUser!.user!.id
-      );
+      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
       const { data, error } = await outsiderClient
         .from('scripture_reflections')
         .select('*')
@@ -185,20 +175,15 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // WHEN: Non-member tries to INSERT a reflection
-      const outsiderClient = await createUserClient(
-        supabaseAdmin,
-        newUser!.user!.id
-      );
-      const { error } = await outsiderClient
-        .from('scripture_reflections')
-        .insert({
-          session_id: sessionId,
-          step_index: 0,
-          user_id: newUser!.user!.id,
-          rating: 5,
-          notes: 'Unauthorized reflection',
-          is_shared: false,
-        });
+      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
+      const { error } = await outsiderClient.from('scripture_reflections').insert({
+        session_id: sessionId,
+        step_index: 0,
+        user_id: newUser!.user!.id,
+        rating: 5,
+        notes: 'Unauthorized reflection',
+        is_shared: false,
+      });
 
       // THEN: Insert is rejected by RLS
       expect(error).toBeTruthy();
@@ -220,18 +205,13 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // WHEN: Non-member tries to INSERT a bookmark
-      const outsiderClient = await createUserClient(
-        supabaseAdmin,
-        newUser!.user!.id
-      );
-      const { error } = await outsiderClient
-        .from('scripture_bookmarks')
-        .insert({
-          session_id: sessionId,
-          step_index: 0,
-          user_id: newUser!.user!.id,
-          share_with_partner: false,
-        });
+      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
+      const { error } = await outsiderClient.from('scripture_bookmarks').insert({
+        session_id: sessionId,
+        step_index: 0,
+        user_id: newUser!.user!.id,
+        share_with_partner: false,
+      });
 
       // THEN: Insert is rejected by RLS
       expect(error).toBeTruthy();
@@ -268,9 +248,7 @@ test.describe('Scripture RLS Security', () => {
   });
 
   test.describe('P0-005: is_shared visibility - unshared reflections hidden', () => {
-    test('should hide unshared reflections from partner', async ({
-      supabaseAdmin,
-    }) => {
+    test('should hide unshared reflections from partner', async ({ supabaseAdmin }) => {
       // GIVEN: A together session with both users having reflections
       const seedResult = await createTestSession(supabaseAdmin, {
         includeReflections: true,
@@ -278,10 +256,7 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // User1 creates a private reflection (is_shared=false)
-      const user1Client = await createUserClient(
-        supabaseAdmin,
-        seedResult.test_user1_id
-      );
+      const user1Client = await createUserClient(supabaseAdmin, seedResult.test_user1_id);
       await user1Client.from('scripture_reflections').insert({
         session_id: seedResult.session_ids[0],
         step_index: 15,
@@ -294,10 +269,7 @@ test.describe('Scripture RLS Security', () => {
       // WHEN: Partner (user2) queries reflections
       // Note: test_user2_id may be null for solo sessions
       if (seedResult.test_user2_id) {
-        const user2Client = await createUserClient(
-          supabaseAdmin,
-          seedResult.test_user2_id
-        );
+        const user2Client = await createUserClient(supabaseAdmin, seedResult.test_user2_id);
         const { data } = await user2Client
           .from('scripture_reflections')
           .select('*')
@@ -324,12 +296,9 @@ test.describe('Scripture RLS Security', () => {
       const userClient = await createUserClient(supabaseAdmin, userId);
 
       // WHEN: User calls the create session RPC
-      const { data, error } = await userClient.rpc(
-        'scripture_create_session',
-        {
-          p_mode: 'solo',
-        }
-      );
+      const { data, error } = await userClient.rpc('scripture_create_session', {
+        p_mode: 'solo',
+      });
 
       // THEN: A valid session is returned
       expect(error).toBeNull();
@@ -376,14 +345,11 @@ test.describe('Scripture RLS Security', () => {
       expect(firstError).toBeNull();
 
       // Submit again with different content (should upsert, not duplicate)
-      const { error: secondError } = await userClient.rpc(
-        'scripture_submit_reflection',
-        {
-          ...reflectionData,
-          p_rating: 5,
-          p_notes: 'Updated submission',
-        }
-      );
+      const { error: secondError } = await userClient.rpc('scripture_submit_reflection', {
+        ...reflectionData,
+        p_rating: 5,
+        p_notes: 'Updated submission',
+      });
       expect(secondError).toBeNull();
 
       // THEN: Only one reflection exists (upsert, not duplicate)

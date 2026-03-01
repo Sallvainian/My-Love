@@ -10,14 +10,14 @@ supabase start
 
 This starts Postgres 17, Auth, Storage, Realtime, Studio, and Inbucket (email). Default ports:
 
-| Service | Port |
-|---|---|
-| API | 54321 |
-| Database | 54322 |
-| Shadow Database | 54320 |
-| Studio | 54323 |
+| Service          | Port  |
+| ---------------- | ----- |
+| API              | 54321 |
+| Database         | 54322 |
+| Shadow Database  | 54320 |
+| Studio           | 54323 |
 | Inbucket (email) | 54324 |
-| Analytics | 54327 |
+| Analytics        | 54327 |
 
 Check status:
 
@@ -195,15 +195,15 @@ sql_paths = ["./seed.sql"]
 
 Key configuration settings in `supabase/config.toml`:
 
-| Section | Setting | Value |
-|---|---|---|
-| `[db]` | `major_version` | 17 |
-| `[db.migrations]` | `enabled` | true |
-| `[auth]` | `enable_signup` | true |
-| `[auth]` | `enable_anonymous_sign_ins` | false |
-| `[auth.email]` | `enable_signup` | true |
-| `[auth.email]` | `enable_confirmations` | false |
-| `[realtime]` | `enabled` | true |
-| `[storage]` | `file_size_limit` | "50MiB" |
-| `[edge_runtime]` | `enabled` | true |
-| `[edge_runtime]` | `deno_version` | 2 |
+| Section           | Setting                     | Value   |
+| ----------------- | --------------------------- | ------- |
+| `[db]`            | `major_version`             | 17      |
+| `[db.migrations]` | `enabled`                   | true    |
+| `[auth]`          | `enable_signup`             | true    |
+| `[auth]`          | `enable_anonymous_sign_ins` | false   |
+| `[auth.email]`    | `enable_signup`             | true    |
+| `[auth.email]`    | `enable_confirmations`      | false   |
+| `[realtime]`      | `enabled`                   | true    |
+| `[storage]`       | `file_size_limit`           | "50MiB" |
+| `[edge_runtime]`  | `enabled`                   | true    |
+| `[edge_runtime]`  | `deno_version`              | 2       |

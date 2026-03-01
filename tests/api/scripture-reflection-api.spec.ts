@@ -642,7 +642,6 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-
       // GIVEN: A session exists with a member user
       const seedResult = await createTestSession(supabaseAdmin, {
         preset: 'mid_session',
@@ -722,7 +721,6 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-
       // GIVEN: A session exists in 'in_progress' status
       const seedResult = await createTestSession(supabaseAdmin, {
         preset: 'mid_session',
@@ -803,7 +801,6 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-
       // GIVEN: A session exists with two linked users (User A and User B)
       const seedResult = await createTestSession(supabaseAdmin, {
         preset: 'mid_session',

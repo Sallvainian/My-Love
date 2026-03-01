@@ -7,12 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
-import {
-  DB_NAME,
-  DB_VERSION,
-  upgradeDb,
-  MyLoveDBSchema,
-} from '../../../src/services/dbSchema';
+import { DB_NAME, DB_VERSION, upgradeDb, MyLoveDBSchema } from '../../../src/services/dbSchema';
 
 // Mock import.meta.env.DEV
 vi.stubGlobal('import', {
@@ -56,7 +51,11 @@ describe('dbSchema - Index Integrity', () => {
     const db = await openTestDb();
 
     // WHEN/THEN: Each child store has by-session index
-    for (const storeName of ['scripture-reflections', 'scripture-bookmarks', 'scripture-messages'] as const) {
+    for (const storeName of [
+      'scripture-reflections',
+      'scripture-bookmarks',
+      'scripture-messages',
+    ] as const) {
       const tx = db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName);
       expect(store.indexNames.contains('by-session')).toBe(true);

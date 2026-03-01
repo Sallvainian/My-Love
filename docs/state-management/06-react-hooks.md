@@ -12,12 +12,13 @@ Provides authentication state to the application shell.
 const { user, loading } = useAuth();
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `user` | `User \| null` | Authenticated Supabase user or null |
-| `loading` | `boolean` | True during initial auth check |
+| Return    | Type           | Description                         |
+| --------- | -------------- | ----------------------------------- |
+| `user`    | `User \| null` | Authenticated Supabase user or null |
+| `loading` | `boolean`      | True during initial auth check      |
 
 **Implementation:**
+
 - Calls `supabase.auth.getUser()` on mount
 - Subscribes to `supabase.auth.onAuthStateChange()` for real-time session changes
 - Cleanup: unsubscribes on unmount
@@ -31,6 +32,7 @@ const { notes, loading, error, sendNote, partnerId } = useLoveNotes();
 ```
 
 **Behavior:**
+
 - Auto-fetches notes on mount via `loadNotes()`
 - Integrates `useRealtimeMessages(partnerId)` for live message delivery
 - Cleans up preview object URLs on unmount via `clearPreviewUrls()`
@@ -43,11 +45,12 @@ Manages a Supabase Broadcast channel for live love note delivery.
 useRealtimeMessages(partnerId);
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter   | Type     | Description                           |
+| ----------- | -------- | ------------------------------------- |
 | `partnerId` | `string` | Partner's user ID for channel scoping |
 
 **Features:**
+
 - Exponential backoff retry: 1s, 2s, 4s, 8s, 16s (max 30s), up to 5 retries
 - Vibration feedback on incoming message (`navigator.vibrate`)
 - Connection state tracking: `connected`, `disconnected`, `connecting`
@@ -62,6 +65,7 @@ useAutoSave(session);
 ```
 
 **Behavior:**
+
 - Listens to `document.addEventListener('visibilitychange')` -- saves when tab becomes hidden
 - Listens to `window.addEventListener('beforeunload')` -- saves on page close
 - Fire-and-forget: does not block the visibility/unload event
@@ -74,12 +78,12 @@ Provides paginated mood history from the Supabase API.
 const { moods, loading, hasMore, loadMore } = useMoodHistory(userId);
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `moods` | `SupabaseMood[]` | Loaded mood entries |
-| `loading` | `boolean` | True during fetch |
-| `hasMore` | `boolean` | True if more pages available |
-| `loadMore` | `() => void` | Load next page |
+| Return     | Type             | Description                  |
+| ---------- | ---------------- | ---------------------------- |
+| `moods`    | `SupabaseMood[]` | Loaded mood entries          |
+| `loading`  | `boolean`        | True during fetch            |
+| `hasMore`  | `boolean`        | True if more pages available |
+| `loadMore` | `() => void`     | Load next page               |
 
 Page size: 50 entries. Uses cursor-based pagination via `moodApi.fetchByUser()`.
 
@@ -91,9 +95,9 @@ Provides partner's mood data with Broadcast API realtime updates.
 const { partnerMood, connectionStatus } = usePartnerMood(partnerId);
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `partnerMood` | `MoodEntry \| null` | Partner's latest mood |
+| Return             | Type                                            | Description            |
+| ------------------ | ----------------------------------------------- | ---------------------- |
+| `partnerMood`      | `MoodEntry \| null`                             | Partner's latest mood  |
 | `connectionStatus` | `'connected' \| 'disconnected' \| 'connecting'` | Realtime channel state |
 
 ### useNetworkStatus (`src/hooks/useNetworkStatus.ts`)
@@ -115,10 +119,10 @@ Wrapper for the Vibration API with feature detection.
 const { vibrate, isSupported } = useVibration();
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `vibrate` | `(pattern: number \| number[]) => void` | Trigger vibration |
-| `isSupported` | `boolean` | True if Vibration API available |
+| Return        | Type                                    | Description                     |
+| ------------- | --------------------------------------- | ------------------------------- |
+| `vibrate`     | `(pattern: number \| number[]) => void` | Trigger vibration               |
+| `isSupported` | `boolean`                               | True if Vibration API available |
 
 Gracefully degrades on unsupported devices (no-op).
 
@@ -130,10 +134,10 @@ Provides Framer Motion configuration respecting user's reduced motion preference
 const { shouldAnimate, motionPresets } = useMotionConfig();
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `shouldAnimate` | `boolean` | False if `prefers-reduced-motion: reduce` |
-| `motionPresets` | `object` | Named animation presets (fadeIn, slideUp, etc.) |
+| Return          | Type      | Description                                     |
+| --------------- | --------- | ----------------------------------------------- |
+| `shouldAnimate` | `boolean` | False if `prefers-reduced-motion: reduce`       |
+| `motionPresets` | `object`  | Named animation presets (fadeIn, slideUp, etc.) |
 
 Reads `window.matchMedia('(prefers-reduced-motion: reduce)')` on mount and listens for changes.
 
@@ -145,11 +149,11 @@ React state wrapper for the image compression service.
 const { compress, isCompressing, error } = useImageCompression();
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `compress` | `(file: File) => Promise<CompressedImage>` | Compress image |
-| `isCompressing` | `boolean` | True during compression |
-| `error` | `string \| null` | Error message if failed |
+| Return          | Type                                       | Description             |
+| --------------- | ------------------------------------------ | ----------------------- |
+| `compress`      | `(file: File) => Promise<CompressedImage>` | Compress image          |
+| `isCompressing` | `boolean`                                  | True during compression |
+| `error`         | `string \| null`                           | Error message if failed |
 
 ### usePhotos (`src/hooks/usePhotos.ts`)
 

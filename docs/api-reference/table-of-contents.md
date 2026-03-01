@@ -1,6 +1,7 @@
 # API Reference -- Table of Contents
 
 ## 1. Supabase Client Configuration
+
 - Environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`)
 - Singleton client instance with `Database` typing
 - Auth config: `persistSession`, `autoRefreshToken`, `detectSessionInUrl`
@@ -10,6 +11,7 @@
 - `isSupabaseConfigured()` -- verify env vars present
 
 ## 2. Authentication Service
+
 - Facade pattern: `authService` composes `sessionService` + `actionService`
 - Types: `AuthCredentials`, `AuthResult`, `AuthStatus`
 - `signIn(credentials)` -- email/password with IndexedDB token storage for Background Sync
@@ -25,6 +27,7 @@
 - `onAuthStateChange(callback)` -- listener with automatic IndexedDB token sync
 
 ## 3. Error Handling Utilities
+
 - `SupabaseServiceError` class: `code`, `details`, `hint`, `isNetworkError`
 - `handleSupabaseError(error, context?)` -- PostgrestError to user-friendly message
 - Error code mapping: 23505 (duplicate), 23503 (FK violation), 23502 (null violation), 42501 (RLS denied), 42P01 (table not found), PGRST116 (no rows), PGRST301 (bad params)
@@ -39,6 +42,7 @@
 - `createOfflineMessage(operation)` -- user-friendly offline text
 
 ## 4. Mood API Service
+
 - `MoodApi` class with Zod-validated Supabase CRUD
 - `ApiValidationError` class with `validationErrors: ZodError | null`
 - `create(moodData: MoodInsert)` -- insert + response validation
@@ -50,6 +54,7 @@
 - `getMoodHistory(userId, offset=0, limit=50)` -- paginated with `.range()`
 
 ## 5. Mood Sync Service
+
 - `MoodSyncService` class for IndexedDB-to-Supabase synchronization
 - `SyncResult`: `{ synced: number, failed: number, errors: string[] }`
 - `syncMood(mood: MoodEntry)` -- transform + upload + broadcast to partner
@@ -60,6 +65,7 @@
 - `SyncService` class (services/syncService.ts): parallel `Promise.all` with partial failure
 
 ## 6. Interaction Service
+
 - `InteractionService` class for poke/kiss interactions
 - Types: `InteractionType = 'poke' | 'kiss'`, `Interaction`, `SupabaseInteractionRecord`
 - `sendPoke(partnerId)` -- delegates to `sendInteraction('poke', partnerId)`
@@ -70,6 +76,7 @@
 - `markAsViewed(interactionId)` -- update `viewed = true`
 
 ## 7. Partner Service
+
 - `PartnerService` class for partner relationship management
 - Types: `UserSearchResult`, `PartnerInfo`, `PartnerRequest`
 - `getPartner()` -- current partner info from users table
@@ -81,6 +88,7 @@
 - `hasPartner()` -- boolean check
 
 ## 8. IndexedDB Services
+
 - `BaseIndexedDBService<T, DBTypes, StoreName>` abstract class
 - Database schema: `MyLoveDBSchema` (8 stores, v1-v5)
 - `upgradeDb()` centralized migration function
@@ -90,6 +98,7 @@
 - Scripture stores: sessions, reflections, bookmarks, messages
 
 ## 9. Photo Services
+
 - `PhotoService` (Supabase Storage) -- cloud photo CRUD with signed URLs
 - `PhotoStorageService` (IndexedDB) -- local photo storage with cursor pagination
 - `ImageCompressionService` -- Canvas API compression (max 2048px, 80% JPEG)
@@ -97,18 +106,21 @@
 - Edge Function: `upload-love-note-image` -- server-side MIME validation + rate limiting
 
 ## 10. Validation Layer
+
 - API schemas (`src/api/validation/supabaseSchemas.ts`): User, Mood, Interaction, Message, Photo
 - Local schemas (`src/validation/schemas.ts`): Message, Photo, Mood, Settings, Export, Scripture
 - Error utilities (`src/validation/errorMessages.ts`): `ValidationError`, `formatZodError`, `getFieldErrors`
 - 12 mood types, 5 message categories, 3 photo MIME types
 
 ## 11. Service Worker & Background Sync
+
 - Workbox: `precacheAndRoute`, `NetworkOnly` (JS/CSS), `NetworkFirst` (navigation), `CacheFirst` (assets)
 - Background Sync API for `sync-pending-moods` tag
 - Direct Supabase REST API calls from SW context (no JS client)
 - SW-DB helpers: `getPendingMoods`, `markMoodSynced`, `storeAuthToken`, `getAuthToken`, `clearAuthToken`
 
 ## 12. Real-Time Subscriptions
+
 - `RealtimeService` -- channel management with Map tracking
 - `subscribeMoodChanges(userId, onMoodChange, onError?)` -- postgres_changes
 - Broadcast API for partner mood notifications

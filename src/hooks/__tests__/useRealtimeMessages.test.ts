@@ -57,9 +57,7 @@ describe('useRealtimeMessages', () => {
     };
 
     const { supabase } = await import('../../api/supabaseClient');
-    vi.mocked(supabase.channel).mockReturnValue(
-      mockChannel as ReturnType<typeof supabase.channel>
-    );
+    vi.mocked(supabase.channel).mockReturnValue(mockChannel as ReturnType<typeof supabase.channel>);
 
     renderHook(() => useRealtimeMessages());
 

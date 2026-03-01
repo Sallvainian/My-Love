@@ -42,6 +42,7 @@ interface PartnerRequest {
 Gets the current user's partner information.
 
 **Flow:**
+
 1. Get current user via `supabase.auth.getUser()`
 2. Query `users` table for `partner_id` and `updated_at` where `id = currentUserId`
 3. If `partner_id` exists, query `users` table again for partner's `id`, `email`, `display_name`
@@ -53,10 +54,10 @@ Gets the current user's partner information.
 
 Searches for users by display name or email. Uses the RLS-protected `users` table directly (no admin API needed).
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `query` | `string` | -- | Search term (min 2 chars) |
-| `limit` | `number` | `10` | Max results |
+| Parameter | Type     | Default | Description               |
+| --------- | -------- | ------- | ------------------------- |
+| `query`   | `string` | --      | Search term (min 2 chars) |
+| `limit`   | `number` | `10`    | Max results               |
 
 **Query:** `.or(email.ilike.%{query}%,display_name.ilike.%{query}%)` with `.neq('id', currentUserId)` to exclude self.
 
@@ -67,6 +68,7 @@ Searches for users by display name or email. Uses the RLS-protected `users` tabl
 Sends a partner connection request.
 
 **Flow:**
+
 1. Check current user is authenticated
 2. Verify current user does not already have a `partner_id` -- throws `'You already have a partner'`
 3. Verify target user does not already have a `partner_id` -- throws `'This user already has a partner'`
@@ -79,6 +81,7 @@ Sends a partner connection request.
 Fetches all pending partner requests involving the current user.
 
 **Flow:**
+
 1. Query `partner_requests` where `status = 'pending'` and user is either sender or recipient
 2. Collect all unique user IDs from the requests
 3. Batch-query `users` table for `id`, `email`, `display_name` of all involved users

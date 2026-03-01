@@ -32,9 +32,9 @@ All user-generated love note content is sanitized via DOMPurify before display:
 // src/utils/messageValidation.ts
 export function sanitizeMessageContent(content: string): string {
   return DOMPurify.sanitize(content, {
-    ALLOWED_TAGS: [],    // No HTML tags allowed
-    ALLOWED_ATTR: [],    // No attributes allowed
-    KEEP_CONTENT: true,  // Preserve text content
+    ALLOWED_TAGS: [], // No HTML tags allowed
+    ALLOWED_ATTR: [], // No attributes allowed
+    KEEP_CONTENT: true, // Preserve text content
   });
 }
 ```

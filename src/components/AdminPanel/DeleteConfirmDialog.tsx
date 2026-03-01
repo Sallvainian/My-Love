@@ -33,7 +33,7 @@ export function DeleteConfirmDialog({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onCancel}
-        className="fixed inset-0 bg-black/50 z-50"
+        className="fixed inset-0 z-50 bg-black/50"
         data-testid="admin-delete-dialog-backdrop"
       />
 
@@ -46,16 +46,16 @@ export function DeleteConfirmDialog({
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+          className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
           data-testid="admin-delete-dialog"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header with warning icon */}
           <div className="p-6 text-center">
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Message?</h2>
+            <h2 className="mb-2 text-xl font-bold text-gray-900">Delete Message?</h2>
             <p className="text-sm text-gray-500">
               This action cannot be undone. The message will be permanently removed from your
               library.
@@ -64,9 +64,9 @@ export function DeleteConfirmDialog({
 
           {/* Message preview */}
           <div className="px-6 pb-6">
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-700 line-clamp-3">{message.text}</p>
-              <div className="mt-2 pt-2 border-t border-gray-300 flex items-center justify-between text-xs text-gray-500">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="line-clamp-3 text-sm text-gray-700">{message.text}</p>
+              <div className="mt-2 flex items-center justify-between border-t border-gray-300 pt-2 text-xs text-gray-500">
                 <span>Category: {message.category}</span>
                 <span>ID: {message.id}</span>
               </div>
@@ -74,17 +74,17 @@ export function DeleteConfirmDialog({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-3 border-t border-gray-200 bg-gray-50 p-6">
             <button
               onClick={onCancel}
-              className="flex-1 px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              className="flex-1 rounded-lg border border-gray-300 px-6 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-100"
               data-testid="admin-delete-dialog-cancel"
             >
               Cancel
             </button>
             <button
               onClick={handleDelete}
-              className="flex-1 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              className="flex-1 rounded-lg bg-red-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-red-700"
               data-testid="admin-delete-dialog-confirm"
             >
               Delete

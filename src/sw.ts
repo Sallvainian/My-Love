@@ -23,12 +23,7 @@ import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
-import {
-  getPendingMoods,
-  getAuthToken,
-  markMoodSynced,
-  type StoredMoodEntry,
-} from './sw-db';
+import { getPendingMoods, getAuthToken, markMoodSynced, type StoredMoodEntry } from './sw-db';
 
 // Background Sync API types
 interface SyncEvent extends ExtendableEvent {
@@ -59,9 +54,7 @@ cleanupOutdatedCaches();
 // CRITICAL: Always fetch JS/CSS/HTML fresh from network
 // This prevents stale code from being served after deployments
 registerRoute(
-  ({ request }) =>
-    request.destination === 'script' ||
-    request.destination === 'style',
+  ({ request }) => request.destination === 'script' || request.destination === 'style',
   new NetworkOnly()
 );
 
@@ -75,8 +68,7 @@ registerRoute(new NavigationRoute(navigationHandler));
 
 // Static assets (images, fonts) - Cache First for performance
 registerRoute(
-  ({ request }) =>
-    request.destination === 'image' || request.destination === 'font',
+  ({ request }) => request.destination === 'image' || request.destination === 'font',
   new CacheFirst({
     cacheName: 'static-assets-v2',
     plugins: [
@@ -90,8 +82,8 @@ registerRoute(
 
 // Google Fonts - Cache First with long expiration
 registerRoute(
-  ({ url }) => url.origin === 'https://fonts.googleapis.com' ||
-               url.origin === 'https://fonts.gstatic.com',
+  ({ url }) =>
+    url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
   new CacheFirst({
     cacheName: 'google-fonts-v2',
     plugins: [
@@ -116,15 +108,12 @@ registerRoute(
  * This ACTUALLY syncs pending moods from IndexedDB to Supabase,
  * even when the app is completely closed.
  */
-self.addEventListener(
-  'sync',
-  ((event: SyncEvent) => {
-    if (event.tag === 'sync-pending-moods') {
-      console.log('[ServiceWorker] Background Sync triggered:', event.tag);
-      event.waitUntil(syncPendingMoods());
-    }
-  }) as EventListener
-);
+self.addEventListener('sync', ((event: SyncEvent) => {
+  if (event.tag === 'sync-pending-moods') {
+    console.log('[ServiceWorker] Background Sync triggered:', event.tag);
+    event.waitUntil(syncPendingMoods());
+  }
+}) as EventListener);
 
 /**
  * Transform local mood format to Supabase REST API format
@@ -133,10 +122,7 @@ self.addEventListener(
  * - mood_type: Always the primary mood (first in array or single mood)
  * - mood_types: Array of all selected moods (includes primary)
  */
-function transformMoodForSupabase(
-  mood: StoredMoodEntry,
-  userId: string
-): Record<string, unknown> {
+function transformMoodForSupabase(mood: StoredMoodEntry, userId: string): Record<string, unknown> {
   // Determine mood_types array: use stored moods array, or create single-element array
   const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
 
@@ -145,9 +131,10 @@ function transformMoodForSupabase(
     mood_type: mood.mood,
     mood_types: moodTypes,
     note: mood.note || null,
-    created_at: mood.timestamp instanceof Date
-      ? mood.timestamp.toISOString()
-      : new Date(mood.timestamp).toISOString(),
+    created_at:
+      mood.timestamp instanceof Date
+        ? mood.timestamp.toISOString()
+        : new Date(mood.timestamp).toISOString(),
   };
 }
 
@@ -209,9 +196,9 @@ async function syncPendingMoods(): Promise<void> {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${authToken.accessToken}`,
-            'Prefer': 'return=representation',
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${authToken.accessToken}`,
+            Prefer: 'return=representation',
           },
           body: JSON.stringify(supabaseMood),
         });
@@ -246,9 +233,7 @@ async function syncPendingMoods(): Promise<void> {
       }
     }
 
-    console.log(
-      `[ServiceWorker] Sync complete: ${successCount} succeeded, ${failCount} failed`
-    );
+    console.log(`[ServiceWorker] Sync complete: ${successCount} succeeded, ${failCount} failed`);
 
     // 5. Notify open clients that sync completed
     const clients = await self.clients.matchAll({ type: 'window' });
@@ -275,20 +260,14 @@ async function syncPendingMoods(): Promise<void> {
  *
  * Receives messages from the main app
  */
-self.addEventListener(
-  'message',
-  ((event: ExtendableMessageEvent) => {
-    if (event.data?.type === 'SKIP_WAITING') {
-      self.skipWaiting();
-    }
-  }) as EventListener
-);
+self.addEventListener('message', ((event: ExtendableMessageEvent) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+}) as EventListener);
 
 // Log when service worker is activated
-self.addEventListener(
-  'activate',
-  ((event: ExtendableEvent) => {
-    console.log('[ServiceWorker] Activated - Background Sync ready');
-    event.waitUntil(self.clients.claim());
-  }) as EventListener
-);
+self.addEventListener('activate', ((event: ExtendableEvent) => {
+  console.log('[ServiceWorker] Activated - Background Sync ready');
+  event.waitUntil(self.clients.claim());
+}) as EventListener);

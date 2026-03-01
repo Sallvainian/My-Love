@@ -53,20 +53,23 @@ export function CountdownTimer({
     [anniversaries, maxDisplay]
   );
 
-  const buildCountdowns = useCallback((_tick: number): AnniversaryWithCountdown[] => {
-    return upcomingAnniversaries.map((anniversary) => {
-      const nextDate = getNextAnniversaryDate(anniversary.date);
-      const timeRemaining = calculateTimeRemaining(nextDate);
-      const shouldCelebrate = shouldTriggerCelebration(nextDate);
+  const buildCountdowns = useCallback(
+    (_tick: number): AnniversaryWithCountdown[] => {
+      return upcomingAnniversaries.map((anniversary) => {
+        const nextDate = getNextAnniversaryDate(anniversary.date);
+        const timeRemaining = calculateTimeRemaining(nextDate);
+        const shouldCelebrate = shouldTriggerCelebration(nextDate);
 
-      return {
-        anniversary,
-        timeRemaining,
-        nextDate,
-        shouldCelebrate,
-      };
-    });
-  }, [upcomingAnniversaries]);
+        return {
+          anniversary,
+          timeRemaining,
+          nextDate,
+          shouldCelebrate,
+        };
+      });
+    },
+    [upcomingAnniversaries]
+  );
 
   const countdowns = useMemo(() => buildCountdowns(tick), [buildCountdowns, tick]);
 
@@ -156,18 +159,7 @@ function CountdownCard({ countdown, isCelebrating, isPrimary }: CountdownCardPro
 
   return (
     <motion.div
-      className={`
-        relative overflow-hidden
-        rounded-2xl
-        bg-white/80 dark:bg-gray-800/80
-        backdrop-blur-sm
-        shadow-lg
-        p-4 sm:p-6
-        border-2 border-transparent
-        transition-all duration-300
-        ${isPrimary ? 'border-pink-200 dark:border-pink-800' : ''}
-        ${isCelebrating ? 'border-pink-400 dark:border-pink-600' : ''}
-      `}
+      className={`relative overflow-hidden rounded-2xl border-2 border-transparent bg-white/80 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 sm:p-6 dark:bg-gray-800/80 ${isPrimary ? 'border-pink-200 dark:border-pink-800' : ''} ${isCelebrating ? 'border-pink-400 dark:border-pink-600' : ''} `}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
     >
@@ -175,22 +167,19 @@ function CountdownCard({ countdown, isCelebrating, isPrimary }: CountdownCardPro
       <AnimatePresence>{isCelebrating && <CelebrationAnimation />}</AnimatePresence>
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="mb-3 flex items-center gap-3">
         <div
-          className={`
-          p-2 rounded-lg
-          ${shouldCelebrate ? 'bg-pink-100 dark:bg-pink-900' : 'bg-purple-100 dark:bg-purple-900'}
-        `}
+          className={`rounded-lg p-2 ${shouldCelebrate ? 'bg-pink-100 dark:bg-pink-900' : 'bg-purple-100 dark:bg-purple-900'} `}
         >
           {shouldCelebrate ? (
-            <Sparkles className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+            <Sparkles className="h-5 w-5 text-pink-600 dark:text-pink-400" />
           ) : (
-            <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
           )}
         </div>
 
         <div className="flex-1">
-          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {anniversary.label}
           </h3>
           {anniversary.description && (
@@ -200,27 +189,19 @@ function CountdownCard({ countdown, isCelebrating, isPrimary }: CountdownCardPro
       </div>
 
       {/* Countdown Display */}
-      <div
-        className={`
-        text-center py-4
-        ${shouldCelebrate ? 'animate-pulse' : ''}
-      `}
-      >
+      <div className={`py-4 text-center ${shouldCelebrate ? 'animate-pulse' : ''} `}>
         <p
-          className={`
-          text-2xl sm:text-3xl font-bold
-          ${
+          className={`text-2xl font-bold sm:text-3xl ${
             shouldCelebrate
               ? 'text-pink-600 dark:text-pink-400'
               : 'text-purple-600 dark:text-purple-400'
-          }
-        `}
+          } `}
         >
           {displayText}
         </p>
 
         {!shouldCelebrate && (
-          <div className="flex justify-center gap-4 mt-4 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-4 flex justify-center gap-4 text-sm text-gray-600 dark:text-gray-400">
             <div className="flex flex-col items-center">
               <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {timeRemaining.days}
@@ -262,7 +243,7 @@ function CelebrationAnimation() {
   );
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10" data-testid="celebration-animation">
+    <div className="pointer-events-none absolute inset-0 z-10" data-testid="celebration-animation">
       {hearts.map((i) => (
         <motion.div
           key={i}
@@ -286,7 +267,7 @@ function CelebrationAnimation() {
             ease: 'easeOut',
           }}
         >
-          <Sparkles className="w-6 h-6 text-pink-500" />
+          <Sparkles className="h-6 w-6 text-pink-500" />
         </motion.div>
       ))}
     </div>

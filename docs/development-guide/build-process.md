@@ -47,13 +47,13 @@ The production base path is set to `/My-Love/` for GitHub Pages deployment.
 
 Configured in `vite.config.ts` under `build.rollupOptions.output.manualChunks`:
 
-| Chunk Name | Libraries | Purpose |
-|---|---|---|
-| `vendor-react` | `react`, `react-dom` | React core -- changes rarely, cached aggressively |
-| `vendor-supabase` | `@supabase/supabase-js` | Supabase client -- heavy, loaded on demand |
-| `vendor-state` | `zustand`, `idb`, `zod` | State management, IndexedDB, validation |
-| `vendor-animation` | `framer-motion` | Animation library -- can be lazy loaded |
-| `vendor-icons` | `lucide-react` | Icon library -- tree-shakeable, benefits from separate cache |
+| Chunk Name         | Libraries               | Purpose                                                      |
+| ------------------ | ----------------------- | ------------------------------------------------------------ |
+| `vendor-react`     | `react`, `react-dom`    | React core -- changes rarely, cached aggressively            |
+| `vendor-supabase`  | `@supabase/supabase-js` | Supabase client -- heavy, loaded on demand                   |
+| `vendor-state`     | `zustand`, `idb`, `zod` | State management, IndexedDB, validation                      |
+| `vendor-animation` | `framer-motion`         | Animation library -- can be lazy loaded                      |
+| `vendor-icons`     | `lucide-react`          | Icon library -- tree-shakeable, benefits from separate cache |
 
 This strategy produces separate cached chunks for major dependencies, improving cache hit rates on repeat visits since vendor code changes infrequently compared to application code.
 
@@ -74,7 +74,12 @@ The VitePWA plugin generates `dist/manifest.webmanifest` with:
   "scope": "./",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
 ```

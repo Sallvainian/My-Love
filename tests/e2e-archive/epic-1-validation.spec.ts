@@ -23,10 +23,7 @@ import { filterIgnoredErrors } from '../support/helpers/consoleMonitor';
 import { validateSupabaseHealth } from '../support/helpers/networkMonitor';
 
 test.describe('Epic 1.1 - Codebase Baseline Validation', () => {
-  test('AC-1.1.1: Application loads without console errors', async ({
-    page,
-    consoleMonitor,
-  }) => {
+  test('AC-1.1.1: Application loads without console errors', async ({ page, consoleMonitor }) => {
     // Navigate to application
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -41,10 +38,7 @@ test.describe('Epic 1.1 - Codebase Baseline Validation', () => {
     console.log(consoleMonitor.getSummary());
   });
 
-  test('AC-1.1.2: Application loads without console warnings', async ({
-    page,
-    consoleMonitor,
-  }) => {
+  test('AC-1.1.2: Application loads without console warnings', async ({ page, consoleMonitor }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -76,34 +70,34 @@ test.describe('Epic 1.1 - Codebase Baseline Validation', () => {
     }
 
     // Wait for service worker with timeout (PWA may take time in dev mode)
-    const swRegistered: SwResult = await page.evaluate(
-      async (): Promise<SwResult> => {
-        // First check if service worker is supported
-        if (!('serviceWorker' in navigator)) {
-          return { registered: false, supported: false, error: 'ServiceWorker not supported' };
-        }
+    const swRegistered: SwResult = await page.evaluate(async (): Promise<SwResult> => {
+      // First check if service worker is supported
+      if (!('serviceWorker' in navigator)) {
+        return { registered: false, supported: false, error: 'ServiceWorker not supported' };
+      }
 
-        try {
-          // Give service worker up to 30s to register (dev mode can be slow)
-          const timeout = new Promise<SwResult>((resolve) =>
-            setTimeout(() => resolve({ registered: false, timeout: true }), 30000)
-          );
+      try {
+        // Give service worker up to 30s to register (dev mode can be slow)
+        const timeout = new Promise<SwResult>((resolve) =>
+          setTimeout(() => resolve({ registered: false, timeout: true }), 30000)
+        );
 
-          const registration = await Promise.race([
-            navigator.serviceWorker.ready.then((reg): SwResult => ({
+        const registration = await Promise.race([
+          navigator.serviceWorker.ready.then(
+            (reg): SwResult => ({
               registered: reg.active !== null,
               state: reg.active?.state,
               scope: reg.scope,
-            })),
-            timeout,
-          ]);
+            })
+          ),
+          timeout,
+        ]);
 
-          return registration;
-        } catch (error) {
-          return { registered: false, error: String(error) };
-        }
+        return registration;
+      } catch (error) {
+        return { registered: false, error: String(error) };
       }
-    );
+    });
 
     // Fail fast with clear messages for different failure modes
     if (swRegistered.supported === false) {
@@ -135,10 +129,7 @@ test.describe('Epic 1.1 - Codebase Baseline Validation', () => {
 });
 
 test.describe('Epic 1.2 - Supabase Connection Validation', () => {
-  test('AC-1.2.1: Supabase client connects successfully', async ({
-    page,
-    networkMonitor,
-  }) => {
+  test('AC-1.2.1: Supabase client connects successfully', async ({ page, networkMonitor }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -176,9 +167,7 @@ test.describe('Epic 1.2 - Supabase Connection Validation', () => {
 
     // Get all Supabase requests
     const supabaseRequests = networkMonitor.getByDomain('supabase.co');
-    const failedSupabase = supabaseRequests.filter(
-      (r) => r.status === null || r.status >= 400
-    );
+    const failedSupabase = supabaseRequests.filter((r) => r.status === null || r.status >= 400);
 
     // Assert no failed Supabase requests
     expect(failedSupabase).toHaveLength(0);
@@ -204,10 +193,7 @@ test.describe('Epic 1.2 - Supabase Connection Validation', () => {
 
     // Check 2: No malformed URLs (would indicate undefined env vars)
     const hasMalformedUrls = supabaseRequests.some(
-      (r) =>
-        r.url.includes('undefined') ||
-        r.url.includes('null') ||
-        r.url.includes('VITE_')  // Unresolved placeholder
+      (r) => r.url.includes('undefined') || r.url.includes('null') || r.url.includes('VITE_') // Unresolved placeholder
     );
 
     // Check 3: Verify app rendered without env-related errors
@@ -231,20 +217,16 @@ test.describe('Epic 1.2 - Supabase Connection Validation', () => {
     });
 
     // Assertions with clear failure messages
-    expect(
-      hasSupabaseUrl,
-      'VITE_SUPABASE_URL not configured - no Supabase requests observed'
-    ).toBe(true);
+    expect(hasSupabaseUrl, 'VITE_SUPABASE_URL not configured - no Supabase requests observed').toBe(
+      true
+    );
 
     expect(
       hasMalformedUrls,
       'Malformed Supabase URLs detected - env vars may contain undefined/null'
     ).toBe(false);
 
-    expect(
-      envErrorCheck.hasEnvError,
-      'Environment error message detected in UI'
-    ).toBe(false);
+    expect(envErrorCheck.hasEnvError, 'Environment error message detected in UI').toBe(false);
 
     expect(
       envErrorCheck.appMounted,
@@ -397,9 +379,7 @@ test.describe('Performance Baseline (Epic 1 AC-1.1.8)', () => {
     // Log slow requests for investigation (warning, not blocking)
     if (slowRequests.length > 0) {
       console.warn(`⚠️  Found ${slowRequests.length} slow requests (>5s):`);
-      slowRequests.forEach((r) =>
-        console.warn(`   - ${r.url} (${r.duration}ms)`)
-      );
+      slowRequests.forEach((r) => console.warn(`   - ${r.url} (${r.duration}ms)`));
     }
 
     // Assert no extremely slow requests (adjust threshold as needed)

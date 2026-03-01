@@ -30,15 +30,15 @@ interface PartnerMoodDisplayProps {
 function LoadingState() {
   return (
     <div
-      className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-6 mb-6 animate-pulse"
+      className="mb-6 animate-pulse rounded-2xl bg-gray-50 p-6 dark:bg-gray-800/50"
       data-testid="loading-state"
     >
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-4"></div>
+      <div className="mb-4 h-4 w-32 rounded bg-gray-200 dark:bg-gray-700"></div>
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+        <div className="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700"></div>
         <div className="flex-1">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+          <div className="mb-2 h-6 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
+          <div className="h-4 w-16 rounded bg-gray-200 dark:bg-gray-700"></div>
         </div>
       </div>
     </div>
@@ -60,7 +60,11 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
   useEffect(() => {
     const currentMoodId = partnerMood?.id;
     // Only animate on actual updates, not initial load
-    if (currentMoodId && prevMoodIdRef.current !== undefined && currentMoodId !== prevMoodIdRef.current) {
+    if (
+      currentMoodId &&
+      prevMoodIdRef.current !== undefined &&
+      currentMoodId !== prevMoodIdRef.current
+    ) {
       // Use queueMicrotask to defer setState and avoid synchronous cascading renders
       queueMicrotask(() => setJustUpdated(true));
       const timer = setTimeout(() => setJustUpdated(false), 3000);
@@ -79,12 +83,12 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
   if (error) {
     return (
       <div
-        className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-6 mb-6"
+        className="mb-6 rounded-2xl bg-red-50 p-6 dark:bg-red-900/20"
         data-testid="partner-mood-error"
         role="alert"
       >
-        <div className="text-6xl mb-3">⚠️</div>
-        <h3 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">
+        <div className="mb-3 text-6xl">⚠️</div>
+        <h3 className="mb-2 text-lg font-medium text-red-900 dark:text-red-100">
           Unable to load partner mood
         </h3>
         <p className="text-red-700 dark:text-red-300">{error}</p>
@@ -109,15 +113,13 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
         borderColor: justUpdated ? ['#F9A8D4', '#EC4899', '#F9A8D4'] : '#F9A8D4',
       }}
       transition={{ duration: 0.6 }}
-      className="bg-linear-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-2xl p-6 mb-6 border-2"
+      className="mb-6 rounded-2xl border-2 bg-linear-to-br from-pink-50 to-pink-100 p-6 dark:from-pink-900/20 dark:to-pink-800/20"
       style={{ borderColor: '#F9A8D4' }}
       data-testid="partner-mood-display"
       role="region"
       aria-label="Partner's current mood"
     >
-      <h2 className="text-sm font-medium text-slate-700 mb-2">
-        Your partner is feeling:
-      </h2>
+      <h2 className="mb-2 text-sm font-medium text-slate-700">Your partner is feeling:</h2>
       <div className="flex items-center gap-4">
         <span
           className="text-6xl"
@@ -134,14 +136,11 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
           >
             {partnerMood.mood_type}
           </h3>
-          <p
-            className="text-sm text-slate-600"
-            data-testid="partner-mood-timestamp"
-          >
+          <p className="text-sm text-slate-600" data-testid="partner-mood-timestamp">
             <time dateTime={partnerMood.created_at ?? undefined}>{timestamp}</time>
             {showJustNowBadge && (
               <span
-                className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-200 text-pink-900"
+                className="ml-2 inline-flex items-center rounded-full bg-pink-200 px-2 py-1 text-xs font-medium text-pink-900"
                 data-testid="partner-mood-just-now-badge"
                 aria-label="Logged just now"
               >

@@ -19,12 +19,12 @@ The `__WB_MANIFEST` array is injected at build time by Vite's PWA plugin. It inc
 
 ### Cache Strategies
 
-| Resource Type | Strategy | Rationale |
-|--------------|----------|-----------|
-| JS/CSS bundles | NetworkOnly | Always serve latest code; hashed filenames handle cache busting |
-| Navigation (HTML) | NetworkFirst | Show latest content, fall back to cache for offline |
-| Images/Fonts | CacheFirst | Static assets rarely change; fast cached response |
-| API calls | NetworkFirst | Fresh data preferred, cached fallback |
+| Resource Type     | Strategy     | Rationale                                                       |
+| ----------------- | ------------ | --------------------------------------------------------------- |
+| JS/CSS bundles    | NetworkOnly  | Always serve latest code; hashed filenames handle cache busting |
+| Navigation (HTML) | NetworkFirst | Show latest content, fall back to cache for offline             |
+| Images/Fonts      | CacheFirst   | Static assets rarely change; fast cached response               |
+| API calls         | NetworkFirst | Fresh data preferred, cached fallback                           |
 
 ### Background Sync
 
@@ -39,6 +39,7 @@ self.addEventListener('sync', (event: SyncEvent) => {
 ```
 
 The `syncPendingMoods()` function in the service worker:
+
 1. Opens the `my-love-db` IndexedDB database directly (not through the app's service layer)
 2. Reads all entries from the `moods` store where `synced === false`
 3. Retrieves the auth token from the `sw-auth` store
@@ -52,7 +53,7 @@ After background sync completes, the service worker notifies all open tabs:
 
 ```typescript
 const clients = await self.clients.matchAll();
-clients.forEach(client => {
+clients.forEach((client) => {
   client.postMessage({
     type: 'BACKGROUND_SYNC_COMPLETED',
     successCount,
@@ -67,14 +68,14 @@ The main app listens for this message via `setupServiceWorkerListener()` in `src
 
 The service worker has its own database access layer because it cannot share the app's service layer (different execution context):
 
-| Function | Purpose |
-|----------|---------|
-| `openMyLoveDB()` | Opens IndexedDB with migration support matching the app's schema |
-| `getPendingMoods()` | Reads moods with `synced === false` |
-| `markMoodSynced(id, supabaseId)` | Updates mood entry after successful sync |
-| `storeAuthToken(token)` | Stores JWT for Supabase REST API calls |
-| `getAuthToken()` | Retrieves stored JWT |
-| `clearAuthToken()` | Removes JWT on sign-out |
+| Function                         | Purpose                                                          |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `openMyLoveDB()`                 | Opens IndexedDB with migration support matching the app's schema |
+| `getPendingMoods()`              | Reads moods with `synced === false`                              |
+| `markMoodSynced(id, supabaseId)` | Updates mood entry after successful sync                         |
+| `storeAuthToken(token)`          | Stores JWT for Supabase REST API calls                           |
+| `getAuthToken()`                 | Retrieves stored JWT                                             |
+| `clearAuthToken()`               | Removes JWT on sign-out                                          |
 
 ## Type Definitions (`src/sw-types.d.ts`)
 
@@ -95,17 +96,17 @@ Service worker registration is conditional:
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   const wb = new Workbox('/My-Love/sw.js');
   wb.addEventListener('waiting', () => {
-    wb.messageSkipWaiting();  // Auto-activate new SW
-    window.location.reload();  // Reload to use new version
+    wb.messageSkipWaiting(); // Auto-activate new SW
+    window.location.reload(); // Reload to use new version
   });
   wb.register();
 }
 
 // Development: unregister any stale service workers
 if (import.meta.env.DEV) {
-  navigator.serviceWorker?.getRegistrations().then(regs =>
-    regs.forEach(reg => reg.unregister())
-  );
+  navigator.serviceWorker
+    ?.getRegistrations()
+    .then((regs) => regs.forEach((reg) => reg.unregister()));
 }
 ```
 

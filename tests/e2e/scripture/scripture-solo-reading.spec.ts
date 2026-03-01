@@ -66,8 +66,7 @@ async function submitReflection(
   const stepSaved = page
     .waitForResponse(
       (resp) =>
-        resp.url().includes('/rest/v1/scripture_sessions') &&
-        resp.request().method() === 'PATCH',
+        resp.url().includes('/rest/v1/scripture_sessions') && resp.request().method() === 'PATCH',
       { timeout: 15_000 }
     )
     .catch(() => null);
@@ -94,9 +93,7 @@ async function submitReflection(
 
 test.describe('Solo Reading Flow', () => {
   test.describe('[P0-009] Advance through 17 steps sequentially', () => {
-    test('should complete full solo reading flow from step 1 to 17', async ({
-      page,
-    }) => {
+    test('should complete full solo reading flow from step 1 to 17', async ({ page }) => {
       test.setTimeout(180_000); // Extended timeout for 17-step traversal
 
       // GIVEN: User navigates to scripture and starts a solo session
@@ -105,20 +102,16 @@ test.describe('Solo Reading Flow', () => {
       // WHEN: User advances through all 17 steps
       for (let step = 1; step <= 17; step++) {
         // THEN: Each step displays verse reference and text
-        await expect(
-          page.getByTestId('scripture-verse-reference')
-        ).toBeVisible();
+        await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
         await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
         // AND: Progress indicator shows current step
-        await expect(
-          page.getByTestId('scripture-progress-indicator')
-        ).toHaveText(`Verse ${step} of 17`);
+        await expect(page.getByTestId('scripture-progress-indicator')).toHaveText(
+          `Verse ${step} of 17`
+        );
 
         // AND: Next Verse button is available
-        await expect(
-          page.getByTestId('scripture-next-verse-button')
-        ).toBeVisible();
+        await expect(page.getByTestId('scripture-next-verse-button')).toBeVisible();
 
         // Advance through reflection to next step (except on last step)
         if (step < 17) {
@@ -134,35 +127,25 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('Verse and Response Screens', () => {
-    test('should display verse screen with correct elements', async ({
-      page,
-    }) => {
+    test('should display verse screen with correct elements', async ({ page }) => {
       // GIVEN: User starts a solo session
       await startSoloSession(page);
 
       // WHEN: First verse screen loads
       // THEN: Verse reference is displayed
-      await expect(
-        page.getByTestId('scripture-verse-reference')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
 
       // AND: Verse text is displayed prominently
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // AND: "View Response" secondary button is available
-      await expect(
-        page.getByTestId('scripture-view-response-button')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-view-response-button')).toBeVisible();
 
       // AND: "Next Verse" primary button is available
-      await expect(
-        page.getByTestId('scripture-next-verse-button')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-next-verse-button')).toBeVisible();
 
       // AND: Progress indicator shows "Verse 1 of 17"
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 1 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
     });
 
     test('should navigate to response screen and back', async ({ page, interceptNetworkCall }) => {
@@ -173,19 +156,13 @@ test.describe('Solo Reading Flow', () => {
       await page.getByTestId('scripture-view-response-button').click();
 
       // THEN: Response prayer text is displayed
-      await expect(
-        page.getByTestId('scripture-response-text')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-response-text')).toBeVisible();
 
       // AND: "Back to Verse" secondary button is available
-      await expect(
-        page.getByTestId('scripture-back-to-verse-button')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-back-to-verse-button')).toBeVisible();
 
       // AND: "Next Verse" button remains available
-      await expect(
-        page.getByTestId('scripture-next-verse-button')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-next-verse-button')).toBeVisible();
 
       // WHEN: User taps "Back to Verse"
       await page.getByTestId('scripture-back-to-verse-button').click();
@@ -194,9 +171,7 @@ test.describe('Solo Reading Flow', () => {
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
     });
 
-    test('should advance from response screen via Next Verse', async ({
-      page,
-    }) => {
+    test('should advance from response screen via Next Verse', async ({ page }) => {
       // GIVEN: User is on the response screen of step 1
       await startSoloSession(page);
       await page.getByTestId('scripture-view-response-button').click();
@@ -207,9 +182,7 @@ test.describe('Solo Reading Flow', () => {
       await advanceStepWithReflection(page);
 
       // THEN: Progress advances to step 2
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 2 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
       // AND: New verse content is displayed
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
@@ -217,15 +190,11 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('[P1-001] Optimistic step advance', () => {
-    test('should show next verse immediately after reflection submit', async ({
-      page,
-    }) => {
+    test('should show next verse immediately after reflection submit', async ({ page }) => {
       // GIVEN: User is in a solo session at step 1
       await startSoloSession(page);
 
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 1 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
 
       // WHEN: User completes reflection for step 1
       await page.getByTestId('scripture-next-verse-button').click();
@@ -236,33 +205,23 @@ test.describe('Solo Reading Flow', () => {
       await page.getByTestId('scripture-reflection-continue').click();
 
       // THEN: UI shows step 2 immediately (optimistic update before server responds)
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 2 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
     });
   });
 
   test.describe('[P1-012] Progress indicator updates', () => {
-    test('should update progress text on each step advance', async ({
-      page,
-    }) => {
+    test('should update progress text on each step advance', async ({ page }) => {
       // GIVEN: User starts a solo session
       await startSoloSession(page);
 
       // WHEN/THEN: Progress updates with each advance
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 1 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
 
       await advanceStepWithReflection(page);
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 2 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
       await advanceStepWithReflection(page);
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 3 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 3 of 17');
     });
   });
 
@@ -272,14 +231,10 @@ test.describe('Solo Reading Flow', () => {
     }) => {
       // GIVEN: User starts a solo session and advances to Verse 2
       const sessionId = await startSoloSession(page);
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 1 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
 
       await advanceStepWithReflection(page);
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 2 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
       // WHEN: User opens exit dialog and chooses save
       const savePromise = page
@@ -332,9 +287,7 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('[P2-012] Session completion boundary', () => {
-    test('should transition to reflection phase after step 17', async ({
-      page,
-    }) => {
+    test('should transition to reflection phase after step 17', async ({ page }) => {
       test.setTimeout(180_000); // Extended timeout for 17-step traversal
 
       // GIVEN: User starts a solo session
@@ -346,9 +299,7 @@ test.describe('Solo Reading Flow', () => {
       }
 
       // Verify we're at step 17
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 17 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 17 of 17');
 
       // WHEN: User taps "Next Verse" on the final step and completes reflection
       await page.getByTestId('scripture-next-verse-button').click();

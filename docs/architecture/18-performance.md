@@ -10,7 +10,9 @@ Non-home views are loaded on demand via `React.lazy()`:
 const PhotoGallery = lazy(() => import('./components/PhotoGallery/PhotoGallery'));
 const MoodTracker = lazy(() => import('./components/MoodTracker/MoodTracker'));
 const LoveNotes = lazy(() => import('./components/love-notes/LoveNotes'));
-const ScriptureOverview = lazy(() => import('./components/scripture-reading/containers/ScriptureOverview'));
+const ScriptureOverview = lazy(
+  () => import('./components/scripture-reading/containers/ScriptureOverview')
+);
 ```
 
 The home view is not lazy-loaded since it is the default landing page.
@@ -44,15 +46,16 @@ Love notes and mood history use `react-window` (v2.2.6) with `react-window-infin
 
 All uploaded images go through Canvas API compression:
 
-| Setting | Value |
-|---------|-------|
-| Max dimension | 2048px (width or height) |
-| JPEG quality | 80% |
-| Allowed formats | JPEG, PNG, WebP |
-| Max upload size | 25MB |
-| Fallback | Original image if compression fails |
+| Setting         | Value                               |
+| --------------- | ----------------------------------- |
+| Max dimension   | 2048px (width or height)            |
+| JPEG quality    | 80%                                 |
+| Allowed formats | JPEG, PNG, WebP                     |
+| Max upload size | 25MB                                |
+| Fallback        | Original image if compression fails |
 
 The compression flow:
+
 1. Validate file type and size
 2. Load image into `Image` element
 3. Calculate scaled dimensions (maintain aspect ratio, max 2048px)
@@ -64,12 +67,12 @@ The compression flow:
 
 Love note image URLs are cached with LRU eviction:
 
-| Setting | Value |
-|---------|-------|
-| Cache size | Max 100 entries |
-| URL expiry | 1 hour (Supabase signed URL default) |
+| Setting               | Value                                              |
+| --------------------- | -------------------------------------------------- |
+| Cache size            | Max 100 entries                                    |
+| URL expiry            | 1 hour (Supabase signed URL default)               |
 | Request deduplication | Concurrent requests for same image share one fetch |
-| Batch fetching | Multiple URLs fetched in a single request |
+| Batch fetching        | Multiple URLs fetched in a single request          |
 
 ## IndexedDB Performance
 
@@ -95,6 +98,7 @@ async getPage(page: number, pageSize: number): Promise<T[]> {
 ### Indexed Queries
 
 The `moods` store has two indexes for efficient queries:
+
 - `by-date` (date field) -- Used by `getMoodForDate()` and `getMoodsInRange()`
 - `by-synced` (synced field) -- Used by `getUnsyncedMoods()` for sync operations
 
@@ -111,6 +115,7 @@ const result = await performanceMonitor.measureAsync('loadMoods', async () => {
 ```
 
 Tracks per-operation metrics:
+
 - Call count
 - Average duration
 - Min/Max duration
@@ -153,11 +158,11 @@ export function measureMemoryUsage(): number {
 
 `src/utils/storageMonitor.ts` proactively monitors localStorage usage:
 
-| Threshold | Level | Action |
-|-----------|-------|--------|
-| < 70% | `safe` | Normal operation |
-| 70-85% | `warning` | Console warning with optimization suggestions |
-| > 85% | `critical` | Console error with action items |
+| Threshold | Level      | Action                                        |
+| --------- | ---------- | --------------------------------------------- |
+| < 70%     | `safe`     | Normal operation                              |
+| 70-85%    | `warning`  | Console warning with optimization suggestions |
+| > 85%     | `critical` | Console error with action items               |
 
 Conservative estimate of 5MB total (typical browser minimum).
 
@@ -167,7 +172,10 @@ Conservative estimate of 5MB total (typical browser minimum).
 
 ```typescript
 export function generateDeterministicNumbers(
-  seed: string, count: number, min: number, max: number
+  seed: string,
+  count: number,
+  min: number,
+  max: number
 ): number[] {
   // FNV-1a hash for seed -> Mulberry32 PRNG
 }

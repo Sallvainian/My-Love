@@ -89,10 +89,7 @@ export function PerStepReflection({ onSubmit, disabled = false }: PerStepReflect
   }, [notes]);
 
   return (
-    <div
-      className="flex w-full flex-col space-y-6"
-      data-testid="scripture-reflection-screen"
-    >
+    <div className="flex w-full flex-col space-y-6" data-testid="scripture-reflection-screen">
       {/* Prompt */}
       <h2
         className="text-center font-serif text-lg font-semibold text-purple-900"
@@ -112,10 +109,7 @@ export function PerStepReflection({ onSubmit, disabled = false }: PerStepReflect
           onKeyDown={handleKeyDown}
         >
           {/* Low label */}
-          <span
-            className="text-xs text-purple-500"
-            data-testid="scripture-rating-label-low"
-          >
+          <span className="text-xs text-purple-500" data-testid="scripture-rating-label-low">
             A little
           </span>
 
@@ -123,7 +117,9 @@ export function PerStepReflection({ onSubmit, disabled = false }: PerStepReflect
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
-              ref={(el) => { ratingRefs.current[n - 1] = el; }}
+              ref={(el) => {
+                ratingRefs.current[n - 1] = el;
+              }}
               type="button"
               role="radio"
               aria-checked={selectedRating === n}
@@ -143,20 +139,14 @@ export function PerStepReflection({ onSubmit, disabled = false }: PerStepReflect
           ))}
 
           {/* High label */}
-          <span
-            className="text-xs text-purple-500"
-            data-testid="scripture-rating-label-high"
-          >
+          <span className="text-xs text-purple-500" data-testid="scripture-rating-label-high">
             A lot
           </span>
         </div>
 
         {/* Validation message */}
         {showValidation && (
-          <p
-            className="text-sm text-purple-400"
-            data-testid="scripture-reflection-validation"
-          >
+          <p className="text-sm text-purple-400" data-testid="scripture-reflection-validation">
             Please select a rating
           </p>
         )}
@@ -178,7 +168,7 @@ export function PerStepReflection({ onSubmit, disabled = false }: PerStepReflect
         {/* Character counter */}
         {notes.length >= CHAR_COUNTER_THRESHOLD && (
           <span
-            className="absolute bottom-2 right-3 text-xs text-gray-400"
+            className="absolute right-3 bottom-2 text-xs text-gray-400"
             data-testid="scripture-reflection-char-count"
             aria-live="polite"
           >

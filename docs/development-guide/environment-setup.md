@@ -4,13 +4,13 @@ The project uses [dotenvx](https://dotenvx.com/) for encrypted environment varia
 
 ## Environment Files
 
-| File | Purpose | In Git? |
-|---|---|---|
-| `.env` | Encrypted environment variables (production Supabase credentials) | Yes (safe to commit -- encrypted via dotenvx) |
-| `.env.keys` | Decryption key for `.env` | No (gitignored -- never commit) |
-| `.env.example` | Template showing required variable names | Yes |
-| `.env.test` | Plain-text local Supabase values for E2E testing | Yes |
-| `.env.local` | Local overrides (optional) | No (gitignored) |
+| File           | Purpose                                                           | In Git?                                       |
+| -------------- | ----------------------------------------------------------------- | --------------------------------------------- |
+| `.env`         | Encrypted environment variables (production Supabase credentials) | Yes (safe to commit -- encrypted via dotenvx) |
+| `.env.keys`    | Decryption key for `.env`                                         | No (gitignored -- never commit)               |
+| `.env.example` | Template showing required variable names                          | Yes                                           |
+| `.env.test`    | Plain-text local Supabase values for E2E testing                  | Yes                                           |
+| `.env.local`   | Local overrides (optional)                                        | No (gitignored)                               |
 
 ## Getting Started with Environment Variables
 
@@ -22,10 +22,10 @@ The dev server script (`npm run dev`) calls `dotenvx run --overload -- npx vite`
 
 ## Required Variables
 
-| Variable | Description | Where to Find |
-|---|---|---|
-| `VITE_SUPABASE_URL` | Supabase project URL (`https://[project-id].supabase.co`) | Supabase Dashboard > Project Settings > API |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anonymous/public (anon) key | Supabase Dashboard > Project Settings > API > anon/public key |
+| Variable                                | Description                                               | Where to Find                                                 |
+| --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                     | Supabase project URL (`https://[project-id].supabase.co`) | Supabase Dashboard > Project Settings > API                   |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anonymous/public (anon) key                      | Supabase Dashboard > Project Settings > API > anon/public key |
 
 The `.env.example` file shows the expected format:
 
@@ -65,12 +65,12 @@ Additionally, `playwright.config.ts` parses `supabase status -o env` to automati
 
 In CI (GitHub Actions), environment variables are provided via GitHub Secrets:
 
-| Secret | Purpose |
-|---|---|
-| `DOTENV_PRIVATE_KEY` | Decryption key for the encrypted `.env` file (used during build) |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI auth token for TypeScript type generation from remote schema |
-| `CURRENTS_RECORD_KEY` | Currents.dev recording key for Playwright cloud reporting |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows |
-| `CLAUDE_PAT` | GitHub personal access token for Claude bot commits and PR operations |
+| Secret                    | Purpose                                                                   |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `DOTENV_PRIVATE_KEY`      | Decryption key for the encrypted `.env` file (used during build)          |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema |
+| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                 |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                          |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations     |
 
 The build step in `deploy.yml` passes `DOTENV_PRIVATE_KEY` to the `npm run build` command, which allows dotenvx to decrypt `.env` and inject the Supabase credentials at build time.

@@ -46,7 +46,8 @@ export type AppMiddleware = [['zustand/persist', unknown]];
  * Composed AppState from ALL slices including AppSlice.
  */
 export interface AppState
-  extends AppSlice,
+  extends
+    AppSlice,
     MessagesSlice,
     PhotosSlice,
     SettingsSlice,

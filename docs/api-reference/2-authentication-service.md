@@ -1,6 +1,7 @@
 # 2. Authentication Service
 
 **Sources:**
+
 - `src/api/authService.ts` (facade)
 - `src/api/auth/actionService.ts` (sign-in, sign-up, sign-out, reset, OAuth)
 - `src/api/auth/sessionService.ts` (session queries, state listener)
@@ -28,7 +29,7 @@ interface AuthCredentials {
 }
 
 interface AuthResult {
-  user: User | null;       // @supabase/supabase-js User
+  user: User | null; // @supabase/supabase-js User
   session: Session | null; // @supabase/supabase-js Session
   error: AuthError | null; // @supabase/supabase-js AuthError
 }
@@ -73,6 +74,7 @@ Sends a password reset email via `supabase.auth.resetPasswordForEmail()`.
 Initiates Google OAuth flow via `supabase.auth.signInWithOAuth()`.
 
 **Configuration:**
+
 ```typescript
 {
   provider: 'google',
@@ -123,6 +125,7 @@ Returns the full auth status object:
 Subscribes to auth state changes via `supabase.auth.onAuthStateChange()`.
 
 **Side effects on events:**
+
 - `SIGNED_IN` or `TOKEN_REFRESHED`: Stores/updates auth token in IndexedDB
 - `SIGNED_OUT`: Clears auth token from IndexedDB
 
@@ -132,11 +135,17 @@ Subscribes to auth state changes via `supabase.auth.onAuthStateChange()`.
 
 ```typescript
 export const authService = {
-  signIn, signUp, signOut,
-  getSession, getUser,
-  getCurrentUserId, getCurrentUserIdOfflineSafe,
-  getAuthStatus, onAuthStateChange,
-  resetPassword, signInWithGoogle,
+  signIn,
+  signUp,
+  signOut,
+  getSession,
+  getUser,
+  getCurrentUserId,
+  getCurrentUserIdOfflineSafe,
+  getAuthStatus,
+  onAuthStateChange,
+  resetPassword,
+  signInWithGoogle,
 };
 ```
 

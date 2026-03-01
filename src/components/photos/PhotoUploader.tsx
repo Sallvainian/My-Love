@@ -196,7 +196,10 @@ export function PhotoUploader({
       // AC-6.1.8: Compression failure handling with fallback logic
       if (selectedFile.size <= FALLBACK_SIZE_LIMIT) {
         // Fallback: Use original file if under 10MB
-        console.warn('[PhotoUploader] Compression failed, using original file as fallback:', (err as Error).message);
+        console.warn(
+          '[PhotoUploader] Compression failed, using original file as fallback:',
+          (err as Error).message
+        );
         try {
           const dimensions = await getImageDimensions(selectedFile);
 
@@ -222,7 +225,9 @@ export function PhotoUploader({
           handleClear();
           onUploadSuccess?.();
         } catch (_dimensionError) {
-          setError('Unable to process this image file. The file may be corrupted or in an unsupported format. Please try a different photo.');
+          setError(
+            'Unable to process this image file. The file may be corrupted or in an unsupported format. Please try a different photo.'
+          );
           // AC-6.2.9: Set retry function for error toast
           setRetryUpload(() => handleUpload);
         }
@@ -231,7 +236,7 @@ export function PhotoUploader({
         const sizeMB = (selectedFile.size / 1024 / 1024).toFixed(1);
         setError(
           `File is too large (${sizeMB} MB) and cannot be uploaded without compression. ` +
-          `Please try a smaller image (under 10 MB) or use a different photo.`
+            `Please try a smaller image (under 10 MB) or use a different photo.`
         );
       }
     }
@@ -283,7 +288,11 @@ export function PhotoUploader({
 
   // AC-6.2.5: Character counter color
   const captionCounterColor =
-    caption.length >= 490 ? 'text-red-500' : caption.length >= 400 ? 'text-yellow-500' : 'text-gray-500';
+    caption.length >= 490
+      ? 'text-red-500'
+      : caption.length >= 400
+        ? 'text-yellow-500'
+        : 'text-gray-500';
 
   const handleCancel = () => {
     handleClear();
@@ -291,12 +300,12 @@ export function PhotoUploader({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-4 bg-white rounded-lg shadow-lg">
-      <div className="flex items-center justify-between mb-4">
+    <div className="mx-auto w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">Upload Photo</h2>
         <button
           onClick={handleCancel}
-          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
+          className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
           aria-label="Close"
         >
           <X size={20} />
@@ -316,19 +325,15 @@ export function PhotoUploader({
         />
         <label
           htmlFor="photo-upload-input"
-          className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-pink-500 hover:bg-pink-50 transition-colors"
+          className="flex w-full cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-4 transition-colors hover:border-pink-500 hover:bg-pink-50"
         >
           <div className="flex flex-col items-center gap-2">
             <div className="flex gap-4">
               <Camera size={32} className="text-gray-400" />
               <Upload size={32} className="text-gray-400" />
             </div>
-            <span className="text-sm text-gray-600">
-              Take photo or select from gallery
-            </span>
-            <span className="text-xs text-gray-400">
-              JPEG, PNG, or WebP (max 25MB)
-            </span>
+            <span className="text-sm text-gray-600">Take photo or select from gallery</span>
+            <span className="text-xs text-gray-400">JPEG, PNG, or WebP (max 25MB)</span>
           </div>
         </label>
       </div>
@@ -339,12 +344,12 @@ export function PhotoUploader({
           <img
             src={previewUrl}
             alt="Preview"
-            className="w-full h-64 object-contain bg-gray-100 rounded-lg"
+            className="h-64 w-full rounded-lg bg-gray-100 object-contain"
           />
 
           {/* Caption Input - AC-6.2.4, AC-6.2.5 */}
           <div className="mt-3">
-            <label htmlFor="caption-input" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="caption-input" className="mb-1 block text-sm font-medium text-gray-700">
               Caption (optional)
             </label>
             <textarea
@@ -355,10 +360,10 @@ export function PhotoUploader({
               maxLength={500}
               rows={3}
               disabled={isUploading}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
             {/* AC-6.2.5: Character counter */}
-            <div className={`text-xs ${captionCounterColor} text-right mt-1`}>
+            <div className={`text-xs ${captionCounterColor} mt-1 text-right`}>
               {caption.length}/500
             </div>
           </div>
@@ -366,11 +371,11 @@ export function PhotoUploader({
           {/* Progress Bar - AC-6.2.2, AC-6.2.3 */}
           {isUploading && (
             <div className="mt-3">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
+              <div className="mb-1 flex justify-between text-sm text-gray-600">
                 <span>Uploading...</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                 <div
                   className="h-full bg-pink-500 transition-all duration-100 ease-out"
                   style={{ width: `${uploadProgress}%` }}
@@ -384,7 +389,7 @@ export function PhotoUploader({
             <button
               onClick={handleClear}
               disabled={isUploading} // Disable during upload
-              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Choose Different Photo
             </button>
@@ -392,7 +397,7 @@ export function PhotoUploader({
             <button
               onClick={handleUpload}
               disabled={!selectedFile || !!error || isUploading} // AC-6.2.1: Disabled until photo selected
-              className="flex-1 px-4 py-2 text-sm text-white bg-pink-500 rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-lg bg-pink-500 px-4 py-2 text-sm text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload Photo'}
             </button>
@@ -402,14 +407,14 @@ export function PhotoUploader({
 
       {/* Error Message - AC-6.1.2 */}
       {error && (
-        <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 border border-red-200 rounded-lg">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-100 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {/* Warning Message */}
       {warning && !error && (
-        <div className="p-3 mb-4 text-sm text-yellow-700 bg-yellow-100 border border-yellow-200 rounded-lg">
+        <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-100 p-3 text-sm text-yellow-700">
           {warning}
         </div>
       )}
@@ -425,19 +430,19 @@ export function PhotoUploader({
       {/* Toast Notification - AC-6.2.8, AC-6.2.9, AC-6.2.13 */}
       {activeToast && (
         <div
-          className={`fixed bottom-4 right-4 max-w-sm p-4 rounded-lg shadow-lg transition-all duration-300 ${
+          className={`fixed right-4 bottom-4 max-w-sm rounded-lg p-4 shadow-lg transition-all duration-300 ${
             activeToast.type === 'success'
-              ? 'bg-green-100 border border-green-200 text-green-800'
+              ? 'border border-green-200 bg-green-100 text-green-800'
               : activeToast.type === 'error'
-                ? 'bg-red-100 border border-red-200 text-red-800'
-                : 'bg-yellow-100 border border-yellow-200 text-yellow-800'
+                ? 'border border-red-200 bg-red-100 text-red-800'
+                : 'border border-yellow-200 bg-yellow-100 text-yellow-800'
           }`}
         >
           <div className="flex items-start gap-3">
             {activeToast.type === 'success' ? (
-              <CheckCircle size={20} className="shrink-0 mt-0.5" />
+              <CheckCircle size={20} className="mt-0.5 shrink-0" />
             ) : (
-              <AlertCircle size={20} className="shrink-0 mt-0.5" />
+              <AlertCircle size={20} className="mt-0.5 shrink-0" />
             )}
             <div className="flex-1">
               <p className="text-sm font-medium">{activeToast.message}</p>
@@ -464,7 +469,7 @@ export function PhotoUploader({
                   clearStorageWarning();
                 }
               }}
-              className="p-1 rounded-full hover:bg-black/5"
+              className="rounded-full p-1 hover:bg-black/5"
               aria-label="Dismiss"
             >
               <X size={16} />

@@ -241,9 +241,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
     // isPendingLockIn should be rolled back
     expect(store.getState().isPendingLockIn).toBe(false);
     // handleScriptureError should have been called
-    const { handleScriptureError } = await import(
-      '../../../src/services/scriptureReadingService'
-    );
+    const { handleScriptureError } = await import('../../../src/services/scriptureReadingService');
     expect(handleScriptureError).toHaveBeenCalled();
   });
 

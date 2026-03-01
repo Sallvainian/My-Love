@@ -25,7 +25,9 @@ The singleton client in `src/api/supabaseClient.ts` is typed with the generated 
 
 ```typescript
 export const supabase: SupabaseClient<Database> = createClient<Database>(
-  supabaseUrl, supabaseAnonKey, {
+  supabaseUrl,
+  supabaseAnonKey,
+  {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     realtime: { params: { eventsPerSecond: 10 } },
   }
@@ -40,10 +42,10 @@ Environment variables are validated at module load time -- missing values throw 
 
 Syncs locally-stored mood entries to Supabase. Key methods:
 
-| Method | Description |
-|--------|-------------|
-| `syncPendingMoods()` | Reads unsynced entries from IndexedDB, upserts each to Supabase, marks synced on success |
-| `fetchMoods(userId, limit)` | Fetches mood records from Supabase for a given user |
+| Method                      | Description                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| `syncPendingMoods()`        | Reads unsynced entries from IndexedDB, upserts each to Supabase, marks synced on success |
+| `fetchMoods(userId, limit)` | Fetches mood records from Supabase for a given user                                      |
 
 The sync process transforms `MoodEntry` (IndexedDB format) into the Supabase `moods` table insert format, handling field mapping between local and remote schemas. Partial failure is handled: if one mood fails to sync, others continue.
 
@@ -51,21 +53,21 @@ The sync process transforms `MoodEntry` (IndexedDB format) into the Supabase `mo
 
 Provides direct Supabase queries for mood data:
 
-| Method | Description |
-|--------|-------------|
-| `fetchByUser(userId, limit, offset)` | Paginated mood fetch with cursor |
+| Method                                         | Description                        |
+| ---------------------------------------------- | ---------------------------------- |
+| `fetchByUser(userId, limit, offset)`           | Paginated mood fetch with cursor   |
 | `fetchByDateRange(userId, startDate, endDate)` | Date-range query for calendar view |
 
 ### interactionService (`src/api/interactionService.ts`)
 
 Manages poke/kiss interactions between partners:
 
-| Method | Description |
-|--------|-------------|
-| `sendInteraction(partnerId, type)` | Send poke or kiss (validates UUID + type first) |
-| `getRecentInteractions(limit)` | Fetch recent interactions for history |
+| Method                              | Description                                     |
+| ----------------------------------- | ----------------------------------------------- |
+| `sendInteraction(partnerId, type)`  | Send poke or kiss (validates UUID + type first) |
+| `getRecentInteractions(limit)`      | Fetch recent interactions for history           |
 | `subscribeToInteractions(callback)` | Realtime subscription for incoming interactions |
-| `unsubscribe()` | Clean up realtime subscription |
+| `unsubscribe()`                     | Clean up realtime subscription                  |
 
 Input validation via `interactionValidation.ts` utilities before any Supabase call.
 
@@ -73,24 +75,24 @@ Input validation via `interactionValidation.ts` utilities before any Supabase ca
 
 Partner discovery and request management:
 
-| Method | Description |
-|--------|-------------|
-| `searchUsers(query)` | Search users by email or display name |
-| `sendPartnerRequest(targetUserId)` | Send partner connection request |
-| `acceptPartnerRequest(requestId)` | Accept incoming request, link partner_ids |
-| `rejectPartnerRequest(requestId)` | Reject incoming request |
-| `getPartnerRequests()` | Fetch sent and received requests |
+| Method                             | Description                               |
+| ---------------------------------- | ----------------------------------------- |
+| `searchUsers(query)`               | Search users by email or display name     |
+| `sendPartnerRequest(targetUserId)` | Send partner connection request           |
+| `acceptPartnerRequest(requestId)`  | Accept incoming request, link partner_ids |
+| `rejectPartnerRequest(requestId)`  | Reject incoming request                   |
+| `getPartnerRequests()`             | Fetch sent and received requests          |
 
 ### authService (`src/api/authService.ts`)
 
 Legacy auth service wrapping Supabase Auth methods. Being superseded by the `auth/` subdirectory modules:
 
-| Method | Description |
-|--------|-------------|
-| `signIn(email, password)` | Sign in with email/password |
-| `signUp(email, password)` | Create new account |
-| `signOut()` | Sign out and clear session |
-| `getUser()` | Get current authenticated user |
+| Method                    | Description                    |
+| ------------------------- | ------------------------------ |
+| `signIn(email, password)` | Sign in with email/password    |
+| `signUp(email, password)` | Create new account             |
+| `signOut()`               | Sign out and clear session     |
+| `getUser()`               | Get current authenticated user |
 
 ### errorHandlers (`src/api/errorHandlers.ts`)
 

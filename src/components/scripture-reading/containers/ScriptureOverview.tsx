@@ -158,7 +158,7 @@ export function ScriptureOverview() {
   // across lobby → countdown → reading phase transitions without unmounting.
   const broadcastSession = useAppStore((state) => state.session);
   useScriptureBroadcast(
-    broadcastSession?.mode === 'together' ? broadcastSession?.id ?? null : null
+    broadcastSession?.mode === 'together' ? (broadcastSession?.id ?? null) : null
   );
 
   // Partner slice state
@@ -306,11 +306,7 @@ export function ScriptureOverview() {
   }
 
   // Story 4.2: Route to ReadingContainer for together-mode reading phase
-  if (
-    session &&
-    session.mode === 'together' &&
-    session.currentPhase === 'reading'
-  ) {
+  if (session && session.mode === 'together' && session.currentPhase === 'reading') {
     return <ReadingContainer />;
   }
 

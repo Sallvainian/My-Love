@@ -77,14 +77,14 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm"
+        className="sticky top-0 z-50 border-b border-gray-200 bg-white/90 shadow-sm backdrop-blur-md"
       >
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             {/* Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                <span className="text-white text-xl">⚙️</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-r from-pink-500 to-rose-500">
+                <span className="text-xl text-white">⚙️</span>
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900" data-testid="admin-title">
@@ -99,22 +99,22 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
               {/* Export button (Story 3.5 AC-3.5.6) */}
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium"
+                className="flex items-center gap-2 rounded-lg bg-blue-100 px-3 py-2 font-medium text-blue-700 transition-colors hover:bg-blue-200"
                 data-testid="export-messages-button"
                 title="Export all custom messages to JSON"
               >
-                <Download className="w-4 h-4" />
+                <Download className="h-4 w-4" />
                 <span className="hidden lg:inline">Export</span>
               </button>
 
               {/* Import button (Story 3.5 AC-3.5.6) */}
               <button
                 onClick={handleImportClick}
-                className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                className="flex items-center gap-2 rounded-lg bg-green-100 px-3 py-2 font-medium text-green-700 transition-colors hover:bg-green-200"
                 data-testid="import-messages-button"
                 title="Import custom messages from JSON"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="h-4 w-4" />
                 <span className="hidden lg:inline">Import</span>
               </button>
               <input
@@ -129,20 +129,20 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
               {/* Create button */}
               <button
                 onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg hover:shadow-lg transition-shadow font-medium"
+                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2 font-medium text-white transition-shadow hover:shadow-lg"
                 data-testid="admin-create-button"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="h-5 w-5" />
                 <span className="hidden sm:inline">Create Message</span>
               </button>
 
               {/* Exit button */}
               <button
                 onClick={handleExit}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300"
                 data-testid="admin-exit-button"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
                 <span className="hidden sm:inline">Exit Admin</span>
               </button>
             </div>
@@ -151,7 +151,7 @@ export function AdminPanel({ onExit }: AdminPanelProps) {
       </motion.div>
 
       {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <MessageList onEdit={setEditingMessage} onDelete={setDeletingMessage} />
       </div>
 

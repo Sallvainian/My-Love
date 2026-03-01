@@ -111,18 +111,11 @@ export function NetworkStatusIndicator({
       {/* Banner for offline/connecting states */}
       {config.showBanner && (
         <div
-          className={`
-            flex items-center justify-center gap-2 px-4 py-2
-            ${config.bgColor} ${config.borderColor} border-b
-            transition-all duration-300 ease-in-out
-          `}
+          className={`flex items-center justify-center gap-2 px-4 py-2 ${config.bgColor} ${config.borderColor} border-b transition-all duration-300 ease-in-out`}
         >
           {/* Status dot */}
           <span
-            className={`
-              inline-block w-2 h-2 rounded-full ${config.dotColor}
-              ${config.animate ? 'animate-pulse' : ''}
-            `}
+            className={`inline-block h-2 w-2 rounded-full ${config.dotColor} ${config.animate ? 'animate-pulse' : ''} `}
             aria-hidden="true"
           />
 
@@ -134,15 +127,11 @@ export function NetworkStatusIndicator({
           />
 
           {/* Status text */}
-          <span className={`text-sm font-medium ${config.textColor}`}>
-            {config.label}
-          </span>
+          <span className={`text-sm font-medium ${config.textColor}`}>{config.label}</span>
 
           {/* Description */}
           {config.description && (
-            <span className="text-sm text-gray-600 ml-2">
-              {config.description}
-            </span>
+            <span className="ml-2 text-sm text-gray-600">{config.description}</span>
           )}
         </div>
       )}
@@ -151,14 +140,10 @@ export function NetworkStatusIndicator({
       {!config.showBanner && !showOnlyWhenOffline && (
         <div className="flex items-center gap-1.5" title={config.ariaLabel}>
           <span
-            className={`inline-block w-2 h-2 rounded-full ${config.dotColor}`}
+            className={`inline-block h-2 w-2 rounded-full ${config.dotColor}`}
             aria-hidden="true"
           />
-          <IconComponent
-            size={14}
-            className={config.textColor}
-            aria-hidden="true"
-          />
+          <IconComponent size={14} className={config.textColor} aria-hidden="true" />
         </div>
       )}
     </div>
@@ -207,12 +192,7 @@ export function NetworkStatusDot({ className = '' }: { className?: string }) {
 
   return (
     <span
-      className={`
-        inline-block w-2.5 h-2.5 rounded-full
-        ${config.color}
-        ${config.animate ? 'animate-pulse' : ''}
-        ${className}
-      `}
+      className={`inline-block h-2.5 w-2.5 rounded-full ${config.color} ${config.animate ? 'animate-pulse' : ''} ${className} `}
       title={config.title}
       role="status"
       aria-label={`Network status: ${config.title}`}

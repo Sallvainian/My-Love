@@ -4,17 +4,18 @@
 
 365 pre-written messages distributed across 5 categories (73 per category):
 
-| Category | Description |
-|---|---|
-| `reason` | Reasons why you love your partner |
-| `memory` | Special memories together |
+| Category      | Description                          |
+| ------------- | ------------------------------------ |
+| `reason`      | Reasons why you love your partner    |
+| `memory`      | Special memories together            |
 | `affirmation` | Daily affirmations and encouragement |
-| `future` | Dreams and plans for the future |
-| `custom` | Miscellaneous custom messages |
+| `future`      | Dreams and plans for the future      |
+| `custom`      | Miscellaneous custom messages        |
 
 Messages rotate daily using a deterministic selection algorithm in `src/utils/messageRotation.ts`. Users can mark messages as favorites, which increases their rotation frequency. The full message library is defined in `src/data/defaultMessages.ts` and lazy-loaded on first run via `src/data/defaultMessagesLoader.ts` to keep the large dataset out of the eager startup path.
 
 A validation script (`scripts/validate-messages.cjs`) verifies:
+
 - Exactly 365 messages total
 - 73 messages per category
 - No duplicate messages
@@ -59,14 +60,14 @@ A validation script (`scripts/validate-messages.cjs`) verifies:
 
 A guided prayer session with 17 scripture steps (all NKJV) organized into 6 section themes:
 
-| Theme | Steps |
-|---|---|
-| Healing and Restoration | 0-2 |
-| Forgiveness and Reconciliation | 3-5 |
-| Confession and Repentance | 6-8 |
-| God's Faithfulness and Peace | 9-11 |
-| The Power of Words | 12-14 |
-| Christlike Character | 15-16 |
+| Theme                          | Steps |
+| ------------------------------ | ----- |
+| Healing and Restoration        | 0-2   |
+| Forgiveness and Reconciliation | 3-5   |
+| Confession and Repentance      | 6-8   |
+| God's Faithfulness and Peace   | 9-11  |
+| The Power of Words             | 12-14 |
+| Christlike Character           | 15-16 |
 
 Each step presents a Bible verse and a couple-focused response prayer. The reading flow supports:
 
@@ -84,6 +85,7 @@ Data is stored across `scripture_sessions`, `scripture_step_states`, `scripture_
 ### Scripture Architecture Notes
 
 The scripture feature uses an **online-first** pattern (the inverse of the rest of the app):
+
 - **Supabase is the source of truth.** Writes go to Supabase RPC functions first and throw on failure (no offline queue).
 - **IndexedDB is a read cache.** Reads use cache-first with fire-and-forget background refresh.
 - **Optimistic UI.** The Zustand slice updates state before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
@@ -109,14 +111,15 @@ export const APP_CONFIG = {
 
 Four visual themes defined in `src/utils/themes.ts` and extended in `tailwind.config.js`:
 
-| Theme | Primary Colors | Hex |
-|---|---|---|
-| Sunset | Rose/coral gradient | #FF6B9D |
-| Ocean | Teal/emerald | #14b8a6 |
-| Lavender | Purple | #a855f7 |
-| Rose | Pink/rose | #f43f5e |
+| Theme    | Primary Colors      | Hex     |
+| -------- | ------------------- | ------- |
+| Sunset   | Rose/coral gradient | #FF6B9D |
+| Ocean    | Teal/emerald        | #14b8a6 |
+| Lavender | Purple              | #a855f7 |
+| Rose     | Pink/rose           | #f43f5e |
 
 Custom Tailwind extensions include:
+
 - **Font families**: Inter (sans), Playfair Display (serif), Dancing Script (cursive)
 - **Animations**: float, fade-in, scale-in, slide-up, pulse-slow, heart-beat, shimmer
 - **Color palettes**: sunset, coral, ocean, lavender, rose (each with 50-900 shades)
