@@ -446,7 +446,7 @@ describe('SoloReadingFlow', () => {
       mockStoreState.partner = null;
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
-      expect(screen.getByText('Session complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-heading')).toBeDefined();
     });
 
     it('shows "Session complete" heading on report phase for unlinked user', () => {
@@ -456,7 +456,7 @@ describe('SoloReadingFlow', () => {
       });
       mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByText('Session complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-heading')).toBeDefined();
     });
 
     it('shows reflections saved message on report phase for unlinked user', () => {
@@ -1166,7 +1166,7 @@ describe('SoloReadingFlow', () => {
       render(<SoloReadingFlow />);
       // Should show unlinked completion (placeholder replaced by Story 2.3)
       expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
-      expect(screen.getByText('Session complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-heading')).toBeDefined();
       // Should have Return to Overview button
       expect(screen.getByTestId('scripture-unlinked-return-btn')).toBeDefined();
       // Should NOT show the ReflectionSummary
@@ -1477,12 +1477,19 @@ describe('SoloReadingFlow', () => {
       await vi.waitFor(() => {
         expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
       });
-      expect(screen.getByTestId('scripture-report-partner-message')).toBeDefined();
-      expect(screen.getByTestId('scripture-report-partner-waiting')).toBeDefined();
+      await vi.waitFor(() => {
+        expect(mockGetSessionReportData).toHaveBeenCalledWith('session-123');
+      });
+
+      const partnerMessage = await screen.findByTestId('scripture-report-partner-message');
+      const waitingMessage = await screen.findByTestId('scripture-report-partner-waiting');
+
+      expect(partnerMessage).toHaveTextContent('Still working through this');
+      expect(waitingMessage).toHaveTextContent("Waiting for Sarah's reflections");
     });
 
     it('treats partner as complete when session-level reflection exists', async () => {
-      mockGetSessionReportData.mockResolvedValueOnce({
+      mockGetSessionReportData.mockResolvedValue({
         reflections: [
           {
             id: 'u-step',

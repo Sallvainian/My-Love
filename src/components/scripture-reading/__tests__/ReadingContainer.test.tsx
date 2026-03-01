@@ -23,6 +23,9 @@ import { ReadingContainer } from '../containers/ReadingContainer';
 // ============================================
 const mockLockIn = vi.fn();
 const mockUndoLockIn = vi.fn();
+const mockSetPartnerDisconnected = vi.fn();
+const mockEndSession = vi.fn();
+const mockLoadSession = vi.fn();
 
 const mockStoreState = {
   session: {
@@ -53,6 +56,11 @@ const mockStoreState = {
   lockIn: mockLockIn,
   undoLockIn: mockUndoLockIn,
   partner: { displayName: 'Jordan', id: 'user-2' },
+  partnerDisconnected: false,
+  partnerDisconnectedAt: null as number | null,
+  setPartnerDisconnected: mockSetPartnerDisconnected,
+  endSession: mockEndSession,
+  loadSession: mockLoadSession,
 };
 
 vi.mock('../../../stores/useAppStore', () => ({
@@ -63,7 +71,9 @@ vi.mock('../../../stores/useAppStore', () => ({
 
 // Mock useScripturePresence hook
 vi.mock('../../../hooks/useScripturePresence', () => ({
-  useScripturePresence: vi.fn().mockReturnValue({ view: null, stepIndex: null, ts: null }),
+  useScripturePresence: vi
+    .fn()
+    .mockReturnValue({ view: null, stepIndex: null, ts: null, isPartnerConnected: true }),
 }));
 
 // Mock framer-motion
@@ -105,6 +115,8 @@ describe('ReadingContainer', () => {
       isPendingLockIn: false,
       partnerLocked: false,
       scriptureError: null,
+      partnerDisconnected: false,
+      partnerDisconnectedAt: null,
     });
   });
 
@@ -170,6 +182,19 @@ describe('ReadingContainer', () => {
     const toast = screen.getByTestId('session-update-toast');
     expect(toast).toBeVisible();
     expect(toast).toHaveTextContent(/session updated/i);
+  });
+
+  test('[P1] shows generic error toast for non-409 reading sync failures', () => {
+    mockStoreState.scriptureError = {
+      code: 'SYNC_FAILED',
+      message: 'RPC timeout',
+    };
+
+    render(<ReadingContainer />);
+
+    const toast = screen.getByTestId('session-error-toast');
+    expect(toast).toBeVisible();
+    expect(toast).toHaveTextContent(/rpc timeout/i);
   });
 
   test('[P1] renders reading-container root element', () => {
