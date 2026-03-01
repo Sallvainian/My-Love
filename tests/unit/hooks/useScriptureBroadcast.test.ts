@@ -11,7 +11,6 @@
  * - No duplicate subscription (channelRef guard)
  * - partner_joined broadcast on SUBSCRIBED
  * - Dispatches onPartnerJoined on incoming partner_joined event
- * - Dispatches onPartnerReady on ready_state_changed event
  * - removeChannel called on cleanup
  */
 
@@ -64,14 +63,12 @@ import { supabase } from '../../../src/api/supabaseClient';
 // ============================================
 
 const mockOnPartnerJoined = vi.fn();
-const mockOnPartnerReady = vi.fn();
 const mockOnBroadcastReceived = vi.fn();
 const mockApplySessionConverted = vi.fn();
 const mockOnPartnerLockInChanged = vi.fn();
 
 const mockStoreState = {
   onPartnerJoined: mockOnPartnerJoined,
-  onPartnerReady: mockOnPartnerReady,
   onBroadcastReceived: mockOnBroadcastReceived,
   applySessionConverted: mockApplySessionConverted,
   onPartnerLockInChanged: mockOnPartnerLockInChanged,
@@ -234,18 +231,6 @@ describe('useScriptureBroadcast', () => {
     broadcastHandlers['partner_joined']?.({ payload: { user_id: 'user-2' } });
 
     expect(mockOnPartnerJoined).toHaveBeenCalledTimes(1);
-  });
-
-  test('[P1] calls onPartnerReady when ready_state_changed event is received', async () => {
-    await act(async () => {
-      renderHook(() => useScriptureBroadcast('session-abc'));
-    });
-
-    broadcastHandlers['ready_state_changed']?.({
-      payload: { user_id: 'user-2', is_ready: true },
-    });
-
-    expect(mockOnPartnerReady).toHaveBeenCalledWith(true);
   });
 
   test('[P1] maps lock_in_status_changed payload to partner lock state', async () => {
