@@ -34,9 +34,64 @@ export const isSelectRoleResponse = (resp: { url(): string; status(): number }):
   resp.status() >= 200 &&
   resp.status() < 300;
 
+/** Matches a scripture_lock_in RPC 2xx response. */
+export const isLockInResponse = (resp: { url(): string; status(): number }): boolean =>
+  resp.url().includes('/rest/v1/rpc/scripture_lock_in') &&
+  resp.status() >= 200 &&
+  resp.status() < 300;
+
 // ---------------------------------------------------------------------------
 // Shared navigation helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Navigate both users through lobby → role selection → ready → countdown → reading phase.
+ * Returns when both users see the reading-container.
+ */
+export async function navigateBothToReadingPhase(
+  page: Page,
+  partnerPage: Page,
+  roles: { userA: 'reader' | 'responder'; userB: 'reader' | 'responder' } = {
+    userA: 'reader',
+    userB: 'responder',
+  }
+): Promise<void> {
+  await page.getByTestId(`lobby-role-${roles.userA}`).click();
+  await partnerPage.getByTestId(`lobby-role-${roles.userB}`).click();
+  await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
+
+  await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
+    timeout: REALTIME_SYNC_TIMEOUT_MS,
+  });
+  const userAReady = page.waitForResponse(isToggleReadyResponse, {
+    timeout: READY_BROADCAST_TIMEOUT_MS,
+  });
+  await page.getByTestId('lobby-ready-button').click();
+  await userAReady;
+  const partnerReady = partnerPage.waitForResponse(isToggleReadyResponse, {
+    timeout: READY_BROADCAST_TIMEOUT_MS,
+  });
+  await partnerPage.getByTestId('lobby-ready-button').click();
+  await partnerReady;
+
+  await expect(page.getByTestId('reading-container')).toBeVisible({
+    timeout: STEP_ADVANCE_TIMEOUT_MS,
+  });
+  await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
+    timeout: STEP_ADVANCE_TIMEOUT_MS,
+  });
+
+  // Confirm realtime broadcast channel is live on both sides by waiting for the
+  // presence-driven partner-position indicator. This element only renders when
+  // the partner's presence channel has subscribed and broadcast — guaranteeing
+  // the broadcast channel (same async setAuth → subscribe flow) is also ready.
+  await expect(page.getByTestId('partner-position')).toBeVisible({
+    timeout: REALTIME_SYNC_TIMEOUT_MS,
+  });
+  await expect(partnerPage.getByTestId('partner-position')).toBeVisible({
+    timeout: REALTIME_SYNC_TIMEOUT_MS,
+  });
+}
 
 /**
  * Navigate to /scripture and start Together mode.

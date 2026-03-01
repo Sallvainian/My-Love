@@ -11,14 +11,14 @@
  *   AC#5 — Reconnection resync: partner returns → resync with server state
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { ensureScriptureOverview } from '../../support/helpers';
 import {
-  REALTIME_SYNC_TIMEOUT_MS,
-  READY_BROADCAST_TIMEOUT_MS,
   SESSION_CREATE_TIMEOUT_MS,
   STEP_ADVANCE_TIMEOUT_MS,
-  isToggleReadyResponse,
 } from '../../support/helpers/scripture-lobby';
+import {
+  startTogetherSessionForRole,
+  setupBothUsersInReading,
+} from '../../support/helpers/scripture-together';
 import { cleanupTestSession } from '../../support/factories';
 
 // ---------------------------------------------------------------------------
@@ -29,129 +29,18 @@ const DISCONNECTION_DETECT_TIMEOUT_MS = 25_000; // Heartbeat 10s + stale TTL 20s
 const DISCONNECTION_PHASE_B_TIMEOUT_MS = 35_000; // Phase B starts at 30s elapsed
 
 // ---------------------------------------------------------------------------
-// Shared helper: navigate both users through lobby to reading phase
+// Shared helper: create a partner browser context
 // ---------------------------------------------------------------------------
 
-async function setupBothUsersInReading(
-  page: import('@playwright/test').Page,
-  partnerPage: import('@playwright/test').Page
+async function createPartnerContext(
+  browser: import('@playwright/test').Browser,
+  originPage: import('@playwright/test').Page,
+  partnerStorageStatePath: string
 ) {
-  const bothAlreadyInReading =
-    (await page
-      .getByTestId('reading-container')
-      .isVisible()
-      .catch(() => false)) &&
-    (await partnerPage
-      .getByTestId('reading-container')
-      .isVisible()
-      .catch(() => false));
-
-  if (bothAlreadyInReading) return;
-
-  // Wait for the ready button to appear on at least User A's page (lobby loaded)
-  await expect(page.getByTestId('lobby-ready-button')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-
-  // Wait for partner to see that User A has joined before readying up
-  await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-    timeout: REALTIME_SYNC_TIMEOUT_MS,
-  });
-
-  // Both users ready up → countdown → reading phase (network-first)
-  const pageReadyResponse = page.waitForResponse(isToggleReadyResponse, {
-    timeout: READY_BROADCAST_TIMEOUT_MS,
-  });
-  await page.getByTestId('lobby-ready-button').click();
-  await pageReadyResponse;
-
-  await expect(partnerPage.getByTestId('lobby-ready-button')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-  const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, {
-    timeout: READY_BROADCAST_TIMEOUT_MS,
-  });
-  await partnerPage.getByTestId('lobby-ready-button').click();
-  await partnerReadyResponse;
-
-  // Wait for reading container on both pages (countdown completes → reading)
-  await expect(page.getByTestId('reading-container')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-  await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-}
-
-async function startTogetherSessionForRole(
-  page: import('@playwright/test').Page,
-  roleTestId: 'lobby-role-reader' | 'lobby-role-responder',
-  options?: { assertPostState?: boolean }
-): Promise<string> {
-  const assertPostState = options?.assertPostState ?? true;
-
-  await ensureScriptureOverview(page);
-
-  const sessionResponse = page
-    .waitForResponse(
-      (resp) =>
-        resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-        resp.request().method() === 'POST' &&
-        resp.status() >= 200 &&
-        resp.status() < 300,
-      { timeout: SESSION_CREATE_TIMEOUT_MS }
-    )
-    .catch((e: Error) => {
-      throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
-    });
-
-  await page.getByTestId('scripture-start-button').click();
-  await expect(page.getByTestId('scripture-mode-together')).toBeVisible();
-  await page.getByTestId('scripture-mode-together').click();
-
-  const response = await sessionResponse;
-  const payload = (await response.json()) as { id?: string };
-  const sessionId = payload.id;
-  expect(sessionId, 'scripture_create_session must return session id').toBeTruthy();
-
-  const hasLobbyRoleSelection = await page
-    .getByTestId('lobby-role-selection')
-    .isVisible({ timeout: 2_000 })
-    .catch(() => false);
-
-  if (assertPostState) {
-    if (hasLobbyRoleSelection) {
-      await page.getByTestId(roleTestId).click();
-      await expect
-        .poll(
-          async () => {
-            const isWaitingVisible = await page
-              .getByText(/waiting for/i)
-              .isVisible()
-              .catch(() => false);
-            const isReadyVisible = await page
-              .getByRole('button', { name: /i'?m ready/i })
-              .isVisible()
-              .catch(() => false);
-            const isReadingVisible = await page
-              .getByTestId('reading-container')
-              .isVisible()
-              .catch(() => false);
-            return isWaitingVisible || isReadyVisible || isReadingVisible;
-          },
-          { timeout: STEP_ADVANCE_TIMEOUT_MS }
-        )
-        .toBe(true);
-    } else {
-      await expect(page.getByTestId('reading-container')).toBeVisible({
-        timeout: STEP_ADVANCE_TIMEOUT_MS,
-      });
-    }
-  } else if (hasLobbyRoleSelection) {
-    await page.getByTestId(roleTestId).click();
-  }
-
-  return sessionId!;
+  const baseURL = new URL(originPage.url()).origin;
+  const context = await browser.newContext({ storageState: partnerStorageStatePath, baseURL });
+  const page = await context.newPage();
+  return { context, page };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,32 +57,27 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     test.setTimeout(120_000);
     const sessionIdsToClean = new Set<string>();
 
-    // GIVEN: User A starts Together mode, selecting Reader when lobby is available
+    // GIVEN: User A starts Together mode, selecting Reader
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
     // GIVEN: User B (partner) joins and selects Responder
-    const baseURL = new URL(page.url()).origin;
-    const partnerContext = await browser.newContext({
-      storageState: partnerStorageStatePath,
-      baseURL,
-    });
-    const partnerPage = await partnerContext.newPage();
+    const partner = await createPartnerContext(browser, page, partnerStorageStatePath);
 
     try {
       const partnerSessionId = await startTogetherSessionForRole(
-        partnerPage,
+        partner.page,
         'lobby-role-responder'
       );
       sessionIdsToClean.add(partnerSessionId);
 
       // Both enter reading phase
-      await setupBothUsersInReading(page, partnerPage);
+      await setupBothUsersInReading(page, partner.page);
 
       // -----------------------------------------------------------------------
       // WHEN: Partner B goes offline (close their page to stop sending presence)
       // -----------------------------------------------------------------------
-      await partnerPage.close();
+      await partner.page.close();
 
       // -----------------------------------------------------------------------
       // THEN: AC#1 — User A sees "Partner reconnecting..." overlay
@@ -204,7 +88,6 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
       await expect(page.getByTestId('disconnection-reconnecting')).toBeVisible();
 
       // AC#1 — Lock-in button shows "Holding your place"
-      await expect(page.getByTestId('lock-in-disconnected')).toBeVisible();
       await expect(page.getByTestId('lock-in-disconnected')).toContainText(/holding your place/i);
 
       // -----------------------------------------------------------------------
@@ -247,7 +130,6 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
       await expect(page.getByTestId('reading-container')).not.toBeVisible({
         timeout: SESSION_CREATE_TIMEOUT_MS,
       });
-      // Scripture overview mode selection is visible after session ends.
       await expect(page.getByTestId('scripture-mode-together')).toBeVisible({
         timeout: SESSION_CREATE_TIMEOUT_MS,
       });
@@ -260,7 +142,7 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
         .single();
       expect(sessionData?.status).toBe('ended_early');
     } finally {
-      await partnerContext.close().catch(() => {});
+      await partner.context.close().catch(() => {});
       await cleanupTestSession(supabaseAdmin, [...sessionIdsToClean]);
     }
   });
@@ -280,30 +162,25 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     test.setTimeout(120_000);
     const sessionIdsToClean = new Set<string>();
 
-    // GIVEN: User A starts Together mode, selecting Reader when lobby is available
+    // GIVEN: User A starts Together mode, selecting Reader
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
-    const baseURL = new URL(page.url()).origin;
-    const partnerContext = await browser.newContext({
-      storageState: partnerStorageStatePath,
-      baseURL,
-    });
-    let partnerPage = await partnerContext.newPage();
+    const partner = await createPartnerContext(browser, page, partnerStorageStatePath);
 
     try {
       const partnerSessionId = await startTogetherSessionForRole(
-        partnerPage,
+        partner.page,
         'lobby-role-responder'
       );
       sessionIdsToClean.add(partnerSessionId);
 
-      await setupBothUsersInReading(page, partnerPage);
+      await setupBothUsersInReading(page, partner.page);
 
       // -----------------------------------------------------------------------
       // WHEN: Partner B goes offline (close tab to stop presence heartbeat)
       // -----------------------------------------------------------------------
-      await partnerPage.close();
+      await partner.page.close();
 
       // THEN: User A sees disconnect overlay
       await expect(page.getByTestId('disconnection-overlay')).toBeVisible({
@@ -324,48 +201,55 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
       await expect(page.getByTestId('disconnection-overlay')).toBeVisible();
 
       // -----------------------------------------------------------------------
-      // WHEN: Partner B comes back online (new tab in same authenticated context)
-      // scripture_create_session only reuses lobby-phase sessions, so we load
-      // the existing reading-phase session directly into the partner's store.
-      // This triggers ReadingContainer mount → useScripturePresence subscribes
-      // → heartbeats resume → User A's presence hook detects partner online.
+      // WHEN: Partner B comes back online (new tab, navigate to scripture)
+      // The app detects the active session and resumes it. The partner's
+      // presence hook re-subscribes → heartbeats resume → User A's hook
+      // detects partner online → overlay dismisses.
       // -----------------------------------------------------------------------
 
-      // Ensure DB has current_phase='reading' so loadSession gets the correct phase.
-      // The countdown→reading transition is normally client-side only, so the DB
-      // may still show 'countdown' at this point.
+      // Ensure DB has current_phase='reading' so the app loads the correct phase
       await supabaseAdmin
         .from('scripture_sessions')
         .update({ current_phase: 'reading' })
         .eq('id', primarySessionId);
 
-      partnerPage = await partnerContext.newPage();
-      await partnerPage.goto('/scripture');
-      // Wait for the app to hydrate (any data-testid means React has rendered)
-      await partnerPage.waitForFunction(() => !!document.querySelector('[data-testid]'), null, {
+      // Open a new partner tab and load the existing together-mode session.
+      // NOTE: Together-mode sessions are not auto-detected on navigation
+      // (checkForActiveSession only finds solo sessions). We call loadSession()
+      // via page.evaluate() with Vite's dev-server ESM resolution. This
+      // couples the test to the dev-server — if the bundler or base path
+      // changes, update the import path below. See test-review-story-4.3.md
+      // recommendation #3 for the app-level fix (add ?sessionId= support).
+      const reconnectedPartnerPage = await partner.context.newPage();
+      await reconnectedPartnerPage.goto('/scripture');
+      await expect(reconnectedPartnerPage.getByTestId('scripture-overview')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
-      // Load the existing reading-phase session into the Zustand store
-      await partnerPage.evaluate(
-        `import("/src/stores/useAppStore.ts").then(m => m.useAppStore.getState().loadSession("${primarySessionId}"))`
+      await reconnectedPartnerPage.evaluate(
+        (sid) =>
+          import('/src/stores/useAppStore.ts').then((m) =>
+            m.useAppStore.getState().loadSession(sid)
+          ),
+        primarySessionId
       );
-      await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
+      await expect(reconnectedPartnerPage.getByTestId('reading-container')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
 
       // -----------------------------------------------------------------------
       // THEN: AC#5 — Both resume reading, overlay dismisses
-      // Partner's ReadingContainer mounts → useScripturePresence subscribes
-      // → sends heartbeat → User A's presence hook receives it → overlay dismisses.
-      // Allow extra time for channel subscription + first heartbeat delivery.
       // -----------------------------------------------------------------------
       await expect(page.getByTestId('disconnection-overlay')).not.toBeVisible({
         timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
       });
 
       // Both users still see reading container (session intact)
-      await expect(page.getByTestId('reading-container')).toBeVisible();
-      await expect(partnerPage.getByTestId('reading-container')).toBeVisible();
+      await expect(page.getByTestId('reading-container')).toBeVisible({
+        timeout: STEP_ADVANCE_TIMEOUT_MS,
+      });
+      await expect(reconnectedPartnerPage.getByTestId('reading-container')).toBeVisible({
+        timeout: STEP_ADVANCE_TIMEOUT_MS,
+      });
 
       // Verify session is still in_progress (not ended)
       const { data: sessionData } = await supabaseAdmin
@@ -375,7 +259,7 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
         .single();
       expect(sessionData?.status).toBe('in_progress');
     } finally {
-      await partnerContext.close().catch(() => {});
+      await partner.context.close().catch(() => {});
       await cleanupTestSession(supabaseAdmin, [...sessionIdsToClean]);
     }
   });
