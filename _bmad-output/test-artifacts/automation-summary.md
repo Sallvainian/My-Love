@@ -1,7 +1,7 @@
 ---
 stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 'step-03-generate-tests', 'step-03c-aggregate', 'step-04-validate-and-summarize']
 lastStep: 'step-04-validate-and-summarize'
-lastSaved: '2026-02-28'
+lastSaved: '2026-03-01'
 workflowType: 'testarch-automate'
 ---
 
@@ -515,3 +515,102 @@ Generated expansion tests in 5 existing files. No new files created.
 1. `test-review` on Story 4.3 (TA step — next in TEA per-story order)
 2. Unskip E2E tests once Supabase is running and E2E infrastructure is validated
 3. `trace` to confirm P0/P1 coverage alignment for Epic 4 stories 4.1 + 4.2 + 4.3
+
+---
+
+## Update: 2026-03-01 (Story 4.3 — Reconnection E2E Test Refactoring — Quality Healing)
+
+- Workflow: `testarch-automate` (Standalone mode — targeted refactoring)
+- Scope: Address top 3 actionable items from test-review-story-4.3.md (score: 78/100 → target: 90+)
+
+### Step 1: Preflight & Context
+
+- **Framework**: Playwright (playwright.config.ts)
+- **Mode**: Standalone (targeted refactoring from test review findings)
+- **Source**: `_bmad-output/test-artifacts/test-reviews/test-review-story-4.3.md` (78/100 C+)
+- **TEA Config**: `tea_use_playwright_utils: true`, `tea_browser_automation: auto`
+- **Knowledge Loaded**: test-quality, test-levels-framework, test-priorities-matrix, test-healing-patterns, selector-resilience, timing-debugging
+
+### Step 2: Identify Automation Targets
+
+| # | Priority | Target | Type | Impact |
+|---|----------|--------|------|--------|
+| 1 | P1 | Extract inline helpers to `scripture-together.ts` | Refactoring | Maintainability: 50→80+ |
+| 2 | P2 | Remove conditional `isVisible().catch()` branching | Healing | Determinism: 85→95+ |
+| 3 | P2 | Improve `page.evaluate()` ESM import safety | Healing | Flakiness risk reduction |
+| 4 | P3 | Remove redundant `toBeVisible` before `toContainText` | Polish | Performance clarity |
+| 5 | P3 | Add explicit timeouts to final assertions | Polish | Intent clarity |
+| 6 | P3 | Replace generic DOM poll with specific element wait | Polish | Determinism clarity |
+| 7 | P3 | Deduplicate partner context creation | Polish | Maintainability |
+
+### Step 3: Generation (Sequential — Refactoring)
+
+**File created:**
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `tests/support/helpers/scripture-together.ts` | 110 | Shared Together Mode helpers: `startTogetherSessionForRole()`, `setupBothUsersInReading()` |
+
+**File modified:**
+
+| File | Before | After | Delta | Description |
+|------|--------|-------|-------|-------------|
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | 383 | 266 | -117 | Refactored: extracted helpers, removed conditionals, improved ESM import, P3 fixes |
+
+### Step 4: Validation
+
+**TypeScript**: `tsc --noEmit` → 0 errors
+**ESLint**: 0 errors
+**Prettier**: Both files already formatted (unchanged)
+
+**Quality checks:**
+- Spec file: 266 lines (was 383, limit 300) — PASS
+- Helper file: 110 lines (limit 300) — PASS
+- No hard waits — PASS
+- No conditional `isVisible().catch()` in spec file — PASS (removed)
+- Network-first pattern preserved — PASS
+- try/finally cleanup preserved — PASS
+- Session ID Set tracking preserved — PASS
+- DB state verification preserved — PASS
+- All AC# references preserved — PASS
+- Priority tags `[P0]`, `[P1]` preserved — PASS
+
+**Changes applied by target:**
+
+1. **P1 — Helper extraction (DONE)**: Created `scripture-together.ts` with `startTogetherSessionForRole()` and `setupBothUsersInReading()`. The spec imports from the new module. The `startTogetherSessionForRole` is a deterministic version that always expects role selection (removed the `isVisible().catch()` probe and multi-branch logic). `setupBothUsersInReading` is the clean ready-up sequence without the "already in reading" guard.
+
+2. **P2 — Conditional branching removal (DONE)**: Both `isVisible().catch(() => false)` probes removed. `startTogetherSessionForRole` now always expects `lobby-role-selection` to be visible (deterministic — uses `navigateToTogetherRoleSelection` which already asserts this). `setupBothUsersInReading` no longer checks if pages are "already in reading" — it always runs the full ready-up sequence.
+
+3. **P2 — ESM import improvement (PARTIAL)**: The `page.evaluate()` call is still needed (app doesn't support `?sessionId=` query param for together-mode session resumption). However, the call is now safer: uses a typed function parameter (`(sid) => import(...).then(...)`, primarySessionId) instead of string interpolation, waits for `scripture-overview` visibility instead of generic DOM poll, and includes a clear comment explaining the limitation and linking to the app-level fix recommendation.
+
+4. **P3 — Minor cleanups (DONE)**: Removed redundant `toBeVisible` before `toContainText` (line 207→merged), added explicit `{ timeout: STEP_ADVANCE_TIMEOUT_MS }` to final assertions, replaced generic `waitForFunction(() => !!document.querySelector('[data-testid]'))` with specific `expect(getByTestId('scripture-overview')).toBeVisible()`, extracted `createPartnerContext()` helper to deduplicate 4-line pattern used in both tests.
+
+### Expected Score Impact
+
+| Dimension | Before | After (Est.) | Notes |
+|-----------|--------|-------------|-------|
+| Determinism | 85 | 92 | Removed 2 conditional probes, typed ESM import |
+| Isolation | 91 | 91 | Unchanged (already strong) |
+| Maintainability | 50 | 85 | -117 lines, 0 duplication with shared helpers |
+| Performance | 83 | 88 | Removed redundant assertion, explicit timeouts |
+| **Weighted Total** | **78** | **89** | Grade: B+ (was C+) |
+
+### Files Created/Updated
+
+| File | Action | Lines | Priority |
+|------|--------|-------|----------|
+| `tests/support/helpers/scripture-together.ts` | **Created** | 110 | P1 |
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | **Updated** | 266 (was 383) | P1-P3 |
+| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+
+### Assumptions & Risks
+
+- **ESM import retained**: The `page.evaluate()` with Vite ESM import is still used for reconnection test (4.3-E2E-002). The app needs `?sessionId=` query param support to fully eliminate this. Documented as known limitation with clear comment.
+- **4.2 spec not modified**: `scripture-reading-4.2.spec.ts` also uses the same ESM import pattern (line 223-226) but for a different purpose (skipping lock-in cycles, not reconnection). Left unchanged to avoid risk in a serial test suite.
+- **Tests not run**: Supabase local instance required. TypeScript, ESLint, and Prettier all pass.
+
+### Next Recommended Workflow
+
+1. Run E2E tests with Supabase: `npx playwright test tests/e2e/scripture/scripture-reconnect-4.3.spec.ts --project=chromium`
+2. `test-review` re-run on Story 4.3 to verify score improvement (target: 89+)
+3. Consider app-level change: add `?sessionId=` query param support to `ScriptureOverview` to eliminate the remaining ESM import in reconnection test
