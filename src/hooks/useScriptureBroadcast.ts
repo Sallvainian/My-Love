@@ -8,17 +8,17 @@
  * do NOT import supabase for broadcast in components or other hooks.
  *
  * Event flow:
- *   partner_joined     → onPartnerJoined() slice action
- *   ready_state_changed → onPartnerReady(is_ready) slice action
- *   state_updated      → onBroadcastReceived(payload) slice action
- *   session_converted  → applySessionConverted() slice action (local state only, no RPC)
+ *   partner_joined        → onPartnerJoined() slice action
+ *   state_updated         → onBroadcastReceived(payload) slice action
+ *   session_converted     → applySessionConverted() slice action (local state only, no RPC)
+ *   lock_in_status_changed → onPartnerLockInChanged(locked) slice action
  *
  * Cleanup: supabase.removeChannel(channel) on sessionId change or unmount.
  * Duplicate subscribe guard: checks channelRef.current?.state === 'subscribed'
  * to handle React StrictMode double-mount.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useShallow } from 'zustand/react/shallow';
 import { supabase } from '../api/supabaseClient';
@@ -29,11 +29,6 @@ import type { ScriptureError } from '../services/scriptureReadingService';
 
 interface PartnerJoinedPayload {
   user_id: string;
-}
-
-interface ReadyStateChangedPayload {
-  user_id: string;
-  is_ready: boolean;
 }
 
 interface SessionConvertedPayload {
@@ -52,34 +47,51 @@ interface LockInStatusChangedPayload {
 export function useScriptureBroadcast(sessionId: string | null): void {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  // Story 4.3: Retry counter — incrementing triggers useEffect re-run to re-subscribe after CHANNEL_ERROR
+  const [retryCount, setRetryCount] = useState(0);
+
   const {
     onPartnerJoined,
-    onPartnerReady,
     onBroadcastReceived,
     applySessionConverted,
     onPartnerLockInChanged,
+    loadSession,
+    setBroadcastFn,
     currentUserId,
     sessionUserId,
+    sessionIdFromStore,
   } = useAppStore(
     useShallow((state) => ({
       onPartnerJoined: state.onPartnerJoined,
-      onPartnerReady: state.onPartnerReady,
       onBroadcastReceived: state.onBroadcastReceived,
       applySessionConverted: state.applySessionConverted,
       onPartnerLockInChanged: state.onPartnerLockInChanged,
+      loadSession: state.loadSession,
+      setBroadcastFn: state.setBroadcastFn,
       currentUserId: state.currentUserId,
       sessionUserId: state.session?.userId ?? null, // user1_id
+      sessionIdFromStore: state.session?.id ?? null,
     }))
   );
 
-  const identityRef = useRef<{ currentUserId: string | null; sessionUserId: string | null }>({
+  const identityRef = useRef<{
+    currentUserId: string | null;
+    sessionUserId: string | null;
+    sessionIdFromStore: string | null;
+  }>({
     currentUserId,
     sessionUserId,
+    sessionIdFromStore,
   });
 
   useEffect(() => {
-    identityRef.current = { currentUserId, sessionUserId };
-  }, [currentUserId, sessionUserId]);
+    identityRef.current = { currentUserId, sessionUserId, sessionIdFromStore };
+  }, [currentUserId, sessionUserId, sessionIdFromStore]);
+
+  // Story 4.3: Track whether channel has errored to know when re-subscribe succeeds
+  const hasErroredRef = useRef(false);
+  // Story 4.3: Guard against retry storms when CHANNEL_ERROR/CLOSED fires before removeChannel resolves
+  const isRetryingRef = useRef(false);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -103,13 +115,6 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         { event: 'partner_joined' },
         (_payload: { payload: PartnerJoinedPayload }) => {
           onPartnerJoined();
-        }
-      )
-      .on(
-        'broadcast',
-        { event: 'ready_state_changed' },
-        (msg: { payload: ReadyStateChangedPayload }) => {
-          onPartnerReady(msg.payload.is_ready);
         }
       )
       .on('broadcast', { event: 'state_updated' }, (msg: { payload: StateUpdatePayload }) => {
@@ -154,7 +159,23 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
-            // Broadcast our own join to notify partner — include user_id per event contract
+            // Story 4.3: If this is a re-subscribe after error, resync state
+            if (hasErroredRef.current) {
+              hasErroredRef.current = false;
+              const sid = identityRef.current.sessionIdFromStore;
+              if (sid) {
+                loadSession(sid);
+              }
+            }
+
+            // Wire broadcast function so Zustand slice actions can broadcast
+            // via channel.send() after RPC success (client-side broadcast).
+            setBroadcastFn?.((event, payload) => {
+              void channel.send({ type: 'broadcast', event, payload });
+            });
+
+            // Broadcast our own join on every successful subscription so peers
+            // can clear disconnected UI after a reconnection.
             void channel.send({
               type: 'broadcast',
               event: 'partner_joined',
@@ -167,6 +188,35 @@ export function useScriptureBroadcast(sessionId: string | null): void {
               details: err,
             };
             handleScriptureError(scriptureError);
+
+            // Story 4.3: Mark as errored and attempt re-subscribe
+            hasErroredRef.current = true;
+            // Guard: do not re-subscribe if session has ended or already retrying
+            if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
+              isRetryingRef.current = true;
+              void supabase.removeChannel(channel).then(() => {
+                if (channelRef.current === channel) {
+                  channelRef.current = null;
+                }
+                isRetryingRef.current = false;
+                // Increment retry counter to trigger useEffect re-run → new channel subscription
+                setRetryCount((c) => c + 1);
+              });
+            }
+          } else if (status === 'CLOSED') {
+            // Story 4.3: Channel closed — remove stale channel before re-subscribe
+            if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
+              hasErroredRef.current = true;
+              isRetryingRef.current = true;
+              void supabase.removeChannel(channel).then(() => {
+                if (channelRef.current === channel) {
+                  channelRef.current = null;
+                }
+                isRetryingRef.current = false;
+                // Increment retry counter to trigger useEffect re-run → new channel subscription
+                setRetryCount((c) => c + 1);
+              });
+            }
           }
         });
       })
@@ -180,6 +230,8 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       });
 
     return () => {
+      // Clear broadcast function so slice actions don't try to broadcast on a dead channel
+      setBroadcastFn?.(null);
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -187,10 +239,12 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     };
   }, [
     sessionId,
+    retryCount,
     onPartnerJoined,
-    onPartnerReady,
     onBroadcastReceived,
     applySessionConverted,
     onPartnerLockInChanged,
+    loadSession,
+    setBroadcastFn,
   ]);
 }
