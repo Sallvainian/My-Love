@@ -17,6 +17,7 @@ import {
   READY_BROADCAST_TIMEOUT_MS,
   COUNTDOWN_APPEAR_TIMEOUT_MS,
   isToggleReadyResponse,
+  isSelectRoleResponse,
   navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
 import {
@@ -65,10 +66,17 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     // Track session IDs for cleanup
     const sessionIdsToClean = [...seed.session_ids];
 
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
     // -----------------------------------------------------------------------
     // GIVEN: User A navigates to /scripture and starts Together mode
     // -----------------------------------------------------------------------
-    await navigateToTogetherRoleSelection(page);
+    const uiSession1 = await navigateToTogetherRoleSelection(page);
+    if (uiSession1) sessionIdsToClean.push(uiSession1);
 
     // AC#1 — Role selection screen present with Reader and Responder cards
     await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
@@ -78,7 +86,9 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(page.getByTestId('lobby-role-responder')).toContainText('You read the response');
 
     // WHEN: User A selects Reader role
+    const userASelectRole = page.waitForResponse(isSelectRoleResponse);
     await page.getByTestId('lobby-role-reader').click();
+    await userASelectRole;
 
     // THEN: Lobby waiting screen appears
     // AC#2 — "Waiting for [Partner Name]..." visible; Continue solo button present
@@ -101,14 +111,17 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
 
     try {
       // Partner navigates to /scripture and enters Together mode
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSession1b = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSession1b && uiSession1b !== uiSession1) sessionIdsToClean.push(uiSession1b);
 
       // AC#1 — Partner also sees role selection
       await expect(partnerPage.getByTestId('lobby-role-selection')).toBeVisible();
       await expect(partnerPage.getByTestId('lobby-role-responder')).toBeVisible();
 
       // Partner selects Responder role
+      const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
       await partnerPage.getByTestId('lobby-role-responder').click();
+      await partnerSelectRole;
 
       // Partner should see lobby waiting screen
       await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
@@ -210,13 +223,16 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // -----------------------------------------------------------------------
       // GIVEN: User navigates to /scripture and starts Together mode
       // -----------------------------------------------------------------------
-      await navigateToTogetherRoleSelection(page);
+      const uiSession2 = await navigateToTogetherRoleSelection(page);
+      if (uiSession2) sessionIdsToClean.push(uiSession2);
 
       // AC#1 — Role selection visible
       await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
 
       // WHEN: User selects a role (Reader)
+      const soloSelectRole = page.waitForResponse(isSelectRoleResponse);
       await page.getByTestId('lobby-role-reader').click();
+      await soloSelectRole;
 
       // -----------------------------------------------------------------------
       // THEN: Lobby waiting screen shows (partner has NOT joined)

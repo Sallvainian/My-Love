@@ -27,6 +27,12 @@ export const isToggleReadyResponse = (resp: { url(): string; status(): number })
   resp.status() >= 200 &&
   resp.status() < 300;
 
+/** Matches a scripture_select_role RPC 2xx response. */
+export const isSelectRoleResponse = (resp: { url(): string; status(): number }): boolean =>
+  resp.url().includes('/rest/v1/rpc/scripture_select_role') &&
+  resp.status() >= 200 &&
+  resp.status() < 300;
+
 // ---------------------------------------------------------------------------
 // Shared navigation helpers
 // ---------------------------------------------------------------------------
@@ -34,8 +40,9 @@ export const isToggleReadyResponse = (resp: { url(): string; status(): number })
 /**
  * Navigate to /scripture and start Together mode.
  * Waits for the role selection screen to become visible.
+ * Returns the session ID from the create-session RPC response.
  */
-export async function navigateToTogetherRoleSelection(page: Page): Promise<void> {
+export async function navigateToTogetherRoleSelection(page: Page): Promise<string> {
   await ensureScriptureOverview(page);
 
   // Network-first: watch for the create-session RPC before clicking
@@ -58,8 +65,11 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<void>
   await expect(page.getByTestId('scripture-mode-together')).toBeVisible();
   await page.getByTestId('scripture-mode-together').click();
 
-  await sessionResponse;
+  const response = await sessionResponse;
+  const payload = (await response.json()) as { id?: string };
 
   // Role selection screen must be visible
   await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
+
+  return payload.id ?? '';
 }

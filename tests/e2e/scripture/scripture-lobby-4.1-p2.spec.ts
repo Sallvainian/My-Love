@@ -14,6 +14,7 @@ import {
   READY_BROADCAST_TIMEOUT_MS,
   COUNTDOWN_APPEAR_TIMEOUT_MS,
   isToggleReadyResponse,
+  isSelectRoleResponse,
   navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
 import {
@@ -51,9 +52,18 @@ test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
 
     const sessionIdsToClean = [...seed.session_ids];
 
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
     // GIVEN: User A navigates to Together mode and selects Reader role
-    await navigateToTogetherRoleSelection(page);
+    const uiSessionP2a = await navigateToTogetherRoleSelection(page);
+    if (uiSessionP2a) sessionIdsToClean.push(uiSessionP2a);
+    const userASelectRole = page.waitForResponse(isSelectRoleResponse);
     await page.getByTestId('lobby-role-reader').click();
+    await userASelectRole;
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
     // GIVEN: User B (partner) opens a second browser context and joins
@@ -65,8 +75,11 @@ test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSessionP2ab = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSessionP2ab && uiSessionP2ab !== uiSessionP2a) sessionIdsToClean.push(uiSessionP2ab);
+      const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
       await partnerPage.getByTestId('lobby-role-responder').click();
+      await partnerSelectRole;
       await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
       // THEN: User A sees partner has joined
@@ -144,9 +157,18 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
 
     const sessionIdsToClean = [...seed.session_ids];
 
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
     // GIVEN: User A navigates to Together mode and selects Reader role
-    await navigateToTogetherRoleSelection(page);
+    const uiSessionP2c = await navigateToTogetherRoleSelection(page);
+    if (uiSessionP2c) sessionIdsToClean.push(uiSessionP2c);
+    const userASelectRole2 = page.waitForResponse(isSelectRoleResponse);
     await page.getByTestId('lobby-role-reader').click();
+    await userASelectRole2;
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
     // GIVEN: User B (partner) opens a second browser context and joins
@@ -158,8 +180,11 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      await navigateToTogetherRoleSelection(partnerPage);
+      const uiSessionP2cb = await navigateToTogetherRoleSelection(partnerPage);
+      if (uiSessionP2cb && uiSessionP2cb !== uiSessionP2c) sessionIdsToClean.push(uiSessionP2cb);
+      const partnerSelectRole2 = partnerPage.waitForResponse(isSelectRoleResponse);
       await partnerPage.getByTestId('lobby-role-responder').click();
+      await partnerSelectRole2;
       await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
       // THEN: User A sees that partner has joined
@@ -214,9 +239,16 @@ test.describe('[4.1-E2E-005] Language Compliance', () => {
     const seed = await createTestSession(supabaseAdmin, { sessionCount: 1 });
     const sessionIdsToClean = [...seed.session_ids];
 
+    // End the seeded session so it doesn't interfere with the UI-created lobby session
+    await supabaseAdmin
+      .from('scripture_sessions')
+      .update({ status: 'complete', current_phase: 'complete' })
+      .in('id', seed.session_ids);
+
     try {
       // GIVEN: User navigates to Together mode and reaches role selection
-      await navigateToTogetherRoleSelection(page);
+      const uiSessionP2e = await navigateToTogetherRoleSelection(page);
+      if (uiSessionP2e) sessionIdsToClean.push(uiSessionP2e);
       await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
 
       // AC#2 — "Continue solo" button on role selection screen
@@ -226,7 +258,9 @@ test.describe('[4.1-E2E-005] Language Compliance', () => {
       await expect(continueSoloOnRoleSelection).toHaveText('Continue solo');
 
       // WHEN: User selects Reader role — transitions to lobby waiting screen
+      const langSelectRole = page.waitForResponse(isSelectRoleResponse);
       await page.getByTestId('lobby-role-reader').click();
+      await langSelectRole;
       await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
       // THEN (AC#2): Language compliance in lobby waiting state
