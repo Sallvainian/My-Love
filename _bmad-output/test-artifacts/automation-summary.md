@@ -2,6 +2,7 @@
 stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 'step-03-generate-tests', 'step-03c-aggregate', 'step-04-validate-and-summarize']
 lastStep: 'step-04-validate-and-summarize'
 lastSaved: '2026-02-28'
+workflowType: 'testarch-automate'
 ---
 
 # Automation Summary
@@ -403,3 +404,114 @@ Generated expansion tests in 3 existing files. No new files created.
 
 1. `test-review` on Story 4.2 expanded tests before merging
 2. `trace` to confirm P0/P1 coverage alignment for Epic 4 stories 4.1 + 4.2
+
+---
+
+## Update: 2026-02-28 (Story 4.3 — Reconnection & Graceful Degradation — Coverage Expansion)
+
+- Workflow: `testarch-automate` (BMad-Integrated mode)
+- Scope: Expand automation coverage for Epic 4 Story 4.3 — fill edge case gaps beyond ATDD checklist
+
+### Step 1: Preflight & Context
+
+- **Framework**: Vitest + happy-dom + React Testing Library (unit/component), Playwright (E2E)
+- **Mode**: BMad-Integrated (story 4.3 artifact at `_bmad-output/implementation-artifacts/4-3-reconnection-and-graceful-degradation.md`)
+- **Story Status**: Review (implementation complete, 777 unit tests passing, typecheck clean)
+- **TEA Config**: `tea_use_playwright_utils: true`, `tea_browser_automation: auto`
+- **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, data-factories, selective-testing, ci-burn-in, test-quality
+
+**Artifacts loaded:**
+- Story 4.3 implementation artifact (6 ACs, 11 tasks all complete)
+- ATDD checklist: `_bmad-output/test-artifacts/atdd-checklist-4.3.md` (27 tests: 25 unit + 2 E2E skipped)
+- Existing test files: 5 unit/component + 1 E2E spec (6 files total)
+
+### Step 2: Identify Automation Targets
+
+**Existing ATDD coverage (28 passing unit tests + 2 skipped E2E):**
+
+| Level | File | Tests | Status |
+|-------|------|-------|--------|
+| Unit | `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | 9 | All passing |
+| Unit | `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | 10 | All passing |
+| Unit | `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | 3 | All passing |
+| Unit | `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | 3 | All passing |
+| Unit | `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 3 (disconnected) | All passing |
+| E2E | `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | 2 | test.skip (require running Supabase) |
+
+**Coverage gaps identified (edge cases & negative paths):**
+
+| # | Priority | Gap | File | Level |
+|---|----------|-----|------|-------|
+| 1 | P2 | Interval cleanup on unmount (no memory leak) | DisconnectionOverlay.test.tsx | Unit |
+| 2 | P2 | Re-renders on disconnectedAt change (Keep Waiting timer reset) | DisconnectionOverlay.test.tsx | Unit |
+| 3 | P2 | Phase A has animate-pulse class for visual feedback | DisconnectionOverlay.test.tsx | Unit |
+| 4 | P1 | `onBroadcastReceived` with `triggered_by` (snake_case) = end_session | scriptureReadingSlice.reconnect.test.ts | Unit |
+| 5 | P2 | `setPartnerDisconnected(true)` idempotent (multiple calls) | scriptureReadingSlice.reconnect.test.ts | Unit |
+| 6 | P2 | `endSession()` sets scriptureError on failure (does not throw) | scriptureReadingSlice.reconnect.test.ts | Unit |
+| 7 | P1 | Stale presence_update dropped (ts > 20s) | useScripturePresence.reconnect.test.ts | Unit |
+| 8 | P2 | Cleanup on unmount clears stale timer and channel | useScripturePresence.reconnect.test.ts | Unit |
+| 9 | P2 | No channel created when sessionId is null | useScripturePresence.reconnect.test.ts | Unit |
+| 10 | P1 | CLOSED status with active session sets hasErrored for resync | useScriptureBroadcast.reconnect.test.ts | Unit |
+| 11 | P2 | Cleanup on unmount removes channel | useScriptureBroadcast.reconnect.test.ts | Unit |
+| 12 | P2 | Disconnected+unlocked has accessible aria-label | LockInButton.test.tsx | Unit |
+| 13 | P2 | Disconnected+locked undo button calls onUndoLockIn | LockInButton.test.tsx | Unit |
+| 14 | P2 | Disconnected+locked+isPending disables undo button | LockInButton.test.tsx | Unit |
+
+### Step 3: Generation
+
+Generated expansion tests in 5 existing files. No new files created.
+
+| File | New Tests | Description |
+|------|-----------|-------------|
+| `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | 3 | Cleanup, timer reset, pulse class |
+| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | 3 | snake_case key, idempotent, error state |
+| `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | 3 | Stale drop, cleanup, null guard |
+| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | 2 | CLOSED status, cleanup |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 3 | Aria-label, undo callback, pending disable |
+
+### Step 4: Validation
+
+```
+5 test files, 51 tests, 0 failures
+- DisconnectionOverlay.test.tsx: 12 passed (was 9, +3 expansion)
+- scriptureReadingSlice.reconnect.test.ts: 13 passed (was 10, +3 expansion)
+- useScripturePresence.reconnect.test.ts: 6 passed (was 3, +3 expansion)
+- useScriptureBroadcast.reconnect.test.ts: 5 passed (was 3, +2 expansion)
+- LockInButton.test.tsx: 15 passed (was 12, +3 expansion)
+```
+
+**Full test suite**: 791 tests, 0 failures, 0 regressions
+**TypeScript**: `tsc --noEmit` clean
+
+### Files Updated
+
+| File | Action | Tests Added | Priority |
+|------|--------|-------------|----------|
+| `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | **Updated** | 3 | P2 |
+| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | **Updated** | 3 | P1 x1, P2 x2 |
+| `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | **Updated** | 3 | P1 x1, P2 x2 |
+| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | **Updated** | 2 | P1 x1, P2 x1 |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | **Updated** | 3 | P2 |
+| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | -- | -- |
+
+### Priority Breakdown
+
+- P0: 0 new tests (ATDD already covered)
+- P1: 3 new tests (snake_case broadcast key, stale presence drop, CLOSED channel handling)
+- P2: 11 new tests (cleanup, idempotency, error state, null guards, a11y, combined states)
+- **Total**: 14 expansion tests added to existing files
+- **Grand total Story 4.3 tests**: 42 (28 ATDD unit + 14 expansion) + 2 E2E (skipped)
+
+### Assumptions & Risks
+
+- All P0 critical paths covered by ATDD — expansion focuses on P1/P2 edge cases
+- No new E2E tests added — 2 existing E2E tests cover all critical user journeys (end session + keep waiting)
+- E2E tests remain `test.skip` until Supabase is running and lobby flow is verified end-to-end
+- Slice test for `triggered_by` (snake_case) validates backward compatibility with both key formats in `StateUpdatePayload`
+- Cleanup tests verify no memory leaks from intervals/timers/channels on unmount
+
+### Next Recommended Workflow
+
+1. `test-review` on Story 4.3 (TA step — next in TEA per-story order)
+2. Unskip E2E tests once Supabase is running and E2E infrastructure is validated
+3. `trace` to confirm P0/P1 coverage alignment for Epic 4 stories 4.1 + 4.2 + 4.3

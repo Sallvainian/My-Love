@@ -1,6 +1,6 @@
 # Story 4.2: Synchronized Reading with Lock-In
 
-Status: review
+Status: done
 
 ## Story
 
@@ -661,3 +661,27 @@ claude-opus-4-6
 | Added ReadingContainer route | Together-mode reading phase now routes to ReadingContainer |
 | Fixed error extraction in `lockIn()` | Plain object `{ message: '...' }` was rendering as `[object Object]` via `String()` |
 | Addressed Story 4.2 review findings (2026-02-28) | Fixed stale presence heartbeat, lock-in button pending behavior, state_updated payload bloat, undo SQL no-op, broadcast teardown risk, and strengthened reflection E2E assertion |
+| Code Review (2026-02-28) | Fixed H1: empty catch in `lockIn()` 409 refetch path now calls `handleScriptureError()` per CLAUDE.md guardrail. Accepted M1-M3 (dual key naming, error extraction complexity, presence reconnection gap) and L1-L3 (return type annotations, ephemeral bookmarks) as-is. |
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Sallvain (via BMAD Code Review workflow)
+**Date:** 2026-02-28
+**Outcome:** Approved
+
+**Summary:**
+- All 14 tasks verified as genuinely complete
+- All 7 Acceptance Criteria implemented with code evidence
+- 749 unit tests passing, TypeScript clean, ESLint clean (0 errors)
+- 1 HIGH issue fixed (empty catch block), 3 MEDIUM accepted, 3 LOW accepted
+- pgTAP: 10 assertions across 6 scenarios
+- E2E: 4 test scenarios covering full lock-in flow, undo, role alternation, last-step reflection
+
+**Issues Fixed:**
+- H1: Added `handleScriptureError()` call to empty catch block in `lockIn()` 409 refetch path (`scriptureReadingSlice.ts:799`)
+
+**Issues Accepted (no fix required):**
+- M1: Dual `triggeredBy`/`triggered_by` keys in `StateUpdatePayload` — cosmetic, neither consumed
+- M2: Complex error extraction in `lockIn()` catch — defensive but functional
+- M3: Presence channel reconnection gap — deferred to Story 4.3 (reconnection scope)
+- L1-L3: Return type annotations, React import, ephemeral bookmarks — minor convention/UX
