@@ -13,6 +13,7 @@ import { ensureScriptureOverview } from '../helpers';
 // ---------------------------------------------------------------------------
 
 export const SESSION_CREATE_TIMEOUT_MS = 15_000;
+export const STEP_ADVANCE_TIMEOUT_MS = 15_000;
 export const REALTIME_SYNC_TIMEOUT_MS = 20_000;
 export const READY_BROADCAST_TIMEOUT_MS = 10_000;
 export const COUNTDOWN_APPEAR_TIMEOUT_MS = 10_000;

@@ -10,12 +10,12 @@
 export function PhotoGridSkeleton() {
   return (
     <div
-      className="relative aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden"
+      className="relative aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700"
       data-testid="photo-grid-skeleton"
       aria-label="Loading photo"
     >
       {/* Shimmer animation overlay */}
-      <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+      <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
     </div>
   );
 }
@@ -33,7 +33,7 @@ export function PhotoGridSkeletonGrid() {
   return (
     <div className="min-h-screen p-4" data-testid="photo-gallery-skeleton">
       <div
-        className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 lg:gap-4 w-full"
+        className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 lg:gap-4"
         data-testid="photo-gallery-skeleton-grid"
       >
         {Array.from({ length: skeletonCount }).map((_, index) => (

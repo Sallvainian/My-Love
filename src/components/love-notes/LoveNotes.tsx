@@ -77,15 +77,15 @@ export function LoveNotes(): ReactElement {
   }, []);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-[#FFF5F5]">
+    <div className="flex h-[calc(100vh-4rem)] flex-col bg-[#FFF5F5]">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 safe-area-top">
+      <header className="safe-area-top flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
         <button
           onClick={navigateHome}
-          className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors"
+          className="-ml-2 rounded-full p-2 transition-colors hover:bg-gray-100"
           aria-label="Go back home"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
         </button>
 
         <h1 className="text-lg font-semibold text-gray-800">Love Notes</h1>
@@ -99,13 +99,13 @@ export function LoveNotes(): ReactElement {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3"
+          className="mx-4 mt-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3"
         >
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-          <p className="text-sm text-red-700 flex-1">{error}</p>
+          <AlertCircle className="h-5 w-5 shrink-0 text-red-500" />
+          <p className="flex-1 text-sm text-red-700">{error}</p>
           <button
             onClick={clearError}
-            className="text-sm text-red-600 font-medium hover:text-red-800"
+            className="text-sm font-medium text-red-600 hover:text-red-800"
           >
             Dismiss
           </button>

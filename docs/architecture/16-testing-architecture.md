@@ -2,13 +2,13 @@
 
 ## Test Layers
 
-| Layer | Framework | Environment | Location |
-|-------|-----------|-------------|----------|
-| Unit Tests | Vitest + happy-dom | In-process DOM | `tests/unit/` |
-| E2E Tests | Playwright | Real browser | `tests/e2e/` |
-| API Tests | Playwright | HTTP | `tests/api/` |
-| Database Tests | pgTAP | PostgreSQL | `supabase/tests/database/` |
-| Smoke Tests | Node.js script | Build output | `scripts/smoke-tests.cjs` |
+| Layer          | Framework          | Environment    | Location                   |
+| -------------- | ------------------ | -------------- | -------------------------- |
+| Unit Tests     | Vitest + happy-dom | In-process DOM | `tests/unit/`              |
+| E2E Tests      | Playwright         | Real browser   | `tests/e2e/`               |
+| API Tests      | Playwright         | HTTP           | `tests/api/`               |
+| Database Tests | pgTAP              | PostgreSQL     | `supabase/tests/database/` |
+| Smoke Tests    | Node.js script     | Build output   | `scripts/smoke-tests.cjs`  |
 
 ## Unit Tests
 
@@ -107,11 +107,11 @@ test('user can log mood', async ({ page, authenticatedPage }) => {
 
 Tests use priority tags for selective execution:
 
-| Tag | Description |
-|-----|-------------|
+| Tag    | Description                            |
+| ------ | -------------------------------------- |
 | `[P0]` | Critical path, must pass before deploy |
-| `[P1]` | Important features, run in CI |
-| `[P2]` | Nice-to-have, run in full suite |
+| `[P1]` | Important features, run in CI          |
+| `[P2]` | Nice-to-have, run in full suite        |
 
 ## Database Tests
 
@@ -123,6 +123,7 @@ npm run test:db
 ```
 
 Test files are in `supabase/tests/database/` and validate:
+
 - RLS policies
 - Database functions
 - Migration correctness

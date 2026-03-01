@@ -7,9 +7,9 @@
 
 The application uses two real-time patterns:
 
-| Pattern | Used For | Module |
-|---|---|---|
-| **Broadcast API** (client-to-client) | Mood updates between partners | `moodSyncService` |
+| Pattern                                 | Used For                          | Module                                  |
+| --------------------------------------- | --------------------------------- | --------------------------------------- |
+| **Broadcast API** (client-to-client)    | Mood updates between partners     | `moodSyncService`                       |
 | **postgres_changes** (server-to-client) | Incoming interactions (poke/kiss) | `interactionService`, `realtimeService` |
 
 **Why two patterns?** RLS policies on the `moods` table use partner subqueries that Supabase Realtime cannot evaluate for `postgres_changes`. The Broadcast API bypasses this by having the sender explicitly broadcast to the partner's channel.
@@ -83,6 +83,7 @@ getActiveSubscriptions(): number
 6. Removes the ephemeral channel.
 
 **Receiving side:**
+
 1. Partner calls `moodSyncService.subscribeMoodUpdates()`.
 2. This subscribes to `mood-updates:{ownUserId}` with `broadcast.self: false`.
 3. Callback fires when partner's broadcast arrives.

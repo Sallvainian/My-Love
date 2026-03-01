@@ -10,6 +10,7 @@ npm run build
 ```
 
 The build process:
+
 1. **dotenvx** decrypts `.env` file using `.env.keys`
 2. **tsc -b** runs TypeScript compilation (project references mode)
 3. **vite build** bundles the application for production
@@ -56,6 +57,7 @@ export default defineConfig(({ mode }) => ({
 ```
 
 This affects:
+
 - Asset URLs (images, fonts, JS/CSS bundles)
 - Service worker registration path (`/My-Love/sw.js`)
 - Navigation URL generation in `NavigationSlice`
@@ -66,9 +68,9 @@ This affects:
 
 Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git:
 
-| Variable | Purpose |
-|----------|---------|
-| `VITE_SUPABASE_URL` | Supabase project URL |
+| Variable                                | Purpose                  |
+| --------------------------------------- | ------------------------ |
+| `VITE_SUPABASE_URL`                     | Supabase project URL     |
 | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key |
 
 The `.env.keys` file contains the decryption key and is gitignored.
@@ -81,12 +83,12 @@ The `.env.keys` file contains the decryption key and is gitignored.
 
 Located in `.github/workflows/`:
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `deploy.yml` | Push to main | Build and deploy to GitHub Pages |
-| `test.yml` | PR / Push | Run unit tests, lint, type check |
-| `migrations.yml` | Migration changes | Validate Supabase migration files |
-| `code-review.yml` | PR | Automated code review |
+| Workflow          | Trigger           | Purpose                           |
+| ----------------- | ----------------- | --------------------------------- |
+| `deploy.yml`      | Push to main      | Build and deploy to GitHub Pages  |
+| `test.yml`        | PR / Push         | Run unit tests, lint, type check  |
+| `migrations.yml`  | Migration changes | Validate Supabase migration files |
+| `code-review.yml` | PR                | Automated code review             |
 
 ## PWA Configuration
 
@@ -97,6 +99,7 @@ The `vite-plugin-pwa` configuration in `vite.config.ts`:
 - **Update**: Auto-reload on new version detection
 
 The web app manifest includes:
+
 - App name, icons, theme color
 - `display: standalone` for native-like experience
 - `start_url: /My-Love/`

@@ -35,13 +35,13 @@ Runs after deployment:
 
 ## Required GitHub Secrets
 
-| Secret | Description |
-|---|---|
-| `DOTENV_PRIVATE_KEY` | Decryption key for the encrypted `.env` file |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI auth token for TypeScript type generation |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows |
-| `CLAUDE_PAT` | GitHub personal access token for Claude bot commits and PR operations |
-| `CURRENTS_RECORD_KEY` | Currents.dev recording key for Playwright cloud reporting |
+| Secret                    | Description                                                           |
+| ------------------------- | --------------------------------------------------------------------- |
+| `DOTENV_PRIVATE_KEY`      | Decryption key for the encrypted `.env` file                          |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                      |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations |
+| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting             |
 
 ## GitHub Pages Configuration
 
@@ -64,6 +64,7 @@ node scripts/post-deploy-check.cjs https://sallvainian.github.io/My-Love/
 ```
 
 Informational (does not block deployment). Checks:
+
 1. HTTP 200 response from the live site
 2. Viewport meta tag and manifest link in HTML
 3. PWA manifest structure validation (name, short_name, icons, display, theme_color)
@@ -81,13 +82,13 @@ base: mode === 'production' ? '/My-Love/' : '/',
 
 ### Manual Chunks (Code Splitting)
 
-| Chunk Name | Libraries |
-|---|---|
-| `vendor-react` | `react`, `react-dom` |
-| `vendor-supabase` | `@supabase/supabase-js` |
-| `vendor-state` | `zustand`, `idb`, `zod` |
-| `vendor-animation` | `framer-motion` |
-| `vendor-icons` | `lucide-react` |
+| Chunk Name         | Libraries               |
+| ------------------ | ----------------------- |
+| `vendor-react`     | `react`, `react-dom`    |
+| `vendor-supabase`  | `@supabase/supabase-js` |
+| `vendor-state`     | `zustand`, `idb`, `zod` |
+| `vendor-animation` | `framer-motion`         |
+| `vendor-icons`     | `lucide-react`          |
 
 ### PWA Manifest
 

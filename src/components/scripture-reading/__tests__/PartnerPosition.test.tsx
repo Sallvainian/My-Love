@@ -18,10 +18,7 @@ import { PartnerPosition } from '../reading/PartnerPosition';
 describe('PartnerPosition', () => {
   test('[P1] renders nothing when presence.view is null', () => {
     const { container } = render(
-      <PartnerPosition
-        partnerName="Jordan"
-        presence={{ view: null, stepIndex: null, ts: null }}
-      />
+      <PartnerPosition partnerName="Jordan" presence={{ view: null, stepIndex: null, ts: null }} />
     );
 
     // Should render nothing (empty or hidden)

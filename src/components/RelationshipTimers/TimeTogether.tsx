@@ -39,59 +39,53 @@ export function TimeTogether() {
 
   return (
     <motion.div
-      className="relative overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-lg p-4 border-2 border-pink-300 dark:border-pink-600"
+      className="relative overflow-hidden rounded-2xl border-2 border-pink-300 bg-white p-4 shadow-lg dark:border-pink-600 dark:bg-gray-900"
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
       data-testid="time-together"
     >
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="p-2 rounded-lg bg-pink-100 dark:bg-pink-900">
-          <Heart className="w-5 h-5 text-pink-500 dark:text-pink-300 fill-current" />
+      <div className="mb-3 flex items-center gap-2">
+        <div className="rounded-lg bg-pink-100 p-2 dark:bg-pink-900">
+          <Heart className="h-5 w-5 fill-current text-pink-500 dark:text-pink-300" />
         </div>
-        <h3 className="font-semibold text-lg text-gray-800 dark:text-white">
-          Time Together
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Time Together</h3>
       </div>
 
       {/* Time Display */}
-      <div className="text-center space-y-2">
+      <div className="space-y-2 text-center">
         {/* Years and Days */}
         <div className="text-xl font-bold text-pink-500 dark:text-pink-300">
-          {timeDiff.years > 0 && (
-            <span>{plural(timeDiff.years, 'year')} </span>
-          )}
+          {timeDiff.years > 0 && <span>{plural(timeDiff.years, 'year')} </span>}
           <span>{plural(timeDiff.days, 'day')}</span>
         </div>
 
         {/* Hours, Minutes, Seconds */}
         <div className="flex justify-center gap-3 text-sm">
           <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-gray-800 dark:text-white tabular-nums">
+            <span className="text-2xl font-bold text-gray-800 tabular-nums dark:text-white">
               {String(timeDiff.hours).padStart(2, '0')}
             </span>
-            <span className="text-gray-500 dark:text-gray-300 text-xs">hours</span>
+            <span className="text-xs text-gray-500 dark:text-gray-300">hours</span>
           </div>
-          <span className="text-2xl font-bold text-gray-400 dark:text-gray-500 self-start">:</span>
+          <span className="self-start text-2xl font-bold text-gray-400 dark:text-gray-500">:</span>
           <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-gray-800 dark:text-white tabular-nums">
+            <span className="text-2xl font-bold text-gray-800 tabular-nums dark:text-white">
               {String(timeDiff.minutes).padStart(2, '0')}
             </span>
-            <span className="text-gray-500 dark:text-gray-300 text-xs">mins</span>
+            <span className="text-xs text-gray-500 dark:text-gray-300">mins</span>
           </div>
-          <span className="text-2xl font-bold text-gray-400 dark:text-gray-500 self-start">:</span>
+          <span className="self-start text-2xl font-bold text-gray-400 dark:text-gray-500">:</span>
           <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-gray-800 dark:text-white tabular-nums animate-pulse">
+            <span className="animate-pulse text-2xl font-bold text-gray-800 tabular-nums dark:text-white">
               {String(timeDiff.seconds).padStart(2, '0')}
             </span>
-            <span className="text-gray-500 dark:text-gray-300 text-xs">secs</span>
+            <span className="text-xs text-gray-500 dark:text-gray-300">secs</span>
           </div>
         </div>
 
         {/* Subtitle */}
-        <p className="text-sm text-pink-500 dark:text-pink-300 font-medium">
-          ...and counting!
-        </p>
+        <p className="text-sm font-medium text-pink-500 dark:text-pink-300">...and counting!</p>
       </div>
     </motion.div>
   );

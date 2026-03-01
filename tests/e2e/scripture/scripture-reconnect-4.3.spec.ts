@@ -37,8 +37,14 @@ async function setupBothUsersInReading(
   partnerPage: import('@playwright/test').Page
 ) {
   const bothAlreadyInReading =
-    (await page.getByTestId('reading-container').isVisible().catch(() => false)) &&
-    (await partnerPage.getByTestId('reading-container').isVisible().catch(() => false));
+    (await page
+      .getByTestId('reading-container')
+      .isVisible()
+      .catch(() => false)) &&
+    (await partnerPage
+      .getByTestId('reading-container')
+      .isVisible()
+      .catch(() => false));
 
   if (bothAlreadyInReading) return;
 
@@ -53,14 +59,18 @@ async function setupBothUsersInReading(
   });
 
   // Both users ready up → countdown → reading phase (network-first)
-  const pageReadyResponse = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+  const pageReadyResponse = page.waitForResponse(isToggleReadyResponse, {
+    timeout: READY_BROADCAST_TIMEOUT_MS,
+  });
   await page.getByTestId('lobby-ready-button').click();
   await pageReadyResponse;
 
   await expect(partnerPage.getByTestId('lobby-ready-button')).toBeVisible({
     timeout: STEP_ADVANCE_TIMEOUT_MS,
   });
-  const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+  const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, {
+    timeout: READY_BROADCAST_TIMEOUT_MS,
+  });
   await partnerPage.getByTestId('lobby-ready-button').click();
   await partnerReadyResponse;
 
@@ -171,7 +181,10 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     const partnerPage = await partnerContext.newPage();
 
     try {
-      const partnerSessionId = await startTogetherSessionForRole(partnerPage, 'lobby-role-responder');
+      const partnerSessionId = await startTogetherSessionForRole(
+        partnerPage,
+        'lobby-role-responder'
+      );
       sessionIdsToClean.add(partnerSessionId);
 
       // Both enter reading phase
@@ -192,9 +205,7 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
 
       // AC#1 — Lock-in button shows "Holding your place"
       await expect(page.getByTestId('lock-in-disconnected')).toBeVisible();
-      await expect(page.getByTestId('lock-in-disconnected')).toContainText(
-        /holding your place/i
-      );
+      await expect(page.getByTestId('lock-in-disconnected')).toContainText(/holding your place/i);
 
       // -----------------------------------------------------------------------
       // WHEN: 30s timeout reached → Phase B
@@ -281,7 +292,10 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     let partnerPage = await partnerContext.newPage();
 
     try {
-      const partnerSessionId = await startTogetherSessionForRole(partnerPage, 'lobby-role-responder');
+      const partnerSessionId = await startTogetherSessionForRole(
+        partnerPage,
+        'lobby-role-responder'
+      );
       sessionIdsToClean.add(partnerSessionId);
 
       await setupBothUsersInReading(page, partnerPage);

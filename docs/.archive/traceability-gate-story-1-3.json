@@ -15,10 +15,7 @@
     ]
   },
   "evidence": {
-    "commits_user_provided": [
-      "f9983b3",
-      "bcc26d2"
-    ],
+    "commits_user_provided": ["f9983b3", "bcc26d2"],
     "validation_commands": [
       {
         "command": "npx playwright test tests/e2e/scripture/scripture-solo-reading.spec.ts --project=chromium --grep \"\\[P1-013\\]\"",
@@ -37,11 +34,7 @@
       }
     ],
     "burn_in": {
-      "tests": [
-        "P1-013",
-        "P1-012",
-        "P2-012"
-      ],
+      "tests": ["P1-013", "P1-012", "P2-012"],
       "status": "passed_repeat_each_10",
       "result": "31 passed (3.4m)"
     }
@@ -51,9 +44,7 @@
       "criterion_id": "AC-1",
       "priority": "P0",
       "description": "Solo session starts correctly",
-      "mapped_test_ids": [
-        "P0-009"
-      ],
+      "mapped_test_ids": ["P0-009"],
       "test_file_lines": [
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:96",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:103",
@@ -72,9 +63,7 @@
       "criterion_id": "AC-2",
       "priority": "P1",
       "description": "Verse screen renders correctly",
-      "mapped_test_ids": [
-        "P0-009"
-      ],
+      "mapped_test_ids": ["P0-009"],
       "test_file_lines": [
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:136",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:145",
@@ -83,9 +72,7 @@
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:159",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:165"
       ],
-      "helper_file_lines": [
-        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:248"
-      ],
+      "helper_file_lines": ["/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:248"],
       "test_level": "e2e",
       "coverage_status": "FULL",
       "evidence_notes": "All required verse controls and progress indicator assertions are present."
@@ -94,10 +81,7 @@
       "criterion_id": "AC-3",
       "priority": "P1",
       "description": "Response screen navigation",
-      "mapped_test_ids": [
-        "UNSCOPED-ID-RESP-NAV",
-        "UNSCOPED-ID-RESP-ADVANCE"
-      ],
+      "mapped_test_ids": ["UNSCOPED-ID-RESP-NAV", "UNSCOPED-ID-RESP-ADVANCE"],
       "test_file_lines": [
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:168",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:173",
@@ -107,9 +91,7 @@
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:191",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:197"
       ],
-      "helper_file_lines": [
-        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:248"
-      ],
+      "helper_file_lines": ["/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:248"],
       "test_level": "e2e",
       "coverage_status": "FULL",
       "evidence_notes": "Response flow and return semantics are explicitly covered."
@@ -118,11 +100,7 @@
       "criterion_id": "AC-4",
       "priority": "P1",
       "description": "Step advancement",
-      "mapped_test_ids": [
-        "P1-001",
-        "P1-012",
-        "P0-009"
-      ],
+      "mapped_test_ids": ["P1-001", "P1-012", "P0-009"],
       "test_file_lines": [
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:219",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:231",
@@ -142,10 +120,7 @@
       "criterion_id": "AC-5",
       "priority": "P2",
       "description": "Session completion boundary",
-      "mapped_test_ids": [
-        "P2-012",
-        "P0-009"
-      ],
+      "mapped_test_ids": ["P2-012", "P0-009"],
       "test_file_lines": [
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:334",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:349",
@@ -162,9 +137,7 @@
       "criterion_id": "AC-6",
       "priority": "P1",
       "description": "Exit with save",
-      "mapped_test_ids": [
-        "P1-013"
-      ],
+      "mapped_test_ids": ["P1-013"],
       "test_file_lines": [
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:269",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:296",
@@ -172,9 +145,7 @@
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:307",
         "/Users/sallvain/Projects/My-Love/tests/e2e/scripture/scripture-solo-reading.spec.ts:315"
       ],
-      "helper_file_lines": [
-        "/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:154"
-      ],
+      "helper_file_lines": ["/Users/sallvain/Projects/My-Love/tests/support/helpers.ts:154"],
       "test_level": "e2e",
       "coverage_status": "FULL",
       "evidence_notes": "Dedicated AC-6 scenario now verifies dialog semantics, save persistence, backend state, and resume continuity with cleanup."

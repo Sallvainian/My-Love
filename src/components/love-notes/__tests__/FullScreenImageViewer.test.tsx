@@ -40,9 +40,7 @@ describe('FullScreenImageViewer', () => {
   });
 
   it('should render image when isOpen is true', () => {
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     const img = screen.getByAltText('Full screen image');
     expect(img).toBeInTheDocument();
@@ -50,9 +48,7 @@ describe('FullScreenImageViewer', () => {
   });
 
   it('should not render when isOpen is false', () => {
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />);
 
     expect(screen.queryByAltText('Full screen image')).not.toBeInTheDocument();
   });
@@ -65,9 +61,7 @@ describe('FullScreenImageViewer', () => {
 
   it('should call onClose when X button is clicked', () => {
     const onClose = vi.fn();
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     const closeButton = screen.getByRole('button', { name: /close/i });
     fireEvent.click(closeButton);
@@ -77,9 +71,7 @@ describe('FullScreenImageViewer', () => {
 
   it('should call onClose when overlay is clicked', () => {
     const onClose = vi.fn();
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     // Get all elements with this label (overlay div and close button)
     // The overlay div comes first in DOM order
@@ -93,9 +85,7 @@ describe('FullScreenImageViewer', () => {
 
   it('should not close when image itself is clicked', () => {
     const onClose = vi.fn();
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     const img = screen.getByAltText('Full screen image');
     fireEvent.click(img);
@@ -106,9 +96,7 @@ describe('FullScreenImageViewer', () => {
 
   it('should call onClose when Escape key is pressed', async () => {
     const onClose = vi.fn();
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
@@ -117,9 +105,7 @@ describe('FullScreenImageViewer', () => {
 
   it('should not respond to other keys', () => {
     const onClose = vi.fn();
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={onClose} />);
 
     fireEvent.keyDown(document, { key: 'Enter' });
     fireEvent.keyDown(document, { key: 'Space' });
@@ -129,9 +115,7 @@ describe('FullScreenImageViewer', () => {
   });
 
   it('should prevent body scroll when open', () => {
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     expect(document.body.style.overflow).toBe('hidden');
   });
@@ -143,9 +127,7 @@ describe('FullScreenImageViewer', () => {
 
     expect(document.body.style.overflow).toBe('hidden');
 
-    rerender(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />
-    );
+    rerender(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />);
 
     expect(document.body.style.overflow).toBe('');
   });
@@ -176,9 +158,7 @@ describe('FullScreenImageViewer', () => {
   });
 
   it('should have proper accessibility attributes', () => {
-    render(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />
-    );
+    render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />);
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
@@ -192,9 +172,7 @@ describe('FullScreenImageViewer', () => {
     );
 
     // Close the viewer
-    rerender(
-      <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={onClose} />
-    );
+    rerender(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={onClose} />);
 
     // Escape should not trigger onClose anymore
     fireEvent.keyDown(document, { key: 'Escape' });

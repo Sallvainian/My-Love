@@ -4,15 +4,15 @@
 
 ## Quick Reference
 
-| Attribute | Value |
-|-----------|-------|
-| **Framework** | React 19.2.4 + TypeScript 5.9.3 + Vite 7.3.1 |
-| **State Management** | Zustand 5.0.11 (10 slices) |
-| **Backend** | Supabase 2.93.3 (Auth, Postgres, Storage, Realtime, Edge Functions) |
-| **Styling** | Tailwind CSS 4.1.17 + Framer Motion 12.29 |
-| **Validation** | Zod 4.3.6 |
-| **Testing** | Vitest 4.0.17 + Playwright 1.58.2 |
-| **Deployment** | PWA with Service Worker (Workbox InjectManifest) on GitHub Pages |
+| Attribute            | Value                                                               |
+| -------------------- | ------------------------------------------------------------------- |
+| **Framework**        | React 19.2.4 + TypeScript 5.9.3 + Vite 7.3.1                        |
+| **State Management** | Zustand 5.0.11 (10 slices)                                          |
+| **Backend**          | Supabase 2.93.3 (Auth, Postgres, Storage, Realtime, Edge Functions) |
+| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.29                           |
+| **Validation**       | Zod 4.3.6                                                           |
+| **Testing**          | Vitest 4.0.17 + Playwright 1.58.2                                   |
+| **Deployment**       | PWA with Service Worker (Workbox InjectManifest) on GitHub Pages    |
 
 ---
 
@@ -171,28 +171,28 @@ supabase/
 
 ## Feature Map
 
-| Feature | Components | Store | Service | API |
-|---------|-----------|-------|---------|-----|
-| Daily Messages | `DailyMessage/` | `messagesSlice` | `customMessageService` | — |
-| Mood Tracking | `MoodTracker/`, `MoodHistory/` | `moodSlice` | `moodService` | `moodApi` |
-| Love Notes | `love-notes/` | `notesSlice` | `loveNoteImageService` | Supabase direct |
-| Photos | `PhotoGallery/`, `PhotoUpload/`, `PhotoCarousel/` | `photosSlice` | `photoService`, `photoStorageService` | Supabase Storage |
-| Scripture | `scripture-reading/` | `scriptureReadingSlice` | `scriptureReadingService` | Supabase RPC |
-| Partner | `PartnerMoodView/`, `PokeKissInterface/` | `partnerSlice`, `interactionsSlice` | `realtimeService` | `partnerService`, `interactionService` |
+| Feature        | Components                                        | Store                               | Service                               | API                                    |
+| -------------- | ------------------------------------------------- | ----------------------------------- | ------------------------------------- | -------------------------------------- |
+| Daily Messages | `DailyMessage/`                                   | `messagesSlice`                     | `customMessageService`                | —                                      |
+| Mood Tracking  | `MoodTracker/`, `MoodHistory/`                    | `moodSlice`                         | `moodService`                         | `moodApi`                              |
+| Love Notes     | `love-notes/`                                     | `notesSlice`                        | `loveNoteImageService`                | Supabase direct                        |
+| Photos         | `PhotoGallery/`, `PhotoUpload/`, `PhotoCarousel/` | `photosSlice`                       | `photoService`, `photoStorageService` | Supabase Storage                       |
+| Scripture      | `scripture-reading/`                              | `scriptureReadingSlice`             | `scriptureReadingService`             | Supabase RPC                           |
+| Partner        | `PartnerMoodView/`, `PokeKissInterface/`          | `partnerSlice`, `interactionsSlice` | `realtimeService`                     | `partnerService`, `interactionService` |
 
 ---
 
 ## Planning Artifacts
 
-| Document | Description | Date |
-|----------|-------------|------|
-| [PRD](../_bmad-output/planning-artifacts/prd.md) | Product Requirements Document | 2026-01-25 |
-| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification.md) | UX Design Specification | 2026-01-25 |
+| Document                                                                       | Description                              | Date       |
+| ------------------------------------------------------------------------------ | ---------------------------------------- | ---------- |
+| [PRD](../_bmad-output/planning-artifacts/prd.md)                               | Product Requirements Document            | 2026-01-25 |
+| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification.md)     | UX Design Specification                  | 2026-01-25 |
 | [Architecture (Scripture)](../_bmad-output/planning-artifacts/architecture.md) | Feature Architecture (Scripture Reading) | 2026-01-26 |
-| [Epics & Stories](../_bmad-output/planning-artifacts/epics.md) | Implementation breakdown | 2026-01-26 |
-| [Test Design - Arch](../_bmad-output/test-design-architecture.md) | Test architecture & risks | 2026-01-27 |
-| [Test Design - QA](../_bmad-output/test-design-qa.md) | QA execution recipe | 2026-01-27 |
-| [Sprint Status](../_bmad-output/implementation-artifacts/sprint-status.yaml) | Current sprint progress | — |
+| [Epics & Stories](../_bmad-output/planning-artifacts/epics.md)                 | Implementation breakdown                 | 2026-01-26 |
+| [Test Design - Arch](../_bmad-output/test-design-architecture.md)              | Test architecture & risks                | 2026-01-27 |
+| [Test Design - QA](../_bmad-output/test-design-qa.md)                          | QA execution recipe                      | 2026-01-27 |
+| [Sprint Status](../_bmad-output/implementation-artifacts/sprint-status.yaml)   | Current sprint progress                  | —          |
 
 ---
 
@@ -208,4 +208,4 @@ supabase/
 
 ---
 
-*Generated by BMAD Document-Project Workflow v1.2.0*
+_Generated by BMAD Document-Project Workflow v1.2.0_

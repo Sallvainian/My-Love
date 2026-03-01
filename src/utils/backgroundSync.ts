@@ -66,9 +66,7 @@ export async function registerBackgroundSync(tag: string): Promise<void> {
  * cleanup();
  * ```
  */
-export function setupServiceWorkerListener(
-  onSyncCompleted: () => Promise<void>
-): () => void {
+export function setupServiceWorkerListener(onSyncCompleted: () => Promise<void>): () => void {
   // Guard: Check if service workers are supported (defense-in-depth)
   if (!isServiceWorkerSupported()) {
     if (import.meta.env.DEV) {

@@ -64,9 +64,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
   test('[P0] returns isPartnerConnected=true initially when session is active', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
-    const { result } = renderHook(() =>
-      useScripturePresence('session-001', 0, 'verse')
-    );
+    const { result } = renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
     // Initially connected (no disconnect detected yet)
     expect(result.current.isPartnerConnected).toBe(true);
@@ -75,9 +73,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
   test('[P0] sets isPartnerConnected=false after 20s with no presence_update', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
-    const { result } = renderHook(() =>
-      useScripturePresence('session-001', 0, 'verse')
-    );
+    const { result } = renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
     // Flush the promise chain (setAuth → getUser → subscribe → SUBSCRIBED → stale timer starts)
     await act(async () => {
@@ -95,9 +91,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
   test('[P0] sets isPartnerConnected=true when new presence_update arrives after disconnect', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
-    const { result } = renderHook(() =>
-      useScripturePresence('session-001', 0, 'verse')
-    );
+    const { result } = renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
     // Flush the promise chain (setAuth → getUser → subscribe → SUBSCRIBED → stale timer starts)
     await act(async () => {
@@ -168,9 +162,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
   test('[P1] drops stale presence_update with ts older than 20s', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
-    const { result } = renderHook(() =>
-      useScripturePresence('session-001', 0, 'verse')
-    );
+    const { result } = renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -203,9 +195,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
   test('[P2] cleanup on unmount clears stale timer and channel', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
-    const { unmount } = renderHook(() =>
-      useScripturePresence('session-001', 0, 'verse')
-    );
+    const { unmount } = renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -226,9 +216,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
   test('[P2] no channel created when sessionId is null', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
-    renderHook(() =>
-      useScripturePresence(null, 0, 'verse')
-    );
+    renderHook(() => useScripturePresence(null, 0, 'verse'));
 
     const { supabase } = await import('../../../src/api/supabaseClient');
     expect(supabase.channel).not.toHaveBeenCalled();

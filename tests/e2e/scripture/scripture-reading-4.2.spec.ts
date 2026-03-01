@@ -16,15 +16,9 @@ import { test, expect } from '../../support/merged-fixtures';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
   READY_BROADCAST_TIMEOUT_MS,
+  STEP_ADVANCE_TIMEOUT_MS,
   isToggleReadyResponse,
-  navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
-import {
-  createTestSession,
-  linkTestPartners,
-  unlinkTestPartners,
-  cleanupTestSession,
-} from '../../support/factories';
 
 // ---------------------------------------------------------------------------
 // All tests in this file share the same test user pair and must run serially
@@ -37,7 +31,6 @@ test.describe.configure({ mode: 'serial' });
 // ---------------------------------------------------------------------------
 
 const LOCK_IN_BROADCAST_TIMEOUT_MS = 15_000;
-const STEP_ADVANCE_TIMEOUT_MS = 15_000;
 const REFLECTION_LOAD_TIMEOUT_MS = 20_000;
 
 // ---------------------------------------------------------------------------
@@ -61,121 +54,90 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
 
   test('[P0] should complete full lock-in flow: both ready → advance to step 2 with role alternation', async ({
     page,
-    browser,
-    supabaseAdmin,
-    partnerStorageStatePath,
+    togetherMode: { partnerPage },
   }) => {
     test.setTimeout(90_000);
 
-    // SETUP: Create a together-mode session with linked partners
-    const seed = await createTestSession(supabaseAdmin, {
-      sessionCount: 1,
-      preset: 'mid_session',
-    });
-    expect(seed.test_user2_id, 'createTestSession must return a partner user ID').toBeTruthy();
-    await linkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
-    const sessionIdsToClean = [...seed.session_ids];
-
-    // End the seeded session so it doesn't interfere with the UI-created lobby session
-    await supabaseAdmin
-      .from('scripture_sessions')
-      .update({ status: 'complete', current_phase: 'complete' })
-      .in('id', seed.session_ids);
-
-    // GIVEN: User A navigates to /scripture, starts Together mode, selects Reader
-    const uiSessionId1 = await navigateToTogetherRoleSelection(page);
-    if (uiSessionId1) sessionIdsToClean.push(uiSessionId1);
+    // GIVEN: User A selects Reader role (fixture already navigated to role selection)
     await page.getByTestId('lobby-role-reader').click();
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
-    // GIVEN: User B (partner) joins and selects Responder
-    const baseURL = new URL(page.url()).origin;
-    const partnerContext = await browser.newContext({
-      storageState: partnerStorageStatePath,
-      baseURL,
+    // GIVEN: User B (partner) is already at role selection (fixture)
+    await partnerPage.getByTestId('lobby-role-responder').click();
+    await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
+
+    // Both users ready up → countdown → reading phase
+    await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
     });
-    const partnerPage = await partnerContext.newPage();
+    const userAReadyResponse = page.waitForResponse(isToggleReadyResponse, {
+      timeout: READY_BROADCAST_TIMEOUT_MS,
+    });
+    await page.getByTestId('lobby-ready-button').click();
+    await userAReadyResponse;
+    const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, {
+      timeout: READY_BROADCAST_TIMEOUT_MS,
+    });
+    await partnerPage.getByTestId('lobby-ready-button').click();
+    await partnerReadyResponse;
 
-    try {
-      const uiSessionId1b = await navigateToTogetherRoleSelection(partnerPage);
-      if (uiSessionId1b && uiSessionId1b !== uiSessionId1) sessionIdsToClean.push(uiSessionId1b);
-      await partnerPage.getByTestId('lobby-role-responder').click();
-      await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
+    // Wait for countdown to complete → reading container visible
+    await expect(page.getByTestId('reading-container')).toBeVisible({
+      timeout: STEP_ADVANCE_TIMEOUT_MS,
+    });
+    await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
+      timeout: STEP_ADVANCE_TIMEOUT_MS,
+    });
 
-      // Both users ready up → countdown → reading phase
-      await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-        timeout: REALTIME_SYNC_TIMEOUT_MS,
-      });
-      const userAReadyResponse = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
-      await page.getByTestId('lobby-ready-button').click();
-      await userAReadyResponse;
-      const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
-      await partnerPage.getByTestId('lobby-ready-button').click();
-      await partnerReadyResponse;
+    // AC#1 — Role indicator: User A (Reader) sees "You read this"
+    await expect(page.getByTestId('role-indicator')).toContainText('You read this');
+    // Partner (Responder) sees "Partner reads this"
+    await expect(partnerPage.getByTestId('role-indicator')).toContainText('Partner reads this');
 
-      // Wait for countdown to complete → reading container visible
-      await expect(page.getByTestId('reading-container')).toBeVisible({
-        timeout: STEP_ADVANCE_TIMEOUT_MS,
-      });
-      await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
-        timeout: STEP_ADVANCE_TIMEOUT_MS,
-      });
-
-      // AC#1 — Role indicator: User A (Reader) sees "You read this"
-      await expect(page.getByTestId('role-indicator')).toContainText('You read this');
-      // Partner (Responder) sees "Partner reads this"
-      await expect(partnerPage.getByTestId('role-indicator')).toContainText('Partner reads this');
-
-      // -----------------------------------------------------------------------
-      // WHEN: User A taps "Ready for next verse" (lock-in)
-      // -----------------------------------------------------------------------
-      const userALockIn = page
-        .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-        .catch((e: Error) => {
-          throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
-        });
-
-      await page.getByTestId('lock-in-button').click();
-      await userALockIn;
-
-      // AC#3 — User A sees waiting state
-      await expect(page.getByTestId('lock-in-button')).toContainText(/waiting for/i);
-      await expect(page.getByTestId('lock-in-undo')).toBeVisible();
-
-      // AC#4 — Partner sees "[PartnerName] is ready" indicator
-      await expect(partnerPage.getByTestId('partner-locked-indicator')).toBeVisible({
-        timeout: REALTIME_SYNC_TIMEOUT_MS,
+    // -----------------------------------------------------------------------
+    // WHEN: User A taps "Ready for next verse" (lock-in)
+    // -----------------------------------------------------------------------
+    const userALockIn = page
+      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
+      .catch((e: Error) => {
+        throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
       });
 
-      // -----------------------------------------------------------------------
-      // WHEN: User B taps "Ready for next verse" (both locked → advance)
-      // -----------------------------------------------------------------------
-      const partnerLockIn = partnerPage
-        .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-        .catch((e: Error) => {
-          throw new Error(`scripture_lock_in RPC (User B) did not fire: ${e.message}`);
-        });
+    await page.getByTestId('lock-in-button').click();
+    await userALockIn;
 
-      await partnerPage.getByTestId('lock-in-button').click();
-      await partnerLockIn;
+    // AC#3 — User A sees waiting state
+    await expect(page.getByTestId('lock-in-button')).toContainText(/waiting for/i);
+    await expect(page.getByTestId('lock-in-undo')).toBeVisible();
 
-      // AC#5 — Both advance to step 2 (verse text changes)
-      await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 2 of 17/i, {
-        timeout: STEP_ADVANCE_TIMEOUT_MS,
+    // AC#4 — Partner sees "[PartnerName] is ready" indicator
+    await expect(partnerPage.getByTestId('partner-locked-indicator')).toBeVisible({
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
+    });
+
+    // -----------------------------------------------------------------------
+    // WHEN: User B taps "Ready for next verse" (both locked → advance)
+    // -----------------------------------------------------------------------
+    const partnerLockIn = partnerPage
+      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
+      .catch((e: Error) => {
+        throw new Error(`scripture_lock_in RPC (User B) did not fire: ${e.message}`);
       });
-      await expect(partnerPage.getByTestId('reading-step-progress')).toContainText(
-        /verse 2 of 17/i,
-        { timeout: STEP_ADVANCE_TIMEOUT_MS }
-      );
 
-      // AC#1 — Role alternation: User A (Reader on step 1) is now Responder on step 2
-      await expect(page.getByTestId('role-indicator')).toContainText('Partner reads this');
-      await expect(partnerPage.getByTestId('role-indicator')).toContainText('You read this');
-    } finally {
-      await partnerContext.close();
-      await cleanupTestSession(supabaseAdmin, sessionIdsToClean);
-      await unlinkTestPartners(supabaseAdmin, seed.test_user1_id, seed.test_user2_id!);
-    }
+    await partnerPage.getByTestId('lock-in-button').click();
+    await partnerLockIn;
+
+    // AC#5 — Both advance to step 2 (verse text changes)
+    await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 2 of 17/i, {
+      timeout: STEP_ADVANCE_TIMEOUT_MS,
+    });
+    await expect(partnerPage.getByTestId('reading-step-progress')).toContainText(/verse 2 of 17/i, {
+      timeout: STEP_ADVANCE_TIMEOUT_MS,
+    });
+
+    // AC#1 — Role alternation: User A (Reader on step 1) is now Responder on step 2
+    await expect(page.getByTestId('role-indicator')).toContainText('Partner reads this');
+    await expect(partnerPage.getByTestId('role-indicator')).toContainText('You read this');
   });
 });
 
@@ -229,10 +191,14 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
-      const userAReadyResponse2 = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+      const userAReadyResponse2 = page.waitForResponse(isToggleReadyResponse, {
+        timeout: READY_BROADCAST_TIMEOUT_MS,
+      });
       await page.getByTestId('lobby-ready-button').click();
       await userAReadyResponse2;
-      const partnerReadyResponse2 = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+      const partnerReadyResponse2 = partnerPage.waitForResponse(isToggleReadyResponse, {
+        timeout: READY_BROADCAST_TIMEOUT_MS,
+      });
       await partnerPage.getByTestId('lobby-ready-button').click();
       await partnerReadyResponse2;
       await expect(page.getByTestId('reading-container')).toBeVisible({
@@ -240,7 +206,9 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
       });
 
       // WHEN: User A locks in
-      const userALockInResponse2 = page.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
+      const userALockInResponse2 = page.waitForResponse(isLockInResponse, {
+        timeout: LOCK_IN_BROADCAST_TIMEOUT_MS,
+      });
       await page.getByTestId('lock-in-button').click();
       await userALockInResponse2;
       await expect(page.getByTestId('lock-in-undo')).toBeVisible();
@@ -313,10 +281,14 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
-      const userAReadyResponse3 = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+      const userAReadyResponse3 = page.waitForResponse(isToggleReadyResponse, {
+        timeout: READY_BROADCAST_TIMEOUT_MS,
+      });
       await page.getByTestId('lobby-ready-button').click();
       await userAReadyResponse3;
-      const partnerReadyResponse3 = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+      const partnerReadyResponse3 = partnerPage.waitForResponse(isToggleReadyResponse, {
+        timeout: READY_BROADCAST_TIMEOUT_MS,
+      });
       await partnerPage.getByTestId('lobby-ready-button').click();
       await partnerReadyResponse3;
       await expect(page.getByTestId('reading-container')).toBeVisible({
@@ -328,10 +300,14 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
       await expect(partnerPage.getByTestId('role-indicator')).toContainText('Partner reads this');
 
       // Both lock in → advance to step 2
-      const userALockIn3 = page.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
+      const userALockIn3 = page.waitForResponse(isLockInResponse, {
+        timeout: LOCK_IN_BROADCAST_TIMEOUT_MS,
+      });
       await page.getByTestId('lock-in-button').click();
       await userALockIn3;
-      const partnerLockIn3 = partnerPage.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
+      const partnerLockIn3 = partnerPage.waitForResponse(isLockInResponse, {
+        timeout: LOCK_IN_BROADCAST_TIMEOUT_MS,
+      });
       await partnerPage.getByTestId('lock-in-button').click();
       await partnerLockIn3;
 
@@ -402,10 +378,14 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
       await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
         timeout: REALTIME_SYNC_TIMEOUT_MS,
       });
-      const userAReadyResponse4 = page.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+      const userAReadyResponse4 = page.waitForResponse(isToggleReadyResponse, {
+        timeout: READY_BROADCAST_TIMEOUT_MS,
+      });
       await page.getByTestId('lobby-ready-button').click();
       await userAReadyResponse4;
-      const partnerReadyResponse4 = partnerPage.waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+      const partnerReadyResponse4 = partnerPage.waitForResponse(isToggleReadyResponse, {
+        timeout: READY_BROADCAST_TIMEOUT_MS,
+      });
       await partnerPage.getByTestId('lobby-ready-button').click();
       await partnerReadyResponse4;
       await expect(page.getByTestId('reading-container')).toBeVisible({
@@ -438,10 +418,14 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
       await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 17 of 17/i);
 
       // Both lock in on last step → reflection phase
-      const userALockIn4 = page.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
+      const userALockIn4 = page.waitForResponse(isLockInResponse, {
+        timeout: LOCK_IN_BROADCAST_TIMEOUT_MS,
+      });
       await page.getByTestId('lock-in-button').click();
       await userALockIn4;
-      const partnerLockIn4 = partnerPage.waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS });
+      const partnerLockIn4 = partnerPage.waitForResponse(isLockInResponse, {
+        timeout: LOCK_IN_BROADCAST_TIMEOUT_MS,
+      });
       await partnerPage.getByTestId('lock-in-button').click();
       await partnerLockIn4;
 

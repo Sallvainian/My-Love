@@ -31,6 +31,7 @@ Reads the current user's `partner_id` while bypassing RLS. Created to break infi
 **Called by:** `partnerService.acceptPartnerRequest()`
 
 **Flow:**
+
 1. Look up the pending request by `p_request_id`
 2. Validate: request exists and `status = 'pending'`
 3. Validate: `auth.uid()` is the `to_user_id` (only recipient can accept)
@@ -39,6 +40,7 @@ Reads the current user's `partner_id` while bypassing RLS. Created to break infi
 6. Set `partner_id` on both users (bidirectional linking)
 
 **Errors:**
+
 - `'Partner request not found or already processed'`
 - `'Only the recipient can accept a partner request'`
 - `'One or both users already have a partner'`
@@ -51,6 +53,7 @@ Reads the current user's `partner_id` while bypassing RLS. Created to break infi
 **Called by:** `partnerService.declinePartnerRequest()`
 
 **Flow:**
+
 1. Look up the pending request by `p_request_id`
 2. Validate: request exists and `status = 'pending'`
 3. Validate: `auth.uid()` is the `to_user_id`
@@ -80,12 +83,13 @@ Returns `true` if `auth.uid()` matches either `user1_id` or `user2_id` of the gi
 
 Creates a new scripture reading session.
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `p_mode` | Yes | `'solo'` or `'together'` |
-| `p_partner_id` | For together mode | Partner's user UUID |
+| Parameter      | Required          | Description              |
+| -------------- | ----------------- | ------------------------ |
+| `p_mode`       | Yes               | `'solo'` or `'together'` |
+| `p_partner_id` | For together mode | Partner's user UUID      |
 
 **Validations:**
+
 - Mode must be `'solo'` or `'together'`
 - Together mode requires `p_partner_id`
 - Partner must exist in `auth.users`
@@ -102,15 +106,16 @@ Creates a new scripture reading session.
 
 Idempotent upsert for reflections using `ON CONFLICT (session_id, step_index, user_id)`.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `p_session_id` | `UUID` | Session ID |
-| `p_step_index` | `INT` | Step number |
-| `p_rating` | `INT` | 1-5 rating |
-| `p_notes` | `TEXT` | Reflection notes |
-| `p_is_shared` | `BOOLEAN` | Share with partner |
+| Parameter      | Type      | Description        |
+| -------------- | --------- | ------------------ |
+| `p_session_id` | `UUID`    | Session ID         |
+| `p_step_index` | `INT`     | Step number        |
+| `p_rating`     | `INT`     | 1-5 rating         |
+| `p_notes`      | `TEXT`    | Reflection notes   |
+| `p_is_shared`  | `BOOLEAN` | Share with partner |
 
 **Validations:**
+
 - `is_scripture_session_member(p_session_id)` must be true
 - Rating must be 1-5
 
@@ -124,21 +129,21 @@ Idempotent upsert for reflections using `ON CONFLICT (session_id, step_index, us
 
 Test data seeding function with preset configurations.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `p_session_count` | `INT` | `1` | Number of sessions to create |
-| `p_include_reflections` | `BOOLEAN` | `false` | Include test reflections |
-| `p_include_messages` | `BOOLEAN` | `false` | Include test prayer messages |
-| `p_preset` | `TEXT` | `NULL` | Preset configuration |
+| Parameter               | Type      | Default | Description                  |
+| ----------------------- | --------- | ------- | ---------------------------- |
+| `p_session_count`       | `INT`     | `1`     | Number of sessions to create |
+| `p_include_reflections` | `BOOLEAN` | `false` | Include test reflections     |
+| `p_include_messages`    | `BOOLEAN` | `false` | Include test prayer messages |
+| `p_preset`              | `TEXT`    | `NULL`  | Preset configuration         |
 
 ### Presets
 
-| Preset | Phase | Step | Status | Notes |
-|--------|-------|------|--------|-------|
-| `NULL` (default) | `lobby` | 0 | `pending` | Fresh session |
-| `'mid_session'` | `reading` | 7 | `in_progress` | Session in progress |
-| `'completed'` | `complete` | 16 | `complete` | Fully completed session |
-| `'with_help_flags'` | `reading` | 7 | `in_progress` | For testing help features |
-| `'unlinked'` | `reading` | 7 | `in_progress` | Solo session with `user2_id = NULL` |
+| Preset              | Phase      | Step | Status        | Notes                               |
+| ------------------- | ---------- | ---- | ------------- | ----------------------------------- |
+| `NULL` (default)    | `lobby`    | 0    | `pending`     | Fresh session                       |
+| `'mid_session'`     | `reading`  | 7    | `in_progress` | Session in progress                 |
+| `'completed'`       | `complete` | 16   | `complete`    | Fully completed session             |
+| `'with_help_flags'` | `reading`  | 7    | `in_progress` | For testing help features           |
+| `'unlinked'`        | `reading`  | 7    | `in_progress` | Solo session with `user2_id = NULL` |
 
 **Returns:** JSONB with `session_ids`, `session_count`, `preset`, `test_user1_id`, `test_user2_id`, and optionally `reflection_ids` and `message_ids`.

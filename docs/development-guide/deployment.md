@@ -62,15 +62,15 @@ permissions:
 
 All workflows are in `.github/workflows/`:
 
-| Workflow | File | Trigger | Purpose |
-|---|---|---|---|
-| Deploy | `deploy.yml` | Push to `main`, manual dispatch | Build, smoke test, deploy to GitHub Pages, health check |
-| Tests | `test.yml` | Push to `main`/`develop`, PRs, daily 2 AM UTC, manual | Lint, unit, E2E P0 gate, E2E sharded, burn-in, merge reports |
-| Supabase Migrations | `supabase-migrations.yml` | PRs touching `supabase/` paths, manual | Migration validation with local Supabase |
-| Claude Code | `claude.yml` | `@claude` mentions in issues/PRs | Claude Code AI assistance |
-| Claude Code Review | `claude-code-review.yml` | PR opened/synchronized/ready | Automated PR code review with Claude |
-| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch | On-demand commit summarization or security review |
-| CI Failure Auto-Fix | `ci-failure-auto-fix.yml` | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code |
+| Workflow             | File                       | Trigger                                                  | Purpose                                                      |
+| -------------------- | -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                          | Build, smoke test, deploy to GitHub Pages, health check      |
+| Tests                | `test.yml`                 | Push to `main`/`develop`, PRs, daily 2 AM UTC, manual    | Lint, unit, E2E P0 gate, E2E sharded, burn-in, merge reports |
+| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                   | Migration validation with local Supabase                     |
+| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                         | Claude Code AI assistance                                    |
+| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                             | Automated PR code review with Claude                         |
+| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                          | On-demand commit summarization or security review            |
+| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code                        |
 
 ### Test Pipeline Stages
 
@@ -87,10 +87,10 @@ The `test.yml` workflow runs a 5-stage pipeline (see [Testing](./testing.md#ci-t
 
 `.github/dependabot.yml` configures weekly dependency updates on Mondays:
 
-| Ecosystem | Groups |
-|---|---|
-| npm | `production-dependencies` (minor/patch), `dev-dependencies` (minor/patch) |
-| GitHub Actions | All action updates grouped together |
+| Ecosystem      | Groups                                                                    |
+| -------------- | ------------------------------------------------------------------------- |
+| npm            | `production-dependencies` (minor/patch), `dev-dependencies` (minor/patch) |
+| GitHub Actions | All action updates grouped together                                       |
 
 - PR limit: 10 open pull requests maximum
 - Labels: `dependencies` + ecosystem-specific (`npm` or `github-actions`)
@@ -104,13 +104,13 @@ The `test.yml` workflow runs a 5-stage pipeline (see [Testing](./testing.md#ci-t
 
 ## Required GitHub Secrets
 
-| Secret | Description |
-|---|---|
-| `DOTENV_PRIVATE_KEY` | Decryption key for the encrypted `.env` file (used during build and health check) |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI auth token for TypeScript type generation from remote schema |
-| `CURRENTS_RECORD_KEY` | Currents.dev recording key for Playwright cloud reporting |
+| Secret                    | Description                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `DOTENV_PRIVATE_KEY`      | Decryption key for the encrypted `.env` file (used during build and health check)         |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
+| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                                 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |
-| `CLAUDE_PAT` | GitHub personal access token for Claude bot commits and PR operations |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations                     |
 
 ## Manual Deployment
 

@@ -17,7 +17,7 @@ import { faker } from '@faker-js/faker';
  */
 export async function waitFor(
   condition: () => boolean | Promise<boolean>,
-  options: { timeout?: number; interval?: number } = {},
+  options: { timeout?: number; interval?: number } = {}
 ): Promise<void> {
   const { timeout = 10000, interval = 100 } = options;
   const start = Date.now();
@@ -73,7 +73,7 @@ export async function clickAndNavigate(
   options: {
     waitUntil?: 'load' | 'domcontentloaded' | 'networkidle' | 'commit';
     timeout?: number;
-  } = {},
+  } = {}
 ): Promise<void> {
   const { waitUntil = 'domcontentloaded', timeout } = options;
 
@@ -93,10 +93,7 @@ export async function clickAndNavigate(
  *   '[data-testid="password"]': 'password123'
  * })
  */
-export async function fillForm(
-  page: Page,
-  fields: Record<string, string>,
-): Promise<void> {
+export async function fillForm(page: Page, fields: Record<string, string>): Promise<void> {
   for (const [selector, value] of Object.entries(fields)) {
     await page.fill(selector, value);
   }
@@ -119,9 +116,13 @@ export async function expectToast(
     timeout?: number;
     selector?: string;
     exact?: boolean;
-  } = {},
+  } = {}
 ): Promise<Locator> {
-  const { timeout = 5000, selector = '[role="status"], [role="alert"], .toast', exact = false } = options;
+  const {
+    timeout = 5000,
+    selector = '[role="status"], [role="alert"], .toast',
+    exact = false,
+  } = options;
 
   const toast = page.locator(selector, { hasText: exact ? message : undefined });
 
@@ -173,14 +174,9 @@ export async function retry<T>(
     initialDelay?: number;
     backoffMultiplier?: number;
     maxDelay?: number;
-  } = {},
+  } = {}
 ): Promise<T> {
-  const {
-    maxAttempts = 3,
-    initialDelay = 1000,
-    backoffMultiplier = 2,
-    maxDelay = 10000,
-  } = options;
+  const { maxAttempts = 3, initialDelay = 1000, backoffMultiplier = 2, maxDelay = 10000 } = options;
 
   let lastError: Error | undefined;
   let delay = initialDelay;
@@ -192,9 +188,7 @@ export async function retry<T>(
       lastError = error as Error;
 
       if (attempt === maxAttempts) {
-        throw new Error(
-          `Failed after ${maxAttempts} attempts. Last error: ${lastError.message}`
-        );
+        throw new Error(`Failed after ${maxAttempts} attempts. Last error: ${lastError.message}`);
       }
 
       await sleep(Math.min(delay, maxDelay));

@@ -127,9 +127,7 @@ describe('MessageInput', () => {
     });
 
     it('should show ImagePreview when image is selected', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       render(<MessageInput />);
@@ -145,9 +143,7 @@ describe('MessageInput', () => {
     });
 
     it('should show error for invalid image file', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({
         valid: false,
         error: 'Unsupported file format',
@@ -169,9 +165,7 @@ describe('MessageInput', () => {
     });
 
     it('should trigger selection haptic when valid image selected', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       render(<MessageInput />);
@@ -187,9 +181,7 @@ describe('MessageInput', () => {
     });
 
     it('should change placeholder when image is selected', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       render(<MessageInput />);
@@ -205,9 +197,7 @@ describe('MessageInput', () => {
     });
 
     it('should remove image when remove button clicked in preview', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       render(<MessageInput />);
@@ -250,9 +240,7 @@ describe('MessageInput', () => {
     });
 
     it('should be enabled when only image is selected (no text)', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       render(<MessageInput />);
@@ -298,9 +286,7 @@ describe('MessageInput', () => {
     });
 
     it('should call sendNote with image file', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       const user = userEvent.setup();
@@ -324,9 +310,7 @@ describe('MessageInput', () => {
     });
 
     it('should call sendNote with both text and image', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       const user = userEvent.setup();
@@ -354,9 +338,7 @@ describe('MessageInput', () => {
     });
 
     it('should clear input and image after successful send', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       const user = userEvent.setup();
@@ -444,9 +426,7 @@ describe('MessageInput', () => {
     });
 
     it('should clear input and image on Escape', async () => {
-      const { imageCompressionService } = await import(
-        '../../../services/imageCompressionService'
-      );
+      const { imageCompressionService } = await import('../../../services/imageCompressionService');
       vi.mocked(imageCompressionService.validateImageFile).mockReturnValue({ valid: true });
 
       const user = userEvent.setup();

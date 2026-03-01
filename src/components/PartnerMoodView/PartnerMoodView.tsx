@@ -312,17 +312,17 @@ export function PartnerMoodView() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4"
+            className="fixed top-4 left-1/2 z-50 mx-4 w-full max-w-md -translate-x-1/2 transform"
             data-testid="partner-mood-notification"
           >
-            <div className="bg-pink-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
-              <Bell className="w-5 h-5 shrink-0" />
+            <div className="flex items-center gap-3 rounded-lg bg-pink-500 px-6 py-4 text-white shadow-lg">
+              <Bell className="h-5 w-5 shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold">
                   {PARTNER_NAME} just logged a mood: {notification.mood}
                 </p>
                 {notification.note && (
-                  <p className="text-sm text-pink-100 mt-1 line-clamp-2">{notification.note}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-pink-100">{notification.note}</p>
                 )}
               </div>
             </div>
@@ -330,11 +330,11 @@ export function PartnerMoodView() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         {/* Partner Error Display */}
         {partnerError && (
           <div
-            className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800"
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
             data-testid="partner-connection-error"
           >
             {partnerError}
@@ -344,29 +344,29 @@ export function PartnerMoodView() {
         {/* Show partner connection UI if no partner connected */}
         {!partner && !isLoadingPartner && (
           <div className="space-y-6">
-            <div className="text-center mb-8">
-              <Users className="w-16 h-16 mx-auto mb-4 text-pink-500" />
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Connect with Your Partner</h1>
+            <div className="mb-8 text-center">
+              <Users className="mx-auto mb-4 h-16 w-16 text-pink-500" />
+              <h1 className="mb-2 text-3xl font-bold text-gray-900">Connect with Your Partner</h1>
               <p className="text-gray-600">Search for your partner to start sharing moods</p>
             </div>
 
             {/* Search Box */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="rounded-lg border border-gray-200 bg-white p-6">
               <label
                 htmlFor="partner-search"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="mb-2 block text-sm font-medium text-gray-700"
               >
                 Search by email or display name
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
                 <input
                   id="partner-search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Enter email or name..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-gray-300 py-3 pr-4 pl-10 focus:border-transparent focus:ring-2 focus:ring-pink-500 focus:outline-none"
                   data-testid="partner-search-input"
                 />
               </div>
@@ -383,7 +383,7 @@ export function PartnerMoodView() {
                   {searchResults.map((user) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="flex items-center justify-between rounded-lg bg-gray-50 p-3 transition-colors hover:bg-gray-100"
                     >
                       <div>
                         <p className="font-medium text-gray-900">{user.displayName}</p>
@@ -391,10 +391,10 @@ export function PartnerMoodView() {
                       </div>
                       <button
                         onClick={() => handleSendRequest(user.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 rounded-lg bg-pink-500 px-4 py-2 font-medium text-white transition-colors hover:bg-pink-600"
                         data-testid={`send-request-${user.id}`}
                       >
-                        <UserPlus className="w-4 h-4" />
+                        <UserPlus className="h-4 w-4" />
                         <span>Send Request</span>
                       </button>
                     </div>
@@ -411,13 +411,13 @@ export function PartnerMoodView() {
 
             {/* Sent Requests */}
             {sentRequests.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Sent Requests</h2>
+              <div className="rounded-lg border border-gray-200 bg-white p-6">
+                <h2 className="mb-4 text-lg font-semibold text-gray-900">Sent Requests</h2>
                 <div className="space-y-2" data-testid="sent-requests-list">
                   {sentRequests.map((request) => (
                     <div
                       key={request.id}
-                      className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                      className="flex items-center justify-between rounded-lg border border-yellow-200 bg-yellow-50 p-3"
                     >
                       <div>
                         <p className="font-medium text-gray-900">
@@ -427,7 +427,7 @@ export function PartnerMoodView() {
                           Sent {new Date(request.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="text-yellow-700 font-medium">Pending</div>
+                      <div className="font-medium text-yellow-700">Pending</div>
                     </div>
                   ))}
                 </div>
@@ -436,13 +436,13 @@ export function PartnerMoodView() {
 
             {/* Received Requests */}
             {receivedRequests.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Received Requests</h2>
+              <div className="rounded-lg border border-gray-200 bg-white p-6">
+                <h2 className="mb-4 text-lg font-semibold text-gray-900">Received Requests</h2>
                 <div className="space-y-2" data-testid="received-requests-list">
                   {receivedRequests.map((request) => (
                     <div
                       key={request.id}
-                      className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                      className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-3"
                     >
                       <div>
                         <p className="font-medium text-gray-900">
@@ -457,18 +457,18 @@ export function PartnerMoodView() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleAcceptRequest(request.id)}
-                          className="flex items-center gap-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+                          className="flex items-center gap-1 rounded-lg bg-green-500 px-3 py-2 font-medium text-white transition-colors hover:bg-green-600"
                           data-testid={`accept-request-${request.id}`}
                         >
-                          <Check className="w-4 h-4" />
+                          <Check className="h-4 w-4" />
                           <span>Accept</span>
                         </button>
                         <button
                           onClick={() => handleDeclineRequest(request.id)}
-                          className="flex items-center gap-1 px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                          className="flex items-center gap-1 rounded-lg bg-gray-500 px-3 py-2 font-medium text-white transition-colors hover:bg-gray-600"
                           data-testid={`decline-request-${request.id}`}
                         >
-                          <X className="w-4 h-4" />
+                          <X className="h-4 w-4" />
                           <span>Decline</span>
                         </button>
                       </div>
@@ -482,8 +482,8 @@ export function PartnerMoodView() {
 
         {/* Show loading state while checking for partner */}
         {isLoadingPartner && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4 animate-pulse">💕</div>
+          <div className="py-12 text-center">
+            <div className="mb-4 animate-pulse text-6xl">💕</div>
             <p className="text-gray-600">Loading partner information...</p>
           </div>
         )}
@@ -494,14 +494,14 @@ export function PartnerMoodView() {
             {/* Header with Refresh Button */}
             <div className="mb-6 flex items-center justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="mb-2 flex items-center gap-2">
                   <h1 className="text-3xl font-bold text-gray-900">
                     {partner.displayName}'s Moods
                   </h1>
                   {/* Story 6.4: Task 7 - Connection Status Indicator */}
                   {syncStatus.isOnline && (
                     <div
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+                      className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${
                         connectionStatus === 'connected'
                           ? 'bg-green-100 text-green-700'
                           : connectionStatus === 'reconnecting'
@@ -518,9 +518,9 @@ export function PartnerMoodView() {
                       }
                     >
                       {connectionStatus === 'connected' ? (
-                        <Wifi className="w-3 h-3" />
+                        <Wifi className="h-3 w-3" />
                       ) : (
-                        <WifiOff className="w-3 h-3" />
+                        <WifiOff className="h-3 w-3" />
                       )}
                       <span className="capitalize">{connectionStatus}</span>
                     </div>
@@ -534,14 +534,14 @@ export function PartnerMoodView() {
                 <button
                   onClick={handleRefresh}
                   disabled={isRefreshing || !syncStatus.isOnline}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors ${
                     isRefreshing || !syncStatus.isOnline
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-pink-500 hover:bg-pink-600 text-white'
+                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                      : 'bg-pink-500 text-white hover:bg-pink-600'
                   }`}
                   data-testid="partner-mood-refresh-button"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                   <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
                 </button>
 
@@ -553,7 +553,7 @@ export function PartnerMoodView() {
             {/* Error Display */}
             {error && (
               <div
-                className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800"
+                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
                 data-testid="partner-mood-error"
               >
                 {error}
@@ -563,7 +563,7 @@ export function PartnerMoodView() {
             {/* Offline Notice */}
             {!syncStatus.isOnline && (
               <div
-                className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800"
+                className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800"
                 data-testid="partner-mood-offline-notice"
               >
                 You're offline. Partner moods will load when you reconnect.
@@ -572,8 +572,8 @@ export function PartnerMoodView() {
 
             {/* Loading State */}
             {isRefreshing && partnerMoods.length === 0 && (
-              <div className="text-center py-12" data-testid="partner-mood-loading">
-                <div className="text-6xl mb-4 animate-pulse">💕</div>
+              <div className="py-12 text-center" data-testid="partner-mood-loading">
+                <div className="mb-4 animate-pulse text-6xl">💕</div>
                 <p className="text-gray-600">Loading partner moods...</p>
               </div>
             )}
@@ -583,12 +583,12 @@ export function PartnerMoodView() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center py-12"
+                className="py-12 text-center"
                 data-testid="partner-mood-empty-state"
               >
-                <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">No moods yet</h3>
-                <p className="text-gray-500 mb-6">
+                <Calendar className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+                <h3 className="mb-2 text-xl font-semibold text-gray-700">No moods yet</h3>
+                <p className="mb-6 text-gray-500">
                   {partner.displayName} hasn't logged any moods yet.
                   {syncStatus.isOnline && <> Try refreshing to check for updates.</>}
                 </p>
@@ -612,7 +612,6 @@ export function PartnerMoodView() {
           </>
         )}
       </div>
-
     </div>
   );
 }
@@ -636,22 +635,22 @@ const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+      className="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
       data-testid="partner-mood-card"
     >
       <div className="flex items-start gap-4">
         {/* Mood Icon */}
         <div className={`${config.color} mt-1`}>
-          <Icon className="w-6 h-6" />
+          <Icon className="h-6 w-6" />
         </div>
 
         {/* Mood Content */}
         <div className="flex-1">
           {/* Date and Mood Label */}
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <div>
               <span className="font-semibold text-gray-900">{config.label}</span>
-              <span className="text-sm text-gray-500 ml-2">{formatDate(date)}</span>
+              <span className="ml-2 text-sm text-gray-500">{formatDate(date)}</span>
             </div>
             <span className="text-xs text-gray-400">
               {new Date(timestamp).toLocaleTimeString('en-US', {
@@ -662,7 +661,7 @@ const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps
           </div>
 
           {/* Note (if exists) */}
-          {note && <p className="text-gray-700 text-sm leading-relaxed">{note}</p>}
+          {note && <p className="text-sm leading-relaxed text-gray-700">{note}</p>}
         </div>
       </div>
     </motion.div>

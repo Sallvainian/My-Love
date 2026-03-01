@@ -273,12 +273,12 @@ export function MoodTracker() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20" data-testid="mood-tracker">
       {/* Tab Navigation - Story 5.4: Added Timeline tab */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4">
+      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-2xl px-4">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('tracker')}
-              className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative ${
+              className={`relative flex-1 px-4 py-4 text-center font-medium transition-colors ${
                 activeTab === 'tracker' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
               }`}
               data-testid="mood-tab-tracker"
@@ -287,41 +287,41 @@ export function MoodTracker() {
               {activeTab === 'tracker' && (
                 <motion.div
                   layoutId="active-tab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600"
+                  className="absolute right-0 bottom-0 left-0 h-0.5 bg-pink-600"
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
               )}
             </button>
             <button
               onClick={() => setActiveTab('timeline')}
-              className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative flex items-center justify-center gap-2 ${
+              className={`relative flex flex-1 items-center justify-center gap-2 px-4 py-4 text-center font-medium transition-colors ${
                 activeTab === 'timeline' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
               }`}
               data-testid="mood-tab-timeline"
             >
-              <List className="w-4 h-4" />
+              <List className="h-4 w-4" />
               Timeline
               {activeTab === 'timeline' && (
                 <motion.div
                   layoutId="active-tab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600"
+                  className="absolute right-0 bottom-0 left-0 h-0.5 bg-pink-600"
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
               )}
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex-1 py-4 px-4 text-center font-medium transition-colors relative flex items-center justify-center gap-2 ${
+              className={`relative flex flex-1 items-center justify-center gap-2 px-4 py-4 text-center font-medium transition-colors ${
                 activeTab === 'history' ? 'text-pink-600' : 'text-gray-600 hover:text-gray-900'
               }`}
               data-testid="mood-tab-history"
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="h-4 w-4" />
               Calendar
               {activeTab === 'history' && (
                 <motion.div
                   layoutId="active-tab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600"
+                  className="absolute right-0 bottom-0 left-0 h-0.5 bg-pink-600"
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
               )}
@@ -339,11 +339,11 @@ export function MoodTracker() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.2 }}
-            className="max-w-2xl mx-auto px-4 py-6"
+            className="mx-auto max-w-2xl px-4 py-6"
           >
             {/* Header */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">How are you feeling?</h1>
+              <h1 className="mb-2 text-3xl font-bold text-gray-900">How are you feeling?</h1>
               <p className="text-gray-600">Track your mood for today</p>
             </div>
 
@@ -354,12 +354,12 @@ export function MoodTracker() {
             <div className="mb-6 flex items-center gap-2 text-sm">
               {syncStatus.isOnline ? (
                 <>
-                  <Cloud className="w-4 h-4 text-green-500" />
+                  <Cloud className="h-4 w-4 text-green-500" />
                   <span className="text-gray-600">Online</span>
                 </>
               ) : (
                 <>
-                  <CloudOff className="w-4 h-4 text-gray-400" />
+                  <CloudOff className="h-4 w-4 text-gray-400" />
                   <span className="text-gray-600">Offline</span>
                 </>
               )}
@@ -375,10 +375,10 @@ export function MoodTracker() {
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="mb-4 flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800"
+                  className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800"
                   data-testid="mood-success-toast"
                 >
-                  <CheckCircle className="w-5 h-5" />
+                  <CheckCircle className="h-5 w-5" />
                   <span className="font-medium">
                     {isEditing ? 'Mood updated successfully!' : 'Mood logged successfully!'}
                   </span>
@@ -393,23 +393,21 @@ export function MoodTracker() {
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="mb-4 flex items-center justify-between gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
+                  className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4"
                   data-testid="mood-offline-error"
                 >
                   <div className="flex items-center gap-2">
-                    <WifiOff className="w-5 h-5 text-yellow-600 shrink-0" />
-                    <span className="text-sm text-yellow-800">
-                      {OFFLINE_ERROR_MESSAGE}
-                    </span>
+                    <WifiOff className="h-5 w-5 shrink-0 text-yellow-600" />
+                    <span className="text-sm text-yellow-800">{OFFLINE_ERROR_MESSAGE}</span>
                   </div>
                   <button
                     type="button"
                     onClick={handleRetrySync}
                     disabled={isRetrying}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-md bg-yellow-100 px-3 py-1.5 text-sm font-medium text-yellow-700 transition-colors hover:bg-yellow-200 disabled:opacity-50"
                     data-testid="mood-retry-button"
                   >
-                    <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
                     {isRetrying ? 'Syncing...' : 'Retry'}
                   </button>
                 </motion.div>
@@ -419,7 +417,7 @@ export function MoodTracker() {
             {/* Error Display */}
             {error && (
               <div
-                className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800"
+                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
                 data-testid="mood-error-message"
               >
                 {error}
@@ -430,13 +428,13 @@ export function MoodTracker() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Mood Selection - Multiple selection support */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="mb-3 block text-sm font-medium text-gray-700">
                   How are you feeling? (select all that apply)
                 </label>
 
                 {/* Positive Emotions - 6 moods in 2 rows of 3 */}
                 <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Positive</p>
+                  <p className="mb-2 text-xs tracking-wide text-gray-500 uppercase">Positive</p>
                   <div className="grid grid-cols-3 gap-3">
                     {(Object.keys(POSITIVE_MOODS) as MoodType[]).map((mood) => (
                       <MoodButton
@@ -453,7 +451,7 @@ export function MoodTracker() {
 
                 {/* Challenging Emotions - 6 moods in 2 rows of 3 */}
                 <div>
-                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Challenging</p>
+                  <p className="mb-2 text-xs tracking-wide text-gray-500 uppercase">Challenging</p>
                   <div className="grid grid-cols-3 gap-3">
                     {(Object.keys(CHALLENGING_MOODS) as MoodType[]).map((mood) => (
                       <MoodButton
@@ -469,7 +467,7 @@ export function MoodTracker() {
                 </div>
 
                 {selectedMoods.length > 0 && (
-                  <p className="text-sm text-gray-600 mt-3">
+                  <p className="mt-3 text-sm text-gray-600">
                     Selected: {selectedMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
                   </p>
                 )}
@@ -479,7 +477,10 @@ export function MoodTracker() {
               <div>
                 {showNoteField ? (
                   <>
-                    <label htmlFor="mood-note" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="mood-note"
+                      className="mb-2 block text-sm font-medium text-gray-700"
+                    >
                       Add a note (optional)
                     </label>
                     <textarea
@@ -489,12 +490,12 @@ export function MoodTracker() {
                       placeholder="What made you feel this way?"
                       rows={4}
                       maxLength={200}
-                      className={`w-full px-4 py-3 border rounded-lg resize-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors ${
+                      className={`w-full resize-none rounded-lg border px-4 py-3 transition-colors focus:border-transparent focus:ring-2 focus:ring-pink-500 ${
                         noteError ? 'border-red-300 bg-red-50' : 'border-gray-300'
                       }`}
                       data-testid="mood-note-input"
                     />
-                    <div className="flex items-center justify-between mt-2">
+                    <div className="mt-2 flex items-center justify-between">
                       {noteError ? (
                         <span className="text-sm text-red-600" data-testid="mood-note-error">
                           {noteError}
@@ -514,7 +515,7 @@ export function MoodTracker() {
                   <button
                     type="button"
                     onClick={() => setShowNoteField(true)}
-                    className="text-sm text-gray-500 hover:text-pink-600 transition-colors"
+                    className="text-sm text-gray-500 transition-colors hover:text-pink-600"
                     data-testid="mood-add-note-toggle"
                   >
                     + Add note (optional)
@@ -526,10 +527,10 @@ export function MoodTracker() {
               <button
                 type="submit"
                 disabled={!isValid || isSubmitting}
-                className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
+                className={`w-full rounded-lg px-6 py-3 font-medium transition-colors ${
                   isValid && !isSubmitting
-                    ? 'bg-pink-500 hover:bg-pink-600 text-white'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    ? 'bg-pink-500 text-white hover:bg-pink-600'
+                    : 'cursor-not-allowed bg-gray-200 text-gray-400'
                 }`}
                 data-testid="mood-submit-button"
               >
@@ -544,20 +545,16 @@ export function MoodTracker() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.2 }}
-            className="max-w-2xl mx-auto px-4 py-6"
+            className="mx-auto max-w-2xl px-4 py-6"
             data-testid="mood-history-section"
           >
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-(--color-text) mb-2">
-                Mood Timeline
-              </h2>
-              <p className="text-(--color-text) opacity-70">
-                View your mood history over time
-              </p>
+              <h2 className="mb-2 text-2xl font-bold text-(--color-text)">Mood Timeline</h2>
+              <p className="text-(--color-text) opacity-70">View your mood history over time</p>
             </div>
 
             {/* Timeline view - Story 5.4 */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
               {user && <MoodHistoryTimeline userId={user.id} />}
             </div>
           </motion.div>

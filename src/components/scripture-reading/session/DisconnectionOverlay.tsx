@@ -62,7 +62,7 @@ export function DisconnectionOverlay({
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
               <WifiOff className="h-6 w-6 text-purple-600" aria-hidden="true" />
             </div>
-            <p className="animate-pulse motion-reduce:animate-none text-base font-medium text-purple-700">
+            <p className="animate-pulse text-base font-medium text-purple-700 motion-reduce:animate-none">
               Partner reconnecting...
             </p>
           </div>
@@ -71,7 +71,9 @@ export function DisconnectionOverlay({
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
               <WifiOff className="h-6 w-6 text-purple-600" aria-hidden="true" />
             </div>
-            <p className="mb-2 text-base font-medium text-gray-700">End this session for both of you?</p>
+            <p className="mb-2 text-base font-medium text-gray-700">
+              End this session for both of you?
+            </p>
             <p className="mb-6 text-sm text-gray-500">
               Your progress so far will be saved before ending.
             </p>

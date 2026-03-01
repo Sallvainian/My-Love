@@ -148,10 +148,9 @@ describe('useScripturePresence', () => {
   });
 
   test('[P1] re-sends presence when view prop changes', async () => {
-    const { rerender } = renderHook(
-      ({ view }) => useScripturePresence('session-abc', 0, view),
-      { initialProps: { view: 'verse' as const } }
-    );
+    const { rerender } = renderHook(({ view }) => useScripturePresence('session-abc', 0, view), {
+      initialProps: { view: 'verse' as const },
+    });
 
     await act(async () => {
       subscribedCallback?.('SUBSCRIBED');

@@ -207,17 +207,17 @@ export function MoodHistoryCalendar() {
   });
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6" data-testid="mood-calendar">
+    <div className="mx-auto w-full max-w-4xl px-4 py-6" data-testid="mood-calendar">
       {/* Calendar Header - AC-3: Month/year display with navigation */}
       {/* Task 10: Enhanced ARIA labels for screen readers */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <button
           onClick={handlePreviousMonth}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+          className="rounded-lg p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:outline-none"
           aria-label={`Go to previous month from ${monthName} ${currentYear}`}
           data-testid="calendar-nav-prev"
         >
-          <ChevronLeft className="w-6 h-6 text-gray-600" />
+          <ChevronLeft className="h-6 w-6 text-gray-600" />
         </button>
 
         <h2
@@ -231,21 +231,21 @@ export function MoodHistoryCalendar() {
 
         <button
           onClick={handleNextMonth}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+          className="rounded-lg p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:outline-none"
           aria-label={`Go to next month from ${monthName} ${currentYear}`}
           data-testid="calendar-nav-next"
         >
-          <ChevronRight className="w-6 h-6 text-gray-600" />
+          <ChevronRight className="h-6 w-6 text-gray-600" />
         </button>
       </div>
 
       {/* Day of week headers */}
       {/* Task 10: Added role and ARIA for screen reader support */}
-      <div className="grid grid-cols-7 gap-2 mb-2" role="row">
+      <div className="mb-2 grid grid-cols-7 gap-2" role="row">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
           <div
             key={day}
-            className="text-center text-sm font-medium text-gray-500 py-2"
+            className="py-2 text-center text-sm font-medium text-gray-500"
             role="columnheader"
             aria-label={
               day === 'Sun'
@@ -272,7 +272,7 @@ export function MoodHistoryCalendar() {
       {isLoading ? (
         <div className="grid grid-cols-7 gap-2" data-testid="calendar-loading">
           {Array.from({ length: 35 }).map((_, i) => (
-            <div key={i} className="aspect-square rounded-lg bg-gray-100 animate-pulse" />
+            <div key={i} className="aspect-square animate-pulse rounded-lg bg-gray-100" />
           ))}
         </div>
       ) : (

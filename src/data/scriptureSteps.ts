@@ -25,8 +25,7 @@ export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
     stepIndex: 0,
     sectionTheme: 'Healing & Restoration',
     verseReference: 'Psalm 147:3',
-    verseText:
-      'He heals the brokenhearted and binds up their wounds.',
+    verseText: 'He heals the brokenhearted and binds up their wounds.',
     responseText:
       'Lord, we ask You to heal the broken places in our hearts and in our marriage. Bind up the wounds we have caused each other, and restore what has been damaged. We trust in Your power to make all things new.',
   },
@@ -34,8 +33,7 @@ export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
     stepIndex: 1,
     sectionTheme: 'Healing & Restoration',
     verseReference: 'Jeremiah 30:17',
-    verseText:
-      '"For I will restore health to you and heal you of your wounds," says the Lord.',
+    verseText: '"For I will restore health to you and heal you of your wounds," says the Lord.',
     responseText:
       'Father, we claim Your promise of restoration. Heal us from the wounds of harsh words, broken trust, and unmet expectations. Restore health to our relationship as only You can.',
   },
@@ -101,8 +99,7 @@ export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
     stepIndex: 8,
     sectionTheme: 'Confession & Repentance',
     verseReference: 'Psalm 51:10',
-    verseText:
-      'Create in me a clean heart, O God, and renew a steadfast spirit within me.',
+    verseText: 'Create in me a clean heart, O God, and renew a steadfast spirit within me.',
     responseText:
       'Lord, create clean hearts in both of us. Remove the pride, defensiveness, and stubbornness that hinder our growth. Renew a steadfast, committed spirit within us — one that perseveres through difficulty.',
   },
@@ -122,7 +119,7 @@ export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
     sectionTheme: "God's Faithfulness & Peace",
     verseReference: 'Lamentations 3:22-23',
     verseText:
-      'Through the Lord\'s mercies we are not consumed, because His compassions fail not. They are new every morning; great is Your faithfulness.',
+      "Through the Lord's mercies we are not consumed, because His compassions fail not. They are new every morning; great is Your faithfulness.",
     responseText:
       'Father, thank You that Your mercies are new every morning. No matter what yesterday held, today is a fresh start. Great is Your faithfulness to us, and we trust You to be faithful in our marriage.',
   },
@@ -159,8 +156,7 @@ export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
     stepIndex: 14,
     sectionTheme: 'The Power of Words',
     verseReference: 'Proverbs 15:1',
-    verseText:
-      'A soft answer turns away wrath, but a harsh word stirs up anger.',
+    verseText: 'A soft answer turns away wrath, but a harsh word stirs up anger.',
     responseText:
       'God, in moments of frustration, help us choose soft answers. When we want to respond harshly, give us the self-control to pause and speak with gentleness. Transform our communication patterns to reflect Your wisdom.',
   },

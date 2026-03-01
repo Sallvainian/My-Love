@@ -111,10 +111,7 @@ export function ReadingContainer(): ReactElement | null {
       // Story 4.3: Show "Reconnected" toast (green tint, 2s auto-dismiss)
       setShowReconnectedToast(true);
       if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
-      reconnectedToastTimerRef.current = setTimeout(
-        () => setShowReconnectedToast(false),
-        2000
-      );
+      reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
     }
     return () => {
       if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);

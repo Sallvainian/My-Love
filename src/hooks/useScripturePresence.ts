@@ -101,33 +101,29 @@ export function useScripturePresence(
       },
     });
 
-    channel.on(
-      'broadcast',
-      { event: 'presence_update' },
-      (msg: { payload: PresencePayload }) => {
-        const payload = msg.payload;
+    channel.on('broadcast', { event: 'presence_update' }, (msg: { payload: PresencePayload }) => {
+      const payload = msg.payload;
 
-        // Drop stale presence
-        if (Date.now() - payload.ts > STALE_TTL_MS) return;
+      // Drop stale presence
+      if (Date.now() - payload.ts > STALE_TTL_MS) return;
 
-        // Reset stale detection timer on each valid presence_update
-        if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
-        staleTimerRef.current = setTimeout(() => {
-          setPartnerPresence((prev) => ({
-            ...prev,
-            isPartnerConnected: false,
-            view: null,
-          }));
-        }, STALE_TTL_MS);
+      // Reset stale detection timer on each valid presence_update
+      if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
+      staleTimerRef.current = setTimeout(() => {
+        setPartnerPresence((prev) => ({
+          ...prev,
+          isPartnerConnected: false,
+          view: null,
+        }));
+      }, STALE_TTL_MS);
 
-        setPartnerPresence({
-          view: payload.view,
-          stepIndex: payload.step_index,
-          ts: payload.ts,
-          isPartnerConnected: true,
-        });
-      }
-    );
+      setPartnerPresence({
+        view: payload.view,
+        stepIndex: payload.step_index,
+        ts: payload.ts,
+        isPartnerConnected: true,
+      });
+    });
 
     channelRef.current = channel;
 
@@ -185,8 +181,7 @@ export function useScripturePresence(
       .catch((err: unknown) => {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SYNC_FAILED,
-          message:
-            err instanceof Error ? err.message : 'Failed to authenticate presence channel',
+          message: err instanceof Error ? err.message : 'Failed to authenticate presence channel',
           details: err,
         };
         handleScriptureError(scriptureError);
@@ -218,7 +213,12 @@ export function useScripturePresence(
   // resets transient view/step data while preserving connection status.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate sync reset of external presence state on step change
-    setPartnerPresence((prev) => ({ view: null, stepIndex: null, ts: null, isPartnerConnected: prev.isPartnerConnected }));
+    setPartnerPresence((prev) => ({
+      view: null,
+      stepIndex: null,
+      ts: null,
+      isPartnerConnected: prev.isPartnerConnected,
+    }));
     sendPresence();
   }, [stepIndex, sendPresence]);
 

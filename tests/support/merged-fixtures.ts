@@ -20,6 +20,7 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 import { test as customFixtures } from './fixtures';
 import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
 import { test as workerAuthFixture } from './fixtures/worker-auth';
+import { test as togetherModeFixture } from './fixtures/together-mode';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -34,10 +35,9 @@ const networkMonitorFixture = base.extend(
       /\/rest\/v1\/users\?select=partner/, // Partner queries fail without partner data in test env
       /\/auth\/v1\/token/, // Background auth token refresh — 400 expected when refresh token is stale
       /\/auth\/v1\/user(?:\?|$)/, // Transient auth user probe failures (e.g. local 504) can be non-functional noise in E2E
-      /\/rest\/v1\/rpc\/scripture_submit_reflection/, // Reflection write failures intentionally tested for retry UI
     ],
     maxTestsPerError: 3, // Prevent domino failures
-  }),
+  })
 );
 
 /**
@@ -62,6 +62,7 @@ export const test = mergeTests(
   customFixtures,
   scriptureNavFixture,
   workerAuthFixture,
+  togetherModeFixture
 );
 
 export { expect } from '@playwright/test';

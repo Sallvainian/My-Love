@@ -116,13 +116,7 @@ describe('DailyPrayerReport', () => {
 
   describe('Partner Waiting State', () => {
     it('shows waiting text when partner incomplete', () => {
-      render(
-        <DailyPrayerReport
-          {...defaultProps}
-          partnerName="Sarah"
-          isPartnerComplete={false}
-        />
-      );
+      render(<DailyPrayerReport {...defaultProps} partnerName="Sarah" isPartnerComplete={false} />);
       const waitingText = screen.getByTestId('scripture-report-partner-waiting');
       expect(waitingText).toBeDefined();
       expect(waitingText).toHaveTextContent("Waiting for Sarah's reflections");
@@ -167,7 +161,9 @@ describe('DailyPrayerReport', () => {
     });
 
     it('renders partner shared bookmark indicators', () => {
-      render(<DailyPrayerReport {...defaultProps} partnerBookmarks={[2, 4]} isPartnerComplete={true} />);
+      render(
+        <DailyPrayerReport {...defaultProps} partnerBookmarks={[2, 4]} isPartnerComplete={true} />
+      );
       expect(screen.getByTestId('scripture-report-partner-bookmark-indicator-2')).toBeDefined();
       expect(screen.getByTestId('scripture-report-partner-bookmark-indicator-4')).toBeDefined();
       expect(screen.queryByTestId('scripture-report-partner-bookmark-indicator-1')).toBeNull();

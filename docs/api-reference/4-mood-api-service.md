@@ -25,8 +25,8 @@ All methods check `isOnline()` before making network calls and throw `SupabaseSe
 
 Inserts a new mood entry.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter  | Type         | Description                                                               |
+| ---------- | ------------ | ------------------------------------------------------------------------- |
 | `moodData` | `MoodInsert` | Mood data (`user_id`, `mood_type`, `mood_types?`, `note?`, `created_at?`) |
 
 **Query:** `supabase.from('moods').insert(moodData).select().single()`
@@ -39,10 +39,10 @@ Inserts a new mood entry.
 
 Fetches moods for a specific user, sorted newest first.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `userId` | `string` | -- | User UUID |
-| `limit` | `number` | `50` | Max results |
+| Parameter | Type     | Default | Description |
+| --------- | -------- | ------- | ----------- |
+| `userId`  | `string` | --      | User UUID   |
+| `limit`   | `number` | `50`    | Max results |
 
 **Query:** `supabase.from('moods').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(limit)`
 
@@ -52,11 +52,11 @@ Fetches moods for a specific user, sorted newest first.
 
 Fetches moods within a date range.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | User UUID |
+| Parameter   | Type     | Description               |
+| ----------- | -------- | ------------------------- |
+| `userId`    | `string` | User UUID                 |
 | `startDate` | `string` | ISO timestamp (inclusive) |
-| `endDate` | `string` | ISO timestamp (inclusive) |
+| `endDate`   | `string` | ISO timestamp (inclusive) |
 
 **Query:** Uses `.gte('created_at', startDate).lte('created_at', endDate)`.
 
@@ -80,11 +80,11 @@ Deletes a mood entry. No response validation needed.
 
 Paginated mood history.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `userId` | `string` | -- | User UUID |
-| `offset` | `number` | `0` | Starting position |
-| `limit` | `number` | `50` | Page size |
+| Parameter | Type     | Default | Description       |
+| --------- | -------- | ------- | ----------------- |
+| `userId`  | `string` | --      | User UUID         |
+| `offset`  | `number` | `0`     | Starting position |
+| `limit`   | `number` | `50`    | Page size         |
 
 **Query:** Uses `.range(offset, offset + limit - 1)` for server-side pagination.
 

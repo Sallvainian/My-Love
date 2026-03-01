@@ -9,18 +9,19 @@ The project uses the BMAD method for planning. All planning documents are in `_b
 
 ## Epic Status
 
-| Epic | Name | Status | Branch |
-|---|---|---|---|
-| 1 | Foundation and Solo Scripture Reading | Complete | merged to main |
-| 2 | Reflection and Daily Prayer Report | In Progress | `codex/finish-epic-2-development` |
-| 3 | Stats and Overview Dashboard | Planned | -- |
-| 4 | Together Mode -- Synchronized Reading | Planned | -- |
+| Epic | Name                                  | Status      | Branch                            |
+| ---- | ------------------------------------- | ----------- | --------------------------------- |
+| 1    | Foundation and Solo Scripture Reading | Complete    | merged to main                    |
+| 2    | Reflection and Daily Prayer Report    | In Progress | `codex/finish-epic-2-development` |
+| 3    | Stats and Overview Dashboard          | Planned     | --                                |
+| 4    | Together Mode -- Synchronized Reading | Planned     | --                                |
 
 ## Epic 1: Foundation and Solo Scripture Reading (Complete)
 
 Users can access Scripture Reading from bottom navigation, start a Solo session, read through all 17 scripture steps at their own pace, save and resume progress, and experience smooth optimistic UI. The feature is fully accessible with keyboard navigation, screen reader support, and reduced motion compliance.
 
 **Stories**:
+
 - Story 1.1: Database Schema and Backend Infrastructure
 - Story 1.2: Navigation and Overview Page
 - Story 1.3: Solo Reading Flow
@@ -32,6 +33,7 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 ## Epic 2: Reflection and Daily Prayer Report (In Progress)
 
 **Stories**:
+
 - Story 2.1: Per-Step Reflection System -- Rating (1-5) and optional notes after each verse, inline reflection screen
 - Story 2.2: End-of-Session Reflection Summary -- Standout verse selection, session rating, bookmark sharing toggle
 - Story 2.3: Daily Prayer Report -- Send and View -- Report generation, partner delivery, view received reports

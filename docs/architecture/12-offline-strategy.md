@@ -4,17 +4,17 @@
 
 The app uses a **hybrid offline strategy** where different features have different network requirements:
 
-| Feature | Pattern | Offline Behavior |
-|---------|---------|-----------------|
-| Daily Messages | Offline-first | Fully functional offline (messages in IndexedDB) |
-| Mood Tracking | Offline-first | Create/update works offline; sync when connected |
-| Custom Messages | Offline-first | Full CRUD offline via IndexedDB |
-| Settings/Theme | Local-only | Always works (localStorage) |
-| Love Notes | Online-required | Read cached messages; send fails with retry prompt |
-| Photo Gallery | Online-required | Cached photos viewable; upload requires connection |
-| Scripture Reading | Online-first | Cached sessions viewable; new sessions require connection |
-| Poke/Kiss | Online-required | Fails with offline error |
-| Partner Data | Online-required | Shows cached partner info; refresh requires connection |
+| Feature           | Pattern         | Offline Behavior                                          |
+| ----------------- | --------------- | --------------------------------------------------------- |
+| Daily Messages    | Offline-first   | Fully functional offline (messages in IndexedDB)          |
+| Mood Tracking     | Offline-first   | Create/update works offline; sync when connected          |
+| Custom Messages   | Offline-first   | Full CRUD offline via IndexedDB                           |
+| Settings/Theme    | Local-only      | Always works (localStorage)                               |
+| Love Notes        | Online-required | Read cached messages; send fails with retry prompt        |
+| Photo Gallery     | Online-required | Cached photos viewable; upload requires connection        |
+| Scripture Reading | Online-first    | Cached sessions viewable; new sessions require connection |
+| Poke/Kiss         | Online-required | Fails with offline error                                  |
+| Partner Data      | Online-required | Shows cached partner info; refresh requires connection    |
 
 ## Three-Tier Sync Architecture
 
@@ -41,11 +41,14 @@ Failures are non-blocking -- the entry is saved locally and will sync via other 
 
 ```typescript
 useEffect(() => {
-  const intervalId = setInterval(async () => {
-    if (navigator.onLine) {
-      await syncPendingMoods();
-    }
-  }, 5 * 60 * 1000); // 5 minutes
+  const intervalId = setInterval(
+    async () => {
+      if (navigator.onLine) {
+        await syncPendingMoods();
+      }
+    },
+    5 * 60 * 1000
+  ); // 5 minutes
   return () => clearInterval(intervalId);
 }, []);
 ```
@@ -141,7 +144,9 @@ if (result.offline) {
 
 ```typescript
 export async function getCurrentUserIdOfflineSafe(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session?.user?.id ?? null;
 }
 ```

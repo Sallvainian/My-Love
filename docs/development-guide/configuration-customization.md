@@ -6,16 +6,16 @@ Edit `src/config/constants.ts` to personalize the app for your relationship:
 
 ```typescript
 export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie',       // Your partner's name, displayed throughout the app
-  defaultStartDate: '2025-10-18',     // Relationship start date (YYYY-MM-DD), used for duration counter
-  isPreConfigured: true,              // Always true since values are hardcoded
+  defaultPartnerName: 'Gracie', // Your partner's name, displayed throughout the app
+  defaultStartDate: '2025-10-18', // Relationship start date (YYYY-MM-DD), used for duration counter
+  isPreConfigured: true, // Always true since values are hardcoded
 } as const;
 ```
 
 Additional exports from this file:
 
 ```typescript
-export const USER_ID = 'default-user' as const;     // Single-user IndexedDB key
+export const USER_ID = 'default-user' as const; // Single-user IndexedDB key
 export const PARTNER_NAME = APP_CONFIG.defaultPartnerName; // Backward-compatible alias
 ```
 
@@ -57,12 +57,12 @@ This produces separate cached chunks for major dependencies, improving cache hit
 
 ### Plugins
 
-| Plugin | Purpose |
-|---|---|
-| `@vitejs/plugin-react` | React Fast Refresh, JSX transform |
-| `vite-plugin-checker` | TypeScript type checking overlay in the browser during development |
+| Plugin                      | Purpose                                                                |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `@vitejs/plugin-react`      | React Fast Refresh, JSX transform                                      |
+| `vite-plugin-checker`       | TypeScript type checking overlay in the browser during development     |
 | `vite-plugin-pwa` (VitePWA) | PWA manifest generation, service worker compilation via InjectManifest |
-| `rollup-plugin-visualizer` | Bundle size analysis output at `dist/stats.html` |
+| `rollup-plugin-visualizer`  | Bundle size analysis output at `dist/stats.html`                       |
 
 ### PWA Configuration
 
@@ -77,14 +77,14 @@ VitePWA({
   srcDir: 'src',
   filename: 'sw.ts',
   injectManifest: {
-    globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],  // Only precache static assets
-    globIgnores: ['**/*.js', '**/*.css', '**/*.html'],     // Do NOT precache code
+    globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'], // Only precache static assets
+    globIgnores: ['**/*.js', '**/*.css', '**/*.html'], // Do NOT precache code
     additionalManifestEntries: [
-      { url: 'index.html', revision: Date.now().toString() },  // Force SW update per build
+      { url: 'index.html', revision: Date.now().toString() }, // Force SW update per build
     ],
   },
-  devOptions: { enabled: false },  // PWA disabled in development
-})
+  devOptions: { enabled: false }, // PWA disabled in development
+});
 ```
 
 ## Tailwind Theme
@@ -95,13 +95,13 @@ VitePWA({
 
 Four themed palettes, each with shades from 50 to 900:
 
-| Palette | Primary Color | Hex (500) |
-|---|---|---|
-| `sunset` | Rose red | `#f43f5e` |
-| `coral` | Light salmon | `#ffa07a` |
-| `ocean` | Teal | `#14b8a6` |
-| `lavender` | Purple | `#a855f7` |
-| `rose` | Rose red | `#f43f5e` |
+| Palette    | Primary Color | Hex (500) |
+| ---------- | ------------- | --------- |
+| `sunset`   | Rose red      | `#f43f5e` |
+| `coral`    | Light salmon  | `#ffa07a` |
+| `ocean`    | Teal          | `#14b8a6` |
+| `lavender` | Purple        | `#a855f7` |
+| `rose`     | Rose red      | `#f43f5e` |
 
 Usage in components:
 
@@ -122,15 +122,15 @@ fontFamily: {
 
 ### Custom Animations
 
-| Animation Class | Description | Duration |
-|---|---|---|
-| `animate-float` | Vertical float (up-down) | 3s infinite |
-| `animate-fade-in` | Opacity 0 to 1 | 0.5s |
-| `animate-scale-in` | Scale 0.9 to 1 with fade | 0.3s |
-| `animate-slide-up` | Translate up 20px with fade | 0.4s |
-| `animate-pulse-slow` | Slow pulse | 3s infinite |
-| `animate-heart-beat` | Heart beat scale | 1s infinite |
-| `animate-shimmer` | Horizontal shimmer sweep | 2s infinite |
+| Animation Class      | Description                 | Duration    |
+| -------------------- | --------------------------- | ----------- |
+| `animate-float`      | Vertical float (up-down)    | 3s infinite |
+| `animate-fade-in`    | Opacity 0 to 1              | 0.5s        |
+| `animate-scale-in`   | Scale 0.9 to 1 with fade    | 0.3s        |
+| `animate-slide-up`   | Translate up 20px with fade | 0.4s        |
+| `animate-pulse-slow` | Slow pulse                  | 3s infinite |
+| `animate-heart-beat` | Heart beat scale            | 1s infinite |
+| `animate-shimmer`    | Horizontal shimmer sweep    | 2s infinite |
 
 ## TypeScript Configuration
 

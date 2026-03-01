@@ -46,9 +46,7 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
         globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
         // Force SW update on every build with timestamp revision
-        additionalManifestEntries: [
-          { url: 'index.html', revision: Date.now().toString() },
-        ],
+        additionalManifestEntries: [{ url: 'index.html', revision: Date.now().toString() }],
       },
       devOptions: {
         enabled: false,

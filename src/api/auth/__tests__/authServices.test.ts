@@ -29,9 +29,8 @@ const {
   mockUnsubscribe: vi.fn(),
 }));
 
-let authStateCallback:
-  | ((event: string, session: Session | null) => void | Promise<void>)
-  | null = null;
+let authStateCallback: ((event: string, session: Session | null) => void | Promise<void>) | null =
+  null;
 
 vi.mock('../../supabaseClient', () => ({
   supabase: {

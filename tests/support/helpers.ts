@@ -256,12 +256,8 @@ export async function ensureScriptureOverview(page: Page): Promise<ScriptureEntr
 
   try {
     const state = await Promise.any<ScriptureEntryState>([
-      startButton
-        .waitFor({ state: 'visible', timeout: 20_000 })
-        .then(() => 'overview' as const),
-      readingFlow
-        .waitFor({ state: 'visible', timeout: 20_000 })
-        .then(() => 'active-flow' as const),
+      startButton.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'overview' as const),
+      readingFlow.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'active-flow' as const),
     ]);
 
     if (state === 'overview') {
@@ -306,10 +302,9 @@ export async function startSoloSession(page: Page): Promise<string> {
   await waitForAuthReadiness(page);
 
   const responsePromise = page
-    .waitForResponse(
-      (resp) => resp.url().includes('/rest/v1/rpc/scripture_create_session'),
-      { timeout: NETWORK_DIAGNOSTIC_TIMEOUT_MS }
-    )
+    .waitForResponse((resp) => resp.url().includes('/rest/v1/rpc/scripture_create_session'), {
+      timeout: NETWORK_DIAGNOSTIC_TIMEOUT_MS,
+    })
     .catch(() => null);
 
   await expect(page.getByTestId('scripture-start-button')).toBeEnabled();
@@ -370,7 +365,8 @@ export async function advanceOneStep(page: Page, rating: number = 3) {
 
   // Wait for reflection submission to complete
   const responsePromise = page.waitForResponse(
-    (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+    (resp) =>
+      resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
   );
 
   await page.getByTestId('scripture-reflection-continue').click();
@@ -421,7 +417,8 @@ export async function completeAllStepsToReflectionSummary(
 
     // Wait for reflection submission to complete
     const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+      (resp) =>
+        resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
     );
 
     await page.getByTestId('scripture-reflection-continue').click();
@@ -469,7 +466,8 @@ export async function submitReflectionSummary(
 
   // Submit the reflection summary — wait for server response
   const responsePromise = page.waitForResponse(
-    (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+    (resp) =>
+      resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
   );
 
   await page.getByTestId('scripture-reflection-summary-continue').click();

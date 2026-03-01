@@ -66,8 +66,9 @@ function cleanCache(): void {
 
   // If still over limit, remove least recently accessed
   if (signedUrlCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(signedUrlCache.entries())
-      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+    const entries = Array.from(signedUrlCache.entries()).sort(
+      (a, b) => a[1].lastAccessed - b[1].lastAccessed
+    );
 
     const toRemove = entries.slice(0, signedUrlCache.size - MAX_CACHE_SIZE);
     for (const [path] of toRemove) {
@@ -117,10 +118,7 @@ interface EdgeFunctionResponse {
  * @returns Storage path for database record
  * @throws Error if validation, compression, or upload fails
  */
-export async function uploadLoveNoteImage(
-  file: File,
-  _userId: string
-): Promise<UploadResult> {
+export async function uploadLoveNoteImage(file: File, _userId: string): Promise<UploadResult> {
   // Client-side validation first (fast feedback)
   const validation = imageCompressionService.validateImageFile(file);
   if (!validation.valid) {
@@ -131,7 +129,9 @@ export async function uploadLoveNoteImage(
   const { blob, compressedSize } = await imageCompressionService.compressImage(file);
 
   // Get current session for auth header
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session?.access_token) {
     throw new Error('Not authenticated');
   }
@@ -140,7 +140,7 @@ export async function uploadLoveNoteImage(
   const response = await fetch(UPLOAD_FUNCTION_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/octet-stream',
     },
     body: blob,
@@ -182,12 +182,11 @@ export async function uploadLoveNoteImage(
  * @param _userId - Current user's ID (unused - Edge Function gets from JWT)
  * @returns Storage path for database record
  */
-export async function uploadCompressedBlob(
-  blob: Blob,
-  _userId: string
-): Promise<UploadResult> {
+export async function uploadCompressedBlob(blob: Blob, _userId: string): Promise<UploadResult> {
   // Get current session for auth header
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session?.access_token) {
     throw new Error('Not authenticated');
   }
@@ -196,7 +195,7 @@ export async function uploadCompressedBlob(
   const response = await fetch(UPLOAD_FUNCTION_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/octet-stream',
     },
     body: blob,
@@ -394,9 +393,7 @@ export async function batchGetSignedUrls(
  * @param storagePath - Storage path to delete
  */
 export async function deleteLoveNoteImage(storagePath: string): Promise<void> {
-  const { error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .remove([storagePath]);
+  const { error } = await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
 
   if (error) {
     console.error('[LoveNoteImageService] Delete failed:', error);

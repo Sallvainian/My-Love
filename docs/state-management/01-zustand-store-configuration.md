@@ -60,6 +60,7 @@ export type AppStateCreator<T> = StateCreator<
 ```
 
 This type gives each slice creator three arguments:
+
 - `set` -- Update function (supports partial state or updater function)
 - `get` -- Returns full `AppState` (cross-slice reads)
 - `_api` -- Store API (rarely used)
@@ -139,12 +140,12 @@ The custom `createJSONStorage` adapter handles:
 
 Only 4 state keys are persisted to localStorage:
 
-| Key | Type | Size Impact |
-|-----|------|-------------|
-| `settings` | `Settings` | ~500 bytes |
-| `isOnboarded` | `boolean` | ~10 bytes |
+| Key              | Type             | Size Impact                       |
+| ---------------- | ---------------- | --------------------------------- |
+| `settings`       | `Settings`       | ~500 bytes                        |
+| `isOnboarded`    | `boolean`        | ~10 bytes                         |
 | `messageHistory` | `MessageHistory` | ~2-5 KB (depends on history size) |
-| `moods` | `MoodEntry[]` | ~10-50 KB (depends on entries) |
+| `moods`          | `MoodEntry[]`    | ~10-50 KB (depends on entries)    |
 
 This keeps localStorage under 100KB typically, well within the 5MB browser limit.
 

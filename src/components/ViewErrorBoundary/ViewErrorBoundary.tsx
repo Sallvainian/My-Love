@@ -29,34 +29,32 @@ function ViewErrorFallback({
   const showOfflineMessage = isOffline || isChunkError;
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh] px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
-        <div className="text-5xl mb-4">{showOfflineMessage ? '📴' : '⚠️'}</div>
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">
-          {showOfflineMessage
-            ? "Can't load this page offline"
-            : `Error loading ${viewName}`}
+    <div className="flex min-h-[60vh] items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 text-center shadow-lg dark:bg-gray-800">
+        <div className="mb-4 text-5xl">{showOfflineMessage ? '📴' : '⚠️'}</div>
+        <h2 className="mb-2 text-xl font-bold text-gray-800 dark:text-gray-100">
+          {showOfflineMessage ? "Can't load this page offline" : `Error loading ${viewName}`}
         </h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-4">
+        <p className="mb-4 text-gray-600 dark:text-gray-300">
           {showOfflineMessage
             ? 'This page needs an internet connection to load. Please reconnect and try again.'
             : 'Something went wrong while loading this view.'}
         </p>
         {error && !showOfflineMessage && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded text-left overflow-auto max-h-24">
+          <p className="mb-4 max-h-24 overflow-auto rounded bg-gray-100 p-2 text-left font-mono text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400">
             {error.message}
           </p>
         )}
-        <div className="flex gap-3 justify-center">
+        <div className="flex justify-center gap-3">
           <button
             onClick={onNavigateHome}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="rounded-lg bg-gray-200 px-4 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           >
             Go Home
           </button>
           <button
             onClick={onRetry}
-            className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium rounded-lg hover:from-pink-600 hover:to-rose-600 transition-all shadow-md hover:shadow-lg"
+            className="rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2 font-medium text-white shadow-md transition-all hover:from-pink-600 hover:to-rose-600 hover:shadow-lg"
           >
             Try Again
           </button>
@@ -84,10 +82,7 @@ interface ViewErrorBoundaryState {
  * - Resets when viewName changes (user navigates away)
  * - Detects offline/chunk errors for appropriate messaging
  */
-export class ViewErrorBoundary extends Component<
-  ViewErrorBoundaryProps,
-  ViewErrorBoundaryState
-> {
+export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBoundaryState> {
   constructor(props: ViewErrorBoundaryProps) {
     super(props);
     this.state = {

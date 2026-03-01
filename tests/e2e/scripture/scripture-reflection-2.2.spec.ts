@@ -23,9 +23,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
 
       // THEN: Reflection summary screen is visible
-      await expect(
-        page.getByTestId('scripture-reflection-summary-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
 
       // AND: Section heading "Your Session" is visible
       const heading = page.getByTestId('scripture-reflection-summary-heading');
@@ -36,42 +34,22 @@ test.describe('End-of-Session Reflection Summary', () => {
       await expect(heading).toBeFocused();
 
       // AND: Bookmarked verse chips are displayed for steps 0, 5, and 12
-      await expect(
-        page.getByTestId('scripture-standout-verse-0')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-standout-verse-0')
-      ).toHaveText('Psalm 147:3');
+      await expect(page.getByTestId('scripture-standout-verse-0')).toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-0')).toHaveText('Psalm 147:3');
 
-      await expect(
-        page.getByTestId('scripture-standout-verse-5')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-standout-verse-5')
-      ).toHaveText('Matthew 6:14-15');
+      await expect(page.getByTestId('scripture-standout-verse-5')).toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-5')).toHaveText('Matthew 6:14-15');
 
-      await expect(
-        page.getByTestId('scripture-standout-verse-12')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-standout-verse-12')
-      ).toHaveText('Proverbs 18:21');
+      await expect(page.getByTestId('scripture-standout-verse-12')).toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-12')).toHaveText('Proverbs 18:21');
 
       // AND: Non-bookmarked verse chips are NOT displayed
-      await expect(
-        page.getByTestId('scripture-standout-verse-1')
-      ).not.toBeVisible();
-      await expect(
-        page.getByTestId('scripture-standout-verse-3')
-      ).not.toBeVisible();
-      await expect(
-        page.getByTestId('scripture-standout-verse-16')
-      ).not.toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-1')).not.toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-3')).not.toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-16')).not.toBeVisible();
 
       // AND: No-bookmarks fallback message is NOT visible (since bookmarks exist)
-      await expect(
-        page.getByTestId('scripture-no-bookmarks-message')
-      ).not.toBeVisible();
+      await expect(page.getByTestId('scripture-no-bookmarks-message')).not.toBeVisible();
 
       // AND: Session rating group is visible
       const ratingGroup = page.getByTestId('scripture-session-rating-group');
@@ -80,15 +58,11 @@ test.describe('End-of-Session Reflection Summary', () => {
 
       // AND: All 5 session rating buttons are visible
       for (let n = 1; n <= 5; n++) {
-        await expect(
-          page.getByTestId(`scripture-session-rating-${n}`)
-        ).toBeVisible();
+        await expect(page.getByTestId(`scripture-session-rating-${n}`)).toBeVisible();
       }
 
       // AND: Optional note textarea is visible
-      await expect(
-        page.getByTestId('scripture-session-note')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-session-note')).toBeVisible();
 
       // AND: Continue button is visible but disabled (no selections yet)
       const continueButton = page.getByTestId('scripture-reflection-summary-continue');
@@ -104,9 +78,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       // GIVEN: User is on the reflection summary screen with bookmarks on steps 0 and 12
       const bookmarkedStepIndices = new Set([0, 12]);
       await completeAllStepsToReflectionSummary(page, bookmarkedStepIndices);
-      await expect(
-        page.getByTestId('scripture-reflection-summary-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
 
       // AND: Continue button is disabled before any selections
       const continueButton = page.getByTestId('scripture-reflection-summary-continue');
@@ -138,18 +110,20 @@ test.describe('End-of-Session Reflection Summary', () => {
       expect(chipBox!.height).toBeGreaterThanOrEqual(48);
 
       // AND: Other verse chip remains unselected
-      await expect(
-        page.getByTestId('scripture-standout-verse-12')
-      ).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.getByTestId('scripture-standout-verse-12')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
 
       // WHEN: User also selects the second verse chip (multi-select)
       await page.getByTestId('scripture-standout-verse-12').click();
 
       // THEN: Both verse chips are now selected
       await expect(verseChip0).toHaveAttribute('aria-pressed', 'true');
-      await expect(
-        page.getByTestId('scripture-standout-verse-12')
-      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('scripture-standout-verse-12')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
 
       // AND: Continue button is still disabled (rating not yet selected)
       await expect(continueButton).toHaveAttribute('aria-disabled', 'true');
@@ -162,15 +136,17 @@ test.describe('End-of-Session Reflection Summary', () => {
       await page.getByTestId('scripture-session-rating-4').click();
 
       // THEN: Rating 4 is checked
-      await expect(
-        page.getByTestId('scripture-session-rating-4')
-      ).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId('scripture-session-rating-4')).toHaveAttribute(
+        'aria-checked',
+        'true'
+      );
 
       // AND: Other ratings are unchecked
       for (const n of [1, 2, 3, 5]) {
-        await expect(
-          page.getByTestId(`scripture-session-rating-${n}`)
-        ).toHaveAttribute('aria-checked', 'false');
+        await expect(page.getByTestId(`scripture-session-rating-${n}`)).toHaveAttribute(
+          'aria-checked',
+          'false'
+        );
       }
 
       // AND: Validation messages disappear
@@ -182,16 +158,11 @@ test.describe('End-of-Session Reflection Summary', () => {
       // WHEN: User types a note in the textarea
       const noteTextarea = page.getByTestId('scripture-session-note');
       await expect(noteTextarea).toBeVisible();
-      await expect(noteTextarea).toHaveAttribute(
-        'aria-label',
-        'Optional session reflection note'
-      );
+      await expect(noteTextarea).toHaveAttribute('aria-label', 'Optional session reflection note');
       await noteTextarea.fill('This session brought us closer together.');
 
       // THEN: Character counter is NOT visible (under 150 chars)
-      await expect(
-        page.getByTestId('scripture-session-note-char-count')
-      ).not.toBeVisible();
+      await expect(page.getByTestId('scripture-session-note-char-count')).not.toBeVisible();
 
       // WHEN: User types a note exceeding 150 characters
       const longNote = 'A'.repeat(155);
@@ -212,9 +183,10 @@ test.describe('End-of-Session Reflection Summary', () => {
       await expect(verseChip0).toHaveAttribute('aria-pressed', 'false');
 
       // AND: The other verse chip remains selected (at least one still selected)
-      await expect(
-        page.getByTestId('scripture-standout-verse-12')
-      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('scripture-standout-verse-12')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
 
       // AND: Continue button stays enabled (one verse + rating selected)
       await expect(continueButton).not.toHaveAttribute('aria-disabled', 'true');
@@ -236,31 +208,32 @@ test.describe('End-of-Session Reflection Summary', () => {
         .single();
       expect(sessionLookupError).toBeNull();
       const activeUserId = sessionRow!.user1_id;
-      await expect(
-        page.getByTestId('scripture-reflection-summary-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
 
       // WHEN: User selects standout verses (steps 0 and 12)
       await page.getByTestId('scripture-standout-verse-0').click();
-      await expect(
-        page.getByTestId('scripture-standout-verse-0')
-      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('scripture-standout-verse-0')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
 
       await page.getByTestId('scripture-standout-verse-12').click();
-      await expect(
-        page.getByTestId('scripture-standout-verse-12')
-      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('scripture-standout-verse-12')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
 
       // AND: User selects session rating 5
       await page.getByTestId('scripture-session-rating-5').click();
-      await expect(
-        page.getByTestId('scripture-session-rating-5')
-      ).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId('scripture-session-rating-5')).toHaveAttribute(
+        'aria-checked',
+        'true'
+      );
 
       // AND: User types an optional note
-      await page.getByTestId('scripture-session-note').fill(
-        'This prayer time was transformative for us.'
-      );
+      await page
+        .getByTestId('scripture-session-note')
+        .fill('This prayer time was transformative for us.');
 
       // AND: Continue button is now enabled
       const continueButton = page.getByTestId('scripture-reflection-summary-continue');
@@ -277,14 +250,10 @@ test.describe('End-of-Session Reflection Summary', () => {
       await summaryResponse;
 
       // THEN: Session advances to report phase — message compose screen appears (linked user)
-      await expect(
-        page.getByTestId('scripture-message-compose-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-message-compose-screen')).toBeVisible();
 
       // AND: Reflection summary screen is no longer visible
-      await expect(
-        page.getByTestId('scripture-reflection-summary-screen')
-      ).not.toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).not.toBeVisible();
 
       // AND: Session-level reflection is persisted with step_index = 17 (MAX_STEPS sentinel)
       const { data: reflections, error } = await supabaseAdmin
@@ -302,9 +271,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       const notesData = JSON.parse(reflections![0].notes!);
       expect(notesData.standoutVerses).toEqual(expect.arrayContaining([0, 12]));
       expect(notesData.standoutVerses).toHaveLength(2);
-      expect(notesData.userNote).toBe(
-        'This prayer time was transformative for us.'
-      );
+      expect(notesData.userNote).toBe('This prayer time was transformative for us.');
 
       // AND: Session phase is now 'report' in the database
       const { data: sessions, error: sessionError } = await supabaseAdmin
@@ -330,22 +297,16 @@ test.describe('End-of-Session Reflection Summary', () => {
       const sessionId = await completeAllStepsToReflectionSummary(page, new Set()); // empty bookmark set
 
       // THEN: Reflection summary screen is visible
-      await expect(
-        page.getByTestId('scripture-reflection-summary-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
 
       // AND: No-bookmarks fallback message is displayed
-      await expect(
-        page.getByTestId('scripture-no-bookmarks-message')
-      ).toBeVisible();
-      await expect(
-        page.getByTestId('scripture-no-bookmarks-message')
-      ).toHaveText("You didn't mark any verses — that's okay");
+      await expect(page.getByTestId('scripture-no-bookmarks-message')).toBeVisible();
+      await expect(page.getByTestId('scripture-no-bookmarks-message')).toHaveText(
+        "You didn't mark any verses — that's okay"
+      );
 
       // AND: No verse chips are rendered
-      await expect(
-        page.getByTestId('scripture-standout-verse-0')
-      ).not.toBeVisible();
+      await expect(page.getByTestId('scripture-standout-verse-0')).not.toBeVisible();
 
       // AND: Continue button is disabled (no rating yet)
       const continueButton = page.getByTestId('scripture-reflection-summary-continue');
@@ -367,9 +328,7 @@ test.describe('End-of-Session Reflection Summary', () => {
       await summaryResponse;
 
       // THEN: Session advances to report phase — message compose screen appears (linked user)
-      await expect(
-        page.getByTestId('scripture-message-compose-screen')
-      ).toBeVisible();
+      await expect(page.getByTestId('scripture-message-compose-screen')).toBeVisible();
 
       // AND: Session-level reflection is persisted with empty standoutVerses
       const { data: reflections, error } = await supabaseAdmin

@@ -13,9 +13,7 @@ export function useMotionConfig() {
   return {
     shouldReduceMotion: !!shouldReduceMotion,
     crossfade: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
-    slide: shouldReduceMotion
-      ? { duration: 0 }
-      : { duration: 0.3, ease: 'easeInOut' as const },
+    slide: shouldReduceMotion ? { duration: 0 } : { duration: 0.3, ease: 'easeInOut' as const },
     spring: shouldReduceMotion
       ? { duration: 0 }
       : { type: 'spring' as const, stiffness: 100, damping: 15 },

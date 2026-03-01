@@ -27,7 +27,7 @@ export function getRelativeTime(timestamp: string): string {
 
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   }).format(past);
 }
 

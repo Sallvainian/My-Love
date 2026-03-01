@@ -29,13 +29,13 @@ supabase start   # Starts Postgres, Auth, Storage, Realtime, Studio via Docker
 
 This reads `supabase/config.toml` and starts the local Supabase stack. Default ports:
 
-| Service | Port | URL |
-|---|---|---|
-| API | 54321 | `http://127.0.0.1:54321` |
+| Service                | Port  | URL                                                       |
+| ---------------------- | ----- | --------------------------------------------------------- |
+| API                    | 54321 | `http://127.0.0.1:54321`                                  |
 | Database (Postgres 17) | 54322 | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
-| Studio | 54323 | `http://127.0.0.1:54323` |
-| Inbucket (email) | 54324 | `http://127.0.0.1:54324` |
-| Analytics | 54327 | `http://127.0.0.1:54327` |
+| Studio                 | 54323 | `http://127.0.0.1:54323`                                  |
+| Inbucket (email)       | 54324 | `http://127.0.0.1:54324`                                  |
+| Analytics              | 54327 | `http://127.0.0.1:54327`                                  |
 
 After starting, apply migrations and seed data:
 

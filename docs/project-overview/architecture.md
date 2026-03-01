@@ -32,6 +32,7 @@ The application follows an offline-first architecture. The UI reads and writes t
 **Supabase**: Cloud backend responsible for cross-device sync, partner features (realtime mood, love notes, interactions), and long-term data persistence. The client singleton lives in `src/api/supabaseClient.ts`.
 
 **Sync triggers**: Three mechanisms keep local and cloud data in sync:
+
 1. Immediate sync on entry creation
 2. Periodic sync every 5 minutes while the app is open
 3. Background Sync API via the service worker when the app is closed
@@ -52,18 +53,18 @@ The scripture feature inverts the offline-first pattern:
 
 A single Zustand store (`src/stores/useAppStore.ts`) is composed from 10 slices using the slice pattern:
 
-| Slice | Responsibility |
-|---|---|
-| `appSlice` | App initialization, loading states |
-| `settingsSlice` | Theme selection, relationship configuration |
-| `navigationSlice` | Current view routing (no router library) |
-| `messagesSlice` | Daily love messages, favorites management |
-| `moodSlice` | Mood tracking, partner mood sync |
-| `interactionsSlice` | Poke/kiss/fart partner interactions |
-| `partnerSlice` | Partner data, display name resolution |
-| `notesSlice` | Love notes chat messages |
-| `photosSlice` | Photo gallery state |
-| `scriptureReadingSlice` | Scripture reading session management |
+| Slice                   | Responsibility                              |
+| ----------------------- | ------------------------------------------- |
+| `appSlice`              | App initialization, loading states          |
+| `settingsSlice`         | Theme selection, relationship configuration |
+| `navigationSlice`       | Current view routing (no router library)    |
+| `messagesSlice`         | Daily love messages, favorites management   |
+| `moodSlice`             | Mood tracking, partner mood sync            |
+| `interactionsSlice`     | Poke/kiss/fart partner interactions         |
+| `partnerSlice`          | Partner data, display name resolution       |
+| `notesSlice`            | Love notes chat messages                    |
+| `photosSlice`           | Photo gallery state                         |
+| `scriptureReadingSlice` | Scripture reading session management        |
 
 State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`.
 
@@ -74,6 +75,7 @@ State is persisted to `localStorage` via `zustand/persist`. The store uses custo
 No router library is used. Navigation is managed by the `navigationSlice` in the Zustand store. `App.tsx` renders views conditionally based on the `currentView` state value.
 
 Supported views and their URL paths:
+
 - `home` -- `/`
 - `photos` -- `/photos`
 - `mood` -- `/mood`
@@ -88,6 +90,7 @@ Supported views and their URL paths:
 Email/password authentication via Supabase Auth. The app expects exactly 2 users linked via `partner_id` in the `users` table. Partner detection is automatic -- the app identifies the other user in the database as the partner.
 
 Auth flow in `App.tsx`:
+
 1. `getSession()` checks for existing auth on mount
 2. `onAuthStateChange()` listens for auth state changes
 3. If no session: render `LoginScreen`
@@ -98,18 +101,18 @@ Auth flow in `App.tsx`:
 
 Route components are lazy-loaded via `React.lazy()` in `App.tsx`:
 
-| Component | Lazy-Loaded | Notes |
-|---|---|---|
-| Home view content | No | Rendered inline for guaranteed offline availability |
-| `PhotoGallery` | Yes | Photo grid with lazy loading |
-| `MoodTracker` | Yes | Mood logging UI |
-| `PartnerMoodView` | Yes | Partner mood real-time display |
-| `LoveNotes` | Yes | Real-time chat |
-| `ScriptureOverview` | Yes | Scripture reading entry point |
-| `WelcomeSplash` | Yes | Welcome splash screen (modal) |
-| `PhotoUpload` | Yes | Photo upload dialog (modal) |
-| `PhotoCarousel` | Yes | Photo carousel viewer (modal) |
-| `AdminPanel` | Yes | Admin interface (accessed via `/admin` route) |
+| Component           | Lazy-Loaded | Notes                                               |
+| ------------------- | ----------- | --------------------------------------------------- |
+| Home view content   | No          | Rendered inline for guaranteed offline availability |
+| `PhotoGallery`      | Yes         | Photo grid with lazy loading                        |
+| `MoodTracker`       | Yes         | Mood logging UI                                     |
+| `PartnerMoodView`   | Yes         | Partner mood real-time display                      |
+| `LoveNotes`         | Yes         | Real-time chat                                      |
+| `ScriptureOverview` | Yes         | Scripture reading entry point                       |
+| `WelcomeSplash`     | Yes         | Welcome splash screen (modal)                       |
+| `PhotoUpload`       | Yes         | Photo upload dialog (modal)                         |
+| `PhotoCarousel`     | Yes         | Photo carousel viewer (modal)                       |
+| `AdminPanel`        | Yes         | Admin interface (accessed via `/admin` route)       |
 
 All lazy-loaded components are wrapped in `<Suspense>` with a spinner fallback and `<ErrorBoundary>` or `<ViewErrorBoundary>` for error containment.
 
@@ -126,6 +129,7 @@ Uses the InjectManifest strategy (not GenerateSW). The custom service worker han
 The `src/sw-types.d.ts` file provides TypeScript declarations for the service worker context.
 
 Service worker registration in `src/main.tsx`:
+
 - **Production**: `registerSW` with `immediate: true` and auto-reload on `onNeedRefresh`
 - **Development**: Unregisters all existing service workers to prevent stale code issues
 
@@ -138,6 +142,7 @@ Zod schemas are defined in `src/validation/schemas.ts` with user-facing error me
 Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git. The `.env.keys` file (gitignored) contains the decryption key.
 
 Key variables:
+
 - `VITE_SUPABASE_URL` -- Supabase project URL
 - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` -- Supabase anon/public key
 
@@ -171,6 +176,7 @@ Supabase Postgres with 12 migration files in `supabase/migrations/`. Postgres ma
 All tables have Row Level Security (RLS) enabled. TypeScript types are auto-generated from the schema via `supabase gen types typescript --local > src/types/database.types.ts`.
 
 Local Supabase configuration is in `supabase/config.toml` with:
+
 - API port: 54321
 - DB port: 54322
 - Studio port: 54323

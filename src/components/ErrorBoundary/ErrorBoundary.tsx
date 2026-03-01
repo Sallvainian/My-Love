@@ -49,26 +49,26 @@ export class ErrorBoundary extends Component<Props, State> {
         this.state.error?.message.includes('Invalid');
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-            <div className="text-6xl mb-4">{isValidationError ? '⚠️' : '💔'}</div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900">
+          <div className="w-full max-w-md rounded-lg bg-white p-8 text-center shadow-lg dark:bg-gray-800">
+            <div className="mb-4 text-6xl">{isValidationError ? '⚠️' : '💔'}</div>
+            <h1 className="mb-2 text-2xl font-bold text-gray-800 dark:text-gray-100">
               {isValidationError ? 'Invalid Data Detected' : 'Something went wrong'}
             </h1>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="mb-6 text-gray-600 dark:text-gray-300">
               {isValidationError
                 ? 'Your settings data appears to be corrupted. Please try refreshing the page or clearing your browser storage.'
                 : 'We encountered an unexpected error. Please try again.'}
             </p>
             {this.state.error && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-mono bg-gray-100 dark:bg-gray-700 p-3 rounded">
+              <p className="mb-6 rounded bg-gray-100 p-3 font-mono text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400">
                 {this.state.error.message}
               </p>
             )}
             <div className="space-y-3">
               <button
                 onClick={this.handleRetry}
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-3 px-6 rounded-lg hover:from-pink-600 hover:to-rose-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                className="w-full rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-6 py-3 font-medium text-white shadow-md transition-all duration-200 hover:from-pink-600 hover:to-rose-600 hover:shadow-lg"
               >
                 Try Again
               </button>
@@ -78,7 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     localStorage.removeItem('my-love-storage');
                     window.location.reload();
                   }}
-                  className="w-full bg-gray-500 text-white font-medium py-3 px-6 rounded-lg hover:bg-gray-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="w-full rounded-lg bg-gray-500 px-6 py-3 font-medium text-white shadow-md transition-all duration-200 hover:bg-gray-600 hover:shadow-lg"
                 >
                   Clear Storage & Reload
                 </button>
