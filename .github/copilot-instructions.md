@@ -1,109 +1,58 @@
-# PR Code Review Guidelines
+<!-- BMAD:START -->
+# BMAD Method — Project Instructions
 
-## Review Philosophy
+## Project Configuration
 
-Review priority order:
-1. **Code quality & consistency** - React patterns, functional style, PWA correctness
-2. **Testing coverage** - Adequate tests for new/changed behavior
-3. **Performance** - Meaningful issues that affect UX
-4. **Security** - Critical vulnerabilities only
+- **Project**: My-Love
+- **User**: Sallvain
+- **Communication Language**: English
+- **Document Output Language**: English
+- **User Skill Level**: intermediate
+- **Output Folder**: {project-root}/_bmad-output
+- **Planning Artifacts**: {project-root}/_bmad-output/planning-artifacts
+- **Implementation Artifacts**: {project-root}/_bmad-output/implementation-artifacts
+- **Project Knowledge**: {project-root}/docs
 
-**Adaptive detail level:**
-- Large architectural changes → strategic feedback on design decisions
-- Small targeted fixes → granular code-level suggestions
+## BMAD Runtime Structure
 
-## Strict vs Flexible Areas
+- **Agent definitions**: `_bmad/bmm/agents/` (BMM module) and `_bmad/core/agents/` (core)
+- **Workflow definitions**: `_bmad/bmm/workflows/` (organized by phase)
+- **Core tasks**: `_bmad/core/tasks/` (help, editorial review, indexing, sharding, adversarial review)
+- **Core workflows**: `_bmad/core/workflows/` (brainstorming, party-mode, advanced-elicitation)
+- **Workflow engine**: `_bmad/core/tasks/workflow.xml` (executes YAML-based workflows)
+- **Module configuration**: `_bmad/bmm/config.yaml`
+- **Core configuration**: `_bmad/core/config.yaml`
+- **Agent manifest**: `_bmad/_config/agent-manifest.csv`
+- **Workflow manifest**: `_bmad/_config/workflow-manifest.csv`
+- **Help manifest**: `_bmad/_config/bmad-help.csv`
+- **Agent memory**: `_bmad/_memory/`
 
-**Strict:** data sync logic, offline flows, Zustand store design, hooks correctness, new behaviors requiring tests
+## Key Conventions
 
-**Flexible:** trivial UI changes, cosmetic refactors, minor formatting or naming differences
+- Always load `_bmad/bmm/config.yaml` before any agent activation or workflow execution
+- Store all config fields as session variables: `{user_name}`, `{communication_language}`, `{output_folder}`, `{planning_artifacts}`, `{implementation_artifacts}`, `{project_knowledge}`
+- MD-based workflows execute directly — load and follow the `.md` file
+- YAML-based workflows require the workflow engine — load `workflow.xml` first, then pass the `.yaml` config
+- Follow step-based workflow execution: load steps JIT, never multiple at once
+- Save outputs after EACH step when using the workflow engine
+- The `{project-root}` variable resolves to the workspace root at runtime
 
-## Core Focus Areas
+## Available Agents
 
-**React Patterns:**
-- Hooks: correct dependency arrays, no conditional hooks, proper cleanup
-- Component boundaries: single responsibility, clear prop contracts
-- Zustand: minimize subscriptions, avoid unnecessary renders, proper selectors
-- Rendering logic: avoid heavy computation inside render paths
-- Prop drilling: prefer context or scoped stores over deep prop chains
+| Agent | Persona | Title | Capabilities |
+|---|---|---|---|
+| bmad-master | BMad Master | BMad Master Executor, Knowledge Custodian, and Workflow Orchestrator | runtime resource management, workflow orchestration, task execution, knowledge custodian |
+| analyst | Mary | Business Analyst | market research, competitive analysis, requirements elicitation, domain expertise |
+| architect | Winston | Architect | distributed systems, cloud infrastructure, API design, scalable patterns |
+| dev | Amelia | Developer Agent | story execution, test-driven development, code implementation |
+| pm | John | Product Manager | PRD creation, requirements discovery, stakeholder alignment, user interviews |
+| qa | Quinn | QA Engineer | test automation, API testing, E2E testing, coverage analysis |
+| quick-flow-solo-dev | Barry | Quick Flow Solo Dev | rapid spec creation, lean implementation, minimum ceremony |
+| sm | Bob | Scrum Master | sprint planning, story preparation, agile ceremonies, backlog management |
+| tech-writer | Paige | Technical Writer | documentation, Mermaid diagrams, standards compliance, concept explanation |
+| ux-designer | Sally | UX Designer | user research, interaction design, UI patterns, experience strategy |
 
-**Functional Style:**
-- Pure functions: no hidden side effects
-- Immutability: avoid mutations, rely on map/filter/spread
-- Composition: small functions over monolithic logic
-- Separation of concerns: avoid mixing fetching, state updates, and rendering in one function/component
+## Slash Commands
 
-**PWA/Offline Correctness:**
-- Service worker: registration, update flow, cache strategies
-- Offline data: IndexedDB usage, sync conflict resolution, stale data handling
-- Cache invalidation: appropriate lifetimes, version management, avoid over-caching
-- Background sync: ensure queued writes, retries, and deduping logic
-
-## Testing Requirements
-
-**When tests are required:**
-- All new features and bug fixes, especially core flows (data sync, offline behavior, Zustand state, PWA logic)
-- Trivial changes (copy, styles, comments) may skip tests with explicit justification in PR
-
-**What to flag:**
-- Missing tests for new or changed behavior
-- Brittle/flaky patterns: arbitrary timeouts, over-mocking, implementation-coupled tests, pointless snapshots
-- Coverage gaps: untested branches, missing error/edge cases, offline scenarios not validated
-
-**Test quality over quantity:**
-- Focus on testing behavior, not implementation details
-- Ensure tests would catch real bugs, not just exercise code
-
-## Performance Guidelines
-
-Review performance across three areas, but only flag meaningful issues:
-
-**Bundle size:**
-- Heavy imports (e.g., importing entire libraries instead of named exports)
-- Duplicate dependencies
-- Dead code or unused chunks
-
-**Runtime performance:**
-- Unnecessary re-renders: missing memoization, bad dependency arrays
-- Unstable props/functions causing avoidable child renders
-- Expensive computations inside render paths
-- Memory leaks: missing cleanup, abandoned subscriptions, retained references
-
-**PWA performance:**
-- Inefficient caching strategies
-- Stale service worker behavior, outdated cache versions
-- Offline data handling: slow IndexedDB usage, missing indexes, inefficient read/write patterns
-
-**Don't flag:**
-- Micro-optimizations that don't affect UX
-- Premature optimization in early-stage code
-- Theoretical complexity issues unless in a hot path
-- Minor performance nits without measurable or likely impact
-
-## Security Considerations
-
-Focus on critical vulnerabilities only:
-- Exposed API keys, tokens, or credentials in code
-- XSS vulnerabilities: unsanitized user input in DOM
-- Unsafe data handling: missing input validation on user-supplied data
-- Authentication/authorization bypasses
-- Insecure direct object references (IDOR)
-- Dangerous eval-like patterns (new Function, dynamic script injection, untrusted HTML parsing)
-
-**Don't flag:** Theoretical security issues without exploitable vectors
-
-## Review Style
-
-**Communication approach:**
-- Be direct but constructive
-- Explain *why* something is problematic, not just *what* is wrong
-- Suggest specific fixes when possible
-- Acknowledge good patterns when you see them
-- If suggesting a major refactor, explain the trade-offs
-- If the code is acceptable, say so and move on - don't force optional changes
-
-**Avoid:**
-- Pedantic corrections on subjective style choices
-- Suggesting changes without explaining the benefit
-- Flagging issues already handled by linters/tooling (ESLint, Prettier, TypeScript)
-- Repeating the same issue multiple times - mention it once and reference other locations
+Type `/bmad-` in Copilot Chat to see all available BMAD workflows and agent activators. Agents are also available in the agents dropdown.
+<!-- BMAD:END -->
