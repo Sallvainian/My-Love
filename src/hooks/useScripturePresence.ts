@@ -26,6 +26,7 @@ export interface PartnerPresenceInfo {
   view: 'verse' | 'response' | null;
   stepIndex: number | null;
   ts: number | null;
+  isPartnerConnected: boolean;
 }
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -43,14 +44,18 @@ export function useScripturePresence(
   stepIndex: number,
   view: 'verse' | 'response'
 ): PartnerPresenceInfo {
+  // Trigger re-subscribe after realtime channel errors/closures.
+  const [retryCount, setRetryCount] = useState(0);
   const [partnerPresence, setPartnerPresence] = useState<PartnerPresenceInfo>({
     view: null,
     stepIndex: null,
     ts: null,
+    isPartnerConnected: true,
   });
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userIdRef = useRef<string>('');
   const latestPresenceRef = useRef<{ stepIndex: number; view: 'verse' | 'response' }>({
     stepIndex,
@@ -105,10 +110,21 @@ export function useScripturePresence(
         // Drop stale presence
         if (Date.now() - payload.ts > STALE_TTL_MS) return;
 
+        // Reset stale detection timer on each valid presence_update
+        if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
+        staleTimerRef.current = setTimeout(() => {
+          setPartnerPresence((prev) => ({
+            ...prev,
+            isPartnerConnected: false,
+            view: null,
+          }));
+        }, STALE_TTL_MS);
+
         setPartnerPresence({
           view: payload.view,
           stepIndex: payload.step_index,
           ts: payload.ts,
+          isPartnerConnected: true,
         });
       }
     );
@@ -132,6 +148,16 @@ export function useScripturePresence(
             intervalRef.current = setInterval(() => {
               sendPresence();
             }, HEARTBEAT_INTERVAL_MS);
+
+            // Start stale detection timer — fires if no presence_update received within TTL
+            if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
+            staleTimerRef.current = setTimeout(() => {
+              setPartnerPresence((prev) => ({
+                ...prev,
+                isPartnerConnected: false,
+                view: null,
+              }));
+            }, STALE_TTL_MS);
           } else if (status === 'CHANNEL_ERROR') {
             const scriptureError: ScriptureError = {
               code: ScriptureErrorCode.SYNC_FAILED,
@@ -139,6 +165,20 @@ export function useScripturePresence(
               details: err,
             };
             handleScriptureError(scriptureError);
+            if (channelRef.current === channel && sessionId) {
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+              }
+              setPartnerPresence((prev) => ({
+                ...prev,
+                isPartnerConnected: false,
+                view: null,
+              }));
+              void supabase.removeChannel(channel);
+              channelRef.current = null;
+              setRetryCount((c) => c + 1);
+            }
           }
         });
       })
@@ -153,6 +193,10 @@ export function useScripturePresence(
       });
 
     return () => {
+      if (staleTimerRef.current) {
+        clearTimeout(staleTimerRef.current);
+        staleTimerRef.current = null;
+      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -162,16 +206,19 @@ export function useScripturePresence(
         channelRef.current = null;
       }
     };
-  }, [sessionId, sendPresence]);
+  }, [sessionId, retryCount, sendPresence]);
 
   // Re-send presence when view changes
   useEffect(() => {
     sendPresence();
   }, [view, sendPresence]);
 
-  // Reset partner presence on step change (stale from old step)
+  // Reset partner presence on step change (stale from old step).
+  // Deliberate sync-external-state pattern: setPartnerPresence in effect body
+  // resets transient view/step data while preserving connection status.
   useEffect(() => {
-    setPartnerPresence({ view: null, stepIndex: null, ts: null });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate sync reset of external presence state on step change
+    setPartnerPresence((prev) => ({ view: null, stepIndex: null, ts: null, isPartnerConnected: prev.isPartnerConnected }));
     sendPresence();
   }, [stepIndex, sendPresence]);
 
