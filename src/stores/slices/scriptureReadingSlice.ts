@@ -35,8 +35,8 @@ export interface StateUpdatePayload {
   user2Ready?: boolean;
   countdownStartedAt?: number | null; // Server UTC ms or null
   currentStepIndex?: number; // Story 4.2: present when step advances via lock-in
-  triggeredBy?: 'lock_in' | 'phase_advance' | 'reconnect'; // Backward compatibility
-  triggered_by?: 'lock_in' | 'phase_advance' | 'reconnect'; // Architecture-aligned key
+  triggeredBy?: 'lock_in' | 'phase_advance' | 'reconnect' | 'end_session'; // Backward compatibility
+  triggered_by?: 'lock_in' | 'phase_advance' | 'reconnect' | 'end_session'; // Architecture-aligned key
 }
 
 // ============================================
@@ -116,6 +116,12 @@ export interface ScriptureReadingState {
   currentUserId: string | null; // Logged-in user's auth ID — used to distinguish user1 vs user2 in broadcasts
   // Story 4.2: Lock-in state
   partnerLocked: boolean;
+  // Story 4.3: Disconnection state
+  partnerDisconnected: boolean;
+  partnerDisconnectedAt: number | null;
+  // Internal: broadcast function set by useScriptureBroadcast hook.
+  // Not for external use — prefixed with underscore to signal internal.
+  _broadcastFn: ((event: string, payload: unknown) => void) | null;
 }
 
 // ============================================
@@ -152,6 +158,12 @@ export interface ScriptureSlice extends ScriptureReadingState {
   lockIn: () => Promise<void>;
   undoLockIn: () => Promise<void>;
   onPartnerLockInChanged: (locked: boolean) => void;
+  // Story 4.3: Disconnection actions
+  setPartnerDisconnected: (disconnected: boolean) => void;
+  endSession: () => Promise<void>;
+  // Internal: set by useScriptureBroadcast hook when channel subscribes/unsubscribes.
+  // Do NOT call from components — this is wiring between the hook and the store.
+  setBroadcastFn: (fn: ((event: string, payload: unknown) => void) | null) => void;
 }
 
 // ============================================
@@ -180,6 +192,11 @@ const initialScriptureState: ScriptureReadingState = {
   currentUserId: null,
   // Story 4.2: Lock-in initial state
   partnerLocked: false,
+  // Story 4.3: Disconnection initial state
+  partnerDisconnected: false,
+  partnerDisconnectedAt: null,
+  // Internal: no broadcast function until useScriptureBroadcast wires it
+  _broadcastFn: null,
 };
 
 // ============================================
@@ -532,7 +549,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     const { session } = state;
     if (!session) return;
 
-    set({ scriptureLoading: true, scriptureError: null });
+    // Optimistic update: set myRole immediately so UI transitions without waiting for RPC
+    set({ myRole: role, scriptureLoading: true, scriptureError: null });
 
     try {
       // Capture current user ID now so onBroadcastReceived can distinguish user1 vs user2
@@ -548,7 +566,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       const snapshot = data as unknown as StateUpdatePayload;
       set({
-        myRole: role,
         currentUserId,
         scriptureLoading: false,
         session: {
@@ -557,6 +574,9 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           version: snapshot.version,
         },
       });
+
+      // Client-side broadcast: notify partner of state update
+      get()._broadcastFn?.('state_updated', snapshot);
     } catch (error) {
       const scriptureError: ScriptureError = {
         code: ScriptureErrorCode.SYNC_FAILED,
@@ -564,7 +584,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         details: error,
       };
       handleScriptureError(scriptureError);
-      set({ scriptureError, scriptureLoading: false });
+      // Rollback optimistic update
+      set({ myRole: null, scriptureError, scriptureLoading: false });
     }
   },
 
@@ -601,6 +622,9 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             ? snapshot.countdownStartedAt
             : currentState.countdownStartedAt,
       }));
+
+      // Client-side broadcast: notify partner of state update
+      get()._broadcastFn?.('state_updated', snapshot);
     } catch (error) {
       // Roll back optimistic update on failure
       set({ myReady: !isReady });
@@ -629,6 +653,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       if (error) throw error;
 
+      // Client-side broadcast: notify partner that session was converted to solo.
+      // Must broadcast BEFORE clearing local state, because _broadcastFn is still wired.
+      get()._broadcastFn?.('session_converted', { mode: 'solo', sessionId: session.id });
+
       set({
         scriptureLoading: false,
         myRole: null,
@@ -656,7 +684,11 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
   // Called when partner joins the broadcast channel
   onPartnerJoined: () => {
-    set({ partnerJoined: true });
+    set({
+      partnerJoined: true,
+      partnerDisconnected: false,
+      partnerDisconnectedAt: null,
+    });
   },
 
   // Called when partner's ready state changes via broadcast
@@ -678,6 +710,16 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   onBroadcastReceived: (payload) => {
     const state = get();
     const { session, currentUserId } = state;
+
+    // Story 4.3: End session or complete phase → exit immediately
+    if (
+      payload.triggeredBy === 'end_session' ||
+      payload.triggered_by === 'end_session' ||
+      payload.currentPhase === 'complete'
+    ) {
+      set({ ...initialScriptureState });
+      return;
+    }
 
     // Version check: only apply if received version is newer
     if (session && payload.version <= session.version) return;
@@ -768,7 +810,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isPendingLockIn: true, scriptureError: null });
 
     try {
-      const { error } = await callLobbyRpc('scripture_lock_in', {
+      const { data, error } = await callLobbyRpc('scripture_lock_in', {
         p_session_id: session.id,
         p_step_index: session.currentStepIndex,
         p_expected_version: session.version,
@@ -776,8 +818,25 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       if (error) throw error;
 
-      // Success: no further state update needed —
-      // state_updated or lock_in_status_changed broadcast will arrive via useScriptureBroadcast
+      // Client-side broadcast: the RPC returns both_locked flag and lock_status payload.
+      // Broadcast the appropriate event based on whether both users are now locked.
+      const lockResult = data as Record<string, unknown>;
+      const broadcastFn = get()._broadcastFn;
+      if (broadcastFn) {
+        if (lockResult.both_locked) {
+          // Both locked → step advanced. Broadcast state_updated.
+          broadcastFn('state_updated', {
+            sessionId: lockResult.sessionId,
+            currentPhase: lockResult.currentPhase,
+            currentStepIndex: lockResult.currentStepIndex,
+            version: lockResult.version,
+            triggered_by: 'lock_in',
+          });
+        } else {
+          // Partial lock → broadcast lock_in_status_changed
+          broadcastFn('lock_in_status_changed', lockResult.lock_status);
+        }
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -796,8 +855,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           if (refreshedSession) {
             set({ session: refreshedSession });
           }
-        } catch {
-          // Refetch failed — proceed with stale state, error already shown
+        } catch (refetchErr) {
+          // Refetch failed — proceed with stale state; log via error handler (CLAUDE.md guardrail)
+          handleScriptureError({
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Failed to refresh session after version mismatch',
+            details: refetchErr,
+          });
         }
         set({
           scriptureError: {
@@ -828,12 +892,18 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isPendingLockIn: false });
 
     try {
-      const { error } = await callLobbyRpc('scripture_undo_lock_in', {
+      const { data, error } = await callLobbyRpc('scripture_undo_lock_in', {
         p_session_id: session.id,
         p_step_index: session.currentStepIndex,
       });
 
       if (error) throw error;
+
+      // Client-side broadcast: notify partner that lock was undone
+      const undoResult = data as Record<string, unknown>;
+      if (undoResult.lock_status) {
+        get()._broadcastFn?.('lock_in_status_changed', undoResult.lock_status);
+      }
     } catch (error) {
       // Rollback: re-set pending lock-in
       set({ isPendingLockIn: true });
@@ -849,5 +919,55 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
   onPartnerLockInChanged: (locked) => {
     set({ partnerLocked: locked });
+  },
+
+  // ============================================================
+  // Story 4.3: Disconnection actions
+  // ============================================================
+
+  setPartnerDisconnected: (disconnected) => {
+    if (disconnected) {
+      set({ partnerDisconnected: true, partnerDisconnectedAt: Date.now() });
+    } else {
+      set({ partnerDisconnected: false, partnerDisconnectedAt: null });
+    }
+  },
+
+  endSession: async () => {
+    const state = get();
+    const { session } = state;
+    if (!session || state.isSyncing) return;
+
+    set({ isSyncing: true, scriptureError: null });
+
+    try {
+      const { data, error } = await callLobbyRpc('scripture_end_session', {
+        p_session_id: session.id,
+      });
+
+      if (error) throw error;
+
+      // Client-side broadcast: notify partner that session was ended.
+      // Must broadcast BEFORE clearing local state, because _broadcastFn is still wired.
+      const endSnapshot = data as unknown as StateUpdatePayload;
+      get()._broadcastFn?.('state_updated', endSnapshot);
+
+      // Success: reset all session state
+      set({ ...initialScriptureState });
+    } catch (error) {
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.SYNC_FAILED,
+        message: error instanceof Error ? error.message : 'Failed to end session',
+        details: error,
+      };
+      handleScriptureError(scriptureError);
+      set({ scriptureError, isSyncing: false });
+    }
+  },
+
+  // Internal: wiring between useScriptureBroadcast hook and the store.
+  // Called by the hook when channel subscribes (set fn) or cleanup (set null).
+  setBroadcastFn: (fn) => {
+    set({ _broadcastFn: fn });
   },
 });
