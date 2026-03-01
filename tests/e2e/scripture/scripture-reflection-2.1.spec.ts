@@ -243,10 +243,10 @@ test.describe('Per-Step Reflection System', () => {
   });
 
   test.describe('2.1-E2E-004 [P1]: Reflection write failure shows retry UI', () => {
-    test('should show non-blocking retry indicator when server returns 500', async ({
-      page,
-      interceptNetworkCall,
-    }) => {
+    test(
+      'should show non-blocking retry indicator when server returns 500',
+      { annotation: [{ type: 'skipNetworkMonitoring' }] },
+      async ({ page, interceptNetworkCall }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
