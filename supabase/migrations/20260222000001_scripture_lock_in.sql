@@ -59,8 +59,19 @@ BEGIN
   END IF;
 
   -- Phase guard: only allow lock-in during reading phase
-  IF v_session.current_phase != 'reading' THEN
+  -- Also accept 'countdown' because the DB stays in countdown until the first
+  -- lock-in arrives (the countdown→reading transition is client-side only).
+  IF v_session.current_phase NOT IN ('reading', 'countdown') THEN
     RAISE EXCEPTION 'Cannot lock in: session is not in reading phase (current phase: %)', v_session.current_phase;
+  END IF;
+
+  -- If session is still in countdown phase, transition it to reading now.
+  -- No version bump — this is a housekeeping transition, not a user action.
+  IF v_session.current_phase = 'countdown' THEN
+    UPDATE public.scripture_sessions
+      SET current_phase = 'reading'
+      WHERE id = p_session_id
+      RETURNING * INTO v_session;
   END IF;
 
   -- Step guard: ensure caller is locking the current step
@@ -224,8 +235,8 @@ BEGIN
     RAISE EXCEPTION 'Session not found or access denied: %', p_session_id;
   END IF;
 
-  -- Phase guard: only allow undo during reading phase
-  IF v_session.current_phase != 'reading' THEN
+  -- Phase guard: only allow undo during reading phase (or countdown — see lock_in comment)
+  IF v_session.current_phase NOT IN ('reading', 'countdown') THEN
     RAISE EXCEPTION 'Cannot undo lock-in: session is not in reading phase (current phase: %)', v_session.current_phase;
   END IF;
 

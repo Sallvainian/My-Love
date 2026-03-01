@@ -27,6 +27,7 @@ import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { RoleIndicator } from '../reading/RoleIndicator';
 import { PartnerPosition } from '../reading/PartnerPosition';
 import { LockInButton } from '../session/LockInButton';
+import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
 
 // Lavender Dreams design tokens
 const scriptureTheme = {
@@ -48,6 +49,12 @@ export function ReadingContainer(): ReactElement | null {
     lockIn,
     undoLockIn,
     partner,
+    partnerDisconnected,
+    partnerDisconnectedAt,
+    setPartnerDisconnected,
+    endSession,
+    loadSession,
+    isSyncing,
   } = useAppStore(
     useShallow((state) => ({
       session: state.session,
@@ -58,6 +65,12 @@ export function ReadingContainer(): ReactElement | null {
       lockIn: state.lockIn,
       undoLockIn: state.undoLockIn,
       partner: state.partner,
+      partnerDisconnected: state.partnerDisconnected,
+      partnerDisconnectedAt: state.partnerDisconnectedAt,
+      setPartnerDisconnected: state.setPartnerDisconnected,
+      endSession: state.endSession,
+      loadSession: state.loadSession,
+      isSyncing: state.isSyncing,
     }))
   );
 
@@ -68,6 +81,10 @@ export function ReadingContainer(): ReactElement | null {
   const [bookmarkedSteps, setBookmarkedSteps] = useState<Set<number>>(new Set());
   const [isLockActionPending, setIsLockActionPending] = useState(false);
 
+  // Story 4.3: Reconnected toast (green tint, 2s auto-dismiss)
+  const [showReconnectedToast, setShowReconnectedToast] = useState(false);
+  const reconnectedToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Presence channel
   const partnerPresence = useScripturePresence(
     session?.id ?? null,
@@ -75,12 +92,58 @@ export function ReadingContainer(): ReactElement | null {
     localView
   );
 
+  // Story 4.3: Track isPartnerConnected transitions
+  const prevConnectedRef = useRef(partnerPresence.isPartnerConnected);
+  useEffect(() => {
+    const wasConnected = prevConnectedRef.current;
+    const isConnected = partnerPresence.isPartnerConnected;
+    prevConnectedRef.current = isConnected;
+
+    if (wasConnected && !isConnected) {
+      // Partner disconnected
+      setPartnerDisconnected(true);
+    } else if (!wasConnected && isConnected) {
+      // Partner reconnected — resync state
+      setPartnerDisconnected(false);
+      if (session?.id) {
+        void loadSession(session.id);
+      }
+      // Story 4.3: Show "Reconnected" toast (green tint, 2s auto-dismiss)
+      setShowReconnectedToast(true);
+      if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
+      reconnectedToastTimerRef.current = setTimeout(
+        () => setShowReconnectedToast(false),
+        2000
+      );
+    }
+    return () => {
+      if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
+    };
+  }, [partnerPresence.isPartnerConnected, setPartnerDisconnected, loadSession, session?.id]);
+
+  // Story 4.3: Keep Waiting handler — dismiss timeout buttons, return to reconnecting state
+  const handleKeepWaiting = useCallback(() => {
+    // If partner already reconnected during Phase B (race condition), dismiss overlay
+    if (partnerPresence.isPartnerConnected) {
+      setPartnerDisconnected(false);
+    } else {
+      // Reset disconnectedAt to "now" so the overlay restarts Phase A countdown
+      setPartnerDisconnected(true);
+    }
+  }, [partnerPresence.isPartnerConnected, setPartnerDisconnected]);
+
+  const handleEndSession = useCallback(() => {
+    void endSession();
+  }, [endSession]);
+
   // Track previous step index for animation direction
   const prevStepRef = useRef(session?.currentStepIndex ?? 0);
 
   // Toast state for "Session updated" on 409
   const [showToast, setShowToast] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [errorToastMessage, setErrorToastMessage] = useState<string | null>(null);
+  const errorToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Watch scriptureError for 409 "Session updated" toast
   useEffect(() => {
@@ -91,6 +154,20 @@ export function ReadingContainer(): ReactElement | null {
     }
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, [scriptureError]);
+
+  // Show a visible error toast for non-409 sync failures (including endSession RPC failures).
+  useEffect(() => {
+    if (!scriptureError || scriptureError.message === 'Session updated') return;
+
+    const message = scriptureError.message.trim() || 'Something went wrong. Please try again.';
+    setErrorToastMessage(message);
+    if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
+    errorToastTimerRef.current = setTimeout(() => setErrorToastMessage(null), 4000);
+
+    return () => {
+      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
     };
   }, [scriptureError]);
 
@@ -147,6 +224,17 @@ export function ReadingContainer(): ReactElement | null {
       style={{ backgroundColor: scriptureTheme.background }}
       data-testid="reading-container"
     >
+      {/* Story 4.3: Disconnection overlay */}
+      {partnerDisconnected && partnerDisconnectedAt !== null && (
+        <DisconnectionOverlay
+          partnerName={partnerName}
+          disconnectedAt={partnerDisconnectedAt}
+          onKeepWaiting={handleKeepWaiting}
+          onEndSession={handleEndSession}
+          isEnding={isSyncing}
+        />
+      )}
+
       {/* Toast: "Session updated" */}
       {showToast && (
         <div
@@ -155,6 +243,28 @@ export function ReadingContainer(): ReactElement | null {
           role="status"
         >
           Session updated
+        </div>
+      )}
+
+      {/* Story 4.3: Toast — "Reconnected" (green tint, 2s auto-dismiss) */}
+      {showReconnectedToast && (
+        <div
+          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-green-200 px-4 py-2 text-sm text-green-800 shadow-md"
+          data-testid="reconnected-toast"
+          role="status"
+        >
+          Reconnected
+        </div>
+      )}
+
+      {/* Story 4.3: Visible sync failure toast for reading phase actions */}
+      {errorToastMessage && (
+        <div
+          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-100 px-4 py-2 text-sm text-red-800 shadow-md"
+          data-testid="session-error-toast"
+          role="alert"
+        >
+          {errorToastMessage}
         </div>
       )}
 
@@ -257,6 +367,7 @@ export function ReadingContainer(): ReactElement | null {
             partnerName={partnerName}
             onLockIn={handleLockIn}
             onUndoLockIn={handleUndoLockIn}
+            isPartnerDisconnected={partnerDisconnected}
           />
         </div>
       </div>

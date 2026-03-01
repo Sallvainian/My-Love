@@ -130,6 +130,7 @@ export function SoloReadingFlow() {
   // Story 2.3: Report sub-phase state and data
   const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>(() => {
     if (session?.currentPhase === 'complete' || session?.status === 'complete') return 'report';
+    if (session?.currentPhase === 'report' && !partner && !isLoadingPartner) return 'complete-unlinked';
     return 'compose';
   });
   const [reportData, setReportData] = useState<{
@@ -693,8 +694,6 @@ export function SoloReadingFlow() {
   // Story 1.5: Screen reader announcements + focus management on step change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (
@@ -702,22 +701,16 @@ export function SoloReadingFlow() {
       prevStepIndexRef.current !== undefined &&
       prevStepIndexRef.current !== session.currentStepIndex
     ) {
-      // Use timeout to decouple announcement from render and fix sync setState lint
-      announcementTimer = setTimeout(() => {
-        setAnnouncement(`Now on verse ${session.currentStepIndex + 1}`);
-      }, 100);
+      setAnnouncement(`Now on verse ${session.currentStepIndex + 1}`);
       focusRaf = requestAnimationFrame(() => {
         verseHeadingRef.current?.focus();
       });
       prevStepIndexRef.current = session.currentStepIndex;
-      clearTimer = setTimeout(() => setAnnouncement(''), 1000);
     } else {
       prevStepIndexRef.current = session?.currentStepIndex;
     }
 
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [session?.currentStepIndex, session]);
@@ -725,20 +718,17 @@ export function SoloReadingFlow() {
   // Story 1.5 + 2.1: Screen reader announcements + focus management on sub-view change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (prevSubViewRef.current !== subView) {
       if (subView === 'response') {
-        const msg = `Viewing response for verse ${(session?.currentStepIndex ?? 0) + 1}`;
-        announcementTimer = setTimeout(() => setAnnouncement(msg), 100);
+        setAnnouncement(`Viewing response for verse ${(session?.currentStepIndex ?? 0) + 1}`);
         focusRaf = requestAnimationFrame(() => {
           backToVerseRef.current?.focus();
         });
       } else if (subView === 'reflection') {
         // Story 2.1: Focus reflection heading on transition
-        announcementTimer = setTimeout(() => setAnnouncement('Reflect on this verse'), 100);
+        setAnnouncement('Reflect on this verse');
         focusRaf = requestAnimationFrame(() => {
           // Focus the reflection prompt heading via data-testid
           const reflectionPrompt = document.querySelector<HTMLElement>(
@@ -747,29 +737,21 @@ export function SoloReadingFlow() {
           reflectionPrompt?.focus();
         });
       } else if (prevSubViewRef.current === 'response') {
-        announcementTimer = setTimeout(
-          () => setAnnouncement(`Back to verse ${(session?.currentStepIndex ?? 0) + 1}`),
-          100
-        );
+        setAnnouncement(`Back to verse ${(session?.currentStepIndex ?? 0) + 1}`);
         focusRaf = requestAnimationFrame(() => {
           verseHeadingRef.current?.focus();
         });
       }
-      clearTimer = setTimeout(() => setAnnouncement(''), 1000);
       prevSubViewRef.current = subView;
     }
 
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [subView, session?.currentStepIndex]);
 
   // Story 2.3: Announcements + focus management for report transitions
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (!isReportEntry) {
@@ -793,7 +775,7 @@ export function SoloReadingFlow() {
     }
 
     if (announcementText) {
-      announcementTimer = setTimeout(() => setAnnouncement(announcementText!), 100);
+      setAnnouncement(announcementText);
       focusRaf = requestAnimationFrame(() => {
         const heading = headingSelector
           ? document.querySelector<HTMLElement>(headingSelector)
@@ -803,10 +785,7 @@ export function SoloReadingFlow() {
     }
 
     prevReportSubPhaseRef.current = reportSubPhase;
-    clearTimer = setTimeout(() => setAnnouncement(''), 1000);
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [isReportEntry, reportSubPhase]);
@@ -819,26 +798,20 @@ export function SoloReadingFlow() {
 
   // Story 1.5 + 2.2: Completion screen announcement + focus (AC #2, #3)
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (isReflectionPhase && !prevIsCompletedRef.current) {
       prevIsCompletedRef.current = true;
-      const msg = 'Review your session reflections';
-      announcementTimer = setTimeout(() => setAnnouncement(msg), 100);
+      setAnnouncement('Review your session reflections');
       focusRaf = requestAnimationFrame(() => {
         completionHeadingRef.current?.focus();
       });
-      clearTimer = setTimeout(() => setAnnouncement(''), 1000);
     }
     if (!isReflectionPhase) {
       prevIsCompletedRef.current = false;
     }
 
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [isReflectionPhase]);

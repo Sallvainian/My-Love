@@ -246,14 +246,7 @@ export function ScriptureOverview() {
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
   useEffect(() => {
     if (activeSession && !isCheckingSession) {
-      const showTimer = setTimeout(() => {
-        setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
-      }, 0);
-      const clearTimer = setTimeout(() => setAnnouncement(''), 1000);
-      return () => {
-        clearTimeout(showTimer);
-        clearTimeout(clearTimer);
-      };
+      setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
     }
   }, [activeSession, isCheckingSession]);
 
@@ -504,6 +497,7 @@ export function ScriptureOverview() {
                 onClick={handleStartTogether}
                 disabled={partnerStatus !== 'linked' || isSessionLoading || !isOnline}
                 variant="primary"
+                testId="scripture-mode-together"
               />
 
               {/* Partner link for unlinked users within mode selection (AC #5) — Story 1.5: min touch target */}
