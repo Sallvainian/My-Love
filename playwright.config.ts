@@ -1,6 +1,5 @@
 import { execSync } from 'child_process';
 import { defineConfig, devices } from '@playwright/test';
-import { currentsReporter } from '@currents/playwright';
 
 /**
  * Load Supabase local env vars for test fixtures.
@@ -62,7 +61,6 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
-    ...(process.env.CURRENTS_RECORD_KEY ? [currentsReporter()] : []),
   ],
 
   outputDir: 'test-results',
