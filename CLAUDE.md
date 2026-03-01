@@ -85,62 +85,9 @@ Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices via t
 - `photosSlice` - photo gallery
 - `scriptureReadingSlice` - scripture reading sessions
 
-State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`.
-
-### Data Layer: Offline-First with Cloud Sync
-
-**Offline-first architecture** — UI reads/writes IndexedDB as the primary data store. Supabase is the sync and sharing layer, not the source of truth for local user data.
-
-- **IndexedDB** (via `idb` library): Primary local storage. Schema defined in `src/services/dbSchema.ts` (versioned, currently v5). Services extend `BaseIndexedDBService` for CRUD operations. Entries are created with `synced: false` and `supabaseId: null`.
-- **Supabase**: Cloud backend for cross-device sync, partner features (realtime mood, love notes, interactions), and data persistence. Client singleton in `src/api/supabaseClient.ts`.
-- **Sync strategy** (moods/photos/interactions): Three triggers — (1) immediate on creation, (2) periodic while app is open, (3) Background Sync API via service worker when app is closed. Partial failure handling: failed entries are retried on next sync pass.
-- **Scripture feature uses the opposite pattern**: Online-first with optimistic UI. Supabase is the source of truth; IndexedDB is a read cache. Writes go to Supabase RPC first and throw on failure (no offline queue). Reads use cache-first with fire-and-forget background refresh. The Zustand slice updates state optimistically before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
-
-### Service Worker (`src/sw.ts`)
-
-Custom InjectManifest strategy (not GenerateSW). Handles:
-- Precaching static assets (images/fonts only - JS/CSS use NetworkFirst)
-- Background Sync for mood entries via direct IndexedDB + Supabase REST API calls
-- Cache strategies: NetworkFirst for navigation/API, CacheFirst for images/fonts
-- Database operations in `src/sw-db.ts` (separate from app IndexedDB code)
-
 ### Environment Variables
 
 Uses [Doppler](https://doppler.com) for secrets management. Locally, `.envrc` loads secrets via `doppler secrets download`. In CI, the `dopplerhq/cli-action` injects secrets via `DOPPLER_TOKEN`.
-
-Key env vars:
-- `VITE_SUPABASE_URL` - Supabase project URL
-- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anon/public key
-
-For E2E tests, `.env.test` provides plain-text local Supabase values. Playwright config auto-detects local Supabase via `supabase status -o env`.
-
-### Authentication
-
-Email/password auth via Supabase Auth. The app expects exactly 2 users linked via `partner_id` in the `users` table. Partner detection is automatic.
-
-### Testing Architecture
-
-**Unit tests** (`tests/unit/`): Vitest + happy-dom + React Testing Library. Setup in `tests/setup.ts`. Uses `fake-indexeddb` for IndexedDB mocking.
-
-**E2E tests** (`tests/e2e/`): Playwright with merged fixtures from `@seontechnologies/playwright-utils` and custom fixtures (`tests/support/merged-fixtures.ts`). Always import `{ test, expect }` from `tests/support/merged-fixtures` in E2E tests.
-
-**Auth setup** (`tests/support/auth-setup.ts`): Creates worker-isolated test users via Supabase Admin API before tests run. Each parallel worker gets its own user pair (user + partner) to prevent cross-contamination. Auth state stored in `tests/.auth/worker-{n}.json`.
-
-**API tests** (`tests/api/`): Playwright-based API tests against Supabase endpoints.
-
-**Database tests** (`supabase/tests/database/`): pgTAP tests run via `supabase test db`.
-
-### Supabase Migrations
-
-Located in `supabase/migrations/`. Named as `YYYYMMDDHHmmss_description.sql`. Tables: `users`, `moods`, `interactions`, `photos`, `love_note_images`, `scripture_*` tables. All tables have RLS enabled.
-
-### Validation
-
-Zod schemas in `src/validation/schemas.ts` with user-facing error messages in `src/validation/errorMessages.ts`.
-
-### Routing
-
-No router library - navigation is managed via `navigationSlice` in Zustand store. `App.tsx` renders views conditionally based on `currentView` state.
 
 ### Base Path
 
@@ -156,11 +103,3 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 - Prettier with `tailwindcss` plugin for class sorting
 - CI workflows in `.github/workflows/`: deploy, test, migrations, code review
 
-## Retrospective Guardrails (Epic Carry-Over)
-
-- Catch blocks must never be empty. In scripture code, catch blocks must call `handleScriptureError()` or re-throw; outside scripture code, re-throw or map to the feature's error handler.
-- For scripture-reading container code and new architecture-conforming work, do not import `supabase` or service modules directly; go through Zustand slice actions (legacy exception: `scriptureReadingService` adapter until refactor).
-- New scope discovered during development must be captured as a follow-up story. Do not reopen a story in review unless there is a critical regression or security fix approved by the owner.
-- After a retrospective, all action items (CLAUDE.md rules, documentation updates, process changes) must be executed in the same session — not deferred to "before next epic." Track each action item in `sprint-status.yaml` under `retro_action_items` with status tracking.
-- pgTAP tests for multi-table scenarios (e.g., couple aggregate queries) must explicitly set all FK relationships (e.g., `partner_id` in `public.users`) before asserting security or aggregation properties. The test scenario name must match the test data topology — a "couple isolation" test with no couple relationship in the data is a false green. Always add a test case verifying the partner direction (user B sees user A's data via partner_id).
-- `project-structure-boundaries.md` is a dev-story exit criterion, not a planning-only artifact. Any story that creates files in a new directory must update the boundaries doc as part of the implementation — not deferred to retrospective cleanup. Include the boundaries doc in the story's File List.
