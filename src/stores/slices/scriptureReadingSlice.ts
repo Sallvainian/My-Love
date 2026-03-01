@@ -565,6 +565,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       if (error) throw error;
 
       const snapshot = data as unknown as StateUpdatePayload;
+
+      // Derive partnerJoined from snapshot: if partner's role is set, they're present.
+      // This handles the case where User A selected a role before User B subscribed
+      // to the broadcast channel, so User B missed the partner_joined broadcast.
+      const isUser1 = currentUserId !== null && currentUserId === session.userId;
+      const partnerRole = isUser1 ? snapshot.user2Role : snapshot.user1Role;
+
       set({
         currentUserId,
         scriptureLoading: false,
@@ -573,6 +580,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           currentPhase: snapshot.currentPhase,
           version: snapshot.version,
         },
+        ...(partnerRole != null ? { partnerJoined: true } : {}),
       });
 
       // Client-side broadcast: notify partner of state update
@@ -748,6 +756,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               : {}),
           }
         : null,
+      // Receiving a state_updated broadcast means the partner is present
+      partnerJoined: true,
       partnerReady: isUser1
         ? (payload.user2Ready ?? currentState.partnerReady)
         : (payload.user1Ready ?? currentState.partnerReady),
@@ -822,20 +832,33 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // Broadcast the appropriate event based on whether both users are now locked.
       const lockResult = data as Record<string, unknown>;
       const broadcastFn = get()._broadcastFn;
-      if (broadcastFn) {
-        if (lockResult.both_locked) {
-          // Both locked → step advanced. Broadcast state_updated.
-          broadcastFn('state_updated', {
-            sessionId: lockResult.sessionId,
-            currentPhase: lockResult.currentPhase,
-            currentStepIndex: lockResult.currentStepIndex,
-            version: lockResult.version,
-            triggered_by: 'lock_in',
+      if (lockResult.both_locked) {
+        // Both locked → step advanced. Update local state (channel is self:false,
+        // so this client won't receive its own broadcast).
+        const currentSession = get().session;
+        if (currentSession) {
+          set({
+            session: {
+              ...currentSession,
+              currentPhase: lockResult.currentPhase as SessionPhase,
+              currentStepIndex: lockResult.currentStepIndex as number,
+              version: lockResult.version as number,
+            },
+            isPendingLockIn: false,
+            partnerLocked: false,
           });
-        } else {
-          // Partial lock → broadcast lock_in_status_changed
-          broadcastFn('lock_in_status_changed', lockResult.lock_status);
         }
+        // Broadcast state_updated to partner.
+        broadcastFn?.('state_updated', {
+          sessionId: lockResult.sessionId,
+          currentPhase: lockResult.currentPhase,
+          currentStepIndex: lockResult.currentStepIndex,
+          version: lockResult.version,
+          triggered_by: 'lock_in',
+        });
+      } else {
+        // Partial lock → broadcast lock_in_status_changed
+        broadcastFn?.('lock_in_status_changed', lockResult.lock_status);
       }
     } catch (error) {
       const errorMessage =
