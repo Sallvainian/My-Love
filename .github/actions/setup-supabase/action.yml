@@ -28,7 +28,7 @@ runs:
     - name: Apply database migrations
       shell: bash
       run: |
-        supabase db reset --linked=false
+        supabase db reset
         echo "Migrations applied"
 
     - name: Export Supabase credentials
