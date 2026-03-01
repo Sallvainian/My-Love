@@ -15,6 +15,8 @@ import { ensureScriptureOverview } from '../../support/helpers';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
   READY_BROADCAST_TIMEOUT_MS,
+  SESSION_CREATE_TIMEOUT_MS,
+  STEP_ADVANCE_TIMEOUT_MS,
   isToggleReadyResponse,
 } from '../../support/helpers/scripture-lobby';
 import { cleanupTestSession } from '../../support/factories';
@@ -25,8 +27,6 @@ import { cleanupTestSession } from '../../support/factories';
 
 const DISCONNECTION_DETECT_TIMEOUT_MS = 25_000; // Heartbeat 10s + stale TTL 20s + buffer
 const DISCONNECTION_PHASE_B_TIMEOUT_MS = 35_000; // Phase B starts at 30s elapsed
-const STEP_ADVANCE_TIMEOUT_MS = 15_000;
-const END_SESSION_TIMEOUT_MS = 15_000;
 
 // ---------------------------------------------------------------------------
 // Shared helper: navigate both users through lobby to reading phase
@@ -99,7 +99,7 @@ async function startTogetherSessionForRole(
         resp.request().method() === 'POST' &&
         resp.status() >= 200 &&
         resp.status() < 300,
-      { timeout: END_SESSION_TIMEOUT_MS }
+      { timeout: SESSION_CREATE_TIMEOUT_MS }
     )
     .catch((e: Error) => {
       throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
@@ -230,7 +230,7 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
             resp.url().includes('/rest/v1/rpc/scripture_end_session') &&
             resp.status() >= 200 &&
             resp.status() < 300,
-          { timeout: END_SESSION_TIMEOUT_MS }
+          { timeout: SESSION_CREATE_TIMEOUT_MS }
         )
         .catch((e: Error) => {
           throw new Error(`scripture_end_session RPC did not fire: ${e.message}`);
@@ -245,11 +245,11 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
       // THEN: AC#4 — Session ends, user returns to scripture overview
       // -----------------------------------------------------------------------
       await expect(page.getByTestId('reading-container')).not.toBeVisible({
-        timeout: END_SESSION_TIMEOUT_MS,
+        timeout: SESSION_CREATE_TIMEOUT_MS,
       });
       // Scripture overview mode selection is visible after session ends.
       await expect(page.getByTestId('scripture-mode-together')).toBeVisible({
-        timeout: END_SESSION_TIMEOUT_MS,
+        timeout: SESSION_CREATE_TIMEOUT_MS,
       });
 
       // Verify session status in DB: ended_early
