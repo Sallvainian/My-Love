@@ -32,7 +32,7 @@ test.describe('Scripture Stats Dashboard', () => {
     }) => {
       // GIVEN: User completes a full solo reading session through the UI
       await scriptureNav.completeAllSteps();
-      await scriptureNav.submitSummary();
+      await scriptureNav.completeSession();
 
       // WHEN: User returns to the scripture overview
       await scriptureNav.ensureOverview();
