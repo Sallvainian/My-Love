@@ -6,7 +6,7 @@
 http://localhost:5173/
 ```
 
-In development mode, Vite uses `/` as the base path. The dev server is started by `npm run dev`, which runs `npx vite` via `scripts/dev-with-cleanup.sh`. Environment variables are loaded by direnv via Doppler (no decryption keys needed locally).
+In development mode, Vite uses `/` as the base path. The dev server is started by `npm run dev`, which runs `npx vite` via `scripts/dev-with-cleanup.sh`. Environment variables are loaded by direnv via dotenvx (decrypting the encrypted `.env` using `.env.keys`).
 
 ## Production Mode
 

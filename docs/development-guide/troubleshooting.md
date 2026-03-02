@@ -40,7 +40,7 @@ location.reload();
 
 ## Dev Server Will Not Start
 
-**Cause**: Wrong Node version, corrupted dependencies, or missing Doppler configuration.
+**Cause**: Wrong Node version, corrupted dependencies, or missing `.env.keys` file.
 
 **Fix**:
 
@@ -51,15 +51,15 @@ npm install
 npm run dev
 ```
 
-If environment variables are not being injected, verify your Doppler CLI setup:
+If environment variables are not being injected, verify your dotenvx setup:
 
 ```bash
-doppler --version        # Confirm Doppler CLI is installed
-doppler setup            # Configure the project
+cat .env.keys            # Confirm .env.keys exists with DOTENV_PRIVATE_KEY
+dotenvx run -- printenv  # Test decryption
 direnv allow             # Allow direnv to load .envrc
 ```
 
-If you do not have Doppler access, use `npm run dev:raw` instead (starts Vite directly, but Supabase features will not work without env vars).
+If you do not have `.env.keys`, restore it from dotenvx-ops: `npx dotenvx-ops login && npx dotenvx-ops sync`. If that's unavailable, use `npm run dev:raw` instead (starts Vite directly, but Supabase features will not work without env vars).
 
 ## Build Fails
 
@@ -73,13 +73,13 @@ npm run lint             # Identify ESLint errors
 npm install              # Ensure all dependencies are installed
 ```
 
-If the build fails because Supabase env vars are missing, verify your Doppler setup:
+If the build fails because Supabase env vars are missing, verify your dotenvx setup:
 
 ```bash
-doppler run -- printenv | grep VITE_SUPABASE   # Check that secrets are available
+dotenvx run -- printenv | grep VITE_SUPABASE   # Check that secrets are available
 ```
 
-If Doppler is not configured, set the variables manually:
+If dotenvx is not configured or `.env.keys` is missing, set the variables manually:
 
 ```bash
 export VITE_SUPABASE_URL="https://your-project.supabase.co"

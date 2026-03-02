@@ -249,7 +249,7 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 - **Status:** PASS
 - **Threshold:** Automated SAST + dependency scanning
 - **Evidence:** CodeQL (`security-extended` + `security-and-quality` suites) on every push/PR + weekly. Dependency Review fails on moderate+ severity. npm audit: 0 vulnerabilities.
-- **Findings:** Comprehensive CI security scanning. CodeQL config has justified exclusions documented in `.github/codeql/codeql-config.yml`. Parameterized PL/pgSQL queries prevent SQL injection. React 19 auto-escaping prevents XSS. Doppler manages all secrets with no hardcoded credentials.
+- **Findings:** Comprehensive CI security scanning. CodeQL config has justified exclusions documented in `.github/codeql/codeql-config.yml`. Parameterized PL/pgSQL queries prevent SQL injection. React 19 auto-escaping prevents XSS. dotenvx manages all secrets with no hardcoded credentials.
 
 ### Compliance (if applicable)
 

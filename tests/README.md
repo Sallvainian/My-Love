@@ -282,7 +282,7 @@ Tests run in GitHub Actions with:
 - Retries enabled (`retries: 2` in CI)
 - JUnit report for CI integration
 - HTML report for debugging
-- Secrets injected via Doppler
+- Secrets injected via dotenvx
 
 ## Debugging
 

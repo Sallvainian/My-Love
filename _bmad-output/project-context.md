@@ -38,7 +38,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.54.0 (flat config)
 - **Formatting:** Prettier ^3.8.1 (100 char width, single quotes, trailing commas ES5)
 - **Package Manager:** npm (package-lock.json)
-- **Env Management:** Doppler (direnv + .envrc locally, dopplerhq/cli-action in CI)
+- **Env Management:** dotenvx (encrypted `.env` committed, `.env.keys` gitignored, `dotenvx run` in CI)
 
 ## Critical Implementation Rules
 
@@ -135,11 +135,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **One story per commit:** Never mix Story 1.2 and Story 1.3 work in the same commit
 - **Separate docs from code:** Documentation-only changes get their own commit
 - **Sprint tracking separate:** Status YAML updates get their own `chore(sprint)` commit
-- **Build command:** `tsc -b && vite build` — Doppler injects env vars at shell level via direnv
+- **Build command:** `tsc -b && vite build` — dotenvx decrypts env vars at shell level via direnv
 - **Deploy target:** GitHub Pages at `/My-Love/` subpath — `base` in vite config switches between `/My-Love/` (prod) and `/` (dev)
 - **Pre-deploy check:** `npm run predeploy` runs build + smoke tests before deployment
 - **CI workflows:** deploy, test, migrations, code review, bundle-size, CodeQL (security scanning), dependency-review, Lighthouse (performance audits)
-- **Env management:** Doppler is the single source of truth for secrets. Locally: `.envrc` + `direnv` injects Doppler vars. CI: `dopplerhq/cli-action` with `DOPPLER_TOKEN`. `.env.test` exists for local test overrides. Never commit plaintext secrets.
+- **Env management:** dotenvx is the secrets manager. Secrets are encrypted in `.env` (committed). `.env.keys` holds the private key (gitignored, backed up to dotenvx-ops). CI: `dotenvx run` with `DOTENV_PRIVATE_KEY` GitHub Secret. `.env.test` exists for local test overrides. Never commit plaintext secrets.
 
 ### Critical Don't-Miss Rules
 
@@ -150,7 +150,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Dual persistence model:** Small state → localStorage (Zustand persist), large data → IndexedDB (via `idb`), remote → Supabase — never store blobs in localStorage
 - **Offline-first:** The app must work offline — all features need graceful degradation when network is unavailable; use `isOnline()` checks and `SupabaseServiceError.isNetworkError`
 - **GitHub Pages base path:** Production builds use `/My-Love/` as base — all asset URLs must be relative or use the Vite `base` config; absolute paths will break on GH Pages
-- **Encrypted env removed:** dotenvx was replaced by Doppler (2026-02-22). There are no longer `.env` or `.env.local` files in the repo. Env vars come from Doppler via direnv (local) or dopplerhq/cli-action (CI).
+- **Encrypted env:** Secrets are encrypted in `.env` using dotenvx (committed to git). Decryption key is in `.env.keys` (gitignored, backed up to dotenvx-ops cloud). Use `dotenvx run` locally and `DOTENV_PRIVATE_KEY` GitHub Secret in CI.
 - **Scripture is the exception:** Unlike every other feature, scripture reading is online-first — writes go to Supabase RPC first (throw on failure), IndexedDB is just a read cache. Do NOT apply the offline-first pattern to scripture code.
 - **Don't mix validation layers:** `src/validation/schemas.ts` is for local data entering IndexedDB; `src/api/validation/supabaseSchemas.ts` is for validating API responses from Supabase. Using the wrong layer will cause silent data corruption or false validation failures.
 - **E2E imports:** Always `import { test, expect } from 'tests/support/merged-fixtures'` in E2E tests — importing directly from `@playwright/test` will miss custom fixtures and auth setup

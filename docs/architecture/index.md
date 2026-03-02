@@ -22,7 +22,7 @@ Live URL: <https://sallvainian.github.io/My-Love/>
 | 12 | [Offline Strategy](./12-offline-strategy.md) | Three-tier sync (immediate, periodic, Background Sync API), network status detection |
 | 13 | [Security Model](./13-security-model.md) | Row Level Security, DOMPurify XSS protection, Zod validation boundaries, env encryption |
 | 14 | [Validation Layer](./14-validation-layer.md) | All Zod schemas with code examples, error transformation, and custom error classes |
-| 15 | [Deployment](./15-deployment.md) | GitHub Pages, Doppler/dotenvx secrets, CI/CD workflows |
+| 15 | [Deployment](./15-deployment.md) | GitHub Pages, dotenvx secrets, CI/CD workflows |
 | 16 | [Testing Architecture](./16-testing-architecture.md) | Five test layers, framework configuration, priority tags, test utilities |
 | 17 | [Error Handling](./17-error-handling.md) | Strategy by layer, custom error classes, retry with backoff, corruption recovery |
 | 18 | [Performance](./18-performance.md) | Lazy loading, virtualization, image compression, bundle splitting, performance monitoring |

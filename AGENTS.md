@@ -62,7 +62,7 @@ supabase gen types typescript --local > src/types/database.types.ts  # Regenerat
 
 ### Environment Variables
 
-Uses [Doppler](https://doppler.com) for secrets management. Locally, `.envrc` loads secrets via `doppler secrets download`. In CI, the `dopplerhq/cli-action` injects secrets via `DOPPLER_TOKEN`.
+Uses [dotenvx](https://dotenvx.com) for secrets management. Secrets are encrypted in `.env` (safe to commit). Locally, `dotenvx run` decrypts using `.env.keys`. In CI, the `DOTENV_PRIVATE_KEY` secret enables decryption via `dotenvx run`.
 
 ### Base Path
 

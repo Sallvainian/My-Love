@@ -38,13 +38,13 @@ jobs:
             --project-id xojempkrugifnaveqtqc \
             > src/types/database.types.ts
 
-      - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
+      - name: Install dotenvx
+        run: curl -sfS https://dotenvx.sh | sh
 
       - name: Build application
-        run: doppler run -- npm run build
+        run: dotenvx run -- npm run build
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
           SENTRY_RELEASE: my-love@${{ github.sha }}
           VITE_SENTRY_RELEASE: my-love@${{ github.sha }}
 
@@ -79,8 +79,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
+      - name: Install dotenvx
+        run: curl -sfS https://dotenvx.sh | sh
 
       - name: Install dependencies for health check
         run: npm install --no-save @supabase/supabase-js
@@ -160,11 +160,11 @@ jobs:
 
       - name: Health Check - Supabase Connection
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
         run: |
           echo "🔍 Checking Supabase connection..."
 
-          # Create health check script (env vars injected by Doppler)
+          # Create health check script (env vars injected by dotenvx)
           cat > health-check-supabase.mjs << 'EOF'
           import { createClient } from '@supabase/supabase-js';
 
@@ -209,8 +209,8 @@ jobs:
           }
           EOF
 
-          # Run health check script (Doppler injects env vars)
-          doppler run -- node health-check-supabase.mjs
+          # Run health check script (dotenvx injects env vars)
+          dotenvx run -- node health-check-supabase.mjs
 
       - name: Health Check Summary
         if: success()
