@@ -137,3 +137,51 @@ export async function jumpToStep(
   await page.evaluate(injectStep, stepIndex);
   await partnerPage.evaluate(injectStep, stepIndex);
 }
+
+/**
+ * Reconnect a partner to an existing together-mode session.
+ *
+ * Navigates to /scripture, waits for the app store to be available,
+ * calls loadSession(), then deterministically waits for the store
+ * state to settle before asserting the DOM.
+ *
+ * Together-mode sessions are not auto-detected on navigation
+ * (checkForActiveSession only finds solo sessions), so we call
+ * loadSession() via window.__APP_STORE__.
+ */
+export async function reconnectPartnerAndLoadSession(
+  page: Page,
+  sessionId: string,
+  options: { timeout?: number } = {}
+): Promise<void> {
+  const timeout = options.timeout ?? STEP_ADVANCE_TIMEOUT_MS;
+
+  // 1. Navigate and wait for app to load
+  await page.goto('/scripture');
+  await expect(page.getByTestId('scripture-overview')).toBeVisible({ timeout });
+
+  // 2. Guard: wait for __APP_STORE__ on fresh page
+  await page.waitForFunction(() => typeof window.__APP_STORE__ !== 'undefined', { timeout: 5_000 });
+
+  // 3. Call loadSession
+  await page.evaluate(async (sid) => {
+    const store = window.__APP_STORE__;
+    if (!store) throw new Error('__APP_STORE__ not found');
+    await store.getState().loadSession(sid);
+  }, sessionId);
+
+  // 4. Deterministic wait: poll store until session is together-mode reading
+  //    (matches ScriptureOverview routing condition)
+  await page.waitForFunction(
+    () => {
+      const store = window.__APP_STORE__;
+      if (!store) return false;
+      const s = store.getState().session;
+      return s !== null && s.mode === 'together' && s.currentPhase === 'reading';
+    },
+    { timeout, polling: 250 }
+  );
+
+  // 5. DOM confirmation (near-instant since store is already correct)
+  await expect(page.getByTestId('reading-container')).toBeVisible({ timeout });
+}

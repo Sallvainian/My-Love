@@ -486,7 +486,8 @@ export async function skipMessageAndCompleteSession(page: Page): Promise<void> {
     (resp) =>
       resp.url().includes('/rest/v1/scripture_sessions') &&
       resp.request().method() === 'PATCH' &&
-      resp.status() === 200,
+      resp.status() >= 200 &&
+      resp.status() < 300,
     { timeout: 15_000 }
   );
 
