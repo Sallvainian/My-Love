@@ -31,6 +31,38 @@ npm run test:unit:coverage     # With coverage report
 npx vitest run tests/unit/services/moodService.test.ts --silent  # Single file
 ```
 
+### Test Setup (`tests/setup.ts`)
+
+The global setup file configures:
+
+```typescript
+import '@testing-library/jest-dom';  // Custom DOM matchers
+import 'fake-indexeddb/auto';        // IndexedDB mock (auto-injected)
+
+// Browser API mocks:
+// - window.matchMedia  (responsive components)
+// - IntersectionObserver  (virtualized lists)
+// - ResizeObserver  (responsive components)
+```
+
+### Vitest Configuration (`vitest.config.ts`)
+
+```typescript
+{
+  globals: true,           // No import needed for describe/it/expect
+  environment: 'happy-dom', // Lightweight DOM (not jsdom)
+  setupFiles: ['./tests/setup.ts'],
+  include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx',
+            'src/**/*.test.ts', 'src/**/*.test.tsx'],
+  coverage: {
+    provider: 'v8',
+    thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
+  },
+}
+```
+
+The path alias `@/` maps to `src/` for clean imports in test files.
+
 ### Test Patterns
 
 Unit tests follow React Testing Library patterns with Zustand store mocking:

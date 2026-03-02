@@ -1,6 +1,6 @@
 # My-Love — Project Documentation
 
-> **Auto-generated:** 2026-02-16 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** ~95 files, ~12,800 lines
+> **Auto-generated:** 2026-03-01 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** 97 files, ~14,400 lines
 
 ## Quick Reference
 
@@ -9,7 +9,8 @@
 | **Framework**        | React 19.2.4 + TypeScript 5.9.3 + Vite 7.3.1                        |
 | **State Management** | Zustand 5.0.11 (10 slices)                                          |
 | **Backend**          | Supabase 2.93.3 (Auth, Postgres, Storage, Realtime, Edge Functions) |
-| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.29                           |
+| **Monitoring**       | Sentry 10.39.0 (error tracking + sourcemaps)                        |
+| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.29.3                         |
 | **Validation**       | Zod 4.3.6                                                           |
 | **Testing**          | Vitest 4.0.17 + Playwright 1.58.2                                   |
 | **Deployment**       | PWA with Service Worker (Workbox InjectManifest) on GitHub Pages    |
@@ -45,9 +46,9 @@
 - **[10-service-worker.md](./architecture/10-service-worker.md)** — InjectManifest strategy, caching, Background Sync
 - **[11-realtime-features.md](./architecture/11-realtime-features.md)** — Broadcast API for love notes and partner mood
 - **[12-offline-strategy.md](./architecture/12-offline-strategy.md)** — Three-tier sync, network status, OfflineError
-- **[13-security-model.md](./architecture/13-security-model.md)** — RLS, DOMPurify, Zod boundaries, env encryption
+- **[13-security-model.md](./architecture/13-security-model.md)** — RLS, DOMPurify, Zod boundaries, Doppler secrets
 - **[14-validation-layer.md](./architecture/14-validation-layer.md)** — All Zod schemas with code and error transformation
-- **[15-deployment.md](./architecture/15-deployment.md)** — GitHub Pages, dotenvx, CI/CD workflows
+- **[15-deployment.md](./architecture/15-deployment.md)** — GitHub Pages, Doppler secrets, CI/CD workflows
 - **[16-testing-architecture.md](./architecture/16-testing-architecture.md)** — 5 test layers, frameworks, priority tags
 - **[17-error-handling.md](./architecture/17-error-handling.md)** — Strategy by layer, retry patterns, corruption recovery
 - **[18-performance.md](./architecture/18-performance.md)** — Lazy loading, virtualization, image compression, bundle analysis
@@ -91,7 +92,7 @@
 - **[6-supabase-rpc-functions.md](./data-models/6-supabase-rpc-functions.md)** — Postgres functions and RPC endpoints
 - **[7-storage-buckets.md](./data-models/7-storage-buckets.md)** — Photos and love-notes-images bucket configs
 - **[8-rls-policies.md](./data-models/8-rls-policies.md)** — Row Level Security policies per table and bucket
-- **[9-migration-history.md](./data-models/9-migration-history.md)** — 12 migrations from 2025-12-03 through 2026-02-06
+- **[9-migration-history.md](./data-models/9-migration-history.md)** — 21 migrations from 2025-12-03 through 2026-03-01
 
 ### Frontend
 
@@ -99,7 +100,7 @@
 
 - **[table-of-contents.md](./component-inventory/table-of-contents.md)** — Full component inventory navigation
 - **[component-hierarchy.md](./component-inventory/component-hierarchy.md)** — Visual component tree with parent-child relationships
-- **[component-inventory-table.md](./component-inventory/component-inventory-table.md)** — All 73 components with props, store connections, features
+- **[component-inventory-table.md](./component-inventory/component-inventory-table.md)** — All 81 components with props, store connections, features
 - **[feature-components.md](./component-inventory/feature-components.md)** — Feature-specific component documentation
 - **[shared-and-utility-components.md](./component-inventory/shared-and-utility-components.md)** — Cross-cutting shared components
 - **[design-patterns.md](./component-inventory/design-patterns.md)** — Barrel exports, lazy loading, memoization patterns
@@ -123,7 +124,7 @@
 
 - **[prerequisites.md](./development-guide/prerequisites.md)** — Required tools and versions
 - **[installation.md](./development-guide/installation.md)** — Clone, install, and verify
-- **[environment-setup.md](./development-guide/environment-setup.md)** — Encrypted env vars, dotenvx, Supabase keys
+- **[environment-setup.md](./development-guide/environment-setup.md)** — Doppler secrets management, Supabase keys
 - **[configuration-customization.md](./development-guide/configuration-customization.md)** — Partner name, start date, feature flags
 - **[available-scripts.md](./development-guide/available-scripts.md)** — Dev, build, lint, and test scripts
 - **[local-development-url.md](./development-guide/local-development-url.md)** — Local dev server URL details
@@ -152,7 +153,7 @@
 
 ```
 src/
-├── components/       # 24 component folders, 73 exported components
+├── components/       # 26 component folders, 81 exported components
 ├── stores/           # Zustand store with 10 slices
 ├── services/         # 12 service modules (Supabase, IndexedDB, sync)
 ├── api/              # API layer (auth, mood, partner, interactions)
@@ -160,11 +161,12 @@ src/
 ├── hooks/            # Custom React hooks
 ├── utils/            # Date helpers, formatters
 ├── types/            # TypeScript type definitions
+├── config/           # Performance, image, and feature config
 ├── sw.ts             # Service Worker (Background Sync)
 └── sw-db.ts          # SW IndexedDB helpers
 supabase/
 ├── functions/        # Edge Functions (image upload)
-└── migrations/       # 12 Postgres migrations
+└── migrations/       # 21 Postgres migrations
 ```
 
 ---
@@ -186,10 +188,10 @@ supabase/
 
 | Document                                                                       | Description                              | Date       |
 | ------------------------------------------------------------------------------ | ---------------------------------------- | ---------- |
-| [PRD](../_bmad-output/planning-artifacts/prd.md)                               | Product Requirements Document            | 2026-01-25 |
-| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification.md)     | UX Design Specification                  | 2026-01-25 |
-| [Architecture (Scripture)](../_bmad-output/planning-artifacts/architecture.md) | Feature Architecture (Scripture Reading) | 2026-01-26 |
-| [Epics & Stories](../_bmad-output/planning-artifacts/epics.md)                 | Implementation breakdown                 | 2026-01-26 |
+| [PRD](../_bmad-output/planning-artifacts/prd/index.md)                                         | Product Requirements Document (11 shards) | 2026-01-25 |
+| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification/index.md)               | UX Design Specification (11 shards)       | 2026-01-25 |
+| [Architecture](../_bmad-output/planning-artifacts/architecture/index.md)                       | Feature Architecture (5 shards)           | 2026-01-26 |
+| [Epics & Stories](../_bmad-output/planning-artifacts/epics/index.md)                           | Implementation breakdown (8 shards)       | 2026-01-26 |
 | [Test Design - Arch](../_bmad-output/test-design-architecture.md)              | Test architecture & risks                | 2026-01-27 |
 | [Test Design - QA](../_bmad-output/test-design-qa.md)                          | QA execution recipe                      | 2026-01-27 |
 | [Sprint Status](../_bmad-output/implementation-artifacts/sprint-status.yaml)   | Current sprint progress                  | —          |
@@ -208,4 +210,4 @@ supabase/
 
 ---
 
-_Generated by BMAD Document-Project Workflow v1.2.0_
+_Generated by BMAD Document-Project Workflow v1.2.0 — Last updated 2026-03-01_

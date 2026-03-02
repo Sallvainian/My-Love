@@ -17,7 +17,7 @@ Every push to `main` triggers the `.github/workflows/deploy.yml` pipeline with t
    ```bash
    npx supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts
    ```
-5. `npm run build` (dotenvx decrypts `.env` via `DOTENV_PRIVATE_KEY` secret, runs `tsc -b`, then `vite build`)
+5. `doppler run -- npm run build` (Doppler injects secrets via `DOPPLER_TOKEN_PRD`, runs `tsc -b && vite build`)
 6. `npm run test:smoke` (validates `dist/` directory structure, `index.html`, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -106,7 +106,8 @@ The `test.yml` workflow runs a 5-stage pipeline (see [Testing](./testing.md#ci-t
 
 | Secret                    | Description                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | Decryption key for the encrypted `.env` file (used during build and health check)         |
+| `DOPPLER_TOKEN_PRD`       | Doppler service token for production secrets (build, deploy, health check)                 |
+| `DOPPLER_TOKEN_DEV`       | Doppler service token for development secrets (test workflows)                            |
 | `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
 | `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                                 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |

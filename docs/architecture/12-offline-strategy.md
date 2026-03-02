@@ -138,6 +138,30 @@ if (result.offline) {
 }
 ```
 
+## Sync Service (`src/services/syncService.ts`)
+
+The `SyncService` class transforms local `MoodEntry` objects (IndexedDB format) into the Supabase `moods` table insert format:
+
+```typescript
+class SyncService {
+  async syncPendingMoods(): Promise<{ synced: number; failed: number }>;
+  async hasPendingSync(): Promise<boolean>;
+  async getPendingCount(): Promise<number>;
+}
+```
+
+**Field mapping (local to remote):**
+
+| Local Field (`MoodEntry`) | Remote Column (`moods`) |
+|--------------------------|------------------------|
+| `mood` | `mood_type` |
+| `moods` | `mood_types` |
+| `note` | `note` |
+| `date` | `created_at` (converted to ISO timestamp) |
+| `userId` | `user_id` |
+
+**Partial failure handling:** If an individual mood entry fails to sync (e.g., network error, RLS violation), the service continues with the remaining entries. Failed entries retain `synced: false` and are retried on the next sync pass.
+
 ## Offline-Safe Authentication
 
 `getCurrentUserIdOfflineSafe()` retrieves the user ID from the cached Supabase session without making a network request. This enables mood tracking to work offline:
@@ -150,6 +174,8 @@ export async function getCurrentUserIdOfflineSafe(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 ```
+
+Note: `getSession()` reads from the in-memory cache (populated during initial auth), unlike `getUser()` which makes a network request to verify the token with the server.
 
 ## Related Documentation
 

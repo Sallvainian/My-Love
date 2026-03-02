@@ -3,9 +3,10 @@
 ## 1. Database Schema Overview
 
 - Supabase table inventory (11 tables across core and scripture features)
-- Custom enum types: `scripture_session_mode`, `scripture_session_phase`, `scripture_session_status`
+- Custom enum types: `scripture_session_mode`, `scripture_session_phase`, `scripture_session_status` (incl. `ended_early`), `scripture_session_role`
 - Storage buckets: `photos` (10 MB max, private), `love-notes-images` (5 MB max, private)
 - TEXT + CHECK constraint pattern (replaces original enum types after migration 20251206024345)
+- 15 RPC functions summary (SECURITY DEFINER vs INVOKER)
 
 ## 2. Supabase Tables
 
@@ -15,7 +16,7 @@
 - 2.4 `interactions` -- Poke/kiss interactions (type check, viewed boolean, from/to user FKs)
 - 2.5 `partner_requests` -- Invitation workflow (pending/accepted/declined status, `no_self_requests` check, unique partial index)
 - 2.6 `photos` -- Photo metadata (storage_path unique, mime_type check, file_size, width, height)
-- 2.7 `scripture_sessions` -- Reading sessions (solo/together mode, phase enum, step index, version for OCC, snapshot JSONB)
+- 2.7 `scripture_sessions` -- Reading sessions (solo/together mode, phase enum, step index, version for OCC, snapshot JSONB, lobby columns: user1_role, user2_role, user1_ready, user2_ready, countdown_started_at)
 - 2.8 `scripture_step_states` -- Step synchronization (user1/user2 lock timestamps, advanced_at, unique session+step)
 - 2.9 `scripture_reflections` -- Per-step reflections (1-5 rating, notes, is_shared, unique session+step+user)
 - 2.10 `scripture_bookmarks` -- Bookmarked steps (share_with_partner toggle, unique session+step+user)
@@ -48,14 +49,21 @@
 ## 6. Supabase RPC Functions
 
 - 6.1 `get_partner_id(user_id UUID)` -> `UUID` -- SECURITY DEFINER, STABLE; deprecated in migration 20251206024345
-- 6.2 `accept_partner_request(p_request_id UUID)` -> `void` -- Atomic partner linking with partner-exists guard
-- 6.3 `decline_partner_request(p_request_id UUID)` -> `void` -- Validate pending + recipient before declining
-- 6.4 `sync_user_profile()` -> `trigger` -- AFTER INSERT OR UPDATE ON auth.users, syncs email + display_name
-- 6.5 `is_scripture_session_member(p_session_id UUID)` -> `BOOLEAN` -- RLS helper checking user1_id/user2_id
-- 6.6 `scripture_create_session(p_mode, p_partner_id)` -> `JSONB` -- Create solo/together session
-- 6.7 `scripture_submit_reflection(...)` -> `JSONB` -- Idempotent upsert via ON CONFLICT
-- 6.8 `scripture_seed_test_data(...)` -> `JSONB` -- Test seeding with presets (default, mid_session, completed, with_help_flags, unlinked)
-- `get_my_partner_id()` -> `UUID` -- SECURITY DEFINER helper to break RLS recursion (added in migration 20260205000001)
+- 6.2 `get_my_partner_id()` -> `UUID` -- SECURITY DEFINER helper to break RLS recursion
+- 6.3 `accept_partner_request(p_request_id UUID)` -> `void` -- Atomic partner linking with partner-exists guard
+- 6.4 `decline_partner_request(p_request_id UUID)` -> `void` -- Validate pending + recipient before declining
+- 6.5 `sync_user_profile()` -> `trigger` -- AFTER INSERT OR UPDATE ON auth.users, syncs email + display_name
+- 6.6 `is_scripture_session_member(p_session_id UUID)` -> `BOOLEAN` -- RLS helper checking user1_id/user2_id
+- 6.7 `scripture_create_session(p_mode, p_partner_id)` -> `JSONB` -- Create solo/together session (together starts in lobby, reuses existing pair)
+- 6.8 `scripture_submit_reflection(...)` -> `JSONB` -- Idempotent upsert via ON CONFLICT
+- 6.9 `scripture_seed_test_data(...)` -> `JSONB` -- Test seeding with presets (default, mid_session, completed, with_help_flags, unlinked)
+- 6.10 `scripture_get_couple_stats(p_partner_id)` -> `JSONB` -- CTE-optimized couple statistics (5 metrics)
+- 6.11 `scripture_select_role(p_session_id, p_role)` -> `JSONB` -- Lobby role selection (reader/responder), lobby phase guard
+- 6.12 `scripture_toggle_ready(p_session_id, p_is_ready)` -> `JSONB` -- Lobby ready toggle, starts countdown when both ready
+- 6.13 `scripture_convert_to_solo(p_session_id)` -> `JSONB` -- Convert together lobby to solo, clears partner state
+- 6.14 `scripture_lock_in(p_session_id, p_step_index, p_expected_version)` -> `JSONB` -- Optimistic concurrency lock, auto-advance on both locked
+- 6.15 `scripture_undo_lock_in(p_session_id, p_step_index)` -> `JSONB` -- Clear user's lock timestamp
+- 6.16 `scripture_end_session(p_session_id)` -> `JSONB` -- Graceful early termination, sets ended_early status
 
 ## 7. Storage Buckets
 
@@ -77,10 +85,11 @@
 - 8.11 `scripture_reflections` -- Own + shared SELECT, own INSERT/UPDATE
 - 8.12 `scripture_bookmarks` -- Own + shared SELECT, own INSERT/UPDATE/DELETE
 - 8.13 `scripture_messages` -- Session member SELECT, sender INSERT
+- 8.14 `realtime.messages` -- Session member SELECT/INSERT for private broadcast channels (`scripture-session:*`, `scripture-presence:*`)
 
 ## 9. Migration History
 
-- 12 migrations from 2025-12-03 through 2026-02-06
-- Core schema, photos, love note images, MIME validation, remote schema sync, RLS fixes, security patches, scripture reading, RPCs, unlinked preset, RLS recursion fix, pgTAP extension
+- 21 migrations from 2025-12-03 through 2026-03-01
+- Core schema (1-7), scripture reading (8-12), statistics (13-14), together-mode lobby (15-17), synchronized reading (18), graceful degradation (19), session fixes and architecture (20-21)
 
 ---

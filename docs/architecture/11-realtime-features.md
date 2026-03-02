@@ -113,6 +113,15 @@ subscribeToInteractions(callback) {
 }
 ```
 
+## Channel Summary
+
+| Channel Pattern | Feature | Protocol | Direction |
+|----------------|---------|----------|-----------|
+| `love-notes:{partnerId}` | Love Notes | Broadcast | Bidirectional |
+| `partner-mood:{partnerId}` | Partner Mood | Broadcast | Bidirectional |
+| `incoming-interactions` | Poke/Kiss | postgres_changes (INSERT) | Receive only |
+| `moods:user_id=eq.{id}` | Mood Realtime | postgres_changes (INSERT) | Receive only |
+
 ## Supabase Client Configuration
 
 The Supabase client is configured with a realtime rate limit:

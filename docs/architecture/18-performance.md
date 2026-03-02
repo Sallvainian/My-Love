@@ -44,15 +44,17 @@ Love notes and mood history use `react-window` (v2.2.6) with `react-window-infin
 
 ### Compression Pipeline (`src/services/imageCompressionService.ts`)
 
-All uploaded images go through Canvas API compression:
+All uploaded images go through Canvas API compression. Configuration is centralized in `src/config/images.ts`:
 
-| Setting         | Value                               |
-| --------------- | ----------------------------------- |
-| Max dimension   | 2048px (width or height)            |
-| JPEG quality    | 80%                                 |
-| Allowed formats | JPEG, PNG, WebP                     |
-| Max upload size | 25MB                                |
-| Fallback        | Original image if compression fails |
+| Setting         | Value                               | Config Constant |
+| --------------- | ----------------------------------- | --------------- |
+| Max width       | 2048px                              | `IMAGE_COMPRESSION.MAX_WIDTH` |
+| Max height      | 2048px                              | `IMAGE_COMPRESSION.MAX_HEIGHT` |
+| JPEG quality    | 80% (0.8)                           | `IMAGE_COMPRESSION.QUALITY` |
+| Allowed formats | JPEG, PNG, WebP                     | `IMAGE_VALIDATION.ALLOWED_MIME_TYPES` |
+| Max upload size | 25MB                                | `IMAGE_VALIDATION.MAX_FILE_SIZE_BYTES` |
+| Large file warn | 10MB (may approach 3s limit)        | `IMAGE_VALIDATION.LARGE_FILE_WARNING_BYTES` |
+| Fallback        | Original image if compression fails | (hardcoded) |
 
 The compression flow:
 
@@ -97,10 +99,11 @@ async getPage(page: number, pageSize: number): Promise<T[]> {
 
 ### Indexed Queries
 
-The `moods` store has two indexes for efficient queries:
+The `moods` store has a `by-date` index (unique on the `date` field) for efficient queries:
 
-- `by-date` (date field) -- Used by `getMoodForDate()` and `getMoodsInRange()`
-- `by-synced` (synced field) -- Used by `getUnsyncedMoods()` for sync operations
+- `getMoodForDate(date)` -- Uses `by-date` index for O(1) lookup by ISO date string
+- `getMoodsInRange(start, end)` -- Uses `IDBKeyRange.bound()` on the `by-date` index for range scans
+- `getUnsyncedMoods()` -- Iterates all entries and filters `synced === false` in JavaScript (no dedicated index for sync status)
 
 ## Performance Monitoring
 
@@ -183,27 +186,63 @@ export function generateDeterministicNumbers(
 
 This avoids `Math.random()` in render paths, preventing hydration mismatches and ensuring stable animation values across re-renders.
 
+## Bundle Splitting
+
+Manual chunk splitting in `vite.config.ts` creates predictable, stable cache keys for vendor libraries:
+
+```typescript
+manualChunks: {
+  'vendor-react': ['react', 'react-dom'],
+  'vendor-supabase': ['@supabase/supabase-js'],
+  'vendor-state': ['zustand', 'idb', 'zod'],
+  'vendor-animation': ['framer-motion'],
+  'vendor-icons': ['lucide-react'],
+},
+```
+
+This ensures that when application code changes, vendor chunk hashes remain the same. Returning users only re-download the app code chunk, not the entire vendor bundle.
+
 ## Bundle Analysis
 
 ```bash
 npm run perf:bundle-report
 ```
 
-Uses `rollup-plugin-visualizer` to generate a visual bundle size report.
+Uses `rollup-plugin-visualizer` to generate a visual bundle size report at `dist/stats.html` with gzip and brotli size estimates.
 
 ## Configuration Constants
 
-From `src/config/performance.ts`:
+From `src/config/performance.ts` (all `as const` for literal types):
 
 ```typescript
 export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 20,
-  MOOD_HISTORY_PAGE_SIZE: 50,
+  DEFAULT_PAGE_SIZE: 20,      // Photos, messages
+  MAX_PAGE_SIZE: 100,          // Upper bound
+  MIN_PAGE_SIZE: 1,            // Lower bound
 };
 
 export const STORAGE_QUOTAS = {
-  PHOTO_STORAGE_WARNING_PERCENT: 80,
-  PHOTO_STORAGE_CRITICAL_PERCENT: 95,
+  WARNING_THRESHOLD_PERCENT: 80,   // Show warning banner
+  ERROR_THRESHOLD_PERCENT: 95,     // Block uploads
+  DEFAULT_QUOTA_MB: 50,            // Fallback for Storage API
+  DEFAULT_QUOTA_BYTES: 50 * 1024 * 1024,
+  MONITORING_INTERVAL_MS: 5 * 60 * 1000,  // 5 minutes
+};
+```
+
+From `src/config/images.ts`:
+
+```typescript
+export const IMAGE_STORAGE = {
+  SIGNED_URL_EXPIRY_SECONDS: 3600,     // 1 hour
+  URL_REFRESH_BUFFER_MS: 5 * 60 * 1000, // Refresh 5 min before expiry
+  MAX_CACHE_SIZE: 100,                  // LRU cache limit
+};
+
+export const NOTES_CONFIG = {
+  PAGE_SIZE: 50,                       // Notes per page
+  RATE_LIMIT_MAX_MESSAGES: 10,         // Max messages per window
+  RATE_LIMIT_WINDOW_MS: 60000,         // 1 minute window
 };
 ```
 

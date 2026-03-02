@@ -140,9 +140,11 @@ The mood system includes 9 components across 2 folders:
 
 ## Scripture Reading
 
-The scripture feature uses container/presentational architecture across 3 sub-directories with a Lavender Dreams design theme (purple palette: primary #A855F7, background #F3E5F5):
+The scripture feature uses container/presentational architecture across 4 sub-directories (containers/, reading/, reflection/, session/, overview/) with a Lavender Dreams design theme (purple palette: primary #A855F7, background #F3E5F5):
 
-- **ScriptureOverview** (`containers/ScriptureOverview.tsx`, 472 lines): Entry container connecting to both PartnerSlice and ScriptureReadingSlice via `useShallow`. Features:
+- **StatsSection** (`overview/StatsSection.tsx`, 184 lines): Couple-aggregate statistics display. Five `StatCard` sub-components showing sessions completed, steps completed, last completed (relative date via `Intl.RelativeTimeFormat`), average rating, and bookmarks saved. Loading state shows `SkeletonCard` placeholders. Zero-state renders em dashes with "Begin your first reading" italic prompt. All stat cards share `CARD_CLASSES` (glass-morphism: `bg-white/80 backdrop-blur-sm border border-purple-200/50`). Lucide icons: BookOpen, CheckCircle, Calendar, Star, Bookmark. Props-only (no store).
+
+- **ScriptureOverview** (`containers/ScriptureOverview.tsx`, 517 lines): Entry container connecting to both PartnerSlice and ScriptureReadingSlice via `useShallow`. Mounts `useScriptureBroadcast` hook at this level (not in LobbyContainer) so it persists across lobby-to-reading phase transitions. Features:
   - Partner status detection (loading/linked/unlinked) with skeleton and link prompts
   - Start button -> mode selection reveal with `AnimatePresence` animation
   - Solo mode (always available when online) and Together mode (requires linked partner)
@@ -150,6 +152,7 @@ The scripture feature uses container/presentational architecture across 3 sub-di
   - "Start fresh" calls `abandonSession` to mark server session as abandoned
   - Offline blocking: Start button disabled, indicator shown
   - Screen reader announcer (`aria-live="polite"`, `aria-atomic="true"`)
+  - Routes to SoloReadingFlow (solo mode), LobbyContainer (together lobby/countdown), or ReadingContainer (together reading) based on session state
   - Internal components: `ModeCard`, `PartnerStatusSkeleton`, `PartnerLinkMessage`, `SoloIcon`, `TogetherIcon`
 
 - **SoloReadingFlow** (`containers/SoloReadingFlow.tsx`, 1441 lines): The largest component in the codebase. Container managing:
@@ -208,6 +211,66 @@ The scripture feature uses container/presentational architecture across 3 sub-di
   - User message in standard container
   - "Waiting for [partner]'s reflections" with `motion-safe:animate-pulse`
   - "Return to Overview" primary button
+
+### Together Mode (Stories 4.1, 4.2, 4.3)
+
+- **LobbyContainer** (`containers/LobbyContainer.tsx`, 254 lines): Together-mode lobby orchestrator with three phases:
+  - **Phase A (Role Selection)**: Two cards for reader/responder roles (`BookOpen` and `MessageCircle` icons), plus "Continue solo" link via `convertToSolo()`
+  - **Phase B (Lobby Waiting)**: Partner join status with live `aria-live="polite"` region, ready toggle button ("I'm Ready" / "Ready"), partner ready indicator, continue solo fallback
+  - **Phase C (Countdown)**: Renders `Countdown` component when `countdownStartedAt !== null`, calls `updatePhase('reading')` on completion
+  - Store: `useShallow` selector with 12 fields from scriptureReadingSlice + partnerSlice
+  - NOTE: `useScriptureBroadcast` is NOT called here (called by ScriptureOverview to persist across phases)
+
+- **ReadingContainer** (`containers/ReadingContainer.tsx`, 374 lines): Together-mode reading orchestrator for Story 4.2/4.3:
+  - Role alternation: effective role calculated as `(myRole === 'reader') === (stepIndex % 2 === 0) ? 'reader' : 'responder'`
+  - Verse/response tabs with `AnimatePresence mode="wait"` slide transitions via `useMotionConfig`
+  - Step progress header ("Verse X of 17") with section theme subtitle
+  - `RoleIndicator`, `BookmarkFlag`, `PartnerPosition` composited into reading view
+  - Lock-in area fixed at bottom with `LockInButton` (ready/waiting/undo states)
+  - `useScripturePresence` hook for ephemeral partner view tracking
+  - Partner disconnection handling: tracks `isPartnerConnected` transitions, shows `DisconnectionOverlay` when disconnected, triggers resync on reconnect via `loadSession`
+  - Three toast types: "Session updated" (purple, 3s, for 409 version mismatch), "Reconnected" (green, 2s), error (red, 4s)
+  - Store: `useShallow` selector with 14 fields including `lockIn`, `undoLockIn`, `endSession`, `partnerDisconnected`, `partnerDisconnectedAt`, `setPartnerDisconnected`
+
+- **Countdown** (`session/Countdown.tsx`, 108 lines): Synchronized 3-second countdown:
+  - Derives digit (3->2->1->0) from `Date.now() - startedAt` server UTC timestamp
+  - 100ms polling interval for smooth digit transitions
+  - Clock skew handling: if mounted after 3s elapsed, completes immediately
+  - `AnimatePresence mode="wait"` with scale animation (initial 1.5 -> animate 1 -> exit 0.5)
+  - Reduced-motion: `shouldReduceMotion` from `useMotionConfig` disables scale/fade, does instant number swap
+  - Focus management: container gets focus on mount (`tabIndex={-1}`)
+  - Accessibility: `aria-live="assertive"` announces "Session starting in 3 seconds" and "Session started"
+  - Shows "Go!" text when digit reaches 0
+
+- **DisconnectionOverlay** (`session/DisconnectionOverlay.tsx`, 133 lines): Two-phase partner disconnection UI:
+  - **Phase A (< 30s)**: "Partner reconnecting..." with `animate-pulse` (reduced-motion: `animate-none`), `WifiOff` icon
+  - **Phase B (>= 30s)**: "Your partner seems to have stepped away" with End Session and Keep Waiting buttons
+  - End Session has confirmation step: "End this session for both of you?" with "Your progress so far will be saved" messaging
+  - Elapsed time derived from `Date.now() - disconnectedAt` via 1-second `setInterval`
+  - No blame or alarm language per design spec
+  - `TIMEOUT_MS = 30_000` constant for phase transition threshold
+  - `isEnding` prop shows "Ending..." loading state on confirm button
+  - Screen reader: `role="status"` + `aria-live="polite"` hidden announcement
+
+- **LockInButton** (`session/LockInButton.tsx`, 133 lines): Multi-state presentational button:
+  - **Unlocked**: Primary purple button "Ready for next verse"
+  - **Locked**: Outlined "Waiting for [partnerName]..." + "Tap to undo" link
+  - **Partner locked** (unlocked): Green check indicator "[PartnerName] is ready" above main button
+  - **Pending**: All buttons disabled with `opacity-50`
+  - **Disconnected + unlocked**: "Holding your place" disabled button + "Reconnecting..." text
+  - **Disconnected + locked**: Waiting text + "Reconnecting..." + undo still available
+  - All buttons have `min-h-[48px]` touch targets and `FOCUS_RING` styles
+
+- **RoleIndicator** (`reading/RoleIndicator.tsx`, 30 lines): Compact pill badge:
+  - Reader: primary purple background (#A855F7), "You read this"
+  - Responder: lighter purple background (#C084FC), "Partner reads this"
+  - `aria-label` includes both role name and display text
+
+- **PartnerPosition** (`reading/PartnerPosition.tsx`, 48 lines): Ephemeral view indicator:
+  - Shows "[partnerName] is reading the verse/the response" with eye SVG icon
+  - Returns `null` when `presence.view === null` (prevents stale indicator display)
+  - `aria-live="polite"` for screen reader updates
+  - Receives `PartnerPresenceInfo` from `useScripturePresence` hook
 
 ## Admin Panel
 

@@ -109,16 +109,16 @@ onRehydrateStorage: () => {
 
 Database name: `my-love-db`, version: 5
 
-| Store                   | Key Path | Auto-Increment | Indexes                  |
-| ----------------------- | -------- | -------------- | ------------------------ |
-| `messages`              | `id`     | Yes            | None                     |
-| `photos`                | `id`     | Yes            | None                     |
-| `moods`                 | `id`     | Yes            | `by-date`, `by-synced`   |
-| `sw-auth`               | `key`    | No             | None                     |
-| `scripture-sessions`    | `id`     | No             | `by-status`, `by-userId` |
-| `scripture-reflections` | `id`     | No             | `by-session`             |
-| `scripture-bookmarks`   | `id`     | No             | `by-session`             |
-| `scripture-messages`    | `id`     | No             | `by-session`             |
+| Store                   | Key Path | Auto-Increment | Indexes                              |
+| ----------------------- | -------- | -------------- | ------------------------------------ |
+| `messages`              | `id`     | Yes            | `by-category` (category), `by-date` (createdAt) |
+| `photos`                | `id`     | Yes            | `by-date` (uploadDate)               |
+| `moods`                 | `id`     | Yes            | `by-date` (date, unique)             |
+| `sw-auth`               | `id`     | No             | None                                 |
+| `scripture-sessions`    | `id`     | No             | `by-user` (userId)                   |
+| `scripture-reflections` | `id`     | No             | `by-session` (sessionId)             |
+| `scripture-bookmarks`   | `id`     | No             | `by-session` (sessionId)             |
+| `scripture-messages`    | `id`     | No             | `by-session` (sessionId)             |
 
 ### Service Layer
 
@@ -160,11 +160,36 @@ Features:
 
 ### localStorage
 
-`storageMonitor.ts` estimates usage and warns at 70%/85% of 5MB limit.
+`src/utils/storageMonitor.ts` estimates usage and warns at configurable thresholds:
+
+| Threshold | Level      | Action                                        |
+| --------- | ---------- | --------------------------------------------- |
+| < 70%     | `safe`     | Normal operation                              |
+| 70-85%    | `warning`  | Console warning with optimization suggestions |
+| > 85%     | `critical` | Console error with action items               |
+
+Conservative estimate of 5MB total (typical browser minimum).
+
+### IndexedDB
+
+`PhotoStorageService.estimateQuotaRemaining()` uses `navigator.storage.estimate()` to check browser-allocated quota. Falls back to `STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES` (50MB) when the Storage API is unavailable (e.g., Safari < 15.2).
+
+| Threshold | Level         | Action          |
+| --------- | ------------- | --------------- |
+| < 80%     | normal        | Normal operation |
+| 80-95%    | `approaching` | Console warning |
+| > 95%     | `critical`    | Reject uploads  |
 
 ### Supabase Storage
 
-`photoService.ts` monitors bucket quota with warnings at 80%/95% capacity.
+`photoService.ts` monitors bucket quota by summing `file_size` from the `photos` table against a 1GB free tier limit:
+
+| Threshold | Level         | Action          |
+| --------- | ------------- | --------------- |
+| < 80%     | normal        | Normal operation |
+| 80-95%    | `approaching` | Console warning |
+| 95-100%   | `critical`    | Reject uploads  |
+| > 100%    | `exceeded`    | Error message   |
 
 ## Related Documentation
 

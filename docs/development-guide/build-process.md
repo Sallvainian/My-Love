@@ -9,16 +9,14 @@ npm run build
 This executes:
 
 ```bash
-dotenvx run --overload -- bash -c 'tsc -b && vite build'
+tsc -b && vite build
 ```
+
+Environment variables are injected by [Doppler](https://doppler.com) before the build runs. Locally, direnv + Doppler CLI inject secrets automatically. In CI, `doppler run -- npm run build` is used (see `deploy.yml`).
 
 ## Build Stages
 
-### Stage 1: Environment Decryption
-
-`dotenvx run --overload` decrypts the `.env` file using the key from `.env.keys`, then injects the decrypted variables into the environment. The `--overload` flag forces decrypted values to override any pre-existing environment variables.
-
-### Stage 2: TypeScript Compilation
+### Stage 1: TypeScript Compilation
 
 `tsc -b` runs the TypeScript compiler in build mode, checking types across the project references defined in `tsconfig.json` (which references `tsconfig.app.json` and `tsconfig.node.json`).
 
@@ -30,7 +28,7 @@ Key TypeScript settings for the build:
 - **noEmit**: true (Vite handles bundling, TypeScript only type-checks)
 - **Incremental**: true with `.tsbuildinfo` cached in `node_modules/.tmp/`
 
-### Stage 3: Vite Build
+### Stage 2: Vite Build
 
 `vite build` produces the production bundle in `dist/` with:
 

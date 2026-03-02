@@ -18,7 +18,7 @@
 | `shared/`             | `NetworkStatusIndicator`, `NetworkStatusDot`, `SyncToast`, `SyncResult` (type)                                                          |
 | `love-notes/`         | `LoveNotes`, `LoveNoteMessage` (+ type), `MessageList` (+ type)                                                                         |
 | `ViewErrorBoundary/`  | `ViewErrorBoundary` (named + default)                                                                                                   |
-| `scripture-reading/`  | `ScriptureOverview`, `SoloReadingFlow`, `BookmarkFlag`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport` |
+| `scripture-reading/`  | `ScriptureOverview`, `SoloReadingFlow`, `LobbyContainer`, `ReadingContainer`, `Countdown`, `LockInButton`, `BookmarkFlag`, `RoleIndicator`, `PartnerPosition`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport`, `StatsSection` |
 
 ## Lazy Loading (Code Splitting)
 
@@ -53,16 +53,24 @@ The `scripture-reading/` feature uses explicit container/presentational separati
 
 **Containers** (connect to store, manage state, handle side effects):
 
-- `ScriptureOverview` - connects to PartnerSlice + ScriptureReadingSlice via `useShallow`, manages mode selection and session lifecycle
+- `ScriptureOverview` - connects to PartnerSlice + ScriptureReadingSlice via `useShallow`, manages mode selection and session lifecycle, mounts `useScriptureBroadcast` for together-mode
 - `SoloReadingFlow` - connects to ScriptureReadingSlice + PartnerSlice via `useShallow`, manages step navigation, save/exit, reflection, and report phases
+- `LobbyContainer` - connects to ScriptureReadingSlice + PartnerSlice via `useShallow`, manages role selection, lobby waiting, and countdown phases (Story 4.1)
+- `ReadingContainer` - connects to ScriptureReadingSlice + PartnerSlice via `useShallow`, manages together-mode reading with role alternation, lock-in, and disconnection handling (Story 4.2/4.3)
 
 **Presentational** (pure UI, accept props, no store access):
 
-- `BookmarkFlag` - toggle icon with ARIA
+- `BookmarkFlag` - toggle icon with ARIA (shared between solo and together flows)
 - `PerStepReflection` - rating scale + note input
 - `ReflectionSummary` - verse chips + rating + note
 - `MessageCompose` - textarea + send/skip
 - `DailyPrayerReport` - read-only report display
+- `StatsSection` - couple-aggregate statistics display (Story 3.1)
+- `Countdown` - synchronized 3-second countdown with server-derived timing (Story 4.1)
+- `LockInButton` - multi-state ready/waiting/undo button (Story 4.2)
+- `DisconnectionOverlay` - two-phase partner disconnection UI (Story 4.3)
+- `RoleIndicator` - reader/responder pill badge (Story 4.2)
+- `PartnerPosition` - ephemeral partner view indicator (Story 4.2)
 
 ## Memoization (React.memo)
 
@@ -120,7 +128,7 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 
 ### Animation Patterns Used
 
-- `AnimatePresence` for mount/unmount transitions (used in CountdownTimer, MoodDetailModal, PhotoCarousel, WelcomeSplash, PokeKissInterface, SoloReadingFlow, MessageList, MessageInput)
+- `AnimatePresence` for mount/unmount transitions (used in CountdownTimer, MoodDetailModal, PhotoCarousel, WelcomeSplash, PokeKissInterface, SoloReadingFlow, MessageList, MessageInput, ReadingContainer, LobbyContainer, Countdown, AnniversarySettings)
 - `AnimatePresence mode="wait"` for sequential transitions (CountdownTimer cards)
 - `whileHover={{ scale: 1.02 }}` for hover effects (RelationshipTimers, CountdownCard)
 - `whileTap={{ scale: 0.95 }}` for press feedback (WelcomeButton)
@@ -136,6 +144,10 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 - `NetworkStatusIndicator`: `role="status"`, `aria-live="polite"` for connectivity changes
 - `SyncToast`: `role="alert"`, `aria-live="polite"` for sync completion
 - `ScriptureOverview` / `SoloReadingFlow`: Dedicated screen reader announcer `<div className="sr-only" aria-live="polite" aria-atomic="true">` for step changes, view transitions, and session events
+- `Countdown`: `aria-live="assertive"` announces countdown start ("Session starting in 3 seconds") and completion ("Session started")
+- `DisconnectionOverlay`: `role="status"` + `aria-live="polite"` hidden announcement for partner disconnection
+- `LobbyContainer`: `aria-live="polite"` on partner join/ready status region
+- `PartnerPosition`: `aria-live="polite"` for partner view changes
 - `MessageInput`: `aria-live="polite"` on character counter
 - `PerStepReflection` / `ReflectionSummary`: `aria-live="polite"` on character counters
 
@@ -160,6 +172,10 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 
 - `BookmarkFlag`: `min-h-[48px] min-w-[48px]` (WCAG 2.5.8)
 - `SoloReadingFlow` buttons: `min-h-[48px]` for secondary, `min-h-[56px]` for primary
+- `LobbyContainer` role cards: `min-h-[140px]`, ready button: `min-h-[56px]`
+- `LockInButton`: `min-h-[48px]` on all button states
+- `DisconnectionOverlay` buttons: `min-h-[48px]`
+- `ReadingContainer` tabs: `min-h-[48px]`
 - Scripture partner link: `min-h-[44px]`
 - `MessageInput` buttons: `min-h-[44px] min-w-[44px]`
 
