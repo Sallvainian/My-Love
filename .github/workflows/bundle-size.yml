@@ -27,13 +27,13 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
+      - name: Install dotenvx
+        run: curl -sfS https://dotenvx.sh | sh
 
       - name: Load secrets into environment
-        run: doppler secrets download --no-file --format env >> $GITHUB_ENV
+        run: dotenvx run -- env | grep -E '^(VITE_|SENTRY_)' >> $GITHUB_ENV
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
 
       - name: Check compressed bundle size
         uses: preactjs/compressed-size-action@v2

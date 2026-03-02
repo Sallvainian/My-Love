@@ -25,7 +25,7 @@ lastSaved: '2026-03-01'
 ### Key project configs
 - Playwright: chromium-only, 2 shards in CI, auth setup project, webServer starts Vite in test mode
 - Vitest: happy-dom env, 80% coverage thresholds, JUnit reporter
-- Doppler: manages all env vars (VITE_SUPABASE_URL, etc.)
+- dotenvx: manages all env vars (VITE_SUPABASE_URL, etc.)
 
 ## Step 2: Generate Pipeline
 

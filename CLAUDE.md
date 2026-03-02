@@ -87,7 +87,27 @@ Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices via t
 
 ### Environment Variables
 
-Uses [Doppler](https://doppler.com) for secrets management. Locally, `.envrc` loads secrets via `doppler secrets download`. In CI, the `dopplerhq/cli-action` injects secrets via `DOPPLER_TOKEN`.
+Uses [dotenvx](https://dotenvx.com) for local encryption and [dotenvx-ops](https://dotenvx.com/ops) for cloud key backup/sync. Docs: https://dotenvx.com/docs/ops/quickstart
+
+**How it works:**
+- Secrets live in `.env` files, encrypted locally via `dotenvx encrypt`
+- Private decryption keys are stored in `.env.keys` (gitignored)
+- `dotenvx-ops backup` syncs private keys to the dotenvx-ops cloud
+- `.env.x` contains the project ID linking to dotenvx-ops (committed to git)
+- To decrypt/run locally: `dotenvx run -- <command>` (reads `.env.keys` automatically)
+- To add/change a secret: `dotenvx set KEY=value` then `dotenvx encrypt`, then `dotenvx-ops backup`
+
+**Files — what's committed vs gitignored:**
+| File | Committed | Contents |
+|------|-----------|----------|
+| `.env` | Yes | Encrypted secrets (safe to commit) |
+| `.env.x` | Yes | dotenvx-ops project ID |
+| `.env.example` | Yes | Template with placeholder values |
+| `.env.test` | Yes | Local Supabase test values |
+| `.env.keys` | **No** (gitignored) | Private decryption keys — backed up to dotenvx-ops cloud |
+| `.envrc` | **No** (gitignored) | direnv config |
+
+**Project secrets (in `.env`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VITE_SENTRY_DSN`, `SUPABASE_PAT`
 
 ### Base Path
 

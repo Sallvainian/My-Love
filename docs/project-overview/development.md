@@ -25,10 +25,10 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 | Command             | Description                                                                  |
 | ------------------- | ---------------------------------------------------------------------------- |
-| `npm run dev`       | Start dev server with process cleanup (env vars loaded by direnv via Doppler) |
+| `npm run dev`       | Start dev server with process cleanup (env vars loaded by dotenvx via direnv) |
 | `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                           |
 | `npm run preview`   | Preview production build locally                                              |
-| `npm run build`     | Production build: `tsc -b && vite build` (env vars injected by Doppler)       |
+| `npm run build`     | Production build: `tsc -b && vite build` (env vars injected by dotenvx)       |
 | `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                        |
 
 ### Code Quality
@@ -98,5 +98,5 @@ npx playwright test --grep "mood tracker"
 - **Generated types**: `src/types/database.types.ts` is auto-generated from Supabase schema -- do not edit manually
 - **ESLint**: `no-explicit-any` is enforced as an error
 - **Prettier**: Uses `prettier-plugin-tailwindcss` for Tailwind class sorting
-- **Env vars**: Managed via [Doppler](https://doppler.com); direnv + Doppler CLI inject secrets locally, `dopplerhq/cli-action` in CI
+- **Env vars**: Managed via [dotenvx](https://dotenvx.com); encrypted `.env` committed to git, `dotenvx run` decrypts locally and in CI
 - **CI workflows**: Located in `.github/workflows/` -- deploy, test, migrations, code review, auto-fix

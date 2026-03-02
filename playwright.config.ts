@@ -58,7 +58,7 @@ if (!process.env.SUPABASE_URL) {
     process.env.SUPABASE_ANON_KEY ??= anonKey;
 
     // Force-set VITE_ variants so the Vite dev server connects to local Supabase.
-    // Must use `=` (not `??=`) because Doppler may inject production values
+    // Must use `=` (not `??=`) because dotenvx may inject production values
     // via direnv, and Vite's loadEnv gives process.env highest priority.
     process.env.VITE_SUPABASE_URL = vars.API_URL;
     process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = anonKey;

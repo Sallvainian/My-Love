@@ -12,7 +12,7 @@ This executes:
 tsc -b && vite build
 ```
 
-Environment variables are injected by [Doppler](https://doppler.com) before the build runs. Locally, direnv + Doppler CLI inject secrets automatically. In CI, `doppler run -- npm run build` is used (see `deploy.yml`).
+Environment variables are decrypted by [dotenvx](https://dotenvx.com) before the build runs. Locally, direnv + dotenvx decrypt secrets automatically. In CI, `dotenvx run -- npm run build` is used (see `deploy.yml`).
 
 ## Build Stages
 
