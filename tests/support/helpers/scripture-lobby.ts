@@ -17,6 +17,7 @@ export const STEP_ADVANCE_TIMEOUT_MS = 15_000;
 export const REALTIME_SYNC_TIMEOUT_MS = 20_000;
 export const READY_BROADCAST_TIMEOUT_MS = 10_000;
 export const COUNTDOWN_APPEAR_TIMEOUT_MS = 10_000;
+export const LOCK_IN_BROADCAST_TIMEOUT_MS = 15_000;
 
 // ---------------------------------------------------------------------------
 // Shared predicates
@@ -39,6 +40,37 @@ export const isLockInResponse = (resp: { url(): string; status(): number }): boo
   resp.url().includes('/rest/v1/rpc/scripture_lock_in') &&
   resp.status() >= 200 &&
   resp.status() < 300;
+
+/** Matches a scripture_convert_to_solo RPC or a PATCH to scripture_sessions (2xx). */
+export const isConvertToSoloResponse = (resp: {
+  url(): string;
+  status(): number;
+  request(): { method(): string };
+}): boolean =>
+  (resp.url().includes('/rest/v1/rpc/scripture_convert_to_solo') ||
+    (resp.url().includes('/rest/v1/scripture_sessions') &&
+      resp.request().method() === 'PATCH')) &&
+  resp.status() >= 200 &&
+  resp.status() < 300;
+
+// ---------------------------------------------------------------------------
+// Shared lock-in helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Click the lock-in button and wait for the RPC response.
+ * Enriches the error with the given `label` on timeout.
+ */
+export async function lockInAndWait(page: Page, label: string): Promise<void> {
+  const lockInResponse = page
+    .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
+    .catch((e: Error) => {
+      throw new Error(`scripture_lock_in RPC (${label}) did not fire: ${e.message}`);
+    });
+
+  await page.getByTestId('lock-in-button').click();
+  await lockInResponse;
+}
 
 // ---------------------------------------------------------------------------
 // Shared navigation helpers

@@ -9,6 +9,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import type { TypedSupabaseClient } from '../factories';
 import { ensureScriptureOverview } from '../helpers';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
@@ -107,4 +108,32 @@ export async function setupBothUsersInReading(page: Page, partnerPage: Page): Pr
   await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
     timeout: STEP_ADVANCE_TIMEOUT_MS,
   });
+}
+
+/**
+ * Jump both pages to a specific step by updating the DB row and
+ * injecting the new step index into each page's live Zustand store.
+ */
+export async function jumpToStep(
+  supabaseAdmin: TypedSupabaseClient,
+  sessionId: string,
+  page: Page,
+  partnerPage: Page,
+  stepIndex: number
+): Promise<void> {
+  await supabaseAdmin
+    .from('scripture_sessions')
+    .update({ current_step_index: stepIndex })
+    .eq('id', sessionId);
+
+  const injectStep = (step: number): void => {
+    const store = window.__APP_STORE__;
+    if (!store) throw new Error('__APP_STORE__ not found');
+    const session = store.getState().session;
+    if (!session) throw new Error('session is null in store');
+    store.setState({ session: { ...session, currentStepIndex: step } });
+  };
+
+  await page.evaluate(injectStep, stepIndex);
+  await partnerPage.evaluate(injectStep, stepIndex);
 }
