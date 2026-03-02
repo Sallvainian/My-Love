@@ -1173,13 +1173,13 @@ export function SoloReadingFlow() {
               {subView === 'verse' ? (
                 /* Verse Screen */
                 <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
-                  {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-600, tabIndex for focus management */}
+                  {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-700, tabIndex for focus management */}
                   <div className="flex items-center justify-between">
                     <div className="w-12" /> {/* Spacer for centering */}
                     <p
                       ref={verseHeadingRef}
                       tabIndex={-1}
-                      className="text-center text-xs font-medium tracking-wide text-purple-600"
+                      className="text-center text-xs font-medium tracking-wide text-purple-700"
                       data-testid="scripture-verse-reference"
                     >
                       {currentStep.verseReference}
