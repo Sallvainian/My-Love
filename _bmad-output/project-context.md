@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-02-17'
+date: '2026-03-01'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 75
+rule_count: 95
 optimized_for_llm: true
 ---
 
@@ -19,24 +19,26 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 - **Language:** TypeScript ~5.9.3 (strict mode, ES2022, verbatimModuleSyntax)
 - **UI Framework:** React ^19.2.4 (react-jsx transform)
-- **Build:** Vite ^7.3.1 (bundler module resolution, manual chunk splitting)
+- **Build:** Vite ^7.3.1 (bundler module resolution, manual chunk splitting, vite-plugin-checker for dev overlay)
 - **State:** Zustand ^5.0.11 (slice-based, persist middleware → localStorage)
-- **Backend:** Supabase ^2.93.3 (PostgreSQL + RLS + Realtime subscriptions + Storage)
+- **Backend:** Supabase ^2.93.3 (PostgreSQL + RLS + Realtime subscriptions + Storage + Broadcast channels)
 - **Local DB:** idb ^8.0.3 (IndexedDB for offline-first persistence)
 - **Validation:** Zod ^4.3.6 (schema validation at data boundaries)
-- **Styling:** Tailwind CSS ^4.1.17 (utility-first, PostCSS, class sorting via Prettier plugin)
+- **Styling:** Tailwind CSS ^4.1.18 (utility-first, PostCSS, class sorting via Prettier plugin)
 - **Animation:** Framer Motion ^12.29.3
 - **Icons:** Lucide React ^0.563.0 (tree-shakeable)
 - **PWA:** vite-plugin-pwa ^1.2.0 (injectManifest strategy, custom sw.ts)
 - **Sanitization:** DOMPurify ^3.3.1 (XSS prevention for user content)
 - **Virtualization:** react-window ^2.2.6 + react-window-infinite-loader ^2.0.1
 - **SSE:** eventsource ^4.1.0
+- **Error Tracking:** @sentry/react ^10.39.0 (prod-only, PII-stripped, ignores chunk/network/ResizeObserver errors)
 - **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 80% thresholds)
-- **E2E Tests:** Playwright ^1.58.2 (Chromium) + Currents ^1.21.1 (CI reporting)
+- **E2E Tests:** Playwright ^1.58.2 (Chromium) + @seontechnologies/playwright-utils ^3.14.0 + @axe-core/playwright ^4.11.1
+- **Test Data:** @faker-js/faker ^10.3.0
 - **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.54.0 (flat config)
 - **Formatting:** Prettier ^3.8.1 (100 char width, single quotes, trailing commas ES5)
 - **Package Manager:** npm (package-lock.json)
-- **Env Management:** dotenvx (encrypted .env, decrypted at build/runtime)
+- **Env Management:** Doppler (direnv + .envrc locally, dopplerhq/cli-action in CI)
 
 ## Critical Implementation Rules
 
@@ -76,6 +78,22 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Stats stale-cache preservation:** When a Zustand action loads stats via an RPC (e.g., `loadCoupleStats()`), only update state if the result is non-null — preserve cached data on failure. Always reset `isStatsLoading` in a `finally` block so loading state never gets stuck.
 - **Skeleton first-load pattern:** Use `showSkeleton = isLoading && !stats` — render the skeleton loader only when no cached data exists. If stale data is available, show it during refresh rather than a full skeleton.
 - **Zero-state fallback over empty fragment:** When an API returns null post-load, use `effectiveData = data ?? zeroStateObject` to render a zero-state display instead of returning an empty fragment or hiding the section. Pair with an `isZeroState(data)` guard to show the zero-state message.
+- **Sentry integration:** `initSentry()` called in `main.tsx` before `createRoot`. Use `setSentryUser(userId, partnerId)` after auth, `clearSentryUser()` on sign-out. Only UUIDs reach Sentry — PII is stripped in `beforeSend`. Config in `src/config/sentry.ts`.
+- **ESLint store-access guardrails:** Components/hooks must NOT use `useAppStore.getState()` — ESLint `no-restricted-properties` enforces this. Use `useAppStore` with a `useShallow` selector instead. Tests are exempt.
+- **ESLint submission control enforcement:** Scripture submit/continue buttons must include a `disabled` prop — ESLint `no-restricted-syntax` enforces via data-testid matching (`scripture-message-send-btn`, `scripture-reflection-continue`, `scripture-reflection-summary-continue`).
+- **ESLint container import restrictions:** Scripture container components (`src/components/scripture-reading/containers/`) must NOT import from `@supabase/supabase-js` or service modules directly — they must go through Zustand slice actions. Exception: `scriptureReadingService` is allowed.
+
+### Together Mode / Realtime Architecture (Epic 4)
+
+- **Client-side broadcasts only:** All Supabase Realtime broadcasts are sent from the client via `channel.send()` after a successful RPC call. Server-side `PERFORM realtime.send()` was removed because it doesn't work in local Docker. RPCs mutate DB state; the calling client broadcasts the event.
+- **Broadcast hook singleton:** `useScriptureBroadcast` is the ONLY place that imports `supabase` for Broadcast — do NOT import supabase for broadcast in components or other hooks. It wires `setBroadcastFn` so slice actions can call `channel.send()`.
+- **Two separate channels:** `scripture-session:{sessionId}` (state events: partner_joined, state_updated, session_converted, lock_in_status_changed) and `scripture-presence:{sessionId}` (ephemeral position/heartbeat, 10s interval, 20s stale TTL). Never combine them.
+- **Presence is ephemeral:** `useScripturePresence` returns `{ view, stepIndex, ts, isPartnerConnected }` — purely local state, NOT stored in Zustand or IndexedDB. Stale presence (>20s) is silently dropped.
+- **Reconnection pattern:** Both broadcast and presence hooks auto-retry on `CHANNEL_ERROR` or `CLOSED` by incrementing a `retryCount` state variable to trigger `useEffect` re-run. After re-subscribe, `loadSession` is called to resync state from DB.
+- **Duplicate subscribe guard:** Hooks check `channelRef.current?.state === 'subscribed'` to handle React StrictMode double-mount.
+- **Session roles:** `SessionRole = 'reader' | 'responder'` — selected in lobby via `selectRole` action → `scripture_select_role` RPC.
+- **Phase guard RPCs:** Lobby RPCs (`scripture_select_role`, `scripture_toggle_ready`, `scripture_convert_to_solo`, `scripture_lock_in`, `scripture_undo_lock_in`, `scripture_end_session`) enforce phase guards to prevent invalid state transitions at the DB level.
+- **RLS for private channels:** RLS policies gate access to `scripture-session:{session_id}` and `scripture-presence:{session_id}` broadcast channels — only session participants can subscribe.
 
 ### Testing Rules
 
@@ -88,11 +106,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **TDD Guard:** `tdd-guard-vitest` reporter is active — follows TDD workflow enforcement
 - **Test env vars:** Vitest config injects mock `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` — do not use real credentials in tests
 - **Test file relaxations:** Test files allow `@ts-ignore`, unused vars, empty patterns, non-standard hook usage — see `eslint.config.js` test overrides
-- **Currents CI reporting:** Playwright uses `@currents/playwright` reporter for CI test result aggregation — configured in `playwright.config.ts`
-- **E2E local Supabase:** Playwright config auto-detects local Supabase via `supabase status -o env` and sets `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` — E2E tests require `supabase start` running locally
+- **E2E local Supabase:** Playwright config auto-detects local Supabase via `supabase status -o env` and re-signs JWT tokens when GoTrue uses ES256 signing keys — E2E tests require `supabase start` running locally
 - **pgTAP test ID format:** Database tests follow `{story}-DB-{N03d}` format (e.g., `3.1-DB-001`, `3.1-DB-001a`) — include the test ID in the `is()`/`ok()` message string so failures are traceable to stories
 - **pgTAP RPC isolation requirement:** Any pgTAP test for a SECURITY DEFINER RPC touching couple data must verify both directions: (a) User A cannot see Couple B's data, and (b) both partners see their shared couple aggregate (partner B sees partner A's solo sessions). Use `tests.authenticate_as()` + `set_config('request.jwt.claims', ...)` to simulate different auth contexts within a single test transaction.
 - **E2E zero-state removal rule:** Do NOT write E2E tests for zero-state UI rendering when the state requires a clean database and cannot be made parallel-safe without mocking. That scenario is covered by unit tests (component rendering) + pgTAP (RPC correctness). An E2E test with mocks is semantically identical to the unit test and adds no value.
+- **Together Mode E2E fixture:** `tests/support/fixtures/together-mode.ts` provides the `togetherMode` fixture — seeds users, links partners, navigates both to role selection. Tests receive `{ seed, partnerContext, partnerPage, sessionIdsToClean, uiSessionId }`.
+- **E2E store manipulation:** `window.__APP_STORE__` is the Zustand store exposed globally (declared in `src/stores/useAppStore.ts`). E2E tests use `page.evaluate(() => window.__APP_STORE__?.setState(...))` to inject state for testing. Only for E2E — never in production code.
+- **E2E helper modules:** `tests/support/helpers/scripture-lobby.ts` exports timeout constants (`SESSION_CREATE_TIMEOUT_MS`, `REALTIME_SYNC_TIMEOUT_MS`, etc.) and response predicates (`isToggleReadyResponse`, `isSelectRoleResponse`, `isLockInResponse`). `tests/support/helpers/scripture-together.ts` exports `startTogetherSessionForRole`, `setupBothUsersInReading`, `jumpToStep`. Always import from these helpers instead of re-defining.
+- **API tests:** `tests/api/` directory for API-level tests (e.g., `scripture-lobby-4.1.spec.ts`). These use the `api` Playwright project which depends on `setup` but runs without a browser context.
 
 ### Code Quality & Style Rules
 
@@ -105,17 +126,20 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **IndexedDB services:** All IndexedDB services extend `BaseIndexedDBService<T>` — call `await service.init()` before use; implements initialization guard against concurrent setup
 - **Per-feature ESLint overrides:** Scripture Reading files (`src/services/scriptureReadingService.ts`, `src/stores/slices/scriptureReadingSlice.ts`, `src/hooks/useScriptureBroadcast.ts`, `src/components/scripture-reading/**`) have their own strict `no-explicit-any` enforcement block in `eslint.config.js` — new features with similar strictness requirements should follow this pattern
 - **`data-testid` for metric cards:** Stats/metrics cards use `{feature}-stats-{metric}` naming (e.g., `scripture-stats-sessions`, `scripture-stats-last-completed`, `scripture-stats-avg-rating`). The wrapping section uses `{feature}-stats-section` and the skeleton uses `{feature}-stats-skeleton`.
+- **Component subdirectory pattern:** Scripture reading uses `containers/` for data-connected components (e.g., `LobbyContainer.tsx`, `ReadingContainer.tsx`), `session/` for session lifecycle components (e.g., `Countdown.tsx`, `DisconnectionOverlay.tsx`, `LockInButton.tsx`), and `reading/` for presentational components (e.g., `PartnerPosition.tsx`, `RoleIndicator.tsx`).
 
 ### Development Workflow Rules
 
-- **Branch naming:** `feature/epic-N-description` — all epic work stays on feature branch until PR
+- **Branch naming:** `epic-N/description` (e.g., `epic-4/together-mode-synchronized-reading`) — all epic work stays on feature branch until PR
 - **Commit format:** `type(scope): description` — types: `feat`, `fix`, `test`, `docs`, `chore`, `refactor`
 - **One story per commit:** Never mix Story 1.2 and Story 1.3 work in the same commit
 - **Separate docs from code:** Documentation-only changes get their own commit
 - **Sprint tracking separate:** Status YAML updates get their own `chore(sprint)` commit
-- **Build command:** `dotenvx run --overload -- bash -c 'tsc -b && vite build'` — requires dotenvx for env decryption
+- **Build command:** `tsc -b && vite build` — Doppler injects env vars at shell level via direnv
 - **Deploy target:** GitHub Pages at `/My-Love/` subpath — `base` in vite config switches between `/My-Love/` (prod) and `/` (dev)
 - **Pre-deploy check:** `npm run predeploy` runs build + smoke tests before deployment
+- **CI workflows:** deploy, test, migrations, code review, bundle-size, CodeQL (security scanning), dependency-review, Lighthouse (performance audits)
+- **Env management:** Doppler is the single source of truth for secrets. Locally: `.envrc` + `direnv` injects Doppler vars. CI: `dopplerhq/cli-action` with `DOPPLER_TOKEN`. `.env.test` exists for local test overrides. Never commit plaintext secrets.
 
 ### Critical Don't-Miss Rules
 
@@ -126,12 +150,15 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Dual persistence model:** Small state → localStorage (Zustand persist), large data → IndexedDB (via `idb`), remote → Supabase — never store blobs in localStorage
 - **Offline-first:** The app must work offline — all features need graceful degradation when network is unavailable; use `isOnline()` checks and `SupabaseServiceError.isNetworkError`
 - **GitHub Pages base path:** Production builds use `/My-Love/` as base — all asset URLs must be relative or use the Vite `base` config; absolute paths will break on GH Pages
-- **Encrypted env:** `.env` is encrypted with dotenvx — `.env.keys` contains decryption key and is gitignored; never commit plaintext secrets
+- **Encrypted env removed:** dotenvx was replaced by Doppler (2026-02-22). There are no longer `.env` or `.env.local` files in the repo. Env vars come from Doppler via direnv (local) or dopplerhq/cli-action (CI).
 - **Scripture is the exception:** Unlike every other feature, scripture reading is online-first — writes go to Supabase RPC first (throw on failure), IndexedDB is just a read cache. Do NOT apply the offline-first pattern to scripture code.
 - **Don't mix validation layers:** `src/validation/schemas.ts` is for local data entering IndexedDB; `src/api/validation/supabaseSchemas.ts` is for validating API responses from Supabase. Using the wrong layer will cause silent data corruption or false validation failures.
 - **E2E imports:** Always `import { test, expect } from 'tests/support/merged-fixtures'` in E2E tests — importing directly from `@playwright/test` will miss custom fixtures and auth setup
 - **SECURITY DEFINER RPC for couple-aggregate queries:** When a query must aggregate data across both partners in ways RLS can't express (e.g., user A seeing user B's solo sessions), use a `SECURITY DEFINER` RPC with `set search_path = ''`. Validate auth internally via `v_user_id := (select auth.uid())` and raise exception if null. Grant `execute` to `authenticated` role. Plain queries with RLS cannot satisfy this requirement.
 - **CTE-based RPC aggregation:** RPCs that compute multiple aggregates from the same base dataset must use a single CTE to filter once, then compute all metrics via sub-selects. Never write 4+ sequential queries against the same filtered rows — see `20260217184551_optimize_couple_stats_rpc.sql` for the established pattern.
+- **No server-side broadcasts:** `PERFORM realtime.send()` does NOT work in local Docker Supabase. All Realtime broadcast events must be sent client-side via `channel.send()` after a successful RPC call. This was explicitly removed in migration `20260301000200_remove_server_side_broadcasts.sql`.
+- **Sentry PII rules:** Only UUIDs reach Sentry — `beforeSend` strips `event.user.email` and `event.user.ip_address`. Use `setSentryUser(userId, partnerId)` after auth (sets user ID + partner tag). Never pass PII to Sentry tags or breadcrumbs.
+- **ES256 JWT re-signing:** Supabase CLI v2.71.1+ defaults GoTrue to ES256 but `supabase status -o env` still outputs stale HS256-signed keys. `playwright.config.ts` re-signs tokens using the GoTrue ES256 private key extracted from the Docker container. If E2E auth fails with 401s, check that the re-signing logic in `playwright.config.ts` is running.
 
 ---
 
@@ -151,4 +178,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-02-17
+Last Updated: 2026-03-01
