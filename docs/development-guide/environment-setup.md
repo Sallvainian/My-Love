@@ -1,39 +1,43 @@
 # Environment Setup
 
-The project uses [Doppler](https://doppler.com) for secrets management. Environment variables are managed in the Doppler dashboard and injected at runtime -- no local secret files or decryption keys needed. In CI, the `dopplerhq/cli-action` injects secrets via `DOPPLER_TOKEN`.
+The project uses [dotenvx](https://dotenvx.com) for secrets management. Environment variables are stored encrypted in `.env` (safe to commit). The private decryption key lives in `.env.keys` (gitignored) and is backed up to [dotenvx-ops](https://dotenvx.com/ops) cloud.
 
 ## How Secrets Are Injected
 
 | Context       | Mechanism                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------- |
-| Local dev     | direnv + Doppler CLI: `.envrc` triggers `doppler` to inject env vars into the shell automatically |
-| CI build      | `dopplerhq/cli-action@v3` with `DOPPLER_TOKEN_PRD` secret: `doppler run -- npm run build`         |
-| CI tests      | `dopplerhq/cli-action@v3` with `DOPPLER_TOKEN_DEV` secret                                        |
+| Local dev     | `dotenvx run -- <command>` decrypts `.env` using `.env.keys`                                      |
+| CI build      | `dotenvx run -- npm run build` with `DOTENV_PRIVATE_KEY` GitHub Secret                            |
+| CI tests      | Tests use local Supabase — no production secrets needed                                           |
 | E2E tests     | Playwright config parses `supabase status -o env` for local Supabase connection values            |
 
 ## Environment Files
 
-| File           | Purpose                                                   | In Git? |
-| -------------- | --------------------------------------------------------- | ------- |
-| `.envrc`       | direnv config (loads Doppler secrets into the shell)      | Yes     |
-| `.env.test`    | Plain-text local Supabase values for E2E testing          | Yes     |
-| `.env.example` | Template showing required variable names                  | Yes     |
-| `.env.local`   | Local overrides (optional)                                | No (gitignored) |
+| File           | Purpose                                                        | In Git? |
+| -------------- | -------------------------------------------------------------- | ------- |
+| `.env`         | Encrypted secrets (Supabase, Sentry, etc.)                     | Yes     |
+| `.env.keys`    | Private decryption key — backed up to dotenvx-ops cloud        | No (gitignored) |
+| `.env.x`       | dotenvx-ops project ID                                         | Yes     |
+| `.env.test`    | Plain-text local Supabase values for E2E testing               | Yes     |
+| `.env.example` | Template showing required variable names                       | Yes     |
+| `.envrc`       | direnv config (loads dotenvx secrets into the shell)           | No (gitignored) |
 
 ## Getting Started with Environment Variables
 
-1. Install the [Doppler CLI](https://docs.doppler.com/docs/install-cli) and authenticate:
+1. Clone the repo and install dependencies (dotenvx is a devDependency):
    ```bash
-   doppler login
-   doppler setup
+   npm install
    ```
-2. Run commands with Doppler (automatically injects secrets):
+2. Get the `.env.keys` file from dotenvx-ops:
    ```bash
-   doppler run -- npm run dev
+   npx dotenvx-ops login
+   npx dotenvx-ops sync
    ```
-3. Or use direnv for automatic injection: install [direnv](https://direnv.net/), run `direnv allow`, and Doppler secrets will be loaded automatically when you `cd` into the project directory.
-
-No local secret files or decryption keys are needed. All secrets are managed in the [Doppler dashboard](https://dashboard.doppler.com).
+3. Run commands with dotenvx (automatically decrypts secrets):
+   ```bash
+   dotenvx run -- npm run dev
+   ```
+4. Or use direnv for automatic injection: install [direnv](https://direnv.net/), run `direnv allow`, and secrets will be loaded automatically when you `cd` into the project directory.
 
 ## Required Variables
 
@@ -51,10 +55,19 @@ VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY="your-anon-key-here"
 
 ## Modifying Secrets
 
-1. Open the [Doppler dashboard](https://dashboard.doppler.com).
-2. Navigate to the project and select the appropriate environment (development or production).
-3. Edit the variables as needed.
-4. Changes take effect on the next `doppler run` invocation or the next time direnv reloads.
+1. Set a new value:
+   ```bash
+   dotenvx set KEY=value
+   ```
+2. Encrypt the updated `.env`:
+   ```bash
+   dotenvx encrypt
+   ```
+3. Back up the private key to dotenvx-ops cloud:
+   ```bash
+   npx dotenvx-ops backup
+   ```
+4. Commit the updated encrypted `.env`.
 
 ## E2E Test Environment
 
@@ -67,19 +80,18 @@ VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 The Playwright config (`playwright.config.ts`) starts the Vite dev server with `--mode test`, which makes Vite load `.env.test` and override the production credentials. This ensures E2E tests run against the local Supabase instance.
 
-Additionally, `playwright.config.ts` parses `supabase status -o env` to automatically detect the local Supabase URL, service role key, and anon key. These are set as `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` environment variables for the test fixtures to use. The config uses `=` (not `??=`) because Doppler may inject production values that need to be overridden with local values.
+Additionally, `playwright.config.ts` parses `supabase status -o env` to automatically detect the local Supabase URL, service role key, and anon key. These are set as `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` environment variables for the test fixtures to use. The config uses `=` (not `??=`) because dotenvx may inject production values that need to be overridden with local values.
 
 ## CI Environment
 
-In CI (GitHub Actions), Doppler injects environment variables via `dopplerhq/cli-action@v3`:
+In CI (GitHub Actions), dotenvx decrypts `.env` using the `DOTENV_PRIVATE_KEY` GitHub Secret:
 
 | Secret                    | Purpose                                                                   |
 | ------------------------- | ------------------------------------------------------------------------- |
-| `DOPPLER_TOKEN_PRD`       | Doppler service token for production secrets (used during build/deploy)   |
-| `DOPPLER_TOKEN_DEV`       | Doppler service token for development secrets (used during tests)         |
+| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (used during build/deploy)      |
 | `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema |
 | `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                          |
 | `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations     |
 
-The build step in `deploy.yml` uses `doppler run -- npm run build`, which injects Supabase credentials and other secrets at build time. The build script itself (`tsc -b && vite build`) receives the injected environment variables transparently.
+The build step in `deploy.yml` uses `dotenvx run -- npm run build`, which decrypts Supabase credentials and other secrets at build time. The build script itself (`tsc -b && vite build`) receives the decrypted environment variables transparently.

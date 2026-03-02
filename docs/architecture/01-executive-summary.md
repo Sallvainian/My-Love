@@ -72,7 +72,7 @@ The application follows a **hybrid data architecture** where the storage pattern
 
 ## Deployment
 
-The app builds via `tsc -b && vite build` and deploys to GitHub Pages using `gh-pages -d dist`. The production base path is `/My-Love/` (configured in `vite.config.ts`). Environment variables are managed by Doppler in CI and by `dotenvx` locally (encrypted `.env` committed to git; `.env.keys` decryption file is gitignored).
+The app builds via `tsc -b && vite build` and deploys to GitHub Pages using `gh-pages -d dist`. The production base path is `/My-Love/` (configured in `vite.config.ts`). Environment variables are managed by dotenvx (encrypted `.env` committed to git; `.env.keys` decryption file is gitignored and backed up to dotenvx-ops cloud).
 
 ## Entry Point Flow
 

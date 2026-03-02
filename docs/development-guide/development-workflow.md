@@ -26,7 +26,7 @@ git checkout -b feature/epic-3-dashboard
 npm run dev
 ```
 
-This starts Vite with signal-trapped cleanup. Environment variables are loaded by direnv via Doppler. The app is available at `http://localhost:5173/`.
+This starts Vite with signal-trapped cleanup. Environment variables are loaded by direnv via dotenvx. The app is available at `http://localhost:5173/`.
 
 ### 3. Make Changes
 

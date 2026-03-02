@@ -46,9 +46,9 @@
 - **[10-service-worker.md](./architecture/10-service-worker.md)** — InjectManifest strategy, caching, Background Sync
 - **[11-realtime-features.md](./architecture/11-realtime-features.md)** — Broadcast API for love notes and partner mood
 - **[12-offline-strategy.md](./architecture/12-offline-strategy.md)** — Three-tier sync, network status, OfflineError
-- **[13-security-model.md](./architecture/13-security-model.md)** — RLS, DOMPurify, Zod boundaries, Doppler secrets
+- **[13-security-model.md](./architecture/13-security-model.md)** — RLS, DOMPurify, Zod boundaries, dotenvx secrets
 - **[14-validation-layer.md](./architecture/14-validation-layer.md)** — All Zod schemas with code and error transformation
-- **[15-deployment.md](./architecture/15-deployment.md)** — GitHub Pages, Doppler secrets, CI/CD workflows
+- **[15-deployment.md](./architecture/15-deployment.md)** — GitHub Pages, dotenvx secrets, CI/CD workflows
 - **[16-testing-architecture.md](./architecture/16-testing-architecture.md)** — 5 test layers, frameworks, priority tags
 - **[17-error-handling.md](./architecture/17-error-handling.md)** — Strategy by layer, retry patterns, corruption recovery
 - **[18-performance.md](./architecture/18-performance.md)** — Lazy loading, virtualization, image compression, bundle analysis
@@ -124,7 +124,7 @@
 
 - **[prerequisites.md](./development-guide/prerequisites.md)** — Required tools and versions
 - **[installation.md](./development-guide/installation.md)** — Clone, install, and verify
-- **[environment-setup.md](./development-guide/environment-setup.md)** — Doppler secrets management, Supabase keys
+- **[environment-setup.md](./development-guide/environment-setup.md)** — dotenvx secrets management, Supabase keys
 - **[configuration-customization.md](./development-guide/configuration-customization.md)** — Partner name, start date, feature flags
 - **[available-scripts.md](./development-guide/available-scripts.md)** — Dev, build, lint, and test scripts
 - **[local-development-url.md](./development-guide/local-development-url.md)** — Local dev server URL details
