@@ -14,7 +14,7 @@ Every push to `main` triggers `.github/workflows/deploy.yml`:
 2. Setup Node.js 20 with npm cache
 3. `npm ci`
 4. Generate TypeScript types from remote Supabase schema: `supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts`
-5. `npm run build` (dotenvx decrypts `.env` via `DOTENV_PRIVATE_KEY` secret, runs `tsc -b`, then `vite build`)
+5. `doppler run -- npm run build` (Doppler injects secrets via `DOPPLER_TOKEN_PRD`, runs `tsc -b && vite build`)
 6. `npm run test:smoke` (validates dist/ directory structure, index.html, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -37,11 +37,12 @@ Runs after deployment:
 
 | Secret                    | Description                                                           |
 | ------------------------- | --------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | Decryption key for the encrypted `.env` file                          |
-| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                      |
-| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations |
-| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting             |
+| `DOPPLER_TOKEN_PRD`       | Doppler service token for production secrets (build, deploy, health check) |
+| `DOPPLER_TOKEN_DEV`       | Doppler service token for development secrets (test workflows)            |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                    |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                          |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations     |
+| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                 |
 
 ## GitHub Pages Configuration
 

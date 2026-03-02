@@ -7,7 +7,7 @@
 
 | Metric                           | Value                                                                           |
 | -------------------------------- | ------------------------------------------------------------------------------- |
-| Total Exported Components        | 73                                                                              |
+| Total Exported Components        | 81                                                                              |
 | Total Internal/Sub-Components    | 21                                                                              |
 | Feature Groups                   | 16                                                                              |
 | Shared/Utility Components        | 4 (NetworkStatusIndicator, NetworkStatusDot, SyncToast, charCounter)            |
@@ -16,6 +16,7 @@
 | Memoized Components (React.memo) | 5 (CalendarDay, MoodCard, LoveNoteMessage, FullScreenImageViewer, ImagePreview) |
 | Lazy-Loaded Components           | 9                                                                               |
 | Virtualized Lists (react-window) | 2 (MessageList, MoodHistoryTimeline)                                            |
+| Together Mode Components         | 8 (LobbyContainer, ReadingContainer, Countdown, DisconnectionOverlay, LockInButton, RoleIndicator, PartnerPosition, StatsSection) |
 
 ## Tech Stack
 

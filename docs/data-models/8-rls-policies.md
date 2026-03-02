@@ -127,6 +127,28 @@ Uses the `is_scripture_session_member()` helper to check membership without dire
 | Session members can view messages | SELECT    | `is_scripture_session_member(session_id)`                            |
 | Users can send messages           | INSERT    | `sender_id = auth.uid() AND is_scripture_session_member(session_id)` |
 
+## 8.14 `realtime.messages` (Private Broadcast Channels)
+
+RLS on `realtime.messages` controls who can send/receive on private broadcast channels. Added in migration 15 (`20260220000001`).
+
+### Scripture Session Broadcast Channel (`scripture-session:{uuid}`)
+
+| Policy                                                   | Operation | Rule                                                                                                                                                    |
+| -------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| scripture_session_members_can_receive_broadcasts         | SELECT    | `topic LIKE 'scripture-session:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
+| scripture_session_members_can_send_broadcasts             | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                              |
+
+The topic format is `scripture-session:{session_uuid}`. The policy extracts the UUID from the topic using `split_part(topic, ':', 2)` and verifies the user is a member of that session.
+
+### Scripture Presence Channel (`scripture-presence:{uuid}`)
+
+| Policy                                                   | Operation | Rule                                                                                                                                                      |
+| -------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| scripture_presence_members_can_receive                   | SELECT    | `topic LIKE 'scripture-presence:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
+| scripture_presence_members_can_send                       | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                                |
+
+Added in migration 18 (`20260222000001`) for partner position tracking during reading.
+
 ## Key Security Patterns
 
 1. **SECURITY DEFINER helpers** break RLS recursion (`get_my_partner_id()`, `is_scripture_session_member()`)
@@ -134,3 +156,5 @@ Uses the `is_scripture_session_member()` helper to check membership without dire
 3. **Path-based folder isolation** in Storage policies uses `storage.foldername(name)[1]` to extract the user ID from the path
 4. **No UPDATE on love_notes** -- messages are immutable once sent
 5. **partner_id immutability** in the users UPDATE policy prevents privilege escalation
+6. **Private broadcast channels** require `realtime.messages` RLS to verify session membership before allowing send/receive
+7. **Topic-based channel authorization** uses `split_part()` to extract session UUID from topic string and verify membership

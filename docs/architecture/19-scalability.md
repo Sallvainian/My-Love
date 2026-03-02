@@ -56,10 +56,11 @@ If love notes volume grows significantly:
 
 ### IndexedDB Indexes
 
-The `moods` store has indexes for efficient queries:
+The `moods` store has a `by-date` unique index for efficient queries:
 
-- `by-date` -- Range queries for calendar view
-- `by-synced` -- Filter unsynced entries for sync operations
+- `by-date` -- Unique index on the ISO date string field; enables O(1) lookups via `getMoodForDate()` and range scans via `getMoodsInRange()` using `IDBKeyRange.bound()`
+
+Note: Unsynced entries are identified by iterating all entries and filtering `synced === false` in JavaScript rather than via a dedicated index. At the expected data volume (~730 entries/year), this approach is adequate.
 
 ### Cursor-Based Pagination
 

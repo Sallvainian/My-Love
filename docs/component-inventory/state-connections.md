@@ -7,7 +7,7 @@ The Zustand store (`useAppStore`) is composed of 10 slices. Below maps each comp
 Components access the store in two ways:
 
 1. **Direct**: `useAppStore((state) => state.field)` or destructured `useAppStore()`
-2. **Via `useShallow`**: `useAppStore(useShallow((state) => ({ ... })))` -- prevents re-renders when unrelated state changes
+2. **Via `useShallow`**: `useAppStore(useShallow((state) => ({ ... })))` -- prevents re-renders when unrelated state changes (used by ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer)
 3. **Via custom hooks**: `useLoveNotes()` and `usePhotos()` wrap store selectors with memoized callbacks and side-effect logic
 
 ## AppSlice
@@ -116,6 +116,8 @@ Components access the store in two ways:
 | `PartnerMoodView`   | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `searchResults`, `isSearching`, `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest` | Direct (combined with MoodSlice selectors) |
 | `ScriptureOverview` | `partner`, `isLoadingPartner`, `loadPartner`                                                                                                                                                                                                 | `useShallow`                               |
 | `SoloReadingFlow`   | `partner`, `isLoadingPartner`                                                                                                                                                                                                                | `useShallow`                               |
+| `LobbyContainer`    | `partner` (for `displayName`)                                                                                                                                                                                                                | `useShallow`                               |
+| `ReadingContainer`  | `partner` (for `displayName`)                                                                                                                                                                                                                | `useShallow`                               |
 
 ## NotesSlice
 
@@ -135,13 +137,15 @@ All access is through the `useLoveNotes` custom hook (`src/hooks/useLoveNotes.ts
 
 **File**: `src/stores/slices/scriptureReadingSlice.ts`
 
-**State**: `session`, `scriptureLoading`, `scriptureError`, `activeSession`, `isCheckingSession`, `isSyncing`, `pendingRetry`
-**Actions**: `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession`, `advanceStep`, `saveAndExit`, `saveSession`, `exitSession`, `retryFailedWrite`, `updatePhase`
+**State**: `session`, `scriptureLoading`, `scriptureError`, `activeSession`, `isCheckingSession`, `isSyncing`, `pendingRetry`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `isPendingLockIn`, `partnerLocked`, `partnerDisconnected`, `partnerDisconnectedAt`, `coupleStats`, `isStatsLoading`
+**Actions**: `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession`, `advanceStep`, `saveAndExit`, `saveSession`, `exitSession`, `retryFailedWrite`, `updatePhase`, `selectRole`, `toggleReady`, `convertToSolo`, `lockIn`, `undoLockIn`, `endSession`, `setPartnerDisconnected`, `loadCoupleStats`
 
 | Component           | Fields Used                                                                                                                                                                                                                                               | Access Pattern |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `ScriptureOverview` | `session`, `scriptureLoading` (as `isSessionLoading`), `scriptureError` (as `sessionError`), `activeSession`, `isCheckingSession`, `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession` | `useShallow`   |
+| `ScriptureOverview` | `session`, `scriptureLoading` (as `isSessionLoading`), `scriptureError` (as `sessionError`), `activeSession`, `isCheckingSession`, `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession`, `coupleStats`, `isStatsLoading`, `loadCoupleStats` | `useShallow`   |
 | `SoloReadingFlow`   | `session`, `isSyncing`, `scriptureError`, `pendingRetry`, `advanceStep`, `saveAndExit`, `saveSession`, `exitSession`, `retryFailedWrite`, `updatePhase`                                                                                                   | `useShallow`   |
+| `LobbyContainer`    | `session`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `scriptureLoading`, `selectRole`, `toggleReady`, `convertToSolo`, `updatePhase`, `partner`                                                                          | `useShallow`   |
+| `ReadingContainer`  | `session`, `myRole`, `isPendingLockIn`, `partnerLocked`, `scriptureError`, `lockIn`, `undoLockIn`, `partner`, `partnerDisconnected`, `partnerDisconnectedAt`, `setPartnerDisconnected`, `endSession`, `loadSession`, `isSyncing`                           | `useShallow`   |
 
 ## Custom Hook Store Wrappers
 
@@ -174,7 +178,7 @@ The following components receive all data via props and have no store connection
 
 - All **RelationshipTimers** components (`TimeTogether`, `BirthdayCountdown`, `EventCountdown`, `RelationshipTimers`)
 - All **Error Boundary** components (`ErrorBoundary`, `ViewErrorBoundary`)
-- All **Scripture Presentational** components (`BookmarkFlag`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport`)
+- All **Scripture Presentational** components (`BookmarkFlag`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport`, `StatsSection`, `Countdown`, `LockInButton`, `DisconnectionOverlay`, `RoleIndicator`, `PartnerPosition`)
 - All **Photo UI** components (`PhotoGridItem`, `PhotoGridSkeleton`, `PhotoViewer`, `PhotoCarouselControls`, `PhotoEditModal`, `PhotoDeleteConfirmation`)
 - All **Mood Display** components (`MoodButton`, `MoodHistoryItem`, `CalendarDay`, `MoodDetailModal`, `PartnerMoodDisplay`, `NoMoodLoggedState`, `MoodHistoryTimeline`, `MoodHistoryCalendar`)
 - All **Love Notes Presentational** components (`LoveNoteMessage`, `MessageList`, `ImagePreview`, `FullScreenImageViewer`)

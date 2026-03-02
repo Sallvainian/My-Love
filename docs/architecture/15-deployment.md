@@ -68,10 +68,14 @@ This affects:
 
 Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git:
 
-| Variable                                | Purpose                  |
-| --------------------------------------- | ------------------------ |
-| `VITE_SUPABASE_URL`                     | Supabase project URL     |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key |
+| Variable                                | Purpose                              |
+| --------------------------------------- | ------------------------------------ |
+| `VITE_SUPABASE_URL`                     | Supabase project URL                 |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key             |
+| `SENTRY_AUTH_TOKEN`                     | Sentry auth token (enables sourcemaps upload) |
+| `SENTRY_ORG`                            | Sentry organization slug             |
+| `SENTRY_PROJECT`                        | Sentry project slug                  |
+| `SENTRY_RELEASE`                        | Release name for Sentry tracking     |
 
 The `.env.keys` file contains the decryption key and is gitignored.
 
@@ -90,6 +94,45 @@ Located in `.github/workflows/`:
 | `migrations.yml`  | Migration changes | Validate Supabase migration files |
 | `code-review.yml` | PR                | Automated code review             |
 
+### Source Maps and Sentry
+
+When `SENTRY_AUTH_TOKEN` is set in the environment, the build enables two additional features:
+
+1. **Hidden source maps**: `sourcemap: 'hidden'` in `build` config generates source maps that are not referenced in the output bundles (invisible to browsers).
+2. **Sentry upload**: `@sentry/vite-plugin` uploads the source maps to Sentry, then deletes the `.map` files from `dist/` to prevent public exposure.
+
+```typescript
+// vite.config.ts (conditional Sentry plugin)
+...(process.env.SENTRY_AUTH_TOKEN
+  ? [sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      release: { name: process.env.SENTRY_RELEASE },
+      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+      telemetry: false,
+    })]
+  : []),
+```
+
+When `SENTRY_AUTH_TOKEN` is absent (e.g., local development), source maps are disabled entirely (`sourcemap: false`).
+
+## Bundle Splitting
+
+Manual chunk splitting in `vite.config.ts` creates predictable cache keys:
+
+```typescript
+manualChunks: {
+  'vendor-react': ['react', 'react-dom'],
+  'vendor-supabase': ['@supabase/supabase-js'],
+  'vendor-state': ['zustand', 'idb', 'zod'],
+  'vendor-animation': ['framer-motion'],
+  'vendor-icons': ['lucide-react'],
+},
+```
+
+This keeps vendor library chunks stable across app code changes, improving cache hit rates on repeat visits.
+
 ## PWA Configuration
 
 The `vite-plugin-pwa` configuration in `vite.config.ts`:
@@ -97,14 +140,26 @@ The `vite-plugin-pwa` configuration in `vite.config.ts`:
 - **Strategy**: `injectManifest` (custom service worker in `src/sw.ts`)
 - **Service Worker**: Compiled from `src/sw.ts`
 - **Update**: Auto-reload on new version detection
+- **Precache**: Only static assets (images, fonts, icons). JS/CSS are excluded from precache since they use `NetworkOnly` strategy in the service worker.
+- **Navigation fallback**: `index.html` is added to the manifest with a timestamp revision to force SW update on every build.
 
 The web app manifest includes:
 
-- App name, icons, theme color
-- `display: standalone` for native-like experience
-- `start_url: /My-Love/`
+```json
+{
+  "name": "My Love - Daily Reminders",
+  "short_name": "My Love",
+  "theme_color": "#FF6B9D",
+  "background_color": "#FFE5EC",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "./",
+  "scope": "./"
+}
+```
 
 ## Related Documentation
 
 - [Service Worker Architecture](./10-service-worker.md)
 - [Technology Stack](./02-technology-stack.md)
+- [Performance](./18-performance.md)

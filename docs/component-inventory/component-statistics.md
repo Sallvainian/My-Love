@@ -4,14 +4,15 @@
 
 | Metric                                         | Count                                 |
 | ---------------------------------------------- | ------------------------------------- |
-| Total component .tsx files (excluding tests)   | 58                                    |
-| Total component .tsx files (including App.tsx) | 59                                    |
+| Total component .tsx files (excluding tests)   | 66                                    |
+| Total component .tsx files (including App.tsx) | 67                                    |
 | Test files (.test.tsx)                         | 12                                    |
 | Component folders                              | 26                                    |
 | Barrel export files (index.ts)                 | 13                                    |
 | Utility .ts files (non-index)                  | 2 (charCounter.ts, motionFeatures.ts) |
 | Lazy-loaded components                         | 9                                     |
 | Store-connected components (direct)            | 15                                    |
+| Store-connected components (via useShallow)    | 4                                     |
 | Store-connected components (via hooks)         | 4                                     |
 | Memoized components (React.memo)               | 5                                     |
 | Virtualized lists (react-window)               | 2                                     |
@@ -22,12 +23,12 @@
 
 | Category                                 | Lines      |
 | ---------------------------------------- | ---------- |
-| Component source (.tsx, excluding tests) | 14,633     |
+| Component source (.tsx, excluding tests) | 15,756     |
 | App.tsx                                  | 612        |
-| **Total component source**               | **15,245** |
+| **Total component source**               | **16,368** |
 | Test files (.test.tsx)                   | 5,553      |
-| Barrel exports + utilities (.ts)         | 77         |
-| **Grand total (all component code)**     | **20,875** |
+| Barrel exports + utilities (.ts)         | 101        |
+| **Grand total (all component code)**     | **22,022** |
 
 ## Largest Components (by line count)
 
@@ -39,10 +40,11 @@
 | `PokeKissInterface`   | `PokeKissInterface/PokeKissInterface.tsx`            | 582   |
 | `MoodTracker`         | `MoodTracker/MoodTracker.tsx`                        | 579   |
 | `PhotoViewer`         | `PhotoGallery/PhotoViewer.tsx`                       | 561   |
-| `AnniversarySettings` | `Settings/AnniversarySettings.tsx`                   | 485   |
+| `ScriptureOverview`   | `scripture-reading/containers/ScriptureOverview.tsx` | 517   |
 | `PhotoUploader`       | `photos/PhotoUploader.tsx`                           | 477   |
-| `ScriptureOverview`   | `scripture-reading/containers/ScriptureOverview.tsx` | 472   |
 | `PhotoUpload`         | `PhotoUpload/PhotoUpload.tsx`                        | 458   |
+| `AnniversarySettings` | `Settings/AnniversarySettings.tsx`                   | 400   |
+| `ReadingContainer`    | `scripture-reading/containers/ReadingContainer.tsx`  | 374   |
 
 ## Component Categories
 
@@ -60,7 +62,7 @@
 | Connection Type         | Count | Components                                                                                                                                                                                                                                                                 |
 | ----------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Direct `useAppStore`    | 15    | `App`, `DailyMessage`, `AdminPanel`, `MessageList` (admin), `CreateMessageForm`, `EditMessageForm`, `DeleteConfirmDialog`, `PhotoCarousel`, `PhotoUpload`, `MoodTracker`, `PartnerMoodView`, `PokeKissInterface`, `InteractionHistory`, `AnniversarySettings`, `LoveNotes` |
-| Via `useShallow`        | 2     | `ScriptureOverview`, `SoloReadingFlow`                                                                                                                                                                                                                                     |
+| Via `useShallow`        | 4     | `ScriptureOverview`, `SoloReadingFlow`, `LobbyContainer`, `ReadingContainer`                                                                                                                                                                                                |
 | Via `useLoveNotes` hook | 2     | `LoveNotes`, `MessageInput`                                                                                                                                                                                                                                                |
 | Via `usePhotos` hook    | 2     | `PhotoGallery`, `PhotoUploader`                                                                                                                                                                                                                                            |
 | Props only (no store)   | 38+   | All presentational, utility, and layout components                                                                                                                                                                                                                         |
@@ -74,7 +76,7 @@
 | Mood Tracking     | 9               | 4 (DateHeader, LoadingSpinner, EmptyMoodHistoryState, NoMoodLoggedState)        | 13               |
 | Partner           | 2               | 4 (MoodCard, PokeAnimation, KissAnimation, FartAnimation)                       | 6                |
 | Love Notes        | 6               | 3 (MessageRow, BeginningOfConversation, LoadingSpinner)                         | 9                |
-| Scripture Reading | 8               | 5 (ModeCard, PartnerStatusSkeleton, PartnerLinkMessage, SoloIcon, TogetherIcon) | 13               |
+| Scripture Reading | 16              | 6 (ModeCard, PartnerStatusSkeleton, PartnerLinkMessage, SoloIcon, TogetherIcon, StatCard/SkeletonCard) | 22               |
 | Admin             | 6               | 1 (MessageRow)                                                                  | 7                |
 | Auth              | 2               | 0                                                                               | 2                |
 | Navigation        | 1               | 0                                                                               | 1                |
@@ -101,7 +103,7 @@
 
 | Animation Type    | Count | Components                                                                                                                                   |
 | ----------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AnimatePresence` | 8     | `CountdownTimer`, `MoodDetailModal`, `PhotoCarousel`, `WelcomeSplash`, `PokeKissInterface`, `SoloReadingFlow`, `MessageList`, `MessageInput` |
+| `AnimatePresence` | 12    | `CountdownTimer`, `MoodDetailModal`, `PhotoCarousel`, `WelcomeSplash`, `PokeKissInterface`, `SoloReadingFlow`, `MessageList`, `MessageInput`, `ReadingContainer`, `LobbyContainer`, `Countdown`, `AnniversarySettings` |
 | `whileHover`      | 2     | `RelationshipTimers`, `CountdownCard`                                                                                                        |
 | `whileTap`        | 1     | `WelcomeButton`                                                                                                                              |
 | `drag` gesture    | 2     | `DailyMessage`, `PhotoCarousel`                                                                                                              |
@@ -138,8 +140,10 @@
 | `useNetworkStatus`    | `src/hooks/useNetworkStatus.ts`    | `NetworkStatusIndicator`, `NetworkStatusDot`, `SoloReadingFlow`, `ScriptureOverview` |
 | `usePartnerMood`      | `src/hooks/usePartnerMood.ts`      | `PartnerMoodDisplay`                                                                 |
 | `useAutoSave`         | `src/hooks/useAutoSave.ts`         | `SoloReadingFlow`                                                                    |
-| `useMotionConfig`     | `src/hooks/useMotionConfig.ts`     | `SoloReadingFlow`, `ScriptureOverview`                                               |
-| `useVibration`        | `src/hooks/useVibration.ts`        | `MessageInput`                                                                       |
-| `useRealtimeMessages` | `src/hooks/useRealtimeMessages.ts` | Via `useLoveNotes`                                                                   |
+| `useMotionConfig`      | `src/hooks/useMotionConfig.ts`      | `SoloReadingFlow`, `ScriptureOverview`, `ReadingContainer`, `Countdown`                |
+| `useVibration`         | `src/hooks/useVibration.ts`         | `MessageInput`                                                                         |
+| `useRealtimeMessages`  | `src/hooks/useRealtimeMessages.ts`  | Via `useLoveNotes`                                                                     |
+| `useScripturePresence` | `src/hooks/useScripturePresence.ts` | `ReadingContainer` (ephemeral partner position tracking via Supabase Presence)         |
+| `useScriptureBroadcast`| `src/hooks/useScriptureBroadcast.ts`| `ScriptureOverview` (persists across lobby/reading phase transitions, not in LobbyContainer) |
 
 ---
