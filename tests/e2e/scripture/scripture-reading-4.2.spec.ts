@@ -16,9 +16,10 @@ import { test, expect } from '../../support/merged-fixtures';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
   STEP_ADVANCE_TIMEOUT_MS,
-  isLockInResponse,
+  lockInAndWait,
   navigateBothToReadingPhase,
 } from '../../support/helpers/scripture-lobby';
+import { jumpToStep } from '../../support/helpers/scripture-together';
 
 // ---------------------------------------------------------------------------
 // All tests in this file share the same test user pair and must run serially
@@ -30,7 +31,6 @@ test.describe.configure({ mode: 'serial' });
 // Constants
 // ---------------------------------------------------------------------------
 
-const LOCK_IN_BROADCAST_TIMEOUT_MS = 15_000;
 const REFLECTION_LOAD_TIMEOUT_MS = 20_000;
 const LAST_STEP_INDEX = 16;
 const TOTAL_VERSES = 17;
@@ -59,14 +59,7 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     // -----------------------------------------------------------------------
     // WHEN: User A taps "Ready for next verse" (lock-in)
     // -----------------------------------------------------------------------
-    const userALockIn = page
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
-      });
-
-    await page.getByTestId('lock-in-button').click();
-    await userALockIn;
+    await lockInAndWait(page, 'User A');
 
     // AC#3 — User A sees waiting state
     await expect(page.getByTestId('lock-in-button')).toContainText(/waiting for/i);
@@ -80,14 +73,7 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     // -----------------------------------------------------------------------
     // WHEN: User B taps "Ready for next verse" (both locked → advance)
     // -----------------------------------------------------------------------
-    const partnerLockIn = partnerPage
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User B) did not fire: ${e.message}`);
-      });
-
-    await partnerPage.getByTestId('lock-in-button').click();
-    await partnerLockIn;
+    await lockInAndWait(partnerPage, 'User B');
 
     // AC#5 — Both advance to step 2 (verse text changes)
     const verseStep2Pattern = new RegExp(`verse 2 of ${TOTAL_VERSES}`, 'i');
@@ -122,13 +108,7 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
     await navigateBothToReadingPhase(page, partnerPage);
 
     // WHEN: User A locks in
-    const userALockInResponse = page
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
-      });
-    await page.getByTestId('lock-in-button').click();
-    await userALockInResponse;
+    await lockInAndWait(page, 'User A');
     await expect(page.getByTestId('lock-in-undo')).toBeVisible();
 
     // WHEN: User A taps "Tap to undo"
@@ -165,20 +145,8 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
     await expect(partnerPage.getByTestId('role-indicator')).toContainText('Partner reads this');
 
     // Both lock in → advance to step 2
-    const userALockIn = page
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
-      });
-    await page.getByTestId('lock-in-button').click();
-    await userALockIn;
-    const partnerLockIn = partnerPage
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User B) did not fire: ${e.message}`);
-      });
-    await partnerPage.getByTestId('lock-in-button').click();
-    await partnerLockIn;
+    await lockInAndWait(page, 'User A');
+    await lockInAndWait(partnerPage, 'User B');
 
     // Wait for step advance
     await expect(page.getByTestId('reading-step-progress')).toContainText(
@@ -210,23 +178,7 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     await navigateBothToReadingPhase(page, partnerPage);
 
     // Advance the session to the last step via DB + Zustand store.
-    // DB update ensures the lock_in RPC reads the correct step index.
-    // window.__APP_STORE__ is the live Zustand instance (exposed by useAppStore.ts).
-    await supabaseAdmin
-      .from('scripture_sessions')
-      .update({ current_step_index: LAST_STEP_INDEX })
-      .eq('id', uiSessionId);
-
-    // Update the live Zustand store via window.__APP_STORE__
-    const jumpToLastStep = (lastStep: number) => {
-      const store = window.__APP_STORE__;
-      if (!store) throw new Error('__APP_STORE__ not found');
-      const session = store.getState().session;
-      if (!session) throw new Error('session is null in store');
-      store.setState({ session: { ...session, currentStepIndex: lastStep } });
-    };
-    await page.evaluate(jumpToLastStep, LAST_STEP_INDEX);
-    await partnerPage.evaluate(jumpToLastStep, LAST_STEP_INDEX);
+    await jumpToStep(supabaseAdmin, uiSessionId, page, partnerPage, LAST_STEP_INDEX);
 
     await expect(page.getByTestId('reading-container')).toBeVisible({
       timeout: STEP_ADVANCE_TIMEOUT_MS,
@@ -242,20 +194,8 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     );
 
     // Both lock in on last step → reflection phase
-    const userALockIn = page
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
-      });
-    await page.getByTestId('lock-in-button').click();
-    await userALockIn;
-    const partnerLockIn = partnerPage
-      .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_lock_in RPC (User B) did not fire: ${e.message}`);
-      });
-    await partnerPage.getByTestId('lock-in-button').click();
-    await partnerLockIn;
+    await lockInAndWait(page, 'User A');
+    await lockInAndWait(partnerPage, 'User B');
 
     // THEN: Both users see reflection phase UI
     // Together-mode reflection routes to SoloReadingFlow → ReflectionSummary

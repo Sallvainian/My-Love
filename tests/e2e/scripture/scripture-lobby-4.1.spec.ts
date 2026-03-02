@@ -18,6 +18,7 @@ import {
   COUNTDOWN_APPEAR_TIMEOUT_MS,
   isToggleReadyResponse,
   isSelectRoleResponse,
+  isConvertToSoloResponse,
   navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
 import { createTestSession, cleanupTestSession } from '../../support/factories';
@@ -196,15 +197,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // -----------------------------------------------------------------------
       // Network-first: watch for session mode conversion RPC
       const conversionResponse = page
-        .waitForResponse(
-          (resp) =>
-            (resp.url().includes('/rest/v1/rpc/scripture_convert_to_solo') ||
-              (resp.url().includes('/rest/v1/scripture_sessions') &&
-                resp.request().method() === 'PATCH')) &&
-            resp.status() >= 200 &&
-            resp.status() < 300,
-          { timeout: CONVERSION_TIMEOUT_MS }
-        )
+        .waitForResponse(isConvertToSoloResponse, { timeout: CONVERSION_TIMEOUT_MS })
         .catch((e: Error) => {
           throw new Error(`scripture_convert_to_solo RPC did not fire: ${e.message}`);
         });
