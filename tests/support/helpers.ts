@@ -474,3 +474,25 @@ export async function submitReflectionSummary(
 
   await responsePromise;
 }
+
+/**
+ * After submitting the reflection summary, skip the message compose screen
+ * and wait for the session-completing PATCH before advancing to the report.
+ */
+export async function skipMessageAndCompleteSession(page: Page): Promise<void> {
+  await expect(page.getByTestId('scripture-message-compose-screen')).toBeVisible();
+
+  const patchResponse = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/rest/v1/scripture_sessions') &&
+      resp.request().method() === 'PATCH' &&
+      resp.status() === 200,
+    { timeout: 15_000 }
+  );
+
+  await page.getByTestId('scripture-message-skip-btn').click();
+
+  await patchResponse;
+
+  await expect(page.getByTestId('scripture-report-screen')).toBeVisible();
+}
