@@ -239,13 +239,29 @@ async create(userId, moods, note) {
 
 ## Validation Limits
 
-Defined in `src/config/performance.ts`:
+Defined in `src/config/performance.ts` with `as const` for literal type inference:
 
 ```typescript
 export const VALIDATION_LIMITS = {
-  MESSAGE_TEXT_MAX_LENGTH: 500,
-  // ... other limits
-};
+  MESSAGE_TEXT_MAX_LENGTH: 1000,   // Messages and custom messages
+  CAPTION_MAX_LENGTH: 500,         // Photo captions
+  NOTE_MAX_LENGTH: 1000,           // Mood notes
+  PARTNER_NAME_MAX_LENGTH: 50,     // Partner name field
+} as const;
+
+export const PAGINATION = {
+  DEFAULT_PAGE_SIZE: 20,           // Photos, messages
+  MAX_PAGE_SIZE: 100,              // Upper bound
+  MIN_PAGE_SIZE: 1,                // Lower bound
+} as const;
+
+export const STORAGE_QUOTAS = {
+  WARNING_THRESHOLD_PERCENT: 80,   // Display warning banner
+  ERROR_THRESHOLD_PERCENT: 95,     // Block uploads
+  DEFAULT_QUOTA_MB: 50,            // Fallback when Storage API unavailable
+  DEFAULT_QUOTA_BYTES: 50 * 1024 * 1024,
+  MONITORING_INTERVAL_MS: 5 * 60 * 1000,  // 5 minutes
+} as const;
 ```
 
 ## Related Documentation

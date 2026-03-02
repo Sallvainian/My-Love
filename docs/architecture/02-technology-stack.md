@@ -15,6 +15,7 @@
 | `react-window`                 | ^2.2.6   | Virtualized list rendering for performance           |
 | `react-window-infinite-loader` | ^2.0.1   | Infinite scroll integration with react-window        |
 | `dompurify`                    | ^3.3.1   | XSS sanitization for user-generated content          |
+| `@sentry/react`                | ^10.39.0 | Error tracking and performance monitoring            |
 | `workbox-window`               | ^7.4.0   | Service worker lifecycle management                  |
 | `eventsource`                  | ^4.1.0   | SSE polyfill for Supabase realtime                   |
 
@@ -30,6 +31,7 @@
 | `@dotenvx/dotenvx`         | ^1.52.0 | Encrypted environment variable management |
 | `vite-plugin-pwa`          | ^1.2.0  | PWA support (InjectManifest strategy)     |
 | `vite-plugin-checker`      | ^0.12.0 | In-editor type checking overlay           |
+| `@sentry/vite-plugin`      | ^5.0.0  | Sentry source map upload during build     |
 | `rollup-plugin-visualizer` | ^6.0.5  | Bundle size analysis                      |
 
 ### CSS and Styling

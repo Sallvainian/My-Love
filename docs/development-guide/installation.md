@@ -58,7 +58,7 @@ The app should be accessible at `http://localhost:5173/`. If the dev server star
 1. Clone the repository
 2. Run `nvm use` to set the correct Node.js version
 3. Run `npm install` to install dependencies
-4. Obtain the `.env.keys` file from a team member and place it in the project root (see [Environment Setup](./environment-setup.md))
+4. Install the [Doppler CLI](https://docs.doppler.com/docs/install-cli), run `doppler login` and `doppler setup` (see [Environment Setup](./environment-setup.md))
 5. Run `npm run dev` to start the development server
 6. (Optional) Run `supabase start` for local database
 7. (Optional) Run `npx playwright install` for E2E tests

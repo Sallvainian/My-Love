@@ -40,7 +40,7 @@ location.reload();
 
 ## Dev Server Will Not Start
 
-**Cause**: Wrong Node version, corrupted dependencies, or dotenvx decryption failure.
+**Cause**: Wrong Node version, corrupted dependencies, or missing Doppler configuration.
 
 **Fix**:
 
@@ -51,7 +51,15 @@ npm install
 npm run dev
 ```
 
-If dotenvx fails to decrypt `.env`, verify that `.env.keys` exists in the project root. If you do not have the decryption key, use `npm run dev:raw` instead (starts Vite without dotenvx, but Supabase features will not work without env vars).
+If environment variables are not being injected, verify your Doppler CLI setup:
+
+```bash
+doppler --version        # Confirm Doppler CLI is installed
+doppler setup            # Configure the project
+direnv allow             # Allow direnv to load .envrc
+```
+
+If you do not have Doppler access, use `npm run dev:raw` instead (starts Vite directly, but Supabase features will not work without env vars).
 
 ## Build Fails
 
@@ -65,13 +73,19 @@ npm run lint             # Identify ESLint errors
 npm install              # Ensure all dependencies are installed
 ```
 
-If the build fails specifically on dotenvx decryption, verify that `.env.keys` exists in the project root:
+If the build fails because Supabase env vars are missing, verify your Doppler setup:
 
 ```bash
-ls -la .env.keys
+doppler run -- printenv | grep VITE_SUPABASE   # Check that secrets are available
 ```
 
-If it does not exist, obtain it from a team member or generate your own Supabase project credentials.
+If Doppler is not configured, set the variables manually:
+
+```bash
+export VITE_SUPABASE_URL="https://your-project.supabase.co"
+export VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY="your-anon-key"
+npm run build
+```
 
 If TypeScript reports errors in `src/types/database.types.ts`, regenerate the types:
 

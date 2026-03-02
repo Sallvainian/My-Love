@@ -6,15 +6,15 @@ Every npm script defined in `package.json`, organized by category.
 
 | Script            | Command                                      | Description                                                                                                                                                                                |
 | ----------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run dev`     | `./scripts/dev-with-cleanup.sh`              | Start Vite dev server with dotenvx decryption and signal-trapped process cleanup. Runs `dotenvx run --overload -- npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
-| `npm run dev:raw` | `vite`                                       | Start Vite dev server directly without dotenvx or cleanup. Useful when you already have decrypted env vars in your shell.                                                                  |
-| `npm run preview` | `dotenvx run --overload -- npx vite preview` | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/`.                                                                          |
+| `npm run dev`     | `./scripts/dev-with-cleanup.sh`              | Start Vite dev server with signal-trapped process cleanup. Env vars are loaded by direnv via Doppler. Runs `npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
+| `npm run dev:raw` | `vite`                                       | Start Vite dev server directly without cleanup wrapper. Useful for quick restarts or when running inside an existing Doppler context.                                                |
+| `npm run preview` | `npx vite preview`                           | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/`.                                                                    |
 
 ## Build
 
 | Script              | Command                                                    | Description                                                                                                                                                         |
 | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run build`     | `dotenvx run --overload -- bash -c 'tsc -b && vite build'` | Full production build: decrypt env vars via dotenvx, TypeScript compile (`tsc -b`), then Vite build with code splitting and PWA generation. Output goes to `dist/`. |
+| `npm run build`     | `tsc -b && vite build`                                     | Full production build: TypeScript compile (`tsc -b`), then Vite build with code splitting and PWA generation. Env vars are injected by Doppler (via direnv locally, `doppler run` in CI). Output goes to `dist/`. |
 | `npm run typecheck` | `tsc --noEmit`                                             | TypeScript type check only (no output files). Use to validate types without building.                                                                               |
 
 ## Code Quality

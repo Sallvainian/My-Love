@@ -6,7 +6,7 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
 
 - [Prerequisites](./prerequisites.md) -- Required tools and versions
 - [Installation](./installation.md) -- Clone, install, and verify
-- [Environment Setup](./environment-setup.md) -- Encrypted env vars, dotenvx, Supabase keys
+- [Environment Setup](./environment-setup.md) -- Doppler secrets management, Supabase keys
   - [Environment Files](./environment-setup.md#environment-files)
   - [Getting Started with Environment Variables](./environment-setup.md#getting-started-with-environment-variables)
   - [Required Variables](./environment-setup.md#required-variables)
