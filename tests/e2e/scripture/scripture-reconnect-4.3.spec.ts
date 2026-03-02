@@ -216,22 +216,17 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
       // Open a new partner tab and load the existing together-mode session.
       // NOTE: Together-mode sessions are not auto-detected on navigation
       // (checkForActiveSession only finds solo sessions). We call loadSession()
-      // via page.evaluate() with Vite's dev-server ESM resolution. This
-      // couples the test to the dev-server — if the bundler or base path
-      // changes, update the import path below. See test-review-story-4.3.md
-      // recommendation #3 for the app-level fix (add ?sessionId= support).
+      // via window.__APP_STORE__ (same pattern as jumpToStep in scripture-together.ts).
       const reconnectedPartnerPage = await partner.context.newPage();
       await reconnectedPartnerPage.goto('/scripture');
       await expect(reconnectedPartnerPage.getByTestId('scripture-overview')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
-      await reconnectedPartnerPage.evaluate(
-        (sid) =>
-          import('/src/stores/useAppStore.ts').then((m) =>
-            m.useAppStore.getState().loadSession(sid)
-          ),
-        primarySessionId
-      );
+      await reconnectedPartnerPage.evaluate(async (sid) => {
+        const store = window.__APP_STORE__;
+        if (!store) throw new Error('__APP_STORE__ not found');
+        await store.getState().loadSession(sid);
+      }, primarySessionId);
       await expect(reconnectedPartnerPage.getByTestId('reading-container')).toBeVisible({
         timeout: STEP_ADVANCE_TIMEOUT_MS,
       });
