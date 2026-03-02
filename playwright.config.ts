@@ -1,10 +1,26 @@
 import { execSync } from 'child_process';
+import * as crypto from 'crypto';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
+ * Sign a JWT with ES256 using the EC private key from GoTrue's GOTRUE_JWT_KEYS.
+ * Supabase CLI v2.71.1+ defaults GoTrue to ES256 but `supabase status -o env`
+ * still outputs stale HS256-signed keys. This re-signs tokens so they're accepted.
+ */
+function signES256(payload: object, jwk: crypto.JsonWebKey & { kid?: string }): string {
+  const header = { alg: 'ES256', typ: 'JWT', kid: jwk.kid };
+  const b64url = (data: string) => Buffer.from(data).toString('base64url');
+  const signingInput = b64url(JSON.stringify(header)) + '.' + b64url(JSON.stringify(payload));
+  const key = crypto.createPrivateKey({ key: jwk, format: 'jwk' });
+  const sig = crypto.sign('SHA256', Buffer.from(signingInput), { key, dsaEncoding: 'ieee-p1363' });
+  return signingInput + '.' + Buffer.from(sig).toString('base64url');
+}
+
+/**
  * Load Supabase local env vars for test fixtures.
- * Parses `supabase status -o env` to set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
- * and SUPABASE_ANON_KEY. Falls back gracefully if Supabase CLI is unavailable (CI).
+ * Parses `supabase status -o env` and, when GoTrue uses ES256 signing keys,
+ * re-signs SERVICE_ROLE_KEY and ANON_KEY so they're accepted by the auth service.
+ * Falls back gracefully if Supabase CLI is unavailable (CI).
  */
 if (!process.env.SUPABASE_URL) {
   try {
@@ -14,15 +30,38 @@ if (!process.env.SUPABASE_URL) {
       const match = line.match(/^(\w+)="(.+)"$/);
       if (match) vars[match[1]] = match[2];
     }
+
+    let serviceRoleKey = vars.SERVICE_ROLE_KEY;
+    let anonKey = vars.ANON_KEY;
+
+    // Detect HS256/ES256 mismatch: if GoTrue has GOTRUE_JWT_KEYS, re-sign tokens.
+    try {
+      const jwtKeysRaw = execSync(
+        'docker inspect supabase_auth_My-Love --format \'{{range .Config.Env}}{{println .}}{{end}}\' 2>/dev/null',
+        { encoding: 'utf-8' }
+      );
+      const jwtKeysLine = jwtKeysRaw.split('\n').find((l) => l.startsWith('GOTRUE_JWT_KEYS='));
+      if (jwtKeysLine) {
+        const jwk = JSON.parse(jwtKeysLine.replace('GOTRUE_JWT_KEYS=', ''))[0];
+        serviceRoleKey = signES256(
+          { iss: 'supabase-demo', role: 'service_role', exp: 1983812996 },
+          jwk
+        );
+        anonKey = signES256({ iss: 'supabase-demo', role: 'anon', exp: 1983812996 }, jwk);
+      }
+    } catch {
+      // Docker not available or container not found — use keys from supabase status
+    }
+
     process.env.SUPABASE_URL ??= vars.API_URL;
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??= vars.SERVICE_ROLE_KEY;
-    process.env.SUPABASE_ANON_KEY ??= vars.ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??= serviceRoleKey;
+    process.env.SUPABASE_ANON_KEY ??= anonKey;
 
     // Force-set VITE_ variants so the Vite dev server connects to local Supabase.
     // Must use `=` (not `??=`) because Doppler may inject production values
     // via direnv, and Vite's loadEnv gives process.env highest priority.
     process.env.VITE_SUPABASE_URL = vars.API_URL;
-    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = vars.ANON_KEY;
+    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY = anonKey;
   } catch {
     // Supabase CLI unavailable — env vars must be set externally (CI)
   }
