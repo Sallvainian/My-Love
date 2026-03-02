@@ -11,6 +11,7 @@ import {
   advanceOneStep,
   completeAllStepsToReflectionSummary,
   submitReflectionSummary,
+  skipMessageAndCompleteSession,
 } from '../helpers';
 import type { InterceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call/fixtures';
 import type { Page } from '@playwright/test';
@@ -47,6 +48,11 @@ export type ScriptureNavFixture = {
    * Submit the reflection summary form.
    */
   submitSummary: () => Promise<void>;
+
+  /**
+   * Submit reflection summary, skip message compose, and wait for session completion.
+   */
+  completeSession: () => Promise<void>;
 };
 
 type ScriptureNavFixtures = {
@@ -66,6 +72,10 @@ export const test = base.extend<ScriptureNavFixtures>({
       completeAllSteps: async (bookmarkSteps = new Set([0, 5, 12])) =>
         completeAllStepsToReflectionSummary(page, bookmarkSteps),
       submitSummary: async () => submitReflectionSummary(page),
+      completeSession: async () => {
+        await submitReflectionSummary(page);
+        await skipMessageAndCompleteSession(page);
+      },
     };
 
     await use(fixture);
