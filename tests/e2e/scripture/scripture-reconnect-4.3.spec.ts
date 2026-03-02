@@ -1,7 +1,7 @@
 /**
  * P0/P1 E2E: Together Mode — Reconnection & Graceful Degradation (Story 4.3)
  *
- * Test IDs: 4.3-E2E-001 (P0), 4.3-E2E-002 (P1)
+ * Test IDs: 4.3-E2E-001 (P0), 4.3-E2E-002 (P1), 4.3-E2E-003 (P1)
  *
  * Acceptance Criteria covered:
  *   AC#1 — Reconnecting indicator: partner offline → "Partner reconnecting..." overlay
@@ -9,15 +9,18 @@
  *   AC#3 — Keep waiting: overlay stays, session continues
  *   AC#4 — End session: scripture_end_session RPC → both clients exit cleanly
  *   AC#5 — Reconnection resync: partner returns → resync with server state
+ *   AC#6 — Stale state handling: reconnecting client updates to canonical state
  */
 import { test, expect } from '../../support/merged-fixtures';
 import {
   SESSION_CREATE_TIMEOUT_MS,
   STEP_ADVANCE_TIMEOUT_MS,
+  lockInAndWait,
 } from '../../support/helpers/scripture-lobby';
 import {
   startTogetherSessionForRole,
   setupBothUsersInReading,
+  reconnectPartnerAndLoadSession,
 } from '../../support/helpers/scripture-together';
 import { cleanupTestSession } from '../../support/factories';
 
@@ -213,23 +216,9 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
         .update({ current_phase: 'reading' })
         .eq('id', primarySessionId);
 
-      // Open a new partner tab and load the existing together-mode session.
-      // NOTE: Together-mode sessions are not auto-detected on navigation
-      // (checkForActiveSession only finds solo sessions). We call loadSession()
-      // via window.__APP_STORE__ (same pattern as jumpToStep in scripture-together.ts).
+      // Open a new partner tab and reconnect to the existing together-mode session.
       const reconnectedPartnerPage = await partner.context.newPage();
-      await reconnectedPartnerPage.goto('/scripture');
-      await expect(reconnectedPartnerPage.getByTestId('scripture-overview')).toBeVisible({
-        timeout: STEP_ADVANCE_TIMEOUT_MS,
-      });
-      await reconnectedPartnerPage.evaluate(async (sid) => {
-        const store = window.__APP_STORE__;
-        if (!store) throw new Error('__APP_STORE__ not found');
-        await store.getState().loadSession(sid);
-      }, primarySessionId);
-      await expect(reconnectedPartnerPage.getByTestId('reading-container')).toBeVisible({
-        timeout: STEP_ADVANCE_TIMEOUT_MS,
-      });
+      await reconnectPartnerAndLoadSession(reconnectedPartnerPage, primarySessionId);
 
       // -----------------------------------------------------------------------
       // THEN: AC#5 — Both resume reading, overlay dismisses
@@ -247,6 +236,139 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
       });
 
       // Verify session is still in_progress (not ended)
+      const { data: sessionData } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('status')
+        .eq('id', primarySessionId)
+        .single();
+      expect(sessionData?.status).toBe('in_progress');
+    } finally {
+      await partner.context.close().catch(() => {});
+      await cleanupTestSession(supabaseAdmin, [...sessionIdsToClean]);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4.3-E2E-003: Reconnect After Step Advance (P1)
+// Traceability gap: 4.3-AC#6 — PARTIAL → FULL
+// ---------------------------------------------------------------------------
+
+test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
+  test('[P1] should resync reconnecting partner to canonical state after step advanced while offline', async ({
+    page,
+    browser,
+    supabaseAdmin,
+    partnerStorageStatePath,
+  }) => {
+    test.setTimeout(120_000);
+    const sessionIdsToClean = new Set<string>();
+
+    // GIVEN: User A starts Together mode, selecting Reader
+    const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
+    sessionIdsToClean.add(primarySessionId);
+
+    const partner = await createPartnerContext(browser, page, partnerStorageStatePath);
+
+    try {
+      const partnerSessionId = await startTogetherSessionForRole(
+        partner.page,
+        'lobby-role-responder'
+      );
+      sessionIdsToClean.add(partnerSessionId);
+
+      await setupBothUsersInReading(page, partner.page);
+
+      // Both users start on step 1 (Verse 1 of 17)
+      await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 1 of 17/i, {
+        timeout: STEP_ADVANCE_TIMEOUT_MS,
+      });
+
+      // -----------------------------------------------------------------------
+      // WHEN: Partner B goes offline (close tab to stop presence heartbeat)
+      // -----------------------------------------------------------------------
+      await partner.page.close();
+
+      // User A sees disconnect overlay
+      await expect(page.getByTestId('disconnection-overlay')).toBeVisible({
+        timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
+      });
+
+      // -----------------------------------------------------------------------
+      // WHILE PARTNER IS OFFLINE: Advance the session step via DB
+      // This simulates the scenario where the session advanced (e.g., via
+      // server-side action or race condition) while the partner was offline.
+      // We bump current_step_index and version in the DB directly.
+      // -----------------------------------------------------------------------
+      const { data: currentSession } = await supabaseAdmin
+        .from('scripture_sessions')
+        .select('current_step_index, version')
+        .eq('id', primarySessionId)
+        .single();
+
+      const newStepIndex = (currentSession?.current_step_index ?? 0) + 1;
+      const newVersion = (currentSession?.version ?? 1) + 1;
+
+      await supabaseAdmin
+        .from('scripture_sessions')
+        .update({
+          current_step_index: newStepIndex,
+          version: newVersion,
+          current_phase: 'reading',
+        })
+        .eq('id', primarySessionId);
+
+      // Also inject the new step into User A's Zustand store so their UI
+      // reflects the advanced state
+      await page.evaluate(
+        ({ step }) => {
+          const store = window.__APP_STORE__;
+          if (!store) throw new Error('__APP_STORE__ not found');
+          const session = store.getState().session;
+          if (!session) throw new Error('session is null in store');
+          store.setState({ session: { ...session, currentStepIndex: step } });
+        },
+        { step: newStepIndex }
+      );
+
+      // Dismiss the disconnect overlay so User A can continue
+      // Wait for Phase B with timeout buttons
+      await expect(page.getByTestId('disconnection-timeout')).toBeVisible({
+        timeout: DISCONNECTION_PHASE_B_TIMEOUT_MS,
+      });
+      await page.getByTestId('disconnection-keep-waiting').click();
+
+      // -----------------------------------------------------------------------
+      // WHEN: Partner B comes back online and loads the session
+      // The loadSession() call fetches server-authoritative state, which now
+      // has a higher step index than the partner's last known state.
+      // AC#6: Reconnecting client updates to canonical state (version check).
+      // -----------------------------------------------------------------------
+      const reconnectedPartnerPage = await partner.context.newPage();
+      await reconnectPartnerAndLoadSession(reconnectedPartnerPage, primarySessionId);
+
+      // -----------------------------------------------------------------------
+      // THEN: AC#6 — Partner resyncs to the advanced step (step 2)
+      // The loadSession resync overwrites the partner's stale local state
+      // with the server-authoritative state (step 2, higher version).
+      // -----------------------------------------------------------------------
+      const advancedStepPattern = new RegExp(`verse ${newStepIndex + 1} of 17`, 'i');
+      await expect(reconnectedPartnerPage.getByTestId('reading-step-progress')).toContainText(
+        advancedStepPattern,
+        { timeout: STEP_ADVANCE_TIMEOUT_MS }
+      );
+
+      // User A should also be on the advanced step
+      await expect(page.getByTestId('reading-step-progress')).toContainText(advancedStepPattern, {
+        timeout: STEP_ADVANCE_TIMEOUT_MS,
+      });
+
+      // Disconnect overlay should dismiss when partner comes back online
+      await expect(page.getByTestId('disconnection-overlay')).not.toBeVisible({
+        timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
+      });
+
+      // Session is still in_progress (not ended)
       const { data: sessionData } = await supabaseAdmin
         .from('scripture_sessions')
         .select('status')

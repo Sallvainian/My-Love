@@ -1,7 +1,8 @@
 /**
  * P0/P1 E2E: Together Mode Reading — Synchronized Lock-In (Story 4.2)
  *
- * Test IDs: 4.2-E2E-001 (P0), 4.2-E2E-002 (P1), 4.2-E2E-003 (P1), 4.2-E2E-004 (P1)
+ * Test IDs: 4.2-E2E-001 (P0), 4.2-E2E-002 (P1), 4.2-E2E-003 (P1), 4.2-E2E-004 (P1),
+ *           4.2-E2E-005 (P1)
  *
  * Acceptance Criteria covered:
  *   AC#1 — Role indicator: Reader/Responder pill badge with alternation
@@ -207,6 +208,71 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     });
     await expect(partnerPage.getByTestId('scripture-reflection-summary-screen')).toBeVisible({
       timeout: REFLECTION_LOAD_TIMEOUT_MS,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4.2-E2E-005: PartnerPosition Indicator Visibility (P1)
+// Traceability gap: 4.2-AC#2 — PARTIAL → FULL
+// ---------------------------------------------------------------------------
+
+test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
+  test('[P1] should show partner position indicator with view text during reading phase', async ({
+    page,
+    togetherMode: { partnerPage },
+  }) => {
+    test.setTimeout(90_000);
+
+    // GIVEN: Both users navigate through lobby to reading phase
+    await navigateBothToReadingPhase(page, partnerPage);
+
+    // Both users start on the verse tab. The useScripturePresence hook
+    // broadcasts presence on channel subscribe and every 10s heartbeat.
+    // After the partner's presence arrives (view='verse'), the
+    // PartnerPosition indicator should render on User A's page.
+
+    // -----------------------------------------------------------------------
+    // THEN: AC#2 — User A sees partner's position indicator
+    // The presence channel broadcasts partner's current view. The
+    // PartnerPosition component renders "[Name] is reading the verse".
+    // We wait with REALTIME_SYNC_TIMEOUT_MS to account for the initial
+    // presence broadcast arriving via the ephemeral presence channel.
+    // -----------------------------------------------------------------------
+    await expect(page.getByTestId('partner-position')).toBeVisible({
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
+    });
+    await expect(page.getByTestId('partner-position')).toContainText(/is reading the verse/i, {
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
+    });
+
+    // Verify the indicator also appears on the partner's page for User A
+    await expect(partnerPage.getByTestId('partner-position')).toBeVisible({
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
+    });
+    await expect(partnerPage.getByTestId('partner-position')).toContainText(
+      /is reading the verse/i,
+      { timeout: REALTIME_SYNC_TIMEOUT_MS }
+    );
+
+    // -----------------------------------------------------------------------
+    // WHEN: Partner switches to the response tab
+    // -----------------------------------------------------------------------
+    await partnerPage.getByTestId('reading-tab-response').click();
+
+    // THEN: User A's indicator updates to show "is reading the response"
+    await expect(page.getByTestId('partner-position')).toContainText(/is reading the response/i, {
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
+    });
+
+    // -----------------------------------------------------------------------
+    // WHEN: Partner switches back to the verse tab
+    // -----------------------------------------------------------------------
+    await partnerPage.getByTestId('reading-tab-verse').click();
+
+    // THEN: User A's indicator reverts to "is reading the verse"
+    await expect(page.getByTestId('partner-position')).toContainText(/is reading the verse/i, {
+      timeout: REALTIME_SYNC_TIMEOUT_MS,
     });
   });
 });
