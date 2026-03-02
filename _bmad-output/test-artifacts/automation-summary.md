@@ -3,6 +3,19 @@ stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 's
 lastStep: 'step-04-validate-and-summarize'
 lastSaved: '2026-03-01'
 workflowType: 'testarch-automate'
+inputDocuments:
+  - '_bmad-output/test-artifacts/traceability-matrix.md'
+  - '_bmad-output/test-artifacts/atdd-checklist-4.2.md'
+  - '_bmad-output/test-artifacts/atdd-checklist-4.3.md'
+  - 'tests/e2e/scripture/scripture-reading-4.2.spec.ts'
+  - 'tests/e2e/scripture/scripture-reconnect-4.3.spec.ts'
+  - 'tests/support/helpers/scripture-together.ts'
+  - 'tests/support/helpers/scripture-lobby.ts'
+  - 'src/components/scripture-reading/reading/PartnerPosition.tsx'
+  - 'src/components/scripture-reading/containers/ReadingContainer.tsx'
+  - 'src/hooks/useScripturePresence.ts'
+  - 'playwright.config.ts'
+  - '_bmad/tea/config.yaml'
 ---
 
 # Automation Summary
@@ -614,3 +627,128 @@ Generated expansion tests in 5 existing files. No new files created.
 1. Run E2E tests with Supabase: `npx playwright test tests/e2e/scripture/scripture-reconnect-4.3.spec.ts --project=chromium`
 2. `test-review` re-run on Story 4.3 to verify score improvement (target: 89+)
 3. Consider app-level change: add `?sessionId=` query param support to `ScriptureOverview` to eliminate the remaining ESM import in reconnection test
+
+---
+
+## Update: 2026-03-01 (Epic 4 Traceability Gap Remediation — P1 E2E Coverage)
+
+- Workflow: `testarch-automate` (BMad-Integrated mode)
+- Scope: Close 2 PARTIAL P1 traceability gaps to raise Epic 4 coverage from 89% to 100%
+- Source: `_bmad-output/test-artifacts/traceability-matrix.md` (gate decision: CONCERNS → target: PASS)
+
+### Step 1: Preflight & Context
+
+- **Framework**: Playwright (playwright.config.ts)
+- **Mode**: BMad-Integrated (traceability matrix + ATDD checklists 4.2 and 4.3)
+- **TEA Config**: `tea_use_playwright_utils: true`, `tea_browser_automation: auto`
+- **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, test-quality
+
+**Artifacts loaded:**
+- Traceability matrix: `_bmad-output/test-artifacts/traceability-matrix.md`
+- ATDD checklists: `atdd-checklist-4.2.md`, `atdd-checklist-4.3.md`
+- Existing E2E specs: `scripture-reading-4.2.spec.ts` (4 tests), `scripture-reconnect-4.3.spec.ts` (2 tests)
+- Source components: `PartnerPosition.tsx`, `ReadingContainer.tsx`, `useScripturePresence.ts`
+- Helpers: `scripture-together.ts`, `scripture-lobby.ts`
+
+### Step 2: Identify Automation Targets
+
+| # | Gap ID | AC | Priority | Level | Description |
+|---|--------|----|----------|-------|-------------|
+| 1 | 4.2-AC#2 | AC#2 | P1 | E2E | PartnerPosition indicator visibility + view text updates during tab switching |
+| 2 | 4.3-AC#6 | AC#6 | P1 | E2E | Partner resyncs to canonical state after session advanced while offline |
+
+**Coverage gap rationale:**
+- 4.2-AC#2: Unit tests (10 `useScripturePresence` hook tests) cover presence logic, but no E2E test verifies the `PartnerPosition` component renders correctly in a real browser with two users.
+- 4.3-AC#6: Unit tests cover version-check discard logic in slice, but no E2E test verifies the full reconnection+resync flow with DB step advancement.
+
+**Duplicate coverage avoidance:** Both are E2E-only gaps — unit/component tests already cover internal logic. These tests validate the visible rendering and multi-user orchestration that unit tests cannot reach.
+
+### Step 3: Generation (Sequential — 2 Tests)
+
+**Test 1: 4.2-E2E-005** — Added to `tests/e2e/scripture/scripture-reading-4.2.spec.ts`
+
+| Test ID | Priority | Name | ACs Covered |
+|---------|----------|------|-------------|
+| 4.2-E2E-005 | P1 | `should show partner position indicator with view text during reading phase` | AC#2 |
+
+**Scenario:**
+1. Both users navigate to reading phase
+2. Both see `partner-position` indicator with "is reading the verse"
+3. Partner switches to response tab → User A sees "is reading the response"
+4. Partner switches back to verse tab → User A sees "is reading the verse"
+
+**Test 2: 4.3-E2E-003** — Added to `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts`
+
+| Test ID | Priority | Name | ACs Covered |
+|---------|----------|------|-------------|
+| 4.3-E2E-003 | P1 | `should resync reconnecting partner to canonical state after step advanced while offline` | AC#6 |
+
+**Scenario:**
+1. Both users in reading phase, verify step 1
+2. Partner goes offline → User A sees disconnect overlay
+3. Session step advanced via DB (current_step_index + 1, version + 1)
+4. User A's Zustand store updated to reflect advanced step
+5. Partner reconnects via new page + `loadSession()` (window.__APP_STORE__)
+6. Partner resyncs to advanced step (verse 2 of 17)
+7. Both users on same step, disconnect overlay dismisses, session still `in_progress`
+
+### Step 4: Validation
+
+**Static checks:**
+- TypeScript: `tsc --noEmit` → 0 errors
+- ESLint: 0 errors
+- Prettier: clean (formatted via `--write`)
+
+**Quality checklist (all PASS):**
+- Given-When-Then format with clear comments
+- Priority tags `[P1]` in test names
+- data-testid selectors only (13 unique testids, zero CSS)
+- No hard waits (`waitForTimeout`)
+- No conditional flow (`isVisible().catch()`)
+- No try-catch for test logic (only cleanup)
+- Network-first pattern (waitForResponse before user actions)
+- Self-cleaning (try/finally with `cleanupTestSession` + `context.close()`)
+- Deterministic (no race conditions, explicit timeouts on all assertions)
+- Isolated (each test creates own session via `startTogetherSessionForRole`)
+
+**File sizes:**
+- `scripture-reading-4.2.spec.ts`: 279 lines (limit 300) — PASS
+- `scripture-reconnect-4.3.spec.ts`: 407 lines (limit 300) — OVER (3 self-contained describe blocks sharing infrastructure; acceptable)
+
+### Files Updated
+
+| File | Action | Tests | Priority |
+|------|--------|-------|----------|
+| `tests/e2e/scripture/scripture-reading-4.2.spec.ts` | **Updated** (+1 test) | 5 total | P1 |
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | **Updated** (+1 test) | 3 total | P1 |
+| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+
+### Priority Breakdown
+
+- P0: 0 new tests (existing coverage complete)
+- P1: 2 new tests (traceability gap remediation)
+- **Total**: 2 E2E tests added to existing files
+- **Epic 4 E2E total**: 10 tests (4.1: 2, 4.2: 5, 4.3: 3)
+
+### Expected Traceability Impact
+
+| Metric | Before | After |
+|--------|--------|-------|
+| P1 E2E coverage | 78% (7/9 FULL) | 100% (9/9 FULL) |
+| Overall coverage | 89% | 100% |
+| PARTIAL items | 2 (4.2-AC#2, 4.3-AC#6) | 0 |
+| Gate decision | CONCERNS | PASS |
+
+### Assumptions & Risks
+
+- **Tests not executed**: Supabase local instance required. All static checks pass (tsc, eslint, prettier).
+- **4.3 file size**: 407 lines exceeds 300-line guideline, but extracting to a 4th file would break the logical grouping. All 3 tests share `createPartnerContext` helper and timeout constants.
+- **Reconnection pattern**: Uses `window.__APP_STORE__.loadSession()` — same pattern as existing 4.3-E2E-002. Will need app-level `?sessionId=` query param to fully eliminate.
+- **Presence timing**: 4.2-E2E-005 depends on presence channel broadcasts (10s heartbeat). `REALTIME_SYNC_TIMEOUT_MS` (20s) provides adequate buffer.
+
+### Next Recommended Workflow
+
+1. Run E2E tests: `npx playwright test tests/e2e/scripture/ --project=chromium`
+2. Update traceability matrix: `_bmad-output/test-artifacts/traceability-matrix.md` — change 4.2-AC#2 and 4.3-AC#6 from PARTIAL to FULL, update gate decision to PASS
+3. `test-review` on Stories 4.2 and 4.3 to validate expanded E2E quality
+4. NFR re-assessment if gate decision changes to PASS
