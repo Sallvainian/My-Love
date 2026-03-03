@@ -20,6 +20,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
+import { ScriptureErrorCode } from '../../../services/scriptureReadingService';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useScripturePresence } from '../../../hooks/useScripturePresence';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
@@ -92,26 +93,28 @@ export function ReadingContainer(): ReactElement | null {
     localView
   );
 
-  // Story 4.3: Track isPartnerConnected transitions
+  // Story 4.3: Track isPartnerConnected transitions (null = unknown, true = connected, false = disconnected)
   const prevConnectedRef = useRef(partnerPresence.isPartnerConnected);
   useEffect(() => {
     const wasConnected = prevConnectedRef.current;
     const isConnected = partnerPresence.isPartnerConnected;
     prevConnectedRef.current = isConnected;
 
-    if (wasConnected && !isConnected) {
-      // Partner disconnected
-      setPartnerDisconnected(true);
-    } else if (!wasConnected && isConnected) {
-      // Partner reconnected — resync state
+    if (isConnected === true && wasConnected !== true) {
+      // Partner connected (first time or reconnected)
       setPartnerDisconnected(false);
-      if (session?.id) {
-        void loadSession(session.id);
+      if (wasConnected === false) {
+        // Only resync + toast on actual RE-connection (was confirmed disconnected)
+        if (session?.id) {
+          void loadSession(session.id);
+        }
+        setShowReconnectedToast(true);
+        if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
+        reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
       }
-      // Story 4.3: Show "Reconnected" toast (green tint, 2s auto-dismiss)
-      setShowReconnectedToast(true);
-      if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
-      reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
+    } else if (isConnected === false && wasConnected !== false) {
+      // Partner disconnected (from connected or unknown)
+      setPartnerDisconnected(true);
     }
     return () => {
       if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
@@ -121,7 +124,7 @@ export function ReadingContainer(): ReactElement | null {
   // Story 4.3: Keep Waiting handler — dismiss timeout buttons, return to reconnecting state
   const handleKeepWaiting = useCallback(() => {
     // If partner already reconnected during Phase B (race condition), dismiss overlay
-    if (partnerPresence.isPartnerConnected) {
+    if (partnerPresence.isPartnerConnected === true) {
       setPartnerDisconnected(false);
     } else {
       // Reset disconnectedAt to "now" so the overlay restarts Phase A countdown
@@ -142,9 +145,9 @@ export function ReadingContainer(): ReactElement | null {
   const [errorToastMessage, setErrorToastMessage] = useState<string | null>(null);
   const errorToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Watch scriptureError for 409 "Session updated" toast
+  // Watch scriptureError for version mismatch toast
   useEffect(() => {
-    if (scriptureError?.message === 'Session updated') {
+    if (scriptureError?.code === ScriptureErrorCode.VERSION_MISMATCH) {
       setShowToast(true);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setShowToast(false), 3000);
@@ -154,9 +157,9 @@ export function ReadingContainer(): ReactElement | null {
     };
   }, [scriptureError]);
 
-  // Show a visible error toast for non-409 sync failures (including endSession RPC failures).
+  // Show a visible error toast for non-version-mismatch sync failures.
   useEffect(() => {
-    if (!scriptureError || scriptureError.message === 'Session updated') return;
+    if (!scriptureError || scriptureError.code === ScriptureErrorCode.VERSION_MISMATCH) return;
 
     const message = scriptureError.message.trim() || 'Something went wrong. Please try again.';
     setErrorToastMessage(message);

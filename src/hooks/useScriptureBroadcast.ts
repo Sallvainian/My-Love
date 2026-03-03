@@ -26,6 +26,7 @@ import { useAppStore } from '../stores/useAppStore';
 import type { StateUpdatePayload } from '../stores/slices/scriptureReadingSlice';
 import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
 import type { ScriptureError } from '../services/scriptureReadingService';
+import { scheduleRetry, SCRIPTURE_RETRY_CONFIG } from './scriptureRetryUtils';
 
 interface PartnerJoinedPayload {
   user_id: string;
@@ -49,6 +50,8 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
   // Story 4.3: Retry counter — incrementing triggers useEffect re-run to re-subscribe after CHANNEL_ERROR
   const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     onPartnerJoined,
@@ -166,6 +169,8 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
+            // Reset retry count on successful subscription
+            retryCountRef.current = 0;
             // Story 4.3: If this is a re-subscribe after error, resync state
             if (hasErroredRef.current) {
               hasErroredRef.current = false;
@@ -232,8 +237,13 @@ export function useScriptureBroadcast(sessionId: string | null): void {
                     channelRef.current = null;
                   }
                   isRetryingRef.current = false;
-                  // Increment retry counter to trigger useEffect re-run → new channel subscription
-                  setRetryCount((c) => c + 1);
+                  const retried = scheduleRetry(retryCountRef, setRetryCount, retryTimerRef);
+                  if (!retried) {
+                    handleScriptureError({
+                      code: ScriptureErrorCode.SYNC_FAILED,
+                      message: `Broadcast channel: max retries (${SCRIPTURE_RETRY_CONFIG.maxRetries}) exceeded`,
+                    });
+                  }
                 })
                 .catch((removeErr: unknown) => {
                   handleScriptureError({
@@ -242,11 +252,16 @@ export function useScriptureBroadcast(sessionId: string | null): void {
                     details: removeErr,
                   });
                   isRetryingRef.current = false;
-                  // Still attempt retry so channel doesn't stay permanently broken
                   if (channelRef.current === channel) {
                     channelRef.current = null;
                   }
-                  setRetryCount((c) => c + 1);
+                  const retried = scheduleRetry(retryCountRef, setRetryCount, retryTimerRef);
+                  if (!retried) {
+                    handleScriptureError({
+                      code: ScriptureErrorCode.SYNC_FAILED,
+                      message: `Broadcast channel: max retries (${SCRIPTURE_RETRY_CONFIG.maxRetries}) exceeded`,
+                    });
+                  }
                 });
             }
           } else if (status === 'CLOSED') {
@@ -263,8 +278,13 @@ export function useScriptureBroadcast(sessionId: string | null): void {
                   isRetryingRef.current = false;
                   // Guard: session may have ended while removeChannel was in-flight
                   if (!identityRef.current.sessionIdFromStore) return;
-                  // Increment retry counter to trigger useEffect re-run → new channel subscription
-                  setRetryCount((c) => c + 1);
+                  const retried = scheduleRetry(retryCountRef, setRetryCount, retryTimerRef);
+                  if (!retried) {
+                    handleScriptureError({
+                      code: ScriptureErrorCode.SYNC_FAILED,
+                      message: `Broadcast channel: max retries (${SCRIPTURE_RETRY_CONFIG.maxRetries}) exceeded`,
+                    });
+                  }
                 })
                 .catch((removeErr: unknown) => {
                   handleScriptureError({
@@ -273,11 +293,16 @@ export function useScriptureBroadcast(sessionId: string | null): void {
                     details: removeErr,
                   });
                   isRetryingRef.current = false;
-                  // Still attempt retry so channel doesn't stay permanently broken
                   if (channelRef.current === channel) {
                     channelRef.current = null;
                   }
-                  setRetryCount((c) => c + 1);
+                  const retried = scheduleRetry(retryCountRef, setRetryCount, retryTimerRef);
+                  if (!retried) {
+                    handleScriptureError({
+                      code: ScriptureErrorCode.SYNC_FAILED,
+                      message: `Broadcast channel: max retries (${SCRIPTURE_RETRY_CONFIG.maxRetries}) exceeded`,
+                    });
+                  }
                 });
             }
           }
@@ -295,6 +320,10 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     return () => {
       // Clear broadcast function so slice actions don't try to broadcast on a dead channel
       setBroadcastFn?.(null);
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current).catch(() => {
           // Swallow cleanup errors on unmount — component is already gone

@@ -357,6 +357,11 @@ export function ScriptureOverview() {
               Continue where you left off? (Step {activeSession.currentStepIndex + 1} of {MAX_STEPS}
               )
             </p>
+            {activeSession.mode === 'together' && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                This was a together-mode session. It will resume as solo reading.
+              </p>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={handleContinue}

@@ -308,7 +308,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     updates: Partial<
       Pick<
         ScriptureSession,
-        'currentPhase' | 'currentStepIndex' | 'status' | 'version' | 'completedAt'
+        'currentPhase' | 'currentStepIndex' | 'status' | 'version' | 'completedAt' | 'mode'
       >
     >
   ): Promise<void> {
@@ -319,6 +319,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
       supabaseUpdates.current_step_index = updates.currentStepIndex;
     if (updates.status !== undefined) supabaseUpdates.status = updates.status;
     if (updates.version !== undefined) supabaseUpdates.version = updates.version;
+    if (updates.mode !== undefined) supabaseUpdates.mode = updates.mode;
     if (updates.completedAt !== undefined)
       supabaseUpdates.completed_at = updates.completedAt?.toISOString() ?? null;
 

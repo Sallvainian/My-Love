@@ -15,6 +15,7 @@ import type {
   ScriptureSession,
   ScriptureSessionPhase as SessionPhase,
   ScriptureSessionMode as SessionMode,
+  ScriptureSessionStatus,
 } from '../../services/dbSchema';
 import { MAX_STEPS } from '../../data/scriptureSteps';
 
@@ -35,8 +36,7 @@ export interface StateUpdatePayload {
   user2Ready?: boolean;
   countdownStartedAt?: number | null; // Server UTC ms or null
   currentStepIndex?: number; // Story 4.2: present when step advances via lock-in
-  triggeredBy?: 'lock_in' | 'phase_advance' | 'reconnect' | 'end_session'; // Backward compatibility
-  triggered_by?: 'lock_in' | 'phase_advance' | 'reconnect' | 'end_session'; // Architecture-aligned key
+  triggered_by?: 'lock_in' | 'phase_advance' | 'reconnect' | 'end_session';
 }
 
 // ============================================
@@ -85,6 +85,12 @@ export interface PendingRetry {
     rating: number;
     notes: string;
     isShared: boolean;
+  };
+  sessionData?: {
+    sessionId: string;
+    currentStepIndex: number;
+    currentPhase: SessionPhase;
+    status: ScriptureSessionStatus;
   };
 }
 
@@ -200,6 +206,18 @@ const initialScriptureState: ScriptureReadingState = {
 };
 
 // ============================================
+// Helpers — session reset
+// ============================================
+
+/** Reset session-scoped state while preserving cross-session fields. */
+function resetSessionState(
+  get: () => ScriptureReadingState & ScriptureSlice
+): Partial<ScriptureReadingState> {
+  const { coupleStats, isStatsLoading, isInitialized } = get();
+  return { ...initialScriptureState, coupleStats, isStatsLoading, isInitialized };
+}
+
+// ============================================
 // Slice creator (Subtask 3.4)
 // ============================================
 
@@ -226,6 +244,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   },
 
   loadSession: async (sessionId) => {
+    if (get().scriptureLoading) return;
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
@@ -257,6 +276,23 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
+      // If resuming a together-mode session, convert to solo on both client and server.
+      // This ensures ScriptureOverview routing (session.mode === 'solo')
+      // sends the user to SoloReadingFlow instead of ReadingContainer/LobbyContainer.
+      if (session.mode === 'together') {
+        const soloSession = { ...session, mode: 'solo' as SessionMode };
+        set({ session: soloSession, scriptureLoading: false, isInitialized: true, currentUserId });
+        // Persist mode change to server (fire-and-forget, non-blocking)
+        void scriptureReadingService.updateSession(sessionId, { mode: 'solo' }).catch((err) => {
+          handleScriptureError({
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Failed to convert session to solo mode',
+            details: err,
+          });
+        });
+        return;
+      }
+
       set({ session, scriptureLoading: false, isInitialized: true, currentUserId });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
@@ -272,7 +308,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   },
 
   exitSession: () => {
-    set({ ...initialScriptureState });
+    set(resetSessionState(get));
   },
 
   updatePhase: (phase) => {
@@ -304,7 +340,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       const sessions = await scriptureReadingService.getUserSessions(userId);
       const incomplete = sessions
-        .filter((s) => s.status === 'in_progress' && s.mode === 'solo')
+        .filter((s) => s.status === 'in_progress')
         .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
       set({ activeSession: incomplete ?? null, isCheckingSession: false });
     } catch (error) {
@@ -364,7 +400,17 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         set({
           scriptureError,
           isSyncing: false,
-          pendingRetry: { type: 'advanceStep', attempts: 1, maxAttempts: 3 },
+          pendingRetry: {
+            type: 'advanceStep',
+            attempts: 1,
+            maxAttempts: 3,
+            sessionData: {
+              sessionId: session.id,
+              currentStepIndex: MAX_STEPS - 1,
+              currentPhase: 'reflection',
+              status: session.status,
+            },
+          },
         });
       }
     } else {
@@ -396,7 +442,17 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         set({
           scriptureError,
           isSyncing: false,
-          pendingRetry: { type: 'advanceStep', attempts: 1, maxAttempts: 3 },
+          pendingRetry: {
+            type: 'advanceStep',
+            attempts: 1,
+            maxAttempts: 3,
+            sessionData: {
+              sessionId: session.id,
+              currentStepIndex: nextStep,
+              currentPhase: session.currentPhase,
+              status: session.status,
+            },
+          },
         });
       }
     }
@@ -419,7 +475,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       });
 
       // Clear session from active state (return to overview)
-      set({ ...initialScriptureState });
+      set(resetSessionState(get));
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -469,7 +525,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       await scriptureReadingService.updateSession(sessionId, {
         status: 'abandoned',
       });
-      set({ ...initialScriptureState });
+      set(resetSessionState(get));
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -495,7 +551,14 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       if (pendingRetry.type === 'reflection' && pendingRetry.reflectionData) {
         const { sessionId, stepIndex, rating, notes, isShared } = pendingRetry.reflectionData;
         await scriptureReadingService.addReflection(sessionId, stepIndex, rating, notes, isShared);
+      } else if (pendingRetry.sessionData) {
+        await scriptureReadingService.updateSession(pendingRetry.sessionData.sessionId, {
+          currentStepIndex: pendingRetry.sessionData.currentStepIndex,
+          currentPhase: pendingRetry.sessionData.currentPhase,
+          status: pendingRetry.sessionData.status,
+        });
       } else {
+        // Fallback: use current session (legacy pendingRetry without sessionData)
         await scriptureReadingService.updateSession(session.id, {
           currentStepIndex: session.currentStepIndex,
           currentPhase: session.currentPhase,
@@ -745,18 +808,17 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     const state = get();
     const { session, currentUserId } = state;
 
-    // Story 4.3: End session or complete phase → exit immediately
+    // Version check FIRST — drop stale broadcasts entirely
+    if (session && payload.version <= session.version) return;
+
+    // Story 4.3: End session or complete phase → exit
     if (
-      payload.triggeredBy === 'end_session' ||
       payload.triggered_by === 'end_session' ||
       payload.currentPhase === 'complete'
     ) {
-      set({ ...initialScriptureState });
+      set(resetSessionState(get));
       return;
     }
-
-    // Version check: only apply if received version is newer
-    if (session && payload.version <= session.version) return;
 
     // session.userId is always user1_id (set by toLocalSession).
     // Compare current auth user to user1_id to correctly map partnerReady/myReady/myRole:
@@ -815,7 +877,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   // back to overview rather than showing an active session the user no longer belongs to.
   applySessionConverted: () => {
     if (!get().session) return;
-    set({ ...initialScriptureState });
+    set(resetSessionState(get));
   },
 
   // ============================================================
@@ -825,7 +887,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   lockIn: async () => {
     const state = get();
     const { session } = state;
-    if (!session || session.currentPhase !== 'reading') return;
+    if (!session || session.currentPhase !== 'reading' || state.isPendingLockIn) return;
 
     // Optimistic: set pending lock-in immediately
     set({ isPendingLockIn: true, scriptureError: null });
@@ -837,7 +899,15 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         p_expected_version: session.version,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (typeof error.message === 'string' && error.message.startsWith('409:')) {
+          throw {
+            code: ScriptureErrorCode.VERSION_MISMATCH,
+            message: error.message,
+          } satisfies ScriptureError;
+        }
+        throw error;
+      }
 
       // Client-side broadcast: the RPC returns both_locked flag and lock_status payload.
       // Broadcast the appropriate event based on whether both users are now locked.
@@ -872,14 +942,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         broadcastFn?.('lock_in_status_changed', lockResult.lock_status);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'object' && error !== null && 'message' in error
-            ? String((error as { message: unknown }).message)
-            : String(error);
-
-      if (errorMessage.includes('409')) {
+      if (isScriptureError(error) && error.code === ScriptureErrorCode.VERSION_MISMATCH) {
         // Version mismatch: rollback, refetch session, show subtle toast
         set({ isPendingLockIn: false });
         try {
@@ -890,7 +953,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             set({ session: refreshedSession });
           }
         } catch (refetchErr) {
-          // Refetch failed — proceed with stale state; log via error handler (CLAUDE.md guardrail)
           handleScriptureError({
             code: ScriptureErrorCode.SYNC_FAILED,
             message: 'Failed to refresh session after version mismatch',
@@ -899,18 +961,20 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         }
         set({
           scriptureError: {
-            code: ScriptureErrorCode.SYNC_FAILED,
+            code: ScriptureErrorCode.VERSION_MISMATCH,
             message: 'Session updated',
           },
         });
       } else {
         // Other error: rollback + standard error handling
         set({ isPendingLockIn: false });
-        const scriptureError: ScriptureError = {
-          code: ScriptureErrorCode.SYNC_FAILED,
-          message: errorMessage,
-          details: error,
-        };
+        const scriptureError: ScriptureError = isScriptureError(error)
+          ? error
+          : {
+              code: ScriptureErrorCode.SYNC_FAILED,
+              message: error instanceof Error ? error.message : String(error),
+              details: error,
+            };
         handleScriptureError(scriptureError);
         set({ scriptureError });
       }
@@ -987,7 +1051,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       get()._broadcastFn?.('state_updated', endSnapshot);
 
       // Success: reset all session state
-      set({ ...initialScriptureState });
+      set(resetSessionState(get));
     } catch (error) {
       const scriptureError: ScriptureError = {
         code: ScriptureErrorCode.SYNC_FAILED,

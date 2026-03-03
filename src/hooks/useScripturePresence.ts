@@ -21,12 +21,13 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../api/supabaseClient';
 import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
 import type { ScriptureError } from '../services/scriptureReadingService';
+import { scheduleRetry, SCRIPTURE_RETRY_CONFIG } from './scriptureRetryUtils';
 
 export interface PartnerPresenceInfo {
   view: 'verse' | 'response' | null;
   stepIndex: number | null;
   ts: number | null;
-  isPartnerConnected: boolean;
+  isPartnerConnected: boolean | null;
 }
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -46,11 +47,13 @@ export function useScripturePresence(
 ): PartnerPresenceInfo {
   // Trigger re-subscribe after realtime channel errors/closures.
   const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [partnerPresence, setPartnerPresence] = useState<PartnerPresenceInfo>({
     view: null,
     stepIndex: null,
     ts: null,
-    isPartnerConnected: true,
+    isPartnerConnected: null,
   });
 
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -137,6 +140,8 @@ export function useScripturePresence(
 
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
+            // Reset retry count on successful subscription
+            retryCountRef.current = 0;
             // Send own presence immediately
             sendPresence();
 
@@ -166,14 +171,61 @@ export function useScripturePresence(
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
               }
+              if (staleTimerRef.current) {
+                clearTimeout(staleTimerRef.current);
+                staleTimerRef.current = null;
+              }
               setPartnerPresence((prev) => ({
                 ...prev,
                 isPartnerConnected: false,
                 view: null,
               }));
-              void supabase.removeChannel(channel);
+              void supabase.removeChannel(channel).catch((removeErr: unknown) => {
+                handleScriptureError({
+                  code: ScriptureErrorCode.SYNC_FAILED,
+                  message: 'Presence channel cleanup failed',
+                  details: removeErr,
+                });
+              });
               channelRef.current = null;
-              setRetryCount((c) => c + 1);
+              const retried = scheduleRetry(retryCountRef, setRetryCount, retryTimerRef);
+              if (!retried) {
+                handleScriptureError({
+                  code: ScriptureErrorCode.SYNC_FAILED,
+                  message: `Presence channel: max retries (${SCRIPTURE_RETRY_CONFIG.maxRetries}) exceeded`,
+                });
+              }
+            }
+          } else if (status === 'CLOSED') {
+            if (channelRef.current === channel && sessionId) {
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+              }
+              if (staleTimerRef.current) {
+                clearTimeout(staleTimerRef.current);
+                staleTimerRef.current = null;
+              }
+              setPartnerPresence((prev) => ({
+                ...prev,
+                isPartnerConnected: false,
+                view: null,
+              }));
+              void supabase.removeChannel(channel).catch((removeErr: unknown) => {
+                handleScriptureError({
+                  code: ScriptureErrorCode.SYNC_FAILED,
+                  message: 'Presence channel cleanup failed',
+                  details: removeErr,
+                });
+              });
+              channelRef.current = null;
+              const retried = scheduleRetry(retryCountRef, setRetryCount, retryTimerRef);
+              if (!retried) {
+                handleScriptureError({
+                  code: ScriptureErrorCode.SYNC_FAILED,
+                  message: `Presence channel: max retries (${SCRIPTURE_RETRY_CONFIG.maxRetries}) exceeded`,
+                });
+              }
             }
           }
         });
@@ -188,6 +240,10 @@ export function useScripturePresence(
       });
 
     return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       if (staleTimerRef.current) {
         clearTimeout(staleTimerRef.current);
         staleTimerRef.current = null;
@@ -197,7 +253,9 @@ export function useScripturePresence(
         intervalRef.current = null;
       }
       if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
+        void supabase.removeChannel(channelRef.current).catch(() => {
+          // Swallow cleanup errors on unmount
+        });
         channelRef.current = null;
       }
     };
