@@ -24,7 +24,7 @@
  * - Passes props to presentational components
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
@@ -213,8 +213,12 @@ export function ScriptureOverview() {
     return new URLSearchParams(window.location.search).get('fresh') === 'true';
   });
 
-  // Story 1.5: Screen reader announcement state (AC #2)
-  const [announcement, setAnnouncement] = useState('');
+  // Story 1.5: Screen reader announcement — derived state (AC #2)
+  const announcement = useMemo(() => {
+    if (activeSession && !isCheckingSession)
+      return `Session resumed at verse ${activeSession.currentStepIndex + 1}`;
+    return '';
+  }, [activeSession, isCheckingSession]);
   const showModes = isModeSelectionRequested && !session;
 
   // Load partner status on mount
@@ -243,12 +247,6 @@ export function ScriptureOverview() {
     }
   }, [checkForActiveSession, clearActiveSession, freshStartRequested, session]);
 
-  // Story 1.5: Announce session resume when activeSession loads (AC #2)
-  useEffect(() => {
-    if (activeSession && !isCheckingSession) {
-      setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
-    }
-  }, [activeSession, isCheckingSession]);
 
   // Determine partner status
   const getPartnerStatus = (): PartnerStatus => {

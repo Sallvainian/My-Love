@@ -35,7 +35,9 @@ export function Countdown({ startedAt, onComplete }: CountdownProps): ReactEleme
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [digit, setDigit] = useState<number>(() => getDigit(startedAt));
-  const [announced, setAnnounced] = useState('Session starting in 3 seconds');
+  const [announced, setAnnounced] = useState(() =>
+    getDigit(startedAt) === 0 ? 'Session started' : 'Session starting in 3 seconds'
+  );
 
   // Focus container on mount for keyboard accessibility (AC #4)
   useEffect(() => {
@@ -46,7 +48,6 @@ export function Countdown({ startedAt, onComplete }: CountdownProps): ReactEleme
   useEffect(() => {
     // If we mounted late (client received broadcast after 3s), complete immediately
     if (getDigit(startedAt) === 0) {
-      setAnnounced('Session started');
       onComplete();
       return;
     }

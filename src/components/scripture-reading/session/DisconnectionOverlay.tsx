@@ -38,6 +38,7 @@ export function DisconnectionOverlay({
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate: re-derive elapsed from Date.now() when disconnectedAt prop changes
     setElapsed(Math.max(0, Date.now() - disconnectedAt));
     setIsConfirmingEndSession(false);
     const interval = setInterval(() => {

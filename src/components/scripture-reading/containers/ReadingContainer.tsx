@@ -24,6 +24,7 @@ import { ScriptureErrorCode } from '../../../services/scriptureReadingService';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useScripturePresence } from '../../../hooks/useScripturePresence';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { useAutoToast } from '../../../hooks/useAutoToast';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { RoleIndicator } from '../reading/RoleIndicator';
 import { PartnerPosition } from '../reading/PartnerPosition';
@@ -108,6 +109,7 @@ export function ReadingContainer(): ReactElement | null {
         if (session?.id) {
           void loadSession(session.id);
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate: Supabase Realtime presence reconnection event triggers toast
         setShowReconnectedToast(true);
         if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
         reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
@@ -136,48 +138,24 @@ export function ReadingContainer(): ReactElement | null {
     void endSession();
   }, [endSession]);
 
-  // Track previous step index for animation direction
-  const prevStepRef = useRef(session?.currentStepIndex ?? 0);
+  // Track previous step index — render-time state adjustment (React docs pattern)
+  const [prevStepIndex, setPrevStepIndex] = useState(session?.currentStepIndex ?? 0);
+  if (session && session.currentStepIndex !== prevStepIndex) {
+    setPrevStepIndex(session.currentStepIndex);
+    setLocalView('verse');
+  }
 
-  // Toast state for "Session updated" on 409
-  const [showToast, setShowToast] = useState(false);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [errorToastMessage, setErrorToastMessage] = useState<string | null>(null);
-  const errorToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Watch scriptureError for version mismatch toast
-  useEffect(() => {
-    if (scriptureError?.code === ScriptureErrorCode.VERSION_MISMATCH) {
-      setShowToast(true);
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setShowToast(false), 3000);
-    }
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, [scriptureError]);
-
-  // Show a visible error toast for non-version-mismatch sync failures.
-  useEffect(() => {
-    if (!scriptureError || scriptureError.code === ScriptureErrorCode.VERSION_MISMATCH) return;
-
-    const message = scriptureError.message.trim() || 'Something went wrong. Please try again.';
-    setErrorToastMessage(message);
-    if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
-    errorToastTimerRef.current = setTimeout(() => setErrorToastMessage(null), 4000);
-
-    return () => {
-      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
-    };
-  }, [scriptureError]);
-
-  // Reset localView to 'verse' on step advance
-  useEffect(() => {
-    if (session && session.currentStepIndex !== prevStepRef.current) {
-      prevStepRef.current = session.currentStepIndex;
-      setLocalView('verse');
-    }
-  }, [session?.currentStepIndex, session]);
+  // Auto-dismissing toasts for scripture errors
+  const showToast = useAutoToast(
+    scriptureError?.code === ScriptureErrorCode.VERSION_MISMATCH || null,
+    3000
+  );
+  const errorToastMessage = useAutoToast(
+    scriptureError && scriptureError.code !== ScriptureErrorCode.VERSION_MISMATCH
+      ? (scriptureError.message.trim() || 'Something went wrong. Please try again.')
+      : null,
+    4000
+  );
 
   // Effective role calculation: roles alternate each step
   const effectiveRole: SessionRole =

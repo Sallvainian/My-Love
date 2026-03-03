@@ -45,6 +45,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
 
   useEffect(() => {
     if (!partnerId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate: guard clause reset when partnerId becomes falsy
       setPartnerMood(null);
       setError(null);
       setIsLoading(false);
