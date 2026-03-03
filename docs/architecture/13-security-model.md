@@ -1,10 +1,14 @@
 # Security Model
 
+> Last updated: 2026-03-03
+
 ## Authentication
 
-- **Method**: Email/password via Supabase Auth
-- **Session**: Persisted in localStorage, auto-refreshed before JWT expiry
+- **Methods**: Email/password + Google OAuth via Supabase Auth
+- **Session**: Persisted in localStorage by Supabase client, auto-refreshed before JWT expiry
 - **Users**: Exactly 2 users per deployment, linked via `partner_id` in the `users` table
+- **Auth guards** (Epic 4): Store slice actions validate auth via `getCurrentUserIdOfflineSafe()` before any Supabase operation
+- **Sentry context**: User UUID set on auth success (`setSentryUser`), cleared on sign-out (`clearSentryUser`). No email or IP sent to Sentry.
 
 ## Row-Level Security (RLS)
 
@@ -65,48 +69,75 @@ Zod v4 schemas validate data at every service boundary, preventing data corrupti
 - **Before Supabase RPCs**: `SupabaseSessionSchema.parse()`, `SupabaseReflectionSchema.parse()`
 - **Before state updates**: `SettingsSchema.parse()` in `setSettings()` and `updateSettings()`
 - **During import**: `CustomMessagesExportSchema.parse()` validates import file structure
+- **API responses**: `SupabaseMoodSchema.parse()`, `MoodArraySchema.parse()` validate all Supabase query results
 
 ## Environment Variable Security
 
-- Environment variables are encrypted with **dotenvx** and committed to git
-- The `.env.keys` file (decryption key) is gitignored
+Secrets are managed by **fnox** with the **age** encryption provider:
+
+- `fnox.toml` contains age-encrypted secret ciphertext, committed safely to git
+- Age keys stored at `~/.age/key.txt` on each machine (Mac, WSL) -- never committed
+- `fnox exec -- npm run dev` decrypts secrets and injects them as environment variables
+- No `.env`, `.env.keys`, or external key management services needed
 - E2E tests use plain-text `.env.test` with local Supabase credentials only
 - Environment variables are validated at module load time in `supabaseClient.ts`
 
-## Service Worker Auth Token Management
+### Secrets Inventory
 
-Auth tokens for background sync are stored in IndexedDB (not localStorage, which is inaccessible to service workers). The `sw-auth` object store uses a string key path `id` with no auto-increment:
+| Secret | Source | Purpose |
+|--------|--------|---------|
+| `VITE_SUPABASE_URL` | `fnox.toml` | Supabase project URL |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | `fnox.toml` | Supabase anon/public key |
+| `SUPABASE_SERVICE_KEY` | `fnox.toml` | Supabase service role key |
+| `SENTRY_AUTH_TOKEN` | `fnox.toml` | Sentry auth token for source map upload |
+| `SENTRY_ORG` | `fnox.toml` | Sentry organization slug |
+| `SENTRY_PROJECT` | `fnox.toml` | Sentry project slug |
+| `VITE_SENTRY_DSN` | `fnox.toml` | Sentry DSN for error tracking |
+| `SUPABASE_PAT` | `fnox.toml` | Supabase Personal Access Token |
+
+## Sentry PII Protection (Epic 4)
+
+Sentry is configured to strip PII before events reach the server:
 
 ```typescript
-// src/sw-db.ts
-export async function storeAuthToken(token: string): Promise<void> {
-  const db = await openMyLoveDB();
-  await db.put('sw-auth', { id: 'current', token, timestamp: Date.now() });
-}
-
-export async function getAuthToken(): Promise<string | null> {
-  const db = await openMyLoveDB();
-  const record = await db.get('sw-auth', 'current');
-  return record?.token ?? null;
-}
-
-export async function clearAuthToken(): Promise<void> {
-  const db = await openMyLoveDB();
-  await db.delete('sw-auth', 'current');
+// src/config/sentry.ts
+beforeSend(event) {
+  if (event.user) {
+    delete event.user.email;
+    delete event.user.ip_address;
+  }
+  return event;
 }
 ```
 
-The token is refreshed whenever the main app's auth state changes via the `onAuthStateChange` listener. The `sw-db.ts` file duplicates the `upgradeDb()` migration logic from `dbSchema.ts` since the service worker runs in a separate execution context and cannot import the app's service layer.
+Only UUIDs are sent as user identifiers. Partner ID is set as a tag, not a user field.
+
+## Service Worker Auth Token Management
+
+Auth tokens for background sync are stored in IndexedDB (not localStorage, which is inaccessible to service workers). The `sw-auth` object store holds the current auth token:
+
+```typescript
+// src/sw-db.ts
+export interface StoredAuthToken {
+  id: 'current';
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  userId: string;
+}
+```
+
+The token is refreshed whenever the main app's auth state changes via the `onAuthStateChange` listener in `sessionService.ts`. Token expiry is checked with a 5-minute buffer before background sync attempts. The `sw-db.ts` file duplicates the `upgradeDb()` migration logic from `dbSchema.ts` since the service worker runs in a separate execution context.
 
 ## Rate Limiting
 
-Love notes have client-side rate limiting (10 messages per minute) implemented in `NotesSlice`:
+Love notes have client-side rate limiting configured in `src/config/images.ts`:
 
 ```typescript
-// Tracks recent message timestamps
-if (recentCount >= 10) {
-  throw new Error('Rate limit exceeded: max 10 messages per minute');
-}
+export const NOTES_CONFIG = {
+  RATE_LIMIT_MAX_MESSAGES: 10,
+  RATE_LIMIT_WINDOW_MS: 60000, // 1 minute
+};
 ```
 
 ## Related Documentation
@@ -114,3 +145,4 @@ if (recentCount >= 10) {
 - [Authentication Flow](./07-authentication-flow.md)
 - [Validation Layer](./14-validation-layer.md)
 - [API Layer](./08-api-layer.md)
+- [Error Handling](./17-error-handling.md)

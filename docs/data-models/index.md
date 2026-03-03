@@ -19,12 +19,12 @@ This section documents the entire data layer of the My-Love application, coverin
 | #   | Document                                                          | Description                                                                                                            |
 | --- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | --  | [Table of Contents](./table-of-contents.md)                       | Detailed outline of all data model sections                                                                            |
-| 1   | [Database Schema Overview](./1-database-schema-overview.md)       | 11 Supabase tables, 4 enum types, storage buckets, 15 RPC functions                                                   |
+| 1   | [Database Schema Overview](./1-database-schema-overview.md)       | 11 Supabase tables, 4 enum types, storage buckets, 16 RPC functions                                                   |
 | 2   | [Supabase Tables](./2-supabase-tables.md)                         | Column-level detail for all 11 tables including lobby columns and role enums                                           |
 | 3   | [IndexedDB Stores](./3-indexeddb-stores.md)                       | `my-love-db` v5: 8 object stores (messages, photos, moods, sw-auth, scripture-\*)                                      |
 | 4   | [TypeScript Type Definitions](./4-typescript-type-definitions.md) | Generated Supabase types, application types, model types                                                               |
 | 5   | [Zod Validation Schemas](./5-zod-validation-schemas.md)           | Local validation + Supabase API validation schemas                                                                     |
-| 6   | [Supabase RPC Functions](./6-supabase-rpc-functions.md)           | 15 Postgres functions: partner management, scripture CRUD, lobby, lock-in, graceful degradation                        |
-| 7   | [Storage Buckets](./7-storage-buckets.md)                         | `photos` (10 MB, private) and `love-notes-images` (5 MB, private) bucket configs                                       |
+| 6   | [Supabase RPC Functions](./6-supabase-rpc-functions.md)           | 16 Postgres functions: partner management, scripture CRUD, lobby, lock-in, graceful degradation                        |
+| 7   | [Storage Buckets](./7-storage-buckets.md)                         | `photos` (10 MB, private) and `love-notes-images` (private, 5 MB via Edge Function) bucket configs                     |
 | 8   | [RLS Policies](./8-rls-policies.md)                               | Row Level Security policies for all tables, storage buckets, and realtime.messages                                     |
-| 9   | [Migration History](./9-migration-history.md)                     | 21 migrations from 2025-12-03 through 2026-03-01                                                                       |
+| 9   | [Migration History](./9-migration-history.md)                     | 24 migrations from 2025-12-03 through 2026-03-03                                                                       |

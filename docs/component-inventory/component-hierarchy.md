@@ -1,7 +1,7 @@
 # Component Hierarchy
 
 ```
-App (root) ── src/App.tsx (612 lines)
+App (root) ── src/App.tsx (624 lines)
 ├── ErrorBoundary (global class component)
 │   ├── LoginScreen (unauthenticated)
 │   ├── DisplayNameSetup (post-OAuth onboarding modal)

@@ -245,46 +245,67 @@ In CI (`test.yml`), burn-in runs only on PRs to `main` with 5 iterations. It det
 
 ## CI Test Pipeline
 
-The `test.yml` workflow runs a 5-stage pipeline:
+The `test.yml` workflow runs a multi-stage pipeline:
 
 ### Stage 1: Lint and Type Check (5-minute timeout)
 
 - ESLint on `src/`, `tests/`, `scripts/`
 - TypeScript type check (`tsc --noEmit`)
 - Prettier formatting check
+- Security audit (`npm audit --audit-level=high`)
 
 ### Stage 2: Unit Tests (10-minute timeout)
 
 - Vitest with coverage
 - Coverage report uploaded as artifact (7-day retention)
 
-### Stage 3a: E2E P0 Gate (15-minute timeout)
+### Stage 3: Database Tests (10-minute timeout)
+
+- Sets up local Supabase via composite action (`.github/actions/setup-supabase/`)
+- Runs pgTAP tests via `npx supabase test db`
+- Runs in parallel with unit tests
+
+### Stage 4a: E2E P0 Gate (15-minute timeout)
 
 - Requires lint to pass
-- Sets up local Supabase via composite action (`.github/actions/setup-supabase/`)
+- Sets up local Supabase via composite action
 - Runs only P0-tagged tests (`--grep "\[P0\]"`)
 - Caches Playwright browsers keyed by `package-lock.json` hash
 
-### Stage 3b: E2E Sharded (30-minute timeout)
+### Stage 4b: E2E Sharded (30-minute timeout)
 
 - Requires P0 gate to pass
 - Runs full E2E suite sharded across 2 workers (`--shard=1/2`, `--shard=2/2`)
 - `fail-fast: false` -- all shards run even if one fails
 - Results uploaded with 30-day retention
 
-### Stage 4: Burn-In (20-minute timeout)
+### Stage 4c: Lighthouse CI (10-minute timeout)
+
+- Requires lint to pass
+- Builds with placeholder Supabase values
+- Runs Lighthouse CI via `@lhci/cli autorun`
+- Non-blocking (warns on regression, does not fail pipeline)
+- Report uploaded as artifact (30-day retention)
+
+### Stage 5: Burn-In (30-minute timeout)
 
 - Only runs on PRs to `main`
 - Requires E2E to pass
 - Detects changed test files via `git diff`
 - Runs 5 iterations on changed specs only
 
-### Stage 5: Merge Reports
+### Stage 6: Merge Reports
 
 - Runs after E2E regardless of success/failure
 - Downloads all shard artifacts
 - Merges HTML reports via `npx playwright merge-reports`
 - Uploads merged report with 30-day retention
+
+### Test Summary
+
+- Branch protection target job
+- Evaluates results from lint, unit tests, db tests, and E2E tests
+- Fails if any required stage failed
 
 ### Concurrency
 

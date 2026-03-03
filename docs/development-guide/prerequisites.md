@@ -2,12 +2,14 @@
 
 ## Required Tools
 
-| Tool         | Version                            | Purpose                                          | Installation                                     |
-| ------------ | ---------------------------------- | ------------------------------------------------ | ------------------------------------------------ |
-| Node.js      | v24.13.0 (pinned in `.nvmrc`)      | JavaScript runtime                               | [nvm](https://github.com/nvm-sh/nvm) recommended |
-| npm          | Bundled with Node.js               | Package manager (lock file: `package-lock.json`) | Included with Node.js                            |
-| Git          | Latest stable                      | Version control                                  | [git-scm.com](https://git-scm.com/)              |
-| Supabase CLI | Latest (`npm install -g supabase`) | Local database, E2E tests, migrations            | `npm install -g supabase`                        |
+| Tool         | Version                                | Purpose                                          | Installation                                         |
+| ------------ | -------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| Node.js      | v24.13.0 (pinned in `.mise.toml`)      | JavaScript runtime                               | [mise](https://mise.jdx.dev) recommended             |
+| npm          | Bundled with Node.js                   | Package manager (lock file: `package-lock.json`) | Included with Node.js                                |
+| Git          | Latest stable                          | Version control                                  | [git-scm.com](https://git-scm.com/)                  |
+| mise         | Latest                                 | Tool version management (Node.js)                | [mise.jdx.dev](https://mise.jdx.dev)                 |
+| fnox         | Latest                                 | Secrets management (age-encrypted)               | [fnox.jdx.dev](https://fnox.jdx.dev)                 |
+| Supabase CLI | Latest (`npm install -g supabase`)     | Local database, E2E tests, migrations            | `npm install -g supabase`                            |
 
 ## Optional Tools
 
@@ -18,17 +20,13 @@
 
 ## Node Version Management
 
-The project pins Node.js v24.13.0 via the `.nvmrc` file in the repository root. If you use [nvm](https://github.com/nvm-sh/nvm), switch to the correct version automatically:
+The project pins Node.js v24.13.0 via `.mise.toml` in the repository root. [mise](https://mise.jdx.dev) is the recommended tool version manager:
 
 ```bash
-nvm use
+mise install
 ```
 
-This reads `.nvmrc` and activates `v24.13.0`. If the version is not installed, nvm will prompt you to install it:
-
-```bash
-nvm install
-```
+This reads `.mise.toml` and installs/activates `v24.13.0`.
 
 ## Supabase CLI
 
@@ -80,6 +78,8 @@ Run these commands to verify your environment is ready:
 node --version          # Should output v24.13.0
 npm --version           # Should output a compatible version
 git --version           # Any recent version
+mise --version          # Any recent version
+fnox check              # Verify all secrets resolve (requires age key)
 supabase --version      # Any recent version
 docker info             # Docker must be running for Supabase local
 ```

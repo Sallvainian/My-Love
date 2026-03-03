@@ -160,18 +160,18 @@ Test data seeding function with preset configurations.
 
 **Returns:** JSONB with `session_ids`, `session_count`, `preset`, `test_user1_id`, `test_user2_id`, and optionally `reflection_ids` and `message_ids`.
 
-## 6.10 `scripture_get_couple_stats(p_partner_id UUID)` -> `JSONB`
+## 6.10 `scripture_get_couple_stats()` -> `JSONB`
 
 **Source:** Migrations `20260217150353` (original), `20260217184551` (CTE optimization)
 **Security:** `SECURITY DEFINER`
 **Search path:** `''`
 **Grant:** `authenticated`
 
-Returns couple reading statistics using CTE-optimized queries.
+Returns couple reading statistics using CTE-optimized queries. Takes no parameters -- uses `auth.uid()` and `get_my_partner_id()` internally.
 
 **Flow:**
 
-1. Get current user via `auth.uid()`
+1. Get current user via `auth.uid()` and partner via `get_my_partner_id()`
 2. Find all session IDs where either user is `user1_id` or `user2_id` (CTE)
 3. Aggregate 5 metrics from that set
 
@@ -238,7 +238,7 @@ Toggles the calling user's ready state in the lobby. If both users become ready,
 
 ## 6.13 `scripture_convert_to_solo(p_session_id UUID)` -> `JSONB`
 
-**Source:** Migrations `20260220000001` (original), `20260221211137` (phase guard), `20260301000200` (removed broadcast)
+**Source:** Migrations `20260220000001` (original), `20260221211137` (phase guard), `20260301000200` (removed broadcast), `20260303000100` (hardening: clear role columns)
 **Security:** `SECURITY INVOKER`
 **Search path:** `''`
 **Grant:** `authenticated`
@@ -250,14 +250,16 @@ Converts a together-mode session to solo mode. Called when one partner taps "Con
 1. Authenticate via `auth.uid()`
 2. `SELECT ... FOR UPDATE` on session (member check)
 3. **Phase guard:** Raise exception if `current_phase != 'lobby'`
-4. Update session: `mode = 'solo'`, `user2_id = NULL`, reset ready states, clear `countdown_started_at`, set `current_phase = 'reading'`, bump version
+4. Update session: `mode = 'solo'`, `user2_id = NULL`, `user1_role = NULL`, `user2_role = NULL`, reset ready states, clear `countdown_started_at`, set `current_phase = 'reading'`, bump version
 5. Return JSONB snapshot with `sessionId`, `mode`, `currentPhase`, `version`
 
 **Note:** The client broadcasts `session_converted` to the partner before the channel is closed.
 
+**Hardening (migration 24):** Now clears `user1_role` and `user2_role` to prevent stale role data after conversion to solo mode.
+
 ## 6.14 `scripture_lock_in(p_session_id UUID, p_step_index INT, p_expected_version INT)` -> `JSONB`
 
-**Source:** Migrations `20260222000001` (original), `20260301000200` (removed broadcast)
+**Source:** Migrations `20260222000001` (original), `20260301000200` (removed broadcast), `20260303000100` (hardening: step boundary constant)
 **Security:** `SECURITY INVOKER`
 **Search path:** `''`
 **Grant:** `authenticated`
@@ -283,9 +285,11 @@ Locks in a user for the current reading step. When both users lock, automaticall
 9. Re-read step state to check if both users are locked
 10. **If both locked:**
     - Mark step as advanced (`advanced_at = now()`)
-    - If `step_index < 16`: increment `current_step_index`, bump version, update `snapshot_json`
-    - If `step_index = 16` (last step): transition to `reflection` phase, set `status = 'complete'`
+    - If `step_index < v_max_step_index` (16): increment `current_step_index`, bump version, update `snapshot_json`
+    - If `step_index = v_max_step_index` (16, last step): transition to `reflection` phase, set `status = 'complete'`
     - Return snapshot with `both_locked: true`
+
+**Hardening (migration 24):** Step boundary uses `v_max_step_index CONSTANT INT := 16` instead of a magic number. This is coupled to `MAX_STEPS = 17` in the frontend (`src/components/scripture-reading/constants.ts`). The constant is 0-indexed (MAX_STEPS - 1).
 11. **If partial lock:**
     - Return snapshot with `both_locked: false` and `lock_status` object
 
@@ -346,7 +350,7 @@ Clears a user's lock-in for the given step.
 
 ## 6.16 `scripture_end_session(p_session_id UUID)` -> `JSONB`
 
-**Source:** Migrations `20260228000001` (original), `20260301000200` (removed broadcast)
+**Source:** Migrations `20260228000001` (original), `20260301000200` (removed broadcast), `20260302000100` (current_phase fix), `20260303000100` (hardening: SECURITY INVOKER revert + merged fix)
 **Security:** `SECURITY INVOKER`
 **Search path:** `''`
 **Grant:** `authenticated`
@@ -362,8 +366,10 @@ Ends a together-mode session early. Called when a user taps "End Session" after 
 1. Authenticate via `auth.uid()`
 2. `SELECT ... FOR UPDATE` on session (member check)
 3. **Status guard:** Raise exception if `status != 'in_progress'`
-4. Update session: `status = 'ended_early'`, `completed_at = now()`, bump version, update `snapshot_json` with `currentPhase: 'complete'` and `triggeredBy: 'end_session'`
+4. Update session: `status = 'ended_early'`, `current_phase = 'complete'`, `completed_at = now()`, bump version, update `snapshot_json` with `currentPhase: 'complete'` and `triggeredBy: 'end_session'`
 5. Return JSONB snapshot with `sessionId`, `currentPhase: 'complete'`, `currentStepIndex`, `version`, `triggered_by: 'end_session'`
+
+**Hardening (migrations 22-24):** Migration 22 fixed the bug where `current_phase` was not set to `'complete'`. Migration 24 merged this fix into the canonical function definition and reverted to SECURITY INVOKER (was briefly SECURITY DEFINER in an intermediate migration).
 
 ## Security Model Summary
 

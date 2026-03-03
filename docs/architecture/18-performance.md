@@ -34,7 +34,7 @@ Individual components can opt into additional motion features via `motionFeature
 
 ### Infinite Scroll Lists
 
-Love notes and mood history use `react-window` (v2.2.6) with `react-window-infinite-loader` for virtualized rendering:
+Love notes and mood history use `react-window` (v2.2.7) with `react-window-infinite-loader` for virtualized rendering:
 
 - Only visible items are rendered in the DOM
 - Scroll position is maintained during data loading

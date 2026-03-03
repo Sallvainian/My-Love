@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-- **Node.js v24.13.0** (pinned in `.nvmrc` -- run `nvm use` to switch)
+- **Node.js v24.13.0** (pinned in `.mise.toml` -- run `mise install` to set up)
 - **npm** (package manager)
+- **fnox** (secrets management: `fnox exec -- <command>` decrypts age-encrypted secrets from `fnox.toml`)
 - **Supabase CLI** (for E2E tests and database work: `npm install -g supabase`)
 - **Playwright browsers** (for E2E tests: `npx playwright install`)
 
@@ -12,9 +13,9 @@
 ```bash
 git clone https://github.com/Sallvainian/My-Love.git
 cd My-Love
-nvm use
+mise install       # Installs Node v24.13.0
 npm install
-npm run dev
+fnox exec -- npm run dev   # Decrypts secrets via age, starts dev server
 ```
 
 The dev server runs at `http://localhost:5173/` (development uses `/` base path; production uses `/My-Love/`).
@@ -25,11 +26,11 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 | Command             | Description                                                                  |
 | ------------------- | ---------------------------------------------------------------------------- |
-| `npm run dev`       | Start dev server with process cleanup (env vars loaded by dotenvx via direnv) |
-| `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                           |
-| `npm run preview`   | Preview production build locally                                              |
-| `npm run build`     | Production build: `tsc -b && vite build` (env vars injected by dotenvx)       |
-| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                        |
+| `npm run dev`       | Start dev server with process cleanup (use `fnox exec -- npm run dev` for secrets) |
+| `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                                |
+| `npm run preview`   | Preview production build locally                                                   |
+| `npm run build`     | Production build: `tsc -b && vite build` (use `fnox exec -- npm run build` locally)|
+| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                              |
 
 ### Code Quality
 
@@ -93,10 +94,10 @@ npx playwright test --grep "mood tracker"
 ## Key Conventions
 
 - **Package manager**: npm
-- **Node version**: v24.13.0 (see `.nvmrc`)
+- **Node version**: v24.13.0 (see `.mise.toml`, managed by [mise](https://mise.jdx.dev))
 - **Path alias**: `@/` maps to `src/` (configured in `vitest.config.ts`, not in `vite.config.ts`)
 - **Generated types**: `src/types/database.types.ts` is auto-generated from Supabase schema -- do not edit manually
 - **ESLint**: `no-explicit-any` is enforced as an error
 - **Prettier**: Uses `prettier-plugin-tailwindcss` for Tailwind class sorting
-- **Env vars**: Managed via [dotenvx](https://dotenvx.com); encrypted `.env` committed to git, `dotenvx run` decrypts locally and in CI
-- **CI workflows**: Located in `.github/workflows/` -- deploy, test, migrations, code review, auto-fix
+- **Env vars**: Managed via [fnox](https://fnox.jdx.dev) with age provider; encrypted ciphertext in `fnox.toml` (committed), `fnox exec` decrypts locally. CI uses GitHub Secrets directly.
+- **CI workflows**: Located in `.github/workflows/` -- deploy, test, migrations, code review, auto-fix, bundle-size, CodeQL, Lighthouse, dependency-review (11 workflows total)

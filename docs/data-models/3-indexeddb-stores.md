@@ -102,7 +102,7 @@ Cached scripture reading sessions for offline support.
 | `partnerId`        | `string?`                  | Partner's ID (together mode)                                        |
 | `currentPhase`     | `ScriptureSessionPhase`    | `lobby`, `countdown`, `reading`, `reflection`, `report`, `complete` |
 | `currentStepIndex` | `number`                   |                                                                     |
-| `status`           | `ScriptureSessionStatus`   | `pending`, `in_progress`, `complete`, `abandoned`                   |
+| `status`           | `ScriptureSessionStatus`   | `pending`, `in_progress`, `complete`, `abandoned`, `ended_early`    |
 | `version`          | `number`                   | Optimistic concurrency control                                      |
 | `snapshotJson`     | `Record<string, unknown>?` |                                                                     |
 | `startedAt`        | `Date`                     |                                                                     |

@@ -211,6 +211,49 @@ channel.on(
 
 Both patterns include exponential backoff retry logic (max 5 retries, 1s-30s delay).
 
+## Pattern 9: Auth Guards (Epic 4 Hardening)
+
+Every store slice action that calls Supabase validates authentication first via `getCurrentUserIdOfflineSafe()`. This prevents unauthenticated API calls from reaching Supabase and receiving confusing RLS errors.
+
+```typescript
+// Pattern used in every slice that calls Supabase
+const userId = await getCurrentUserIdOfflineSafe();
+if (!userId) {
+  console.warn('[SliceName] No authenticated user, skipping operation');
+  return;
+}
+// ... proceed with Supabase call
+```
+
+**Key properties:**
+
+- **Non-blocking**: If no user is authenticated, the action logs a warning and returns early instead of throwing.
+- **Offline-safe**: Uses `getSession()` (in-memory cache) rather than `getUser()` (network request), so it works offline.
+- **Consistent**: Applied uniformly across `moodSlice`, `interactionsSlice`, `partnerSlice`, `notesSlice`, `photosSlice`, and `scriptureReadingSlice`.
+
+This guard works in concert with Pattern 7 (Validation at Service Boundaries) -- auth is checked first, then data is validated via Zod before any write.
+
+## Pattern 10: Reconnect on Channel Error (Epic 4 Hardening)
+
+Realtime channels (Broadcast and Presence) can enter `CHANNEL_ERROR` or `CLOSED` states due to network interruptions. The reconnect pattern detects these states, cleans up dead channels, and triggers re-subscription:
+
+```typescript
+// src/hooks/useScriptureBroadcast.ts
+channel.on('system', {}, (payload) => {
+  if (payload.status === 'CHANNEL_ERROR' || payload.status === 'CLOSED') {
+    supabase.removeChannel(channel);  // Clean up dead channel
+    setRetryCount((c) => c + 1);       // Trigger useEffect re-run
+  }
+});
+```
+
+On re-subscribe success, `loadSession()` is called to resync state from Supabase, ensuring the UI reflects the latest data after a reconnection gap.
+
+**Applied in:**
+- `useScriptureBroadcast` -- Broadcast channel for scripture session events
+- `useScripturePresence` -- Presence channel with 10s heartbeat, 20s stale TTL
+- `useRealtimeMessages` -- Love notes Broadcast with max 5 retries, 1s-30s exponential backoff
+
 ## Related Documentation
 
 - [Data Architecture](./04-data-architecture.md)

@@ -6,7 +6,7 @@
 - Custom enum types: `scripture_session_mode`, `scripture_session_phase`, `scripture_session_status` (incl. `ended_early`), `scripture_session_role`
 - Storage buckets: `photos` (10 MB max, private), `love-notes-images` (5 MB max, private)
 - TEXT + CHECK constraint pattern (replaces original enum types after migration 20251206024345)
-- 15 RPC functions summary (SECURITY DEFINER vs INVOKER)
+- 16 RPC functions summary (SECURITY DEFINER vs INVOKER)
 
 ## 2. Supabase Tables
 
@@ -44,7 +44,7 @@
 ## 5. Zod Validation Schemas
 
 - 5.1 Local Validation (`validation/schemas.ts`) -- MessageSchema, PhotoSchema, MoodEntrySchema, SettingsSchema, CustomMessagesExportSchema, Scripture schemas
-- 5.2 Supabase API Validation (`api/validation/supabaseSchemas.ts`) -- User, Mood, Interaction Row/Insert/Update schemas, array schemas, UUID/Timestamp/MoodType common schemas
+- 5.2 Supabase API Validation (`api/validation/supabaseSchemas.ts`) -- User, Mood, Interaction Row/Insert/Update schemas, CoupleStatsSchema, array schemas, UUID/Timestamp/MoodType common schemas
 
 ## 6. Supabase RPC Functions
 
@@ -57,18 +57,18 @@
 - 6.7 `scripture_create_session(p_mode, p_partner_id)` -> `JSONB` -- Create solo/together session (together starts in lobby, reuses existing pair)
 - 6.8 `scripture_submit_reflection(...)` -> `JSONB` -- Idempotent upsert via ON CONFLICT
 - 6.9 `scripture_seed_test_data(...)` -> `JSONB` -- Test seeding with presets (default, mid_session, completed, with_help_flags, unlinked)
-- 6.10 `scripture_get_couple_stats(p_partner_id)` -> `JSONB` -- CTE-optimized couple statistics (5 metrics)
+- 6.10 `scripture_get_couple_stats()` -> `JSONB` -- CTE-optimized couple statistics (5 metrics), uses `auth.uid()` + `get_my_partner_id()` internally
 - 6.11 `scripture_select_role(p_session_id, p_role)` -> `JSONB` -- Lobby role selection (reader/responder), lobby phase guard
 - 6.12 `scripture_toggle_ready(p_session_id, p_is_ready)` -> `JSONB` -- Lobby ready toggle, starts countdown when both ready
-- 6.13 `scripture_convert_to_solo(p_session_id)` -> `JSONB` -- Convert together lobby to solo, clears partner state
-- 6.14 `scripture_lock_in(p_session_id, p_step_index, p_expected_version)` -> `JSONB` -- Optimistic concurrency lock, auto-advance on both locked
+- 6.13 `scripture_convert_to_solo(p_session_id)` -> `JSONB` -- Convert together lobby to solo, clears partner state and role columns (hardening)
+- 6.14 `scripture_lock_in(p_session_id, p_step_index, p_expected_version)` -> `JSONB` -- Optimistic concurrency lock, auto-advance on both locked, `v_max_step_index` constant (hardening)
 - 6.15 `scripture_undo_lock_in(p_session_id, p_step_index)` -> `JSONB` -- Clear user's lock timestamp
-- 6.16 `scripture_end_session(p_session_id)` -> `JSONB` -- Graceful early termination, sets ended_early status
+- 6.16 `scripture_end_session(p_session_id)` -> `JSONB` -- Graceful early termination, sets ended_early status and current_phase = 'complete' (SECURITY INVOKER since hardening)
 
 ## 7. Storage Buckets
 
 - `photos` bucket -- 10 MB max, private, path-based folder isolation (`auth.uid()` = first folder segment)
-- `love-notes-images` bucket -- 5 MB max, private, extension validation (jpg, jpeg, png, webp) + folder isolation
+- `love-notes-images` bucket -- private, 5 MB enforced by Edge Function (no bucket-level limit), extension validation (jpg, jpeg, png, webp) + folder isolation
 
 ## 8. RLS Policies
 
@@ -85,11 +85,12 @@
 - 8.11 `scripture_reflections` -- Own + shared SELECT, own INSERT/UPDATE
 - 8.12 `scripture_bookmarks` -- Own + shared SELECT, own INSERT/UPDATE/DELETE
 - 8.13 `scripture_messages` -- Session member SELECT, sender INSERT
-- 8.14 `realtime.messages` -- Session member SELECT/INSERT for private broadcast channels (`scripture-session:*`, `scripture-presence:*`)
+- 8.14 `realtime.messages` -- Session member SELECT/INSERT for private broadcast channels (`scripture-session:*`, `scripture-presence:*`), UUID regex guard before `::uuid` cast (hardening)
 
 ## 9. Migration History
 
-- 21 migrations from 2025-12-03 through 2026-03-01
-- Core schema (1-7), scripture reading (8-12), statistics (13-14), together-mode lobby (15-17), synchronized reading (18), graceful degradation (19), session fixes and architecture (20-21)
+- 24 migrations from 2025-12-03 through 2026-03-03
+- Core schema (1-7), scripture reading (8-12), statistics (13-14), together-mode lobby (15-17), synchronized reading (18), graceful degradation (19), session fixes and architecture (20-21), hardening (22-24)
+- New since last scan: `20260302000100` (end_session current_phase fix), `20260302000200` (step boundary comment), `20260303000100` (Epic 4 hardening chunks 1-4: SECURITY INVOKER, UUID guard on RLS, role column cleanup)
 
 ---

@@ -1,43 +1,64 @@
 # Environment Setup
 
-The project uses [dotenvx](https://dotenvx.com) for secrets management. Environment variables are stored encrypted in `.env` (safe to commit). The private decryption key lives in `.env.keys` (gitignored) and is backed up to [dotenvx-ops](https://dotenvx.com/ops) cloud.
+The project uses [fnox](https://fnox.jdx.dev) with the `age` provider for secrets management. Secrets are stored as age-encrypted ciphertext inline in `fnox.toml` (safe to commit). The age private key lives at `~/.age/key.txt` and is never committed. Tool versions (Node.js) are managed by [mise](https://mise.jdx.dev) via `.mise.toml`.
 
 ## How Secrets Are Injected
 
 | Context       | Mechanism                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------- |
-| Local dev     | `dotenvx run -- <command>` decrypts `.env` using `.env.keys`                                      |
-| CI build      | `dotenvx run -- npm run build` with `DOTENV_PRIVATE_KEY` GitHub Secret                            |
-| CI tests      | Tests use local Supabase — no production secrets needed                                           |
+| Local dev     | `fnox exec -- <command>` decrypts `fnox.toml` using `~/.age/key.txt`                             |
+| CI build      | GitHub Secrets injected as environment variables directly (no fnox in CI)                          |
+| CI tests      | Tests use local Supabase -- no production secrets needed                                          |
 | E2E tests     | Playwright config parses `supabase status -o env` for local Supabase connection values            |
 
 ## Environment Files
 
 | File           | Purpose                                                        | In Git? |
 | -------------- | -------------------------------------------------------------- | ------- |
-| `.env`         | Encrypted secrets (Supabase, Sentry, etc.)                     | Yes     |
-| `.env.keys`    | Private decryption key — backed up to dotenvx-ops cloud        | No (gitignored) |
-| `.env.x`       | dotenvx-ops project ID                                         | Yes     |
+| `fnox.toml`    | Age-encrypted secrets (Supabase, Sentry, etc.)                 | Yes     |
+| `.mise.toml`   | Tool versions (Node 24.13.0) and env vars (CODEX_HOME)        | Yes     |
 | `.env.test`    | Plain-text local Supabase values for E2E testing               | Yes     |
 | `.env.example` | Template showing required variable names                       | Yes     |
-| `.envrc`       | direnv config (loads dotenvx secrets into the shell)           | No (gitignored) |
+
+Files that are **not** committed:
+- `~/.age/key.txt` -- age private key (env var: `FNOX_AGE_KEY_FILE`)
+- `.env` -- not used (legacy, gitignored)
+- `.env.keys` -- not used (legacy artifact, gitignored)
+- `.envrc` -- direnv config (gitignored)
+- `fnox.local.toml` -- local overrides (gitignored)
 
 ## Getting Started with Environment Variables
 
-1. Clone the repo and install dependencies (dotenvx is a devDependency):
+1. Install fnox and mise:
    ```bash
-   npm install
+   # Install mise (tool version manager)
+   curl https://mise.run | sh
+
+   # Install fnox (secrets manager)
+   # See https://fnox.jdx.dev for installation instructions
    ```
-2. Get the `.env.keys` file from dotenvx-ops:
+
+2. Set up your age key:
    ```bash
-   npx dotenvx-ops login
-   npx dotenvx-ops sync
+   mkdir -p ~/.age
+   age-keygen -o ~/.age/key.txt
+   # Share your public key with the project maintainer to be added as a recipient
    ```
-3. Run commands with dotenvx (automatically decrypts secrets):
+
+3. Set the age key environment variable (add to `~/.zshrc` or `~/.bashrc`):
    ```bash
-   dotenvx run -- npm run dev
+   export FNOX_AGE_KEY_FILE=~/.age/key.txt
    ```
-4. Or use direnv for automatic injection: install [direnv](https://direnv.net/), run `direnv allow`, and secrets will be loaded automatically when you `cd` into the project directory.
+
+4. Verify secrets resolve:
+   ```bash
+   fnox check
+   ```
+
+5. Run commands with fnox (automatically decrypts secrets):
+   ```bash
+   fnox exec -- npm run dev
+   ```
 
 ## Required Variables
 
@@ -45,29 +66,22 @@ The project uses [dotenvx](https://dotenvx.com) for secrets management. Environm
 | --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- |
 | `VITE_SUPABASE_URL`                     | Supabase project URL (`https://[project-id].supabase.co`) | Supabase Dashboard > Project Settings > API                   |
 | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anonymous/public (anon) key                      | Supabase Dashboard > Project Settings > API > anon/public key |
+| `VITE_SENTRY_DSN`                       | Sentry DSN for error tracking (optional for local dev)    | Sentry > Project Settings > Client Keys (DSN)                 |
 
-The `.env.example` file shows the expected format:
-
-```
-VITE_SUPABASE_URL="https://xojempkrugifnaveqtqc.supabase.co"
-VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY="your-anon-key-here"
-```
+Additional secrets in `fnox.toml`: `SUPABASE_SERVICE_KEY`, `SUPABASE_PAT`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
 
 ## Modifying Secrets
 
 1. Set a new value:
    ```bash
-   dotenvx set KEY=value
+   fnox set KEY "value"
    ```
-2. Encrypt the updated `.env`:
+2. Verify it resolves:
    ```bash
-   dotenvx encrypt
+   fnox get KEY
+   fnox check
    ```
-3. Back up the private key to dotenvx-ops cloud:
-   ```bash
-   npx dotenvx-ops backup
-   ```
-4. Commit the updated encrypted `.env`.
+3. Commit the updated `fnox.toml`.
 
 ## E2E Test Environment
 
@@ -75,23 +89,27 @@ E2E tests use a separate `.env.test` file with plain-text local Supabase connect
 
 ```
 VITE_SUPABASE_URL=http://127.0.0.1:54321
-VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=SUPABASE_TEST_ANON_KEY_PLACEHOLDER
 ```
 
-The Playwright config (`playwright.config.ts`) starts the Vite dev server with `--mode test`, which makes Vite load `.env.test` and override the production credentials. This ensures E2E tests run against the local Supabase instance.
+The Playwright config (`playwright.config.ts`) starts the Vite dev server with `--mode test`, which makes Vite load `.env.test` and override any production credentials. This ensures E2E tests run against the local Supabase instance.
 
-Additionally, `playwright.config.ts` parses `supabase status -o env` to automatically detect the local Supabase URL, service role key, and anon key. These are set as `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` environment variables for the test fixtures to use. The config uses `=` (not `??=`) because dotenvx may inject production values that need to be overridden with local values.
+Additionally, `playwright.config.ts` parses `supabase status -o env` to automatically detect the local Supabase URL, service role key, and anon key. These are set as `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` environment variables for the test fixtures to use. The config uses `=` (not `??=`) because fnox may inject production values that need to be overridden with local values.
 
 ## CI Environment
 
-In CI (GitHub Actions), dotenvx decrypts `.env` using the `DOTENV_PRIVATE_KEY` GitHub Secret:
+In CI (GitHub Actions), secrets are provided directly as GitHub Secrets environment variables -- fnox is not used in CI.
 
-| Secret                    | Purpose                                                                   |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (used during build/deploy)      |
-| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema |
-| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                 |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                          |
-| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations     |
+| Secret                                    | Purpose                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                       | Supabase project URL for production builds                                |
+| `VITE_SUPABASE_ANON_KEY`                  | Supabase anon/public key for production builds                            |
+| `VITE_SENTRY_DSN`                         | Sentry DSN for error tracking                                             |
+| `SENTRY_AUTH_TOKEN`                       | Sentry auth token for source map uploads                                  |
+| `SENTRY_ORG`                              | Sentry organization slug                                                  |
+| `SENTRY_PROJECT`                          | Sentry project slug                                                       |
+| `SUPABASE_ACCESS_TOKEN`                   | Supabase CLI auth token for TypeScript type generation from remote schema |
+| `CLAUDE_CODE_OAUTH_TOKEN`                 | Claude Code OAuth token for AI-powered workflows                          |
+| `CLAUDE_PAT`                              | GitHub personal access token for Claude bot commits and PR operations     |
 
-The build step in `deploy.yml` uses `dotenvx run -- npm run build`, which decrypts Supabase credentials and other secrets at build time. The build script itself (`tsc -b && vite build`) receives the decrypted environment variables transparently.
+The build step in `deploy.yml` passes these secrets as environment variables to `npm run build`. The build script (`tsc -b && vite build`) receives them transparently. The Sentry Vite plugin uses `SENTRY_AUTH_TOKEN` to upload source maps during build.

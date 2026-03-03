@@ -23,10 +23,10 @@ git checkout -b feature/epic-3-dashboard
 ### 2. Start the Dev Server
 
 ```bash
-npm run dev
+fnox exec -- npm run dev
 ```
 
-This starts Vite with signal-trapped cleanup. Environment variables are loaded by direnv via dotenvx. The app is available at `http://localhost:5173/`.
+This starts Vite with signal-trapped cleanup. Environment variables are decrypted from `fnox.toml` via the age provider. The app is available at `http://localhost:5173/`.
 
 ### 3. Make Changes
 

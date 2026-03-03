@@ -95,6 +95,10 @@
 - `MoodService` -- mood tracking with sync status
 - `CustomMessageService` -- messages with filtering, export/import
 - `PhotoStorageService` -- photo blobs with v1-v2 data migration
+- `ScriptureReadingService` -- cache-first CRUD (IndexedDB cache -> Supabase fetch -> update cache), Sentry error reporting, corruption recovery
+- `PerformanceMonitor` -- Web Performance API metrics (measureAsync, recordMetric, getReport)
+- `MigrationService` -- LocalStorage-to-IndexedDB data migration
+- `StorageService` (legacy) -- direct IndexedDB operations, `localStorageHelper`
 - Scripture stores: sessions, reflections, bookmarks, messages
 
 ## 9. Photo Services
@@ -125,4 +129,8 @@
 - `subscribeMoodChanges(userId, onMoodChange, onError?)` -- postgres_changes
 - Broadcast API for partner mood notifications
 - Interaction realtime via postgres_changes INSERT events
+- `useScriptureBroadcast` -- private broadcast channel with 4 events, CHANNEL_ERROR/CLOSED reconnect with retry counter, `setBroadcastFn()` for client-side broadcast pattern
+- `useScripturePresence` -- ephemeral presence channel, 10s heartbeat, 20s stale TTL, partner position tracking
+- `useRealtimeMessages` -- love notes delivery with exponential backoff retry (5 retries, 1s-30s)
 - Channel lifecycle: subscribe, track, unsubscribe, cleanup
+- 6 channel types: scripture-session (private), scripture-presence (private), love-notes, mood-updates, incoming-interactions, moods

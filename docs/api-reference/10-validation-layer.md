@@ -97,6 +97,20 @@ Each entity has corresponding `InsertSchema` and `UpdateSchema` variants with re
 | `InteractionInsertSchema` | Validates interaction creation data                 |
 | `InteractionUpdateSchema` | Validates interaction updates                       |
 
+### CoupleStatsSchema
+
+```typescript
+export const CoupleStatsSchema = z.object({
+  total_sessions: z.number(),
+  completed_sessions: z.number(),
+  total_reflections: z.number(),
+  shared_reflections: z.number(),
+  total_messages: z.number(),
+});
+```
+
+Validates the JSONB response from the `scripture_get_couple_stats` RPC. Used by `scriptureReadingService.getCoupleStats()`.
+
 ### Array Schemas
 
 ```typescript

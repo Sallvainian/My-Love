@@ -178,8 +178,55 @@ try {
    - Sets error state: "Failed to initialize app"
    - App remains in loading/error state
 
+## Sentry Error Tracking (Epic 4 Hardening)
+
+`@sentry/react` v10.39.0 provides production error tracking:
+
+### Initialization (`src/config/sentry.ts`)
+
+```typescript
+initSentry()  // Called in main.tsx before React renders
+```
+
+- **No-op** when `VITE_SENTRY_DSN` is absent (local development)
+- **Trace sample rate**: 20% (`tracesSampleRate: 0.2`)
+- **PII stripping**: `beforeSend` deletes `event.user.email` and `event.user.ip_address`
+- **User context**: UUID only via `setSentryUser(userId, partnerId)`, cleared on sign-out via `clearSentryUser()`
+
+### Filtered Errors
+
+The following errors are ignored to reduce noise:
+
+| Error Type | Pattern | Reason |
+|-----------|---------|--------|
+| Chunk load errors | `ChunkLoadError`, `Loading chunk .* failed` | Expected during deployments when old chunks are invalidated |
+| Network errors | `Failed to fetch`, `NetworkError`, `Load failed` | Expected during offline/flaky connectivity |
+| ResizeObserver | `ResizeObserver loop` | Browser implementation noise, not actionable |
+
+### Source Maps
+
+When `SENTRY_AUTH_TOKEN` is set, the build pipeline:
+
+1. Generates hidden source maps (`sourcemap: 'hidden'`)
+2. Uploads them to Sentry via `@sentry/vite-plugin`
+3. Deletes `.map` files from `dist/` to prevent public exposure
+
+### Retry with Backoff (`src/api/errorHandlers.ts`)
+
+```typescript
+retryWithBackoff(operation, {
+  maxAttempts: 3,     // Default
+  baseDelay: 1000,    // 1 second
+  maxDelay: 30000,    // 30 seconds
+  multiplier: 2,      // Exponential
+})
+```
+
+Retries: 1s, 2s, 4s (capped at 30s). Only retries on network errors and transient Supabase errors, not on validation or auth failures.
+
 ## Related Documentation
 
 - [Validation Layer](./14-validation-layer.md)
 - [Offline Strategy](./12-offline-strategy.md)
 - [Architecture Patterns](./03-architecture-patterns.md)
+- [Security Model](./13-security-model.md)

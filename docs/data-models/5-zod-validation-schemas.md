@@ -112,6 +112,7 @@ Validate every Supabase API response before the data is used in the application.
 | `SupabaseInteractionSchema` | `interactions` rows    | `viewed` nullable boolean                                                |
 | `SupabaseMessageSchema`     | Messages (placeholder) | `text` 1-500, `category`, `is_custom`, `active`                          |
 | `SupabasePhotoSchema`       | Photos (placeholder)   | `mime_type` enum, positive dimensions                                    |
+| `CoupleStatsSchema`         | RPC response           | 5 numeric metrics: `total_sessions`, `completed_sessions`, `total_reflections`, `shared_reflections`, `total_messages` |
 
 ### Insert/Update Schema Variants
 

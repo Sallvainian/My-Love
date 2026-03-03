@@ -31,9 +31,10 @@ type Database = {
     Functions: {
       accept_partner_request: { Args: { p_request_id: string }; Returns: undefined };
       decline_partner_request: { Args: { p_request_id: string }; Returns: undefined };
-      get_my_partner_id: { Args: Record<string, never>; Returns: string };
+      get_my_partner_id: { Args: never; Returns: string };
       is_scripture_session_member: { Args: { p_session_id: string }; Returns: boolean };
       scripture_create_session: { Args: { p_mode: string; p_partner_id?: string }; Returns: Json };
+      scripture_get_couple_stats: { Args: never; Returns: Json };
       scripture_seed_test_data: { Args: {...}; Returns: Json };
       scripture_submit_reflection: { Args: {...}; Returns: Json };
     };
@@ -45,6 +46,10 @@ type Database = {
   };
 };
 ```
+
+> **Note:** The generated `Functions` only includes 8 SECURITY DEFINER functions. The 6 SECURITY INVOKER RPCs (`scripture_select_role`, `scripture_toggle_ready`, `scripture_convert_to_solo`, `scripture_lock_in`, `scripture_undo_lock_in`, `scripture_end_session`) are invoked via `supabase.rpc()` with manual typing.
+
+> **Note:** The generated `Enums` for `scripture_session_status` does **not** include `'ended_early'` because `ALTER TYPE ... ADD VALUE` in migration 19 runs outside transactions and is not always picked up by `supabase gen types`. The `scripture_session_role` enum (`'reader' | 'responder'`) is also absent from generated types; role columns are typed as `string | null` in the generated Row types.
 
 Each table provides three type variants:
 

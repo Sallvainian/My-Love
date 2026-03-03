@@ -2,7 +2,7 @@
 
 ## Barrel Exports
 
-9 component directories use `index.ts` barrel exports for clean imports:
+13 component directories use `index.ts` barrel exports for clean imports:
 
 | Folder                | Exports                                                                                                                                 |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -40,9 +40,9 @@ All lazy views are wrapped in `<Suspense fallback={<LoadingSpinner />}>`. Additi
 
 ## Error Boundaries (Two-Tier Strategy)
 
-1. **Global ErrorBoundary** (`ErrorBoundary/ErrorBoundary.tsx`): Class component wrapping LoginScreen, DisplayNameSetup, WelcomeSplash, and AdminPanel. Full-screen recovery UI. Detects `isValidationError()` for corruption-specific "Clear Storage & Reload" option. Uses `getDerivedStateFromError` and `componentDidCatch`.
+1. **Global ErrorBoundary** (`ErrorBoundary/ErrorBoundary.tsx`): Class component wrapping LoginScreen, DisplayNameSetup, WelcomeSplash, and AdminPanel. Full-screen recovery UI. Detects `isValidationError()` for corruption-specific "Clear Storage & Reload" option. Uses `getDerivedStateFromError` and `componentDidCatch`. Reports errors to Sentry via `Sentry.captureException()` (Epic 4 hardening).
 
-2. **ViewErrorBoundary** (`ViewErrorBoundary/ViewErrorBoundary.tsx`): Class component wrapping all lazy-loaded views inside `<main>`. Shows inline error UI (preserves `BottomNavigation` visibility). Auto-resets when user navigates to different view via `getDerivedStateFromProps` comparing `viewName`. Detects three error categories:
+2. **ViewErrorBoundary** (`ViewErrorBoundary/ViewErrorBoundary.tsx`): Class component wrapping all lazy-loaded views inside `<main>`. Shows inline error UI (preserves `BottomNavigation` visibility). Auto-resets when user navigates to different view via `getDerivedStateFromProps` comparing `viewName`. Reports errors to Sentry with `tags: { view: viewName }` for per-view error tracking (Epic 4 hardening). Detects three error categories:
    - "Failed to fetch dynamically imported module" (chunk load failure)
    - "Loading chunk" / "ChunkLoadError"
    - Offline state (`!navigator.onLine`)
@@ -158,6 +158,7 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 - `FullScreenImageViewer`: Stores `previousFocusRef`, auto-focuses close button, restores on close
 - `SoloReadingFlow`: Exit dialog focus trap with Tab cycling; stores/restores focus via `previousFocusRef`; `verseHeadingRef.focus()` on step change; `completionHeadingRef.focus()` on reflection phase
 - `ReflectionSummary`: Focus heading on mount via `requestAnimationFrame`
+- `DisconnectionOverlay`: Focus trap with Tab cycling within dialog; stores/restores `previousFocusRef`; auto-focuses first button when timeout or confirmation phase starts; Escape key handling (cancel confirmation or keep waiting)
 
 ### Keyboard Navigation
 
@@ -188,11 +189,19 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 
 - `role="status"`: NetworkStatusIndicator, NetworkStatusDot, offline indicators
 - `role="alert"`: SyncToast, error displays, validation messages
-- `role="dialog"` + `aria-modal="true"`: PhotoEditModal, FullScreenImageViewer, exit confirmation
+- `role="dialog"` + `aria-modal="true"`: PhotoEditModal, FullScreenImageViewer, exit confirmation, DisconnectionOverlay
 - `role="radiogroup"` + `role="radio"` + `aria-checked`: PerStepReflection, ReflectionSummary
 - `role="listitem"`: LoveNoteMessage
 - `aria-pressed`: BookmarkFlag, ReflectionSummary verse chips
 - `aria-current="step"`: SoloReadingFlow progress indicator
+
+## Sentry Error Reporting
+
+Both error boundaries integrate Sentry (`@sentry/react`) for production error monitoring (added in Epic 4 hardening):
+
+- **ErrorBoundary**: Calls `Sentry.captureException(error, { extra: { componentStack } })` in `componentDidCatch`
+- **ViewErrorBoundary**: Calls `Sentry.captureException(error, { tags: { view: this.props.viewName }, extra: { componentStack } })` for per-view error categorization
+- **App.tsx**: Calls `setSentryUser()` on authentication and `clearSentryUser()` on sign-out for user-scoped error tracking
 
 ## Optimistic UI
 

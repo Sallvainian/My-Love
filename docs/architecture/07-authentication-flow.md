@@ -2,7 +2,7 @@
 
 ## Overview
 
-Authentication is handled by Supabase Auth with email/password credentials. The app expects exactly two users linked via the `partner_id` column in the `users` table. Partner detection is automatic once both users exist.
+Authentication is handled by Supabase Auth with email/password and Google OAuth. The app expects exactly two users linked via the `partner_id` column in the `users` table. Partner detection is automatic once both users exist.
 
 ## Auth Architecture
 
@@ -42,7 +42,7 @@ Authentication logic is split across three files in `src/api/auth/`:
 | File                | Purpose                                            |
 | ------------------- | -------------------------------------------------- |
 | `sessionService.ts` | Session management, offline-safe user ID retrieval |
-| `actionService.ts`  | Sign-in, sign-up, sign-out actions                 |
+| `actionService.ts`  | Sign-in, sign-up, sign-out, Google OAuth actions   |
 | `types.ts`          | Auth-related type definitions                      |
 
 #### Offline-Safe Authentication
@@ -66,7 +66,23 @@ The service worker needs auth tokens for background sync. The `sw-db.ts` file pr
 - `getAuthToken()` -- Reads JWT for Supabase REST API calls during background sync
 - `clearAuthToken()` -- Removes JWT on sign-out
 
-The main app stores the auth token to IndexedDB whenever the session changes, keeping the service worker's copy up to date.
+The main app stores the auth token to IndexedDB whenever the session changes (on `SIGNED_IN` and `TOKEN_REFRESHED` events), keeping the service worker's copy up to date. The token is cleared on `SIGNED_OUT`.
+
+## Sentry User Context (Epic 4 Hardening)
+
+On successful authentication, `setSentryUser(userId, partnerId)` sets the Sentry user context with the UUID and partner ID tag. On sign-out, `clearSentryUser()` removes the context. No PII (email, IP) is sent to Sentry -- the `beforeSend` hook strips these fields:
+
+```typescript
+// src/config/sentry.ts
+setSentryUser(userId: string, partnerId?: string | null): void {
+  Sentry.setUser({ id: userId });
+  if (partnerId) Sentry.setTag('partner_id', partnerId);
+}
+
+clearSentryUser(): void {
+  Sentry.setUser(null);
+}
+```
 
 ## Login Flow
 
@@ -80,13 +96,19 @@ useAuth() -> supabase.auth.getUser()
 user === null? -> Render <LoginScreen />
     |
     v
-User enters email + password
+User enters email + password (or taps "Sign in with Google")
     |
     v
-supabase.auth.signInWithPassword({ email, password })
+supabase.auth.signInWithPassword() or supabase.auth.signInWithOAuth({ provider: 'google' })
     |
     v
 onAuthStateChange fires with SIGNED_IN event
+    |
+    v
+storeAuthToken() saves JWT to IndexedDB (for SW background sync)
+    |
+    v
+setSentryUser(userId, partnerId)  // Set Sentry context (UUID only, no PII)
     |
     v
 useAuth updates user state
@@ -116,8 +138,13 @@ The `getPartnerDisplayName()` function fetches the partner's `display_name` from
 
 All Supabase tables have RLS enabled. Policies reference `auth.uid()` to restrict access to the authenticated user's own data and their partner's shared data (where applicable).
 
+## Auth Guards (Epic 4 Hardening)
+
+Every store slice action that calls Supabase validates authentication first via `getCurrentUserIdOfflineSafe()`. This prevents unauthenticated API calls from hitting Supabase RLS policies and returning confusing errors. See [Architecture Patterns - Pattern 9](./03-architecture-patterns.md#pattern-9-auth-guards-epic-4-hardening) for details.
+
 ## Related Documentation
 
 - [Architecture Patterns](./03-architecture-patterns.md)
 - [Security Model](./13-security-model.md)
 - [Offline Strategy](./12-offline-strategy.md)
+- [Error Handling](./17-error-handling.md)

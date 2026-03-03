@@ -40,6 +40,8 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 
 ## RPC Functions (Summary)
 
+16 functions total. Only the 8 SECURITY DEFINER functions appear in the auto-generated `database.types.ts`; the 6 SECURITY INVOKER functions plus the trigger and deprecated helper are called via `.rpc()` at the application level.
+
 | Function | Security | Purpose |
 |----------|----------|---------|
 | `accept_partner_request` | DEFINER | Atomic partner linking |
@@ -53,10 +55,10 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 | `scripture_get_couple_stats` | DEFINER | Couple statistics (CTE-optimized) |
 | `scripture_select_role` | INVOKER | Lobby role selection |
 | `scripture_toggle_ready` | INVOKER | Lobby ready state with countdown |
-| `scripture_convert_to_solo` | INVOKER | Convert together to solo |
-| `scripture_lock_in` | INVOKER | Synchronized reading step lock |
+| `scripture_convert_to_solo` | INVOKER | Convert together to solo; clears role columns (hardening) |
+| `scripture_lock_in` | INVOKER | Synchronized reading step lock; uses `v_max_step_index` constant (hardening) |
 | `scripture_undo_lock_in` | INVOKER | Undo step lock |
-| `scripture_end_session` | INVOKER | Graceful early termination |
+| `scripture_end_session` | INVOKER | Graceful early termination; sets `current_phase = 'complete'` (hardening) |
 
 ## Key Schema Patterns
 
@@ -66,5 +68,7 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 - **SECURITY INVOKER with `SET search_path = ''`:** Scripture RPCs run as the calling user (RLS applies) with a locked search path.
 - **SECURITY DEFINER helpers:** Break RLS recursion or bypass RLS for specific internal lookups.
 - **Client-side broadcasts:** After migration 21, all Realtime broadcasts are sent from the client via `channel.send()`, not from server-side `realtime.send()`.
+- **UUID regex guard on RLS:** `realtime.messages` policies validate the session UUID segment with `~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'` before the `::uuid` cast, preventing SQL injection via crafted topic strings (hardening migration 24).
+- **Step boundary constant:** `scripture_lock_in` uses `v_max_step_index CONSTANT INT := 16` (hardening migration 24) instead of a magic number, coupled to `MAX_STEPS = 17` in the frontend.
 
 ---

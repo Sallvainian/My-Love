@@ -7,15 +7,19 @@ The application boots from `src/main.tsx`, which is referenced by `index.html`.
 ### Boot Sequence
 
 ```typescript
-// 1. React StrictMode (double-mounts in development)
-// 2. LazyMotion with domAnimation features (Framer Motion tree-shaking)
-// 3. Render <App /> into DOM root
+// 1. Initialize Sentry (no-ops without VITE_SENTRY_DSN)
+// 2. React StrictMode (double-mounts in development)
+// 3. LazyMotion with domAnimation features (Framer Motion tree-shaking)
+// 4. Render <App /> into DOM root
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation } from 'framer-motion';
+import { initSentry } from './config/sentry';
 import App from './App.tsx';
 import './index.css';
+
+initSentry();  // Sets up @sentry/react with PII stripping, error filters
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -89,13 +93,15 @@ if (import.meta.env.DEV) {
 
 ### Initialization Effects (in order)
 
-1. **Auth check** (`useAuth`): Calls `supabase.auth.getUser()`, subscribes to `onAuthStateChange`
-2. **URL detection**: Reads `window.location.pathname` to determine initial view
-3. **App init** (`initializeApp`): Opens IndexedDB, loads/seeds messages, sets `isLoading = false`
-4. **Mood load** (`loadMoods`): Reads all moods from IndexedDB into Zustand state
-5. **Periodic sync**: Sets up 5-minute `setInterval` for `syncPendingMoods()`
-6. **SW listener**: Registers handler for `BACKGROUND_SYNC_COMPLETED` messages
-7. **Theme**: Applies CSS variables via `applyTheme(settings.themeName)`
+1. **Sentry init** (`initSentry`): Called in `main.tsx` before React renders (no-ops without `VITE_SENTRY_DSN`)
+2. **Auth check** (`useAuth`): Calls `supabase.auth.getUser()`, subscribes to `onAuthStateChange`
+3. **Sentry user context**: `setSentryUser(userId, partnerId)` on auth success (UUID only, no PII)
+4. **URL detection**: Reads `window.location.pathname` to determine initial view
+5. **App init** (`initializeApp`): Opens IndexedDB, loads/seeds messages, sets `isLoading = false`
+6. **Mood load** (`loadMoods`): Reads all moods from IndexedDB into Zustand state
+7. **Periodic sync**: Sets up 5-minute `setInterval` for `syncPendingMoods()`
+8. **SW listener**: Registers handler for `BACKGROUND_SYNC_COMPLETED` messages
+9. **Theme**: Applies CSS variables via `applyTheme(settings.themeName)`
 
 ## Service Worker Entry Point: `src/sw.ts`
 

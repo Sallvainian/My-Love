@@ -12,7 +12,7 @@ This executes:
 tsc -b && vite build
 ```
 
-Environment variables are decrypted by [dotenvx](https://dotenvx.com) before the build runs. Locally, direnv + dotenvx decrypt secrets automatically. In CI, `dotenvx run -- npm run build` is used (see `deploy.yml`).
+Environment variables must be available before the build runs. Locally, use `fnox exec -- npm run build` to decrypt secrets from `fnox.toml` via the age provider. In CI (`deploy.yml`), secrets are provided directly as GitHub Secrets environment variables.
 
 ## Build Stages
 

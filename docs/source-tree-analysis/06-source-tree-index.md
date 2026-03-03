@@ -9,6 +9,7 @@
 | 03  | [Entry Point Trace](./03-entry-point-trace.md)               | Boot sequence from `main.tsx` through `App.tsx`, SW registration, store initialization       |
 | 04  | [Critical Folders](./04-critical-folders.md)                 | Analysis of highest-impact directories: stores, services, api, validation, hooks, components |
 | 05  | [NPM Scripts Reference](./05-npm-scripts-reference.md)       | All npm scripts with commands, descriptions, and usage examples                              |
+| 06  | [Source Tree Index](./06-source-tree-index.md)               | Quick reference with cross-links and file counts (this file)                                 |
 
 ## Quick Reference: File Counts by Directory
 
@@ -16,12 +17,12 @@
 | ----------------- | ---------------- | ------------------------------------------------- |
 | `src/stores/`     | 12               | State management (1 store + 1 types + 10 slices)  |
 | `src/services/`   | 14               | Data services (1 base + 13 concrete)              |
-| `src/hooks/`      | 13               | React hooks (1 barrel + 12 hooks)                 |
+| `src/hooks/`      | 15               | React hooks (1 barrel + 14 hooks)                 |
 | `src/api/`        | 10               | Supabase API layer                                |
 | `src/components/` | ~70              | React components across 22 directories            |
 | `src/utils/`      | 17               | Utility functions                                 |
 | `src/validation/` | 3                | Zod schemas and error handling                    |
-| `src/config/`     | 4                | Configuration constants                           |
+| `src/config/`     | 5                | Configuration constants + Sentry                  |
 | `src/types/`      | 3                | Type definitions                                  |
 | `src/data/`       | 3                | Static data (messages, scripture steps)           |
 | `src/` (root)     | 5                | App.tsx, main.tsx, sw.ts, sw-db.ts, sw-types.d.ts |

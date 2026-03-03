@@ -27,6 +27,9 @@ All migrations are stored in `supabase/migrations/` and applied in filename-sort
 | 19 | `20260228000001_scripture_end_session.sql` | 2026-02-28 | **Graceful degradation (Story 4-3).** Added `'ended_early'` value to `scripture_session_status` enum via `ALTER TYPE ... ADD VALUE IF NOT EXISTS`. Created `scripture_end_session(session_id)` RPC: validates caller is session member, validates `status = 'in_progress'`, sets `status = 'ended_early'` and `completed_at = now()`, bumps version, updates `snapshot_json`. |
 | 20 | `20260301000100_fix_scripture_create_session_together_lobby.sql` | 2026-03-01 | **Together session creation fix.** Two changes: (1) Together-mode sessions now start in `lobby` phase instead of `reading`. (2) Reuses existing in-progress together session for the same user pair (any user order) if still in `lobby` phase, preventing duplicate sessions. Solo sessions still start in `reading` phase. |
 | 21 | `20260301000200_remove_server_side_broadcasts.sql` | 2026-03-01 | **Architecture change: client-side broadcasts.** Removed all `PERFORM realtime.send()` calls from 6 RPCs: `scripture_select_role`, `scripture_toggle_ready`, `scripture_convert_to_solo`, `scripture_lock_in`, `scripture_undo_lock_in`, `scripture_end_session`. Server-side `realtime.send()` inserts into `realtime.messages`, but the local Supabase Docker Realtime service has no replication slot to deliver those messages to WebSocket clients. After this migration, Zustand slice actions broadcast state updates via `channel.send()` (client-side WebSocket) after each RPC succeeds. |
+| 22 | `20260302000100_fix_end_session_current_phase.sql` | 2026-03-02 | **Bug fix: `scripture_end_session` now sets `current_phase = 'complete'`.** Previously the function set `status = 'ended_early'` but left `current_phase` at its previous value (e.g., `reading`), causing UI to not render the completion screen. Now explicitly sets `current_phase = 'complete'` alongside `status = 'ended_early'`. |
+| 23 | `20260302000200_add_step_boundary_comment.sql` | 2026-03-02 | **Documentation: step boundary comment.** Added `COMMENT ON FUNCTION public.scripture_lock_in` documenting the hardcoded step boundary (`v_max_step_index = 16`, coupled to `MAX_STEPS = 17` in frontend `constants.ts`). No functional changes. |
+| 24 | `20260303000100_hardening_chunks_1_4.sql` | 2026-03-03 | **Epic 4 hardening (chunks 1-4).** Four changes in one transaction: **(A1)** `scripture_end_session` reverted to `SECURITY INVOKER` and merged with the `current_phase = 'complete'` fix from migration 22. **(A2)** `scripture_lock_in` adds `v_max_step_index CONSTANT INT := 16` replacing the magic number, with a comment tying it to `MAX_STEPS = 17` in frontend constants. **(A3)** All 4 `realtime.messages` RLS policies (session + presence channels) recreated with UUID regex guard (`~ '^[0-9a-f]{8}-...'`) before the `::uuid` cast to prevent SQL injection via crafted topic strings. **(A4)** `scripture_convert_to_solo` now clears `user1_role = NULL, user2_role = NULL` in addition to existing cleanup, preventing stale role data after conversion. |
 
 ## Migration Categories
 
@@ -50,6 +53,9 @@ End session RPC with `ended_early` status.
 
 ### Session Fixes and Architecture (Migrations 20-21)
 Together session creation semantics (lobby start, pair reuse) and removal of server-side broadcasts in favor of client-side channel.send().
+
+### Hardening (Migrations 22-24)
+Bug fixes (`current_phase = 'complete'` on end session), documentation comments (step boundary constant), and security hardening (SECURITY INVOKER revert for end_session, UUID regex guard on all `realtime.messages` RLS policies, role column cleanup in convert-to-solo, `v_max_step_index` CONSTANT replacing magic number in lock-in).
 
 ## Key Patterns Across Migrations
 

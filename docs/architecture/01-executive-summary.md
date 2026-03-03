@@ -6,6 +6,8 @@
 
 The application serves exactly two users (a couple) and is scoped for personal use rather than multi-tenant SaaS. This constraint simplifies the data model, reduces backend complexity, and allows aggressive caching strategies.
 
+> Last updated: 2026-03-03 (Epic 4 hardening: auth guards, Sentry, reconnect, error handling)
+
 ## Technical Stack at a Glance
 
 | Layer            | Technology          | Version  | Role |
@@ -14,15 +16,16 @@ The application serves exactly two users (a couple) and is scoped for personal u
 | Language         | TypeScript          | 5.9.3    | Strict mode, ES2022 target, bundler module resolution |
 | Build Tool       | Vite                | 7.3.1    | Dev server, HMR, manual chunk splitting, PWA plugin |
 | Styling          | Tailwind CSS        | 4.1.17   | v4 with PostCSS, Prettier class sorting |
-| Animation        | Framer Motion       | 12.29.3  | Page transitions, micro-interactions, reduced-motion support |
+| Animation        | Framer Motion       | 12.34.3  | Page transitions, micro-interactions, reduced-motion support |
 | State Management | Zustand             | 5.0.11   | Single store, 10 slices, persist middleware |
-| Backend / Auth   | Supabase            | 2.93.3   | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
+| Backend / Auth   | Supabase            | 2.97.0   | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
 | Validation       | Zod                 | 4.3.6    | Runtime schema validation at all service boundaries |
 | Local Storage    | IndexedDB via `idb` | 8.0.3    | 8 object stores, versioned migrations (v1-v5) |
-| Icons            | Lucide React        | 0.563.0  | Tree-shakeable SVG icons |
-| Virtualization   | react-window        | 2.2.6    | Windowed rendering for large lists |
+| Icons            | Lucide React        | 0.575.0  | Tree-shakeable SVG icons |
+| Virtualization   | react-window        | 2.2.7    | Windowed rendering for large lists |
 | Sanitization     | DOMPurify           | 3.3.1    | XSS protection for user-generated content |
-| Error Tracking   | Sentry              | 10.39.0  | Error reporting with PII stripping |
+| Error Tracking   | Sentry              | 10.39.0  | Error reporting, performance tracing, PII stripping |
+| Secrets          | fnox (age provider) | --       | Encrypted secrets in `fnox.toml`, committed to git |
 
 ## Architecture Philosophy
 
@@ -44,6 +47,10 @@ The application follows a **hybrid data architecture** where the storage pattern
    - **Background Sync API**: Via service worker when the app is closed and connectivity returns
 
 7. **PWA-first** -- Custom InjectManifest service worker with Workbox strategies: `NetworkOnly` for JS/CSS (always fresh code), `CacheFirst` for images/fonts, `NetworkFirst` for navigation. Background Sync for offline mood uploads.
+
+8. **Auth guards** (Epic 4 hardening) -- Store slice actions validate authentication via `getCurrentUserIdOfflineSafe()` before any Supabase operation, preventing unauthenticated API calls.
+
+9. **Sentry error tracking** (Epic 4 hardening) -- `@sentry/react` initialized at app boot, user context set post-auth (UUID only, no PII), chunk-load and network errors filtered, source maps uploaded via `@sentry/vite-plugin`.
 
 ## Feature Map
 
@@ -69,20 +76,23 @@ The application follows a **hybrid data architecture** where the storage pattern
 | Supabase Broadcast (not postgres_changes for chat) | Broadcast is ephemeral and lower-latency; no persistent subscription cost for transient messages |
 | react-window (not react-virtuoso) | Lighter weight, sufficient for simple list virtualization |
 | Manual chunk splitting | Predictable cache keys for vendor libraries; avoids cache-busting on app code changes |
+| fnox/age for secrets (not dotenvx/Doppler) | Age works everywhere (Mac, SSH, WSL, headless, CI); macOS Keychain fails in non-GUI SSH sessions |
+| Sentry for error tracking | Production crash visibility for a 2-user app where bugs may go unreported |
 
 ## Deployment
 
-The app builds via `tsc -b && vite build` and deploys to GitHub Pages using `gh-pages -d dist`. The production base path is `/My-Love/` (configured in `vite.config.ts`). Environment variables are managed by dotenvx (encrypted `.env` committed to git; `.env.keys` decryption file is gitignored and backed up to dotenvx-ops cloud).
+The app builds via `tsc -b && vite build` and deploys to GitHub Pages using `gh-pages -d dist`. The production base path is `/My-Love/` (configured in `vite.config.ts`). Environment variables are managed by **fnox with the age provider** -- secrets are encrypted inline in `fnox.toml` (committed to git) and decrypted at runtime via age keys stored at `~/.age/key.txt`.
 
 ## Entry Point Flow
 
 ```
 index.html
   -> src/main.tsx
-       -> Sentry.init() (production only)
+       -> initSentry() (no-ops without VITE_SENTRY_DSN)
        -> React.StrictMode > LazyMotion > App
             -> App.tsx (625 lines)
                  -> Auth check (getSession + onAuthStateChange)
+                 -> setSentryUser() on auth success
                  -> initializeApp() via settingsSlice
                  -> View routing (home, photos, mood, partner, notes, scripture)
                  -> Lazy-loaded components via React.lazy + Suspense
@@ -91,10 +101,18 @@ index.html
                  -> Service worker background sync listener
 ```
 
+## Epic 4 Hardening Changes (2026-03-03)
+
+- **Auth guards**: Every store slice action that calls Supabase validates authentication first via `getCurrentUserIdOfflineSafe()`.
+- **Error handling improvements**: `SupabaseServiceError` custom class, PostgrestError code mapping, exponential backoff retry (`retryWithBackoff`).
+- **Sentry integration**: `initSentry()` in `main.tsx`, `setSentryUser()`/`clearSentryUser()` on auth state changes, `@sentry/vite-plugin` for source map upload, PII stripping in `beforeSend`.
+- **Reconnect logic**: `useScriptureBroadcast` and `useScripturePresence` detect CHANNEL_ERROR/CLOSED, clean up dead channels, and trigger re-subscribe via retry counter. On re-subscribe success, `loadSession()` resyncs state.
+- **Database hardening**: Migration `20260303000100_hardening_chunks_1_4.sql` adds server-side guards.
+
 ## Related Documentation
 
 - [Technology Stack](./02-technology-stack.md) -- Full dependency table with rationale
-- [Architecture Patterns](./03-architecture-patterns.md) -- Eight architectural patterns in detail
+- [Architecture Patterns](./03-architecture-patterns.md) -- Nine architectural patterns in detail
 - [Data Architecture](./04-data-architecture.md) -- IndexedDB schema, Supabase tables, migration history
 - [State Management Overview](./05-state-management-overview.md) -- Zustand store composition
 - [State Management Deep-Dive](../state-management/index.md) -- Slice details, persistence, hooks

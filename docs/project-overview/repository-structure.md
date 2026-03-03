@@ -8,13 +8,17 @@ My-Love/
 |   |-- codeql/
 |   |   +-- codeql-config.yml         # CodeQL security analysis (security-extended + security-and-quality)
 |   |-- workflows/
+|   |   |-- bundle-size.yml           # PR bundle size comparison (brotli-compressed, preactjs/compressed-size-action)
 |   |   |-- ci-failure-auto-fix.yml   # Auto-fix CI failures with Claude Code on non-main branches
 |   |   |-- claude-code-review.yml    # Automated PR code review with Claude (/review skill)
 |   |   |-- claude.yml               # Claude Code for @claude mentions in issues/PRs
+|   |   |-- codeql.yml               # CodeQL security analysis (weekly + push to main + PRs)
+|   |   |-- dependency-review.yml     # Dependency vulnerability review on PRs
 |   |   |-- deploy.yml               # Build + smoke test + deploy to GitHub Pages + health check
+|   |   |-- lighthouse.yml            # Lighthouse PWA audit after deploy (post-deploy, 2 runs)
 |   |   |-- manual-code-analysis.yml  # On-demand commit summarization or security review
 |   |   |-- supabase-migrations.yml   # Migration validation on PRs touching supabase/ paths
-|   |   +-- test.yml                  # Full test pipeline: lint, unit, E2E (sharded), burn-in, merge reports
+|   |   +-- test.yml                  # Full test pipeline: lint, unit, db, E2E (P0 gate + sharded), Lighthouse CI, burn-in, merge reports
 |   +-- dependabot.yml               # Weekly npm + GitHub Actions dependency updates
 |
 |-- _bmad-output/
@@ -106,7 +110,7 @@ My-Love/
 |
 |-- supabase/
 |   |-- config.toml                 # Local Supabase configuration (ports, auth, storage, realtime)
-|   |-- migrations/                 # 12 SQL migration files (YYYYMMDDHHmmss_description.sql)
+|   |-- migrations/                 # 24 SQL migration files (YYYYMMDDHHmmss_description.sql)
 |   |-- seed.sql                    # Database seed data for local development
 |   +-- tests/
 |       +-- database/              # pgTAP database tests
@@ -136,11 +140,11 @@ My-Love/
 |   |-- setup.ts                   # Vitest setup: fake-indexeddb, matchMedia/IntersectionObserver/ResizeObserver mocks
 |   +-- README.md                  # Test suite documentation with directory structure and best practices
 |
-|-- .env                           # Encrypted environment variables (safe to commit via dotenvx)
 |-- .env.example                   # Template showing required environment variables
 |-- .env.test                      # Plain-text local Supabase values for E2E testing
-|-- .gitignore                     # Git ignore rules (node_modules, dist, .env.keys, test artifacts)
-|-- .nvmrc                         # Node version: v24.13.0
+|-- .gitignore                     # Git ignore rules (node_modules, dist, test artifacts)
+|-- .mise.toml                     # Tool versions (Node 24.13.0) and env vars, managed by mise
+|-- fnox.toml                      # Age-encrypted secrets (safe to commit), managed by fnox
 |-- .prettierrc                    # Prettier configuration (100 char width, single quotes, tailwind plugin)
 |-- .prettierignore                # Prettier ignore rules
 |-- CLAUDE.md                      # Claude Code guidance (architecture, commands, conventions)

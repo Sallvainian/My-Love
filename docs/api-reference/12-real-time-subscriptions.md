@@ -136,6 +136,21 @@ After migration 21, all state broadcasts are sent from the client. The flow is:
 4. `broadcastFn` calls `channel.send({ type: 'broadcast', event, payload })`
 5. Partner's `useScriptureBroadcast` receives the event and dispatches to Zustand
 
+### Reconnect Logic (Story 4.3)
+
+On `CHANNEL_ERROR` or `CLOSED` status:
+
+1. Set `hasErroredRef = true` to track that an error occurred
+2. Guard: skip if `sessionIdFromStore` is null (session ended) or `isRetryingRef` is true (already retrying)
+3. Set `isRetryingRef = true` to prevent retry storms
+4. Call `supabase.removeChannel(channel)` to clean up the dead channel
+5. Set `channelRef.current = null` so the useEffect guard passes on next run
+6. Set `isRetryingRef = false`
+7. Increment `retryCount` state, which triggers the useEffect to re-run and create a fresh channel
+8. On successful `SUBSCRIBED` after error: check `hasErroredRef`, if true call `loadSession(sessionId)` to resync state, then reset `hasErroredRef`
+
+The `removeChannel().catch()` path also resets refs and increments retry count to ensure the channel does not stay permanently broken even if cleanup fails.
+
 ### Lock-In User Detection
 
 For `lock_in_status_changed`, the hook determines which lock field represents the partner:

@@ -2,7 +2,7 @@
 
 ## NetworkStatusIndicator
 
-**File**: `src/components/shared/NetworkStatusIndicator.tsx` (224 lines)
+**File**: `src/components/shared/NetworkStatusIndicator.tsx` (203 lines)
 
 Two variants exported from the same file:
 
@@ -35,7 +35,7 @@ Compact 10px (`w-2.5 h-2.5`) circle for inline/header integration. Same three-st
 
 ## SyncToast
 
-**File**: `src/components/shared/SyncToast.tsx` (163 lines)
+**File**: `src/components/shared/SyncToast.tsx` (151 lines)
 
 ```typescript
 interface SyncResult {
@@ -63,7 +63,7 @@ Auto-dismisses after `autoDismissMs` (default 5000ms). Manual dismiss via X butt
 
 ## charCounter
 
-**File**: `src/components/scripture-reading/reflection/charCounter.ts` (6 lines)
+**File**: `src/components/scripture-reading/reflection/charCounter.ts` (5 lines)
 
 ```typescript
 export const CHAR_COUNTER_RATIO = 0.75;
@@ -77,7 +77,7 @@ Utility function used by `PerStepReflection` to determine when to show character
 
 ## motionFeatures
 
-**File**: `src/components/scripture-reading/motionFeatures.ts` (4 lines)
+**File**: `src/components/scripture-reading/motionFeatures.ts` (3 lines)
 
 ```typescript
 import { domAnimation } from 'framer-motion';
@@ -90,18 +90,16 @@ Re-export for dynamic import by `SoloReadingFlow`'s `LazyMotion` component. Enab
 
 **File**: `src/App.tsx` (inline, not exported)
 
-Inline component defined within `App.tsx` used as the `<Suspense fallback>` for all lazy-loaded routes:
+Inline arrow function component defined within `App.tsx` used as the `<Suspense fallback>` for all lazy-loaded routes:
 
 ```tsx
-function LoadingSpinner() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-pink-500 border-t-transparent" />
-    </div>
-  );
-}
+const LoadingSpinner = () => (
+  <div className="flex min-h-screen items-center justify-center">
+    <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-pink-500"></div>
+  </div>
+);
 ```
 
-Centered full-screen pink spinning border circle. Not exported -- used only as Suspense fallback within App.
+Centered full-screen pink spinning border circle (`h-12 w-12`, `border-b-2`). Not exported -- used only as Suspense fallback within App.
 
 ---

@@ -137,6 +137,7 @@ config/
   performance.ts          # Pagination limits, storage quotas
   images.ts               # Compression settings, file size limits
   relationshipDates.ts    # Birthday/anniversary dates
+  sentry.ts               # Sentry init, user context, PII stripping
 ```
 
 **Why critical:**
@@ -144,6 +145,7 @@ config/
 - `constants.ts` contains the default partner name and relationship start date.
 - `performance.ts` defines `VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH` used by Zod schemas.
 - `images.ts` defines compression quality and max dimensions.
+- `sentry.ts` (Epic 4) initializes `@sentry/react`, sets user context on auth success, strips PII in `beforeSend`, and filters chunk load / network errors.
 
 ---
 

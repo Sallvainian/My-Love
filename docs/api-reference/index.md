@@ -9,7 +9,7 @@ Complete reference documentation for the My Love application API layer.
 | Frontend        | React                                                        | 19.2.4                       |
 | Language        | TypeScript                                                   | 5.9.3                        |
 | Build           | Vite                                                         | 7.3.1                        |
-| Backend         | Supabase (Auth, Postgres, Storage, Realtime, Edge Functions) | supabase-js 2.93.3           |
+| Backend         | Supabase (Auth, Postgres, Storage, Realtime, Edge Functions) | supabase-js 2.97.0           |
 | Validation      | Zod                                                          | 4.3.6 (imported as `zod/v4`) |
 | Offline Storage | IndexedDB via `idb`                                          | 8.0.3                        |
 | Service Worker  | Workbox (InjectManifest)                                     | --                           |
@@ -57,8 +57,11 @@ All services use the singleton pattern. Import the instance, not the class:
 | `photoStorageService`     | `src/services/photoStorageService`     |
 | `imageCompressionService` | `src/services/imageCompressionService` |
 | `photoService`            | `src/services/photoService`            |
+| `scriptureReadingService` | `src/services/scriptureReadingService` |
 | `realtimeService`         | `src/services/realtimeService`         |
 | `syncService`             | `src/services/syncService`             |
+| `performanceMonitor`      | `src/services/performanceMonitor`      |
+| `loveNoteImageService`    | `src/services/loveNoteImageService`    |
 
 ## Documents
 
@@ -98,6 +101,10 @@ src/services/
   dbSchema.ts                -> Doc 8
   moodService.ts             -> Doc 8
   customMessageService.ts    -> Doc 8
+  scriptureReadingService.ts -> Doc 8
+  performanceMonitor.ts      -> Doc 8
+  migrationService.ts        -> Doc 8
+  storage.ts                 -> Doc 8
   photoStorageService.ts     -> Doc 9
   photoService.ts            -> Doc 9
   imageCompressionService.ts -> Doc 9
@@ -108,6 +115,11 @@ src/services/
 src/validation/
   schemas.ts                 -> Doc 10
   errorMessages.ts           -> Doc 10
+
+src/hooks/
+  useScriptureBroadcast.ts   -> Doc 12
+  useScripturePresence.ts    -> Doc 12
+  useRealtimeMessages.ts     -> Doc 12
 
 src/sw.ts                    -> Doc 11
 src/sw-db.ts                 -> Doc 11

@@ -44,64 +44,90 @@ partialize: (state: AppState) => ({
 
 ### Custom Map Serialization
 
-`messageHistory.shownMessages` is a `Map<string, number>` (date string -> message ID). JSON.stringify cannot handle Maps, so the custom storage adapter converts:
+`messageHistory.shownMessages` is a `Map<string, number>` (date string -> message ID). JSON.stringify cannot handle Maps, so serialization is split between `partialize` (write) and `onRehydrateStorage` (read):
 
-**Serialization (write):**
+**Serialization (write via `partialize`):**
 
 ```typescript
-// Map -> Array of [key, value] entries
-parsed.state.messageHistory.shownMessages = Array.from(
-  state.messageHistory.shownMessages.entries()
-);
+messageHistory: {
+  ...state.messageHistory,
+  shownMessages:
+    state.messageHistory?.shownMessages instanceof Map
+      ? Array.from(state.messageHistory.shownMessages.entries())
+      : [],
+},
 // Stored as: [["2025-11-15", 42], ["2025-11-16", 17], ...]
 ```
 
-**Deserialization (read):**
+**Deserialization (read via `onRehydrateStorage`):**
 
 ```typescript
-// Array of [key, value] entries -> Map
-parsed.messageHistory.shownMessages = new Map(parsed.messageHistory.shownMessages);
+// Validates array structure before converting
+const isValidArray = raw.every(
+  (item) => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string'
+);
+if (isValidArray) {
+  state.messageHistory.shownMessages = new Map(raw);
+}
 ```
 
 ### Corruption Recovery
 
-The custom storage adapter wraps `getItem` in a try/catch:
+The store uses `createJSONStorage` with a custom adapter that performs pre-hydration validation:
 
 ```typescript
-getItem: (name: string) => {
-  const item = localStorage.getItem(name);
-  if (!item) return null;
-  try {
-    const parsed = JSON.parse(item);
-    // ... deserialization
-    return JSON.stringify(parsed);
-  } catch {
-    console.error('[Store] Failed to parse persisted state');
-    localStorage.removeItem(name);
-    return null;  // Triggers default state
-  }
-},
+storage: createJSONStorage(() => ({
+  getItem: (name) => {
+    const str = localStorage.getItem(name);
+    if (!str) return null;
+    try {
+      const data = JSON.parse(str);
+      const validation = validateHydratedState(data.state);
+      if (!validation.isValid) {
+        localStorage.removeItem(name);
+        return null;  // Triggers default state
+      }
+      return str;
+    } catch {
+      localStorage.removeItem(name);
+      return null;
+    }
+  },
+  setItem: (name, value) => localStorage.setItem(name, value),
+  removeItem: (name) => localStorage.removeItem(name),
+})),
 ```
 
-If corrupted data is detected, it is removed and the store falls back to defaults.
+Two layers of recovery:
+1. **Pre-hydration** (in `getItem`): Validates structure before Zustand deserializes. Only critical errors (type mismatches on `shownMessages` or `currentIndex`) trigger rejection.
+2. **Post-hydration** (in `onRehydrateStorage`): Re-validates after deserialization. Handles Map deserialization errors and null messageHistory.
 
 ### Hydration Verification
 
-The `onRehydrateStorage` callback sets `__isHydrated` after hydration completes:
+The `onRehydrateStorage` callback sets `__isHydrated` after hydration completes via direct property assignment (actions are not available in this callback):
 
 ```typescript
-onRehydrateStorage: () => {
-  return (_state, error) => {
-    useAppStore.setState({ __isHydrated: !error });
-  };
+onRehydrateStorage: () => (state, error) => {
+  if (error) {
+    localStorage.removeItem('my-love-storage');
+    return;
+  }
+
+  // Deserialize shownMessages array back to Map with validation
+  // Handle null/undefined messageHistory gracefully
+  // ...
+
+  if (state) {
+    state.__isHydrated = true;
+  }
 },
 ```
 
 `initializeApp()` checks this flag. If hydration failed:
 
-1. Error message is set
-2. Corrupted localStorage is cleared
-3. User is prompted to refresh
+1. Error message is set via `get().setError()`
+2. Corrupted localStorage is cleared (`localStorage.removeItem('my-love-storage')`)
+3. Loading is set to false; the user sees an error message prompting refresh
 
 ## IndexedDB Persistence
 

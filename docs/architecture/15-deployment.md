@@ -1,17 +1,19 @@
 # Deployment
 
+> Last updated: 2026-03-03
+
 ## Build Pipeline
 
 ### Production Build
 
 ```bash
-npm run build
-# Expands to: dotenvx run --overload -- bash -c 'tsc -b && vite build'
+fnox exec -- npm run build
+# Expands to: tsc -b && vite build
 ```
 
 The build process:
 
-1. **dotenvx** decrypts `.env` file using `.env.keys`
+1. **fnox** decrypts secrets from `fnox.toml` using age keys at `~/.age/key.txt`
 2. **tsc -b** runs TypeScript compilation (project references mode)
 3. **vite build** bundles the application for production
 
@@ -64,24 +66,30 @@ This affects:
 
 ## Environment Variables
 
-### Encrypted Variables
+### Secrets Management: fnox with age provider
 
-Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git:
+Secrets are managed by [fnox](https://fnox.jdx.dev) using the **age** encryption provider. Encrypted ciphertext is stored inline in `fnox.toml` (committed to git). Decryption uses age keys stored at `~/.age/key.txt` on each machine.
 
 | Variable                                | Purpose                              |
 | --------------------------------------- | ------------------------------------ |
 | `VITE_SUPABASE_URL`                     | Supabase project URL                 |
 | `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key             |
-| `SENTRY_AUTH_TOKEN`                     | Sentry auth token (enables sourcemaps upload) |
+| `SUPABASE_SERVICE_KEY`                  | Supabase service role key            |
+| `SENTRY_AUTH_TOKEN`                     | Sentry auth token (enables source map upload) |
 | `SENTRY_ORG`                            | Sentry organization slug             |
 | `SENTRY_PROJECT`                        | Sentry project slug                  |
-| `SENTRY_RELEASE`                        | Release name for Sentry tracking     |
+| `VITE_SENTRY_DSN`                       | Sentry DSN for error tracking        |
+| `SUPABASE_PAT`                          | Supabase Personal Access Token       |
 
-The `.env.keys` file contains the decryption key and is gitignored.
+Key commands:
+- `fnox exec -- <command>` -- inject secrets and run
+- `fnox set KEY "value"` -- encrypt and store a secret
+- `fnox get KEY` -- decrypt and retrieve a secret
+- `fnox check` -- verify all secrets resolve
 
 ### Test Variables
 
-`.env.test` provides plain-text local Supabase values for E2E tests. Playwright config auto-detects local Supabase via `supabase status -o env`.
+`.env.test` provides plain-text local Supabase values for E2E tests. Playwright config auto-detects local Supabase via `supabase status -o env` and re-signs JWT tokens with ES256 when GoTrue uses ES256 signing keys.
 
 ## CI/CD Workflows
 

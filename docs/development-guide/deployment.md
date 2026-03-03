@@ -11,13 +11,13 @@ Every push to `main` triggers the `.github/workflows/deploy.yml` pipeline with t
 ### Job 1: Build (`ubuntu-latest`)
 
 1. Checkout code
-2. Setup Node.js 20 with npm cache
+2. Setup Node.js (version from `.mise.toml`) with npm cache
 3. `npm ci` (clean install from lock file)
 4. Generate TypeScript types from remote Supabase schema:
    ```bash
    npx supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts
    ```
-5. `dotenvx run -- npm run build` (dotenvx decrypts `.env` via `DOTENV_PRIVATE_KEY`, runs `tsc -b && vite build`)
+5. `npm run build` with Supabase and Sentry secrets injected via GitHub Secrets environment variables (runs `tsc -b && vite build`)
 6. `npm run test:smoke` (validates `dist/` directory structure, `index.html`, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -62,26 +62,33 @@ permissions:
 
 All workflows are in `.github/workflows/`:
 
-| Workflow             | File                       | Trigger                                                  | Purpose                                                      |
-| -------------------- | -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
-| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                          | Build, smoke test, deploy to GitHub Pages, health check      |
-| Tests                | `test.yml`                 | Push to `main`/`develop`, PRs, daily 2 AM UTC, manual    | Lint, unit, E2E P0 gate, E2E sharded, burn-in, merge reports |
-| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                   | Migration validation with local Supabase                     |
-| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                         | Claude Code AI assistance                                    |
-| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                             | Automated PR code review with Claude                         |
-| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                          | On-demand commit summarization or security review            |
-| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code                        |
+| Workflow             | File                       | Trigger                                                       | Purpose                                                               |
+| -------------------- | -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                               | Build, smoke test, deploy to GitHub Pages, health check               |
+| Tests                | `test.yml`                 | Push to `main`, PRs, weekly Sunday 2 AM UTC, manual           | Lint, unit, db, E2E (P0 gate + sharded), Lighthouse CI, burn-in      |
+| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                        | Migration validation with local Supabase                              |
+| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                              | Claude Code AI assistance                                             |
+| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                                  | Automated PR code review with Claude                                  |
+| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                               | On-demand commit summarization or security review                     |
+| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs      | Auto-fix CI failures with Claude Code                                 |
+| Bundle Size          | `bundle-size.yml`          | PRs to `main`/`develop`                                       | Brotli-compressed bundle size comparison                              |
+| CodeQL               | `codeql.yml`               | Push to `main`, PRs to `main`/`develop`, weekly Monday 10 AM  | CodeQL security analysis (javascript-typescript)                      |
+| Dependency Review    | `dependency-review.yml`    | PRs to `main`/`develop`                                       | Dependency vulnerability review (fail on moderate+ severity)          |
+| Lighthouse           | `lighthouse.yml`           | After deploy workflow completes, manual                       | Lighthouse PWA audit against live site (2 runs)                       |
 
 ### Test Pipeline Stages
 
-The `test.yml` workflow runs a 5-stage pipeline (see [Testing](./testing.md#ci-test-pipeline) for full details):
+The `test.yml` workflow runs a multi-stage pipeline (see [Testing](./testing.md#ci-test-pipeline) for full details):
 
-1. **Lint and Type Check** (5-min timeout) -- ESLint, `tsc --noEmit`, Prettier check
+1. **Lint and Type Check** (5-min timeout) -- ESLint, `tsc --noEmit`, Prettier check, security audit
 2. **Unit Tests** (10-min timeout) -- Vitest with coverage
-3. **E2E P0 Gate** (15-min timeout) -- P0-tagged Playwright tests with local Supabase
-4. **E2E Sharded** (30-min timeout) -- Full E2E suite sharded across 2 workers
-5. **Burn-In** (20-min timeout) -- Flaky detection on changed test files (PRs to `main` only)
-6. **Merge Reports** -- Combines shard artifacts into unified HTML report
+3. **Database Tests** (10-min timeout) -- pgTAP tests via local Supabase
+4. **E2E P0 Gate** (15-min timeout) -- P0-tagged Playwright tests with local Supabase
+5. **E2E Sharded** (30-min timeout) -- Full E2E suite sharded across 2 workers
+6. **Lighthouse CI** (10-min timeout) -- Performance/PWA audit (non-blocking)
+7. **Burn-In** (30-min timeout) -- Flaky detection on changed test files (PRs to `main` only)
+8. **Merge Reports** -- Combines shard artifacts into unified HTML report
+9. **Test Summary** -- Branch protection gate (fails if lint, unit, db, or E2E failed)
 
 ### Dependabot
 
@@ -104,13 +111,17 @@ The `test.yml` workflow runs a 5-stage pipeline (see [Testing](./testing.md#ci-t
 
 ## Required GitHub Secrets
 
-| Secret                    | Description                                                                               |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (build, deploy, health check)                   |
-| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
-| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                                 |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |
-| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations                     |
+| Secret                                    | Description                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                       | Supabase project URL for production builds                                                |
+| `VITE_SUPABASE_ANON_KEY`                  | Supabase anon/public key for production builds                                            |
+| `VITE_SENTRY_DSN`                         | Sentry DSN for error tracking in production                                               |
+| `SENTRY_AUTH_TOKEN`                       | Sentry auth token for source map uploads during build                                     |
+| `SENTRY_ORG`                              | Sentry organization slug                                                                  |
+| `SENTRY_PROJECT`                          | Sentry project slug                                                                       |
+| `SUPABASE_ACCESS_TOKEN`                   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
+| `CLAUDE_CODE_OAUTH_TOKEN`                 | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |
+| `CLAUDE_PAT`                              | GitHub personal access token for Claude bot commits and PR operations                     |
 
 ## Manual Deployment
 

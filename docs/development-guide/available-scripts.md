@@ -6,15 +6,15 @@ Every npm script defined in `package.json`, organized by category.
 
 | Script            | Command                                      | Description                                                                                                                                                                                |
 | ----------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run dev`     | `./scripts/dev-with-cleanup.sh`              | Start Vite dev server with signal-trapped process cleanup. Env vars are loaded by direnv via dotenvx. Runs `npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
-| `npm run dev:raw` | `vite`                                       | Start Vite dev server directly without cleanup wrapper. Useful for quick restarts or when running inside an existing dotenvx context.                                                |
+| `npm run dev`     | `./scripts/dev-with-cleanup.sh`              | Start Vite dev server with signal-trapped process cleanup. Use `fnox exec -- npm run dev` to inject secrets. Runs `npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
+| `npm run dev:raw` | `vite`                                       | Start Vite dev server directly without cleanup wrapper. Useful for quick restarts or when running inside an existing fnox context.                                                          |
 | `npm run preview` | `npx vite preview`                           | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/`.                                                                    |
 
 ## Build
 
 | Script              | Command                                                    | Description                                                                                                                                                         |
 | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run build`     | `tsc -b && vite build`                                     | Full production build: TypeScript compile (`tsc -b`), then Vite build with code splitting and PWA generation. Env vars are injected by dotenvx (via direnv locally, `dotenvx run` in CI). Output goes to `dist/`. |
+| `npm run build`     | `tsc -b && vite build`                                     | Full production build: TypeScript compile (`tsc -b`), then Vite build with code splitting and PWA generation. Use `fnox exec -- npm run build` locally to inject secrets. In CI, secrets are provided via GitHub Secrets. Output goes to `dist/`. |
 | `npm run typecheck` | `tsc --noEmit`                                             | TypeScript type check only (no output files). Use to validate types without building.                                                                               |
 
 ## Code Quality

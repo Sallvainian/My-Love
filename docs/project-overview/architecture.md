@@ -139,12 +139,17 @@ Zod schemas are defined in `src/validation/schemas.ts` with user-facing error me
 
 ## Environment Variables
 
-Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git. The `.env.keys` file (gitignored) contains the decryption key.
+Uses [fnox](https://fnox.jdx.dev) with the `age` provider for encrypted secrets management. Secrets are stored as age-encrypted ciphertext inline in `fnox.toml` (safe to commit). The age private key lives at `~/.age/key.txt` (env var: `FNOX_AGE_KEY_FILE`). Tool versions (Node.js) are managed by [mise](https://mise.jdx.dev) via `.mise.toml`.
 
-Key variables:
+Key variables (stored in `fnox.toml`):
 
 - `VITE_SUPABASE_URL` -- Supabase project URL
 - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` -- Supabase anon/public key
+- `VITE_SENTRY_DSN` -- Sentry DSN for error tracking
+- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` -- Sentry build-time config
+- `SUPABASE_SERVICE_KEY`, `SUPABASE_PAT` -- Admin keys
+
+Local development: `fnox exec -- npm run dev` decrypts secrets via age and starts the dev server. In CI, secrets are provided via GitHub Secrets (not fnox).
 
 For E2E tests, `.env.test` provides plain-text local Supabase values (`http://127.0.0.1:54321`). The Playwright config auto-detects local Supabase credentials via `supabase status -o env`.
 
@@ -160,7 +165,7 @@ The `index.html` file includes a SPA redirect handler that converts GitHub Pages
 
 ## Database Schema
 
-Supabase Postgres with 12 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
+Supabase Postgres with 24 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
 
 - `users` -- App users with `partner_id` for partner linking
 - `moods` -- Mood tracking entries with emoji and optional notes
@@ -199,7 +204,7 @@ Local Supabase configuration is in `supabase/config.toml` with:
 
 5. **InjectManifest over GenerateSW.** The custom service worker gives full control over caching strategies and background sync logic, which is necessary for the offline mood sync feature.
 
-6. **Encrypted .env committed to git.** Using dotenvx, the encrypted `.env` file is version-controlled. Only `.env.keys` (the decryption key) is gitignored. This simplifies deployment secrets management.
+6. **Encrypted secrets in fnox.toml.** Using fnox with the age provider, secrets are stored as age-encrypted ciphertext inline in `fnox.toml` (committed to git). The age private key lives at `~/.age/key.txt` and is never committed. In CI, secrets are provided via GitHub Secrets directly.
 
 7. **Base path handling.** Production uses `/My-Love/` base path for GitHub Pages. Development uses `/`. This is configured in `vite.config.ts` and handled in `App.tsx` route detection.
 

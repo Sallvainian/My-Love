@@ -5,8 +5,8 @@
 ```bash
 git clone https://github.com/Sallvainian/My-Love.git
 cd My-Love
-nvm use          # Switch to Node v24.13.0 (reads .nvmrc)
-npm install      # Install all dependencies
+mise install       # Installs Node v24.13.0 (reads .mise.toml)
+npm install        # Install all dependencies
 ```
 
 ## Install Playwright Browsers (for E2E Tests)
@@ -48,7 +48,7 @@ supabase db reset   # Runs all migrations + seed.sql
 Start the development server:
 
 ```bash
-npm run dev
+fnox exec -- npm run dev
 ```
 
 The app should be accessible at `http://localhost:5173/`. If the dev server starts without errors and the browser shows the application UI, installation is complete.
@@ -56,9 +56,9 @@ The app should be accessible at `http://localhost:5173/`. If the dev server star
 ## Full Setup Checklist
 
 1. Clone the repository
-2. Run `nvm use` to set the correct Node.js version
+2. Run `mise install` to set the correct Node.js version (reads `.mise.toml`)
 3. Run `npm install` to install dependencies
-4. Get the `.env.keys` file via `npx dotenvx-ops login && npx dotenvx-ops sync` (see [Environment Setup](./environment-setup.md))
-5. Run `npm run dev` to start the development server
+4. Set up your age key and verify secrets resolve with `fnox check` (see [Environment Setup](./environment-setup.md))
+5. Run `fnox exec -- npm run dev` to start the development server with secrets
 6. (Optional) Run `supabase start` for local database
 7. (Optional) Run `npx playwright install` for E2E tests

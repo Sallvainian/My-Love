@@ -14,7 +14,7 @@ Complete directory analysis and entry point tracing for the **My-Love** PWA code
 ## At a Glance
 
 - **Package manager:** npm (lock file: `package-lock.json`)
-- **Source directory:** `src/` with 150+ TypeScript/TSX files
+- **Source directory:** `src/` with 170+ TypeScript/TSX files
 - **Build output:** `dist/` (Vite production build)
 - **Test directories:** `tests/` (E2E), co-located `__tests__/` (unit)
 - **Supabase:** `supabase/` (migrations, functions, config)

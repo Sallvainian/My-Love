@@ -40,26 +40,25 @@ location.reload();
 
 ## Dev Server Will Not Start
 
-**Cause**: Wrong Node version, corrupted dependencies, or missing `.env.keys` file.
+**Cause**: Wrong Node version, corrupted dependencies, or missing age key.
 
 **Fix**:
 
 ```bash
-nvm use                  # Switch to Node v24.13.0 (reads .nvmrc)
+mise install             # Install Node v24.13.0 (reads .mise.toml)
 rm -rf node_modules
 npm install
-npm run dev
+fnox exec -- npm run dev
 ```
 
-If environment variables are not being injected, verify your dotenvx setup:
+If environment variables are not being injected, verify your fnox setup:
 
 ```bash
-cat .env.keys            # Confirm .env.keys exists with DOTENV_PRIVATE_KEY
-dotenvx run -- printenv  # Test decryption
-direnv allow             # Allow direnv to load .envrc
+fnox check               # Verify all secrets resolve
+fnox get VITE_SUPABASE_URL  # Test individual secret decryption
 ```
 
-If you do not have `.env.keys`, restore it from dotenvx-ops: `npx dotenvx-ops login && npx dotenvx-ops sync`. If that's unavailable, use `npm run dev:raw` instead (starts Vite directly, but Supabase features will not work without env vars).
+If your age key is not set up, see [Environment Setup](./environment-setup.md) for instructions. You can also use `npm run dev:raw` instead (starts Vite directly, but Supabase features will not work without env vars).
 
 ## Build Fails
 
@@ -73,13 +72,14 @@ npm run lint             # Identify ESLint errors
 npm install              # Ensure all dependencies are installed
 ```
 
-If the build fails because Supabase env vars are missing, verify your dotenvx setup:
+If the build fails because Supabase env vars are missing, verify your fnox setup:
 
 ```bash
-dotenvx run -- printenv | grep VITE_SUPABASE   # Check that secrets are available
+fnox check                    # Verify all secrets resolve
+fnox get VITE_SUPABASE_URL    # Check that secrets are available
 ```
 
-If dotenvx is not configured or `.env.keys` is missing, set the variables manually:
+If fnox is not configured or the age key is missing, set the variables manually:
 
 ```bash
 export VITE_SUPABASE_URL="https://your-project.supabase.co"

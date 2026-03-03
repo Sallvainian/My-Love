@@ -11,7 +11,7 @@
 | Total Internal/Sub-Components    | 21                                                                              |
 | Feature Groups                   | 16                                                                              |
 | Shared/Utility Components        | 4 (NetworkStatusIndicator, NetworkStatusDot, SyncToast, charCounter)            |
-| Barrel Export Files (index.ts)   | 9                                                                               |
+| Barrel Export Files (index.ts)   | 13                                                                              |
 | Class Components                 | 2 (ErrorBoundary, ViewErrorBoundary)                                            |
 | Memoized Components (React.memo) | 5 (CalendarDay, MoodCard, LoveNoteMessage, FullScreenImageViewer, ImagePreview) |
 | Lazy-Loaded Components           | 9                                                                               |
@@ -20,15 +20,16 @@
 
 ## Tech Stack
 
-- **React** 19.2.4 with TypeScript 5.9
+- **React** 19.2.4 with TypeScript 5.9.3
 - **State Management**: Zustand 5.0.11 (`useAppStore`) with `useShallow` selector
 - **Animations**: Framer Motion (imported as `m as motion` for tree-shaking; `LazyMotion` in scripture)
-- **Icons**: Lucide React (Heart, Camera, Upload, X, Sparkles, Calendar, Bookmark, etc.)
+- **Icons**: Lucide React (Heart, Camera, Upload, X, Sparkles, Calendar, Bookmark, WifiOff, etc.)
 - **Virtualization**: react-window v2 (`List`, `useListRef`) + react-window-infinite-loader (`useInfiniteLoader`)
-- **Backend**: Supabase (Auth with email/password + Google OAuth, Database, Realtime Broadcast)
-- **Styling**: Tailwind CSS 4.1 (utility-first, dark mode via class)
+- **Backend**: Supabase (Auth with email/password + Google OAuth, Database, Realtime Broadcast, Presence)
+- **Styling**: Tailwind CSS 4.1.17 (utility-first, dark mode via class)
 - **Sanitization**: DOMPurify (XSS prevention in LoveNoteMessage)
 - **Image Processing**: imageCompressionService (client-side compression before upload)
+- **Error Monitoring**: Sentry (`@sentry/react`) in ErrorBoundary and ViewErrorBoundary
 
 ## Documentation Files
 

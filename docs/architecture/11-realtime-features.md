@@ -2,10 +2,11 @@
 
 ## Overview
 
-The app uses Supabase Realtime for live updates between partners. Two realtime patterns are employed:
+The app uses Supabase Realtime for live updates between partners. Three realtime patterns are employed:
 
-1. **Broadcast API** -- Used for love notes and partner mood updates (preferred pattern)
-2. **postgres_changes** -- Used for mood realtime updates (legacy pattern)
+1. **Broadcast API** -- Used for love notes, partner mood updates, and scripture session events (preferred pattern)
+2. **Presence API** -- Used for scripture together-mode position tracking (heartbeat + stale detection)
+3. **postgres_changes** -- Used for poke/kiss interaction notifications (INSERT events)
 
 ## Love Notes Realtime (`src/hooks/useRealtimeMessages.ts`)
 
@@ -113,14 +114,60 @@ subscribeToInteractions(callback) {
 }
 ```
 
+## Scripture Realtime (Epic 4)
+
+### Broadcast (`src/hooks/useScriptureBroadcast.ts`)
+
+Manages broadcast channel `scripture-session:{sessionId}` for together-mode scripture reading sessions. Events:
+
+| Event                    | Purpose                                      |
+|--------------------------|----------------------------------------------|
+| `partner_joined`         | Partner joined the session                   |
+| `state_updated`          | Session state changed (step, phase)          |
+| `session_converted`      | Solo session converted to together-mode      |
+| `lock_in_status_changed` | Partner locked/unlocked their reading step   |
+
+### Presence (`src/hooks/useScripturePresence.ts`)
+
+Presence channel `scripture-presence:{sessionId}` tracks partner online status:
+
+- **Heartbeat**: Every 10 seconds
+- **Stale TTL**: 20 seconds (partner marked as offline if no heartbeat received)
+- **Tracked state**: `{ userId, currentStep, phase, lastSeen }`
+
+## Reconnect Logic (Epic 4 Hardening)
+
+All realtime channels implement reconnect logic for `CHANNEL_ERROR` and `CLOSED` states:
+
+```typescript
+// Pattern used in useScriptureBroadcast and useScripturePresence
+channel.on('system', {}, (payload) => {
+  if (payload.status === 'CHANNEL_ERROR' || payload.status === 'CLOSED') {
+    supabase.removeChannel(channel);  // Clean up dead channel
+    setRetryCount((c) => c + 1);       // Trigger useEffect re-run for re-subscribe
+  }
+});
+```
+
+On re-subscribe success, `loadSession()` is called to resync state from Supabase, ensuring the UI reflects the latest data after a reconnection gap.
+
+**Reconnect strategies by feature:**
+
+| Hook                     | Max Retries | Backoff          | On Reconnect        |
+|--------------------------|-------------|------------------|---------------------|
+| `useScriptureBroadcast`  | Unlimited   | useEffect re-run | `loadSession()`     |
+| `useScripturePresence`   | Unlimited   | useEffect re-run | Presence re-track   |
+| `useRealtimeMessages`    | 5           | 1s-30s exponential | Channel re-subscribe |
+
 ## Channel Summary
 
 | Channel Pattern | Feature | Protocol | Direction |
 |----------------|---------|----------|-----------|
 | `love-notes:{partnerId}` | Love Notes | Broadcast | Bidirectional |
 | `partner-mood:{partnerId}` | Partner Mood | Broadcast | Bidirectional |
+| `scripture-session:{sessionId}` | Scripture Together-Mode | Broadcast | Bidirectional |
+| `scripture-presence:{sessionId}` | Scripture Presence | Presence | Bidirectional |
 | `incoming-interactions` | Poke/Kiss | postgres_changes (INSERT) | Receive only |
-| `moods:user_id=eq.{id}` | Mood Realtime | postgres_changes (INSERT) | Receive only |
 
 ## Supabase Client Configuration
 

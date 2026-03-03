@@ -1,6 +1,6 @@
 # My-Love — Project Documentation
 
-> **Auto-generated:** 2026-03-01 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** 97 files, ~14,400 lines
+> **Auto-generated:** 2026-03-03 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** 97 files across 9 sections
 
 ## Quick Reference
 
@@ -8,9 +8,9 @@
 | -------------------- | ------------------------------------------------------------------- |
 | **Framework**        | React 19.2.4 + TypeScript 5.9.3 + Vite 7.3.1                        |
 | **State Management** | Zustand 5.0.11 (10 slices)                                          |
-| **Backend**          | Supabase 2.93.3 (Auth, Postgres, Storage, Realtime, Edge Functions) |
+| **Backend**          | Supabase 2.97.0 (Auth, Postgres, Storage, Realtime, Edge Functions) |
 | **Monitoring**       | Sentry 10.39.0 (error tracking + sourcemaps)                        |
-| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.29.3                         |
+| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.34.3                         |
 | **Validation**       | Zod 4.3.6                                                           |
 | **Testing**          | Vitest 4.0.17 + Playwright 1.58.2                                   |
 | **Deployment**       | PWA with Service Worker (Workbox InjectManifest) on GitHub Pages    |
@@ -36,7 +36,7 @@
 
 - **[01-executive-summary.md](./architecture/01-executive-summary.md)** — Architecture overview at a glance
 - **[02-technology-stack.md](./architecture/02-technology-stack.md)** — Full technology table with versions and rationale
-- **[03-architecture-patterns.md](./architecture/03-architecture-patterns.md)** — 8 patterns: offline-first, online-first, Supabase-direct, sliced store
+- **[03-architecture-patterns.md](./architecture/03-architecture-patterns.md)** — 10 patterns: offline-first, online-first, Supabase-direct, sliced store, auth guards, reconnect
 - **[04-data-architecture.md](./architecture/04-data-architecture.md)** — Dual storage: Supabase + IndexedDB + localStorage
 - **[05-state-management-overview.md](./architecture/05-state-management-overview.md)** — Zustand architecture (see State Management for details)
 - **[06-component-hierarchy.md](./architecture/06-component-hierarchy.md)** — React component tree from StrictMode through all views
@@ -46,9 +46,9 @@
 - **[10-service-worker.md](./architecture/10-service-worker.md)** — InjectManifest strategy, caching, Background Sync
 - **[11-realtime-features.md](./architecture/11-realtime-features.md)** — Broadcast API for love notes and partner mood
 - **[12-offline-strategy.md](./architecture/12-offline-strategy.md)** — Three-tier sync, network status, OfflineError
-- **[13-security-model.md](./architecture/13-security-model.md)** — RLS, DOMPurify, Zod boundaries, dotenvx secrets
+- **[13-security-model.md](./architecture/13-security-model.md)** — RLS, DOMPurify, Zod boundaries, fnox/age secrets
 - **[14-validation-layer.md](./architecture/14-validation-layer.md)** — All Zod schemas with code and error transformation
-- **[15-deployment.md](./architecture/15-deployment.md)** — GitHub Pages, dotenvx secrets, CI/CD workflows
+- **[15-deployment.md](./architecture/15-deployment.md)** — GitHub Pages, fnox/age secrets, CI/CD workflows
 - **[16-testing-architecture.md](./architecture/16-testing-architecture.md)** — 5 test layers, frameworks, priority tags
 - **[17-error-handling.md](./architecture/17-error-handling.md)** — Strategy by layer, retry patterns, corruption recovery
 - **[18-performance.md](./architecture/18-performance.md)** — Lazy loading, virtualization, image compression, bundle analysis
@@ -92,7 +92,7 @@
 - **[6-supabase-rpc-functions.md](./data-models/6-supabase-rpc-functions.md)** — Postgres functions and RPC endpoints
 - **[7-storage-buckets.md](./data-models/7-storage-buckets.md)** — Photos and love-notes-images bucket configs
 - **[8-rls-policies.md](./data-models/8-rls-policies.md)** — Row Level Security policies per table and bucket
-- **[9-migration-history.md](./data-models/9-migration-history.md)** — 21 migrations from 2025-12-03 through 2026-03-01
+- **[9-migration-history.md](./data-models/9-migration-history.md)** — 24 migrations from 2025-12-03 through 2026-03-03
 
 ### Frontend
 
@@ -112,9 +112,9 @@
 - **[01-zustand-store-configuration.md](./state-management/01-zustand-store-configuration.md)** — Store creation, persist config, Map serialization, corruption recovery
 - **[02-slice-details.md](./state-management/02-slice-details.md)** — All 10 slices: state shapes, actions, validation, persistence
 - **[03-cross-slice-dependencies.md](./state-management/03-cross-slice-dependencies.md)** — Dependency graph, initialization coordination
-- **[04-data-flow.md](./state-management/04-data-flow.md)** — 6 patterns: offline-first, online-first, realtime, cache, sync, hydration
+- **[04-data-flow.md](./state-management/04-data-flow.md)** — 7 patterns: offline-first, online-first, realtime, cache, sync, hydration, broadcast reconnect
 - **[05-persistence-strategy.md](./state-management/05-persistence-strategy.md)** — localStorage vs IndexedDB, quota monitoring
-- **[06-react-hooks.md](./state-management/06-react-hooks.md)** — All 12 custom hooks with signatures and behavior
+- **[06-react-hooks.md](./state-management/06-react-hooks.md)** — All 14 custom hooks with signatures and behavior
 - **[07-direct-store-access.md](./state-management/07-direct-store-access.md)** — getState(), setState(), subscribe(), E2E support
 - **[08-state-management-index.md](./state-management/08-state-management-index.md)** — Quick reference with file locations
 
@@ -124,7 +124,7 @@
 
 - **[prerequisites.md](./development-guide/prerequisites.md)** — Required tools and versions
 - **[installation.md](./development-guide/installation.md)** — Clone, install, and verify
-- **[environment-setup.md](./development-guide/environment-setup.md)** — dotenvx secrets management, Supabase keys
+- **[environment-setup.md](./development-guide/environment-setup.md)** — fnox/age secrets management, Supabase keys
 - **[configuration-customization.md](./development-guide/configuration-customization.md)** — Partner name, start date, feature flags
 - **[available-scripts.md](./development-guide/available-scripts.md)** — Dev, build, lint, and test scripts
 - **[local-development-url.md](./development-guide/local-development-url.md)** — Local dev server URL details
@@ -166,7 +166,7 @@ src/
 └── sw-db.ts          # SW IndexedDB helpers
 supabase/
 ├── functions/        # Edge Functions (image upload)
-└── migrations/       # 21 Postgres migrations
+└── migrations/       # 24 Postgres migrations
 ```
 
 ---
@@ -210,4 +210,4 @@ supabase/
 
 ---
 
-_Generated by BMAD Document-Project Workflow v1.2.0 — Last updated 2026-03-01_
+_Generated by BMAD Document-Project Workflow v1.2.0 — Last updated 2026-03-03_

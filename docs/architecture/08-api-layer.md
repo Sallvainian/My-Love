@@ -96,16 +96,34 @@ Partner discovery and request management:
 | `rejectPartnerRequest(requestId)`  | Reject incoming request                   |
 | `getPartnerRequests()`             | Fetch sent and received requests          |
 
-### authService (`src/api/authService.ts`)
+### Auth Services (`src/api/auth/`)
 
-Legacy auth service wrapping Supabase Auth methods. Being superseded by the `auth/` subdirectory modules:
+Authentication logic is split across three files:
 
-| Method                    | Description                    |
-| ------------------------- | ------------------------------ |
-| `signIn(email, password)` | Sign in with email/password    |
-| `signUp(email, password)` | Create new account             |
-| `signOut()`               | Sign out and clear session     |
-| `getUser()`               | Get current authenticated user |
+**`sessionService.ts`** -- Session management and offline-safe authentication:
+
+| Method                          | Description                                                |
+| ------------------------------- | ---------------------------------------------------------- |
+| `getSession()`                  | Get current session from in-memory cache (no network)      |
+| `getUser()`                     | Get current user (network request to verify token)         |
+| `getCurrentUserId()`            | Get user ID or null (network)                              |
+| `getCurrentUserIdOfflineSafe()` | Get user ID from cached session (no network, offline-safe) |
+| `getAuthStatus()`               | Returns `{ isAuthenticated, userId }` from cached session  |
+| `onAuthStateChange(callback)`   | Subscribe to auth state changes, stores/clears IndexedDB token |
+
+**`actionService.ts`** -- Auth actions:
+
+| Method                    | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `signIn(email, password)` | Sign in with email/password, stores auth token to IDB    |
+| `signUp(email, password)` | Create new account                                       |
+| `signOut()`               | Sign out, clear session, clear IndexedDB auth token      |
+| `resetPassword(email)`    | Send password reset email                                |
+| `signInWithGoogle()`      | Google OAuth sign-in via Supabase                        |
+
+**`types.ts`** -- Auth type definitions (AuthStatus, AuthAction).
+
+**Legacy**: `authService.ts` (root `api/` level) is the old auth service, being superseded by the `auth/` subdirectory modules.
 
 ### errorHandlers (`src/api/errorHandlers.ts`)
 

@@ -6,7 +6,7 @@
 | ---------------------------------------------- | ------------------------------------- |
 | Total component .tsx files (excluding tests)   | 66                                    |
 | Total component .tsx files (including App.tsx) | 67                                    |
-| Test files (.test.tsx)                         | 12                                    |
+| Test files (.test.tsx)                         | 20                                    |
 | Component folders                              | 26                                    |
 | Barrel export files (index.ts)                 | 13                                    |
 | Utility .ts files (non-index)                  | 2 (charCounter.ts, motionFeatures.ts) |
@@ -23,28 +23,28 @@
 
 | Category                                 | Lines      |
 | ---------------------------------------- | ---------- |
-| Component source (.tsx, excluding tests) | 15,756     |
-| App.tsx                                  | 612        |
-| **Total component source**               | **16,368** |
-| Test files (.test.tsx)                   | 5,553      |
-| Barrel exports + utilities (.ts)         | 101        |
-| **Grand total (all component code)**     | **22,022** |
+| Component source (.tsx, excluding tests) | 15,825     |
+| App.tsx                                  | 624        |
+| **Total component source**               | **16,449** |
+| Test files (.test.tsx)                   | 7,095      |
+| Barrel exports + utilities (.ts)         | 81         |
+| **Grand total (all component code)**     | **23,625** |
 
 ## Largest Components (by line count)
 
 | Component             | File                                                 | Lines |
 | --------------------- | ---------------------------------------------------- | ----- |
-| `SoloReadingFlow`     | `scripture-reading/containers/SoloReadingFlow.tsx`   | 1,441 |
-| `PartnerMoodView`     | `PartnerMoodView/PartnerMoodView.tsx`                | 670   |
-| `App`                 | `App.tsx`                                            | 612   |
+| `SoloReadingFlow`     | `scripture-reading/containers/SoloReadingFlow.tsx`   | 1,446 |
+| `PartnerMoodView`     | `PartnerMoodView/PartnerMoodView.tsx`                | 669   |
+| `App`                 | `App.tsx`                                            | 624   |
 | `PokeKissInterface`   | `PokeKissInterface/PokeKissInterface.tsx`            | 582   |
-| `MoodTracker`         | `MoodTracker/MoodTracker.tsx`                        | 579   |
-| `PhotoViewer`         | `PhotoGallery/PhotoViewer.tsx`                       | 561   |
-| `ScriptureOverview`   | `scripture-reading/containers/ScriptureOverview.tsx` | 517   |
-| `PhotoUploader`       | `photos/PhotoUploader.tsx`                           | 477   |
+| `MoodTracker`         | `MoodTracker/MoodTracker.tsx`                        | 576   |
+| `PhotoViewer`         | `PhotoGallery/PhotoViewer.tsx`                       | 557   |
+| `ScriptureOverview`   | `scripture-reading/containers/ScriptureOverview.tsx` | 516   |
+| `PhotoUploader`       | `photos/PhotoUploader.tsx`                           | 482   |
 | `PhotoUpload`         | `PhotoUpload/PhotoUpload.tsx`                        | 458   |
-| `AnniversarySettings` | `Settings/AnniversarySettings.tsx`                   | 400   |
-| `ReadingContainer`    | `scripture-reading/containers/ReadingContainer.tsx`  | 374   |
+| `AnniversarySettings` | `Settings/AnniversarySettings.tsx`                   | 399   |
+| `ReadingContainer`    | `scripture-reading/containers/ReadingContainer.tsx`  | 373   |
 
 ## Component Categories
 
@@ -86,18 +86,19 @@
 
 ## Design Pattern Adoption
 
-| Pattern                              | Count     | Details                                                                                       |
-| ------------------------------------ | --------- | --------------------------------------------------------------------------------------------- |
-| Barrel exports (index.ts)            | 13        | All major feature folders                                                                     |
-| Container/Presentational split       | 1 feature | Scripture Reading (2 containers, 5 presentational)                                            |
-| Virtualized lists (react-window v2)  | 2         | `MessageList`, `MoodHistoryTimeline`                                                          |
-| Infinite loading (useInfiniteLoader) | 2         | `MessageList`, `MoodHistoryTimeline`                                                          |
-| Optimistic UI                        | 5         | Mood logging, bookmarks, reflections, phase updates, message sending                          |
-| XSS sanitization (DOMPurify)         | 2         | `LoveNoteMessage`, `MessageInput`                                                             |
-| Object URL cleanup                   | 4         | `PhotoUploader`, `PhotoEditModal`, `ImagePreview`, `LoveNoteMessage`                          |
-| Focus management (store/restore)     | 3         | `FullScreenImageViewer`, `SoloReadingFlow`, `ReflectionSummary`                               |
-| ARIA live regions                    | 5         | `NetworkStatusIndicator`, `SyncToast`, `ScriptureOverview`, `SoloReadingFlow`, `MessageInput` |
-| Keyboard navigation                  | 5         | `DailyMessage`, `PhotoCarousel`, `PhotoViewer`, `PerStepReflection`, `MessageInput`           |
+| Pattern                              | Count     | Details                                                                                                 |
+| ------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------- |
+| Barrel exports (index.ts)            | 13        | All major feature folders                                                                               |
+| Container/Presentational split       | 1 feature | Scripture Reading (4 containers, 11 presentational)                                                     |
+| Virtualized lists (react-window v2)  | 2         | `MessageList`, `MoodHistoryTimeline`                                                                    |
+| Infinite loading (useInfiniteLoader) | 2         | `MessageList`, `MoodHistoryTimeline`                                                                    |
+| Optimistic UI                        | 5         | Mood logging, bookmarks, reflections, phase updates, message sending                                    |
+| XSS sanitization (DOMPurify)         | 2         | `LoveNoteMessage`, `MessageInput`                                                                       |
+| Object URL cleanup                   | 4         | `PhotoUploader`, `PhotoEditModal`, `ImagePreview`, `LoveNoteMessage`                                    |
+| Focus management (store/restore)     | 4         | `FullScreenImageViewer`, `SoloReadingFlow`, `ReflectionSummary`, `DisconnectionOverlay`                 |
+| ARIA live regions                    | 8         | `NetworkStatusIndicator`, `SyncToast`, `ScriptureOverview`, `SoloReadingFlow`, `MessageInput`, `Countdown`, `DisconnectionOverlay`, `PartnerPosition` |
+| Keyboard navigation                  | 5         | `DailyMessage`, `PhotoCarousel`, `PhotoViewer`, `PerStepReflection`, `MessageInput`                     |
+| Sentry error reporting               | 2         | `ErrorBoundary`, `ViewErrorBoundary` (via `@sentry/react`)                                              |
 
 ## Animation Usage (Framer Motion)
 
@@ -127,8 +128,16 @@
 | `ReflectionSummary.test.tsx`     | `ReflectionSummary`     |
 | `DailyPrayerReport.test.tsx`     | `DailyPrayerReport`     |
 | `SoloReadingFlow.test.tsx`       | `SoloReadingFlow`       |
+| `StatsSection.test.tsx`          | `StatsSection`          |
+| `Countdown.test.tsx`             | `Countdown`             |
+| `DisconnectionOverlay.test.tsx`  | `DisconnectionOverlay`  |
+| `LobbyContainer.test.tsx`       | `LobbyContainer`        |
+| `LockInButton.test.tsx`          | `LockInButton`          |
+| `PartnerPosition.test.tsx`       | `PartnerPosition`       |
+| `ReadingContainer.test.tsx`      | `ReadingContainer`      |
+| `RoleIndicator.test.tsx`         | `RoleIndicator`         |
 
-12 test files covering 12 components. Components with highest test priority appear to be the scripture-reading feature (6 test files) and love-notes feature (4 test files).
+20 test files covering 20 components. The scripture-reading feature has the highest test coverage with 14 test files. Love-notes has 4 test files. Navigation has 1 test file.
 
 ## Hooks Used by Components
 

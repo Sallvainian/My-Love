@@ -72,7 +72,7 @@ A guided prayer session with 17 scripture steps (all NKJV) organized into 6 sect
 Each step presents a Bible verse and a couple-focused response prayer. The reading flow supports:
 
 - **Solo mode** -- Individual reading at your own pace
-- **Together mode** -- Synchronized reading with partner (planned, Epic 4)
+- **Together mode** -- Synchronized reading with partner via Supabase Broadcast (lobby, role selection, countdown, lock-in advancement, reconnection handling)
 - Per-step reflections with 1-5 rating scale
 - Verse bookmarking during sessions
 - End-of-session reflection summary with standout verse selection and session rating
@@ -166,5 +166,5 @@ Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provid
 - Row Level Security (RLS) enabled on all Supabase tables
 - Policies ensure only the two linked partner users can access their shared data
 - DOMPurify sanitization for user-generated HTML content
-- Encrypted environment variables (dotenvx) -- secrets never committed in plaintext
+- Encrypted secrets via fnox with age provider -- ciphertext committed in `fnox.toml`, private key never committed
 - CodeQL security analysis configured with `security-extended` and `security-and-quality` query suites

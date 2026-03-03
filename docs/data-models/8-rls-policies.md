@@ -129,25 +129,35 @@ Uses the `is_scripture_session_member()` helper to check membership without dire
 
 ## 8.14 `realtime.messages` (Private Broadcast Channels)
 
-RLS on `realtime.messages` controls who can send/receive on private broadcast channels. Added in migration 15 (`20260220000001`).
+RLS on `realtime.messages` controls who can send/receive on private broadcast channels. Added in migration 15 (`20260220000001`). Recreated with UUID regex guard in migration 24 (`20260303000100`).
+
+### UUID Regex Guard (Hardening)
+
+All 4 policies include a regex validation step **before** the `::uuid` cast:
+
+```sql
+split_part(topic, ':', 2) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+```
+
+This prevents SQL injection via crafted topic strings. Without this guard, a malicious topic like `scripture-session:not-a-uuid` would cause a PostgreSQL cast error. The regex uses lowercase hex only because `gen_random_uuid()` always produces lowercase.
 
 ### Scripture Session Broadcast Channel (`scripture-session:{uuid}`)
 
 | Policy                                                   | Operation | Rule                                                                                                                                                    |
 | -------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| scripture_session_members_can_receive_broadcasts         | SELECT    | `topic LIKE 'scripture-session:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
+| scripture_session_members_can_receive_broadcasts         | SELECT    | `topic LIKE 'scripture-session:%' AND split_part(topic, ':', 2) ~ UUID_REGEX AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
 | scripture_session_members_can_send_broadcasts             | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                              |
 
-The topic format is `scripture-session:{session_uuid}`. The policy extracts the UUID from the topic using `split_part(topic, ':', 2)` and verifies the user is a member of that session.
+The topic format is `scripture-session:{session_uuid}`. The policy extracts the UUID from the topic using `split_part(topic, ':', 2)`, validates it against the UUID regex, then verifies the user is a member of that session.
 
 ### Scripture Presence Channel (`scripture-presence:{uuid}`)
 
 | Policy                                                   | Operation | Rule                                                                                                                                                      |
 | -------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| scripture_presence_members_can_receive                   | SELECT    | `topic LIKE 'scripture-presence:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
-| scripture_presence_members_can_send                       | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                                |
+| scripture_presence_members_can_receive_broadcasts        | SELECT    | `topic LIKE 'scripture-presence:%' AND split_part(topic, ':', 2) ~ UUID_REGEX AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
+| scripture_presence_members_can_send_broadcasts            | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                                |
 
-Added in migration 18 (`20260222000001`) for partner position tracking during reading.
+Added in migration 18 (`20260222000001`) for partner position tracking during reading. Recreated with UUID regex guard in migration 24 (`20260303000100`).
 
 ## Key Security Patterns
 
@@ -158,3 +168,4 @@ Added in migration 18 (`20260222000001`) for partner position tracking during re
 5. **partner_id immutability** in the users UPDATE policy prevents privilege escalation
 6. **Private broadcast channels** require `realtime.messages` RLS to verify session membership before allowing send/receive
 7. **Topic-based channel authorization** uses `split_part()` to extract session UUID from topic string and verify membership
+8. **UUID regex guard** on all `realtime.messages` policies validates the extracted UUID segment against a lowercase hex regex before the `::uuid` cast, preventing SQL injection and cast errors from malformed topic strings (hardening migration 24)

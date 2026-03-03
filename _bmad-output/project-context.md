@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-03-01'
+date: '2026-03-03'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 95
+rule_count: 97
 optimized_for_llm: true
 ---
 
@@ -21,24 +21,24 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **UI Framework:** React ^19.2.4 (react-jsx transform)
 - **Build:** Vite ^7.3.1 (bundler module resolution, manual chunk splitting, vite-plugin-checker for dev overlay)
 - **State:** Zustand ^5.0.11 (slice-based, persist middleware → localStorage)
-- **Backend:** Supabase ^2.93.3 (PostgreSQL + RLS + Realtime subscriptions + Storage + Broadcast channels)
+- **Backend:** Supabase ^2.97.0 (PostgreSQL + RLS + Realtime subscriptions + Storage + Broadcast channels)
 - **Local DB:** idb ^8.0.3 (IndexedDB for offline-first persistence)
 - **Validation:** Zod ^4.3.6 (schema validation at data boundaries)
-- **Styling:** Tailwind CSS ^4.1.18 (utility-first, PostCSS, class sorting via Prettier plugin)
-- **Animation:** Framer Motion ^12.29.3
-- **Icons:** Lucide React ^0.563.0 (tree-shakeable)
+- **Styling:** Tailwind CSS ^4.1.17 (utility-first, PostCSS, class sorting via Prettier plugin)
+- **Animation:** Framer Motion ^12.34.3
+- **Icons:** Lucide React ^0.575.0 (tree-shakeable)
 - **PWA:** vite-plugin-pwa ^1.2.0 (injectManifest strategy, custom sw.ts)
 - **Sanitization:** DOMPurify ^3.3.1 (XSS prevention for user content)
-- **Virtualization:** react-window ^2.2.6 + react-window-infinite-loader ^2.0.1
+- **Virtualization:** react-window ^2.2.7 + react-window-infinite-loader ^2.0.1
 - **SSE:** eventsource ^4.1.0
 - **Error Tracking:** @sentry/react ^10.39.0 (prod-only, PII-stripped, ignores chunk/network/ResizeObserver errors)
 - **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 80% thresholds)
 - **E2E Tests:** Playwright ^1.58.2 (Chromium) + @seontechnologies/playwright-utils ^3.14.0 + @axe-core/playwright ^4.11.1
 - **Test Data:** @faker-js/faker ^10.3.0
-- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.54.0 (flat config)
+- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.56.1 (flat config)
 - **Formatting:** Prettier ^3.8.1 (100 char width, single quotes, trailing commas ES5)
 - **Package Manager:** npm (package-lock.json)
-- **Env Management:** dotenvx (encrypted `.env` committed, `.env.keys` gitignored, `dotenvx run` in CI)
+- **Env Management:** fnox with age provider (encrypted secrets in `fnox.toml` committed, decrypted via `fnox exec --`, age keys at `~/.age/key.txt`)
 
 ## Critical Implementation Rules
 
@@ -135,11 +135,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **One story per commit:** Never mix Story 1.2 and Story 1.3 work in the same commit
 - **Separate docs from code:** Documentation-only changes get their own commit
 - **Sprint tracking separate:** Status YAML updates get their own `chore(sprint)` commit
-- **Build command:** `tsc -b && vite build` — dotenvx decrypts env vars at shell level via direnv
+- **Build command:** `tsc -b && vite build` — fnox decrypts env vars at shell level via `fnox exec --`
 - **Deploy target:** GitHub Pages at `/My-Love/` subpath — `base` in vite config switches between `/My-Love/` (prod) and `/` (dev)
 - **Pre-deploy check:** `npm run predeploy` runs build + smoke tests before deployment
-- **CI workflows:** deploy, test, migrations, code review, bundle-size, CodeQL (security scanning), dependency-review, Lighthouse (performance audits)
-- **Env management:** dotenvx is the secrets manager. Secrets are encrypted in `.env` (committed). `.env.keys` holds the private key (gitignored, backed up to dotenvx-ops). CI: `dotenvx run` with `DOTENV_PRIVATE_KEY` GitHub Secret. `.env.test` exists for local test overrides. Never commit plaintext secrets.
+- **CI workflows:** deploy, test, migrations, code review, bundle-size, CodeQL (security scanning), dependency-review, Lighthouse (performance audits), CI failure auto-fix, manual code analysis
+- **Env management:** fnox with age provider is the secrets manager. Secrets are encrypted inline in `fnox.toml` (committed). Age private keys at `~/.age/key.txt` (gitignored). CI: secrets injected via GitHub Secrets. `.env.test` exists for local test overrides. Never commit plaintext secrets. No `.env` or `.env.keys` files needed.
 
 ### Critical Don't-Miss Rules
 
@@ -150,7 +150,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Dual persistence model:** Small state → localStorage (Zustand persist), large data → IndexedDB (via `idb`), remote → Supabase — never store blobs in localStorage
 - **Offline-first:** The app must work offline — all features need graceful degradation when network is unavailable; use `isOnline()` checks and `SupabaseServiceError.isNetworkError`
 - **GitHub Pages base path:** Production builds use `/My-Love/` as base — all asset URLs must be relative or use the Vite `base` config; absolute paths will break on GH Pages
-- **Encrypted env:** Secrets are encrypted in `.env` using dotenvx (committed to git). Decryption key is in `.env.keys` (gitignored, backed up to dotenvx-ops cloud). Use `dotenvx run` locally and `DOTENV_PRIVATE_KEY` GitHub Secret in CI.
+- **Encrypted env:** Secrets are encrypted inline in `fnox.toml` using age (committed to git). Age private key at `~/.age/key.txt` (gitignored). Use `fnox exec -- <command>` locally. CI uses GitHub Secrets directly. No `.env` or `.env.keys` files.
+- **fnox commands:** `fnox exec -- npm run dev` (dev with secrets), `fnox set KEY "value"` (encrypt a secret), `fnox get KEY` (decrypt), `fnox check` (verify all secrets resolve)
 - **Scripture is the exception:** Unlike every other feature, scripture reading is online-first — writes go to Supabase RPC first (throw on failure), IndexedDB is just a read cache. Do NOT apply the offline-first pattern to scripture code.
 - **Don't mix validation layers:** `src/validation/schemas.ts` is for local data entering IndexedDB; `src/api/validation/supabaseSchemas.ts` is for validating API responses from Supabase. Using the wrong layer will cause silent data corruption or false validation failures.
 - **E2E imports:** Always `import { test, expect } from 'tests/support/merged-fixtures'` in E2E tests — importing directly from `@playwright/test` will miss custom fixtures and auth setup
@@ -178,4 +179,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-01
+Last Updated: 2026-03-03

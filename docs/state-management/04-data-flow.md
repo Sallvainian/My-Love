@@ -1,5 +1,7 @@
 # Data Flow Patterns
 
+7 patterns covering offline-first, online-first, realtime, cache, sync, hydration, and broadcast reconnect flows.
+
 ## Pattern 1: Component -> Slice -> IndexedDB (Offline-First)
 
 Used by: Mood tracking, Custom messages
@@ -35,38 +37,58 @@ Component (e.g., LoveNotes MessageInput)
     v
 NotesSlice.sendNote()
     |
-    | 1. Rate limit check (10 msgs/min)
-    | 2. sanitizeMessageContent(text)  -- DOMPurify
-    | 3. if (imageFile) compress + upload via Edge Function
-    | 4. supabase.from('love_notes').insert(...)
+    | 1. Rate limit check (10 msgs/min via checkRateLimit)
+    | 2. getCurrentUserId() + getPartnerId()
+    | 3. if (imageFile) validate + compress + upload to storage
+    | 4. Create optimistic note with tempId + sending: true
     | 5. set({ notes: [...state.notes, tempNote] })  -- optimistic with tempId
-    | 6. Replace tempId with real ID on Supabase confirmation
+    | 6. supabase.from('love_notes').insert(...)
+    | 7. Replace tempId with real ID on Supabase confirmation
+    | 8. Broadcast 'new_message' to partner channel
     v
 State updated, component re-renders
 ```
 
-**Key point:** The optimistic update uses a temporary ID. If the Supabase insert fails, the note may be rolled back or shown in an error state.
+**Key point:** The optimistic update uses a temporary ID (`tempId`). If the Supabase insert fails, the note is marked with `error: true` and can be retried via `retryFailedMessage(tempId)`. On retry, cached `imageBlob` is reused to avoid re-compression.
 
 ## Pattern 3: Realtime -> Slice -> State
 
-Used by: Love notes (incoming), Partner mood, Interactions
+Used by: Love notes (incoming), Partner mood, Interactions, Scripture together-mode
 
 ```
-Supabase Realtime (Broadcast/postgres_changes)
+Supabase Realtime (Broadcast API)
     |
-    | Event received by hook (e.g., useRealtimeMessages)
+    | Event received by hook (e.g., useRealtimeMessages, useScriptureBroadcast)
     v
-Hook callback
+Hook callback (useRealtimeMessages.handleNewMessage)
     |
-    | calls useAppStore().addIncomingNote(note)
+    | calls useAppStore().addNote(note)
     v
-NotesSlice.addIncomingNote()
+NotesSlice.addNote()
     |
+    | Deduplication: check if note.id already exists in notes array
     | set({ notes: [...state.notes, note] })
     v
 State updated, component re-renders
     |
-    | navigator.vibrate()  -- haptic feedback
+    | navigator.vibrate([30])  -- haptic feedback
+```
+
+Scripture together-mode variant:
+```
+Broadcast channel: scripture-session:{sessionId}
+    |
+    | 'state_updated' event received by useScriptureBroadcast
+    v
+ScriptureSlice.onBroadcastReceived(payload)
+    |
+    | 1. Version check: payload.version > session.version
+    | 2. Identify user1 vs user2 via currentUserId === session.userId
+    | 3. Map ready/role states for correct user (self vs partner)
+    | 4. Update session phase, version, step index
+    | 5. Clear lock-in flags on step advance
+    v
+State updated, together-mode UI re-renders
 ```
 
 ## Pattern 4: Read-Through Cache (Scripture)
@@ -148,6 +170,45 @@ SettingsSlice.initializeApp()
     v
 App renders main content
 ```
+
+## Pattern 7: Broadcast Reconnect (Epic 4 Hardening)
+
+Used by: Scripture together-mode broadcast channels
+
+```
+Channel subscription (useScriptureBroadcast)
+    |
+    | CHANNEL_ERROR or CLOSED received
+    v
+Hook error handler
+    |
+    | 1. Set hasErroredRef = true
+    | 2. Guard: check sessionIdFromStore exists + not already retrying
+    | 3. supabase.removeChannel(channel)  -- cleanup stale channel
+    | 4. channelRef.current = null
+    | 5. setRetryCount(c => c + 1)  -- trigger useEffect re-run
+    v
+useEffect re-fires (sessionId + retryCount in deps)
+    |
+    | 1. New channel = supabase.channel(channelName, { private: true })
+    | 2. Wire all broadcast event handlers (partner_joined, state_updated, etc.)
+    | 3. supabase.realtime.setAuth()
+    | 4. channel.subscribe()
+    v
+On SUBSCRIBED status
+    |
+    | 1. Check hasErroredRef -- if true, this is a reconnect
+    | 2. loadSession(sessionId) -- resync state from DB
+    | 3. setBroadcastFn(channel.send) -- rewire store broadcast
+    | 4. Broadcast partner_joined -- clear partner's disconnected UI
+    v
+Session state reconciled, channel healthy
+```
+
+**Key points:**
+- `isRetryingRef` prevents retry storms when CHANNEL_ERROR fires before removeChannel resolves
+- On reconnect success, `loadSession` fetches the authoritative session from DB to reconcile any missed broadcasts
+- The same pattern is used by `useScripturePresence` for the ephemeral presence channel
 
 ## State Update Semantics
 

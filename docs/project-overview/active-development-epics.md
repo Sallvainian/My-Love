@@ -10,12 +10,12 @@ The project uses the BMAD method for planning. All planning documents are in `_b
 
 ## Epic Status
 
-| Epic | Name                                  | Status      | Stories | Branch                                    |
-| ---- | ------------------------------------- | ----------- | ------- | ----------------------------------------- |
-| 1    | Foundation and Solo Scripture Reading | Done        | 5/5     | merged to main                            |
-| 2    | Reflection and Daily Prayer Report    | Done        | 3/3     | merged to main                            |
-| 3    | Stats and Overview Dashboard          | Done        | 1/1     | merged to main                            |
-| 4    | Together Mode -- Synchronized Reading | In Progress | 2/3     | `epic-4/together-mode-synchronized-reading` |
+| Epic | Name                                  | Status | Stories | Branch                                    |
+| ---- | ------------------------------------- | ------ | ------- | ----------------------------------------- |
+| 1    | Foundation and Solo Scripture Reading | Done   | 5/5     | merged to main                            |
+| 2    | Reflection and Daily Prayer Report    | Done   | 3/3     | merged to main                            |
+| 3    | Stats and Overview Dashboard          | Done   | 1/1     | merged to main                            |
+| 4    | Together Mode -- Synchronized Reading | Done   | 3/3     | `epic-4/together-mode-synchronized-reading` |
 
 ## Epic 1: Foundation and Solo Scripture Reading (Done)
 
@@ -61,19 +61,19 @@ Users can view their Scripture Reading journey statistics on the overview page -
 
 **Retrospective**: Done
 
-## Epic 4: Together Mode -- Synchronized Reading (In Progress)
+## Epic 4: Together Mode -- Synchronized Reading (Done)
 
-Couples can read scripture together in real-time with a lobby, Reader/Responder role selection, 3-second countdown, synchronized phase advancement via lock-in mechanism, partner position indicators, and graceful reconnection handling. Includes no-shame fallback to solo from lobby.
+Couples can read scripture together in real-time with a lobby, Reader/Responder role selection, 3-second countdown, synchronized phase advancement via lock-in mechanism, partner position indicators, and graceful reconnection handling. Includes no-shame fallback to solo from lobby. Epic 4 also included a hardening pass: auth guards, Sentry error tracking integration, reconnection logic, and centralized error handling.
 
-**Stories**:
+**Stories (all done)**:
 
-| Story | Name                                    | Status      |
-| ----- | --------------------------------------- | ----------- |
-| 4.1   | Lobby, Role Selection, and Countdown    | Done        |
-| 4.2   | Synchronized Reading with Lock-In       | Done        |
-| 4.3   | Reconnection and Graceful Degradation   | In Progress |
+| Story | Name                                    | Status |
+| ----- | --------------------------------------- | ------ |
+| 4.1   | Lobby, Role Selection, and Countdown    | Done   |
+| 4.2   | Synchronized Reading with Lock-In       | Done   |
+| 4.3   | Reconnection and Graceful Degradation   | Done   |
 
-**Retrospective**: Optional (epic not yet complete)
+**Retrospective**: Done
 
 ### Story 4.1: Lobby, Role Selection, and Countdown (Done)
 
@@ -83,13 +83,13 @@ Users can select Reader or Responder role, enter a lobby, ready up with their pa
 
 Couples read verses with clear roles that alternate each step. Partners can freely navigate between verse and response screens with position indicators. Advancement requires mutual lock-in via the `scripture_lock_in` RPC with optimistic UI.
 
-### Story 4.3: Reconnection and Graceful Degradation (In Progress)
+### Story 4.3: Reconnection and Graceful Degradation (Done)
 
-Handles network interruptions during together-mode sessions with graceful fallback to solo mode, reconnection detection, and state recovery.
+Handles network interruptions during together-mode sessions with graceful fallback to solo mode, reconnection detection, and state recovery. Includes auth guards, Sentry error tracking integration, and centralized error handling pipeline.
 
 ## Retrospective Action Items
 
-All retrospective action items from Epics 1-3 have been completed:
+All retrospective action items from Epics 1-4 have been completed:
 
 | Action Item                            | Source  | Status |
 | -------------------------------------- | ------- | ------ |
@@ -102,6 +102,7 @@ All retrospective action items from Epics 1-3 have been completed:
 | pgTAP couple relationship checklist    | Epic 3  | Done   |
 | Architecture doc as exit criterion     | Epic 3  | Done   |
 | Update structure boundaries doc        | Epic 3  | Done   |
+| Error pipeline standard               | Epic 4  | Done   |
 
 ## PRD User Journeys
 

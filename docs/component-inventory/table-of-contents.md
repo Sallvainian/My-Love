@@ -41,6 +41,7 @@
    - Virtualization (react-window v2)
    - Animation (Framer Motion / LazyMotion)
    - Accessibility (ARIA, Focus Management, Keyboard Nav)
+   - Sentry Error Reporting
    - Optimistic UI
    - XSS Sanitization
 6. [State Connections](./state-connections.md)

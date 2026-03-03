@@ -40,12 +40,12 @@ The `AppSlice` interface is defined in `types.ts` (not in `appSlice.ts`) to prev
 | `SettingsSlice`         | `settingsSlice.ts`         | Yes (`settings`, `isOnboarded`) | MessagesSlice (initializeApp) |
 | `NavigationSlice`       | `navigationSlice.ts`       | No                              | None                          |
 | `MessagesSlice`         | `messagesSlice.ts`         | Yes (`messageHistory`)          | SettingsSlice (read settings) |
-| `MoodSlice`             | `moodSlice.ts`             | Yes (`moods`)                   | None                          |
-| `InteractionsSlice`     | `interactionsSlice.ts`     | No                              | None                          |
-| `PartnerSlice`          | `partnerSlice.ts`          | No                              | None                          |
-| `NotesSlice`            | `notesSlice.ts`            | No                              | None                          |
-| `PhotosSlice`           | `photosSlice.ts`           | No                              | None                          |
-| `ScriptureReadingSlice` | `scriptureReadingSlice.ts` | No                              | None                          |
+| `MoodSlice`             | `moodSlice.ts`             | Yes (`moods`)                   | Auth guard via `getCurrentUserIdOfflineSafe()` |
+| `InteractionsSlice`     | `interactionsSlice.ts`     | No                              | Auth guard via `getCurrentUserIdOfflineSafe()` |
+| `PartnerSlice`          | `partnerSlice.ts`          | No                              | Auth guard via `getCurrentUserIdOfflineSafe()` |
+| `NotesSlice`            | `notesSlice.ts`            | No                              | Auth guard via `getCurrentUserIdOfflineSafe()` |
+| `PhotosSlice`           | `photosSlice.ts`           | No                              | Auth guard via `getCurrentUserIdOfflineSafe()` |
+| `ScriptureReadingSlice` | `scriptureReadingSlice.ts` | No                              | Auth guard via `getCurrentUserIdOfflineSafe()` |
 
 ### Persistence Configuration
 
@@ -92,6 +92,21 @@ if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
   (window as Record<string, unknown>).__STORE__ = useAppStore;
 }
 ```
+
+### Auth Guards (Epic 4 Hardening)
+
+Every slice that calls Supabase validates authentication first via `getCurrentUserIdOfflineSafe()` from `src/api/auth/sessionService.ts`. This prevents unauthenticated API calls and provides clear early-return behavior:
+
+```typescript
+// Pattern applied in moodSlice, interactionsSlice, partnerSlice, notesSlice, photosSlice, scriptureReadingSlice
+const userId = await getCurrentUserIdOfflineSafe();
+if (!userId) {
+  console.warn('[SliceName] No authenticated user, skipping operation');
+  return;
+}
+```
+
+The guard uses `getSession()` (in-memory cache) rather than `getUser()` (network request), so it works offline.
 
 ## Related Documentation
 

@@ -76,6 +76,26 @@ The `AppSlice` interface is defined in `src/stores/types.ts` rather than `src/st
 
 By keeping `AppSlice` in `types.ts` alongside `AppState`, the circular dependency is avoided.
 
+## Hook-to-Store Wiring (Epic 4)
+
+The `ScriptureReadingSlice` has an internal `_broadcastFn` field that is set by the `useScriptureBroadcast` hook when its channel subscribes. This enables store actions (`selectRole`, `toggleReady`, `lockIn`, etc.) to broadcast events to the partner without importing Supabase directly. The wiring flow:
+
+```
+useScriptureBroadcast (hook)
+    |
+    | channel.subscribe() succeeds
+    v
+setBroadcastFn(channel.send)  -- wires the function into store state
+    |
+    v
+Store actions call get()._broadcastFn?.('event', payload)
+    |
+    v
+On unmount: setBroadcastFn(null)  -- clears to prevent stale channel use
+```
+
+This is NOT a cross-slice dependency (it is a hook-to-slice dependency) but is worth noting because it creates a runtime coupling between the hook lifecycle and the store's ability to broadcast.
+
 ## Slice Independence
 
 Most slices are self-contained, communicating with external services (IndexedDB, Supabase) rather than other slices. This design:

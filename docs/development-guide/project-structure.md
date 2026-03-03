@@ -142,7 +142,7 @@ tests/
 supabase/
   config.toml                       # Local Supabase configuration (ports, auth, storage, realtime)
   seed.sql                          # Database seed data for local development
-  migrations/                       # SQL migration files (YYYYMMDDHHmmss_description.sql format)
+  migrations/                       # 24 SQL migration files (YYYYMMDDHHmmss_description.sql format)
   tests/
     database/                       # pgTAP database tests
 ```
@@ -191,13 +191,17 @@ scripts/
       action.yml                    # Composite action: install CLI, start local, apply migrations, export credentials
 
   workflows/
-    deploy.yml                      # Build + smoke test + deploy to GitHub Pages + health check
-    test.yml                        # Full test pipeline: lint, unit, E2E P0 gate, E2E sharded, burn-in, merge reports
-    supabase-migrations.yml         # Migration validation on PRs touching supabase/ paths
-    claude.yml                      # Claude Code for @claude mentions in issues/PRs
-    claude-code-review.yml          # Automated PR code review with Claude
-    manual-code-analysis.yml        # On-demand commit summarization or security review
+    bundle-size.yml                 # PR bundle size comparison (brotli-compressed)
     ci-failure-auto-fix.yml         # Auto-fix CI failures with Claude Code on non-main branches
+    claude-code-review.yml          # Automated PR code review with Claude
+    claude.yml                      # Claude Code for @claude mentions in issues/PRs
+    codeql.yml                      # CodeQL security analysis (weekly + push + PRs)
+    dependency-review.yml           # Dependency vulnerability review on PRs
+    deploy.yml                      # Build + smoke test + deploy to GitHub Pages + health check
+    lighthouse.yml                  # Lighthouse PWA audit after deploy (2 runs)
+    manual-code-analysis.yml        # On-demand commit summarization or security review
+    supabase-migrations.yml         # Migration validation on PRs touching supabase/ paths
+    test.yml                        # Full test pipeline: lint, unit, db, E2E (P0 gate + sharded), Lighthouse CI, burn-in, merge reports
 
   dependabot.yml                    # Weekly npm + GitHub Actions dependency updates (Monday)
   codeql/
@@ -207,10 +211,10 @@ scripts/
 ## Configuration Files (Root)
 
 ```
-.env                                # Encrypted environment variables (safe to commit)
 .env.example                        # Template showing required variables
 .env.test                           # Plain-text local Supabase values for E2E testing
-.nvmrc                              # Node version: v24.13.0
+.mise.toml                          # Tool versions (Node 24.13.0) and env vars, managed by mise
+fnox.toml                           # Age-encrypted secrets (safe to commit), managed by fnox
 .prettierrc                         # Prettier config (100 char width, single quotes, tailwind plugin)
 .prettierignore                     # Prettier ignore rules
 .gitignore                          # Git ignore (node_modules, dist, .env.keys, test artifacts)

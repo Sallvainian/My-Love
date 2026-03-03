@@ -15,7 +15,7 @@
 ### Configuration
 
 - **Runner**: Vitest 4.0.17 (`vitest.config.ts`)
-- **DOM**: happy-dom 20.5.0 (lightweight DOM implementation)
+- **DOM**: happy-dom 20.7.0 (lightweight DOM implementation)
 - **Setup**: `tests/setup.ts` (global test setup)
 - **Coverage**: V8 coverage with 80% threshold
 - **Path alias**: `@/` maps to `src/`
@@ -95,7 +95,7 @@ test('creates mood entry', async () => {
 ### Configuration
 
 - **Runner**: Playwright 1.58.2 (`playwright.config.ts`)
-- **Fixtures**: Merged from `@seontechnologies/playwright-utils` and custom fixtures
+- **Fixtures**: Merged from `@seontechnologies/playwright-utils` v3.14.0 and custom fixtures
 - **Auth Setup**: Worker-isolated test users via Supabase Admin API
 - **Imports**: Always from `tests/support/merged-fixtures.ts`
 

@@ -8,13 +8,13 @@ All scripts are defined in `package.json`. The package manager is **npm** (lock 
 | --------- | -------------------------------------------- | ---------------------------------------------- |
 | `dev`     | `./scripts/dev-with-cleanup.sh`              | Start dev server (runs cleanup script wrapper) |
 | `dev:raw` | `vite`                                       | Start Vite dev server directly                 |
-| `preview` | `dotenvx run --overload -- npx vite preview` | Preview production build (decrypts .env)       |
+| `preview` | `fnox exec -- npx vite preview`              | Preview production build (decrypts secrets)    |
 
 ## Build
 
 | Script               | Command                                                                                                    | Description                                        |
 | -------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `build`              | `dotenvx run --overload -- bash -c 'tsc -b && vite build'`                                                 | Production build (decrypt env, type check, bundle) |
+| `build`              | `fnox exec -- bash -c 'tsc -b && vite build'`                                                              | Production build (decrypt secrets, type check, bundle) |
 | `perf:build`         | `mkdir -p docs/performance && npm run typecheck && vite build 2>&1 \| tee docs/performance/perf-build.log` | Build with performance logging                     |
 | `perf:bundle-report` | `npm run perf:build && node scripts/perf-bundle-report.mjs`                                                | Build + generate bundle analysis                   |
 
@@ -99,7 +99,7 @@ These are not npm scripts but commonly used commands:
 | `supabase status`                                                     | Show connection URLs and keys                 |
 | `supabase db reset`                                                   | Reset DB and re-run all migrations            |
 | `supabase migration new <name>`                                       | Create new migration file                     |
-| `supabase gen types typescript --local > src/types/database.types.ts` | Regenerate TypeScript types                   |
+| `supabase gen types typescript --local \| grep -v '^Connecting to' > src/types/database.types.ts` | Regenerate TypeScript types |
 
 ## Script Dependencies
 

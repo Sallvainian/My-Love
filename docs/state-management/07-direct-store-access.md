@@ -83,12 +83,18 @@ unsubscribe();
 
 ## E2E Testing Access
 
-In development and test environments, the store is exposed globally:
+The store is exposed unconditionally on the window object:
 
 ```typescript
 // src/stores/useAppStore.ts
-if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-  (window as Record<string, unknown>).__STORE__ = useAppStore;
+declare global {
+  interface Window {
+    __APP_STORE__?: typeof useAppStore;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__APP_STORE__ = useAppStore;
 }
 ```
 
@@ -97,7 +103,7 @@ E2E tests can then:
 ```typescript
 // In Playwright test
 await page.evaluate(() => {
-  const store = (window as any).__STORE__;
+  const store = window.__APP_STORE__;
   const state = store.getState();
   return state.moods.length;
 });

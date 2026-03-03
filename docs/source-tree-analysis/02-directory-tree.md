@@ -139,6 +139,7 @@ src/
     performance.ts                 # Pagination, storage quotas, validation limits
     images.ts                      # Image compression/validation/storage config
     relationshipDates.ts           # Birthdays, wedding, visit dates
+    sentry.ts                      # Sentry initialization, user context, PII stripping
 
   constants/                       # UI constants
     animations.ts                  # Animation timing and values
@@ -160,6 +161,8 @@ src/
     usePartnerMood.ts              # Partner mood + Broadcast realtime
     usePhotos.ts                   # Photo store consumer with auto-load
     useRealtimeMessages.ts         # Broadcast channel with backoff retry
+    useScriptureBroadcast.ts       # Scripture session Broadcast with reconnect
+    useScripturePresence.ts        # Scripture presence with heartbeat + reconnect
     useVibration.ts                # Vibration API wrapper
 
   services/                        # Data services
