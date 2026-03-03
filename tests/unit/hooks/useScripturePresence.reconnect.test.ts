@@ -28,7 +28,7 @@ const { mockChannel, mockSubscribe, mockRemoveChannel } = vi.hoisted(() => {
   return {
     mockChannel,
     mockSubscribe,
-    mockRemoveChannel: vi.fn(),
+    mockRemoveChannel: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -60,13 +60,13 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
     vi.useRealTimers();
   });
 
-  test('[P0] returns isPartnerConnected=true initially when session is active', async () => {
+  test('[P0] returns isPartnerConnected=null initially when session is active', async () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
 
     const { result } = renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
-    // Initially connected (no disconnect detected yet)
-    expect(result.current.isPartnerConnected).toBe(true);
+    // Initially null (unknown — haven't heard from partner yet)
+    expect(result.current.isPartnerConnected).toBeNull();
   });
 
   test('[P0] sets isPartnerConnected=false after 20s with no presence_update', async () => {
@@ -129,6 +129,9 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
     const { useScripturePresence } = await import('../../../src/hooks/useScripturePresence');
     const { supabase } = await import('../../../src/api/supabaseClient');
 
+    // removeChannel must resolve so scheduleRetry runs
+    mockRemoveChannel.mockResolvedValueOnce(undefined);
+
     renderHook(() => useScripturePresence('session-001', 0, 'verse'));
 
     await act(async () => {
@@ -141,15 +144,23 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
 
     expect(firstSubscribeCallback).toBeTypeOf('function');
 
+    // Trigger CHANNEL_ERROR
     act(() => {
       firstSubscribeCallback?.('CHANNEL_ERROR', new Error('network failure'));
     });
 
+    // Flush removeChannel promise resolution
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
     expect(mockRemoveChannel).toHaveBeenCalled();
+
+    // scheduleRetry uses setTimeout with baseDelay (1000ms) — advance past it
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100);
+    });
+
     expect(supabase.channel).toHaveBeenCalledTimes(2);
     expect(mockSubscribe).toHaveBeenCalledTimes(2);
   });

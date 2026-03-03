@@ -73,7 +73,7 @@ vi.mock('../../../stores/useAppStore', () => ({
 vi.mock('../../../hooks/useScripturePresence', () => ({
   useScripturePresence: vi
     .fn()
-    .mockReturnValue({ view: null, stepIndex: null, ts: null, isPartnerConnected: true }),
+    .mockReturnValue({ view: null, stepIndex: null, ts: null, isPartnerConnected: null }),
 }));
 
 // Mock framer-motion
@@ -172,9 +172,9 @@ describe('ReadingContainer', () => {
     expect(roleIndicator).toHaveTextContent('You read this');
   });
 
-  test('[P1] shows "Session updated" toast when SYNC_FAILED error with Session updated message', () => {
+  test('[P1] shows "Session updated" toast when VERSION_MISMATCH error', () => {
     mockStoreState.scriptureError = {
-      code: 'SYNC_FAILED',
+      code: 'VERSION_MISMATCH',
       message: 'Session updated',
     };
     render(<ReadingContainer />);

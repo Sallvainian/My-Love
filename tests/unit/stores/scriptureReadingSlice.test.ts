@@ -193,7 +193,7 @@ describe('scriptureReadingSlice', () => {
   });
 
   describe('exitSession', () => {
-    it('should reset all state to initial values', async () => {
+    it('should reset session state while preserving cross-session fields', async () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');
 
@@ -210,6 +210,9 @@ describe('scriptureReadingSlice', () => {
 
       const store = createTestStore();
 
+      // Set cross-session fields
+      store.setState({ coupleStats: { totalSessions: 5 } as never, isStatsLoading: false });
+
       // Create session first
       await store.getState().createSession('solo');
       expect(store.getState().session).not.toBeNull();
@@ -217,14 +220,17 @@ describe('scriptureReadingSlice', () => {
       // Exit
       store.getState().exitSession();
 
+      // Session-scoped fields are reset
       expect(store.getState().session).toBeNull();
       expect(store.getState().scriptureLoading).toBe(false);
-      expect(store.getState().isInitialized).toBe(false);
       expect(store.getState().isPendingLockIn).toBe(false);
       expect(store.getState().isPendingReflection).toBe(false);
       expect(store.getState().isSyncing).toBe(false);
       expect(store.getState().scriptureError).toBeNull();
       expect(store.getState().pendingRetry).toBeNull();
+      // Cross-session fields are preserved
+      expect(store.getState().isInitialized).toBe(true);
+      expect(store.getState().coupleStats).not.toBeNull();
     });
   });
 
@@ -414,7 +420,7 @@ describe('scriptureReadingSlice', () => {
       );
     });
 
-    it('should ignore together mode sessions when finding active session', async () => {
+    it('should include together mode sessions when finding active session', async () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');
 
@@ -438,7 +444,8 @@ describe('scriptureReadingSlice', () => {
       const store = createTestStore();
       await store.getState().checkForActiveSession();
 
-      expect(store.getState().activeSession).toBeNull();
+      expect(store.getState().activeSession).not.toBeNull();
+      expect(store.getState().activeSession?.id).toBe('session-together');
     });
   });
 
