@@ -152,13 +152,13 @@ class SyncService {
 
 **Field mapping (local to remote):**
 
-| Local Field (`MoodEntry`) | Remote Column (`moods`) |
-|--------------------------|------------------------|
-| `mood` | `mood_type` |
-| `moods` | `mood_types` |
-| `note` | `note` |
-| `date` | `created_at` (converted to ISO timestamp) |
-| `userId` | `user_id` |
+| Local Field (`MoodEntry`) | Remote Column (`moods`)                   |
+| ------------------------- | ----------------------------------------- |
+| `mood`                    | `mood_type`                               |
+| `moods`                   | `mood_types`                              |
+| `note`                    | `note`                                    |
+| `date`                    | `created_at` (converted to ISO timestamp) |
+| `userId`                  | `user_id`                                 |
 
 **Partial failure handling:** If an individual mood entry fails to sync (e.g., network error, RLS violation), the service continues with the remaining entries. Failed entries retain `synced: false` and are retried on the next sync pass.
 

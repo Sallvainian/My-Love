@@ -812,10 +812,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     if (session && payload.version <= session.version) return;
 
     // Story 4.3: End session or complete phase → exit
-    if (
-      payload.triggered_by === 'end_session' ||
-      payload.currentPhase === 'complete'
-    ) {
+    if (payload.triggered_by === 'end_session' || payload.currentPhase === 'complete') {
       set(resetSessionState(get));
       return;
     }

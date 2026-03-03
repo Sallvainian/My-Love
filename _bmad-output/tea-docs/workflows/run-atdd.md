@@ -7,12 +7,14 @@ The ATDD workflow generates failing acceptance tests before feature implementati
 ## When to Use This
 
 **Use ATDD when:**
+
 - Implementing a NEW feature that doesn't exist yet
 - Following TDD workflow (red -> green -> refactor)
 - Tests should guide your implementation
 - Practicing acceptance test-driven development
 
 **Don't use this if:**
+
 - Feature already exists (use `automate` instead)
 - You want tests that pass immediately
 
@@ -51,6 +53,7 @@ TEA requests:
 ### 4. Specify Test Levels
 
 Choose from:
+
 - E2E tests (browser-based, full user journey)
 - API tests (backend only, faster)
 - Component tests (UI components in isolation)
@@ -58,10 +61,10 @@ Choose from:
 
 ### Component Testing by Framework
 
-| Framework | Tool |
-|-----------|------|
-| Cypress | Cypress Component Testing (*.cy.tsx) |
-| Playwright | Vitest + React Testing Library (*.test.tsx) |
+| Framework  | Tool                                         |
+| ---------- | -------------------------------------------- |
+| Cypress    | Cypress Component Testing (\*.cy.tsx)        |
+| Playwright | Vitest + React Testing Library (\*.test.tsx) |
 
 ### 5. Review Generated Tests
 
@@ -160,6 +163,7 @@ test.describe('Profile API', () => {
 ```
 
 **Key Benefits of Playwright Utils:**
+
 - Returns `{ status, body }` (cleaner than separate calls)
 - Automatic schema validation with Zod
 - Type-safe response bodies
@@ -221,16 +225,19 @@ test('should edit and save profile', async ({ page }) => {
 This is the TDD red phase - all tests must fail before implementation.
 
 **For Playwright:**
+
 ```bash
 npx playwright test
 ```
 
 **For Cypress:**
+
 ```bash
 npx cypress run
 ```
 
 Expected output shows failures:
+
 ```
 Running 6 tests using 1 worker
 
@@ -244,6 +251,7 @@ Running 6 tests using 1 worker
 ```
 
 **All tests should fail** - confirming:
+
 - Feature doesn't exist yet
 - Tests will guide implementation
 - Clear success criteria established
@@ -251,6 +259,7 @@ Running 6 tests using 1 worker
 ### 7. Implement the Feature
 
 Follow this sequence:
+
 1. Start with API tests (backend first)
 2. Make API tests pass
 3. Move to E2E tests (frontend)
@@ -262,16 +271,19 @@ Follow this sequence:
 After implementation, run your test suite.
 
 **For Playwright:**
+
 ```bash
 npx playwright test
 ```
 
 **For Cypress:**
+
 ```bash
 npx cypress run
 ```
 
 Expected output:
+
 ```
 Running 6 tests using 1 worker
 
@@ -290,17 +302,20 @@ Completion of the TDD cycle: red -> green -> refactor
 ## What You Get
 
 ### Failing Tests
+
 - API tests for backend endpoints
 - E2E tests for user workflows
 - Component tests (if requested)
 - All tests fail initially (red phase)
 
 ### Implementation Guidance
+
 - Clear checklist of what to build
 - Acceptance criteria translated to assertions
 - Edge cases and error scenarios identified
 
 ### TDD Workflow Support
+
 - Tests guide implementation
 - Confidence to refactor
 - Living documentation of features
@@ -337,6 +352,7 @@ Skip P2/P3 for now - add later with automate
 ### API Tests First, E2E Later
 
 Recommended order:
+
 1. Generate API tests with `atdd`
 2. Implement backend (make API tests pass)
 3. Generate E2E tests with `atdd` (or `automate`)
@@ -347,6 +363,7 @@ Recommended order:
 ### Keep Tests Deterministic
 
 TEA generates deterministic tests by default:
+
 - No hard waits (`waitForTimeout`)
 - Network-first patterns (wait for responses)
 - Explicit assertions (no conditionals)

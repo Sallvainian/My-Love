@@ -10,22 +10,22 @@ The application serves exactly two users (a couple) and is scoped for personal u
 
 ## Technical Stack at a Glance
 
-| Layer            | Technology          | Version  | Role |
-| ---------------- | ------------------- | -------- | ---- |
-| UI Framework     | React               | 19.2.4   | Concurrent rendering, lazy loading, Suspense |
-| Language         | TypeScript          | 5.9.3    | Strict mode, ES2022 target, bundler module resolution |
-| Build Tool       | Vite                | 7.3.1    | Dev server, HMR, manual chunk splitting, PWA plugin |
-| Styling          | Tailwind CSS        | 4.1.17   | v4 with PostCSS, Prettier class sorting |
-| Animation        | Framer Motion       | 12.34.3  | Page transitions, micro-interactions, reduced-motion support |
-| State Management | Zustand             | 5.0.11   | Single store, 10 slices, persist middleware |
-| Backend / Auth   | Supabase            | 2.97.0   | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
-| Validation       | Zod                 | 4.3.6    | Runtime schema validation at all service boundaries |
-| Local Storage    | IndexedDB via `idb` | 8.0.3    | 8 object stores, versioned migrations (v1-v5) |
-| Icons            | Lucide React        | 0.575.0  | Tree-shakeable SVG icons |
-| Virtualization   | react-window        | 2.2.7    | Windowed rendering for large lists |
-| Sanitization     | DOMPurify           | 3.3.1    | XSS protection for user-generated content |
-| Error Tracking   | Sentry              | 10.39.0  | Error reporting, performance tracing, PII stripping |
-| Secrets          | fnox (age provider) | --       | Encrypted secrets in `fnox.toml`, committed to git |
+| Layer            | Technology          | Version | Role                                                             |
+| ---------------- | ------------------- | ------- | ---------------------------------------------------------------- |
+| UI Framework     | React               | 19.2.4  | Concurrent rendering, lazy loading, Suspense                     |
+| Language         | TypeScript          | 5.9.3   | Strict mode, ES2022 target, bundler module resolution            |
+| Build Tool       | Vite                | 7.3.1   | Dev server, HMR, manual chunk splitting, PWA plugin              |
+| Styling          | Tailwind CSS        | 4.1.17  | v4 with PostCSS, Prettier class sorting                          |
+| Animation        | Framer Motion       | 12.34.3 | Page transitions, micro-interactions, reduced-motion support     |
+| State Management | Zustand             | 5.0.11  | Single store, 10 slices, persist middleware                      |
+| Backend / Auth   | Supabase            | 2.97.0  | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
+| Validation       | Zod                 | 4.3.6   | Runtime schema validation at all service boundaries              |
+| Local Storage    | IndexedDB via `idb` | 8.0.3   | 8 object stores, versioned migrations (v1-v5)                    |
+| Icons            | Lucide React        | 0.575.0 | Tree-shakeable SVG icons                                         |
+| Virtualization   | react-window        | 2.2.7   | Windowed rendering for large lists                               |
+| Sanitization     | DOMPurify           | 3.3.1   | XSS protection for user-generated content                        |
+| Error Tracking   | Sentry              | 10.39.0 | Error reporting, performance tracing, PII stripping              |
+| Secrets          | fnox (age provider) | --      | Encrypted secrets in `fnox.toml`, committed to git               |
 
 ## Architecture Philosophy
 
@@ -54,30 +54,30 @@ The application follows a **hybrid data architecture** where the storage pattern
 
 ## Feature Map
 
-| Feature           | Data Pattern   | Primary Storage            | Sync Target       | Realtime Channel          |
-| ----------------- | -------------- | -------------------------- | ------------------ | ------------------------- |
-| Daily Messages    | Offline-first  | IndexedDB `messages` store | N/A (local only)  | None                      |
-| Mood Tracking     | Offline-first  | IndexedDB `moods` store    | Supabase `moods`   | Broadcast API (partner)   |
-| Photo Gallery     | Supabase-first | Supabase Storage `photos`  | N/A (direct)       | None                      |
-| Love Notes Chat   | Supabase-first | Supabase `love_notes`      | N/A (direct)       | Broadcast API (partner)   |
-| Scripture Reading | Online-first   | Supabase + IDB cache       | Supabase RPCs      | Broadcast + Presence      |
-| Poke/Kiss         | Supabase-first | Supabase `interactions`    | N/A (direct)       | `postgres_changes` (INSERT) |
-| Settings/Theme    | Local-only     | localStorage (persist)     | N/A                | None                      |
-| Partner Management| Supabase-first | Supabase `users`/RPCs      | N/A (direct)       | None                      |
+| Feature            | Data Pattern   | Primary Storage            | Sync Target      | Realtime Channel            |
+| ------------------ | -------------- | -------------------------- | ---------------- | --------------------------- |
+| Daily Messages     | Offline-first  | IndexedDB `messages` store | N/A (local only) | None                        |
+| Mood Tracking      | Offline-first  | IndexedDB `moods` store    | Supabase `moods` | Broadcast API (partner)     |
+| Photo Gallery      | Supabase-first | Supabase Storage `photos`  | N/A (direct)     | None                        |
+| Love Notes Chat    | Supabase-first | Supabase `love_notes`      | N/A (direct)     | Broadcast API (partner)     |
+| Scripture Reading  | Online-first   | Supabase + IDB cache       | Supabase RPCs    | Broadcast + Presence        |
+| Poke/Kiss          | Supabase-first | Supabase `interactions`    | N/A (direct)     | `postgres_changes` (INSERT) |
+| Settings/Theme     | Local-only     | localStorage (persist)     | N/A              | None                        |
+| Partner Management | Supabase-first | Supabase `users`/RPCs      | N/A (direct)     | None                        |
 
 ## Key Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Single Zustand store (not Redux) | Less boilerplate, native TypeScript generics, built-in persist middleware |
-| IndexedDB over localStorage for large data | localStorage has 5-10MB limit; IndexedDB handles binary blobs (photos), structured data, and indexed queries |
-| InjectManifest over GenerateSW | Full control over service worker: custom Background Sync, selective caching strategies, message handling |
-| Zod v4 (not v3) | Better TypeScript inference, smaller bundle, `z.coerce` for date parsing |
-| Supabase Broadcast (not postgres_changes for chat) | Broadcast is ephemeral and lower-latency; no persistent subscription cost for transient messages |
-| react-window (not react-virtuoso) | Lighter weight, sufficient for simple list virtualization |
-| Manual chunk splitting | Predictable cache keys for vendor libraries; avoids cache-busting on app code changes |
-| fnox/age for secrets (not dotenvx/Doppler) | Age works everywhere (Mac, SSH, WSL, headless, CI); macOS Keychain fails in non-GUI SSH sessions |
-| Sentry for error tracking | Production crash visibility for a 2-user app where bugs may go unreported |
+| Decision                                           | Rationale                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Single Zustand store (not Redux)                   | Less boilerplate, native TypeScript generics, built-in persist middleware                                    |
+| IndexedDB over localStorage for large data         | localStorage has 5-10MB limit; IndexedDB handles binary blobs (photos), structured data, and indexed queries |
+| InjectManifest over GenerateSW                     | Full control over service worker: custom Background Sync, selective caching strategies, message handling     |
+| Zod v4 (not v3)                                    | Better TypeScript inference, smaller bundle, `z.coerce` for date parsing                                     |
+| Supabase Broadcast (not postgres_changes for chat) | Broadcast is ephemeral and lower-latency; no persistent subscription cost for transient messages             |
+| react-window (not react-virtuoso)                  | Lighter weight, sufficient for simple list virtualization                                                    |
+| Manual chunk splitting                             | Predictable cache keys for vendor libraries; avoids cache-busting on app code changes                        |
+| fnox/age for secrets (not dotenvx/Doppler)         | Age works everywhere (Mac, SSH, WSL, headless, CI); macOS Keychain fails in non-GUI SSH sessions             |
+| Sentry for error tracking                          | Production crash visibility for a 2-user app where bugs may go unreported                                    |
 
 ## Deployment
 

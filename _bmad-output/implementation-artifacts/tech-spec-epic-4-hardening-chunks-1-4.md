@@ -5,7 +5,15 @@ created: '2026-03-02'
 status: 'completed'
 stepsCompleted: [1, 2, 3, 4]
 adversarialReview: { findings: 13, allFixed: true, reviewer: 'sonnet' }
-tech_stack: ['@sentry/react ^10.39.0', '@supabase/supabase-js ^2.97.0', 'zustand ^5.0.11', 'react ^19.2.4', 'vitest ^4.0.17', 'postgresql (pgTAP)']
+tech_stack:
+  [
+    '@sentry/react ^10.39.0',
+    '@supabase/supabase-js ^2.97.0',
+    'zustand ^5.0.11',
+    'react ^19.2.4',
+    'vitest ^4.0.17',
+    'postgresql (pgTAP)',
+  ]
 files_to_modify:
   - 'src/services/scriptureReadingService.ts'
   - 'src/hooks/useScriptureBroadcast.ts'
@@ -49,12 +57,14 @@ Wire `@sentry/react` into the existing `handleScriptureError` function so all sc
 **In Scope (11 items across 2 chunks):**
 
 **Chunk 1 — Error Observability:**
+
 - C2: Wire Sentry into `handleScriptureError` (`scriptureReadingService.ts`)
 - C4: Add `.catch()` to `channel.send()` calls (`useScriptureBroadcast.ts`)
 - E7: Wrap `_broadcastFn` invocations in try/catch (`useScriptureBroadcast.ts`)
 - T3: Test endSession phase ordering (new test file)
 
 **Chunk 4 — Auth + SQL Hardening:**
+
 - E4: Auth error check in `loadSession` (`scriptureReadingSlice.ts`)
 - E5: Null user guard in broadcast (`useScriptureBroadcast.ts`)
 - I8: Null `currentUserId` guard in `selectRole` (`scriptureReadingSlice.ts`)
@@ -64,6 +74,7 @@ Wire `@sentry/react` into the existing `handleScriptureError` function so all sc
 - A4: Clear role columns in `convertToSolo` (migration)
 
 **Out of Scope:**
+
 - Chunk 2: Reconnection Resilience (MAX_RETRIES, backoff, presence CLOSED handler) — depends on Chunk 1
 - Chunk 3: State Correctness (version guard ordering, scoped reset, structured error matching) — depends on Chunk 1
 - I12: Supabase version pinning — retro artifact error (no v6 exists; dropped)
@@ -75,11 +86,13 @@ Wire `@sentry/react` into the existing `handleScriptureError` function so all sc
 ### Codebase Patterns
 
 **Error Handling (Current State — Problem):**
+
 - `handleScriptureError` (`scriptureReadingService.ts:48-72`) uses a switch/case on `ScriptureErrorCode` enum. Each case only calls `console.warn()` or `console.error()`. No Sentry integration.
 - Sentry is already initialized in `src/config/sentry.ts` with `@sentry/react ^10.39.0`. Provides `Sentry.captureException()`, `Sentry.captureMessage()`, and `Sentry.setTag()`. `Sentry.init()` ignores `NetworkError`, `Failed to fetch`, `Load failed` — so offline errors won't double-report.
 - `ScriptureErrorCode` enum has 7 values: `VERSION_MISMATCH`, `SESSION_NOT_FOUND`, `UNAUTHORIZED`, `SYNC_FAILED`, `OFFLINE`, `CACHE_CORRUPTED`, `VALIDATION_FAILED`.
 
 **Channel Operations (Current State — Problem):**
+
 - `useScriptureBroadcast.ts:174` — `void channel.send({ type: 'broadcast', event, payload })` — no `.catch()`.
 - `useScriptureBroadcast.ts:179-183` — `void channel.send(...)` for partner_joined — no `.catch()`.
 - `useScriptureBroadcast.ts:197` — `void supabase.removeChannel(channel).then(...)` — `.then()` but no `.catch()`.
@@ -87,17 +100,20 @@ Wire `@sentry/react` into the existing `handleScriptureError` function so all sc
 - `useScriptureBroadcast.ts:236` — cleanup `void supabase.removeChannel(channelRef.current)` — no `.catch()`.
 
 **Broadcast Function (Current State — Problem):**
+
 - `_broadcastFn` is set via `setBroadcastFn` at `scriptureReadingSlice.ts:982` — it wraps `channel.send()`.
 - Called in 8 places across the slice (lines 591, 639, 670, 822, 840, 849, 916, 964) — all as `get()._broadcastFn?.('event', payload)`.
 - The function calls `void channel.send()` which returns a Promise — if the channel is in a bad state, this can throw synchronously or reject.
 
 **Auth Pattern (Current State — Problem):**
+
 - `loadSession` (`scriptureReadingSlice.ts:247-248`): `const { data: authData } = await supabase.auth.getUser()` — ignores `error` field. If auth fails, `authData.user?.id` is `undefined` → `currentUserId` set to `null`.
 - `selectRole` (`scriptureReadingSlice.ts:561`): Same pattern — no auth error check. `currentUserId` can be `null`, then passed to user1/user2 comparison logic silently producing wrong results.
 - `checkForActiveSession` (`scriptureReadingSlice.ts:288-293`): Already has proper null guard — `if (!userId) { set({ isCheckingSession: false }); return; }`. This is the pattern to follow.
 - `useScriptureBroadcast.ts:154-158`: `const { data: authData, error: authError } = await supabase.auth.getUser()` — does check `authError` and throws. But `userId = authData.user?.id ?? ''` uses empty string fallback instead of bailing out.
 
 **SQL Patterns (Current State — Problem):**
+
 - **Migration history:** `20260301000200_remove_server_side_broadcasts.sql` is the CURRENT LIVE version of all 6 scripture RPCs (removed `realtime.send()`). Later migration `20260302000100` fixed `current_phase` but regressed `scripture_end_session` to SECURITY DEFINER. All SQL tasks must copy from `20260301000200` as the base.
 - `scripture_end_session` in `20260302000100_fix_end_session_current_phase.sql` uses `SECURITY DEFINER` — all other 5 scripture RPCs use `SECURITY INVOKER`. Decision: revert to INVOKER by copying from `20260301000200` and merging in the `current_phase = 'complete'` fix.
 - `scripture_lock_in` in `20260301000200` (line ~300) uses hardcoded `IF p_step_index < 16` — should use a declared variable `v_max_step_index`.
@@ -106,18 +122,18 @@ Wire `@sentry/react` into the existing `handleScriptureError` function so all sc
 
 ### Files to Reference
 
-| File | Purpose | Lines |
-| ---- | ------- | ----- |
-| `src/services/scriptureReadingService.ts` | `handleScriptureError` (lines 48-72), `ScriptureErrorCode` enum (lines 32-40) | 943 |
-| `src/hooks/useScriptureBroadcast.ts` | Channel lifecycle, `channel.send()` (lines 174, 179), `removeChannel` (lines 197, 211, 236) | 251 |
-| `src/stores/slices/scriptureReadingSlice.ts` | `loadSession` (line 228), `selectRole` (line 551), `_broadcastFn` calls (8 sites) | ~1000 |
-| `src/config/sentry.ts` | Sentry init, `captureException`, `captureMessage` | 55 |
-| `supabase/migrations/20260301000200_remove_server_side_broadcasts.sql` | **COPY SOURCE** for all SQL tasks — current live version of all 6 scripture RPCs (INVOKER, no realtime.send) | 580 |
-| `supabase/migrations/20260302000100_fix_end_session_current_phase.sql` | `current_phase = 'complete'` fix to merge into Task 10 — but has DEFINER regression, do NOT use as base | 64 |
-| `supabase/migrations/20260302000200_add_step_boundary_comment.sql` | Comment to re-add in Task 11 (will be dropped by CREATE OR REPLACE) | 9 |
-| `supabase/migrations/20260220000001_scripture_lobby_and_roles.sql` | RLS policy names reference (for DROP POLICY) — do NOT copy function bodies (has realtime.send) | 367 |
-| `tests/unit/hooks/useScriptureBroadcast.test.ts` | Existing broadcast hook tests — mock pattern reference | ~200 |
-| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | Existing slice tests — mock pattern reference | ~200 |
+| File                                                                   | Purpose                                                                                                      | Lines |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----- |
+| `src/services/scriptureReadingService.ts`                              | `handleScriptureError` (lines 48-72), `ScriptureErrorCode` enum (lines 32-40)                                | 943   |
+| `src/hooks/useScriptureBroadcast.ts`                                   | Channel lifecycle, `channel.send()` (lines 174, 179), `removeChannel` (lines 197, 211, 236)                  | 251   |
+| `src/stores/slices/scriptureReadingSlice.ts`                           | `loadSession` (line 228), `selectRole` (line 551), `_broadcastFn` calls (8 sites)                            | ~1000 |
+| `src/config/sentry.ts`                                                 | Sentry init, `captureException`, `captureMessage`                                                            | 55    |
+| `supabase/migrations/20260301000200_remove_server_side_broadcasts.sql` | **COPY SOURCE** for all SQL tasks — current live version of all 6 scripture RPCs (INVOKER, no realtime.send) | 580   |
+| `supabase/migrations/20260302000100_fix_end_session_current_phase.sql` | `current_phase = 'complete'` fix to merge into Task 10 — but has DEFINER regression, do NOT use as base      | 64    |
+| `supabase/migrations/20260302000200_add_step_boundary_comment.sql`     | Comment to re-add in Task 11 (will be dropped by CREATE OR REPLACE)                                          | 9     |
+| `supabase/migrations/20260220000001_scripture_lobby_and_roles.sql`     | RLS policy names reference (for DROP POLICY) — do NOT copy function bodies (has realtime.send)               | 367   |
+| `tests/unit/hooks/useScriptureBroadcast.test.ts`                       | Existing broadcast hook tests — mock pattern reference                                                       | ~200  |
+| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts`            | Existing slice tests — mock pattern reference                                                                | ~200  |
 
 ### Technical Decisions
 
@@ -157,10 +173,18 @@ Tasks are ordered by dependency (lowest-level first). Chunk 1 and Chunk 4 can be
       setBroadcastFn?.((event, payload) => {
         try {
           void channel.send({ type: 'broadcast', event, payload }).catch((err: unknown) => {
-            handleScriptureError({ code: ScriptureErrorCode.SYNC_FAILED, message: 'Broadcast send failed', details: err });
+            handleScriptureError({
+              code: ScriptureErrorCode.SYNC_FAILED,
+              message: 'Broadcast send failed',
+              details: err,
+            });
           });
         } catch (err: unknown) {
-          handleScriptureError({ code: ScriptureErrorCode.SYNC_FAILED, message: 'Broadcast send threw synchronously', details: err });
+          handleScriptureError({
+            code: ScriptureErrorCode.SYNC_FAILED,
+            message: 'Broadcast send threw synchronously',
+            details: err,
+          });
         }
       });
       ```
@@ -191,6 +215,7 @@ Tasks are ordered by dependency (lowest-level first). Chunk 1 and Chunk 4 can be
 - [x] **Task 6: Add auth error check in `loadSession`** (E4)
   - File: `src/stores/slices/scriptureReadingSlice.ts`
   - Action: Move the auth check BEFORE the `getSession()` network call. Currently auth happens at line 247, AFTER `getSession()` at line 234. The auth check must come first so we don't make a network call with no authenticated user. Replace lines 234-248:
+
     ```typescript
     // Auth check FIRST — before any network call
     const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -209,6 +234,7 @@ Tasks are ordered by dependency (lowest-level first). Chunk 1 and Chunk 4 can be
     // Now safe to fetch session
     const { data: session, error } = await supabase.from('scripture_sessions').select('*')...
     ```
+
   - Notes: This differs from `checkForActiveSession` (line 288-293), which does auth inline because it uses `auth.getUser()` in the query filter. `loadSession` receives `sessionId` as a param and uses it to query — auth must be a separate pre-check. The key behavioral change is: auth failure now returns early BEFORE hitting the network for the session query.
 
 - [x] **Task 7: Add null `currentUserId` guard in `selectRole`** (I8)
@@ -357,7 +383,7 @@ Tasks are ordered by dependency (lowest-level first). Chunk 1 and Chunk 4 can be
 - Chunk 1 and Chunk 4 can be implemented in parallel since Chunk 4 has no dependency on Chunk 1.
 - The retro identifies Chunks 2+3 as follow-up work after Chunk 1 is complete. A separate quick-spec should be created for those.
 - Source: Epic 4 Retrospective (`_bmad-output/implementation-artifacts/epic-4-retro-2026-03-02.md`)
-- The `_broadcastFn` is called in 8 places in the slice (lines 591, 639, 670, 822, 840, 849, 916, 964). The E7 fix wraps it at the *definition* site (`useScriptureBroadcast.ts:173`) rather than all 8 call sites — single point of defense.
+- The `_broadcastFn` is called in 8 places in the slice (lines 591, 639, 670, 822, 840, 849, 916, 964). The E7 fix wraps it at the _definition_ site (`useScriptureBroadcast.ts:173`) rather than all 8 call sites — single point of defense.
 - Task 2 is the combined C4+E7 implementation for the `setBroadcastFn` lambda (try/catch + `.catch()`) plus the partner_joined `.catch()`.
 - **SQL copy source:** All SQL tasks (10, 11, 13) MUST copy from `20260301000200_remove_server_side_broadcasts.sql` — this is the current live version with `realtime.send()` calls removed. Do NOT copy from older migrations (`20260220000001`, `20260222000001`, `20260302000100`) as they contain either server-side broadcasts or SECURITY DEFINER regressions.
 - The SQL migration creates/replaces 3 functions and drops/recreates 4 RLS policies. All operations should be in a single migration file. Supabase migrations run inside an implicit transaction — if any statement fails, the entire migration rolls back.
@@ -367,21 +393,21 @@ Tasks are ordered by dependency (lowest-level first). Chunk 1 and Chunk 4 can be
 
 An adversarial review (Sonnet model, fresh context) was run against the v1 spec and found 13 findings. All 13 were validated as Real and have been incorporated into this spec:
 
-| # | Severity | Fix Summary |
-|---|----------|-------------|
-| F1 | Critical | Task 10: Changed copy source from `20260302000100` to `20260301000200` |
-| F2 | Critical | Task 10: Added merge of `current_phase = 'complete'` from `20260302000100` to prevent regression |
-| F3 | High | Task 13: Changed copy source from `20260220000001` to `20260301000200` (prevents double-broadcast) |
-| F4 | Medium | Corrected `_broadcastFn` call site count from 7 to 8 (added lines 840, 849) |
-| F5 | High | Task 6: Moved auth check BEFORE `getSession()` network call |
-| F6 | High | Merged Tasks 2+4 into single Task 2 (both modified line 174) |
-| F7 | Medium | Task 8: Added note to NOT set `channelRef.current = null` on early return (prevents orphaned channel) |
-| F8 | Medium | Technical Decision 9: Documented UUID regex case-sensitivity assumption |
-| F9 | High | Task 11: Changed copy source from `20260222000001` to `20260301000200`; re-add comment from `20260302000200` |
-| F10 | Medium | AC-7: Labeled as regression guard; added payload assertion (`triggered_by`, `currentPhase`) |
-| F11 | Low | AC-3: Required explicit `toHaveBeenCalledTimes(1)` assertion |
-| F12 | Low | Fixed selectRole line number reference to 561 |
-| F13 | Medium | Added explicit rollback plan (supabase db reset + partial rollback strategy) |
+| #   | Severity | Fix Summary                                                                                                  |
+| --- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| F1  | Critical | Task 10: Changed copy source from `20260302000100` to `20260301000200`                                       |
+| F2  | Critical | Task 10: Added merge of `current_phase = 'complete'` from `20260302000100` to prevent regression             |
+| F3  | High     | Task 13: Changed copy source from `20260220000001` to `20260301000200` (prevents double-broadcast)           |
+| F4  | Medium   | Corrected `_broadcastFn` call site count from 7 to 8 (added lines 840, 849)                                  |
+| F5  | High     | Task 6: Moved auth check BEFORE `getSession()` network call                                                  |
+| F6  | High     | Merged Tasks 2+4 into single Task 2 (both modified line 174)                                                 |
+| F7  | Medium   | Task 8: Added note to NOT set `channelRef.current = null` on early return (prevents orphaned channel)        |
+| F8  | Medium   | Technical Decision 9: Documented UUID regex case-sensitivity assumption                                      |
+| F9  | High     | Task 11: Changed copy source from `20260222000001` to `20260301000200`; re-add comment from `20260302000200` |
+| F10 | Medium   | AC-7: Labeled as regression guard; added payload assertion (`triggered_by`, `currentPhase`)                  |
+| F11 | Low      | AC-3: Required explicit `toHaveBeenCalledTimes(1)` assertion                                                 |
+| F12 | Low      | Fixed selectRole line number reference to 561                                                                |
+| F13 | Medium   | Added explicit rollback plan (supabase db reset + partial rollback strategy)                                 |
 
 ### Implementation Review Notes
 

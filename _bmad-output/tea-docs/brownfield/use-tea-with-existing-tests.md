@@ -30,6 +30,7 @@ Run `test-review` on current tests to identify quality issues: "Hard waits every
 ### Phase 2: Prioritize Improvements
 
 **Priority Sequence:**
+
 1. P0 requirements to 100% coverage
 2. Eliminate flaky tests using network-first patterns
 3. P1 requirements to 80%+ coverage
@@ -64,13 +65,13 @@ Track quarterly metrics: coverage percentage, quality score, flakiness rates. Ta
 
 ## Common Challenges & Solutions
 
-| Challenge | Solution |
-|-----------|----------|
-| Unknown coverage | Run `trace` to reverse-engineer test mapping |
-| Brittle tests | Make incremental improvements with baseline validation |
-| Missing documentation | Create tests/README.md with setup and execution guides |
-| Slow execution | Configure parallel sharding; implement selective testing |
-| Constant failures | Use `test-review` to identify flakiness patterns |
+| Challenge             | Solution                                                 |
+| --------------------- | -------------------------------------------------------- |
+| Unknown coverage      | Run `trace` to reverse-engineer test mapping             |
+| Brittle tests         | Make incremental improvements with baseline validation   |
+| Missing documentation | Create tests/README.md with setup and execution guides   |
+| Slow execution        | Configure parallel sharding; implement selective testing |
+| Constant failures     | Use `test-review` to identify flakiness patterns         |
 
 ## Recommended Workflow Sequence
 

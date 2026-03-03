@@ -234,7 +234,7 @@ Use `data-testid` attributes for stability:
 
 ```tsx
 // Component
-<button data-testid="submit-button">Submit</button>
+<button data-testid="submit-button">Submit</button>;
 
 // Test — prefer getByTestId over CSS selectors
 await page.getByTestId('submit-button').click();

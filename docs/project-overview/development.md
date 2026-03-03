@@ -24,13 +24,13 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 ### Development
 
-| Command             | Description                                                                  |
-| ------------------- | ---------------------------------------------------------------------------- |
-| `npm run dev`       | Start dev server with process cleanup (use `fnox exec -- npm run dev` for secrets) |
-| `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                                |
-| `npm run preview`   | Preview production build locally                                                   |
-| `npm run build`     | Production build: `tsc -b && vite build` (use `fnox exec -- npm run build` locally)|
-| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                              |
+| Command             | Description                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `npm run dev`       | Start dev server with process cleanup (use `fnox exec -- npm run dev` for secrets)  |
+| `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                                 |
+| `npm run preview`   | Preview production build locally                                                    |
+| `npm run build`     | Production build: `tsc -b && vite build` (use `fnox exec -- npm run build` locally) |
+| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                               |
 
 ### Code Quality
 

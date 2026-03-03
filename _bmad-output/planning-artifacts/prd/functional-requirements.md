@@ -1,6 +1,6 @@
 # Functional Requirements
 
-*This is the capability contract. Every feature must trace back to these requirements.*
+_This is the capability contract. Every feature must trace back to these requirements._
 
 ## Session Management
 
@@ -33,9 +33,9 @@
 - **FR16:** User in lobby can see partner's join status
 - **FR17:** User in lobby can toggle their ready state (Ready / Not Ready)
 - **FR18:** User in lobby (pre-countdown) can fall back to Solo mode without shame messaging
-  - *Note: Fallback is from lobby only. Once Together session starts, MVP behavior is "End session" (no convert-to-solo mid-session).*
+  - _Note: Fallback is from lobby only. Once Together session starts, MVP behavior is "End session" (no convert-to-solo mid-session)._
 - **FR19:** System starts a 3-second countdown when both users are ready
-  - *Note: Countdown start is server-authoritative (timestamp stored) so both clients stay in sync.*
+  - _Note: Countdown start is server-authoritative (timestamp stored) so both clients stay in sync._
 - **FR20:** Reader sees verse text and can mark "Done reading" to advance the phase
 - **FR21:** Responder sees waiting screen while Reader is reading
 - **FR22:** Responder sees response text and can mark "Done" to advance the phase
@@ -46,7 +46,7 @@
 - **FR27:** System shows "Partner reconnecting..." indicator if partner goes offline
 - **FR28:** System pauses phase advancement while partner is offline
 - **FR29:** User can end session cleanly (with confirmation) if partner remains offline
-  - *Note: FR27-29 together ensure graceful offline handling without incorrect phase advancement.*
+  - _Note: FR27-29 together ensure graceful offline handling without incorrect phase advancement._
 
 ---
 
@@ -96,7 +96,7 @@
 - **FR51:** User using screen reader receives clear aria-labels for rating scale
 - **FR52:** System moves focus appropriately on phase transitions
 - **FR53:** System respects `prefers-reduced-motion` by disabling motion-heavy animations
-  - *Note: Countdown can remain but without motion effects.*
+  - _Note: Countdown can remain but without motion effects._
 - **FR54:** System uses icons/text alongside color for state indicators (not color-only)
 
 ---

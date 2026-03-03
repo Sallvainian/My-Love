@@ -240,15 +240,15 @@ Cache-first CRUD service for scripture reading data. Uses a **read pattern** of:
 
 Defines `ScriptureErrorCode` enum and `ScriptureError` interface. The `handleScriptureError()` function routes errors to Sentry with tags:
 
-| Error Code | Sentry Level | Action |
-|------------|-------------|--------|
-| `VERSION_MISMATCH` | warning | `captureMessage` -- refetch needed |
-| `SYNC_FAILED` | warning | `captureMessage` -- queue for retry |
-| `CACHE_CORRUPTED` | error | `captureException` -- clear and refetch |
-| `SESSION_NOT_FOUND` | error | `captureException` |
-| `UNAUTHORIZED` | error | `captureException` |
-| `OFFLINE` | info | `captureMessage` |
-| `VALIDATION_FAILED` | warning | `captureMessage` |
+| Error Code          | Sentry Level | Action                                  |
+| ------------------- | ------------ | --------------------------------------- |
+| `VERSION_MISMATCH`  | warning      | `captureMessage` -- refetch needed      |
+| `SYNC_FAILED`       | warning      | `captureMessage` -- queue for retry     |
+| `CACHE_CORRUPTED`   | error        | `captureException` -- clear and refetch |
+| `SESSION_NOT_FOUND` | error        | `captureException`                      |
+| `UNAUTHORIZED`      | error        | `captureException`                      |
+| `OFFLINE`           | info         | `captureMessage`                        |
+| `VALIDATION_FAILED` | warning      | `captureMessage`                        |
 
 ### Session Methods
 
@@ -296,6 +296,7 @@ Calls `scripture_get_couple_stats` RPC. Validates response with `CoupleStatsSche
 ### Corruption Recovery
 
 If `SupabaseSessionSchema.parse()` fails for a cached session, the service:
+
 1. Clears the corrupted entry from IndexedDB
 2. Reports `CACHE_CORRUPTED` error to Sentry
 3. Re-fetches from Supabase
@@ -312,8 +313,8 @@ Tracks operation execution times using the Web Performance API (`performance.now
 
 ```typescript
 interface PerformanceMetric {
-  name: string;       // Operation name (e.g., 'db-read', 'photo-upload')
-  count: number;      // Execution count
+  name: string; // Operation name (e.g., 'db-read', 'photo-upload')
+  count: number; // Execution count
   avgDuration: number; // Average time in ms
   minDuration: number; // Minimum time in ms
   maxDuration: number; // Maximum time in ms
@@ -324,14 +325,14 @@ interface PerformanceMetric {
 
 ### Methods
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
+| Method                          | Signature                                   | Description                                                       |
+| ------------------------------- | ------------------------------------------- | ----------------------------------------------------------------- |
 | `measureAsync(name, operation)` | `<T>(string, () => Promise<T>): Promise<T>` | Wraps async operation with timing; records metric on success only |
-| `recordMetric(name, duration)` | `(string, number): void` | Records a custom metric value |
-| `getMetrics(name)` | `(string): PerformanceMetric \| undefined` | Get metrics for a specific operation |
-| `getAllMetrics()` | `(): Map<string, PerformanceMetric>` | Get all recorded metrics |
-| `clear()` | `(): void` | Reset all metrics |
-| `getReport()` | `(): string` | Human-readable report sorted by total duration |
+| `recordMetric(name, duration)`  | `(string, number): void`                    | Records a custom metric value                                     |
+| `getMetrics(name)`              | `(string): PerformanceMetric \| undefined`  | Get metrics for a specific operation                              |
+| `getAllMetrics()`               | `(): Map<string, PerformanceMetric>`        | Get all recorded metrics                                          |
+| `clear()`                       | `(): void`                                  | Reset all metrics                                                 |
+| `getReport()`                   | `(): string`                                | Human-readable report sorted by total duration                    |
 
 In DEV mode, each metric recording logs to console: `[PerfMonitor] {name}: {duration}ms`.
 

@@ -18,16 +18,16 @@ TEA delivers actionable quality strategies, automation coverage, and gate decisi
 
 ## Nine Core Workflows
 
-| Command | Primary Outputs | Key Feature |
-|---------|-----------------|-------------|
-| `framework` | Playwright/Cypress scaffold | Use when no production harness exists |
-| `ci` | CI workflow, test scripts | Platform-aware (GitHub Actions default) |
-| `test-design` | Risk assessment + coverage strategy | **+ Exploratory**: Interactive UI discovery |
-| `atdd` | Failing acceptance tests | **+ Recording**: Live browser verification |
-| `automate` | Prioritized specs, fixtures | **+ Healing**: Visual debugging + trace analysis |
-| `test-review` | Quality review report (0-100 score) | Reviews against knowledge base patterns |
-| `nfr-assess` | NFR assessment report | Focuses on security/performance/reliability |
-| `trace` | Coverage matrix + gate decision | Two-phase: traceability then go/no-go |
+| Command       | Primary Outputs                     | Key Feature                                      |
+| ------------- | ----------------------------------- | ------------------------------------------------ |
+| `framework`   | Playwright/Cypress scaffold         | Use when no production harness exists            |
+| `ci`          | CI workflow, test scripts           | Platform-aware (GitHub Actions default)          |
+| `test-design` | Risk assessment + coverage strategy | **+ Exploratory**: Interactive UI discovery      |
+| `atdd`        | Failing acceptance tests            | **+ Recording**: Live browser verification       |
+| `automate`    | Prioritized specs, fixtures         | **+ Healing**: Visual debugging + trace analysis |
+| `test-review` | Quality review report (0-100 score) | Reviews against knowledge base patterns          |
+| `nfr-assess`  | NFR assessment report               | Focuses on security/performance/reliability      |
+| `trace`       | Coverage matrix + gate decision     | Two-phase: traceability then go/no-go            |
 
 ## BMad Method Integration - Phase Structure
 
@@ -37,6 +37,7 @@ TEA delivers actionable quality strategies, automation coverage, and gate decisi
 **Phase 4** (Required): Implementation
 
 TEA integrates across phases:
+
 - **Phase 2**: Optional `nfr-assess` (Enterprise)
 - **Phase 3**: `test-design` (system-level), `framework`, `ci` - runs once per project
 - **Phase 4**: Per-epic `test-design`, then `atdd`, `automate`, `test-review`, `trace`
@@ -45,11 +46,13 @@ TEA integrates across phases:
 ## Track-Specific Cheat Sheets
 
 ### Greenfield - BMad Method (Simple/Standard Work)
+
 - Phase 3: Run `framework`, `ci` after architecture
 - Phase 4: Per-epic `test-design`, optional `atdd`, then `automate`
 - Gate: Optional `test-review`, run `trace` Phase 2
 
 ### Brownfield - BMad Method or Enterprise
+
 - Documentation (Prerequisite): Use `document-project` if undocumented
 - Phase 2: Run `trace` baseline coverage
 - Phase 3: `framework`, `ci`
@@ -57,6 +60,7 @@ TEA integrates across phases:
 - Gate: Include `nfr-assess` if not done earlier
 
 ### Greenfield - Enterprise Method
+
 - Phase 1: `research` for domain/compliance analysis (recommended)
 - Phase 2: Run `nfr-assess` early
 - Phase 3: `framework`, `ci`
@@ -70,12 +74,14 @@ TEA uniquely requires extensive domain knowledge spanning test patterns, CI/CD, 
 ## Optional Integrations
 
 **Playwright Utils** (`@seontechnologies/playwright-utils`)
+
 - Install: `npm install -D @seontechnologies/playwright-utils`
 - Provides production-ready fixtures and utilities
 - Impacts: `framework`, `atdd`, `automate`, `test-review`, `ci`
 - Includes: api-request, auth-session, network-recorder, intercept-network-call, and others
 
 **Playwright MCP Enhancements**
+
 - Two servers: `playwright` (browser automation) and `playwright-test` (test runner with failure analysis)
 - Enables live browser verification for test design and automation
 - Enhances selector verification and healing capabilities

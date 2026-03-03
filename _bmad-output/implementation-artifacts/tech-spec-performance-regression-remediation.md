@@ -52,6 +52,7 @@ Implement a focused remediation pass that (1) establishes reliable build/perform
 ### Scope
 
 **In Scope:**
+
 - Performance baseline capture from production build artifacts and reproducible commands
 - Startup payload reduction (initial route and common app shell)
 - Auth-related import-graph cleanup that improves chunking behavior
@@ -59,6 +60,7 @@ Implement a focused remediation pass that (1) establishes reliable build/perform
 - Validation via build output and test runs relevant to touched areas
 
 **Out of Scope:**
+
 - Large feature rewrites unrelated to startup performance
 - New product features or UX redesign
 - Backend/database performance tuning outside frontend payload/runtime behavior
@@ -76,18 +78,18 @@ Implement a focused remediation pass that (1) establishes reliable build/perform
 
 ### Files to Reference
 
-| File | Purpose |
-| ---- | ------- |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/vite.config.ts` | Chunk strategy and build plugin behavior |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/App.tsx` | Startup app shell, lazy boundaries, auth at app bootstrap |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/stores/slices/settingsSlice.ts` | First-run initialization and default message seeding |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/api/authService.ts` | Auth API surface causing broad eager imports |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/api/supabaseClient.ts` | Dynamic auth import path and chunking warning context |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/components/Navigation/__tests__/BottomNavigation.test.tsx` | Auth service mocking pattern in component tests |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/hooks/__tests__/useRealtimeMessages.test.ts` | Supabase/auth mocking pattern in hook tests |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/_bmad-output/project-context.md` | Canonical project rules and architecture constraints |
-| `/Users/sallvain/Projects/My-Love/dist/stats.html` | Measured bundle graph for current commit (same HEAD) |
-| `/Users/sallvain/.codex/worktrees/b241/My-Love/_bmad-output/planning-artifacts/prd/non-functional-requirements.md` | Latency and responsiveness NFR targets |
+| File                                                                                                               | Purpose                                                   |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/vite.config.ts`                                                     | Chunk strategy and build plugin behavior                  |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/App.tsx`                                                        | Startup app shell, lazy boundaries, auth at app bootstrap |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/stores/slices/settingsSlice.ts`                                 | First-run initialization and default message seeding      |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/api/authService.ts`                                             | Auth API surface causing broad eager imports              |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/api/supabaseClient.ts`                                          | Dynamic auth import path and chunking warning context     |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/components/Navigation/__tests__/BottomNavigation.test.tsx`      | Auth service mocking pattern in component tests           |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/src/hooks/__tests__/useRealtimeMessages.test.ts`                    | Supabase/auth mocking pattern in hook tests               |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/_bmad-output/project-context.md`                                    | Canonical project rules and architecture constraints      |
+| `/Users/sallvain/Projects/My-Love/dist/stats.html`                                                                 | Measured bundle graph for current commit (same HEAD)      |
+| `/Users/sallvain/.codex/worktrees/b241/My-Love/_bmad-output/planning-artifacts/prd/non-functional-requirements.md` | Latency and responsiveness NFR targets                    |
 
 ### Technical Decisions
 

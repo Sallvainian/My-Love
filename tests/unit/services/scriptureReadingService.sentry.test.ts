@@ -13,7 +13,11 @@ import {
   ScriptureErrorCode,
 } from '../../../src/services/scriptureReadingService';
 
-const mockScopeInstances: Array<{ setTag: ReturnType<typeof vi.fn>; setLevel: ReturnType<typeof vi.fn>; setExtra: ReturnType<typeof vi.fn> }> = [];
+const mockScopeInstances: Array<{
+  setTag: ReturnType<typeof vi.fn>;
+  setLevel: ReturnType<typeof vi.fn>;
+  setExtra: ReturnType<typeof vi.fn>;
+}> = [];
 
 vi.mock('@sentry/react', () => ({
   withScope: vi.fn((callback: (scope: unknown) => void) => {
@@ -106,7 +110,9 @@ describe('handleScriptureError — Sentry integration', () => {
     expect(Sentry.withScope).toHaveBeenCalledTimes(1);
     expect(Sentry.captureMessage).toHaveBeenCalledWith('Sync failed — queue for retry');
     // F2 fix: warning-level errors now include details as extra context
-    expect(mockScopeInstances[0].setExtra).toHaveBeenCalledWith('details', { reason: 'channel timeout' });
+    expect(mockScopeInstances[0].setExtra).toHaveBeenCalledWith('details', {
+      reason: 'channel timeout',
+    });
   });
 
   test('VERSION_MISMATCH calls Sentry.captureMessage with level warning', () => {

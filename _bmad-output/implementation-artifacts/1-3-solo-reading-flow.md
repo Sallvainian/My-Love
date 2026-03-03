@@ -146,18 +146,18 @@ So that I can engage with scripture in a calm, self-paced experience.
 
 Story 1.1 and 1.2 created substantial infrastructure. These files **already exist**:
 
-| File | Status | Notes |
-|------|--------|-------|
-| `src/stores/slices/scriptureReadingSlice.ts` | EXISTS | Has `advanceStep`, `saveAndExit`, `createSession`, `loadSession`, `exitSession` |
-| `src/services/scriptureReadingService.ts` (857 lines) | EXISTS | Full CRUD, cache-first reads, write-through, error recovery |
-| `src/data/scriptureSteps.ts` | EXISTS | 17 steps, MAX_STEPS=17, verse/response data |
-| `src/services/dbSchema.ts` | EXISTS | DB_VERSION=5, all scripture stores |
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | EXISTS | Already has session routing to SoloReadingFlow |
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | EXISTS | **ALREADY IMPLEMENTED** — full reading flow component |
-| `src/components/scripture-reading/index.ts` | EXISTS | Barrel exports ScriptureOverview + SoloReadingFlow |
-| `tests/e2e/scripture/scripture-solo-reading.spec.ts` | EXISTS | E2E test specs (P0-009, P1-001, P1-010, P1-011, P1-012, P2-012) |
-| `tests/unit/stores/scriptureReadingSlice.test.ts` | EXISTS | Slice tests including advanceStep + saveAndExit |
-| `src/validation/schemas.ts` | EXISTS | Centralized Zod schemas |
+| File                                                                | Status | Notes                                                                           |
+| ------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| `src/stores/slices/scriptureReadingSlice.ts`                        | EXISTS | Has `advanceStep`, `saveAndExit`, `createSession`, `loadSession`, `exitSession` |
+| `src/services/scriptureReadingService.ts` (857 lines)               | EXISTS | Full CRUD, cache-first reads, write-through, error recovery                     |
+| `src/data/scriptureSteps.ts`                                        | EXISTS | 17 steps, MAX_STEPS=17, verse/response data                                     |
+| `src/services/dbSchema.ts`                                          | EXISTS | DB_VERSION=5, all scripture stores                                              |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | EXISTS | Already has session routing to SoloReadingFlow                                  |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`   | EXISTS | **ALREADY IMPLEMENTED** — full reading flow component                           |
+| `src/components/scripture-reading/index.ts`                         | EXISTS | Barrel exports ScriptureOverview + SoloReadingFlow                              |
+| `tests/e2e/scripture/scripture-solo-reading.spec.ts`                | EXISTS | E2E test specs (P0-009, P1-001, P1-010, P1-011, P1-012, P2-012)                 |
+| `tests/unit/stores/scriptureReadingSlice.test.ts`                   | EXISTS | Slice tests including advanceStep + saveAndExit                                 |
+| `src/validation/schemas.ts`                                         | EXISTS | Centralized Zod schemas                                                         |
 
 ## ⚠️ CRITICAL: Implementation Status Assessment
 
@@ -173,14 +173,14 @@ Story 1.1 and 1.2 created substantial infrastructure. These files **already exis
 
 The current component implements:
 
-| AC | Implementation | Status | Gap |
-|----|---------------|--------|-----|
-| #1 Session start | ScriptureOverview routes to SoloReadingFlow when `session.status === 'in_progress' && session.mode === 'solo'` | ✅ Done | None — session creation in Story 1.2 |
-| #2 Verse screen | Verse ref (`text-sm font-medium text-purple-500`), verse text (`font-serif text-xl` in glass card), progress ("Verse X of 17"), View Response + Next Verse buttons | ✅ Done | Verify font sizes match AC spec (Inter 500 12px, Playfair 400 20px) |
-| #3 Response screen | Response text (`text-base text-purple-800`), Back to Verse + Next Verse, crossfade 200ms, `useReducedMotion()` | ✅ Done | None |
-| #4 Step advancement | `advanceStep()` increments step, slide-left 300ms, progress updates | ✅ Done | None |
-| #5 Session completion | On last step → phase='reflection', status='complete', placeholder screen with "Return to Overview" | ✅ Done | None |
-| #6 Exit with save | X button → dialog "Save your progress?" with Save & Exit / Cancel, calls `saveAndExit()` | ✅ Done | None |
+| AC                    | Implementation                                                                                                                                                     | Status  | Gap                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------- |
+| #1 Session start      | ScriptureOverview routes to SoloReadingFlow when `session.status === 'in_progress' && session.mode === 'solo'`                                                     | ✅ Done | None — session creation in Story 1.2                                |
+| #2 Verse screen       | Verse ref (`text-sm font-medium text-purple-500`), verse text (`font-serif text-xl` in glass card), progress ("Verse X of 17"), View Response + Next Verse buttons | ✅ Done | Verify font sizes match AC spec (Inter 500 12px, Playfair 400 20px) |
+| #3 Response screen    | Response text (`text-base text-purple-800`), Back to Verse + Next Verse, crossfade 200ms, `useReducedMotion()`                                                     | ✅ Done | None                                                                |
+| #4 Step advancement   | `advanceStep()` increments step, slide-left 300ms, progress updates                                                                                                | ✅ Done | None                                                                |
+| #5 Session completion | On last step → phase='reflection', status='complete', placeholder screen with "Return to Overview"                                                                 | ✅ Done | None                                                                |
+| #6 Exit with save     | X button → dialog "Save your progress?" with Save & Exit / Cancel, calls `saveAndExit()`                                                                           | ✅ Done | None                                                                |
 
 ## What Actually Needs Work
 
@@ -196,18 +196,18 @@ The current component implements:
 
 ## data-testid Mismatch Analysis
 
-| E2E Spec TestID | Component TestID | Action Needed |
-|-----------------|-----------------|---------------|
-| `scripture-verse-reference` | `verse-reference` | **FIX** — align to one convention |
-| `scripture-verse-text` | `verse-text` | **FIX** |
-| `scripture-progress-indicator` | `progress-indicator` | **FIX** |
-| `scripture-view-response-button` | `view-response-button` | **FIX** |
-| `scripture-next-verse-button` | `next-verse-button` | **FIX** |
-| `scripture-response-text` | `response-text` | **FIX** |
-| `scripture-back-to-verse-button` | `back-to-verse-button` | **FIX** |
-| `scripture-completion-screen` | `reading-complete` | **FIX** |
-| `scripture-start-button` | `start-button` | **FIX** (in ScriptureOverview) |
-| `scripture-mode-solo` | Solo ModeCard (no testid) | **FIX** — add testid to Solo mode card |
+| E2E Spec TestID                  | Component TestID          | Action Needed                          |
+| -------------------------------- | ------------------------- | -------------------------------------- |
+| `scripture-verse-reference`      | `verse-reference`         | **FIX** — align to one convention      |
+| `scripture-verse-text`           | `verse-text`              | **FIX**                                |
+| `scripture-progress-indicator`   | `progress-indicator`      | **FIX**                                |
+| `scripture-view-response-button` | `view-response-button`    | **FIX**                                |
+| `scripture-next-verse-button`    | `next-verse-button`       | **FIX**                                |
+| `scripture-response-text`        | `response-text`           | **FIX**                                |
+| `scripture-back-to-verse-button` | `back-to-verse-button`    | **FIX**                                |
+| `scripture-completion-screen`    | `reading-complete`        | **FIX**                                |
+| `scripture-start-button`         | `start-button`            | **FIX** (in ScriptureOverview)         |
+| `scripture-mode-solo`            | Solo ModeCard (no testid) | **FIX** — add testid to Solo mode card |
 
 **Recommendation:** Update the component `data-testid` values to match E2E specs (prefix with `scripture-`). This is the safer option since E2E specs were reviewed/written first and components should conform.
 
@@ -219,17 +219,17 @@ The current component implements:
   - [Source: architecture/implementation-patterns-consistency-rules.md#Process Patterns]
 
 - **Zustand selector pattern:** Use object selector, never bare `useAppStore()`.
+
   ```typescript
-  const { session, isSyncing, scriptureError, advanceStep, saveAndExit } = useAppStore(
-    (state) => ({
-      session: state.session,
-      isSyncing: state.isSyncing,
-      scriptureError: state.scriptureError,
-      advanceStep: state.advanceStep,
-      saveAndExit: state.saveAndExit,
-    })
-  );
+  const { session, isSyncing, scriptureError, advanceStep, saveAndExit } = useAppStore((state) => ({
+    session: state.session,
+    isSyncing: state.isSyncing,
+    scriptureError: state.scriptureError,
+    advanceStep: state.advanceStep,
+    saveAndExit: state.saveAndExit,
+  }));
   ```
+
   - [Source: docs/project-context.md#Framework-Specific Rules]
 
 - **Error handling:** Use `ScriptureErrorCode` enum + `handleScriptureError()`. Errors surfaced via `scriptureError` from slice.
@@ -249,19 +249,19 @@ The current component implements:
 
 ```typescript
 const scriptureTheme = {
-  primary: '#A855F7',     // Purple-500
-  background: '#F3E5F5',  // Light lavender
-  surface: '#FAF5FF',     // Very light purple
+  primary: '#A855F7', // Purple-500
+  background: '#F3E5F5', // Light lavender
+  surface: '#FAF5FF', // Very light purple
 };
 ```
 
 ## Animation Specifications
 
-| Transition | Duration | Type | Reduced Motion |
-|------------|----------|------|----------------|
-| Verse ↔ Response | 200ms | Crossfade (opacity) | Instant (0ms) |
-| Step → Step | 300ms | Slide-left + fade | Instant (0ms) |
-| Exit dialog | 200ms | Crossfade + scale | Instant (0ms) |
+| Transition       | Duration | Type                | Reduced Motion |
+| ---------------- | -------- | ------------------- | -------------- |
+| Verse ↔ Response | 200ms    | Crossfade (opacity) | Instant (0ms)  |
+| Step → Step      | 300ms    | Slide-left + fade   | Instant (0ms)  |
+| Exit dialog      | 200ms    | Crossfade + scale   | Instant (0ms)  |
 
 Animation handled via Framer Motion `AnimatePresence` + `motion.div` with `useReducedMotion()` hook.
 
@@ -301,6 +301,7 @@ Completion Screen
 ## Button Styling Reference
 
 **Primary (Next Verse, Save & Exit, Complete Reading, Return to Overview):**
+
 ```
 w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl
 font-semibold text-lg hover:from-purple-600 hover:to-purple-700
@@ -309,6 +310,7 @@ min-h-[56px] shadow-lg shadow-purple-500/25
 ```
 
 **Secondary (View Response, Back to Verse):**
+
 ```
 w-full py-3 px-4 bg-white/80 backdrop-blur-sm border border-purple-200/50
 text-purple-700 rounded-xl font-medium hover:bg-purple-50/80
@@ -323,14 +325,14 @@ advanceStep: async () => {
   // Normal: increment currentStepIndex, set isSyncing, persist via updateSession
   // Last step: set phase='reflection', status='complete', persist completion
   // Error: set scriptureError with SYNC_FAILED, clear isSyncing
-}
+};
 
 // saveAndExit: Persist current state to server + clear session
 saveAndExit: async () => {
   // Persist current step/phase/status to server
   // On success: clear all slice state (return to overview)
   // On error: set scriptureError, keep session state (don't lose progress)
-}
+};
 ```
 
 ## Cache/Persistence Pattern
@@ -346,6 +348,7 @@ Session Load (resume): Cache first → return cached → fetch fresh → update 
 **New unit test file needed:** `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`
 
 **Mock strategy:**
+
 ```typescript
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: vi.fn(),
@@ -372,6 +375,7 @@ const mockState = {
 ```
 
 **Test coverage targets:**
+
 - All 6 ACs covered
 - All button interactions
 - Both sub-views (verse, response)
@@ -384,6 +388,7 @@ const mockState = {
 - Reduced motion fallback (optional: mock `useReducedMotion`)
 
 **Existing slice tests to verify/extend:**
+
 - `tests/unit/stores/scriptureReadingSlice.test.ts` already has tests for `advanceStep` and `saveAndExit`
 - Verify edge cases: last-step completion, server error during advance, save failure preserves session
 
@@ -401,15 +406,15 @@ These tests should pass once `data-testid` values are aligned.
 
 ## Technology Versions (Locked)
 
-| Technology | Version | Notes |
-|-----------|---------|-------|
-| React | 19.2.3 | Hooks only |
-| TypeScript | 5.9.3 | Strict mode |
-| Zustand | 5.0.10 | Slice composition |
-| Framer Motion | 12.27.1 | AnimatePresence, useReducedMotion |
-| Vitest | 4.0.17 | Unit tests |
-| Testing Library | 16.3.2 | Component tests |
-| Tailwind CSS | 4.1.17 | Lavender theme |
+| Technology      | Version | Notes                             |
+| --------------- | ------- | --------------------------------- |
+| React           | 19.2.3  | Hooks only                        |
+| TypeScript      | 5.9.3   | Strict mode                       |
+| Zustand         | 5.0.10  | Slice composition                 |
+| Framer Motion   | 12.27.1 | AnimatePresence, useReducedMotion |
+| Vitest          | 4.0.17  | Unit tests                        |
+| Testing Library | 16.3.2  | Component tests                   |
+| Tailwind CSS    | 4.1.17  | Lavender theme                    |
 
 ## Project Structure Notes
 
@@ -450,12 +455,15 @@ These tests should pass once `data-testid` values are aligned.
 ## Dev Agent Record
 
 ## Agent Model Used
+
 claude-opus-4-5 (via OpenClaw subagent)
 
 ## Debug Log References
+
 None — clean implementation pass
 
 ## Completion Notes List
+
 - SoloReadingFlow.tsx was already fully implemented from prior work
 - SoloReadingFlow.test.tsx created with 50 comprehensive unit tests covering all 6 ACs
 - Fixed data-testid mismatch: component testids aligned to E2E spec convention (scripture- prefix)
@@ -466,16 +474,17 @@ None — clean implementation pass
 - Pre-existing failure: useMotionConfig.test.ts references non-existent file (not Story 1.3 scope)
 
 ## Change Log
+
 - **SoloReadingFlow.tsx**: Updated 8 data-testid values to use scripture- prefix for E2E alignment
 - **SoloReadingFlow.test.tsx**: Updated all 50 tests to use new scripture-prefixed testids
 - **ScriptureOverview.tsx**: Added testId prop to ModeCard, scripture-mode-solo to Solo card, start-button → scripture-start-button
 - **ScriptureOverview.test.tsx**: Updated 21 start-button references to scripture-start-button
 
 ## File List
-- src/components/scripture-reading/containers/SoloReadingFlow.tsx (modified — testid alignment)
-- src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx (modified — testid alignment)
-- src/components/scripture-reading/containers/ScriptureOverview.tsx (modified — testid alignment + ModeCard testId prop)
-- src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx (modified — testid alignment)
-- _bmad-output/implementation-artifacts/sprint-status.yaml (modified — status → review)
-- _bmad-output/implementation-artifacts/1-3-solo-reading-flow.md (modified — tasks, status, dev record)
 
+- src/components/scripture-reading/containers/SoloReadingFlow.tsx (modified — testid alignment)
+- src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx (modified — testid alignment)
+- src/components/scripture-reading/containers/ScriptureOverview.tsx (modified — testid alignment + ModeCard testId prop)
+- src/components/scripture-reading/**tests**/ScriptureOverview.test.tsx (modified — testid alignment)
+- \_bmad-output/implementation-artifacts/sprint-status.yaml (modified — status → review)
+- \_bmad-output/implementation-artifacts/1-3-solo-reading-flow.md (modified — tasks, status, dev record)

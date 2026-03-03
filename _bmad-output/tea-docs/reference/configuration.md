@@ -1,11 +1,13 @@
 # TEA Configuration Reference
 
 ## Overview
+
 This is the complete configuration guide for Test Architect (TEA), covering file locations, configuration options, environment variables, patterns, best practices, troubleshooting, and examples.
 
 ## Configuration File Locations
 
 ### User Configuration (Installer-Generated)
+
 - **Location:** `_bmad/tea/config.yaml`
 - **Purpose:** Project-specific configuration values for your repository
 - **Created By:** BMad installer
@@ -13,6 +15,7 @@ This is the complete configuration guide for Test Architect (TEA), covering file
 - **Usage:** Edit this file to change TEA behavior in your project
 
 Example structure:
+
 ```yaml
 project_name: my-awesome-app
 user_skill_level: intermediate
@@ -22,6 +25,7 @@ tea_use_mcp_enhancements: false
 ```
 
 ### Canonical Schema (Source of Truth)
+
 - **Location:** `src/bmm/module.yaml`
 - **Purpose:** Defines available configuration keys, defaults, and installer prompts
 - **Created By:** BMAD maintainers (part of BMAD repo)
@@ -41,12 +45,14 @@ The installer reads `module.yaml` to prompt for config values, then writes user 
 **Installer Prompt:** "Are you using playwright-utils (@seontechnologies/playwright-utils) in your project? You must install packages yourself, or use test architect's `framework` command."
 
 **Purpose:** Enables TEA to:
+
 - Include playwright-utils in `framework` scaffold
 - Generate tests using playwright-utils fixtures
 - Review tests against playwright-utils patterns
 - Configure CI with burn-in and selective testing utilities
 
 **Affects Workflows:**
+
 - `framework` - Includes playwright-utils imports and fixture examples
 - `atdd` - Uses fixtures like `apiRequest`, `authSession` in generated tests
 - `automate` - Leverages utilities for test patterns
@@ -54,16 +60,19 @@ The installer reads `module.yaml` to prompt for config values, then writes user 
 - `ci` - Includes burn-in utility and selective testing
 
 **Enable:**
+
 ```yaml
 tea_use_playwright_utils: true
 ```
 
 **Disable:**
+
 ```yaml
 tea_use_playwright_utils: false
 ```
 
 **Prerequisites:**
+
 ```bash
 npm install -D @seontechnologies/playwright-utils
 ```
@@ -77,12 +86,14 @@ npm install -D @seontechnologies/playwright-utils
 **Installer Prompt:** "Test Architect Playwright MCP capabilities (healing, exploratory, verification) are optionally available. You will have to setup your MCPs yourself; refer to https://docs.bmad-method.org/explanation/features/tea-overview for configuration examples. Would you like to enable MCP enhancements in Test Architect?"
 
 **Purpose:** Enables TEA to use Model Context Protocol servers for:
+
 - Live browser automation during test design
 - Selector verification with actual DOM
 - Interactive UI discovery
 - Visual debugging and healing
 
 **Affects Workflows:**
+
 - `test-design` - Enables exploratory mode (browser-based UI discovery)
 - `atdd` - Enables recording mode (verify selectors with live browser)
 - `automate` - Enables healing mode (fix tests with visual debugging)
@@ -90,10 +101,12 @@ npm install -D @seontechnologies/playwright-utils
 **MCP Servers Required:**
 
 Two Playwright MCP servers (actively maintained, continuously updated):
+
 - `playwright` - Browser automation (`npx @playwright/mcp@latest`)
 - `playwright-test` - Test runner with failure analysis (`npx playwright run-test-mcp-server`)
 
 **Configuration Example:**
+
 ```json
 {
   "mcpServers": {
@@ -110,16 +123,19 @@ Two Playwright MCP servers (actively maintained, continuously updated):
 ```
 
 **Enable:**
+
 ```yaml
 tea_use_mcp_enhancements: true
 ```
 
 **Disable:**
+
 ```yaml
 tea_use_mcp_enhancements: false
 ```
 
 **Prerequisites:**
+
 1. MCP servers installed in IDE configuration
 2. `@playwright/mcp` package available globally or locally
 3. Browser binaries installed (`npx playwright install`)
@@ -135,11 +151,13 @@ TEA also uses core BMM configuration options from `_bmad/tea/config.yaml`:
 **Purpose:** Where TEA writes output files (test designs, reports, traceability matrices)
 
 **Example:**
+
 ```yaml
 output_folder: _bmad-output
 ```
 
 **TEA Output Files:**
+
 - `test-design-architecture.md` + `test-design-qa.md` (from `test-design` system-level - TWO documents)
 - `test-design-epic-N.md` (from `test-design` epic-level)
 - `test-review.md` (from `test-review`)
@@ -157,11 +175,13 @@ output_folder: _bmad-output
 **Purpose:** Affects how TEA explains concepts in chat responses
 
 **Example:**
+
 ```yaml
 user_skill_level: beginner
 ```
 
 **Impact on TEA:**
+
 - **Beginner:** More detailed explanations, links to concepts, verbose guidance
 - **Intermediate:** Balanced explanations, assumes basic knowledge
 - **Expert:** Concise, technical, minimal hand-holding
@@ -173,11 +193,13 @@ user_skill_level: beginner
 **Purpose:** Used in TEA-generated documentation and reports
 
 **Example:**
+
 ```yaml
 project_name: my-awesome-app
 ```
 
 **Used in:**
+
 - Report headers
 - Documentation titles
 - CI configuration comments
@@ -189,6 +211,7 @@ project_name: my-awesome-app
 **Purpose:** Language for TEA chat responses
 
 **Example:**
+
 ```yaml
 communication_language: english
 ```
@@ -202,6 +225,7 @@ communication_language: english
 **Purpose:** Language for TEA-generated documents (test designs, reports)
 
 **Example:**
+
 ```yaml
 document_output_language: english
 ```
@@ -213,6 +237,7 @@ document_output_language: english
 ### Test Framework Variables
 
 **Playwright:**
+
 ```env
 BASE_URL=https://todomvc.com/examples/react/dist/
 API_BASE_URL=https://api.example.com
@@ -221,6 +246,7 @@ TEST_USER_PASSWORD=password123
 ```
 
 **Cypress:**
+
 ```bash
 # cypress.env.json or .env
 CYPRESS_BASE_URL=https://example.com
@@ -265,6 +291,7 @@ API_BASE_URL=https://api.example.com
 ### Team vs Individual
 
 **Team config (committed):**
+
 ```yaml
 # _bmad/tea/config.yaml.example (committed to repo)
 project_name: team-project
@@ -274,16 +301,18 @@ tea_use_mcp_enhancements: false
 ```
 
 **Individual config (typically gitignored):**
+
 ```yaml
 # _bmad/tea/config.yaml (user adds to .gitignore)
 user_name: John Doe
 user_skill_level: expert
-tea_use_mcp_enhancements: true  # Individual preference
+tea_use_mcp_enhancements: true # Individual preference
 ```
 
 ### Monorepo Configuration
 
 **Root config:**
+
 ```yaml
 # _bmad/tea/config.yaml (root)
 project_name: monorepo-parent
@@ -291,6 +320,7 @@ output_folder: _bmad-output
 ```
 
 **Package-specific:**
+
 ```yaml
 # packages/web-app/_bmad/tea/config.yaml
 project_name: web-app
@@ -310,6 +340,7 @@ tea_use_playwright_utils: false
 ### 1. Use Version Control Wisely
 
 **Commit:**
+
 ```
 _bmad/tea/config.yaml.example    # Template for team
 .nvmrc                            # Node version
@@ -317,6 +348,7 @@ package.json                      # Dependencies
 ```
 
 **Recommended for .gitignore:**
+
 ```
 _bmad/tea/config.yaml            # User-specific values
 .env                              # Secrets
@@ -326,11 +358,13 @@ _bmad/tea/config.yaml            # User-specific values
 ### 2. Document Required Setup
 
 **In your README:**
+
 ```markdown
 ## Setup
+
 1. Install BMad
 2. Copy config template:
-   cp _bmad/tea/config.yaml.example _bmad/tea/config.yaml
+   cp \_bmad/tea/config.yaml.example \_bmad/tea/config.yaml
 3. Edit config with your values:
    - Set user_name
    - Enable tea_use_playwright_utils if using playwright-utils
@@ -340,6 +374,7 @@ _bmad/tea/config.yaml            # User-specific values
 ### 3. Validate Configuration
 
 **Check config is valid:**
+
 ```bash
 # Check TEA config is set
 cat _bmad/tea/config.yaml | grep tea_use
@@ -354,6 +389,7 @@ npm list @seontechnologies/playwright-utils
 ### 4. Keep Config Minimal
 
 **Don't over-configure:**
+
 ```yaml
 # Bad - overriding everything unnecessarily
 project_name: my-project
@@ -371,6 +407,7 @@ document_output_language: english
 ```
 
 **Good - only essential overrides:**
+
 ```yaml
 tea_use_playwright_utils: true
 output_folder: docs/testing
@@ -386,11 +423,13 @@ output_folder: docs/testing
 **Problem:** TEA doesn't use my config values.
 
 **Causes:**
+
 1. Config file in wrong location
 2. YAML syntax error
 3. Typo in config key
 
 **Solution:**
+
 ```bash
 # Check file exists
 ls -la _bmad/tea/config.yaml
@@ -408,11 +447,13 @@ diff _bmad/tea/config.yaml src/bmm/module.yaml
 **Problem:** `tea_use_playwright_utils: true` but TEA doesn't use utilities.
 
 **Causes:**
+
 1. Package not installed
 2. Config file not saved
 3. Workflow run before config update
 
 **Solution:**
+
 ```bash
 # Verify package installed
 npm list @seontechnologies/playwright-utils
@@ -429,11 +470,13 @@ grep tea_use_playwright_utils _bmad/tea/config.yaml
 **Problem:** `tea_use_mcp_enhancements: true` but no browser opens.
 
 **Causes:**
+
 1. MCP servers not configured in IDE
 2. MCP package not installed
 3. Browser binaries missing
 
 **Solution:**
+
 ```bash
 # Check MCP package available
 npx @playwright/mcp@latest --version
@@ -452,6 +495,7 @@ npx playwright install
 **Cause:** TEA loads config at workflow start.
 
 **Solution:**
+
 1. Save `_bmad/tea/config.yaml`
 2. Start fresh chat
 3. Run TEA workflow
@@ -473,11 +517,13 @@ tea_use_mcp_enhancements: true # Recommended
 ```
 
 **Why recommended:**
+
 - Playwright Utils: Production-ready fixtures and utilities
 - MCP enhancements: Live browser verification, visual debugging
 - Together: The three-part stack (see Testing as Engineering)
 
 **Prerequisites:**
+
 ```bash
 npm install -D @seontechnologies/playwright-utils
 # Configure MCP servers in IDE (see Enable MCP Enhancements guide)
@@ -496,6 +542,7 @@ tea_use_mcp_enhancements: false
 ```
 
 **Best for:**
+
 - First-time TEA users (keep it simple initially)
 - Quick experiments
 - Learning basics before adding integrations
@@ -505,6 +552,7 @@ tea_use_mcp_enhancements: false
 ### Monorepo Setup
 
 **Root config:**
+
 ```yaml
 # _bmad/tea/config.yaml (root)
 project_name: monorepo
@@ -513,6 +561,7 @@ tea_use_playwright_utils: true
 ```
 
 **Package configs:**
+
 ```yaml
 # apps/web/_bmad/tea/config.yaml
 project_name: web-app
@@ -523,7 +572,7 @@ output_folder: ../../_bmad-output/web
 # apps/api/_bmad/tea/config.yaml
 project_name: api-service
 output_folder: ../../_bmad-output/api
-tea_use_playwright_utils: false  # Using vanilla Playwright only
+tea_use_playwright_utils: false # Using vanilla Playwright only
 ```
 
 ### Team Template
@@ -551,11 +600,13 @@ document_output_language: english
 ```
 
 **Team instructions:**
+
 ```markdown
 ## Setup for New Team Members
+
 1. Clone repo
 2. Copy config template:
-   cp _bmad/tea/config.yaml.example _bmad/tea/config.yaml
+   cp \_bmad/tea/config.yaml.example \_bmad/tea/config.yaml
 3. Edit with your name and preferences
 4. Install dependencies:
    npm install
@@ -567,15 +618,18 @@ document_output_language: english
 ## See Also
 
 ### How-To Guides
+
 - Set Up Test Framework
 - Integrate Playwright Utils
 - Enable MCP Enhancements
 
 ### Reference
+
 - TEA Command Reference
 - Knowledge Base Index
 - Glossary
 
 ### Explanation
+
 - TEA Overview
 - Testing as Engineering

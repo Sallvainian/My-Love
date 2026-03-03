@@ -19,6 +19,7 @@ Without guardrails, AI-generated tests produce redundant, flaky, and untrusted o
 ### 1. Determinism (No Flakiness)
 
 **Requirements:**
+
 - Eliminate hard waits (`waitForTimeout`)
 - Avoid conditionals for flow control
 - Remove try-catch for flow control
@@ -34,6 +35,7 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### 2. Isolation (No Dependencies)
 
 **Requirements:**
+
 - Self-cleaning tests
 - No global state dependencies
 - Parallel execution capability
@@ -47,6 +49,7 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### 3. Explicit Assertions (No Hidden Validation)
 
 **Requirements:**
+
 - Assertions visible in test body
 - Specific, meaningful assertions
 - Actual behavior validation
@@ -58,6 +61,7 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### 4. Focused Tests (Appropriate Size)
 
 **Requirements:**
+
 - Test size under 300 lines
 - Single responsibility
 - Clear naming
@@ -70,6 +74,7 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### 5. Fast Execution (Performance Budget)
 
 **Requirements:**
+
 - Individual test execution under 90 seconds
 - Efficient selectors (prefer `getByRole()` over XPath)
 - Minimal redundant actions
@@ -84,42 +89,48 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### Scoring Categories (100 points total)
 
 **Determinism (35 points):**
+
 - No hard waits: 10 points
 - No conditionals: 10 points
 - No try-catch flow: 10 points
 - Network-first patterns: 5 points
 
 **Isolation (25 points):**
+
 - Self-cleaning: 15 points
 - No global state: 5 points
 - Parallel-safe: 5 points
 
 **Assertions (20 points):**
+
 - Explicit in test body: 10 points
 - Specific and meaningful: 10 points
 
 **Structure (10 points):**
+
 - Test size under 300 lines: 5 points
 - Clear naming: 5 points
 
 **Performance (10 points):**
+
 - Execution time under 1.5 minutes: 10 points
 
 ### Score Interpretation
 
-| Score | Interpretation | Action |
-|-------|---|---|
-| 90-100 | Excellent | Production-ready, minimal changes |
-| 80-89 | Good | Minor improvements recommended |
-| 70-79 | Acceptable | Address recommendations before release |
-| 60-69 | Needs Work | Fix critical issues |
-| < 60 | Critical | Significant refactoring needed |
+| Score  | Interpretation | Action                                 |
+| ------ | -------------- | -------------------------------------- |
+| 90-100 | Excellent      | Production-ready, minimal changes      |
+| 80-89  | Good           | Minor improvements recommended         |
+| 70-79  | Acceptable     | Address recommendations before release |
+| 60-69  | Needs Work     | Fix critical issues                    |
+| < 60   | Critical       | Significant refactoring needed         |
 
 ## Comparison: Good vs Bad Tests
 
 ### User Login Example
 
 **Bad Test (45/100):**
+
 - Vague test name
 - 3-second hard wait
 - Conditional element checking
@@ -128,6 +139,7 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 - No cleanup
 
 **Good Test (95/100):**
+
 - Descriptive name clearly stating behavior
 - Network response wait
 - Explicit assertions on token and redirect
@@ -137,12 +149,14 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### API Testing Example
 
 **Bad Test (50/100):**
+
 - Hard-coded test data causing conflicts
 - Conditional response handling
 - Weak assertions
 - No cleanup
 
 **Good Test (92/100):**
+
 - Unique test data using timestamp
 - Direct status and body assertions
 - Explicit cleanup of created resources
@@ -153,6 +167,7 @@ With Playwright Utils, use `interceptNetworkCall()` for cleaner response handlin
 ### During Test Generation (atdd, automate)
 
 TEA generates tests following standards automatically:
+
 - Network-first patterns instead of hard waits
 - Accessible selectors for resilience
 - Explicit assertions visible in test body
@@ -161,6 +176,7 @@ TEA generates tests following standards automatically:
 ### During Test Review (test-review)
 
 TEA audits tests and flags violations with score impact:
+
 - Hard wait detection (-10 points)
 - Conditional flow control flagging (-10 points)
 - Code duplication recommendations (-3 points)
@@ -168,6 +184,7 @@ TEA audits tests and flags violations with score impact:
 ## Definition of Done Checklist
 
 **Test Quality DoD:**
+
 - No hard waits
 - No conditionals for flow control
 - No try-catch for flow control
@@ -182,6 +199,7 @@ TEA audits tests and flags violations with score impact:
 - Order-independent
 
 **Code Review DoD:**
+
 - Test quality score exceeding 80
 - No critical issues from test-review
 - Adherence to project patterns
@@ -208,25 +226,30 @@ Short-term perception: hard waits seem simpler. Long-term reality: flaky tests c
 ## Related Concepts
 
 **Core TEA Concepts:**
+
 - Risk-Based Testing - quality scales with risk
 - Knowledge Base System - standards enforcement
 - Engagement Models - quality across different models
 
 **Technical Patterns:**
+
 - Network-First Patterns - determinism implementation
 - Fixture Architecture - isolation through fixtures
 
 **Overview References:**
+
 - TEA Overview - quality standards in lifecycle
 - Testing as Engineering - why quality matters
 
 ## Practical Guides
 
 **Workflow Guides:**
+
 - How to Run Test Review - audit against standards
 - How to Run ATDD - generate quality tests
 - How to Run Automate - expand with quality
 
 **Use-Case Guides:**
+
 - Using TEA with Existing Tests - improve legacy quality
 - Running TEA for Enterprise - enterprise quality thresholds

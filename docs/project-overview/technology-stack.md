@@ -4,16 +4,16 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 ## Runtime and Frameworks
 
-| Technology   | Version | Purpose                                                   |
-| ------------ | ------- | --------------------------------------------------------- |
+| Technology   | Version | Purpose                                                                   |
+| ------------ | ------- | ------------------------------------------------------------------------- |
 | Node.js      | 24.13.0 | Runtime (pinned via `.mise.toml` managed by [mise](https://mise.jdx.dev)) |
-| React        | 19.2.4  | UI framework                                              |
-| React DOM    | 19.2.4  | DOM rendering                                             |
-| TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                |
-| Vite         | 7.3.1   | Build tool and dev server                                 |
-| Tailwind CSS | 4.1.17  | Utility-first CSS framework (v4 with PostCSS integration) |
-| PostCSS      | 8.5.6   | CSS post-processing                                       |
-| Autoprefixer | 10.4.27 | Vendor prefix automation                                  |
+| React        | 19.2.4  | UI framework                                                              |
+| React DOM    | 19.2.4  | DOM rendering                                                             |
+| TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                                |
+| Vite         | 7.3.1   | Build tool and dev server                                                 |
+| Tailwind CSS | 4.1.17  | Utility-first CSS framework (v4 with PostCSS integration)                 |
+| PostCSS      | 8.5.6   | CSS post-processing                                                       |
+| Autoprefixer | 10.4.27 | Vendor prefix automation                                                  |
 
 **Why Vite?** Vite provides near-instant hot module replacement during development and fast production builds via Rollup. The project uses Vite's InjectManifest strategy for PWA service worker compilation, the `vite-plugin-checker` for in-browser TypeScript error overlays, and `rollup-plugin-visualizer` for bundle analysis.
 
@@ -46,10 +46,10 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 ## Error Tracking
 
-| Technology     | Version | Purpose                                                   |
-| -------------- | ------- | --------------------------------------------------------- |
-| @sentry/react  | 10.39.0 | Error tracking, performance monitoring, session replay    |
-| @sentry/vite-plugin | 5.0.0 | Source map upload to Sentry during production builds |
+| Technology          | Version | Purpose                                                |
+| ------------------- | ------- | ------------------------------------------------------ |
+| @sentry/react       | 10.39.0 | Error tracking, performance monitoring, session replay |
+| @sentry/vite-plugin | 5.0.0   | Source map upload to Sentry during production builds   |
 
 **Why Sentry?** Added in Epic 4 hardening. Sentry captures unhandled exceptions, tracks error rates, and provides source-mapped stack traces in production. The Vite plugin uploads source maps during build and deletes them from `dist/` afterward so they are never deployed publicly. Sentry is initialized in `src/config/sentry.ts` and is a no-op when `VITE_SENTRY_DSN` is absent (safe for local development).
 
@@ -89,7 +89,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 | eslint-plugin-react-refresh | 0.5.2   | React Refresh HMR validation                                                          |
 | Prettier                    | 3.8.1   | Code formatting                                                                       |
 | prettier-plugin-tailwindcss | 0.7.2   | Tailwind class sorting                                                                |
-| fnox (age provider)         | --      | Encrypted secrets management via [fnox](https://fnox.jdx.dev) with age encryption    |
+| fnox (age provider)         | --      | Encrypted secrets management via [fnox](https://fnox.jdx.dev) with age encryption     |
 | mise                        | --      | Tool version management (Node.js pinned in `.mise.toml`)                              |
 | vite-plugin-checker         | 0.12.0  | Vite-integrated TypeScript type checking overlay                                      |
 | rollup-plugin-visualizer    | 6.0.5   | Bundle analysis (generates `dist/stats.html` with gzip and brotli sizes)              |

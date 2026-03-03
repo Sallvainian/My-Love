@@ -23,6 +23,7 @@ This page provides a quick reference for all 9 TEA (Test Engineering Architect) 
 **Phase:** Learning/Onboarding (before other phases)
 
 **7 Sessions:**
+
 1. Quick Start (30 min)
 2. Core Concepts (45 min)
 3. Architecture (60 min)
@@ -93,6 +94,7 @@ This page provides a quick reference for all 9 TEA (Test Engineering Architect) 
 **Phase:** Phase 4 (optional), Release Gate
 
 **Scoring Categories:**
+
 - Determinism: 35 points
 - Isolation: 25 points
 - Assertions: 20 points
@@ -121,20 +123,21 @@ This page provides a quick reference for all 9 TEA (Test Engineering Architect) 
 2. **Gate Decision Phase:** PASS/CONCERNS/FAIL/WAIVED determination
 
 **Gate Rules:**
+
 - P0 coverage: 100% required
 - P1 coverage: >=90% PASS, 80-89% CONCERNS, <80% FAIL
 - Overall coverage: >=80% required
 
 ## Summary Table
 
-| Command | Phase | Frequency | Primary Output |
-|---------|-------|-----------|-----------------|
-| teach-me-testing | Learning | Once per learner | Progress + notes + cert |
-| framework | 3 | Once | Test infrastructure |
-| ci | 3 | Once | CI/CD pipeline |
-| test-design | 3, 4 | System + per epic | Test design doc |
-| atdd | 4 | Per story (optional) | Failing tests |
-| automate | 4 | Per story | Passing tests |
-| test-review | 4, Gate | Per epic/release | Quality report |
-| nfr-assess | 2, Gate | Per release | NFR assessment |
-| trace | 2, 4, Gate | Baseline + refresh + gate | Coverage matrix + decision |
+| Command          | Phase      | Frequency                 | Primary Output             |
+| ---------------- | ---------- | ------------------------- | -------------------------- |
+| teach-me-testing | Learning   | Once per learner          | Progress + notes + cert    |
+| framework        | 3          | Once                      | Test infrastructure        |
+| ci               | 3          | Once                      | CI/CD pipeline             |
+| test-design      | 3, 4       | System + per epic         | Test design doc            |
+| atdd             | 4          | Per story (optional)      | Failing tests              |
+| automate         | 4          | Per story                 | Passing tests              |
+| test-review      | 4, Gate    | Per epic/release          | Quality report             |
+| nfr-assess       | 2, Gate    | Per release               | NFR assessment             |
+| trace            | 2, 4, Gate | Baseline + refresh + gate | Coverage matrix + decision |

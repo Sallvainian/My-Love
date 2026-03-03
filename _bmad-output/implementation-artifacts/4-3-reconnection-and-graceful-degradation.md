@@ -87,7 +87,7 @@ so that our session isn't lost and we can resume or exit cleanly.
     ```typescript
     interface DisconnectionOverlayProps {
       partnerName: string;
-      disconnectedAt: number;  // ms timestamp
+      disconnectedAt: number; // ms timestamp
       onKeepWaiting: () => void;
       onEndSession: () => void;
     }
@@ -203,41 +203,42 @@ so that our session isn't lost and we can resume or exit cleanly.
 
 ### What Already Exists — DO NOT Recreate
 
-| Component/File | What It Does | Location |
-|---|---|---|
-| `scriptureReadingSlice.ts` | All session state, lobby state, lock-in state, `callLobbyRpc` helper, `isPendingLockIn`, `partnerLocked`, `exitSession` | `src/stores/slices/scriptureReadingSlice.ts` |
-| `useScriptureBroadcast.ts` | Manages `scripture-session:{sessionId}` channel; handles `partner_joined`, `ready_state_changed`, `state_updated`, `session_converted`, `lock_in_status_changed` | `src/hooks/useScriptureBroadcast.ts` |
-| `useScripturePresence.ts` | Manages `scripture-presence:{sessionId}` channel; sends heartbeat every 10s; drops stale presence after 20s TTL | `src/hooks/useScripturePresence.ts` |
-| `ReadingContainer.tsx` | Together-mode reading orchestrator — roles, step view, lock-in, presence, animation | `src/components/scripture-reading/containers/ReadingContainer.tsx` |
-| `LockInButton.tsx` | Lock-in / waiting / undo button — states: available, locked, pending | `src/components/scripture-reading/session/LockInButton.tsx` |
-| `PartnerPosition.tsx` | Partner view position display — "[Name] is viewing the [verse/response]" | `src/components/scripture-reading/reading/PartnerPosition.tsx` |
-| `ScriptureOverview.tsx` | Main router — mounts `useScriptureBroadcast` at top level, routes to Lobby/Reading/Solo | `src/components/scripture-reading/containers/ScriptureOverview.tsx` |
-| `LobbyContainer.tsx` | Lobby: role selection, ready state, countdown | `src/components/scripture-reading/containers/LobbyContainer.tsx` |
-| `SoloReadingFlow.tsx` | Solo reading container — reference for AnimatePresence pattern | `src/components/scripture-reading/containers/SoloReadingFlow.tsx` |
-| `scriptureReadingService.ts` | IndexedDB + Supabase CRUD, `handleScriptureError`, `ScriptureErrorCode` | `src/services/scriptureReadingService.ts` |
-| `callLobbyRpc` helper | Untyped RPC wrapper for RPCs not in `database.types.ts` — reuse for `scripture_end_session` | `scriptureReadingSlice.ts` line 50 |
-| `useNetworkStatus` hook | `{ isOnline }` — already exists, use for offline detection | `src/hooks/useNetworkStatus.ts` |
-| `partnerSlice` | `partner: PartnerInfo \| null` — has `partner.displayName` for UI | `src/stores/slices/partnerSlice.ts` |
-| `scriptureTheme` tokens | `{ primary: '#A855F7', background: '#F3E5F5', surface: '#FAF5FF' }` | `ScriptureOverview.tsx` line 42 |
-| `FOCUS_RING` constant | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'` | `ScriptureOverview.tsx` line 48 |
-| `scripture-lobby.ts` helpers | `setupTogetherSession`, lobby helpers for E2E | `tests/support/helpers/scripture-lobby.ts` |
-| `SCRIPTURE_STEPS` / `MAX_STEPS` | Step data (17 steps) | `src/data/scriptureSteps.ts` |
-| `handleScriptureError` / `ScriptureErrorCode` | Error routing — MUST use, never empty catch | `src/services/scriptureReadingService.ts` |
-| RLS policies for `realtime.messages` | `scripture-session:%` and `scripture-presence:%` channel policies from Stories 4.1 + 4.2 | `supabase/migrations/` |
-| `exitSession()` | Existing slice action that resets all session state (session = null, clears lobby/lock-in state) | `scriptureReadingSlice.ts` |
+| Component/File                                | What It Does                                                                                                                                                     | Location                                                            |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `scriptureReadingSlice.ts`                    | All session state, lobby state, lock-in state, `callLobbyRpc` helper, `isPendingLockIn`, `partnerLocked`, `exitSession`                                          | `src/stores/slices/scriptureReadingSlice.ts`                        |
+| `useScriptureBroadcast.ts`                    | Manages `scripture-session:{sessionId}` channel; handles `partner_joined`, `ready_state_changed`, `state_updated`, `session_converted`, `lock_in_status_changed` | `src/hooks/useScriptureBroadcast.ts`                                |
+| `useScripturePresence.ts`                     | Manages `scripture-presence:{sessionId}` channel; sends heartbeat every 10s; drops stale presence after 20s TTL                                                  | `src/hooks/useScripturePresence.ts`                                 |
+| `ReadingContainer.tsx`                        | Together-mode reading orchestrator — roles, step view, lock-in, presence, animation                                                                              | `src/components/scripture-reading/containers/ReadingContainer.tsx`  |
+| `LockInButton.tsx`                            | Lock-in / waiting / undo button — states: available, locked, pending                                                                                             | `src/components/scripture-reading/session/LockInButton.tsx`         |
+| `PartnerPosition.tsx`                         | Partner view position display — "[Name] is viewing the [verse/response]"                                                                                         | `src/components/scripture-reading/reading/PartnerPosition.tsx`      |
+| `ScriptureOverview.tsx`                       | Main router — mounts `useScriptureBroadcast` at top level, routes to Lobby/Reading/Solo                                                                          | `src/components/scripture-reading/containers/ScriptureOverview.tsx` |
+| `LobbyContainer.tsx`                          | Lobby: role selection, ready state, countdown                                                                                                                    | `src/components/scripture-reading/containers/LobbyContainer.tsx`    |
+| `SoloReadingFlow.tsx`                         | Solo reading container — reference for AnimatePresence pattern                                                                                                   | `src/components/scripture-reading/containers/SoloReadingFlow.tsx`   |
+| `scriptureReadingService.ts`                  | IndexedDB + Supabase CRUD, `handleScriptureError`, `ScriptureErrorCode`                                                                                          | `src/services/scriptureReadingService.ts`                           |
+| `callLobbyRpc` helper                         | Untyped RPC wrapper for RPCs not in `database.types.ts` — reuse for `scripture_end_session`                                                                      | `scriptureReadingSlice.ts` line 50                                  |
+| `useNetworkStatus` hook                       | `{ isOnline }` — already exists, use for offline detection                                                                                                       | `src/hooks/useNetworkStatus.ts`                                     |
+| `partnerSlice`                                | `partner: PartnerInfo \| null` — has `partner.displayName` for UI                                                                                                | `src/stores/slices/partnerSlice.ts`                                 |
+| `scriptureTheme` tokens                       | `{ primary: '#A855F7', background: '#F3E5F5', surface: '#FAF5FF' }`                                                                                              | `ScriptureOverview.tsx` line 42                                     |
+| `FOCUS_RING` constant                         | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'`                                                                               | `ScriptureOverview.tsx` line 48                                     |
+| `scripture-lobby.ts` helpers                  | `setupTogetherSession`, lobby helpers for E2E                                                                                                                    | `tests/support/helpers/scripture-lobby.ts`                          |
+| `SCRIPTURE_STEPS` / `MAX_STEPS`               | Step data (17 steps)                                                                                                                                             | `src/data/scriptureSteps.ts`                                        |
+| `handleScriptureError` / `ScriptureErrorCode` | Error routing — MUST use, never empty catch                                                                                                                      | `src/services/scriptureReadingService.ts`                           |
+| RLS policies for `realtime.messages`          | `scripture-session:%` and `scripture-presence:%` channel policies from Stories 4.1 + 4.2                                                                         | `supabase/migrations/`                                              |
+| `exitSession()`                               | Existing slice action that resets all session state (session = null, clears lobby/lock-in state)                                                                 | `scriptureReadingSlice.ts`                                          |
 
 ### What Does NOT Exist Yet — You Must Create
 
-| File | Purpose |
-|---|---|
+| File                                                                | Purpose                                                                                      |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `src/components/scripture-reading/session/DisconnectionOverlay.tsx` | Two-phase overlay: reconnecting (< 30s) and timeout (>= 30s) with Keep Waiting / End Session |
-| `supabase/migrations/YYYYMMDDHHMMSS_scripture_end_session.sql` | `scripture_end_session` RPC for clean session termination |
-| `supabase/tests/database/12_scripture_end_session.sql` | pgTAP tests for end session RPC |
-| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | E2E tests for reconnection flow |
+| `supabase/migrations/YYYYMMDDHHMMSS_scripture_end_session.sql`      | `scripture_end_session` RPC for clean session termination                                    |
+| `supabase/tests/database/12_scripture_end_session.sql`              | pgTAP tests for end session RPC                                                              |
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts`               | E2E tests for reconnection flow                                                              |
 
 ### Architecture Constraints
 
 **Presence-Based Disconnection Detection:**
+
 - `useScripturePresence` already has a 20s stale TTL — when no `presence_update` is received for >20s, the partner presence is dropped (`view: null`)
 - Story 4.3 extends this by adding `isPartnerConnected: boolean` to `PartnerPresenceInfo`
 - When the stale timer fires → `isPartnerConnected = false` → `ReadingContainer` detects this and sets `partnerDisconnected` in the slice
@@ -245,16 +246,19 @@ so that our session isn't lost and we can resume or exit cleanly.
 - This leverages the existing heartbeat (10s) + TTL (20s) architecture from Story 4.2 — no new channels or protocols needed
 
 **Broadcast Channel Continuity:**
+
 - `useScriptureBroadcast` is mounted in `ScriptureOverview.tsx` (moved there in Story 4.2) — persists across lobby, reading, reflection phases
 - For Story 4.3, extend `useScriptureBroadcast` to handle `CHANNEL_ERROR` and `CLOSED` states for reconnection
 - On re-subscribe → call `loadSession()` to resync with server-authoritative state (handles missed broadcasts)
 - The existing `onBroadcastReceived` version check (`version <= localVersion → ignore`) prevents stale state overwrites
 
 **Two Disconnection Scenarios:**
+
 1. **Partner disconnects** (you remain online): Detected via `useScripturePresence` stale TTL. You see "Partner reconnecting..." overlay. Lock-in paused.
 2. **You disconnect** (your network drops): On reconnect, `useScriptureBroadcast` channel re-subscribes → `loadSession()` resyncs state. `useScripturePresence` re-sends own presence → partner sees you back.
 
 **End Session Flow:**
+
 ```
 User taps "End Session" → endSession() slice action
 → callLobbyRpc('scripture_end_session', { p_session_id })
@@ -266,28 +270,33 @@ User taps "End Session" → endSession() slice action
 ```
 
 **Lock-In Paused When Disconnected:**
+
 - When `partnerDisconnected = true`, the `LockInButton` shows "Holding your place" (disabled)
 - User CAN still lock in if they choose (the server doesn't know about presence), but the UX discourages it by disabling the button
 - If user was already locked in when partner disconnected: undo remains available
 
 **Session Termination Data Preservation:**
+
 - `scripture_end_session` RPC sets `status = 'ended_early'` — distinct from `completed` (normal finish) and `abandoned` (solo timeout)
 - All reflections and bookmarks already saved (per-step, persisted as they're created in Stories 2.1-2.3)
 - `snapshot_json` updated on end — preserves last known state
 - No data loss — everything up to the current step is already in the DB
 
 **Import Discipline (from CLAUDE.md):**
+
 - Do NOT import `supabase` in `DisconnectionOverlay` or `ReadingContainer` — presentational components get data via props/slice
 - `useScripturePresence` already imports `supabase` for its presence channel — no new supabase imports needed
 - `useScriptureBroadcast` already imports `supabase` — channel error handling extends existing code
 - Data flow: `ReadingContainer` → slice actions → `callLobbyRpc` (RPCs)
 
 **Error Handling (CLAUDE.md guardrail):**
+
 - `endSession()` errors → `handleScriptureError({ code: SYNC_FAILED, ... })`
 - Channel re-subscribe errors → `handleScriptureError(SYNC_FAILED)`
 - All errors through `handleScriptureError` — NEVER empty catch blocks
 
 **State Flow: Partner Disconnects**
+
 ```
 Partner's heartbeat stops
 → 20s passes → useScripturePresence stale timer fires
@@ -300,6 +309,7 @@ Partner's heartbeat stops
 ```
 
 **State Flow: Partner Reconnects**
+
 ```
 Partner's presence_update arrives
 → useScripturePresence: reset stale timer, isPartnerConnected = true
@@ -313,6 +323,7 @@ Partner's presence_update arrives
 ### UX Requirements
 
 **DisconnectionOverlay:**
+
 - Semi-transparent backdrop: `bg-black/30 backdrop-blur-sm` over reading content
 - Centered card: `bg-white rounded-2xl p-6 shadow-lg max-w-sm mx-auto`
 - Phase A (< 30s):
@@ -328,12 +339,14 @@ Partner's presence_update arrives
 - Reduced-motion: no pulse animation, static text
 
 **Lock-In Button Disconnected State:**
+
 - "Holding your place" text in muted purple
 - "Reconnecting..." helper below in small text
 - Button has `opacity-50 pointer-events-none` (disabled appearance)
 - Same layout as existing locked state but with different text
 
 **Reconnection Toast:**
+
 - When partner reconnects after a disconnect: brief "Reconnected" toast (green tint, 2s auto-dismiss)
 - Non-blocking, same position as "Session updated" toast
 
@@ -379,6 +392,7 @@ src/stores/slices/
 ### Testing Requirements
 
 **Test IDs:**
+
 - `disconnection-overlay` — overlay root
 - `disconnection-reconnecting` — Phase A content (< 30s)
 - `disconnection-timeout` — Phase B content (>= 30s)
@@ -388,10 +402,12 @@ src/stores/slices/
 - `reconnected-toast` — reconnection success toast
 
 **Co-location pattern (from Story 4.1):**
+
 - Component unit tests: `src/components/scripture-reading/__tests__/`
 - Service/hook unit tests: `tests/unit/` mirroring src structure
 
 **E2E test patterns:**
+
 - Import `{ test, expect }` from `tests/support/merged-fixtures`
 - Use `scripture-lobby.ts` helpers for session setup
 - Use worker-isolated auth (worker-{n}.json + worker-{n}-partner.json)
@@ -485,26 +501,28 @@ Claude Opus 4.6 (claude-opus-4-6)
 ### File List
 
 **New files:**
+
 - src/components/scripture-reading/session/DisconnectionOverlay.tsx
 - supabase/migrations/20260228000001_scripture_end_session.sql
 - supabase/tests/database/12_scripture_end_session.sql
 
 **Modified files:**
+
 - src/stores/slices/scriptureReadingSlice.ts — added partnerDisconnected state, setPartnerDisconnected/endSession actions, extended onBroadcastReceived
 - src/hooks/useScripturePresence.ts — added isPartnerConnected to PartnerPresenceInfo, stale detection timer
 - src/hooks/useScriptureBroadcast.ts — added CHANNEL_ERROR/CLOSED handling, re-subscribe with loadSession resync
 - src/components/scripture-reading/containers/ReadingContainer.tsx — added disconnection detection, overlay rendering, reconnect resync
 - src/components/scripture-reading/containers/ScriptureOverview.tsx — touched during story implementation history (top-level broadcast lifecycle + routing) and now included for traceability parity with git state
 - src/components/scripture-reading/session/LockInButton.tsx — added isPartnerDisconnected prop with disabled state
-- src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx — unskipped 9 tests
-- src/components/scripture-reading/__tests__/LockInButton.test.tsx — added 3 disconnected state tests
-- src/components/scripture-reading/__tests__/ReadingContainer.test.tsx — added coverage for visible non-409 reading-phase sync failure toast
+- src/components/scripture-reading/**tests**/DisconnectionOverlay.test.tsx — unskipped 9 tests
+- src/components/scripture-reading/**tests**/LockInButton.test.tsx — added 3 disconnected state tests
+- src/components/scripture-reading/**tests**/ReadingContainer.test.tsx — added coverage for visible non-409 reading-phase sync failure toast
 - tests/unit/stores/scriptureReadingSlice.reconnect.test.ts — unskipped 10 tests
 - tests/unit/hooks/useScripturePresence.reconnect.test.ts — unskipped 3 tests, fixed subscribe mock
 - tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts — unskipped 3 tests, fixed promise flush
 - tests/e2e/scripture/scripture-reconnect-4.3.spec.ts — fixed matcher API, added confirmation-step click path for end-session flow, and added partner-page recovery assertion
-- _bmad-output/implementation-artifacts/sprint-status.yaml — story 4.3 status tracked/updated during implementation and follow-up review rounds
-- _bmad-output/planning-artifacts/architecture/project-structure-boundaries.md — added DisconnectionOverlay.tsx
+- \_bmad-output/implementation-artifacts/sprint-status.yaml — story 4.3 status tracked/updated during implementation and follow-up review rounds
+- \_bmad-output/planning-artifacts/architecture/project-structure-boundaries.md — added DisconnectionOverlay.tsx
 
 ## Code Review Action Items
 

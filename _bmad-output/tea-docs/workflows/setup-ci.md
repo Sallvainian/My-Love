@@ -1,9 +1,11 @@
 # How to Set Up CI Pipeline with TEA - Complete Guide
 
 ## Overview
+
 TEA's `ci` workflow scaffolds production-ready CI/CD configuration for automated test execution with selective testing, parallel sharding, and flakiness detection.
 
 ## When to Use This
+
 - Need to automate test execution in CI/CD
 - Want selective testing (only run affected tests)
 - Need parallel execution for faster feedback
@@ -12,6 +14,7 @@ TEA's `ci` workflow scaffolds production-ready CI/CD configuration for automated
 - Optimizing existing CI/CD workflow
 
 ## Prerequisites
+
 - BMad Method installed
 - TEA agent available
 - Test framework configured (run `framework` first)
@@ -21,20 +24,25 @@ TEA's `ci` workflow scaffolds production-ready CI/CD configuration for automated
 ## Steps
 
 ### 1. Load TEA Agent
+
 Start a fresh chat and load TEA:
+
 ```
 tea
 ```
 
 ### 2. Run the CI Workflow
+
 ```
 ci
 ```
 
 ### 3. Select CI/CD Platform
+
 TEA asks which platform you're using.
 
 **Supported Platforms:**
+
 - GitHub Actions (most common)
 - GitLab CI
 - Circle CI
@@ -42,6 +50,7 @@ TEA asks which platform you're using.
 - Other (generic template)
 
 Example response:
+
 ```
 GitHub Actions
 ```
@@ -49,51 +58,62 @@ GitHub Actions
 ### 4. Configure Test Strategy
 
 #### Repository Structure
+
 **Question:** "What's your repository structure?"
 
 **Options:**
+
 - Single app - One application in root
 - Monorepo - Multiple apps/packages
 - Monorepo with affected detection - Only test changed packages
 
 Example:
+
 ```
 Monorepo with multiple apps
 Need selective testing for changed packages only
 ```
 
 #### Parallel Execution
+
 **Question:** "Want to shard tests for parallel execution?"
 
 **Options:**
+
 - No sharding - Run tests sequentially
 - Shard by workers - Split across N workers
 - Shard by file - Each file runs in parallel
 
 Example:
+
 ```
 Yes, shard across 4 workers for faster execution
 ```
 
 **Benefits of Sharding:**
+
 - 4 workers: 20-minute suite → 5 minutes
 - Better resource usage
 - Faster developer feedback
 
 #### Burn-In Loops
+
 **Question:** "Want burn-in loops for flakiness detection?"
 
 **Options:**
+
 - No burn-in - Run tests once
 - PR burn-in - Run tests multiple times on PRs
 - Nightly burn-in - Dedicated flakiness detection job
 
 Example:
+
 ```
 Yes, run tests 5 times on PRs to catch flaky tests early
 ```
 
 **Benefits:**
+
 - Catches flaky tests before they merge
 - Prevents intermittent CI failures
 - Builds confidence in test suite
@@ -286,6 +306,7 @@ burn-in:
 ```
 
 How it works:
+
 - Runs every test 5 times
 - Fails if any iteration fails
 - Detects flakiness before merge
@@ -297,6 +318,7 @@ Use when: Small test suite, want to run everything multiple times
 If `tea_use_playwright_utils: true`:
 
 **scripts/burn-in-changed.ts:**
+
 ```typescript
 import { runBurnIn } from '@seontechnologies/playwright-utils/burn-in';
 
@@ -307,6 +329,7 @@ await runBurnIn({
 ```
 
 **playwright.burn-in.config.ts:**
+
 ```typescript
 import type { BurnInConfig } from '@seontechnologies/playwright-utils/burn-in';
 
@@ -320,6 +343,7 @@ export default config;
 ```
 
 **package.json:**
+
 ```json
 {
   "scripts": {
@@ -329,6 +353,7 @@ export default config;
 ```
 
 How it works:
+
 - Git diff analysis (only affected tests)
 - Smart filtering (skip configs, docs, types)
 - Volume control (run 30% of affected tests)
@@ -338,12 +363,12 @@ Use when: Large test suite, want intelligent selection
 
 **Comparison Table:**
 
-| Feature | Classic Burn-In | Smart Burn-In (PW-Utils) |
-|---------|-----------------|--------------------------|
+| Feature        | Classic Burn-In                    | Smart Burn-In (PW-Utils)            |
+| -------------- | ---------------------------------- | ----------------------------------- |
 | Changed 1 file | Runs all 500 tests x 5 = 2500 runs | Runs 3 affected tests x 5 = 15 runs |
-| Config change | Runs all tests | Skips (no tests affected) |
-| Type change | Runs all tests | Skips (no runtime impact) |
-| Setup | Zero config | Requires config file |
+| Config change  | Runs all tests                     | Skips (no tests affected)           |
+| Type change    | Runs all tests                     | Skips (no runtime impact)           |
+| Setup          | Zero config                        | Requires config file                |
 
 **Recommendation:** Start with classic (simple), upgrade to smart (faster) when suite grows.
 
@@ -370,12 +395,14 @@ Repository Settings → Secrets and variables → Actions
 **How to Add Secrets:**
 
 **GitHub Actions:**
+
 1. Go to repo Settings → Secrets → Actions
 2. Click "New repository secret"
 3. Add name and value
 4. Use in workflow: `${{ secrets.TEST_USER_EMAIL }}`
 
 **GitLab CI:**
+
 1. Go to Project Settings → CI/CD → Variables
 2. Add variable name and value
 3. Use in workflow: `$TEST_USER_EMAIL`
@@ -385,6 +412,7 @@ Repository Settings → Secrets and variables → Actions
 #### Push and Verify
 
 **Commit the workflow file:**
+
 ```bash
 git add .github/workflows/test.yml
 git commit -m "ci: add automated test pipeline"
@@ -392,11 +420,13 @@ git push
 ```
 
 **Watch the CI run:**
+
 - GitHub Actions: Go to Actions tab
 - GitLab CI: Go to CI/CD → Pipelines
 - Circle CI: Go to Pipelines
 
 **Expected Result:**
+
 ```
 ✓ test (shard 1/4) - 3m 24s
 ✓ test (shard 2/4) - 3m 18s
@@ -408,6 +438,7 @@ git push
 #### Test on Pull Request
 
 **Create test PR:**
+
 ```bash
 git checkout -b test-ci-setup
 echo "# Test" > test.md
@@ -417,6 +448,7 @@ git push -u origin test-ci-setup
 ```
 
 **Open PR and verify:**
+
 - Tests run automatically
 - Burn-in runs (if configured for PRs)
 - Selective tests run (if applicable)
@@ -425,24 +457,29 @@ git push -u origin test-ci-setup
 ## What You Get
 
 ### Automated Test Execution
+
 - On every PR - Catch issues before merge
 - On every push to main - Protect production
 - Nightly - Comprehensive regression testing
 
 ### Parallel Execution
+
 - 4x faster feedback - Shard across multiple workers
 - Efficient resource usage - Maximize CI runner utilization
 
 ### Selective Testing
+
 - Run only affected tests - Git diff-based selection
 - Faster PR feedback - Don't run entire suite every time
 
 ### Flakiness Detection
+
 - Burn-in loops - Run tests multiple times
 - Early detection - Catch flaky tests in PRs
 - Confidence building - Know tests are reliable
 
 ### Artifact Collection
+
 - Test results - Saved for 7 days
 - Screenshots - On test failures
 - Videos - Full test recordings
@@ -453,18 +490,22 @@ git push -u origin test-ci-setup
 ### Start Simple, Add Complexity
 
 **Week 1:** Basic pipeline
+
 - Run tests on PR
 - Single worker (no sharding)
 
 **Week 2:** Add parallelization
+
 - Shard across 4 workers
 - Faster feedback
 
 **Week 3:** Add selective testing
+
 - Git diff-based selection
 - Skip unaffected tests
 
 **Week 4:** Add burn-in
+
 - Detect flaky tests
 - Run on PR and nightly
 
@@ -473,12 +514,14 @@ git push -u origin test-ci-setup
 **Goal:** PR feedback in < 5 minutes
 
 **Strategies:**
+
 - Shard tests across workers (4 workers = 4x faster)
 - Use selective testing (run 20% of tests, not 100%)
 - Cache dependencies (`actions/cache`, `cache: 'npm'`)
 - Run smoke tests first, full suite after
 
 **Example fast workflow:**
+
 ```yaml
 jobs:
   smoke:
@@ -510,6 +553,7 @@ test('@local-only should use local service', async ({ page }) => {});
 ```
 
 **In CI:**
+
 ```bash
 # PR: Run critical and smoke only
 npx playwright test --grep "@critical|@smoke"
@@ -522,18 +566,19 @@ npx playwright test --grep-invert "@local-only"
 
 Track metrics:
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| PR feedback time | < 5 min | 3m 24s | OK |
-| Full suite time | < 15 min | 12m 18s | OK |
-| Flakiness rate | < 1% | 0.3% | OK |
-| CI cost/month | < $100 | $75 | OK |
+| Metric           | Target   | Current | Status |
+| ---------------- | -------- | ------- | ------ |
+| PR feedback time | < 5 min  | 3m 24s  | OK     |
+| Full suite time  | < 15 min | 12m 18s | OK     |
+| Flakiness rate   | < 1%     | 0.3%    | OK     |
+| CI cost/month    | < $100   | $75     | OK     |
 
 ### Handle Flaky Tests
 
 When burn-in detects flakiness:
 
 1. **Quarantine flaky test:**
+
 ```javascript
 test.skip('flaky test - investigating', async ({ page }) => {
   // TODO: Fix flakiness
@@ -541,16 +586,19 @@ test.skip('flaky test - investigating', async ({ page }) => {
 ```
 
 2. **Investigate with trace viewer:**
+
 ```bash
 npx playwright show-trace test-results/trace.zip
 ```
 
 3. **Fix root cause:**
+
 - Add network-first patterns
 - Remove hard waits
 - Fix race conditions
 
 4. **Verify fix:**
+
 ```bash
 npm run test:burn-in -- tests/flaky.spec.ts --repeat 20
 ```
@@ -558,6 +606,7 @@ npm run test:burn-in -- tests/flaky.spec.ts --repeat 20
 ### Secure Secrets
 
 **Don't commit secrets to code:**
+
 ```yaml
 # Bad
 - run: API_KEY=sk-1234... npm test
@@ -569,6 +618,7 @@ npm run test:burn-in -- tests/flaky.spec.ts --repeat 20
 ```
 
 **Use environment-specific secrets:**
+
 - `STAGING_API_URL`
 - `PROD_API_URL`
 - `TEST_API_URL`
@@ -596,10 +646,12 @@ Speed up CI with caching:
 ### Tests Pass Locally, Fail in CI
 
 **Symptoms:**
+
 - Green locally, red in CI
 - "Works on my machine"
 
 **Common Causes:**
+
 - Different Node version
 - Different browser version
 - Missing environment variables
@@ -607,6 +659,7 @@ Speed up CI with caching:
 - Race conditions (CI slower)
 
 **Solutions:**
+
 ```yaml
 # Pin Node version
 - uses: actions/setup-node@v4
@@ -626,6 +679,7 @@ env:
 **Problem:** CI takes 30+ minutes, developers wait too long.
 
 **Solutions:**
+
 1. Shard tests: 4 workers = 4x faster
 2. Selective testing: Only run affected tests on PR
 3. Smoke tests first: Run critical path (2 min), full suite after
@@ -639,9 +693,11 @@ env:
 **Cause:** Test suite is flaky.
 
 **Solution:**
+
 1. Identify flaky tests (check which iteration fails)
 2. Fix flaky tests using `test-review`
 3. Re-run burn-in on specific files:
+
 ```bash
 npm run test:burn-in tests/flaky.spec.ts
 ```
@@ -651,6 +707,7 @@ npm run test:burn-in tests/flaky.spec.ts
 **Problem:** Using too many CI minutes, hitting plan limit.
 
 **Solutions:**
+
 1. Run full suite only on main branch
 2. Use selective testing on PRs
 3. Run expensive tests nightly only

@@ -1,5 +1,15 @@
 ---
-stepsCompleted: ['step-01-preflight-and-context', 'step-02-generation-mode', 'step-03-test-strategy', 'step-04-generate-tests', 'step-04a-api-unit-tests', 'step-04b-e2e-tests', 'step-04c-aggregate', 'step-05-validate-and-complete']
+stepsCompleted:
+  [
+    'step-01-preflight-and-context',
+    'step-02-generation-mode',
+    'step-03-test-strategy',
+    'step-04-generate-tests',
+    'step-04a-api-unit-tests',
+    'step-04b-e2e-tests',
+    'step-04c-aggregate',
+    'step-05-validate-and-complete',
+  ]
 lastStep: 'step-05-validate-and-complete'
 lastSaved: '2026-02-17'
 ---
@@ -36,31 +46,32 @@ Story 3.1 adds a couple-aggregate stats dashboard to the Scripture Reading overv
 
 ### AC → Test Level Mapping
 
-| AC | Test ID | Level | Priority | Why This Level | Red Phase Failure |
-|---|---|---|---|---|---|
-| #4 | 3.1-DB-001 | pgTAP | P0 | Security isolation must be DB-verified | RPC doesn't exist |
-| #1 | 3.1-DB-002 | pgTAP | P0 | Aggregate correctness requires known seed data | RPC doesn't exist |
-| #1 | 3.1-E2E-001 | E2E | P0 | Full journey: seeded data → stats visible | Component + RPC don't exist |
-| #1 | 3.1-UNIT-001 | Unit | P1 | Component renders 5 stat cards | Component doesn't exist |
-| #3 | 3.1-UNIT-002 | Unit | P1 | Skeleton loading state | Component doesn't exist |
-| #3 | 3.1-UNIT-003 | Unit | P1 | Stale-while-revalidate | Component doesn't exist |
-| #2 | 3.1-UNIT-004 | Unit | P1 | Zero-state: dashes + message | Component doesn't exist |
-| #1 | 3.1-UNIT-005 | Unit | P1 | Service calls RPC correctly | Service method doesn't exist |
-| #1 | 3.1-UNIT-006 | Unit | P1 | Service error handling | Service method doesn't exist |
-| #3 | 3.1-UNIT-007 | Unit | P1 | Slice state flow | Slice fields don't exist |
-| #2 | 3.1-E2E-002 | E2E | P1 | E2E zero-state journey | Component + RPC don't exist |
-| #5 | 3.1-UNIT-008 | Unit | P2 | No gamification language | Component doesn't exist |
-| #1 | 3.1-UNIT-009 | Unit | P2 | Relative date formatting | Component doesn't exist |
-| #1 | 3.1-UNIT-010 | Unit | P2 | Decimal rating formatting | Component doesn't exist |
-| #5 | 3.1-UNIT-011 | Unit | P2 | Glass morphism classes | Component doesn't exist |
-| #5 | 3.1-UNIT-012 | Unit | P2 | Accessibility aria-labels | Component doesn't exist |
-| #2 | 3.1-DB-003 | pgTAP | P2 | RPC zero-state return | RPC doesn't exist |
-| — | 3.1-PERF-001 | pgTAP | P3 | RPC performance baseline | RPC doesn't exist |
-| — | 3.1-UNIT-013 | Unit | P3 | Zod schema validation | Schema doesn't exist |
+| AC  | Test ID      | Level | Priority | Why This Level                                 | Red Phase Failure            |
+| --- | ------------ | ----- | -------- | ---------------------------------------------- | ---------------------------- |
+| #4  | 3.1-DB-001   | pgTAP | P0       | Security isolation must be DB-verified         | RPC doesn't exist            |
+| #1  | 3.1-DB-002   | pgTAP | P0       | Aggregate correctness requires known seed data | RPC doesn't exist            |
+| #1  | 3.1-E2E-001  | E2E   | P0       | Full journey: seeded data → stats visible      | Component + RPC don't exist  |
+| #1  | 3.1-UNIT-001 | Unit  | P1       | Component renders 5 stat cards                 | Component doesn't exist      |
+| #3  | 3.1-UNIT-002 | Unit  | P1       | Skeleton loading state                         | Component doesn't exist      |
+| #3  | 3.1-UNIT-003 | Unit  | P1       | Stale-while-revalidate                         | Component doesn't exist      |
+| #2  | 3.1-UNIT-004 | Unit  | P1       | Zero-state: dashes + message                   | Component doesn't exist      |
+| #1  | 3.1-UNIT-005 | Unit  | P1       | Service calls RPC correctly                    | Service method doesn't exist |
+| #1  | 3.1-UNIT-006 | Unit  | P1       | Service error handling                         | Service method doesn't exist |
+| #3  | 3.1-UNIT-007 | Unit  | P1       | Slice state flow                               | Slice fields don't exist     |
+| #2  | 3.1-E2E-002  | E2E   | P1       | E2E zero-state journey                         | Component + RPC don't exist  |
+| #5  | 3.1-UNIT-008 | Unit  | P2       | No gamification language                       | Component doesn't exist      |
+| #1  | 3.1-UNIT-009 | Unit  | P2       | Relative date formatting                       | Component doesn't exist      |
+| #1  | 3.1-UNIT-010 | Unit  | P2       | Decimal rating formatting                      | Component doesn't exist      |
+| #5  | 3.1-UNIT-011 | Unit  | P2       | Glass morphism classes                         | Component doesn't exist      |
+| #5  | 3.1-UNIT-012 | Unit  | P2       | Accessibility aria-labels                      | Component doesn't exist      |
+| #2  | 3.1-DB-003   | pgTAP | P2       | RPC zero-state return                          | RPC doesn't exist            |
+| —   | 3.1-PERF-001 | pgTAP | P3       | RPC performance baseline                       | RPC doesn't exist            |
+| —   | 3.1-UNIT-013 | Unit  | P3       | Zod schema validation                          | Schema doesn't exist         |
 
 ### Red Phase Confirmation
 
 All 19 tests will fail because none of the implementation exists yet:
+
 - `scripture_get_couple_stats` RPC — not created
 - `StatsSection.tsx` component — not created
 - `getCoupleStats()` service method — not created
@@ -73,28 +84,28 @@ All 19 tests will fail because none of the implementation exists yet:
 
 ### Summary Statistics
 
-| Metric | Value |
-|---|---|
-| TDD Phase | RED (all tests skip/fail) |
-| Total Test Assertions | 52 |
-| Unit Tests (Vitest) | 39 (all `it.skip()`) |
-| E2E Tests (Playwright) | 2 (all `test.skip()`) |
-| pgTAP Assertions | 11 |
-| Placeholder Assertions | 0 (verified) |
-| Test Files Created | 5 |
-| Execution Mode | Parallel (unit+pgTAP || E2E) |
+| Metric                    | Value                                |
+| ------------------------- | ------------------------------------ | --- | ---- |
+| TDD Phase                 | RED (all tests skip/fail)            |
+| Total Test Assertions     | 52                                   |
+| Unit Tests (Vitest)       | 39 (all `it.skip()`)                 |
+| E2E Tests (Playwright)    | 2 (all `test.skip()`)                |
+| pgTAP Assertions          | 11                                   |
+| Placeholder Assertions    | 0 (verified)                         |
+| Test Files Created        | 5                                    |
+| Execution Mode            | Parallel (unit+pgTAP                 |     | E2E) |
 | Existing Suite Regression | 0 (597 passed, 39 skipped, 0 failed) |
-| TypeScript Errors | 0 (`tsc --noEmit` clean) |
+| TypeScript Errors         | 0 (`tsc --noEmit` clean)             |
 
 ### Generated Test Files
 
-| File | Test Count | Test IDs Covered | Level |
-|---|---|---|---|
-| `src/components/scripture-reading/__tests__/StatsSection.test.tsx` | 24 | 3.1-UNIT-001, 002, 003, 004, 008, 009, 010, 011, 012 | Unit |
-| `tests/unit/services/scriptureReadingService.stats.test.ts` | 9 | 3.1-UNIT-005, 006, 013 | Unit |
-| `tests/unit/stores/scriptureReadingSlice.stats.test.ts` | 6 | 3.1-UNIT-007 | Unit |
-| `tests/e2e/scripture/scripture-stats.spec.ts` | 2 | 3.1-E2E-001, 002 | E2E |
-| `supabase/tests/database/09_scripture_couple_stats.sql` | 11 | 3.1-DB-001, 002, 003 | pgTAP |
+| File                                                               | Test Count | Test IDs Covered                                     | Level |
+| ------------------------------------------------------------------ | ---------- | ---------------------------------------------------- | ----- |
+| `src/components/scripture-reading/__tests__/StatsSection.test.tsx` | 24         | 3.1-UNIT-001, 002, 003, 004, 008, 009, 010, 011, 012 | Unit  |
+| `tests/unit/services/scriptureReadingService.stats.test.ts`        | 9          | 3.1-UNIT-005, 006, 013                               | Unit  |
+| `tests/unit/stores/scriptureReadingSlice.stats.test.ts`            | 6          | 3.1-UNIT-007                                         | Unit  |
+| `tests/e2e/scripture/scripture-stats.spec.ts`                      | 2          | 3.1-E2E-001, 002                                     | E2E   |
+| `supabase/tests/database/09_scripture_couple_stats.sql`            | 11         | 3.1-DB-001, 002, 003                                 | pgTAP |
 
 ### TDD Red Phase Compliance
 
@@ -113,24 +124,24 @@ All 19 tests will fail because none of the implementation exists yet:
 
 ### Acceptance Criteria Coverage
 
-| AC | Covered By | Status |
-|---|---|---|
-| #1 (5 metrics) | DB-002, E2E-001, UNIT-001, UNIT-005, UNIT-009, UNIT-010 | Fully covered |
-| #2 (Zero-state) | E2E-002, UNIT-004, DB-003 | Fully covered |
-| #3 (Loading/SWR) | UNIT-002, UNIT-003, UNIT-007 | Fully covered |
-| #4 (Security/RPC) | DB-001 (4 isolation assertions) | Fully covered |
-| #5 (Styling/a11y) | UNIT-008, UNIT-011, UNIT-012 | Fully covered |
+| AC                | Covered By                                              | Status        |
+| ----------------- | ------------------------------------------------------- | ------------- |
+| #1 (5 metrics)    | DB-002, E2E-001, UNIT-001, UNIT-005, UNIT-009, UNIT-010 | Fully covered |
+| #2 (Zero-state)   | E2E-002, UNIT-004, DB-003                               | Fully covered |
+| #3 (Loading/SWR)  | UNIT-002, UNIT-003, UNIT-007                            | Fully covered |
+| #4 (Security/RPC) | DB-001 (4 isolation assertions)                         | Fully covered |
+| #5 (Styling/a11y) | UNIT-008, UNIT-011, UNIT-012                            | Fully covered |
 
 ### Risk Coverage (from Test Design)
 
-| Risk | Score | Test Coverage |
-|---|---|---|
-| E3-R01: SECURITY DEFINER data isolation | 6 | DB-001 (4 assertions: cross-couple isolation for sessions, bookmarks, ratings) |
-| E3-R02: Aggregate accuracy | 4 | DB-002 (5 assertions: each metric verified against known seed data) |
-| E3-R03: Zero-state rendering | 3 | E2E-002, UNIT-004, DB-003 |
-| E3-R04: Loading state UX | 3 | UNIT-002, UNIT-003, UNIT-007 |
-| E3-R05: Gamification language | 2 | UNIT-008 |
-| E3-R06: Performance | 2 | PERF-001 (deferred to P3) |
+| Risk                                    | Score | Test Coverage                                                                  |
+| --------------------------------------- | ----- | ------------------------------------------------------------------------------ |
+| E3-R01: SECURITY DEFINER data isolation | 6     | DB-001 (4 assertions: cross-couple isolation for sessions, bookmarks, ratings) |
+| E3-R02: Aggregate accuracy              | 4     | DB-002 (5 assertions: each metric verified against known seed data)            |
+| E3-R03: Zero-state rendering            | 3     | E2E-002, UNIT-004, DB-003                                                      |
+| E3-R04: Loading state UX                | 3     | UNIT-002, UNIT-003, UNIT-007                                                   |
+| E3-R05: Gamification language           | 2     | UNIT-008                                                                       |
+| E3-R06: Performance                     | 2     | PERF-001 (deferred to P3)                                                      |
 
 ---
 

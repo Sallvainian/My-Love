@@ -57,11 +57,13 @@ Update {outputFile} with the final status:
 
 ```markdown
 ### [timestamp] Orchestration Complete
+
 - **Final Status:** [SUCCESS / FAILED / PARTIAL]
 - **Duration:** [approximate time from start to end]
 ```
 
 Update the frontmatter `status` field:
+
 - SUCCESS: Workflow completed successfully
 - FAILED: Workflow failed or was aborted
 - PARTIAL: Workflow partially completed
@@ -91,6 +93,7 @@ Present the recommendation:
 Display:
 
 "**Select an option:**
+
 - **[R]** Run the recommended workflow
 - **[D]** Done -- end orchestration"
 

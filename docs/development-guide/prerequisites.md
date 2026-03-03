@@ -2,14 +2,14 @@
 
 ## Required Tools
 
-| Tool         | Version                                | Purpose                                          | Installation                                         |
-| ------------ | -------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
-| Node.js      | v24.13.0 (pinned in `.mise.toml`)      | JavaScript runtime                               | [mise](https://mise.jdx.dev) recommended             |
-| npm          | Bundled with Node.js                   | Package manager (lock file: `package-lock.json`) | Included with Node.js                                |
-| Git          | Latest stable                          | Version control                                  | [git-scm.com](https://git-scm.com/)                  |
-| mise         | Latest                                 | Tool version management (Node.js)                | [mise.jdx.dev](https://mise.jdx.dev)                 |
-| fnox         | Latest                                 | Secrets management (age-encrypted)               | [fnox.jdx.dev](https://fnox.jdx.dev)                 |
-| Supabase CLI | Latest (`npm install -g supabase`)     | Local database, E2E tests, migrations            | `npm install -g supabase`                            |
+| Tool         | Version                            | Purpose                                          | Installation                             |
+| ------------ | ---------------------------------- | ------------------------------------------------ | ---------------------------------------- |
+| Node.js      | v24.13.0 (pinned in `.mise.toml`)  | JavaScript runtime                               | [mise](https://mise.jdx.dev) recommended |
+| npm          | Bundled with Node.js               | Package manager (lock file: `package-lock.json`) | Included with Node.js                    |
+| Git          | Latest stable                      | Version control                                  | [git-scm.com](https://git-scm.com/)      |
+| mise         | Latest                             | Tool version management (Node.js)                | [mise.jdx.dev](https://mise.jdx.dev)     |
+| fnox         | Latest                             | Secrets management (age-encrypted)               | [fnox.jdx.dev](https://fnox.jdx.dev)     |
+| Supabase CLI | Latest (`npm install -g supabase`) | Local database, E2E tests, migrations            | `npm install -g supabase`                |
 
 ## Optional Tools
 

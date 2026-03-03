@@ -33,13 +33,13 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### Coverage Summary
 
-| Priority  | Total Criteria | FULL Coverage | Coverage % | Status       |
-| --------- | -------------- | ------------- | ---------- | ------------ |
-| P0        | 19             | 19            | 100%       | PASS         |
-| P1        | 65             | 63            | 97%        | PASS         |
-| P2        | 25             | 25            | 100%       | PASS         |
-| P3        | 0              | 0             | 100%       | PASS         |
-| **Total** | **109**        | **107**       | **98%**    | **PASS**     |
+| Priority  | Total Criteria | FULL Coverage | Coverage % | Status   |
+| --------- | -------------- | ------------- | ---------- | -------- |
+| P0        | 19             | 19            | 100%       | PASS     |
+| P1        | 65             | 63            | 97%        | PASS     |
+| P2        | 25             | 25            | 100%       | PASS     |
+| P3        | 0              | 0             | 100%       | PASS     |
+| **Total** | **109**        | **107**       | **98%**    | **PASS** |
 
 **Legend:**
 
@@ -555,14 +555,14 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### Coverage by Test Level
 
-| Test Level | Tests | Criteria Covered | Coverage % |
-| ---------- | ----- | ---------------- | ---------- |
-| E2E        | 13    | 19/19 AC         | 100%       |
-| API        | 3     | 3/19 AC          | 16%        |
-| Component  | 71    | 19/19 AC         | 100%       |
-| Unit       | 50    | 17/19 AC         | 89%        |
-| pgTAP (DB) | 24    | 13/19 AC         | 68%        |
-| **Total**  | **161** | **19/19 AC**   | **100%**   |
+| Test Level | Tests   | Criteria Covered | Coverage % |
+| ---------- | ------- | ---------------- | ---------- |
+| E2E        | 13      | 19/19 AC         | 100%       |
+| API        | 3       | 3/19 AC          | 16%        |
+| Component  | 71      | 19/19 AC         | 100%       |
+| Unit       | 50      | 17/19 AC         | 89%        |
+| pgTAP (DB) | 24      | 13/19 AC         | 68%        |
+| **Total**  | **161** | **19/19 AC**     | **100%**   |
 
 ---
 
@@ -633,18 +633,22 @@ None required — all P0 and P1 criteria have FULL coverage.
 #### Non-Functional Requirements (NFRs)
 
 **Security**: PASS
+
 - Security Issues: 0
 - All RPCs have non-member rejection tests; RLS policies verified; channel auth enforced
 
 **Performance**: PASS with CONCERNS
+
 - NFR assessment (Epic 4): 24 PASS, 3 CONCERNS, 0 FAIL
 - Lighthouse performance threshold warn-only (NFR-P3)
 
 **Reliability**: PASS
+
 - Reconnection, graceful degradation, and error handling fully covered
 - Bounded retry, tri-state presence, structured errors implemented
 
 **Maintainability**: PASS
+
 - Tests organized by story and feature; clear naming conventions; defense-in-depth coverage
 
 **NFR Source**: `_bmad-output/test-artifacts/nfr-assessment-epic-4.md`
@@ -667,13 +671,13 @@ None required — all P0 and P1 criteria have FULL coverage.
 
 #### P0 Criteria (Must ALL Pass)
 
-| Criterion             | Threshold | Actual  | Status  |
-| --------------------- | --------- | ------- | ------- |
-| P0 Coverage           | 100%      | 100%    | PASS    |
-| P0 Test Pass Rate     | 100%      | 100%    | PASS    |
-| Security Issues       | 0         | 0       | PASS    |
-| Critical NFR Failures | 0         | 0       | PASS    |
-| Flaky Tests           | 0         | 0       | PASS    |
+| Criterion             | Threshold | Actual | Status |
+| --------------------- | --------- | ------ | ------ |
+| P0 Coverage           | 100%      | 100%   | PASS   |
+| P0 Test Pass Rate     | 100%      | 100%   | PASS   |
+| Security Issues       | 0         | 0      | PASS   |
+| Critical NFR Failures | 0         | 0      | PASS   |
+| Flaky Tests           | 0         | 0      | PASS   |
 
 **P0 Evaluation**: ALL PASS
 
@@ -681,12 +685,12 @@ None required — all P0 and P1 criteria have FULL coverage.
 
 #### P1 Criteria (Required for PASS, May Accept for CONCERNS)
 
-| Criterion              | Threshold | Actual | Status  |
-| ---------------------- | --------- | ------ | ------- |
-| P1 Coverage            | >=90%     | 97%    | PASS    |
-| P1 Test Pass Rate      | >=90%     | 100%   | PASS    |
-| Overall Test Pass Rate | >=80%     | 100%   | PASS    |
-| Overall Coverage       | >=80%     | 98%    | PASS    |
+| Criterion              | Threshold | Actual | Status |
+| ---------------------- | --------- | ------ | ------ |
+| P1 Coverage            | >=90%     | 97%    | PASS   |
+| P1 Test Pass Rate      | >=90%     | 100%   | PASS   |
+| Overall Test Pass Rate | >=80%     | 100%   | PASS   |
+| Overall Coverage       | >=80%     | 98%    | PASS   |
 
 **P1 Evaluation**: ALL PASS
 
@@ -694,10 +698,10 @@ None required — all P0 and P1 criteria have FULL coverage.
 
 #### P2/P3 Criteria (Informational, Don't Block)
 
-| Criterion         | Actual | Notes                    |
-| ----------------- | ------ | ------------------------ |
-| P2 Test Pass Rate | 100%   | Tracked, doesn't block   |
-| P3 Test Pass Rate | N/A    | No P3 criteria for Epic 4|
+| Criterion         | Actual | Notes                     |
+| ----------------- | ------ | ------------------------- |
+| P2 Test Pass Rate | 100%   | Tracked, doesn't block    |
+| P3 Test Pass Rate | N/A    | No P3 criteria for Epic 4 |
 
 ---
 
@@ -761,8 +765,8 @@ All P0 criteria met with 100% coverage and pass rates across 19 critical require
 traceability_and_gate:
   # Phase 1: Traceability
   traceability:
-    story_id: "epic-4"
-    date: "2026-03-03"
+    story_id: 'epic-4'
+    date: '2026-03-03'
     coverage:
       overall: 98%
       p0: 100%
@@ -780,14 +784,14 @@ traceability_and_gate:
       blocker_issues: 0
       warning_issues: 0
     recommendations:
-      - "Add version-gap resync unit test for 4.3-AC#6"
-      - "Run burn-in validation before production deployment"
+      - 'Add version-gap resync unit test for 4.3-AC#6'
+      - 'Run burn-in validation before production deployment'
 
   # Phase 2: Gate Decision
   gate_decision:
-    decision: "PASS"
-    gate_type: "story"
-    decision_mode: "deterministic"
+    decision: 'PASS'
+    gate_type: 'story'
+    decision_mode: 'deterministic'
     criteria:
       p0_coverage: 100%
       p0_pass_rate: 100%
@@ -806,11 +810,11 @@ traceability_and_gate:
       min_overall_pass_rate: 80
       min_coverage: 80
     evidence:
-      test_results: "static traceability analysis"
-      traceability: "_bmad-output/test-artifacts/traceability-matrix.md"
-      nfr_assessment: "_bmad-output/test-artifacts/nfr-assessment-epic-4.md"
-      code_coverage: "npm run test:unit:coverage"
-    next_steps: "Run burn-in, add version-gap resync test, merge and deploy"
+      test_results: 'static traceability analysis'
+      traceability: '_bmad-output/test-artifacts/traceability-matrix.md'
+      nfr_assessment: '_bmad-output/test-artifacts/nfr-assessment-epic-4.md'
+      code_coverage: 'npm run test:unit:coverage'
+    next_steps: 'Run burn-in, add version-gap resync test, merge and deploy'
 ```
 
 ---

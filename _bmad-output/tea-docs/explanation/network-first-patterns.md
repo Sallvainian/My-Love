@@ -5,6 +5,7 @@
 Network-first patterns solve test flakiness by waiting for actual network events rather than arbitrary timeouts. The core principle: "UI changes because APIs respond. Wait for the API response, not an arbitrary timeout."
 
 **Traditional approach (problematic):**
+
 ```typescript
 await page.click('button');
 await page.waitForTimeout(3000);
@@ -12,9 +13,10 @@ await expect(page.locator('.success')).toBeVisible();
 ```
 
 **Network-first approach (deterministic):**
+
 ```typescript
-const responsePromise = page.waitForResponse((resp) =>
-  resp.url().includes('/api/submit') && resp.ok()
+const responsePromise = page.waitForResponse(
+  (resp) => resp.url().includes('/api/submit') && resp.ok()
 );
 await page.click('button');
 await responsePromise;
@@ -26,6 +28,7 @@ await expect(page.locator('.success')).toBeVisible();
 ### Hard Waits Create Flakiness
 
 Fixed timeouts fail inconsistently:
+
 - Fast networks waste time unnecessarily
 - Slow networks timeout prematurely
 - CI environments typically run slower than local machines
@@ -36,14 +39,17 @@ Result: "Works on my machine" syndrome with flaky CI pipelines.
 ### The Timeout Escalation Trap
 
 Developers increase timeouts when tests fail:
+
 ```
 2s timeout -> fails -> 5s timeout -> fails -> 10s timeout
 ```
+
 This creates slow tests that still fail intermittently. A suite taking 5 minutes can stretch to 30 minutes.
 
 ### Race Conditions
 
 Navigation and API requests create timing races:
+
 ```typescript
 await page.goto('/dashboard');
 await expect(page.locator('.data-table')).toBeVisible();
@@ -58,8 +64,8 @@ The test checks for UI before the API responds, failing intermittently.
 Set up the wait listener BEFORE triggering navigation or actions:
 
 ```typescript
-const dashboardPromise = page.waitForResponse((resp) =>
-  resp.url().includes('/api/dashboard') && resp.ok()
+const dashboardPromise = page.waitForResponse(
+  (resp) => resp.url().includes('/api/dashboard') && resp.ok()
 );
 await page.goto('/dashboard');
 const response = await dashboardPromise;
@@ -69,6 +75,7 @@ await expect(page.locator('.data-table tr')).toHaveCount(data.items.length);
 ```
 
 Benefits:
+
 - Wait established BEFORE navigation (no race condition)
 - Waits for actual API response (deterministic)
 - No fixed timeout (adapts to network speed)
@@ -99,6 +106,7 @@ test('should load dashboard data', async ({ page, interceptNetworkCall }) => {
 ```
 
 Playwright Utils benefits:
+
 - Automatic JSON parsing (no manual `await response.json()`)
 - Returns structured `{ status, responseJson, requestJson }`
 - Cleaner API without response status checking
@@ -115,6 +123,7 @@ await promise;
 ```
 
 Order matters:
+
 1. `waitForResponse()` starts listening immediately
 2. Then trigger the action making the request
 3. Then wait for the promise to resolve
@@ -129,9 +138,7 @@ Order matters:
 ```typescript
 test('should create user', async ({ page }) => {
   const createUserPromise = page.waitForResponse(
-    (resp) => resp.url().includes('/api/users') &&
-      resp.request().method() === 'POST' &&
-      resp.ok(),
+    (resp) => resp.url().includes('/api/users') && resp.request().method() === 'POST' && resp.ok()
   );
 
   await page.fill('#name', 'Test User');
@@ -186,13 +193,15 @@ Recommended fix: Replace with network interception patterns.
 #### Basic Response Wait
 
 **Vanilla Playwright:**
+
 ```typescript
-const promise = page.waitForResponse(resp => resp.ok());
+const promise = page.waitForResponse((resp) => resp.ok());
 await page.click('button');
 await promise;
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 test('basic wait', async ({ page, interceptNetworkCall }) => {
   const responseCall = interceptNetworkCall({ url: '**' });
@@ -205,15 +214,15 @@ test('basic wait', async ({ page, interceptNetworkCall }) => {
 #### Specific URL Match
 
 **Vanilla Playwright:**
+
 ```typescript
-const promise = page.waitForResponse((resp) =>
-  resp.url().includes('/api/users/123')
-);
+const promise = page.waitForResponse((resp) => resp.url().includes('/api/users/123'));
 await page.goto('/user/123');
 await promise;
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 test('specific URL', async ({ page, interceptNetworkCall }) => {
   const userCall = interceptNetworkCall({ url: '**/api/users/123' });
@@ -226,17 +235,18 @@ test('specific URL', async ({ page, interceptNetworkCall }) => {
 #### Method + Status Match
 
 **Vanilla Playwright:**
+
 ```typescript
 const promise = page.waitForResponse(
-  (resp) => resp.url().includes('/api/users') &&
-    resp.request().method() === 'POST' &&
-    resp.status() === 201,
+  (resp) =>
+    resp.url().includes('/api/users') && resp.request().method() === 'POST' && resp.status() === 201
 );
 await page.click('button[type="submit"]');
 await promise;
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 test('method and status', async ({ page, interceptNetworkCall }) => {
   const createCall = interceptNetworkCall({
@@ -252,6 +262,7 @@ test('method and status', async ({ page, interceptNetworkCall }) => {
 #### Multiple Responses
 
 **Vanilla Playwright:**
+
 ```typescript
 const [usersResp, postsResp] = await Promise.all([
   page.waitForResponse((resp) => resp.url().includes('/api/users')),
@@ -264,6 +275,7 @@ const posts = await postsResp.json();
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 test('multiple responses', async ({ page, interceptNetworkCall }) => {
   const usersCall = interceptNetworkCall({ url: '**/api/users' });
@@ -271,8 +283,10 @@ test('multiple responses', async ({ page, interceptNetworkCall }) => {
 
   await page.goto('/dashboard');
 
-  const [{ responseJson: users }, { responseJson: posts }] =
-    await Promise.all([usersCall, postsCall]);
+  const [{ responseJson: users }, { responseJson: posts }] = await Promise.all([
+    usersCall,
+    postsCall,
+  ]);
 
   expect(users).toBeInstanceOf(Array);
   expect(posts).toBeInstanceOf(Array);
@@ -282,10 +296,9 @@ test('multiple responses', async ({ page, interceptNetworkCall }) => {
 #### Validate Response Data
 
 **Vanilla Playwright:**
+
 ```typescript
-const promise = page.waitForResponse((resp) =>
-  resp.url().includes('/api/checkout') && resp.ok()
-);
+const promise = page.waitForResponse((resp) => resp.url().includes('/api/checkout') && resp.ok());
 
 await page.click('button:has-text("Complete Order")');
 
@@ -299,6 +312,7 @@ await expect(page.locator('.order-confirmation')).toContainText(order.id);
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 test('validate response data', async ({ page, interceptNetworkCall }) => {
   const checkoutCall = interceptNetworkCall({
@@ -325,6 +339,7 @@ test('validate response data', async ({ page, interceptNetworkCall }) => {
 **Vanilla Playwright (Manual HAR Handling):**
 
 Record mode:
+
 ```typescript
 test('offline testing - RECORD', async ({ page, context }) => {
   await context.routeFromHAR('./hars/dashboard.har', {
@@ -337,6 +352,7 @@ test('offline testing - RECORD', async ({ page, context }) => {
 ```
 
 Playback mode:
+
 ```typescript
 test('offline testing - PLAYBACK', async ({ page, context }) => {
   await context.routeFromHAR('./hars/dashboard.har', {
@@ -364,11 +380,13 @@ test('should work offline', async ({ page, context, networkRecorder }) => {
 ```
 
 Switch to playback:
+
 ```bash
 PW_NET_MODE=playback npx playwright test
 ```
 
 Playwright Utils benefits:
+
 - Automatic HAR file management (naming, paths)
 - CRUD operation detection (stateful mocking)
 - Environment variable control
@@ -378,6 +396,7 @@ Playwright Utils benefits:
 ### Network Request Interception
 
 **Vanilla Playwright:**
+
 ```typescript
 test('should handle API error', async ({ page }) => {
   await page.route('**/api/users', (route) => {
@@ -398,6 +417,7 @@ test('should handle API error', async ({ page }) => {
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 
@@ -422,6 +442,7 @@ test('should handle API error', async ({ page, interceptNetworkCall }) => {
 ```
 
 Playwright Utils benefits:
+
 - Automatic JSON parsing
 - Returns promise with `{ status, responseJson, requestJson }`
 - Glob pattern matching (simpler than regex)
@@ -432,6 +453,7 @@ Playwright Utils benefits:
 ### Loading Dashboard Data
 
 **Traditional (Flaky):**
+
 ```typescript
 test('dashboard loads data', async ({ page }) => {
   await page.goto('/dashboard');
@@ -441,15 +463,17 @@ test('dashboard loads data', async ({ page }) => {
 ```
 
 Failure modes:
+
 - API takes 2.5s -> test fails
 - API returns 3 items not 5 -> hard to debug
 - CI slower than local -> fails only in CI
 
 **Network-First (Deterministic):**
+
 ```typescript
 test('dashboard loads data', async ({ page }) => {
-  const apiPromise = page.waitForResponse((resp) =>
-    resp.url().includes('/api/dashboard') && resp.ok()
+  const apiPromise = page.waitForResponse(
+    (resp) => resp.url().includes('/api/dashboard') && resp.ok()
   );
 
   await page.goto('/dashboard');
@@ -463,12 +487,14 @@ test('dashboard loads data', async ({ page }) => {
 ```
 
 Benefits:
+
 - Waits exactly as long as needed
 - Validates API response
 - Validates UI matches API
 - Works in any environment
 
 **With Playwright Utils:**
+
 ```typescript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 
@@ -480,7 +506,10 @@ test('dashboard loads data', async ({ page, interceptNetworkCall }) => {
 
   await page.goto('/dashboard');
 
-  const { status, responseJson: { items } } = await dashboardCall;
+  const {
+    status,
+    responseJson: { items },
+  } = await dashboardCall;
 
   expect(status).toBe(200);
   expect(items).toHaveLength(5);
@@ -492,6 +521,7 @@ test('dashboard loads data', async ({ page, interceptNetworkCall }) => {
 ### Form Submission
 
 **Traditional (Flaky):**
+
 ```typescript
 test('form submission', async ({ page }) => {
   await page.fill('#email', 'test@example.com');
@@ -502,12 +532,11 @@ test('form submission', async ({ page }) => {
 ```
 
 **Network-First (Deterministic):**
+
 ```typescript
 test('form submission', async ({ page }) => {
   const submitPromise = page.waitForResponse(
-    (resp) => resp.url().includes('/api/submit') &&
-      resp.request().method() === 'POST' &&
-      resp.ok(),
+    (resp) => resp.url().includes('/api/submit') && resp.request().method() === 'POST' && resp.ok()
   );
 
   await page.fill('#email', 'test@example.com');
@@ -522,6 +551,7 @@ test('form submission', async ({ page }) => {
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 
@@ -554,6 +584,7 @@ await page.waitForSelector('.success', { timeout: 5000 });
 **Problem:** This waits for DOM rendering, not the API that caused the change.
 
 **Better approach:**
+
 ```typescript
 await page.waitForResponse(matcher);
 await page.waitForSelector('.success');
@@ -564,6 +595,7 @@ await page.waitForSelector('.success');
 Short-term: tests run fast locally
 
 Long-term problems:
+
 - Different environments (CI typically slower)
 - Under load (API responses slower)
 - Network variability (unpredictable)
@@ -574,25 +606,23 @@ Network-first patterns prevent these issues before they appear.
 ### "Too Much Boilerplate"
 
 **Vanilla Playwright (Repetitive):**
+
 ```typescript
 test('test 1', async ({ page }) => {
-  const promise = page.waitForResponse((resp) =>
-    resp.url().includes('/api/submit') && resp.ok()
-  );
+  const promise = page.waitForResponse((resp) => resp.url().includes('/api/submit') && resp.ok());
   await page.click('button');
   await promise;
 });
 
 test('test 2', async ({ page }) => {
-  const promise = page.waitForResponse((resp) =>
-    resp.url().includes('/api/load') && resp.ok()
-  );
+  const promise = page.waitForResponse((resp) => resp.url().includes('/api/load') && resp.ok());
   await page.click('button');
   await promise;
 });
 ```
 
 **With Playwright Utils (Cleaner):**
+
 ```typescript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 
@@ -611,6 +641,7 @@ test('test 2', async ({ page, interceptNetworkCall }) => {
 ```
 
 Benefits:
+
 - Less boilerplate (fixture handles complexity)
 - Automatic JSON parsing
 - Glob pattern matching
@@ -623,28 +654,34 @@ For detailed network-first patterns, consult the knowledge base index and Knowle
 ## Related Concepts
 
 **Core TEA Concepts:**
+
 - Test Quality Standards (determinism requires network-first)
 - Risk-Based Testing (high-risk features need reliable tests)
 
 **Technical Patterns:**
+
 - Fixture Architecture (network utilities as fixtures)
 - Knowledge Base System (network patterns in knowledge base)
 
 **Overview:**
+
 - TEA Overview (network-first in workflows)
 - Testing as Engineering (why flakiness matters)
 
 ## Practical Guides
 
 **Workflow Guides:**
+
 - How to Run Test Review (review for hard waits)
 - How to Run ATDD (generate network-first tests)
 - How to Run Automate (expand with network patterns)
 
 **Use-Case Guides:**
+
 - Using TEA with Existing Tests (fix flaky legacy tests)
 
 **Customization:**
+
 - Integrate Playwright Utils (network utilities)
 
 ## Reference

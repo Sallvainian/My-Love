@@ -15,15 +15,15 @@ Zustand 5.0.11 state management architecture for the **My-Love** PWA (React 19.2
 
 ## Quick Reference
 
-| Slice        | Key State                                                                               | Persisted                               | Cross-Slice Deps       |
-| ------------ | --------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------- |
-| App          | `isLoading`, `error`, `__isHydrated`                                                    | No                                      | None                   |
-| Settings     | `settings`, `isOnboarded`                                                               | Yes (localStorage)                      | App, Messages          |
-| Navigation   | `currentView`                                                                           | No                                      | None                   |
-| Messages     | `messages`, `messageHistory`, `currentMessage`, `customMessages`                        | Partial (messageHistory)                | Settings (via `get()`) |
-| Mood         | `moods`, `partnerMoods`, `syncStatus`                                                   | Yes (moods in localStorage + IndexedDB) | None                   |
-| Interactions | `interactions`, `unviewedCount`, `isSubscribed`                                         | No                                      | None                   |
-| Partner      | `partner`, `sentRequests`, `receivedRequests`, `searchResults`                           | No                                      | None                   |
-| Notes        | `notes`, `notesIsLoading`, `notesHasMore`, `sentMessageTimestamps`                      | No                                      | None                   |
-| Photos       | `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress`                            | No                                      | None                   |
-| Scripture    | `session`, `scriptureLoading`, `activeSession`, `pendingRetry`, lobby/lock-in/disconnection state | No                              | None                   |
+| Slice        | Key State                                                                                         | Persisted                               | Cross-Slice Deps       |
+| ------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------- |
+| App          | `isLoading`, `error`, `__isHydrated`                                                              | No                                      | None                   |
+| Settings     | `settings`, `isOnboarded`                                                                         | Yes (localStorage)                      | App, Messages          |
+| Navigation   | `currentView`                                                                                     | No                                      | None                   |
+| Messages     | `messages`, `messageHistory`, `currentMessage`, `customMessages`                                  | Partial (messageHistory)                | Settings (via `get()`) |
+| Mood         | `moods`, `partnerMoods`, `syncStatus`                                                             | Yes (moods in localStorage + IndexedDB) | None                   |
+| Interactions | `interactions`, `unviewedCount`, `isSubscribed`                                                   | No                                      | None                   |
+| Partner      | `partner`, `sentRequests`, `receivedRequests`, `searchResults`                                    | No                                      | None                   |
+| Notes        | `notes`, `notesIsLoading`, `notesHasMore`, `sentMessageTimestamps`                                | No                                      | None                   |
+| Photos       | `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress`                                      | No                                      | None                   |
+| Scripture    | `session`, `scriptureLoading`, `activeSession`, `pendingRetry`, lobby/lock-in/disconnection state | No                                      | None                   |

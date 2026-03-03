@@ -144,18 +144,18 @@ So that all frontend features have a reliable backend foundation.
 
 **Test file:** `tests/e2e/scripture/scripture-rls-security.spec.ts` (10 tests, all RED)
 
-| Test ID | Test Name | Task | What Makes It GREEN |
-|---------|-----------|------|---------------------|
-| P0-001a | SELECT scripture_sessions - member access | 7 | RLS policy + test auth flow working |
-| P0-001b | SELECT scripture_sessions - non-member blocked | 7 | RLS policy blocking non-member |
-| P0-002a | SELECT scripture_reflections - member access | 8 | RLS policy + seed with reflections |
-| P0-002b | SELECT scripture_reflections - non-member blocked | 8 | RLS policy blocking non-member |
-| P0-003a | INSERT scripture_reflections - non-member rejected | 9 | RLS INSERT policy rejecting |
-| P0-003b | INSERT scripture_bookmarks - non-member rejected | 9 | RLS INSERT policy rejecting |
-| P0-004 | user_id = auth.uid() enforced on INSERT | 10 | WITH CHECK on user_id |
-| P0-005 | is_shared visibility - unshared hidden | 11 | SELECT policy filtering is_shared |
-| P0-008 | Solo session creation via RPC | 12 | `scripture_create_session` RPC exists |
-| P0-012 | Idempotent reflection write (upsert) | 13 | `scripture_submit_reflection` RPC with UPSERT |
+| Test ID | Test Name                                          | Task | What Makes It GREEN                           |
+| ------- | -------------------------------------------------- | ---- | --------------------------------------------- |
+| P0-001a | SELECT scripture_sessions - member access          | 7    | RLS policy + test auth flow working           |
+| P0-001b | SELECT scripture_sessions - non-member blocked     | 7    | RLS policy blocking non-member                |
+| P0-002a | SELECT scripture_reflections - member access       | 8    | RLS policy + seed with reflections            |
+| P0-002b | SELECT scripture_reflections - non-member blocked  | 8    | RLS policy blocking non-member                |
+| P0-003a | INSERT scripture_reflections - non-member rejected | 9    | RLS INSERT policy rejecting                   |
+| P0-003b | INSERT scripture_bookmarks - non-member rejected   | 9    | RLS INSERT policy rejecting                   |
+| P0-004  | user_id = auth.uid() enforced on INSERT            | 10   | WITH CHECK on user_id                         |
+| P0-005  | is_shared visibility - unshared hidden             | 11   | SELECT policy filtering is_shared             |
+| P0-008  | Solo session creation via RPC                      | 12   | `scripture_create_session` RPC exists         |
+| P0-012  | Idempotent reflection write (upsert)               | 13   | `scripture_submit_reflection` RPC with UPSERT |
 
 **Run command:** `npx playwright test tests/e2e/scripture/scripture-rls-security.spec.ts`
 
@@ -164,6 +164,7 @@ So that all frontend features have a reliable backend foundation.
 ## Migration File for New RPCs
 
 Tasks 12-13 require a **new migration file** (do NOT modify the Sprint 0 migration):
+
 - Path: `supabase/migrations/20260130000001_scripture_rpcs.sql`
 - Contains: `scripture_create_session` and `scripture_submit_reflection` RPCs
 - After creating: run `supabase db reset` locally, then `supabase gen types typescript --local` to update `database.types.ts`
@@ -171,6 +172,7 @@ Tasks 12-13 require a **new migration file** (do NOT modify the Sprint 0 migrati
 ## Test Infrastructure Notes
 
 The RLS tests use:
+
 - **Factory:** `createTestSession(supabaseAdmin, options)` — seeds via `scripture_seed_test_data` RPC
 - **Helper:** `createUserClient(supabaseAdmin, userId)` — creates authenticated Supabase client for specific user
 - **Fixture:** `supabaseAdmin` from `tests/support/merged-fixtures.ts` — service-role client
@@ -184,28 +186,28 @@ The RLS tests use:
 
 Sprint 0 implemented significant backend infrastructure. The following files are **already created and should NOT be recreated**:
 
-| File | Status | Notes |
-|------|--------|-------|
-| `supabase/migrations/20260128000001_scripture_reading.sql` | DONE | 5 tables, RLS, RPCs, seeding RPC, indexes |
-| `src/services/dbSchema.ts` | DONE | DB_VERSION=5, all scripture stores, types, upgradeDb() |
-| `src/stores/slices/navigationSlice.ts` | DONE | Already has `'scripture'` in ViewType |
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | PARTIAL | Basic overview component exists |
-| `src/services/BaseIndexedDBService.ts` | DONE | Generic base class for IndexedDB services |
-| `tests/e2e/scripture-*.spec.ts` | PARTIAL | Placeholder E2E tests (mostly skipped) |
+| File                                                                | Status  | Notes                                                  |
+| ------------------------------------------------------------------- | ------- | ------------------------------------------------------ |
+| `supabase/migrations/20260128000001_scripture_reading.sql`          | DONE    | 5 tables, RLS, RPCs, seeding RPC, indexes              |
+| `src/services/dbSchema.ts`                                          | DONE    | DB_VERSION=5, all scripture stores, types, upgradeDb() |
+| `src/stores/slices/navigationSlice.ts`                              | DONE    | Already has `'scripture'` in ViewType                  |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | PARTIAL | Basic overview component exists                        |
+| `src/services/BaseIndexedDBService.ts`                              | DONE    | Generic base class for IndexedDB services              |
+| `tests/e2e/scripture-*.spec.ts`                                     | PARTIAL | Placeholder E2E tests (mostly skipped)                 |
 
 ## What Needs to Be Created
 
-| File | Action | Priority |
-|------|--------|----------|
-| `src/services/scriptureReadingService.ts` | CREATE | P0 |
-| `src/stores/slices/scriptureReadingSlice.ts` | CREATE | P0 |
-| `src/stores/types.ts` | MODIFY (add ScriptureSlice) | P0 |
-| `src/stores/useAppStore.ts` | MODIFY (compose slice) | P0 |
-| `src/data/scriptureSteps.ts` | CREATE | P0 |
-| `src/types/database.types.ts` | REGENERATE (supabase gen types) | P1 |
-| `src/types/models.ts` | MODIFY (add scripture models) | P1 |
-| `src/validation/schemas.ts` | MODIFY (add scripture schemas) | P1 |
-| Existing IndexedDB services | VERIFY imports from dbSchema.ts | P1 |
+| File                                         | Action                          | Priority |
+| -------------------------------------------- | ------------------------------- | -------- |
+| `src/services/scriptureReadingService.ts`    | CREATE                          | P0       |
+| `src/stores/slices/scriptureReadingSlice.ts` | CREATE                          | P0       |
+| `src/stores/types.ts`                        | MODIFY (add ScriptureSlice)     | P0       |
+| `src/stores/useAppStore.ts`                  | MODIFY (compose slice)          | P0       |
+| `src/data/scriptureSteps.ts`                 | CREATE                          | P0       |
+| `src/types/database.types.ts`                | REGENERATE (supabase gen types) | P1       |
+| `src/types/models.ts`                        | MODIFY (add scripture models)   | P1       |
+| `src/validation/schemas.ts`                  | MODIFY (add scripture schemas)  | P1       |
+| Existing IndexedDB services                  | VERIFY imports from dbSchema.ts | P1       |
 
 ## Architecture Compliance
 
@@ -262,6 +264,7 @@ CORRUPTION: On IndexedDB error → clear cache → refetch from server
 ```
 
 Scripture stores do NOT use the 'synced' index pattern. They are read-cache only. The server (Supabase) is always source of truth.
+
 - [Source: architecture.md#Decision 4: Caching Architecture]
 
 ## IndexedDB Stores (from dbSchema.ts)
@@ -341,14 +344,16 @@ export function handleScriptureError(error: ScriptureError): void {
 export const MAX_STEPS = 17;
 
 export interface ScriptureStep {
-  stepIndex: number;        // 0-16
-  sectionTheme: string;     // e.g., "Healing & Restoration"
-  verseReference: string;   // e.g., "Psalm 147:3"
-  verseText: string;        // Full NKJV verse text
-  responseText: string;     // Couple-focused response prayer
+  stepIndex: number; // 0-16
+  sectionTheme: string; // e.g., "Healing & Restoration"
+  verseReference: string; // e.g., "Psalm 147:3"
+  verseText: string; // Full NKJV verse text
+  responseText: string; // Couple-focused response prayer
 }
 
-export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [ /* 17 steps */ ];
+export const SCRIPTURE_STEPS: readonly ScriptureStep[] = [
+  /* 17 steps */
+];
 ```
 
 The 6 section themes (from PRD): Healing & Restoration, Forgiveness & Reconciliation, Confession & Repentance, God's Faithfulness & Peace, The Power of Words, Christlike Character.
@@ -365,26 +370,27 @@ scripture_seed_test_data(p_preset TEXT DEFAULT 'mid_session') → JSONB (test en
 
 ## RLS Pattern (Session-Based Access)
 
-All scripture_* tables enforce that the authenticated user must be `user1_id` or `user2_id` on the parent scripture_session. Uses `is_scripture_session_member(p_session_id)` helper function.
+All scripture\_\* tables enforce that the authenticated user must be `user1_id` or `user2_id` on the parent scripture_session. Uses `is_scripture_session_member(p_session_id)` helper function.
 
 ## sw-db.ts Sync Note
 
 Service worker file `src/sw-db.ts` must be kept in sync manually with dbSchema.ts. **For this story, no sw-db.ts update is needed** — scripture uses cache-only pattern, not Background Sync.
+
 - [Source: architecture.md#Tech Debt Fix]
 
 ## Technology Versions (Locked)
 
-| Technology | Version | Notes |
-|-----------|---------|-------|
-| React | 19.2.3 | Hooks only, no class components |
-| TypeScript | 5.9.3 | Strict mode |
-| Zustand | 5.0.10 | Latest stable, slice composition |
-| Supabase JS | 2.90.1 | Auth, DB, Storage, Realtime Broadcast |
-| idb | 8.0.3 | Latest stable |
-| Zod | 4.3.5 | Latest stable, validate at boundaries |
-| Framer Motion | 12.27.1 | useReducedMotion hook stable |
-| Vitest | 4.0.17 | Unit/integration tests |
-| fake-indexeddb | 6.2.5 | IndexedDB test mock |
+| Technology     | Version | Notes                                 |
+| -------------- | ------- | ------------------------------------- |
+| React          | 19.2.3  | Hooks only, no class components       |
+| TypeScript     | 5.9.3   | Strict mode                           |
+| Zustand        | 5.0.10  | Latest stable, slice composition      |
+| Supabase JS    | 2.90.1  | Auth, DB, Storage, Realtime Broadcast |
+| idb            | 8.0.3   | Latest stable                         |
+| Zod            | 4.3.5   | Latest stable, validate at boundaries |
+| Framer Motion  | 12.27.1 | useReducedMotion hook stable          |
+| Vitest         | 4.0.17  | Unit/integration tests                |
+| fake-indexeddb | 6.2.5   | IndexedDB test mock                   |
 
 ## Project Structure Notes
 
@@ -413,11 +419,13 @@ Service worker file `src/sw-db.ts` must be kept in sync manually with dbSchema.t
 ## Dev Agent Record
 
 ## Agent Model Used
+
 Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## Debug Log References
 
 ## Completion Notes List
+
 - Task 1: All Sprint 0 infrastructure verified. Migration has 5 tables, RLS policies, seeding RPC. Note: Functional RPCs (create_session, lock_in, advance_phase, submit_reflection) listed as "DONE (Sprint 0)" in AC are not in migration file — these are future work beyond this story. dbSchema.ts confirmed at v5 with all 4 scripture stores. All 3 existing services (mood, customMessage, photoStorage) already import from dbSchema.ts — no hardcoded DB_VERSION found.
 - Task 2: Created scriptureReadingService.ts (25.9KB) — extends BaseIndexedDBService with full session/reflection/bookmark/message CRUD, Zod validation schemas for all Supabase responses, cache-first reads, write-through writes, corruption recovery, ScriptureErrorCode enum + handleScriptureError(). Uses existing moodService/customMessageService patterns.
 - Task 3: Created scriptureReadingSlice.ts (5.3KB) — Zustand slice with SessionPhase, SessionMode, ScriptureSession types co-located. State: session, isLoading, isInitialized, isPendingLockIn, isPendingReflection, isSyncing, error. Actions: createSession, loadSession, exitSession, updatePhase, clearScriptureError. Composed into useAppStore.ts and AppState via types.ts.
@@ -443,6 +451,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
   - Slice field rename: `isLoading` → `scriptureLoading`, `error` → `scriptureError` to avoid AppState intersection collision. Validation schemas centralized in `src/validation/schemas.ts`. Updated all test files to match renamed fields.
 
 ## Validation Gates
+
 - TypeScript: `npx tsc --noEmit` — PASS (zero errors)
 - Tests: `npx vitest run` — 23 files, 286 tests, all PASS (1 expected failure: useMotionConfig.test.ts — hook not yet created, Phase 5 RED test)
 - Regressions: Zero (286 tests all pass)
@@ -452,6 +461,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 ## File List
 
 **Created:**
+
 - `src/services/scriptureReadingService.ts` — Scripture reading IndexedDB service (cache-first reads, write-through, corruption recovery)
 - `src/stores/slices/scriptureReadingSlice.ts` — Zustand slice for scripture reading session state
 - `src/data/scriptureSteps.ts` — Static 17-step scripture data with themes, verses, and response prayers
@@ -460,11 +470,13 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - `tests/unit/data/scriptureSteps.test.ts` — Static data unit tests (structure, themes, uniqueness)
 
 **Modified:**
+
 - `src/stores/types.ts` — Added ScriptureSlice to AppState interface
 - `src/stores/useAppStore.ts` — Composed createScriptureReadingSlice into store
 - `src/types/database.types.ts` — Regenerated with scripture tables, enums, RPCs (including scripture_create_session, scripture_submit_reflection)
 
 **Created (Phase 1B):**
+
 - `supabase/migrations/20260130000001_scripture_rpcs.sql` — Fix seed RPC variable reuse bug + scripture_create_session + scripture_submit_reflection RPCs
 - `tests/e2e/scripture/scripture-rls-security.spec.ts` — 10 E2E RLS/RPC API tests (P0-001 through P0-012)
 - `tests/e2e/scripture/scripture-accessibility.spec.ts` — Accessibility E2E test placeholders
@@ -474,6 +486,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - `tests/unit/hooks/useMotionConfig.test.ts` — RED test for useMotionConfig hook (Story 1.5)
 
 **Modified (Code Review Fixes):**
+
 - `src/validation/schemas.ts` — Centralized scripture Zod validation schemas (moved from inline in service)
 - `src/types/models.ts` — Added scripture type re-exports from dbSchema
 - `src/services/scriptureReadingService.ts` — Write-through updateSession, removed redundant auth.getUser(), onRefresh callback for getSession, removed `synced` from toLocal transforms, updated RPC signature for addReflection
@@ -482,4 +495,3 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - `src/data/scriptureSteps.ts` — Removed redundant `as const`
 - `tests/unit/services/scriptureReadingService.test.ts` — Added 20 service-level tests (cache-first, write-through, bookmark/message CRUD, recovery)
 - `tests/unit/stores/scriptureReadingSlice.test.ts` — Updated field references to scriptureLoading/scriptureError
-

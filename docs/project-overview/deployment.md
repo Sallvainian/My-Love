@@ -35,17 +35,17 @@ Runs after deployment:
 
 ## Required GitHub Secrets
 
-| Secret                                    | Description                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`                       | Supabase project URL for production builds                                |
-| `VITE_SUPABASE_ANON_KEY`                  | Supabase anon/public key for production builds                            |
-| `VITE_SENTRY_DSN`                         | Sentry DSN for error tracking in production                               |
-| `SENTRY_AUTH_TOKEN`                       | Sentry auth token for source map uploads during build                     |
-| `SENTRY_ORG`                              | Sentry organization slug                                                  |
-| `SENTRY_PROJECT`                          | Sentry project slug                                                       |
-| `SUPABASE_ACCESS_TOKEN`                   | Supabase CLI auth token for TypeScript type generation                    |
-| `CLAUDE_CODE_OAUTH_TOKEN`                 | Claude Code OAuth token for AI-powered workflows                          |
-| `CLAUDE_PAT`                              | GitHub personal access token for Claude bot commits and PR operations     |
+| Secret                    | Description                                                           |
+| ------------------------- | --------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`       | Supabase project URL for production builds                            |
+| `VITE_SUPABASE_ANON_KEY`  | Supabase anon/public key for production builds                        |
+| `VITE_SENTRY_DSN`         | Sentry DSN for error tracking in production                           |
+| `SENTRY_AUTH_TOKEN`       | Sentry auth token for source map uploads during build                 |
+| `SENTRY_ORG`              | Sentry organization slug                                              |
+| `SENTRY_PROJECT`          | Sentry project slug                                                   |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                      |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations |
 
 ## GitHub Pages Configuration
 

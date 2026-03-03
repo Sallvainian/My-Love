@@ -1,5 +1,12 @@
 ---
-stepsCompleted: ['step-01-preflight', 'step-02-select-framework', 'step-03-scaffold-framework', 'step-04-docs-and-scripts', 'step-05-validate-and-summary']
+stepsCompleted:
+  [
+    'step-01-preflight',
+    'step-02-select-framework',
+    'step-03-scaffold-framework',
+    'step-04-docs-and-scripts',
+    'step-05-validate-and-summary',
+  ]
 lastStep: 'step-05-validate-and-summary'
 lastSaved: '2026-03-01'
 status: complete
@@ -16,9 +23,9 @@ mode: audit # Framework already exists — running as audit/improvement pass
 
 ## Prerequisites
 
-| Check | Result |
-|-------|--------|
-| `package.json` exists | PASS |
+| Check                  | Result                                    |
+| ---------------------- | ----------------------------------------- |
+| `package.json` exists  | PASS                                      |
 | Existing E2E framework | **EXISTS** — `playwright.config.ts` found |
 
 ## Existing Framework Inventory
@@ -65,9 +72,11 @@ No framework change needed.
 # Step 3: Scaffold Framework (Audit)
 
 ## Execution Mode
+
 - Resolved: `sequential` (audit of existing infrastructure)
 
 ## 1. Directory Structure — PASS
+
 - `tests/e2e/` — feature-domain organized (auth, home, mood, navigation, notes, partner, photos, scripture, offline)
 - `tests/unit/` — layer organized (hooks, services, stores, utils, data, validation)
 - `tests/api/` — API-level tests (separate Playwright project)
@@ -78,6 +87,7 @@ No framework change needed.
 - `tests/.auth/` — worker-scoped auth state (10 workers + partners)
 
 ## 2. Framework Config — PASS
+
 - Timeouts: action 15s, navigation 30s, test 60s
 - Base URL: env fallback
 - Artifacts: trace/screenshot/video always-on
@@ -85,11 +95,13 @@ No framework change needed.
 - Parallelism: fullyParallel, CI-tuned
 
 ## 3. Environment Setup — PASS
+
 - `.nvmrc` with v24.13.0
 - Supabase auto-loading from `supabase status`
 - Vite `--mode test` for `.env.test`
 
 ## 4. Fixtures & Factories — EXCELLENT
+
 - `merged-fixtures.ts`: 9 fixtures via `mergeTests`
 - All `@seontechnologies/playwright-utils` fixtures integrated
 - RPC-based seeding with typed schema and FK-ordered cleanup
@@ -97,6 +109,7 @@ No framework change needed.
 - Together-mode fixture with full lifecycle management
 
 ## 5. Sample Tests & Helpers — PASS
+
 - Generic helpers (waitFor, getTestId, clickAndNavigate, expectToast, retry)
 - Domain helpers (scripture flow navigation)
 - Supabase admin client helper
@@ -104,23 +117,26 @@ No framework change needed.
 - Vitest setup with proper browser API mocks
 
 ## Improvement Opportunities
-| # | Area | Finding | Severity |
-|---|------|---------|----------|
-| 1 | Config | Trace/video always-on slows local runs (consider retain-on-failure) | Low |
-| 2 | Missing | No `.env.example` documenting test env vars | Low |
-| 3 | Missing | No page-objects layer (not needed for current architecture) | Low |
+
+| #   | Area    | Finding                                                             | Severity |
+| --- | ------- | ------------------------------------------------------------------- | -------- |
+| 1   | Config  | Trace/video always-on slows local runs (consider retain-on-failure) | Low      |
+| 2   | Missing | No `.env.example` documenting test env vars                         | Low      |
+| 3   | Missing | No page-objects layer (not needed for current architecture)         | Low      |
 
 **Overall: Production-grade scaffold — complete and mature.**
 
 # Step 4: Documentation & Scripts (Audit)
 
 ## 1. tests/README.md — PASS with staleness
+
 - Comprehensive coverage of all required topics
 - Directory tree is stale (missing worker-auth, together-mode, scripture-navigation fixtures; lists moved files)
 - Claims "on failure only" for artifacts but config has always-on
 - Missing newer test domains (scripture sub-specs: lobby, reading, reconnect, accessibility, RLS)
 
 ## 2. Build & Test Scripts — PASS (exceeds requirements)
+
 - 12 test-related scripts in package.json
 - Priority-based runs (test:p0, test:p1)
 - Coverage, UI mode, debug mode, burn-in, CI-local, smoke, DB tests
@@ -130,6 +146,7 @@ No framework change needed.
 ## Validation Result: 73 PASS / 4 SKIP / 3 INFO / 0 FAIL
 
 All checklist items pass or are intentionally skipped:
+
 - SKIP: page-objects (not needed), .env.example (auto-loads from supabase), troubleshooting section (mature project)
 - INFO: artifacts always-on (deliberate choice), sleep() exists (used sparingly)
 

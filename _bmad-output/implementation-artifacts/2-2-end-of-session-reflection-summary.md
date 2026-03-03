@@ -91,36 +91,38 @@ So that I can process the experience as a whole before seeing the prayer report.
 
 The following are already implemented from Story 2.1 and Epic 1. **Extend, don't duplicate:**
 
-| Component/File | What It Does | Location |
-|---|---|---|
-| `PerStepReflection.tsx` | Rating scale (1-5) + note textarea pattern — **reuse this visual pattern** | `src/components/scripture-reading/reflection/PerStepReflection.tsx` |
-| `scriptureReadingService.addReflection()` | Writes reflection to Supabase + IndexedDB cache | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.getBookmarksBySession()` | Reads bookmarks (cache-first) | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.getReflectionsBySession()` | Reads all reflections for a session | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.updateSession()` | Updates session fields (phase, status, etc.) on server | `src/services/scriptureReadingService.ts` |
-| `scripture_submit_reflection` RPC | Server-side upsert with `ON CONFLICT DO UPDATE` | `supabase/migrations/20260130000001_scripture_rpcs.sql` |
-| `scripture_reflections` table | DB table with unique constraint `(session_id, step_index, user_id)` | `supabase/migrations/20260128000001_scripture_reading.sql` |
-| `ScriptureReflection` type | `{ id, sessionId, stepIndex, userId, rating, notes, isShared, createdAt }` | `src/services/dbSchema.ts` |
-| `ScriptureBookmark` type | `{ id, sessionId, stepIndex, userId, shareWithPartner, createdAt }` | `src/services/dbSchema.ts` |
-| `SupabaseReflectionSchema` | Zod validation for RPC responses | `src/validation/schemas.ts` |
-| `SCRIPTURE_STEPS` constant | Array of 17 steps with `{ stepIndex, sectionTheme, verseReference, verseText, responseText }` | `src/data/scriptureSteps.ts` |
-| `MAX_STEPS` constant | `17` | `src/data/scriptureSteps.ts` |
-| `SoloReadingFlow.tsx` | Container with verse/response/reflection subviews, bookmark state (`bookmarkedSteps`), step navigation | `src/components/scripture-reading/containers/SoloReadingFlow.tsx` |
-| `scriptureReadingSlice` | Zustand slice with `advanceStep()`, `updatePhase()`, `saveSession()`, `exitSession()` | `src/stores/slices/scriptureReadingSlice.ts` |
-| `useMotionConfig` hook | `crossfade` (400ms fade), `slide` transitions, respects `prefers-reduced-motion` | `src/hooks/useMotionConfig.ts` |
-| `FOCUS_RING` constant | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'` | Used in `SoloReadingFlow.tsx`, `PerStepReflection.tsx` |
-| `bookmarkedSteps` state | `Set<number>` of step indices the user bookmarked — **already loaded on session mount** | `SoloReadingFlow.tsx` line 94 |
-| `isCompleted` check | `session.status === 'complete' || session.currentPhase === 'reflection'` | `SoloReadingFlow.tsx` line 341 |
+| Component/File                                      | What It Does                                                                                           | Location                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | -------------------------------------- | ------------------------------ |
+| `PerStepReflection.tsx`                             | Rating scale (1-5) + note textarea pattern — **reuse this visual pattern**                             | `src/components/scripture-reading/reflection/PerStepReflection.tsx` |
+| `scriptureReadingService.addReflection()`           | Writes reflection to Supabase + IndexedDB cache                                                        | `src/services/scriptureReadingService.ts`                           |
+| `scriptureReadingService.getBookmarksBySession()`   | Reads bookmarks (cache-first)                                                                          | `src/services/scriptureReadingService.ts`                           |
+| `scriptureReadingService.getReflectionsBySession()` | Reads all reflections for a session                                                                    | `src/services/scriptureReadingService.ts`                           |
+| `scriptureReadingService.updateSession()`           | Updates session fields (phase, status, etc.) on server                                                 | `src/services/scriptureReadingService.ts`                           |
+| `scripture_submit_reflection` RPC                   | Server-side upsert with `ON CONFLICT DO UPDATE`                                                        | `supabase/migrations/20260130000001_scripture_rpcs.sql`             |
+| `scripture_reflections` table                       | DB table with unique constraint `(session_id, step_index, user_id)`                                    | `supabase/migrations/20260128000001_scripture_reading.sql`          |
+| `ScriptureReflection` type                          | `{ id, sessionId, stepIndex, userId, rating, notes, isShared, createdAt }`                             | `src/services/dbSchema.ts`                                          |
+| `ScriptureBookmark` type                            | `{ id, sessionId, stepIndex, userId, shareWithPartner, createdAt }`                                    | `src/services/dbSchema.ts`                                          |
+| `SupabaseReflectionSchema`                          | Zod validation for RPC responses                                                                       | `src/validation/schemas.ts`                                         |
+| `SCRIPTURE_STEPS` constant                          | Array of 17 steps with `{ stepIndex, sectionTheme, verseReference, verseText, responseText }`          | `src/data/scriptureSteps.ts`                                        |
+| `MAX_STEPS` constant                                | `17`                                                                                                   | `src/data/scriptureSteps.ts`                                        |
+| `SoloReadingFlow.tsx`                               | Container with verse/response/reflection subviews, bookmark state (`bookmarkedSteps`), step navigation | `src/components/scripture-reading/containers/SoloReadingFlow.tsx`   |
+| `scriptureReadingSlice`                             | Zustand slice with `advanceStep()`, `updatePhase()`, `saveSession()`, `exitSession()`                  | `src/stores/slices/scriptureReadingSlice.ts`                        |
+| `useMotionConfig` hook                              | `crossfade` (400ms fade), `slide` transitions, respects `prefers-reduced-motion`                       | `src/hooks/useMotionConfig.ts`                                      |
+| `FOCUS_RING` constant                               | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'`                     | Used in `SoloReadingFlow.tsx`, `PerStepReflection.tsx`              |
+| `bookmarkedSteps` state                             | `Set<number>` of step indices the user bookmarked — **already loaded on session mount**                | `SoloReadingFlow.tsx` line 94                                       |
+| `isCompleted` check                                 | `session.status === 'complete'                                                                         |                                                                     | session.currentPhase === 'reflection'` | `SoloReadingFlow.tsx` line 341 |
 
 ## Architecture Constraints
 
 **State Management:**
+
 - Types co-located with `scriptureReadingSlice.ts` — do NOT create separate type files
 - `ReflectionSummary` is a **presentational (dumb) component** — receives all data via props
 - Container logic (bookmark loading, phase transitions, service calls) stays in `SoloReadingFlow`
 - Use `updatePhase('report')` from the slice to transition after reflection summary submission
 
 **Session-Level Reflection Data Model:**
+
 - Reuse the existing `scripture_reflections` table with `step_index: MAX_STEPS` (17) as sentinel for session-level reflections
 - Why 17 not -1: Zod schema `SupabaseReflectionSchema` has `step_index: z.number().int().min(0)` — negative values fail validation
 - The unique constraint `(session_id, step_index, user_id)` guarantees idempotent upsert for step 17
@@ -129,12 +131,14 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - The `rating` field stores the session-level rating (1-5)
 
 **Phase Transition Fix (CRITICAL):**
+
 - Currently, `advanceStep()` sets BOTH `currentPhase: 'reflection'` AND `status: 'complete'` when step 17 finishes
 - This is WRONG for Story 2.2 — status should stay `'in_progress'` until after the report phase (Story 2.3)
 - Fix: change `status: 'complete'` → `status: 'in_progress'` in `advanceStep()` when reaching max steps
 - The session will be marked `'complete'` in Story 2.3 after the Daily Prayer Report
 
 **Completion Screen Refactor:**
+
 - The current `isCompleted` guard (`SoloReadingFlow.tsx` line 340-342) checks `session.status === 'complete' || session.currentPhase === 'reflection'`
 - This must be split into two states:
   1. `currentPhase === 'reflection'` → show `ReflectionSummary` component
@@ -142,12 +146,14 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Remove `session.status === 'complete'` from this guard — it's premature
 
 **Data Flow:**
+
 - Reads: `bookmarkedSteps` already loaded in `SoloReadingFlow` state (optimistic, populated on session mount)
 - Map `bookmarkedSteps` Set → array via `SCRIPTURE_STEPS[stepIndex]` to get `verseReference` and `verseText`
 - Writes: `addReflection(sessionId, MAX_STEPS, rating, JSON.stringify({standoutVerses, userNote}), false)` → non-blocking
 - Phase advance: `updatePhase('report')` → persists to server → then render Story 2.3 placeholder
 
 **Error Handling:**
+
 - Use existing `ScriptureErrorCode` enum
 - Write failures: non-blocking toast via `SyncToast`, never block phase advancement
 - If reflection write fails, still advance to 'report' phase
@@ -155,6 +161,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 ## UX / Design Requirements
 
 **Bookmarked Verse Chips:**
+
 - Display only bookmarked verses (NOT all 17)
 - Each chip shows verse reference text (e.g., "Psalm 147:3")
 - Uses MoodButton-style pattern: rounded pill, toggleable
@@ -165,12 +172,14 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Wrap layout (`flex-wrap`) for multiple bookmarks
 
 **No-Bookmarks Fallback:**
+
 - When `bookmarkedSteps` is empty, show: "You didn't mark any verses — that's okay"
 - This is NOT an error — it's a gentle acknowledgment (per UX Principle 4: Vulnerability is Invited, Not Demanded)
 - When no bookmarks exist, the verse selection requirement is waived (only rating required)
 - Continue button enables with just a rating selected
 
 **Session Rating:**
+
 - Same visual pattern as `PerStepReflection` rating (1-5 numbered circles)
 - Prompt: "How meaningful was this session for you today?" (note: "session" not "verse")
 - End labels: "A little" (1) and "A lot" (5)
@@ -178,6 +187,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - 48x48px circle buttons, purple selected/white unselected
 
 **Note Textarea:**
+
 - Same pattern as `PerStepReflection` note textarea
 - Placeholder: "Reflect on the session as a whole (optional)"
 - Max 200 chars, auto-grow to ~4 lines, `resize-none`
@@ -185,6 +195,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - `enterKeyHint="done"`, `aria-label="Optional session reflection note"`
 
 **Validation:**
+
 - Quiet only — no red, no aggressive indicators
 - When bookmarks exist: both standout verse AND rating required
 - When no bookmarks: only rating required
@@ -192,12 +203,14 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Continue button: `aria-disabled` + `opacity-50 cursor-not-allowed` until requirements met
 
 **Transitions:**
+
 - Reading (step 17 reflection) → Reflection Summary: fade-through-white (400ms) via `crossfade`
 - Reflection Summary → Report placeholder: fade-through-white (400ms)
 - All transitions: instant swap when `prefers-reduced-motion`
 - Focus moves to reflection summary heading on entry
 
 **Layout:**
+
 - Section heading: "Your Session" (centered, serif, `text-purple-900`)
 - Verse chips section with subheading: "Verses that stood out"
 - Rating section (reuse PerStepReflection layout)
@@ -207,21 +220,22 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 
 ## File Locations
 
-| New File | Purpose |
-|---|---|
-| `src/components/scripture-reading/reflection/ReflectionSummary.tsx` | Reflection summary presentational component |
-| `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx` | Unit tests for ReflectionSummary |
+| New File                                                                | Purpose                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------- |
+| `src/components/scripture-reading/reflection/ReflectionSummary.tsx`     | Reflection summary presentational component |
+| `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx` | Unit tests for ReflectionSummary            |
 
-| Modified File | Changes |
-|---|---|
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | Replace completion placeholder with ReflectionSummary; add report phase placeholder; refactor `isCompleted` guard |
-| `src/components/scripture-reading/index.ts` | Add barrel export for `ReflectionSummary` |
-| `src/stores/slices/scriptureReadingSlice.ts` | Fix `advanceStep()` to NOT set `status: 'complete'` at step 17 (keep `'in_progress'`) |
-| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Update completion tests for new ReflectionSummary flow |
+| Modified File                                                         | Changes                                                                                                           |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`     | Replace completion placeholder with ReflectionSummary; add report phase placeholder; refactor `isCompleted` guard |
+| `src/components/scripture-reading/index.ts`                           | Add barrel export for `ReflectionSummary`                                                                         |
+| `src/stores/slices/scriptureReadingSlice.ts`                          | Fix `advanceStep()` to NOT set `status: 'complete'` at step 17 (keep `'in_progress'`)                             |
+| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Update completion tests for new ReflectionSummary flow                                                            |
 
 ## Testing Requirements
 
 **Unit Tests (ReflectionSummary.test.tsx):**
+
 - Renders bookmarked verses as selectable chips with correct verse references
 - Displays no-bookmark fallback message when empty
 - Chips toggle `aria-pressed` on click (multi-select)
@@ -234,12 +248,14 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Keyboard navigation within rating radiogroup
 
 **Integration Tests (SoloReadingFlow.test.tsx):**
+
 - After step 17 reflection submit → ReflectionSummary screen appears
 - Bookmarked verses from session appear as chips in ReflectionSummary
 - Submitting reflection summary calls `addReflection` with `stepIndex: MAX_STEPS` (17)
 - Phase advances to 'report' after submission
 
 **Test IDs:**
+
 - `scripture-reflection-summary-screen` — root container
 - `scripture-reflection-summary-heading` — section heading
 - `scripture-standout-verse-{stepIndex}` — each verse chip
@@ -253,6 +269,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - `scripture-report-placeholder` — Story 2.3 placeholder screen
 
 **Test file locations:**
+
 - `src/components/scripture-reading/__tests__/ReflectionSummary.test.tsx`
 - `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` (modified)
 
@@ -275,6 +292,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 ## Previous Story Intelligence (Story 2.1)
 
 **Learnings from Story 2.1 implementation:**
+
 - `aria-disabled` pattern preferred over HTML `disabled` on Continue button — allows click events to fire for validation display
 - Character counter threshold was set to 150 (not 200) for better UX warning — follow same pattern
 - Debounce approach: visual toggle is instant, server write is debounced — bookmark state in `SoloReadingFlow` is source of truth for UI
@@ -284,6 +302,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 - Action buttons hidden during reflection subview to avoid confusion — apply same pattern for reflection summary
 
 **Code review fixes from Story 2.1 (avoid same mistakes):**
+
 - Do NOT import `supabase` directly in container components — use `session.userId` from slice
 - Avoid duplicate `aria-live` announcers — use the single dynamic announcer pattern
 - Always clean up debounce timers on unmount to prevent ghost writes
@@ -291,6 +310,7 @@ The following are already implemented from Story 2.1 and Epic 1. **Extend, don't
 ## Git Intelligence
 
 Recent commits show established patterns:
+
 - Component files: PascalCase (`ReflectionSummary.tsx`)
 - Focus management: `useRef` + `requestAnimationFrame` for focus on mount/transition
 - `AnimatePresence` with `mode="wait"` for view transitions
@@ -368,9 +388,11 @@ None — clean implementation, no debugging required.
 ## File List
 
 **New:**
+
 - `src/components/scripture-reading/reflection/ReflectionSummary.tsx`
 
 **Modified (Story 2.2):**
+
 - `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
 - `src/components/scripture-reading/index.ts`
 - `src/stores/slices/scriptureReadingSlice.ts`
@@ -380,10 +402,10 @@ None — clean implementation, no debugging required.
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 **Modified (Cross-story — Story 2.1 cleanup):**
+
 - `src/components/scripture-reading/reading/BookmarkFlag.tsx` — Refactored to pure presentational (debounce moved to container)
 - `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx` — Updated tests for new presentational pattern
 - `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx` — Comment update (char counter threshold)
 - `tests/api/scripture-reflection-api.spec.ts` — Unskipped Story 2.1 tests, added Story 2.2 API tests
 - `tests/e2e/scripture/scripture-reflection.spec.ts` — Unskipped Story 2.1 tests, added Story 2.2 E2E tests
 - `_bmad-output/implementation-artifacts/2-1-per-step-reflection-system.md` — Status `complete` → `done`, file list corrections
-

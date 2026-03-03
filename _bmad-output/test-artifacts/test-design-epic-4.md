@@ -42,13 +42,13 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 ## Not in Scope
 
-| Item | Reasoning | Mitigation |
-|------|-----------|-----------|
-| **Epic 1 Solo Reading** | Already shipped and tested; regression suite in place | Regression pass required (see Interworking) |
-| **Epic 2 Reflection + Daily Prayer Report** | Already shipped and tested; Together mode exits to this phase | Regression pass required |
-| **Supabase Realtime infrastructure config** | Platform team owns channel limits, billing, connection pool | Platform monitoring in place |
-| **Performance testing at scale** | App is single-couple; presence overhead negligible at current scale | E4-R12 documented as MONITOR |
-| **Extended WCAG 2.1 AA accessibility** | ACs specify exact aria-live requirements; deep screen reader flows beyond specified ACs deferred | Manual QA review recommended before launch |
+| Item                                        | Reasoning                                                                                        | Mitigation                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| **Epic 1 Solo Reading**                     | Already shipped and tested; regression suite in place                                            | Regression pass required (see Interworking) |
+| **Epic 2 Reflection + Daily Prayer Report** | Already shipped and tested; Together mode exits to this phase                                    | Regression pass required                    |
+| **Supabase Realtime infrastructure config** | Platform team owns channel limits, billing, connection pool                                      | Platform monitoring in place                |
+| **Performance testing at scale**            | App is single-couple; presence overhead negligible at current scale                              | E4-R12 documented as MONITOR                |
+| **Extended WCAG 2.1 AA accessibility**      | ACs specify exact aria-live requirements; deep screen reader flows beyond specified ACs deferred | Manual QA review recommended before launch  |
 
 ---
 
@@ -56,31 +56,31 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 ### High-Priority Risks (Score ≥6) — MITIGATE Required
 
-| Risk ID | Category | Description | P | I | Score | Mitigation | Owner | Timeline |
-|---------|----------|-------------|---|---|-------|------------|-------|----------|
-| E4-R01 | TECH | **Lock-In RPC concurrency** — both users click "Ready" simultaneously; non-atomic upsert could double-advance `current_step_index` or corrupt `version` | 2 | 3 | **6** | RPC uses `expected_version` guard + atomic `UPDATE ... WHERE version = expected_version`; second writer receives 409 | Backend Dev | Sprint (Epic 4) |
-| E4-R02 | TECH | **Stale broadcast ingestion** — client receives out-of-order or replayed broadcast with `version ≤ localVersion`; anti-race guard missing or broken | 2 | 3 | **6** | Client discards any broadcast where `incoming.version ≤ local.version`; explicit unit test for bypass scenario | Frontend Dev | Sprint (Epic 4) |
-| E4-R03 | DATA | **Incomplete 409 rollback** — server rejects `scripture_lock_in` with 409; optimistic `pending_lock_in` not cleared; UI permanently shows "Ready", partner advancement blocked | 2 | 3 | **6** | Full rollback on 409: reset `pending_lock_in`, refetch canonical session state, show "Session updated" toast | Frontend Dev | Sprint (Epic 4) |
-| E4-R04 | TECH | **Presence TTL false positive** — mobile OS backgrounds app, heartbeat stops; partner sees "Partner reconnecting..." for an active partner who is merely backgrounded | 3 | 2 | **6** | Grace buffer before showing reconnecting indicator (>20s); distinguish network loss vs backgrounded app | Frontend Dev | Sprint (Epic 4) |
-| E4-R05 | BUS | **Reconnection snapshot miss** — disconnected partner rejoins but `snapshot_json` not fetched or applied; partner resumes at stale step/phase | 2 | 3 | **6** | On reconnect: always refetch session via server API; apply `snapshot_json` before resuming; version check guards | Frontend Dev | Sprint (Epic 4) |
-| E4-R06 | SEC | **Broadcast channel authorization gap** — `scripture-session:{session_id}` channel missing `private: true` or `realtime.messages` RLS policy omitted; non-session member reads session events | 2 | 3 | **6** | Private channel required; RLS policy on realtime.messages: `session_id IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` | Backend Dev | Sprint (Epic 4) |
+| Risk ID | Category | Description                                                                                                                                                                                   | P   | I   | Score | Mitigation                                                                                                                                                          | Owner        | Timeline        |
+| ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | --- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------- |
+| E4-R01  | TECH     | **Lock-In RPC concurrency** — both users click "Ready" simultaneously; non-atomic upsert could double-advance `current_step_index` or corrupt `version`                                       | 2   | 3   | **6** | RPC uses `expected_version` guard + atomic `UPDATE ... WHERE version = expected_version`; second writer receives 409                                                | Backend Dev  | Sprint (Epic 4) |
+| E4-R02  | TECH     | **Stale broadcast ingestion** — client receives out-of-order or replayed broadcast with `version ≤ localVersion`; anti-race guard missing or broken                                           | 2   | 3   | **6** | Client discards any broadcast where `incoming.version ≤ local.version`; explicit unit test for bypass scenario                                                      | Frontend Dev | Sprint (Epic 4) |
+| E4-R03  | DATA     | **Incomplete 409 rollback** — server rejects `scripture_lock_in` with 409; optimistic `pending_lock_in` not cleared; UI permanently shows "Ready", partner advancement blocked                | 2   | 3   | **6** | Full rollback on 409: reset `pending_lock_in`, refetch canonical session state, show "Session updated" toast                                                        | Frontend Dev | Sprint (Epic 4) |
+| E4-R04  | TECH     | **Presence TTL false positive** — mobile OS backgrounds app, heartbeat stops; partner sees "Partner reconnecting..." for an active partner who is merely backgrounded                         | 3   | 2   | **6** | Grace buffer before showing reconnecting indicator (>20s); distinguish network loss vs backgrounded app                                                             | Frontend Dev | Sprint (Epic 4) |
+| E4-R05  | BUS      | **Reconnection snapshot miss** — disconnected partner rejoins but `snapshot_json` not fetched or applied; partner resumes at stale step/phase                                                 | 2   | 3   | **6** | On reconnect: always refetch session via server API; apply `snapshot_json` before resuming; version check guards                                                    | Frontend Dev | Sprint (Epic 4) |
+| E4-R06  | SEC      | **Broadcast channel authorization gap** — `scripture-session:{session_id}` channel missing `private: true` or `realtime.messages` RLS policy omitted; non-session member reads session events | 2   | 3   | **6** | Private channel required; RLS policy on realtime.messages: `session_id IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` | Backend Dev  | Sprint (Epic 4) |
 
 ### Medium-Priority Risks (Score 3–5)
 
-| Risk ID | Category | Description | P | I | Score | Mitigation | Owner |
-|---------|----------|-------------|---|---|-------|------------|-------|
-| E4-R07 | BUS | **Countdown clock drift** — server sends `startedAt` timestamp; client renders from `Date.now()` with network delay; visible mismatch between partners >1s | 2 | 2 | 4 | Clients compute `timeRemaining = startedAt + 3000 - Date.now()`; drift ≤500ms acceptable; test with simulated delay | Frontend Dev |
-| E4-R08 | BUS | **Solo fallback channel leak** — user taps "Continue solo" in lobby; broadcast channel not unsubscribed; stale listener persists into future sessions | 2 | 2 | 4 | Channel cleanup required in solo-fallback code path; integration test verifies unsubscribe called | Frontend Dev |
-| E4-R09 | DATA | **Role alternation off-by-one** — `step_index % 2` logic inverted; wrong roles shown from step 2 onward | 2 | 2 | 4 | Unit test `determineRole(baseRole, stepIndex)` across steps 0–16; E2E verifies pill badge text on step 2 | Frontend Dev |
-| E4-R10 | BUS | **Accessibility regression — countdown** — aria-live announcement missing; reduced-motion users see animation instead of static | 2 | 2 | 4 | Accessibility E2E: assert aria-live content; assert `prefers-reduced-motion` respected | Frontend Dev |
-| E4-R11 | BUS | **No-shame language compliance** — lobby fallback and reconnection timeout use blame or alarm language | 1 | 3 | 3 | Assert exact AC-specified strings: "Continue solo", "Your partner seems to have stepped away", "Holding your place" | QA |
+| Risk ID | Category | Description                                                                                                                                                | P   | I   | Score | Mitigation                                                                                                          | Owner        |
+| ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | --- | ----- | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| E4-R07  | BUS      | **Countdown clock drift** — server sends `startedAt` timestamp; client renders from `Date.now()` with network delay; visible mismatch between partners >1s | 2   | 2   | 4     | Clients compute `timeRemaining = startedAt + 3000 - Date.now()`; drift ≤500ms acceptable; test with simulated delay | Frontend Dev |
+| E4-R08  | BUS      | **Solo fallback channel leak** — user taps "Continue solo" in lobby; broadcast channel not unsubscribed; stale listener persists into future sessions      | 2   | 2   | 4     | Channel cleanup required in solo-fallback code path; integration test verifies unsubscribe called                   | Frontend Dev |
+| E4-R09  | DATA     | **Role alternation off-by-one** — `step_index % 2` logic inverted; wrong roles shown from step 2 onward                                                    | 2   | 2   | 4     | Unit test `determineRole(baseRole, stepIndex)` across steps 0–16; E2E verifies pill badge text on step 2            | Frontend Dev |
+| E4-R10  | BUS      | **Accessibility regression — countdown** — aria-live announcement missing; reduced-motion users see animation instead of static                            | 2   | 2   | 4     | Accessibility E2E: assert aria-live content; assert `prefers-reduced-motion` respected                              | Frontend Dev |
+| E4-R11  | BUS      | **No-shame language compliance** — lobby fallback and reconnection timeout use blame or alarm language                                                     | 1   | 3   | 3     | Assert exact AC-specified strings: "Continue solo", "Your partner seems to have stepped away", "Holding your place" | QA           |
 
 ### Low-Priority Risks (Score 1–2)
 
-| Risk ID | Category | Description | P | I | Score | Action |
-|---------|----------|-------------|---|---|-------|--------|
-| E4-R12 | PERF | Presence heartbeat every 10s — negligible at current scale | 1 | 2 | 2 | Monitor |
-| E4-R13 | OPS | Channel count at session end — both channels must be unsubscribed | 1 | 2 | 2 | Monitor |
+| Risk ID | Category | Description                                                       | P   | I   | Score | Action  |
+| ------- | -------- | ----------------------------------------------------------------- | --- | --- | ----- | ------- |
+| E4-R12  | PERF     | Presence heartbeat every 10s — negligible at current scale        | 1   | 2   | 2     | Monitor |
+| E4-R13  | OPS      | Channel count at session end — both channels must be unsubscribed | 1   | 2   | 2     | Monitor |
 
 ### Risk Category Legend
 
@@ -124,13 +124,13 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 **Criteria:** Blocks the core Together Mode journey + risk score ≥6 + no workaround for either partner.
 
-| Test ID | Requirement | Test Level | Risk Link | Tests | Notes |
-|---------|-------------|-----------|-----------|-------|-------|
-| 4.2-API-001 | Both users lock-in simultaneously — exactly one advance, second gets 409 | API | E4-R01 | 3 | Concurrent RPC calls; assert `version` increments once; assert second caller receives 409 |
-| 4.2-API-002 | 409 response → full rollback: `pending_lock_in` cleared, refetch fires, toast shown | E2E | E4-R03 | 2 | Route mock for 409; assert button state restored; assert "Session updated" toast visible |
-| 4.2-UNIT-001 | Broadcast handler discards stale events (version ≤ local) | Unit | E4-R02 | 2 | Feed out-of-order broadcasts; assert stale ignored; assert newer version applied |
-| 4.0-API-003 | Non-session member cannot subscribe to `scripture-session:{id}` channel | API | E4-R06 | 2 | Subscribe as unlinked user; assert subscription denied by RLS |
-| 4.0-E2E-001 | Together session full journey — role → lobby → both ready → countdown → step 1 reading → lock-in → advance | E2E | All | 2 | Worker-isolated pair; covers 4.1 + 4.2 happy path in one flow |
+| Test ID      | Requirement                                                                                                | Test Level | Risk Link | Tests | Notes                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------- | ---------- | --------- | ----- | ----------------------------------------------------------------------------------------- |
+| 4.2-API-001  | Both users lock-in simultaneously — exactly one advance, second gets 409                                   | API        | E4-R01    | 3     | Concurrent RPC calls; assert `version` increments once; assert second caller receives 409 |
+| 4.2-API-002  | 409 response → full rollback: `pending_lock_in` cleared, refetch fires, toast shown                        | E2E        | E4-R03    | 2     | Route mock for 409; assert button state restored; assert "Session updated" toast visible  |
+| 4.2-UNIT-001 | Broadcast handler discards stale events (version ≤ local)                                                  | Unit       | E4-R02    | 2     | Feed out-of-order broadcasts; assert stale ignored; assert newer version applied          |
+| 4.0-API-003  | Non-session member cannot subscribe to `scripture-session:{id}` channel                                    | API        | E4-R06    | 2     | Subscribe as unlinked user; assert subscription denied by RLS                             |
+| 4.0-E2E-001  | Together session full journey — role → lobby → both ready → countdown → step 1 reading → lock-in → advance | E2E        | All       | 2     | Worker-isolated pair; covers 4.1 + 4.2 happy path in one flow                             |
 
 **Total P0: 11 tests**
 
@@ -140,16 +140,16 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 **Criteria:** Important features + risk score 3–5 + common workflows.
 
-| Test ID | Requirement | Test Level | Risk Link | Tests | Notes |
-|---------|-------------|-----------|-----------|-------|-------|
-| 4.3-E2E-001 | Disconnected partner reconnects — canonical snapshot applied; resumes at correct step | E2E | E4-R05 | 2 | Simulate disconnect + reconnect; assert `snapshot_json` fetched; assert correct step rendered |
-| 4.1-API-001 | Role selection stored on session — Reader/Responder persisted in `scripture_sessions` | API | — | 2 | POST role; GET session; assert `user1_role` |
-| 4.1-E2E-001 | Ready toggle real-time sync — User A toggles Ready, User B sees update immediately | E2E | — | 2 | Worker pair; assert aria-live "Jordan is ready" fires on User B |
-| 4.1-E2E-002 | "Continue solo" — session.mode updates to 'solo', broadcast channel unsubscribed | E2E | E4-R08 | 2 | Click "Continue solo"; assert mode='solo' via API; assert channel cleanup |
-| 4.2-E2E-001 | Partner position indicator — partner navigates to response, indicator updates | E2E | — | 2 | Presence event injection; assert "[Name] is viewing the response" visible |
-| 4.2-COMP-001 | LockIn button state machine — click→pending→undo cycle; server confirm→advance | Component | — | 3 | Mock RPC; assert button transforms through states |
-| 4.2-UNIT-002 | `determineRole(baseRole, stepIndex)` — correct parity flip for steps 0–16 | Unit | E4-R09 | 2 | Boundary: steps 0, 1, 2, 15, 16 |
-| 4.1-COMP-001 | Countdown timer — renders correctly from server timestamp, ticks down | Component | E4-R07 | 2 | Mount with `startedAt=now-500ms`; assert ~2.5s shown; assert tick |
+| Test ID      | Requirement                                                                           | Test Level | Risk Link | Tests | Notes                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------- | ---------- | --------- | ----- | --------------------------------------------------------------------------------------------- |
+| 4.3-E2E-001  | Disconnected partner reconnects — canonical snapshot applied; resumes at correct step | E2E        | E4-R05    | 2     | Simulate disconnect + reconnect; assert `snapshot_json` fetched; assert correct step rendered |
+| 4.1-API-001  | Role selection stored on session — Reader/Responder persisted in `scripture_sessions` | API        | —         | 2     | POST role; GET session; assert `user1_role`                                                   |
+| 4.1-E2E-001  | Ready toggle real-time sync — User A toggles Ready, User B sees update immediately    | E2E        | —         | 2     | Worker pair; assert aria-live "Jordan is ready" fires on User B                               |
+| 4.1-E2E-002  | "Continue solo" — session.mode updates to 'solo', broadcast channel unsubscribed      | E2E        | E4-R08    | 2     | Click "Continue solo"; assert mode='solo' via API; assert channel cleanup                     |
+| 4.2-E2E-001  | Partner position indicator — partner navigates to response, indicator updates         | E2E        | —         | 2     | Presence event injection; assert "[Name] is viewing the response" visible                     |
+| 4.2-COMP-001 | LockIn button state machine — click→pending→undo cycle; server confirm→advance        | Component  | —         | 3     | Mock RPC; assert button transforms through states                                             |
+| 4.2-UNIT-002 | `determineRole(baseRole, stepIndex)` — correct parity flip for steps 0–16             | Unit       | E4-R09    | 2     | Boundary: steps 0, 1, 2, 15, 16                                                               |
+| 4.1-COMP-001 | Countdown timer — renders correctly from server timestamp, ticks down                 | Component  | E4-R07    | 2     | Mount with `startedAt=now-500ms`; assert ~2.5s shown; assert tick                             |
 
 **Total P1: 17 tests**
 
@@ -159,18 +159,18 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 **Criteria:** Secondary flows + risk score 1–2 + edge cases and accessibility.
 
-| Test ID | Requirement | Test Level | Risk Link | Tests | Notes |
-|---------|-------------|-----------|-----------|-------|-------|
-| 4.3-E2E-002 | Disconnection UI — heartbeat stops >20s; "Partner reconnecting…" shown + lock-in paused | E2E | E4-R04 | 2 | Simulate stopped heartbeat; assert UI state |
-| 4.3-E2E-003 | "End Session" after 30s timeout — both progress saved, session status updated, channels cleaned | E2E | — | 2 | Simulate 31s offline; click "End Session"; assert cleanup |
-| 4.1-COMP-002 | Reduced-motion countdown — static number, no Framer Motion animation | Component | E4-R10 | 1 | `useReducedMotion` mock; assert no motion variant |
-| 4.1-E2E-003 | Countdown aria-live — "Session starting in 3 seconds" and "Session started" announced | E2E | E4-R10 | 2 | Playwright aria-live assertion |
-| 4.1-E2E-004 | Ready state aria-live — partner ready toggle triggers "Jordan is ready" announcement | E2E | — | 1 | |
-| 4.2-UNIT-003 | Presence throttle — updates not more than once per view change + 10s heartbeat | Unit | — | 2 | Timer mock; assert no excess broadcasts |
-| 4.2-COMP-002 | Slide-left transition reduced-motion — instant (0ms duration) | Component | — | 1 | `prefers-reduced-motion` mock |
-| 4.2-UNIT-004 | Stale presence TTL — presence older than 20s hides position indicator | Unit | — | 1 | |
-| 4.1-E2E-005 | Language compliance — exact no-blame strings present on screen per AC | E2E | E4-R11 | 2 | Text assertions: "Continue solo", "Your partner seems to have stepped away", "Holding your place" |
-| 4.3-E2E-004 | Both channels unsubscribed at normal session end | E2E | E4-R13 | 1 | |
+| Test ID      | Requirement                                                                                     | Test Level | Risk Link | Tests | Notes                                                                                             |
+| ------------ | ----------------------------------------------------------------------------------------------- | ---------- | --------- | ----- | ------------------------------------------------------------------------------------------------- |
+| 4.3-E2E-002  | Disconnection UI — heartbeat stops >20s; "Partner reconnecting…" shown + lock-in paused         | E2E        | E4-R04    | 2     | Simulate stopped heartbeat; assert UI state                                                       |
+| 4.3-E2E-003  | "End Session" after 30s timeout — both progress saved, session status updated, channels cleaned | E2E        | —         | 2     | Simulate 31s offline; click "End Session"; assert cleanup                                         |
+| 4.1-COMP-002 | Reduced-motion countdown — static number, no Framer Motion animation                            | Component  | E4-R10    | 1     | `useReducedMotion` mock; assert no motion variant                                                 |
+| 4.1-E2E-003  | Countdown aria-live — "Session starting in 3 seconds" and "Session started" announced           | E2E        | E4-R10    | 2     | Playwright aria-live assertion                                                                    |
+| 4.1-E2E-004  | Ready state aria-live — partner ready toggle triggers "Jordan is ready" announcement            | E2E        | —         | 1     |                                                                                                   |
+| 4.2-UNIT-003 | Presence throttle — updates not more than once per view change + 10s heartbeat                  | Unit       | —         | 2     | Timer mock; assert no excess broadcasts                                                           |
+| 4.2-COMP-002 | Slide-left transition reduced-motion — instant (0ms duration)                                   | Component  | —         | 1     | `prefers-reduced-motion` mock                                                                     |
+| 4.2-UNIT-004 | Stale presence TTL — presence older than 20s hides position indicator                           | Unit       | —         | 1     |                                                                                                   |
+| 4.1-E2E-005  | Language compliance — exact no-blame strings present on screen per AC                           | E2E        | E4-R11    | 2     | Text assertions: "Continue solo", "Your partner seems to have stepped away", "Holding your place" |
+| 4.3-E2E-004  | Both channels unsubscribed at normal session end                                                | E2E        | E4-R13    | 1     |                                                                                                   |
 
 **Total P2: 15 tests**
 
@@ -180,11 +180,11 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 **Criteria:** Nice-to-have, exploratory, regression depth.
 
-| Test ID | Requirement | Test Level | Tests | Notes |
-|---------|-------------|-----------|-------|-------|
-| 4.2-E2E-002 | Reflection phase transition — lock-in past step 17 → `phase = 'reflection'` | E2E | 1 | |
-| 4.3-E2E-005 | "Keep Waiting" — reconnecting indicator persists after selection | E2E | 1 | |
-| 4.2-COMP-003 | RoleIndicator colors — #A855F7 (Reader) and #C084FC (Responder) rendered | Component | 1 | |
+| Test ID      | Requirement                                                                 | Test Level | Tests | Notes |
+| ------------ | --------------------------------------------------------------------------- | ---------- | ----- | ----- |
+| 4.2-E2E-002  | Reflection phase transition — lock-in past step 17 → `phase = 'reflection'` | E2E        | 1     |       |
+| 4.3-E2E-005  | "Keep Waiting" — reconnecting indicator persists after selection            | E2E        | 1     |       |
+| 4.2-COMP-003 | RoleIndicator colors — #A855F7 (Reader) and #C084FC (Responder) rendered    | Component  | 1     |       |
 
 **Total P3: 3 tests**
 
@@ -194,11 +194,11 @@ Epic 4 enables couples to read scripture together in real-time with a lobby, Rea
 
 **Philosophy:** Run all Playwright functional tests on every PR. With worker parallelization, 40+ Playwright tests complete in 10–15 minutes. Only defer tests that are genuinely long-running or require external tooling.
 
-| Gate | Tests | Tooling | Time |
-|------|-------|---------|------|
-| **Every PR** | P0 + P1 + P2 + P3 (Playwright unit, component, API, E2E) | `npx playwright test` | ~10–15 min |
-| **Nightly** | Full P0–P3 suite + presence heartbeat timer tests | Playwright | <30 min |
-| **On-demand** | Performance baseline for presence overhead (future) | k6 or Playwright network monitor | — |
+| Gate          | Tests                                                    | Tooling                          | Time       |
+| ------------- | -------------------------------------------------------- | -------------------------------- | ---------- |
+| **Every PR**  | P0 + P1 + P2 + P3 (Playwright unit, component, API, E2E) | `npx playwright test`            | ~10–15 min |
+| **Nightly**   | Full P0–P3 suite + presence heartbeat timer tests        | Playwright                       | <30 min    |
+| **On-demand** | Performance baseline for presence overhead (future)      | k6 or Playwright network monitor | —          |
 
 Smoke command (P0 E2E only): `npx playwright test --grep "@p0"` — <5 min
 
@@ -206,12 +206,12 @@ Smoke command (P0 E2E only): `npx playwright test --grep "@p0"` — <5 min
 
 ## Resource Estimates
 
-| Priority | Tests | Effort Range |
-|----------|-------|-------------|
-| P0 | 11 | ~20–35 hours |
-| P1 | 17 | ~20–30 hours |
-| P2 | 15 | ~7–13 hours |
-| P3 | 3 | ~1–2 hours |
+| Priority  | Tests  | Effort Range                      |
+| --------- | ------ | --------------------------------- |
+| P0        | 11     | ~20–35 hours                      |
+| P1        | 17     | ~20–30 hours                      |
+| P2        | 15     | ~7–13 hours                       |
+| P3        | 3      | ~1–2 hours                        |
 | **Total** | **46** | **~48–80 hours (~1.5–2.5 weeks)** |
 
 Estimates include fixture setup, worker-isolated pair provisioning, and broadcast/presence mock infrastructure. First-time presence channel testing setup adds ~8–12 hours to P0 effort.
@@ -249,61 +249,67 @@ Estimates include fixture setup, worker-isolated pair provisioning, and broadcas
 ### E4-R01: Lock-In RPC Concurrency (Score: 6)
 
 **Mitigation Strategy:**
+
 1. Implement RPC using `UPDATE scripture_sessions SET version = version + 1, current_step_index = current_step_index + 1 WHERE id = session_id AND version = expected_version`
 2. Return 409 status when `version != expected_version`
 3. Both clients handle 409: rollback optimistic state, refetch session
-**Owner:** Backend Dev
-**Timeline:** Sprint (Epic 4) — before first E2E tests run
-**Status:** Planned
-**Verification:** Test ID 4.2-API-001 (concurrent lock-in; exactly one advance)
+   **Owner:** Backend Dev
+   **Timeline:** Sprint (Epic 4) — before first E2E tests run
+   **Status:** Planned
+   **Verification:** Test ID 4.2-API-001 (concurrent lock-in; exactly one advance)
 
 ### E4-R02: Stale Broadcast Ingestion (Score: 6)
 
 **Mitigation Strategy:**
+
 1. Client handler: `if (incoming.version <= localVersion) return; // discard`
 2. Version stored in Zustand slice as `localVersion`
 3. Tested explicitly with out-of-order event injection
-**Owner:** Frontend Dev
-**Timeline:** Sprint (Epic 4)
-**Status:** Planned
-**Verification:** Test ID 4.2-UNIT-001
+   **Owner:** Frontend Dev
+   **Timeline:** Sprint (Epic 4)
+   **Status:** Planned
+   **Verification:** Test ID 4.2-UNIT-001
 
 ### E4-R03: Incomplete 409 Rollback (Score: 6)
 
 **Mitigation Strategy:**
+
 1. On 409 response from `scripture_lock_in`: clear `pending_lock_in` from Zustand slice
 2. Dispatch refetch action to reload canonical session state
 3. Show non-alarming toast: "Session updated"
-**Owner:** Frontend Dev
-**Timeline:** Sprint (Epic 4)
-**Status:** Planned
-**Verification:** Test ID 4.2-API-002
+   **Owner:** Frontend Dev
+   **Timeline:** Sprint (Epic 4)
+   **Status:** Planned
+   **Verification:** Test ID 4.2-API-002
 
 ### E4-R04: Presence TTL False Positive (Score: 6)
 
 **Mitigation Strategy:**
+
 1. Implement two-tier presence: heartbeat miss → internal "suspected offline" state (not shown)
 2. Only show "Partner reconnecting..." after 20s without heartbeat (as specified in AC)
 3. Do not show indicator for <20s heartbeat gaps (backgrounded device tolerance)
-**Owner:** Frontend Dev
-**Timeline:** Sprint (Epic 4)
-**Status:** Planned
-**Verification:** Test ID 4.3-E2E-002
+   **Owner:** Frontend Dev
+   **Timeline:** Sprint (Epic 4)
+   **Status:** Planned
+   **Verification:** Test ID 4.3-E2E-002
 
 ### E4-R05: Reconnection Snapshot Miss (Score: 6)
 
 **Mitigation Strategy:**
+
 1. On channel reconnection event: always call `GET /scripture_sessions/{id}` before rendering
 2. Apply `snapshot_json` from response as canonical state
 3. Compare `snapshot.version` to `localVersion`; overwrite if snapshot is newer
-**Owner:** Frontend Dev
-**Timeline:** Sprint (Epic 4)
-**Status:** Planned
-**Verification:** Test ID 4.3-E2E-001
+   **Owner:** Frontend Dev
+   **Timeline:** Sprint (Epic 4)
+   **Status:** Planned
+   **Verification:** Test ID 4.3-E2E-001
 
 ### E4-R06: Broadcast Channel Authorization Gap (Score: 6)
 
 **Mitigation Strategy:**
+
 1. All scripture session channels must use `{ config: { private: true } }`
 2. RLS policy on `realtime.messages`:
    ```sql
@@ -318,10 +324,10 @@ Estimates include fixture setup, worker-isolated pair provisioning, and broadcas
    );
    ```
 3. Same pattern applied to `scripture-presence:*` channels
-**Owner:** Backend Dev
-**Timeline:** Sprint (Epic 4) — before any broadcast tests
-**Status:** Planned
-**Verification:** Test ID 4.0-API-003
+   **Owner:** Backend Dev
+   **Timeline:** Sprint (Epic 4) — before any broadcast tests
+   **Status:** Planned
+   **Verification:** Test ID 4.0-API-003
 
 ---
 
@@ -356,13 +362,13 @@ Estimates include fixture setup, worker-isolated pair provisioning, and broadcas
 
 ## Interworking & Regression
 
-| Service/Component | Impact | Regression Scope |
-|-------------------|--------|-----------------|
-| **Epic 1 Solo Reading** | Together mode reuses `ScriptureReadingService` and `scriptureReadingSlice` | All existing `tests/e2e/scripture/scripture-solo-reading.spec.ts` must pass |
-| **Epic 2 Reflection + Daily Prayer Report** | Together mode exits to reflection phase (same flow) | All existing `tests/e2e/scripture/scripture-reflection-*.spec.ts` must pass |
-| **scripture-session Broadcast Channel** | New subscription added; must not interfere with existing mood/interaction channels | Run full `npm test:unit` and `npm test:e2e` regression before release |
-| **scripture-rls-security.spec.ts** | RLS changes for realtime.messages may affect existing session security tests | Run `tests/e2e/scripture/scripture-rls-security.spec.ts` after RLS policy deployment |
-| **IndexedDB schema (v5)** | `scripture_sessions` store added to cache layer | Run `tests/unit/services/scriptureReadingService.*.test.ts` regression |
+| Service/Component                           | Impact                                                                             | Regression Scope                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Epic 1 Solo Reading**                     | Together mode reuses `ScriptureReadingService` and `scriptureReadingSlice`         | All existing `tests/e2e/scripture/scripture-solo-reading.spec.ts` must pass          |
+| **Epic 2 Reflection + Daily Prayer Report** | Together mode exits to reflection phase (same flow)                                | All existing `tests/e2e/scripture/scripture-reflection-*.spec.ts` must pass          |
+| **scripture-session Broadcast Channel**     | New subscription added; must not interfere with existing mood/interaction channels | Run full `npm test:unit` and `npm test:e2e` regression before release                |
+| **scripture-rls-security.spec.ts**          | RLS changes for realtime.messages may affect existing session security tests       | Run `tests/e2e/scripture/scripture-rls-security.spec.ts` after RLS policy deployment |
+| **IndexedDB schema (v5)**                   | `scripture_sessions` store added to cache layer                                    | Run `tests/unit/services/scriptureReadingService.*.test.ts` regression               |
 
 ---
 

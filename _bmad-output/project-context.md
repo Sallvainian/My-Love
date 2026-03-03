@@ -3,7 +3,15 @@ project_name: 'My-Love'
 user_name: 'Sallvain'
 date: '2026-03-03'
 sections_completed:
-  ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
+  [
+    'technology_stack',
+    'language_rules',
+    'framework_rules',
+    'testing_rules',
+    'quality_rules',
+    'workflow_rules',
+    'anti_patterns',
+  ]
 status: 'complete'
 rule_count: 97
 optimized_for_llm: true

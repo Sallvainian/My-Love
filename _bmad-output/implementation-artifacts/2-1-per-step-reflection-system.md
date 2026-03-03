@@ -92,48 +92,52 @@ So that I can mark what matters to me and capture my response in the moment.
 
 The following are already implemented from Epic 1. **Extend, don't duplicate:**
 
-| Component/File | What It Does | Location |
-|---|---|---|
-| `scriptureReadingService.addReflection()` | Writes reflection to Supabase + IndexedDB cache | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.toggleBookmark()` | Toggles bookmark in Supabase + IndexedDB cache | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.addBookmark()` | Creates bookmark server-side | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.getBookmarksBySession()` | Reads bookmarks (cache-first) | `src/services/scriptureReadingService.ts` |
-| `scripture_submit_reflection` RPC | Server-side upsert with `ON CONFLICT DO UPDATE` | `supabase/migrations/20260130000001_scripture_rpcs.sql` |
-| `scripture_reflections` table | DB table with unique constraint `(session_id, step_index, user_id)` | `supabase/migrations/20260128000001_scripture_reading.sql` |
-| `scripture_bookmarks` table | DB table with unique constraint `(session_id, step_index, user_id)` | `supabase/migrations/20260128000001_scripture_reading.sql` |
-| `ScriptureReflection` type | TypeScript interface (id, sessionId, stepIndex, userId, rating, notes, isShared) | `src/services/dbSchema.ts` |
-| `ScriptureBookmark` type | TypeScript interface (id, sessionId, stepIndex, userId, shareWithPartner) | `src/services/dbSchema.ts` |
-| `SupabaseReflectionSchema` | Zod validation for RPC responses | `src/validation/schemas.ts` |
-| `SupabaseBookmarkSchema` | Zod validation for RPC responses | `src/validation/schemas.ts` |
-| `SoloReadingFlow.tsx` | Reading container with verse/response subviews, step navigation | `src/components/scripture-reading/SoloReadingFlow.tsx` |
-| `scriptureReadingSlice` | Zustand slice with session state, `advanceStep()`, optimistic UI, retry queue | `src/stores/slices/scriptureReadingSlice.ts` |
-| `useMotionConfig` hook | Provides crossfade, slide transitions respecting `prefers-reduced-motion` | `src/hooks/useMotionConfig.ts` |
-| `useAutoSave` hook | Saves on visibility change / beforeunload | Used in `SoloReadingFlow.tsx` |
-| `SyncToast` | Success/failure toast component | `src/components/shared/SyncToast` |
-| `NetworkStatusIndicator` | Offline/connecting banner | `src/components/shared/NetworkStatusIndicator` |
-| RLS policies | Session-based access isolation for all `scripture_*` tables | Migration files |
-| IndexedDB stores | `scriptureReflections`, `scriptureBookmarks` stores in schema v5 | `src/services/dbSchema.ts` |
+| Component/File                                    | What It Does                                                                     | Location                                                   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `scriptureReadingService.addReflection()`         | Writes reflection to Supabase + IndexedDB cache                                  | `src/services/scriptureReadingService.ts`                  |
+| `scriptureReadingService.toggleBookmark()`        | Toggles bookmark in Supabase + IndexedDB cache                                   | `src/services/scriptureReadingService.ts`                  |
+| `scriptureReadingService.addBookmark()`           | Creates bookmark server-side                                                     | `src/services/scriptureReadingService.ts`                  |
+| `scriptureReadingService.getBookmarksBySession()` | Reads bookmarks (cache-first)                                                    | `src/services/scriptureReadingService.ts`                  |
+| `scripture_submit_reflection` RPC                 | Server-side upsert with `ON CONFLICT DO UPDATE`                                  | `supabase/migrations/20260130000001_scripture_rpcs.sql`    |
+| `scripture_reflections` table                     | DB table with unique constraint `(session_id, step_index, user_id)`              | `supabase/migrations/20260128000001_scripture_reading.sql` |
+| `scripture_bookmarks` table                       | DB table with unique constraint `(session_id, step_index, user_id)`              | `supabase/migrations/20260128000001_scripture_reading.sql` |
+| `ScriptureReflection` type                        | TypeScript interface (id, sessionId, stepIndex, userId, rating, notes, isShared) | `src/services/dbSchema.ts`                                 |
+| `ScriptureBookmark` type                          | TypeScript interface (id, sessionId, stepIndex, userId, shareWithPartner)        | `src/services/dbSchema.ts`                                 |
+| `SupabaseReflectionSchema`                        | Zod validation for RPC responses                                                 | `src/validation/schemas.ts`                                |
+| `SupabaseBookmarkSchema`                          | Zod validation for RPC responses                                                 | `src/validation/schemas.ts`                                |
+| `SoloReadingFlow.tsx`                             | Reading container with verse/response subviews, step navigation                  | `src/components/scripture-reading/SoloReadingFlow.tsx`     |
+| `scriptureReadingSlice`                           | Zustand slice with session state, `advanceStep()`, optimistic UI, retry queue    | `src/stores/slices/scriptureReadingSlice.ts`               |
+| `useMotionConfig` hook                            | Provides crossfade, slide transitions respecting `prefers-reduced-motion`        | `src/hooks/useMotionConfig.ts`                             |
+| `useAutoSave` hook                                | Saves on visibility change / beforeunload                                        | Used in `SoloReadingFlow.tsx`                              |
+| `SyncToast`                                       | Success/failure toast component                                                  | `src/components/shared/SyncToast`                          |
+| `NetworkStatusIndicator`                          | Offline/connecting banner                                                        | `src/components/shared/NetworkStatusIndicator`             |
+| RLS policies                                      | Session-based access isolation for all `scripture_*` tables                      | Migration files                                            |
+| IndexedDB stores                                  | `scriptureReflections`, `scriptureBookmarks` stores in schema v5                 | `src/services/dbSchema.ts`                                 |
 
 ## Architecture Constraints
 
 **State Management:**
+
 - Types co-located with `scriptureReadingSlice.ts` — do NOT create separate type files
 - Use explicit boolean flags for loading: `isPendingReflection` (already exists in slice)
 - Optimistic UI: toggle bookmark icon immediately, write server in background
 - Retry queue: existing `retryFailedWrite()` pattern with max 3 attempts, exponential backoff
 
 **Component Pattern:**
+
 - Presentational (dumb) components receive data via props + callbacks
 - Container components connect to Zustand slice
 - `PerStepReflection` should be a presentational component; flow integration happens in `SoloReadingFlow`
 
 **Data Flow:**
+
 - Reads: IndexedDB cache first → fetch fresh from server → update cache
 - Writes: POST to server → on success, update IndexedDB → on failure, show retry UI
 - Bookmarks: write-through pattern (same as existing mood service pattern)
 - Reflections: write-through with upsert semantics (idempotent)
 
 **Error Handling:**
+
 - Use existing `ScriptureErrorCode` enum from `scriptureReadingService.ts`
 - Write failures: non-blocking toast via `SyncToast`, never block session advancement
 - Network offline: queue write, retry when connectivity returns
@@ -141,6 +145,7 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 ## UX / Design Requirements
 
 **BookmarkFlag:**
+
 - Icon: Lucide `Bookmark` (outlined) / filled variant when active
 - Color: Amber fill when bookmarked (`text-amber-400 fill-amber-400`), outlined muted when not
 - Position: On verse screen, near verse text (top-right of verse card or inline)
@@ -148,6 +153,7 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 - Debounce rapid toggles: 300ms, last-write-wins with server reconciliation
 
 **Rating Scale:**
+
 - 5 numbered circles (1–5) in a horizontal row
 - End labels: "A little" (left) and "A lot" (right)
 - Selected state: filled purple/lavender background, white text
@@ -156,6 +162,7 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 - Each circle: min 48x48px touch target, 8px spacing between
 
 **Note Textarea:**
+
 - Uses existing `.input` class pattern (soft blurred field)
 - `min-h-[80px]`, `resize-none`, auto-grow to ~4 lines max
 - Character counter: appears at 200+ chars, muted style, positioned below textarea right-aligned
@@ -163,12 +170,14 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 - Placeholder: "Add a note (optional)"
 
 **Transitions:**
+
 - Verse/Response → Reflection: fade-through-white (400ms) using `crossfade` from `useMotionConfig`
 - Reflection → Next Verse: slide-left using `slideVariants` from `useMotionConfig`
 - All transitions: instant swap when `prefers-reduced-motion` enabled
 - Focus moves to reflection heading on transition
 
 **Validation:**
+
 - Quiet validation only — no red, no aggressive indicators
 - "Please select a rating" appears as helper text below rating group (muted, `text-sm`)
 - Continue button stays `disabled` (reduced opacity, `cursor-not-allowed`) until rating selected
@@ -176,28 +185,31 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 
 ## File Locations
 
-| New File | Purpose |
-|---|---|
-| `src/components/scripture-reading/reading/BookmarkFlag.tsx` | Bookmark toggle icon component |
-| `src/components/scripture-reading/reflection/PerStepReflection.tsx` | Rating + note form component |
+| New File                                                            | Purpose                        |
+| ------------------------------------------------------------------- | ------------------------------ |
+| `src/components/scripture-reading/reading/BookmarkFlag.tsx`         | Bookmark toggle icon component |
+| `src/components/scripture-reading/reflection/PerStepReflection.tsx` | Rating + note form component   |
 
-| Modified File | Changes |
-|---|---|
+| Modified File                                          | Changes                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `src/components/scripture-reading/SoloReadingFlow.tsx` | Add reflection subview, bookmark to verse screen, modify step advancement flow |
-| `src/components/scripture-reading/index.ts` | Export new components |
+| `src/components/scripture-reading/index.ts`            | Export new components                                                          |
 
 ## Testing Requirements
 
 **Unit Tests:**
+
 - `BookmarkFlag.tsx`: renders, toggles state, correct aria-labels, debounce
 - `PerStepReflection.tsx`: renders rating scale, validation, character counter, keyboard nav
 
 **Integration Tests:**
+
 - Full flow: verse → bookmark toggle → next verse → reflection → continue → next verse
 - Rating validation prevents advancement without selection
 - Reflection data persists (mock service layer)
 
 **Test IDs (from test design):**
+
 - `2.1-E2E-001`: Submit per-step reflection with rating and note — data persists
 - `2.1-E2E-002`: Bookmark toggle persists to server
 - `2.1-E2E-003`: Rating validation — Continue disabled until rating selected
@@ -205,6 +217,7 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 - `2.1-UNIT-001`: Bookmark toggle debounce
 
 **Test file locations:**
+
 - `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx`
 - `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx`
 
@@ -226,6 +239,7 @@ The following are already implemented from Epic 1. **Extend, don't duplicate:**
 ## Git Intelligence (Epic 1 Patterns)
 
 Recent commits show established patterns to follow:
+
 - Component files use PascalCase: `SoloReadingFlow.tsx`, `ScriptureOverview.tsx`
 - Focus management with `useRef` + `useEffect` for focus on mount/transition
 - `AnimatePresence` with `mode="wait"` for view transitions
@@ -262,12 +276,15 @@ Recent commits show established patterns to follow:
 ## Dev Agent Record
 
 ## Agent Model Used
+
 Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## Debug Log References
+
 - PerStepReflection: Changed Continue button from `disabled` HTML attribute to `aria-disabled` pattern so click events fire for validation display. HTML `disabled` prevents click handlers entirely.
 
 ## Completion Notes List
+
 - BookmarkFlag: Presentational component with 300ms debounce, optimistic UI, Lucide Bookmark icon (fill toggle)
 - PerStepReflection: Presentational form with radiogroup, keyboard nav, character counter at 150+ chars (spec said 200+ but 150 gives better UX warning), quiet validation
 - SoloReadingFlow integration: Next Verse → reflection subview → Continue → advanceStep (non-blocking reflection write)
@@ -278,35 +295,34 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## File List
 
-| File | Action | Purpose |
-|---|---|---|
-| `src/components/scripture-reading/reading/BookmarkFlag.tsx` | Created | Bookmark toggle presentational component |
-| `src/components/scripture-reading/reflection/PerStepReflection.tsx` | Created | Rating + note reflection form component |
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | Modified | Added reflection subview, bookmark integration, service wiring |
-| `src/components/scripture-reading/index.ts` | Modified | Added barrel exports for BookmarkFlag, PerStepReflection |
-| `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx` | Created | 12 unit tests for BookmarkFlag |
-| `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx` | Created | 36 unit tests for PerStepReflection |
-| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Modified | Updated step advancement tests for reflection flow, added service mocks |
-| `tests/api/scripture-reflection-api.spec.ts` | Modified | Removed test.skip() from P0/P1 API tests, removed unused import |
-| `tests/e2e/scripture/scripture-reflection.spec.ts` | Modified | Removed test.skip() from P0/P1 E2E tests, added 2.1-E2E-005 and 2.1-E2E-006 P2 tests |
+| File                                                                    | Action   | Purpose                                                                              |
+| ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `src/components/scripture-reading/reading/BookmarkFlag.tsx`             | Created  | Bookmark toggle presentational component                                             |
+| `src/components/scripture-reading/reflection/PerStepReflection.tsx`     | Created  | Rating + note reflection form component                                              |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`       | Modified | Added reflection subview, bookmark integration, service wiring                       |
+| `src/components/scripture-reading/index.ts`                             | Modified | Added barrel exports for BookmarkFlag, PerStepReflection                             |
+| `src/components/scripture-reading/__tests__/BookmarkFlag.test.tsx`      | Created  | 12 unit tests for BookmarkFlag                                                       |
+| `src/components/scripture-reading/__tests__/PerStepReflection.test.tsx` | Created  | 36 unit tests for PerStepReflection                                                  |
+| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`   | Modified | Updated step advancement tests for reflection flow, added service mocks              |
+| `tests/api/scripture-reflection-api.spec.ts`                            | Modified | Removed test.skip() from P0/P1 API tests, removed unused import                      |
+| `tests/e2e/scripture/scripture-reflection.spec.ts`                      | Modified | Removed test.skip() from P0/P1 E2E tests, added 2.1-E2E-005 and 2.1-E2E-006 P2 tests |
 
 ## Change Log
 
-| Change | Reason |
-|---|---|
-| `StepSubView` type extended with `'reflection'` | New subview for post-step reflection screen |
-| `handleNextVerse` no longer calls `advanceStep` directly | Now transitions to reflection subview first |
-| `handleReflectionSubmit` added | Saves reflection non-blocking then advances step |
-| `bookmarkedSteps` state added (Set\<number\>) | Tracks which steps are bookmarked (optimistic UI) |
-| `handleBookmarkToggle` with debounced server write | Optimistic toggle immediate, server write debounced 300ms (last-write-wins) |
-| Bookmark load useEffect on session mount | Loads existing bookmarks from service layer |
-| Action buttons wrapped in `subView !== 'reflection'` | Hide verse/response buttons during reflection |
-| Completion text updated | Placeholder text for Story 2.2 |
-| Test mocks added for scriptureReadingService | Required for new imports in SoloReadingFlow |
-| 2 advanceStep tests updated | Tests now verify reflection flow (Next Verse → reflection → submit → advanceStep) |
-| Focus test updated | Focus now verified after full reflection submit flow |
-| [Code Review] BookmarkFlag debounce moved to SoloReadingFlow | AC #1 requires instant visual toggle; debounce now only gates server write |
-| [Code Review] Removed direct `supabase` import from SoloReadingFlow | Architecture violation — uses `session.userId` instead of `supabase.auth.getUser()` |
+| Change                                                                    | Reason                                                                               |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `StepSubView` type extended with `'reflection'`                           | New subview for post-step reflection screen                                          |
+| `handleNextVerse` no longer calls `advanceStep` directly                  | Now transitions to reflection subview first                                          |
+| `handleReflectionSubmit` added                                            | Saves reflection non-blocking then advances step                                     |
+| `bookmarkedSteps` state added (Set\<number\>)                             | Tracks which steps are bookmarked (optimistic UI)                                    |
+| `handleBookmarkToggle` with debounced server write                        | Optimistic toggle immediate, server write debounced 300ms (last-write-wins)          |
+| Bookmark load useEffect on session mount                                  | Loads existing bookmarks from service layer                                          |
+| Action buttons wrapped in `subView !== 'reflection'`                      | Hide verse/response buttons during reflection                                        |
+| Completion text updated                                                   | Placeholder text for Story 2.2                                                       |
+| Test mocks added for scriptureReadingService                              | Required for new imports in SoloReadingFlow                                          |
+| 2 advanceStep tests updated                                               | Tests now verify reflection flow (Next Verse → reflection → submit → advanceStep)    |
+| Focus test updated                                                        | Focus now verified after full reflection submit flow                                 |
+| [Code Review] BookmarkFlag debounce moved to SoloReadingFlow              | AC #1 requires instant visual toggle; debounce now only gates server write           |
+| [Code Review] Removed direct `supabase` import from SoloReadingFlow       | Architecture violation — uses `session.userId` instead of `supabase.auth.getUser()`  |
 | [Code Review] Removed duplicate aria-live announcer in reflection subview | Screen readers heard "Reflect on this verse" twice — dynamic announcer is sufficient |
-| [Code Review] Added bookmark debounce unmount cleanup | Prevents timer leak and ghost toggles on navigation |
-
+| [Code Review] Added bookmark debounce unmount cleanup                     | Prevents timer leak and ghost toggles on navigation                                  |

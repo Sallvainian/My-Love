@@ -1,5 +1,13 @@
 ---
-stepsCompleted: ['step-01-preflight-and-context', 'step-02-generation-mode', 'step-03-test-strategy', 'step-04-generate-tests', 'step-04c-aggregate', 'step-05-validate-and-complete']
+stepsCompleted:
+  [
+    'step-01-preflight-and-context',
+    'step-02-generation-mode',
+    'step-03-test-strategy',
+    'step-04-generate-tests',
+    'step-04c-aggregate',
+    'step-05-validate-and-complete',
+  ]
 lastStep: 'step-05-validate-and-complete'
 lastSaved: '2026-02-20'
 ---
@@ -258,7 +266,9 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 **Implementation Example:**
 
 ```tsx
-{/* Phase A */}
+{
+  /* Phase A */
+}
 <div data-testid="lobby-role-selection">
   <button data-testid="lobby-role-reader" onClick={() => selectRole('reader')}>
     Reader <span>You read the verse</span>
@@ -266,9 +276,11 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   <button data-testid="lobby-role-responder" onClick={() => selectRole('responder')}>
     Responder <span>You read the response</span>
   </button>
-</div>
+</div>;
 
-{/* Phase B */}
+{
+  /* Phase B */
+}
 <div data-testid="lobby-waiting">
   <p data-testid="lobby-partner-status" aria-live="polite">
     {partnerJoined ? `${partner.displayName} has joined!` : `Waiting for ${partner.displayName}...`}
@@ -282,12 +294,14 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   <button data-testid="lobby-continue-solo" onClick={convertToSolo}>
     Continue solo
   </button>
-</div>
+</div>;
 
-{/* Countdown */}
+{
+  /* Countdown */
+}
 <div data-testid="countdown-container" tabIndex={-1} ref={containerRef} aria-live="assertive">
   <span data-testid="countdown-digit">{currentDigit}</span>
-</div>
+</div>;
 ```
 
 ---
@@ -553,6 +567,7 @@ npm run test:e2e
 **Command:** `npx vitest run [4 files] --silent --reporter=dot`
 
 **Results:**
+
 ```
 Test Files: 3 failed | 1 skipped (4)
       Tests: 9 skipped (9)
@@ -560,6 +575,7 @@ Test Files: 3 failed | 1 skipped (4)
 ```
 
 **Summary:**
+
 - 3 files fail with `Failed to resolve import` (components/hook don't exist) → ✅ Expected RED
 - 1 file (`scriptureReadingSlice.lobby.test.ts`) runs but has 9 skipped tests → ✅ Expected RED
 - E2E: all `test.skip(true, '[RED PHASE]...')` — will be collected but not executed
@@ -567,6 +583,7 @@ Test Files: 3 failed | 1 skipped (4)
 - **Status:** ✅ RED phase verified
 
 **Expected Failure Messages:**
+
 - Unit (import error): `Failed to resolve import "../containers/LobbyContainer"` — correct, file doesn't exist
 - Unit (import error): `Failed to resolve import "../session/Countdown"` — correct, file doesn't exist
 - Unit (import error): `Failed to resolve import "../../../src/hooks/useScriptureBroadcast"` — correct, file doesn't exist

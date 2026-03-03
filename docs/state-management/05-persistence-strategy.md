@@ -99,6 +99,7 @@ storage: createJSONStorage(() => ({
 ```
 
 Two layers of recovery:
+
 1. **Pre-hydration** (in `getItem`): Validates structure before Zustand deserializes. Only critical errors (type mismatches on `shownMessages` or `currentIndex`) trigger rejection.
 2. **Post-hydration** (in `onRehydrateStorage`): Re-validates after deserialization. Handles Map deserialization errors and null messageHistory.
 
@@ -135,16 +136,16 @@ onRehydrateStorage: () => (state, error) => {
 
 Database name: `my-love-db`, version: 5
 
-| Store                   | Key Path | Auto-Increment | Indexes                              |
-| ----------------------- | -------- | -------------- | ------------------------------------ |
+| Store                   | Key Path | Auto-Increment | Indexes                                         |
+| ----------------------- | -------- | -------------- | ----------------------------------------------- |
 | `messages`              | `id`     | Yes            | `by-category` (category), `by-date` (createdAt) |
-| `photos`                | `id`     | Yes            | `by-date` (uploadDate)               |
-| `moods`                 | `id`     | Yes            | `by-date` (date, unique)             |
-| `sw-auth`               | `id`     | No             | None                                 |
-| `scripture-sessions`    | `id`     | No             | `by-user` (userId)                   |
-| `scripture-reflections` | `id`     | No             | `by-session` (sessionId)             |
-| `scripture-bookmarks`   | `id`     | No             | `by-session` (sessionId)             |
-| `scripture-messages`    | `id`     | No             | `by-session` (sessionId)             |
+| `photos`                | `id`     | Yes            | `by-date` (uploadDate)                          |
+| `moods`                 | `id`     | Yes            | `by-date` (date, unique)                        |
+| `sw-auth`               | `id`     | No             | None                                            |
+| `scripture-sessions`    | `id`     | No             | `by-user` (userId)                              |
+| `scripture-reflections` | `id`     | No             | `by-session` (sessionId)                        |
+| `scripture-bookmarks`   | `id`     | No             | `by-session` (sessionId)                        |
+| `scripture-messages`    | `id`     | No             | `by-session` (sessionId)                        |
 
 ### Service Layer
 
@@ -200,22 +201,22 @@ Conservative estimate of 5MB total (typical browser minimum).
 
 `PhotoStorageService.estimateQuotaRemaining()` uses `navigator.storage.estimate()` to check browser-allocated quota. Falls back to `STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES` (50MB) when the Storage API is unavailable (e.g., Safari < 15.2).
 
-| Threshold | Level         | Action          |
-| --------- | ------------- | --------------- |
+| Threshold | Level         | Action           |
+| --------- | ------------- | ---------------- |
 | < 80%     | normal        | Normal operation |
-| 80-95%    | `approaching` | Console warning |
-| > 95%     | `critical`    | Reject uploads  |
+| 80-95%    | `approaching` | Console warning  |
+| > 95%     | `critical`    | Reject uploads   |
 
 ### Supabase Storage
 
 `photoService.ts` monitors bucket quota by summing `file_size` from the `photos` table against a 1GB free tier limit:
 
-| Threshold | Level         | Action          |
-| --------- | ------------- | --------------- |
+| Threshold | Level         | Action           |
+| --------- | ------------- | ---------------- |
 | < 80%     | normal        | Normal operation |
-| 80-95%    | `approaching` | Console warning |
-| 95-100%   | `critical`    | Reject uploads  |
-| > 100%    | `exceeded`    | Error message   |
+| 80-95%    | `approaching` | Console warning  |
+| 95-100%   | `critical`    | Reject uploads   |
+| > 100%    | `exceeded`    | Error message    |
 
 ## Related Documentation
 

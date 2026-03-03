@@ -38,12 +38,12 @@
 
 ## `love-notes-images` Bucket
 
-| Setting         | Value                                |
-| --------------- | ------------------------------------ |
-| Public          | No (private)                         |
+| Setting         | Value                                                 |
+| --------------- | ----------------------------------------------------- |
+| Public          | No (private)                                          |
 | File size limit | No bucket-level limit; 5 MB enforced by Edge Function |
-| Purpose         | Love note image attachments          |
-| Path pattern    | `{user_id}/{timestamp}-{uuid}.{ext}` |
+| Purpose         | Love note image attachments                           |
+| Path pattern    | `{user_id}/{timestamp}-{uuid}.{ext}`                  |
 
 ### Storage RLS Policies
 

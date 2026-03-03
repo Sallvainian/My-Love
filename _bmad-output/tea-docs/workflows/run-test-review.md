@@ -1,6 +1,7 @@
 # How to Run Test Review with TEA - Complete Guide
 
 ## Overview
+
 TEA's `test-review` workflow audits test quality using objective scoring and actionable feedback, evaluating tests against established best practices.
 
 ## When to Use This Workflow
@@ -21,12 +22,15 @@ TEA's `test-review` workflow audits test quality using objective scoring and act
 ## Step-by-Step Instructions
 
 ### 1. Load TEA Agent
+
 Start a new chat session and initialize:
+
 ```
 tea
 ```
 
 ### 2. Run the Test Review Workflow
+
 ```
 test-review
 ```
@@ -34,26 +38,33 @@ test-review
 ### 3. Specify Review Scope
 
 **Option A: Single File**
+
 ```
 tests/e2e/checkout.spec.ts
 ```
+
 Best for reviewing specific failing tests or new test feedback.
 
 **Option B: Directory**
+
 ```
 tests/e2e/
 ```
+
 Best for comparing quality across multiple files or auditing entire test suites.
 
 **Option C: Entire Suite**
+
 ```
 tests/
 ```
+
 Best for comprehensive audits or establishing baseline metrics.
 
 ### 4. Review the Quality Report
 
 TEA generates `test-review.md` containing:
+
 - Overall score (0-100)
 - Category-specific scores
 - Critical issues with line numbers
@@ -63,27 +74,28 @@ TEA generates `test-review.md` containing:
 
 ## Quality Scoring Framework
 
-| Category | Max Points | Purpose |
-|----------|-----------|---------|
-| **Determinism** | 35 | Consistent results across runs |
-| **Isolation** | 25 | Independent test execution |
-| **Assertions** | 20 | Meaningful verification |
-| **Structure** | 10 | Readability and maintainability |
-| **Performance** | 10 | Efficient execution |
+| Category        | Max Points | Purpose                         |
+| --------------- | ---------- | ------------------------------- |
+| **Determinism** | 35         | Consistent results across runs  |
+| **Isolation**   | 25         | Independent test execution      |
+| **Assertions**  | 20         | Meaningful verification         |
+| **Structure**   | 10         | Readability and maintainability |
+| **Performance** | 10         | Efficient execution             |
 
 ### Scoring Interpretation
 
-| Range | Meaning | Required Action |
-|-------|---------|-----------------|
-| 90-100 | Excellent | Minimal changes; production-ready |
-| 80-89 | Good | Minor improvements recommended |
-| 70-79 | Acceptable | Address recommendations before release |
-| 60-69 | Needs Improvement | Fix critical issues |
-| <60 | Critical | Significant refactoring needed |
+| Range  | Meaning           | Required Action                        |
+| ------ | ----------------- | -------------------------------------- |
+| 90-100 | Excellent         | Minimal changes; production-ready      |
+| 80-89  | Good              | Minor improvements recommended         |
+| 70-79  | Acceptable        | Address recommendations before release |
+| 60-69  | Needs Improvement | Fix critical issues                    |
+| <60    | Critical          | Significant refactoring needed         |
 
 ## Critical Issues Overview
 
 ### Hard Waits Detection
+
 Hard-coded timeouts like `page.waitForTimeout(3000)` create flaky tests. Replace with network-first patterns:
 
 ```typescript
@@ -91,12 +103,11 @@ Hard-coded timeouts like `page.waitForTimeout(3000)` create flaky tests. Replace
 await page.waitForTimeout(3000);
 
 // Use:
-await page.waitForResponse(
-  (resp) => resp.url().includes('/api/endpoint') && resp.ok()
-);
+await page.waitForResponse((resp) => resp.url().includes('/api/endpoint') && resp.ok());
 ```
 
 ### Conditional Flow Control
+
 Tests using `if/else` become non-deterministic. Make behavior explicit:
 
 ```typescript
@@ -114,6 +125,7 @@ test('show banner for new users', async ({ page }) => {
 ## Key Recommendations
 
 ### 1. Extract Repeated Setup
+
 Move duplicated login sequences into reusable fixtures. With Playwright Utils:
 
 ```typescript
@@ -130,12 +142,11 @@ test('example', async ({ page, authToken }) => {
 ```
 
 ### 2. Add Network Assertions
+
 Verify API responses alongside UI changes:
 
 ```typescript
-const responsePromise = page.waitForResponse(
-  (resp) => resp.url().includes('/api/profile')
-);
+const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/profile'));
 await page.click('button[name="save"]');
 const response = await responsePromise;
 const data = await response.json();
@@ -143,6 +154,7 @@ expect(data.success).toBe(true);
 ```
 
 ### 3. Improve Test Names
+
 Use descriptive naming that clarifies intent:
 
 ```typescript
@@ -154,17 +166,20 @@ test('should show validation error for expired card', async ({ page }) => {});
 ## Next Steps (Prioritized)
 
 ### Immediate
+
 1. Fix all critical issues (hard waits, conditionals)
 2. Resolve performance bottlenecks
 3. Re-run review to confirm improvements
 
 ### Short-term
+
 4. Apply top 3 recommendations
 5. Extract common fixtures
 6. Add network assertions where missing
 7. Improve vague test names
 
 ### Long-term
+
 8. Re-run full suite review (target: 85+)
 9. Implement performance budgets in CI
 10. Document patterns for team alignment
@@ -172,14 +187,17 @@ test('should show validation error for expired card', async ({ page }) => {});
 ## Best Practices
 
 ### Review Frequency
+
 - **Per story:** Optional spot-checks
 - **Per epic:** Recommended for consistency
 - **Per release:** Required for quality gates
 - **Quarterly:** Audit entire suite
 
 ### Review as Release Checklist
+
 ```markdown
 ## Release Checklist
+
 - [ ] All tests passing
 - [ ] Test review score > 80
 - [ ] Critical issues resolved
@@ -187,26 +205,32 @@ test('should show validation error for expired card', async ({ page }) => {});
 ```
 
 ### Track Quality Trends
+
 Monitor scores over time to demonstrate improvement efforts and maintain quality momentum.
 
 ### Incremental Review Strategy
+
 For large suites, divide reviews by category: E2E tests (Week 1) -> API tests (Week 2) -> Component tests (Week 3) -> Apply fixes (Week 4).
 
 ## Common Issues and Solutions
 
 ### Low Determinism Score
+
 **Causes:** Hard waits, conditionals, missing network assertions
 **Fix:** Apply network-first patterns and remove flow-control conditionals
 
 ### Low Performance Score
+
 **Causes:** Unnecessary timeouts, inefficient selectors, heavy setup
 **Fix:** Optimize selectors, use fixtures, implement parallelization
 
 ### Low Isolation Score
+
 **Causes:** Shared state, incomplete cleanup, hard-coded data
 **Fix:** Use fixtures, clean up in afterEach, generate unique test data
 
 ### Overwhelming Issue Count
+
 **Strategy:** Prioritize critical issues first, apply top 3 recommendations, iterate incrementally rather than fixing everything simultaneously.
 
 ## Related Workflows
@@ -218,6 +242,7 @@ For large suites, divide reviews by category: E2E tests (Week 1) -> API tests (W
 ## Knowledge Base Integration
 
 TEA evaluates tests against:
+
 - Test quality standards
 - Network-first patterns
 - Timing and debugging practices
@@ -225,4 +250,4 @@ TEA evaluates tests against:
 
 ---
 
-*Generated with BMad Method - TEA (Test Engineering Architect)*
+_Generated with BMad Method - TEA (Test Engineering Architect)_

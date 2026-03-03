@@ -58,21 +58,21 @@ The E2E spec for Story 4.3 (Reconnection & Graceful Degradation) covers the two 
 
 ## Quality Criteria Assessment
 
-| Criterion                            | Status  | Violations | Notes                                              |
-| ------------------------------------ | ------- | ---------- | -------------------------------------------------- |
-| BDD Format (Given-When-Then)         | PASS    | 0          | GIVEN/WHEN/THEN comments in both tests             |
-| Test IDs                             | PASS    | 0          | 4.3-E2E-001 (P0), 4.3-E2E-002 (P1)                |
-| Priority Markers (P0/P1/P2/P3)      | PASS    | 0          | [P0] and [P1] in test names                        |
-| Hard Waits (sleep, waitForTimeout)   | PASS    | 0          | No hard waits — all waits are event-based          |
-| Determinism (no conditionals)        | WARN    | 4          | Conditional flow, broad waitForFunction, ESM import |
-| Isolation (cleanup, no shared state) | PASS    | 3          | Minor — DB mutation, store coupling, let reassign   |
-| Fixture Patterns                     | PASS    | 0          | Uses merged-fixtures with supabaseAdmin, browser   |
-| Data Factories                       | PASS    | 0          | cleanupTestSession factory for teardown            |
-| Network-First Pattern                | PASS    | 0          | waitForResponse before all RPC interactions        |
-| Explicit Assertions                  | PASS    | 0          | All assertions explicit with AC# references        |
-| Test Length (<=300 lines)            | FAIL    | 1          | 383 lines (exceeds 300-line limit)                 |
-| Test Duration (<=1.5 min)            | WARN    | 1          | 120s timeout (justified by presence TTL timing)    |
-| Flakiness Patterns                   | WARN    | 2          | Dynamic ESM import, broad DOM poll                 |
+| Criterion                            | Status | Violations | Notes                                               |
+| ------------------------------------ | ------ | ---------- | --------------------------------------------------- |
+| BDD Format (Given-When-Then)         | PASS   | 0          | GIVEN/WHEN/THEN comments in both tests              |
+| Test IDs                             | PASS   | 0          | 4.3-E2E-001 (P0), 4.3-E2E-002 (P1)                  |
+| Priority Markers (P0/P1/P2/P3)       | PASS   | 0          | [P0] and [P1] in test names                         |
+| Hard Waits (sleep, waitForTimeout)   | PASS   | 0          | No hard waits — all waits are event-based           |
+| Determinism (no conditionals)        | WARN   | 4          | Conditional flow, broad waitForFunction, ESM import |
+| Isolation (cleanup, no shared state) | PASS   | 3          | Minor — DB mutation, store coupling, let reassign   |
+| Fixture Patterns                     | PASS   | 0          | Uses merged-fixtures with supabaseAdmin, browser    |
+| Data Factories                       | PASS   | 0          | cleanupTestSession factory for teardown             |
+| Network-First Pattern                | PASS   | 0          | waitForResponse before all RPC interactions         |
+| Explicit Assertions                  | PASS   | 0          | All assertions explicit with AC# references         |
+| Test Length (<=300 lines)            | FAIL   | 1          | 383 lines (exceeds 300-line limit)                  |
+| Test Duration (<=1.5 min)            | WARN   | 1          | 120s timeout (justified by presence TTL timing)     |
+| Flakiness Patterns                   | WARN   | 2          | Dynamic ESM import, broad DOM poll                  |
 
 **Total Violations**: 0 Critical, 3 High, 8 Medium, 7 Low
 
@@ -127,6 +127,7 @@ No critical (P0) issues detected.
 
 **Issue Description**:
 The file contains two inline helpers totaling ~120 lines that substantially duplicate logic already in `tests/support/helpers/scripture-lobby.ts`:
+
 - `setupBothUsersInReading` (lines 35-84) duplicates `navigateBothToReadingPhase` (lobby.ts:51-83) — same waitForResponse + ready-button + reading-container pattern
 - `startTogetherSessionForRole` (lines 86-155) duplicates `navigateToTogetherRoleSelection` (lobby.ts:90-120) — same ensureScriptureOverview, create_session RPC watch, mode selection
 
@@ -178,6 +179,7 @@ P1 — the 300-line limit and "no duplication with support files" are core quali
 
 **Issue Description**:
 Both inline helpers use `isVisible().catch(() => false)` probes to branch on runtime state:
+
 - `setupBothUsersInReading` checks if both pages are already in reading (lines 39-49)
 - `startTogetherSessionForRole` probes for lobby role selection with a 2s timeout (lines 117-119), then follows different paths based on the result
 
@@ -193,9 +195,14 @@ const hasLobbyRoleSelection = await page
   .catch(() => false);
 
 if (assertPostState) {
-  if (hasLobbyRoleSelection) { /* path A */ }
-  else { /* path B */ }
-} else if (hasLobbyRoleSelection) { /* path C */ }
+  if (hasLobbyRoleSelection) {
+    /* path A */
+  } else {
+    /* path B */
+  }
+} else if (hasLobbyRoleSelection) {
+  /* path C */
+}
 ```
 
 **Recommended Improvement**:
@@ -355,7 +362,10 @@ Before clicking "End Session", the test sets up a response interceptor for `scri
 
 ```typescript
 const endSessionResponse = page.waitForResponse(
-  (resp) => resp.url().includes('/rest/v1/rpc/scripture_end_session') && resp.status() >= 200 && resp.status() < 300,
+  (resp) =>
+    resp.url().includes('/rest/v1/rpc/scripture_end_session') &&
+    resp.status() >= 200 &&
+    resp.status() < 300,
   { timeout: SESSION_CREATE_TIMEOUT_MS }
 );
 await page.getByTestId('disconnection-end-session').click();
@@ -498,40 +508,40 @@ No re-review needed — approve as-is. The P1 recommendation (helper extraction)
 
 ### Violation Summary by Location
 
-| Line | Severity | Dimension | Issue | Fix |
-| ---- | -------- | --------- | ----- | --- |
-| 35-84 | HIGH | Maintainability | setupBothUsersInReading duplicates navigateBothToReadingPhase | Reuse shared helper |
-| 39-49 | MEDIUM | Determinism | Conditional isVisible guard creates two execution paths | Remove guard, ensure preconditions |
-| 86-155 | HIGH | Maintainability | startTogetherSessionForRole duplicates navigateToTogetherRoleSelection | Extend shared helper |
-| 117-119 | MEDIUM | Determinism | isVisible().catch() probe for non-deterministic branching | Always expect role selection |
-| 119 | LOW | Maintainability | Magic timeout 2_000 without named constant | Extract to named constant |
-| 162-267 | HIGH | Maintainability | Test 4.3-E2E-001 body exceeds 100 lines (~105) | Extract setup to helpers |
-| 172-191 | MEDIUM | Maintainability | Duplicated 20-line GIVEN setup block | Extract to shared setup |
-| 207-208 | MEDIUM | Performance | Redundant toBeVisible before toContainText | Remove redundant assertion |
-| 273-382 | MEDIUM | Maintainability | Test 4.3-E2E-002 body exceeds 100 lines (~109) | Extract reconnection sim |
-| 337-340 | LOW | Isolation | Direct DB mutation bypasses app under test | Drive phase via app or document gap |
-| 337-340 | MEDIUM | Performance | DB workaround adds extra round-trip | Persist phase server-side |
-| 345-347 | MEDIUM | Determinism | Broad waitForFunction matches any data-testid | Wait for specific element |
-| 349-351 | MEDIUM | Determinism | Dynamic ESM import depends on dev-server path | Use page navigation |
-| 349-351 | LOW | Isolation | page.evaluate couples test to internal store API | Use UI-driven reconnection |
-| 292 | LOW | Isolation | let reassignment of partnerPage mid-test | Use separate const |
-| 367-368 | LOW | Performance | Missing explicit timeouts on final assertions | Add STEP_ADVANCE_TIMEOUT_MS |
+| Line    | Severity | Dimension       | Issue                                                                  | Fix                                 |
+| ------- | -------- | --------------- | ---------------------------------------------------------------------- | ----------------------------------- |
+| 35-84   | HIGH     | Maintainability | setupBothUsersInReading duplicates navigateBothToReadingPhase          | Reuse shared helper                 |
+| 39-49   | MEDIUM   | Determinism     | Conditional isVisible guard creates two execution paths                | Remove guard, ensure preconditions  |
+| 86-155  | HIGH     | Maintainability | startTogetherSessionForRole duplicates navigateToTogetherRoleSelection | Extend shared helper                |
+| 117-119 | MEDIUM   | Determinism     | isVisible().catch() probe for non-deterministic branching              | Always expect role selection        |
+| 119     | LOW      | Maintainability | Magic timeout 2_000 without named constant                             | Extract to named constant           |
+| 162-267 | HIGH     | Maintainability | Test 4.3-E2E-001 body exceeds 100 lines (~105)                         | Extract setup to helpers            |
+| 172-191 | MEDIUM   | Maintainability | Duplicated 20-line GIVEN setup block                                   | Extract to shared setup             |
+| 207-208 | MEDIUM   | Performance     | Redundant toBeVisible before toContainText                             | Remove redundant assertion          |
+| 273-382 | MEDIUM   | Maintainability | Test 4.3-E2E-002 body exceeds 100 lines (~109)                         | Extract reconnection sim            |
+| 337-340 | LOW      | Isolation       | Direct DB mutation bypasses app under test                             | Drive phase via app or document gap |
+| 337-340 | MEDIUM   | Performance     | DB workaround adds extra round-trip                                    | Persist phase server-side           |
+| 345-347 | MEDIUM   | Determinism     | Broad waitForFunction matches any data-testid                          | Wait for specific element           |
+| 349-351 | MEDIUM   | Determinism     | Dynamic ESM import depends on dev-server path                          | Use page navigation                 |
+| 349-351 | LOW      | Isolation       | page.evaluate couples test to internal store API                       | Use UI-driven reconnection          |
+| 292     | LOW      | Isolation       | let reassignment of partnerPage mid-test                               | Use separate const                  |
+| 367-368 | LOW      | Performance     | Missing explicit timeouts on final assertions                          | Add STEP_ADVANCE_TIMEOUT_MS         |
 
 ### Quality Trends
 
-| Review Date | Score | Grade | Critical Issues | Trend |
-| ----------- | ----- | ----- | --------------- | ----- |
-| 2026-03-01 (v1) | 91/100 | A | 0 | -- (first review) |
-| 2026-03-01 (v2) | 78/100 | C+ | 0 | Declined (stricter rubric) |
+| Review Date     | Score  | Grade | Critical Issues | Trend                      |
+| --------------- | ------ | ----- | --------------- | -------------------------- |
+| 2026-03-01 (v1) | 91/100 | A     | 0               | -- (first review)          |
+| 2026-03-01 (v2) | 78/100 | C+    | 0               | Declined (stricter rubric) |
 
 Note: Score decline reflects stricter evaluation rubric applied in v2 (individual test length >100 lines flagged as HIGH, helper duplication scored separately from file length). The test file itself has not changed between reviews.
 
 ### Related Reviews
 
-| File | Score | Grade | Critical | Status |
-| ---- | ----- | ----- | -------- | ------ |
-| Story 4.1 tests | See test-review-story-4.1.md | | | Approved |
-| Story 4.2 tests | See test-review-story-4.2.md | | | Approved |
+| File            | Score                        | Grade | Critical | Status   |
+| --------------- | ---------------------------- | ----- | -------- | -------- |
+| Story 4.1 tests | See test-review-story-4.1.md |       |          | Approved |
+| Story 4.2 tests | See test-review-story-4.2.md |       |          | Approved |
 
 ---
 

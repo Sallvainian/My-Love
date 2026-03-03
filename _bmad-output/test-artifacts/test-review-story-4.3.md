@@ -64,21 +64,21 @@ The Story 4.3 test suite demonstrates solid structural foundations: all 6 files 
 
 ## Quality Criteria Assessment
 
-| Criterion                            | Status  | Violations | Notes                                                           |
-| ------------------------------------ | ------- | ---------- | --------------------------------------------------------------- |
-| BDD Format (Given-When-Then)         | PASS    | 0          | All tests follow BDD naming; E2E has Given/When/Then comments   |
-| Test IDs                             | PASS    | 0          | E2E: `4.3-E2E-001`, `4.3-E2E-002`; unit tests use descriptive names |
-| Priority Markers (P0/P1/P2/P3)       | PASS    | 0          | All tests tagged `[P0]`, `[P1]`, or `[P2]`                     |
-| Hard Waits (sleep, waitForTimeout)   | PASS    | 0          | No `waitForTimeout` anywhere; E2E uses locator timeouts         |
-| Determinism (no conditionals)        | WARN    | 4          | 2 HIGH (Date.now outside fake timers), 1 MEDIUM, 1 LOW         |
-| Isolation (cleanup, no shared state) | WARN    | 8          | 5 MEDIUM (shared vi.fn, missing clearAllMocks), 3 LOW           |
-| Fixture Patterns                     | PASS    | 0          | E2E uses `createTestSession` factory; unit uses `createStoreWithReadingSession` |
-| Data Factories                       | WARN    | 4          | Magic strings (`session-reconnect-001` x8), magic numbers (`31_000` x6) |
-| Network-First Pattern                | PASS    | 0          | E2E uses `waitForResponse` for RPC; route blocking for disconnect |
-| Explicit Assertions                  | PASS    | 0          | All tests have explicit `expect()` assertions                   |
-| Test Length (<=300 lines)            | PASS    | 0          | Max file: 299 lines (scriptureReadingSlice); all under 300      |
-| Test Duration (<=1.5 min)            | WARN    | 2          | E2E tests: 60-120s each due to real-time disconnection waits    |
-| Flakiness Patterns                   | WARN    | 2          | Date.now() bracketing race; setTimeout-based flushPromises       |
+| Criterion                            | Status | Violations | Notes                                                                           |
+| ------------------------------------ | ------ | ---------- | ------------------------------------------------------------------------------- |
+| BDD Format (Given-When-Then)         | PASS   | 0          | All tests follow BDD naming; E2E has Given/When/Then comments                   |
+| Test IDs                             | PASS   | 0          | E2E: `4.3-E2E-001`, `4.3-E2E-002`; unit tests use descriptive names             |
+| Priority Markers (P0/P1/P2/P3)       | PASS   | 0          | All tests tagged `[P0]`, `[P1]`, or `[P2]`                                      |
+| Hard Waits (sleep, waitForTimeout)   | PASS   | 0          | No `waitForTimeout` anywhere; E2E uses locator timeouts                         |
+| Determinism (no conditionals)        | WARN   | 4          | 2 HIGH (Date.now outside fake timers), 1 MEDIUM, 1 LOW                          |
+| Isolation (cleanup, no shared state) | WARN   | 8          | 5 MEDIUM (shared vi.fn, missing clearAllMocks), 3 LOW                           |
+| Fixture Patterns                     | PASS   | 0          | E2E uses `createTestSession` factory; unit uses `createStoreWithReadingSession` |
+| Data Factories                       | WARN   | 4          | Magic strings (`session-reconnect-001` x8), magic numbers (`31_000` x6)         |
+| Network-First Pattern                | PASS   | 0          | E2E uses `waitForResponse` for RPC; route blocking for disconnect               |
+| Explicit Assertions                  | PASS   | 0          | All tests have explicit `expect()` assertions                                   |
+| Test Length (<=300 lines)            | PASS   | 0          | Max file: 299 lines (scriptureReadingSlice); all under 300                      |
+| Test Duration (<=1.5 min)            | WARN   | 2          | E2E tests: 60-120s each due to real-time disconnection waits                    |
+| Flakiness Patterns                   | WARN   | 2          | Date.now() bracketing race; setTimeout-based flushPromises                      |
 
 **Total Violations**: 0 Critical, 2 High, 19 Medium, 12 Low
 
@@ -214,12 +214,12 @@ Both E2E tests duplicate ~20 lines of identical session creation and partner lin
 
 ### R4: Name magic strings and numbers (MEDIUM — Maintainability)
 
-| Value | File | Occurrences | Suggested Constant |
-|-------|------|-------------|--------------------|
-| `'session-reconnect-001'` | scriptureReadingSlice.reconnect | 8 | `TEST_SESSION_ID` |
-| `31_000` | DisconnectionOverlay | 6 | `PHASE_B_ELAPSED_MS` |
-| `20_001` | useScripturePresence | 2 | `PAST_STALE_TTL_MS` |
-| `120_000` | E2E spec | 2 | `E2E_TEST_TIMEOUT_MS` |
+| Value                     | File                            | Occurrences | Suggested Constant    |
+| ------------------------- | ------------------------------- | ----------- | --------------------- |
+| `'session-reconnect-001'` | scriptureReadingSlice.reconnect | 8           | `TEST_SESSION_ID`     |
+| `31_000`                  | DisconnectionOverlay            | 6           | `PHASE_B_ELAPSED_MS`  |
+| `20_001`                  | useScripturePresence            | 2           | `PAST_STALE_TTL_MS`   |
+| `120_000`                 | E2E spec                        | 2           | `E2E_TEST_TIMEOUT_MS` |
 
 ### R5: Replace `setTimeout`-based `flushPromises` (MEDIUM — Determinism)
 
@@ -228,12 +228,17 @@ Both E2E tests duplicate ~20 lines of identical session creation and partner lin
 ```typescript
 // Before:
 async function flushPromises() {
-  await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 }
 
 // After:
 async function flushPromises() {
-  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 ```
 
@@ -301,8 +306,12 @@ Each test creates its own store instance, preventing state leakage between tests
 ### BP5: Proper fake timer lifecycle (DisconnectionOverlay, useScripturePresence)
 
 ```typescript
-beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.useRealTimers(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 ```
 
 Clean install/restore pattern for fake timers. Both files properly pair the lifecycle.
@@ -311,14 +320,14 @@ Clean install/restore pattern for fake timers. Both files properly pair the life
 
 ## Test File Analysis
 
-| File | Lines | Tests | Framework | Determinism | Isolation | Maintainability | Performance |
-|------|-------|-------|-----------|-------------|-----------|-----------------|-------------|
-| DisconnectionOverlay.test.tsx | 234 | 12 | Vitest/RTL | 1 HIGH | 2 (1M+1L) | 2 (1M+1L) | Clean |
-| LockInButton.test.tsx | 174 | 14 | Vitest/RTL | Clean | 2 (2M) | 1 (1L) | Clean |
-| scriptureReadingSlice.reconnect.test.ts | 299 | 13 | Vitest | 1 HIGH+1 LOW | Clean | 3 (2M+1L) | 1 (1L) |
-| useScripturePresence.reconnect.test.ts | 207 | 6 | Vitest/RTL | Clean | 1 (1M) | 3 (2M+1L) | 1 (1L) |
-| useScriptureBroadcast.reconnect.test.ts | 170 | 5 | Vitest/RTL | 1 MEDIUM | 2 (1M+1L) | 4 (3M+1L) | Clean |
-| scripture-reconnect-4.3.spec.ts | 272 | 2 | Playwright | Clean | 1 (1L) | 3 (2M+1L) | 4 (3M+1L) |
+| File                                    | Lines | Tests | Framework  | Determinism  | Isolation | Maintainability | Performance |
+| --------------------------------------- | ----- | ----- | ---------- | ------------ | --------- | --------------- | ----------- |
+| DisconnectionOverlay.test.tsx           | 234   | 12    | Vitest/RTL | 1 HIGH       | 2 (1M+1L) | 2 (1M+1L)       | Clean       |
+| LockInButton.test.tsx                   | 174   | 14    | Vitest/RTL | Clean        | 2 (2M)    | 1 (1L)          | Clean       |
+| scriptureReadingSlice.reconnect.test.ts | 299   | 13    | Vitest     | 1 HIGH+1 LOW | Clean     | 3 (2M+1L)       | 1 (1L)      |
+| useScripturePresence.reconnect.test.ts  | 207   | 6     | Vitest/RTL | Clean        | 1 (1M)    | 3 (2M+1L)       | 1 (1L)      |
+| useScriptureBroadcast.reconnect.test.ts | 170   | 5     | Vitest/RTL | 1 MEDIUM     | 2 (1M+1L) | 4 (3M+1L)       | Clean       |
+| scripture-reconnect-4.3.spec.ts         | 272   | 2     | Playwright | Clean        | 1 (1L)    | 3 (2M+1L)       | 4 (3M+1L)   |
 
 **Total**: 1,356 lines, 52 tests across 6 files
 
@@ -329,6 +338,7 @@ Clean install/restore pattern for fake timers. Both files properly pair the life
 ### Story Alignment
 
 Story 4.3 defines 6 Acceptance Criteria:
+
 - AC#1: Reconnecting indicator — covered by DisconnectionOverlay tests + E2E
 - AC#2: Timeout options (30s) — covered by DisconnectionOverlay Phase B tests + E2E
 - AC#3: Keep waiting — covered by E2E test 4.3-E2E-002
@@ -345,6 +355,7 @@ The ATDD checklist (`atdd-checklist-4.3.md`) specifies 27 tests. The 52 tests fo
 ### Code Review Integration
 
 Story 4.3 code review flagged:
+
 - H1: broadcast re-subscribe broken — tested by `useScriptureBroadcast.reconnect.test.ts`
 - M1: reconnection toast — not in test scope (toast is M1, not a test issue)
 - M2: inline SVG instead of Lucide WifiOff — not a test concern
@@ -354,15 +365,15 @@ Story 4.3 code review flagged:
 
 ## Knowledge Base References
 
-| Fragment | Applied To | Key Finding |
-|----------|-----------|-------------|
-| `test-quality.md` | All files | 2 HIGHs: Date.now() without fake timers violates determinism rule |
-| `data-factories.md` | E2E spec | PASS: uses `createTestSession` factory pattern correctly |
-| `test-levels-framework.md` | Suite | PASS: proper unit/component/E2E level separation |
-| `selector-resilience.md` | All files | PASS: all tests use `data-testid` selectors exclusively |
-| `timing-debugging.md` | E2E spec | PASS: condition-based waits, network-first RPC verification |
-| `test-healing-patterns.md` | Determinism | Applied: Date.now() bracketing is a known flakiness pattern |
-| `selective-testing.md` | Suite | All tests tagged with priority markers for selective runs |
+| Fragment                   | Applied To  | Key Finding                                                       |
+| -------------------------- | ----------- | ----------------------------------------------------------------- |
+| `test-quality.md`          | All files   | 2 HIGHs: Date.now() without fake timers violates determinism rule |
+| `data-factories.md`        | E2E spec    | PASS: uses `createTestSession` factory pattern correctly          |
+| `test-levels-framework.md` | Suite       | PASS: proper unit/component/E2E level separation                  |
+| `selector-resilience.md`   | All files   | PASS: all tests use `data-testid` selectors exclusively           |
+| `timing-debugging.md`      | E2E spec    | PASS: condition-based waits, network-first RPC verification       |
+| `test-healing-patterns.md` | Determinism | Applied: Date.now() bracketing is a known flakiness pattern       |
+| `selective-testing.md`     | Suite       | All tests tagged with priority markers for selective runs         |
 
 ---
 
@@ -390,12 +401,12 @@ Story 4.3 code review flagged:
 
 ### Dimension Score Details
 
-| Dimension | Score | Grade | HIGH | MEDIUM | LOW | Weight |
-|-----------|-------|-------|------|--------|-----|--------|
-| Determinism | 73 | C | 2 | 1 | 1 | 30% |
-| Isolation | 69 | D | 0 | 5 | 3 | 30% |
-| Maintainability | 40 | F | 0 | 10 | 5 | 25% |
-| Performance | 85 | B | 0 | 3 | 3 | 15% |
+| Dimension       | Score | Grade | HIGH | MEDIUM | LOW | Weight |
+| --------------- | ----- | ----- | ---- | ------ | --- | ------ |
+| Determinism     | 73    | C     | 2    | 1      | 1   | 30%    |
+| Isolation       | 69    | D     | 0    | 5      | 3   | 30%    |
+| Maintainability | 40    | F     | 0    | 10     | 5   | 25%    |
+| Performance     | 85    | B     | 0    | 3      | 3   | 15%    |
 
 ### Subprocess Execution
 

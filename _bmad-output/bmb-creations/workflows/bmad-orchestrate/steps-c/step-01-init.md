@@ -60,10 +60,12 @@ To determine which BMAD workflow to execute next, confirm the choice with the us
 Check if the user has already specified which workflow to run (e.g., "run bmad-tea-testarch-atdd" or a specific slash command).
 
 **If user provided a specific workflow:**
+
 - Extract the workflow/slash command name
 - Skip to step 3 (Confirm Selection)
 
 **If no specific workflow provided:**
+
 - Proceed to step 2
 
 ### 2. Invoke bmad-help for Recommendation
@@ -84,6 +86,7 @@ Would you like to run this workflow?"
 Present options:
 
 "**Select an option:**
+
 - **[Y]** Yes, run this workflow
 - **[S]** Specify a different workflow
 - **[X]** Exit orchestrator"
@@ -100,6 +103,7 @@ Present options:
 ### 5. Create Orchestration Log
 
 Create {outputFile} from {templateFile} with:
+
 - `workflow_name`: the selected workflow name
 - `workflow_command`: the slash command to invoke
 - `date`: current date
@@ -110,6 +114,7 @@ Append to the log:
 
 ```markdown
 ### [timestamp] Orchestration Started
+
 - **Selected workflow:** [workflow name]
 - **Command:** [slash command]
 - **User:** {user_name}

@@ -17,12 +17,14 @@ An interactive HTML mockup was created (`ux-design-directions.html`) showcasing 
 **Single unified direction** based on Lavender Dreams theme with the following characteristics:
 
 **Visual Style:**
+
 - Lavender Dreams purple gradient backgrounds
 - Glass morphism cards (white/80% + backdrop blur)
 - Playfair Display for scripture, Inter for UI, Dancing Script for partner messages
 - Soft shadows and rounded-3xl corners
 
 **Interaction Patterns:**
+
 - Role indicators as pill badges with microphone icons
 - Bookmark flag with instant toggle (amber when active)
 - Partner position indicator with subtle pulse animation
@@ -30,6 +32,7 @@ An interactive HTML mockup was created (`ux-design-directions.html`) showcasing 
 - "Stood out to you" / "Stood out to [Partner]" labels for verse comparison
 
 **Information Hierarchy:**
+
 - "Verse X of 17" as progress indicator
 - Scripture text largest and most prominent
 - Role and partner position as secondary information
@@ -47,11 +50,13 @@ An interactive HTML mockup was created (`ux-design-directions.html`) showcasing 
 ## Implementation Approach
 
 **Reuse existing patterns:**
+
 - Card, button, and input styling from My-Love design system
 - Framer Motion animation patterns
 - Safe-area and responsive utilities
 
 **Create new components (8 total):**
+
 - `<Countdown>` with reduced-motion fallback
 - `<RoleIndicator>` pill badge
 - `<BookmarkFlag>` toggle with instant feedback
@@ -65,10 +70,10 @@ An interactive HTML mockup was created (`ux-design-directions.html`) showcasing 
 
 ## Implementation Roadmap
 
-| Phase | Components | Priority | Rationale |
-|-------|------------|----------|-----------|
-| **Phase 1 — Core Sync** | Countdown, RoleIndicator, LockInButton, PartnerPosition, SessionProgress | P0 | Required for Together mode to function |
-| **Phase 2 — Session Completion** | BookmarkFlag, ReflectionSummary, DailyPrayerReport | P1 | MVP scope; Daily Prayer Report is the emotional payoff |
+| Phase                            | Components                                                               | Priority | Rationale                                              |
+| -------------------------------- | ------------------------------------------------------------------------ | -------- | ------------------------------------------------------ |
+| **Phase 1 — Core Sync**          | Countdown, RoleIndicator, LockInButton, PartnerPosition, SessionProgress | P0       | Required for Together mode to function                 |
+| **Phase 2 — Session Completion** | BookmarkFlag, ReflectionSummary, DailyPrayerReport                       | P1       | MVP scope; Daily Prayer Report is the emotional payoff |
 
 **P0 (Core Sync):** Without these, Together mode doesn't work. Users can't see roles, can't progress together, can't track position.
 

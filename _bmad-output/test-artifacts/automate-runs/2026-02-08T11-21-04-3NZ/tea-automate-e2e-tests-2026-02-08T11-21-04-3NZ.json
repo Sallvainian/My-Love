@@ -15,11 +15,7 @@
     }
   ],
   "fixture_needs": [],
-  "knowledge_fragments_used": [
-    "fixture-architecture",
-    "network-first",
-    "selector-resilience"
-  ],
+  "knowledge_fragments_used": ["fixture-architecture", "network-first", "selector-resilience"],
   "test_count": 2,
   "summary": "Updated 2 P0 assertions in scripture reflection report flow to rely on stable accessibility signals."
 }

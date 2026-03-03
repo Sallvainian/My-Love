@@ -7,6 +7,7 @@ The TEA Academy provides a comprehensive learning program through the `teach-me-
 ## Key Program Structure
 
 **Seven Sessions:**
+
 1. Quick Start (30 min) - TEA fundamentals and engagement models
 2. Core Concepts (45 min) - Risk-based testing and quality principles
 3. Architecture & Patterns (60 min) - Fixture composition and network-first approaches
@@ -22,6 +23,7 @@ Users begin by running `tea` then selecting the `teach-me-testing` workflow. An 
 ## Progress Tracking
 
 The system automatically saves progress to:
+
 - Progress file: `{test_artifacts}/teaching-progress/{your-name}-tea-progress.yaml`
 - Session notes: `{test_artifacts}/tea-academy/{your-name}/session-{N}-notes.md`
 - Completion certificate upon finishing all sessions

@@ -7,15 +7,15 @@
 
 ## Review Team
 
-| Agent | Aspect | Model |
-|-------|--------|-------|
-| code-reviewer | CLAUDE.md compliance, security, React patterns, state management | Opus |
-| error-hunter | Silent failures, swallowed errors, reconnection logic, auth guards | Opus |
-| test-analyzer | Coverage gaps, edge cases, test quality, mock realism | Opus |
-| type-analyst | Type invariants, encapsulation, discriminated unions, Zod consistency | Opus |
-| comment-reviewer | Comment accuracy, stale docs, TODO items, SQL comments | Opus |
-| root-cause-analyst | Systemic root cause analysis across all findings | Opus |
-| adversarial-reviewer | Cynical adversarial review of source code and migrations | Opus |
+| Agent                | Aspect                                                                | Model |
+| -------------------- | --------------------------------------------------------------------- | ----- |
+| code-reviewer        | CLAUDE.md compliance, security, React patterns, state management      | Opus  |
+| error-hunter         | Silent failures, swallowed errors, reconnection logic, auth guards    | Opus  |
+| test-analyzer        | Coverage gaps, edge cases, test quality, mock realism                 | Opus  |
+| type-analyst         | Type invariants, encapsulation, discriminated unions, Zod consistency | Opus  |
+| comment-reviewer     | Comment accuracy, stale docs, TODO items, SQL comments                | Opus  |
+| root-cause-analyst   | Systemic root cause analysis across all findings                      | Opus  |
+| adversarial-reviewer | Cynical adversarial review of source code and migrations              | Opus  |
 
 ---
 
@@ -133,39 +133,39 @@ The PR is well-structured with solid fundamentals — thorough auth guards, opti
 
 ## Suggestions (20)
 
-| # | Suggestion | Source | File |
-|---|-----------|--------|------|
-| S1 | `handleScriptureError` repetitive 66-line switch — simplify to severity-based conditional | Code | `scriptureReadingService.ts:49-115` |
-| S2 | Missing return type annotation on `LockInButton` | Code | `LockInButton.tsx:25` |
-| S3 | `scriptureTheme` object duplicated across 3 component files — extract to shared constants | Code, RCA-5 | `ReadingContainer.tsx`, `LobbyContainer.tsx`, `ScriptureOverview.tsx` |
-| S4 | Presence channel retry lacks backoff — tight loop on persistent error | Code, Error | `useScripturePresence.ts` |
-| S5 | `DisconnectionOverlay` computed boolean in useEffect dependency array | Code | `DisconnectionOverlay.tsx:63` |
-| S6 | `lockIn` 409 detection by string matching — fragile | Code, Adversarial | `scriptureReadingSlice.ts:882` |
-| S7 | Background refresh methods have empty catch blocks (`// Silent failure`) | Error | `scriptureReadingService.ts:820-855` |
-| S8 | Zod `.parse()` throws without `VALIDATION_FAILED` error code — Sentry won't tag | Error | `scriptureReadingService.ts:247,381,...` |
-| S9 | `checkForActiveSession` only checks solo sessions — together-mode not resumable | Error, Adversarial | `scriptureReadingSlice.ts:307` |
-| S10 | Edge function catch-all missing CORS headers | Error | `upload-love-note-image/index.ts:267` |
-| S11 | `LobbyContainer` async handlers don't catch — unhandled promise rejections | Error | `LobbyContainer.tsx:68-81` |
-| S12 | Mixed naming conventions (semantic vs positional) for role/ready fields | Type | `dbSchema.ts:53-58` |
-| S13 | `PartnerPresenceInfo` mixed absence signals — consider discriminated union | Type | `useScripturePresence.ts:25-30` |
-| S14 | `_broadcastFn` non-serializable in Zustand state — document persistence exclusion | Type | `scriptureReadingSlice.ts:124` |
-| S15 | `NetworkStatusIndicator` and `SyncToast` lack unit tests | Test | `src/components/shared/` |
-| S16 | `convertToSolo()` error path untested | Test | `scriptureReadingSlice.ts:708-716` |
-| S17 | `endSession()` `isSyncing` guard untested | Test | `scriptureReadingSlice.ts:973` |
-| S18 | `Countdown` calls `onComplete` in useEffect without mounted guard — stale closure risk | Adversarial | `Countdown.tsx:50-51, 58-59` |
-| S19 | RLS policies on `realtime.messages` do unindexed scan on `user1_id` | Adversarial | migration SQL |
-| S20 | Migration chain has fragile intermediate state — partial rollback restores broken broadcasts | Adversarial | `20260228000001` → `20260301000200` |
+| #   | Suggestion                                                                                   | Source             | File                                                                  |
+| --- | -------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------- |
+| S1  | `handleScriptureError` repetitive 66-line switch — simplify to severity-based conditional    | Code               | `scriptureReadingService.ts:49-115`                                   |
+| S2  | Missing return type annotation on `LockInButton`                                             | Code               | `LockInButton.tsx:25`                                                 |
+| S3  | `scriptureTheme` object duplicated across 3 component files — extract to shared constants    | Code, RCA-5        | `ReadingContainer.tsx`, `LobbyContainer.tsx`, `ScriptureOverview.tsx` |
+| S4  | Presence channel retry lacks backoff — tight loop on persistent error                        | Code, Error        | `useScripturePresence.ts`                                             |
+| S5  | `DisconnectionOverlay` computed boolean in useEffect dependency array                        | Code               | `DisconnectionOverlay.tsx:63`                                         |
+| S6  | `lockIn` 409 detection by string matching — fragile                                          | Code, Adversarial  | `scriptureReadingSlice.ts:882`                                        |
+| S7  | Background refresh methods have empty catch blocks (`// Silent failure`)                     | Error              | `scriptureReadingService.ts:820-855`                                  |
+| S8  | Zod `.parse()` throws without `VALIDATION_FAILED` error code — Sentry won't tag              | Error              | `scriptureReadingService.ts:247,381,...`                              |
+| S9  | `checkForActiveSession` only checks solo sessions — together-mode not resumable              | Error, Adversarial | `scriptureReadingSlice.ts:307`                                        |
+| S10 | Edge function catch-all missing CORS headers                                                 | Error              | `upload-love-note-image/index.ts:267`                                 |
+| S11 | `LobbyContainer` async handlers don't catch — unhandled promise rejections                   | Error              | `LobbyContainer.tsx:68-81`                                            |
+| S12 | Mixed naming conventions (semantic vs positional) for role/ready fields                      | Type               | `dbSchema.ts:53-58`                                                   |
+| S13 | `PartnerPresenceInfo` mixed absence signals — consider discriminated union                   | Type               | `useScripturePresence.ts:25-30`                                       |
+| S14 | `_broadcastFn` non-serializable in Zustand state — document persistence exclusion            | Type               | `scriptureReadingSlice.ts:124`                                        |
+| S15 | `NetworkStatusIndicator` and `SyncToast` lack unit tests                                     | Test               | `src/components/shared/`                                              |
+| S16 | `convertToSolo()` error path untested                                                        | Test               | `scriptureReadingSlice.ts:708-716`                                    |
+| S17 | `endSession()` `isSyncing` guard untested                                                    | Test               | `scriptureReadingSlice.ts:973`                                        |
+| S18 | `Countdown` calls `onComplete` in useEffect without mounted guard — stale closure risk       | Adversarial        | `Countdown.tsx:50-51, 58-59`                                          |
+| S19 | RLS policies on `realtime.messages` do unindexed scan on `user1_id`                          | Adversarial        | migration SQL                                                         |
+| S20 | Migration chain has fragile intermediate state — partial rollback restores broken broadcasts | Adversarial        | `20260228000001` → `20260301000200`                                   |
 
 ---
 
 ## Comment Issues
 
-| # | Severity | Issue | File |
-|---|----------|-------|------|
-| CM1 | Important | Misleading comment: `session.userId` is "always `user1_id`" — only true for together-mode load path | `scriptureReadingSlice.ts:761` |
-| CM2 | Suggestion | `callLobbyRpc` "Remove once..." comment lacks tracking mechanism | `scriptureReadingSlice.ts:47-49` |
-| CM3 | Suggestion | Dual key pattern lacks deprecation intent documentation | `scriptureReadingSlice.ts:38-39` |
-| CM4 | Positive | eslint-disable comments have inline justifications — good pattern to emulate | `useScripturePresence.ts:215` |
+| #   | Severity   | Issue                                                                                               | File                             |
+| --- | ---------- | --------------------------------------------------------------------------------------------------- | -------------------------------- |
+| CM1 | Important  | Misleading comment: `session.userId` is "always `user1_id`" — only true for together-mode load path | `scriptureReadingSlice.ts:761`   |
+| CM2 | Suggestion | `callLobbyRpc` "Remove once..." comment lacks tracking mechanism                                    | `scriptureReadingSlice.ts:47-49` |
+| CM3 | Suggestion | Dual key pattern lacks deprecation intent documentation                                             | `scriptureReadingSlice.ts:38-39` |
+| CM4 | Positive   | eslint-disable comments have inline justifications — good pattern to emulate                        | `useScripturePresence.ts:215`    |
 
 ---
 
@@ -225,16 +225,16 @@ Stories 4.1-4.3 were built incrementally, each adding components with slightly d
 
 ## Recommended Action Order
 
-| Order | Action | Resolves | Effort |
-|-------|--------|----------|--------|
-| 1 | Regenerate `database.types.ts` | C1, I1, I2 | 1 command |
-| 2 | Add null-session guard to `onBroadcastReceived` | C2 | 3 lines |
-| 3 | Backport retry cap + backoff to presence hook | I5, I6, I7 | ~30 min |
-| 4 | Audit `SECURITY DEFINER` on `scripture_create_session` | I11 | ~15 min |
-| 5 | Default `isPartnerConnected: false` | I12 | 1 line |
-| 6 | Add tests: Sentry PII, `both_locked`, `ended_early` | I8, I9, I10 | ~2 hr |
-| 7 | Add pgTAP test for step boundary constant | I3 | ~15 min |
-| 8 | Remaining suggestions | S1-S20 | Follow-up PR |
+| Order | Action                                                 | Resolves    | Effort       |
+| ----- | ------------------------------------------------------ | ----------- | ------------ |
+| 1     | Regenerate `database.types.ts`                         | C1, I1, I2  | 1 command    |
+| 2     | Add null-session guard to `onBroadcastReceived`        | C2          | 3 lines      |
+| 3     | Backport retry cap + backoff to presence hook          | I5, I6, I7  | ~30 min      |
+| 4     | Audit `SECURITY DEFINER` on `scripture_create_session` | I11         | ~15 min      |
+| 5     | Default `isPartnerConnected: false`                    | I12         | 1 line       |
+| 6     | Add tests: Sentry PII, `both_locked`, `ended_early`    | I8, I9, I10 | ~2 hr        |
+| 7     | Add pgTAP test for step boundary constant              | I3          | ~15 min      |
+| 8     | Remaining suggestions                                  | S1-S20      | Follow-up PR |
 
 ---
 
@@ -244,22 +244,22 @@ This section cross-references the PR code review findings with the NFR Assessmen
 
 ### NFR Scorecard
 
-| Category | NFR Score | PR Review Correlation |
-|----------|-----------|----------------------|
-| 1. Testability & Automation | PASS (4/4) | Confirmed — strong test coverage |
-| 2. Test Data Strategy | PASS (3/3) | Confirmed |
-| 3. Scalability & Availability | CONCERNS (1/4) | Confirmed — by-design for MVP (2-user channels) |
-| 4. Disaster Recovery | CONCERNS (2/3) | Confirmed — RTO/RPO undefined, platform-managed |
-| 5. Security | PASS (4/4) | **Challenged** — I11 found `SECURITY DEFINER` on `scripture_create_session` |
-| 6. Monitorability | CONCERNS (2/4) | **Challenged** — I9 found Sentry PII stripping is untested |
-| 7. QoS & QoE | CONCERNS (2/4) | Confirmed — no formal latency measurement |
-| 8. Deployability | PASS (2/3) | Confirmed |
+| Category                      | NFR Score      | PR Review Correlation                                                       |
+| ----------------------------- | -------------- | --------------------------------------------------------------------------- |
+| 1. Testability & Automation   | PASS (4/4)     | Confirmed — strong test coverage                                            |
+| 2. Test Data Strategy         | PASS (3/3)     | Confirmed                                                                   |
+| 3. Scalability & Availability | CONCERNS (1/4) | Confirmed — by-design for MVP (2-user channels)                             |
+| 4. Disaster Recovery          | CONCERNS (2/3) | Confirmed — RTO/RPO undefined, platform-managed                             |
+| 5. Security                   | PASS (4/4)     | **Challenged** — I11 found `SECURITY DEFINER` on `scripture_create_session` |
+| 6. Monitorability             | CONCERNS (2/4) | **Challenged** — I9 found Sentry PII stripping is untested                  |
+| 7. QoS & QoE                  | CONCERNS (2/4) | Confirmed — no formal latency measurement                                   |
+| 8. Deployability              | PASS (2/3)     | Confirmed                                                                   |
 
 ### Cross-Reference: PR Findings vs. NFR Assessment
 
 #### Security (NFR-S1, S2) — NFR says PASS, PR review challenges
 
-The NFR assessment states: *"All 6 scripture RPCs now consistently SECURITY INVOKER; `scripture_end_session` regression to DEFINER reverted (AC-12)."*
+The NFR assessment states: _"All 6 scripture RPCs now consistently SECURITY INVOKER; `scripture_end_session` regression to DEFINER reverted (AC-12)."_
 
 However, the adversarial review found **I11**: `scripture_create_session` still uses `SECURITY DEFINER` (in `20260301000100_fix_scripture_create_session_together_lobby.sql:17`). This was not caught by the NFR assessment or the hardening tech spec adversarial review. The NFR's security PASS should be qualified — while 6 of 7 RPCs are correctly `SECURITY INVOKER`, the session creation RPC runs with elevated privileges.
 
@@ -290,13 +290,13 @@ Both the NFR assessment and PR review agree that real-time sync latency (NFR-P1:
 
 The hardening tech spec explicitly deferred Chunks 2 and 3. Multiple PR review findings map directly to these deferred items:
 
-| Deferred Item | Chunk | PR Finding | Status |
-|---------------|-------|-----------|--------|
-| MAX_RETRIES + exponential backoff | Chunk 2 | **I5** (unbounded retry) | Unresolved — confirmed by 3 reviewers |
-| Presence CLOSED handler hardening | Chunk 2 | **I7** (removeChannel error swallowed) | Unresolved |
-| Version guard ordering | Chunk 3 | **C2** (null session broadcast) | Unresolved — escalated to Critical |
-| Structured error matching | Chunk 3 | **S6** (409 detection by string matching) | Unresolved |
-| Scoped state reset | Chunk 3 | **S9** (together-mode sessions not resumable) | Unresolved |
+| Deferred Item                     | Chunk   | PR Finding                                    | Status                                |
+| --------------------------------- | ------- | --------------------------------------------- | ------------------------------------- |
+| MAX_RETRIES + exponential backoff | Chunk 2 | **I5** (unbounded retry)                      | Unresolved — confirmed by 3 reviewers |
+| Presence CLOSED handler hardening | Chunk 2 | **I7** (removeChannel error swallowed)        | Unresolved                            |
+| Version guard ordering            | Chunk 3 | **C2** (null session broadcast)               | Unresolved — escalated to Critical    |
+| Structured error matching         | Chunk 3 | **S6** (409 detection by string matching)     | Unresolved                            |
+| Scoped state reset                | Chunk 3 | **S9** (together-mode sessions not resumable) | Unresolved                            |
 
 **Conclusion:** The PR review validates that Chunks 2+3 are genuinely needed. The retro recommendation to create a quick-spec for these chunks should be prioritized — at least I5 and C2 should be addressed before or alongside merge.
 
@@ -304,20 +304,20 @@ The hardening tech spec explicitly deferred Chunks 2 and 3. Multiple PR review f
 
 For context, these are the PRD-defined non-functional requirements for Epic 4:
 
-| NFR | Threshold | PR Status |
-|-----|-----------|-----------|
-| NFR-P1 | Real-time sync latency < 500ms | Not measured (architecture inferred) |
-| NFR-P2 | Phase transition < 200ms | PASS (synchronous Zustand set) |
-| NFR-P3 | Initial load < 2s on 3G | Not measured (no Lighthouse in CI) |
-| NFR-P4 | "Syncing..." indicator, no jitter | PASS (optimistic UI + version guards) |
-| NFR-S1 | Reflection data: user + partner only (RLS) | PASS |
-| NFR-S2 | Session data: participants only | CONCERNS (I11: SECURITY DEFINER) |
-| NFR-S4 | Encryption at rest + in transit | PASS (Supabase defaults) |
-| NFR-R1 | Session state recovery 100% | CONCERNS (C2: null session broadcasts) |
-| NFR-R3 | Zero double-advances | PASS (server-authoritative versioning) |
-| NFR-R5 | Usable if partner offline | PASS (solo fallback) |
-| NFR-R6 | Reflection write idempotency | PASS (unique constraint) |
-| NFR-A1 | WCAG AA minimum | PASS (tested in E2E) |
+| NFR    | Threshold                                  | PR Status                              |
+| ------ | ------------------------------------------ | -------------------------------------- |
+| NFR-P1 | Real-time sync latency < 500ms             | Not measured (architecture inferred)   |
+| NFR-P2 | Phase transition < 200ms                   | PASS (synchronous Zustand set)         |
+| NFR-P3 | Initial load < 2s on 3G                    | Not measured (no Lighthouse in CI)     |
+| NFR-P4 | "Syncing..." indicator, no jitter          | PASS (optimistic UI + version guards)  |
+| NFR-S1 | Reflection data: user + partner only (RLS) | PASS                                   |
+| NFR-S2 | Session data: participants only            | CONCERNS (I11: SECURITY DEFINER)       |
+| NFR-S4 | Encryption at rest + in transit            | PASS (Supabase defaults)               |
+| NFR-R1 | Session state recovery 100%                | CONCERNS (C2: null session broadcasts) |
+| NFR-R3 | Zero double-advances                       | PASS (server-authoritative versioning) |
+| NFR-R5 | Usable if partner offline                  | PASS (solo fallback)                   |
+| NFR-R6 | Reflection write idempotency               | PASS (unique constraint)               |
+| NFR-A1 | WCAG AA minimum                            | PASS (tested in E2E)                   |
 
 ---
 

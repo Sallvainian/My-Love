@@ -16,15 +16,15 @@
 
 ## Supporting Libraries
 
-| Library                      | Version | Purpose                               |
-| ---------------------------- | ------- | ------------------------------------- |
-| lucide-react                 | 0.575.0 | Tree-shakeable SVG icons              |
-| react-window                 | 2.2.7   | Virtualized list rendering            |
-| react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists |
-| dompurify                    | 3.3.1   | XSS sanitization for user content     |
-| workbox-window               | 7.4.0   | Service worker lifecycle management   |
+| Library                      | Version | Purpose                                   |
+| ---------------------------- | ------- | ----------------------------------------- |
+| lucide-react                 | 0.575.0 | Tree-shakeable SVG icons                  |
+| react-window                 | 2.2.7   | Virtualized list rendering                |
+| react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists     |
+| dompurify                    | 3.3.1   | XSS sanitization for user content         |
+| workbox-window               | 7.4.0   | Service worker lifecycle management       |
 | @sentry/react                | 10.39.0 | Error tracking and performance monitoring |
-| eventsource                  | 4.1.0   | SSE polyfill for Supabase Realtime    |
+| eventsource                  | 4.1.0   | SSE polyfill for Supabase Realtime        |
 
 ## Build and Development
 

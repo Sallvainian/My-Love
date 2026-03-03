@@ -1,15 +1,18 @@
 # How to Set Up a Test Framework with TEA
 
 ## Overview
+
 TEA's `framework` workflow scaffolds a production-ready test framework for your project.
 
 ## When to Use This
+
 - No existing test framework in your project
 - Current test setup isn't production-ready
 - Starting a new project that needs testing infrastructure
 - Phase 3 (Solutioning) after architecture is complete
 
 **Prerequisites:**
+
 - BMad Method installed
 - Architecture completed (or at least tech stack decided)
 - TEA agent available
@@ -17,23 +20,30 @@ TEA's `framework` workflow scaffolds a production-ready test framework for your 
 ## Steps
 
 ### 1. Load the TEA Agent
+
 Start a fresh chat and load the TEA (Test Engineering Architect) agent.
 
 ### 2. Run the Framework Workflow
+
 Execute the command:
+
 ```
 framework
 ```
 
 ### 3. Answer TEA's Questions
+
 TEA will inquire about:
+
 - Your tech stack (React, Node, etc.)
 - Preferred test framework (Playwright, Cypress, Jest)
 - Testing scope (E2E, integration, unit)
 - CI/CD platform (GitHub Actions, etc.)
 
 ### 4. Review Generated Output
+
 TEA generates:
+
 - **Test scaffold** — Directory structure and config files
 - **Sample specs** — Example tests following best practices
 - **`.env.example`** — Environment variable template
@@ -41,6 +51,7 @@ TEA generates:
 - **README updates** — Testing documentation
 
 ## What You Get
+
 ```
 tests/
 ├── e2e/
@@ -53,6 +64,7 @@ tests/
 ```
 
 ## Optional: Playwright Utils Integration
+
 TEA can integrate with `@seontechnologies/playwright-utils` for advanced fixtures:
 
 ```
@@ -64,19 +76,24 @@ Enable during BMad installation or set `tea_use_playwright_utils: true` in confi
 **Available utilities:** api-request, network-recorder, auth-session, intercept-network-call, recurse, log, file-utils, burn-in, network-error-monitor
 
 ## Optional: MCP Enhancements
+
 TEA can leverage Playwright MCP servers for enhanced capabilities:
+
 - `playwright` — Browser automation
 - `playwright-test` — Test runner with failure analysis
 
 Configure in your IDE's MCP settings.
 
 ## Tips
+
 - **Run only once per repository** — Framework setup is a one-time operation
 - **Run after architecture is complete** — Framework aligns with tech stack
 - **Follow up with CI setup** — Run `ci` to configure CI/CD pipeline
 
 ## Next Steps
+
 After test framework setup:
+
 1. **Test Design** — Create test plans for system or epics
 2. **CI Configuration** — Set up automated test runs
 3. **Story Implementation** — Tests are ready for development

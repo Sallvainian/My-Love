@@ -252,28 +252,29 @@ So that I never lose progress and the experience feels smooth.
 
 Story 1.4 builds on substantial infrastructure from Stories 1.1-1.3. Much of the "plumbing" exists; this story adds resilience, offline handling, and retry logic.
 
-| Capability | Status | Gap |
-|-----------|--------|-----|
-| `saveAndExit` (persist + clear state) | ✅ Done (Story 1.3) | None — works correctly |
-| `advanceStep` (optimistic increment + server persist) | ✅ Done (Story 1.3) | Need retry on failure |
-| `loadSession` (cache-first + `onRefresh` callback) | ✅ Done (Story 1.1) | Verify e2e, add corruption guard |
-| `checkForActiveSession` (find incomplete solo sessions) | ✅ Done (Story 1.2) | Verify corruption resilience |
-| Resume prompt in ScriptureOverview | ✅ Done (Story 1.2) | Harden "Start fresh" to server-abandon |
-| IndexedDB corruption recovery methods | ✅ Done (Story 1.1) | Wire into UI flows |
-| Auto-save on visibility change | ❌ New | Create `useAutoSave` hook |
-| `saveSession` (persist without clearing) | ❌ New | Add to slice |
-| `abandonSession` (server-side abandon) | ❌ New | Add to slice |
-| Offline detection | ❌ New | Create `useNetworkStatus` hook |
-| Offline indicator UI | ❌ New | Add to SoloReadingFlow |
-| Step blocking when offline | ❌ New | Add to SoloReadingFlow |
-| Retry UI for failed writes | ❌ New | Add `pendingRetry` state + UI |
-| Auto-retry on reconnect | ❌ New | Wire in SoloReadingFlow |
+| Capability                                              | Status              | Gap                                    |
+| ------------------------------------------------------- | ------------------- | -------------------------------------- |
+| `saveAndExit` (persist + clear state)                   | ✅ Done (Story 1.3) | None — works correctly                 |
+| `advanceStep` (optimistic increment + server persist)   | ✅ Done (Story 1.3) | Need retry on failure                  |
+| `loadSession` (cache-first + `onRefresh` callback)      | ✅ Done (Story 1.1) | Verify e2e, add corruption guard       |
+| `checkForActiveSession` (find incomplete solo sessions) | ✅ Done (Story 1.2) | Verify corruption resilience           |
+| Resume prompt in ScriptureOverview                      | ✅ Done (Story 1.2) | Harden "Start fresh" to server-abandon |
+| IndexedDB corruption recovery methods                   | ✅ Done (Story 1.1) | Wire into UI flows                     |
+| Auto-save on visibility change                          | ❌ New              | Create `useAutoSave` hook              |
+| `saveSession` (persist without clearing)                | ❌ New              | Add to slice                           |
+| `abandonSession` (server-side abandon)                  | ❌ New              | Add to slice                           |
+| Offline detection                                       | ❌ New              | Create `useNetworkStatus` hook         |
+| Offline indicator UI                                    | ❌ New              | Add to SoloReadingFlow                 |
+| Step blocking when offline                              | ❌ New              | Add to SoloReadingFlow                 |
+| Retry UI for failed writes                              | ❌ New              | Add `pendingRetry` state + UI          |
+| Auto-retry on reconnect                                 | ❌ New              | Wire in SoloReadingFlow                |
 
 ## Key Architecture Decisions
 
 **1. Auto-Save Strategy: `visibilitychange` + `beforeunload`**
 
 `visibilitychange` is the primary signal — it fires reliably on:
+
 - Tab switch (mobile: home button, app switcher)
 - Screen lock
 - Switching to another app on mobile
@@ -294,22 +295,23 @@ Story 1.2 left "Start fresh" clearing only local state. Story 1.4 fixes this: "S
 
 ## Source Files to Touch
 
-| File | Action | Notes |
-|------|--------|-------|
-| `src/hooks/useAutoSave.ts` | **CREATE** | Auto-save hook for visibility/beforeunload |
-| `src/hooks/useNetworkStatus.ts` | **CREATE** | Online/offline detection hook |
-| `src/stores/slices/scriptureReadingSlice.ts` | **MODIFY** | Add `saveSession`, `abandonSession`, `retryFailedWrite`, `pendingRetry` state |
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | **MODIFY** | Wire useAutoSave, useNetworkStatus, offline indicator, retry UI |
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | **MODIFY** | Wire useNetworkStatus, offline-disable Start, fix "Start fresh" |
-| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | **MODIFY** | Add offline + retry tests |
-| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | **MODIFY** | Add abandon + offline tests |
-| `tests/unit/hooks/useAutoSave.test.ts` | **CREATE** | Hook tests |
-| `tests/unit/hooks/useNetworkStatus.test.ts` | **CREATE** | Hook tests |
-| `tests/unit/stores/scriptureReadingSlice.test.ts` | **MODIFY** | Add saveSession, abandonSession, retryFailedWrite tests |
+| File                                                                    | Action     | Notes                                                                         |
+| ----------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
+| `src/hooks/useAutoSave.ts`                                              | **CREATE** | Auto-save hook for visibility/beforeunload                                    |
+| `src/hooks/useNetworkStatus.ts`                                         | **CREATE** | Online/offline detection hook                                                 |
+| `src/stores/slices/scriptureReadingSlice.ts`                            | **MODIFY** | Add `saveSession`, `abandonSession`, `retryFailedWrite`, `pendingRetry` state |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`       | **MODIFY** | Wire useAutoSave, useNetworkStatus, offline indicator, retry UI               |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx`     | **MODIFY** | Wire useNetworkStatus, offline-disable Start, fix "Start fresh"               |
+| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`   | **MODIFY** | Add offline + retry tests                                                     |
+| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | **MODIFY** | Add abandon + offline tests                                                   |
+| `tests/unit/hooks/useAutoSave.test.ts`                                  | **CREATE** | Hook tests                                                                    |
+| `tests/unit/hooks/useNetworkStatus.test.ts`                             | **CREATE** | Hook tests                                                                    |
+| `tests/unit/stores/scriptureReadingSlice.test.ts`                       | **MODIFY** | Add saveSession, abandonSession, retryFailedWrite tests                       |
 
 ## Existing Patterns to Follow
 
 **Zustand Slice Pattern (from `scriptureReadingSlice.ts`):**
+
 ```typescript
 // Add to ScriptureReadingState:
 pendingRetry: {
@@ -325,6 +327,7 @@ retryFailedWrite: () => Promise<void>;
 ```
 
 **Service Cache Pattern (from `scriptureReadingService.ts`):**
+
 ```
 READ:  IndexedDB cache → return cached → fetch fresh from server → update cache (onRefresh callback)
 WRITE: POST to Supabase → on success → update IndexedDB → on failure → throw ScriptureError
@@ -332,6 +335,7 @@ CORRUPTION: try cache op → catch → recoverXxxCache() → fall back to server
 ```
 
 **Error Handling Pattern (from `scriptureReadingService.ts`):**
+
 ```typescript
 // All server errors create ScriptureError with proper code:
 const scriptureErr = createScriptureError(
@@ -353,6 +357,7 @@ catch (error) {
 ```
 
 **Hook Pattern (follow existing hooks like `useAutoSave`):**
+
 ```typescript
 export function useAutoSave({ session, saveSession }: UseAutoSaveOptions): void {
   useEffect(() => {
@@ -368,15 +373,16 @@ export function useAutoSave({ session, saveSession }: UseAutoSaveOptions): void 
 ```
 
 **Component Styling (Lavender Dreams theme):**
+
 ```typescript
 // Offline banner
-className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm"
+className = 'bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm';
 
 // Retry banner
-className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between"
+className = 'bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between';
 
 // Error banner (existing)
-className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm"
+className = 'bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm';
 ```
 
 ## Zustand State Changes (Comprehensive)
@@ -426,70 +432,82 @@ export interface ScriptureSlice extends ScriptureReadingState {
 ## Offline Banner Component Spec
 
 ```tsx
-{/* Offline indicator (AC #4) */}
-{!isOnline && (
-  <div
-    className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm flex items-center gap-2"
-    data-testid="offline-indicator"
-    role="status"
-    aria-live="polite"
-  >
-    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z" />
-      {/* Diagonal line through = wifi-off */}
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
-    </svg>
-    <span>You're offline. Cached data shown. Connect to continue.</span>
-  </div>
-)}
+{
+  /* Offline indicator (AC #4) */
+}
+{
+  !isOnline && (
+    <div
+      className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"
+      data-testid="offline-indicator"
+      role="status"
+      aria-live="polite"
+    >
+      <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M13 12a1 1 0 11-2 0 1 1 0 012 0z"
+        />
+        {/* Diagonal line through = wifi-off */}
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+      </svg>
+      <span>You're offline. Cached data shown. Connect to continue.</span>
+    </div>
+  );
+}
 ```
 
 ## Retry Banner Component Spec
 
 ```tsx
-{/* Retry UI (AC #6) */}
-{pendingRetry && (
-  <div
-    className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between"
-    data-testid="retry-banner"
-  >
-    <span className="text-amber-700 text-sm">
-      {pendingRetry.attempts >= pendingRetry.maxAttempts
-        ? 'Save failed. Your progress is saved locally.'
-        : 'Save failed. Tap to retry.'}
-    </span>
-    {pendingRetry.attempts < pendingRetry.maxAttempts && (
-      <button
-        onClick={retryFailedWrite}
-        className="text-amber-800 font-medium text-sm hover:text-amber-900 min-w-[44px] min-h-[44px] flex items-center justify-center"
-        data-testid="retry-button"
-        type="button"
-      >
-        Retry ({pendingRetry.attempts}/{pendingRetry.maxAttempts})
-      </button>
-    )}
-  </div>
-)}
+{
+  /* Retry UI (AC #6) */
+}
+{
+  pendingRetry && (
+    <div
+      className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
+      data-testid="retry-banner"
+    >
+      <span className="text-sm text-amber-700">
+        {pendingRetry.attempts >= pendingRetry.maxAttempts
+          ? 'Save failed. Your progress is saved locally.'
+          : 'Save failed. Tap to retry.'}
+      </span>
+      {pendingRetry.attempts < pendingRetry.maxAttempts && (
+        <button
+          onClick={retryFailedWrite}
+          className="flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium text-amber-800 hover:text-amber-900"
+          data-testid="retry-button"
+          type="button"
+        >
+          Retry ({pendingRetry.attempts}/{pendingRetry.maxAttempts})
+        </button>
+      )}
+    </div>
+  );
+}
 ```
 
 ## Testing Strategy
 
 **Unit Test Coverage Targets:**
 
-| Area | Test Count (est.) | Priority |
-|------|-------------------|----------|
-| `useAutoSave` hook | 5 tests | P0 |
-| `useNetworkStatus` hook | 5 tests | P0 |
-| Slice: `saveSession` | 3 tests | P0 |
-| Slice: `abandonSession` | 3 tests | P0 |
-| Slice: `retryFailedWrite` | 5 tests | P0 |
-| Slice: `advanceStep` retry integration | 3 tests | P0 |
-| SoloReadingFlow: offline UI | 5 tests | P0 |
-| SoloReadingFlow: retry UI | 4 tests | P1 |
-| ScriptureOverview: abandon + offline | 4 tests | P1 |
-| Corruption recovery e2e | 3 tests | P1 |
-| **Total** | **~40 tests** | |
+| Area                                   | Test Count (est.) | Priority |
+| -------------------------------------- | ----------------- | -------- |
+| `useAutoSave` hook                     | 5 tests           | P0       |
+| `useNetworkStatus` hook                | 5 tests           | P0       |
+| Slice: `saveSession`                   | 3 tests           | P0       |
+| Slice: `abandonSession`                | 3 tests           | P0       |
+| Slice: `retryFailedWrite`              | 5 tests           | P0       |
+| Slice: `advanceStep` retry integration | 3 tests           | P0       |
+| SoloReadingFlow: offline UI            | 5 tests           | P0       |
+| SoloReadingFlow: retry UI              | 4 tests           | P1       |
+| ScriptureOverview: abandon + offline   | 4 tests           | P1       |
+| Corruption recovery e2e                | 3 tests           | P1       |
+| **Total**                              | **~40 tests**     |          |
 
 **Mock Strategy for Hooks:**
 
@@ -514,8 +532,10 @@ document.dispatchEvent(new Event('visibilitychange'));
 // Mock service for retry tests
 vi.mock('../../services/scriptureReadingService', () => ({
   scriptureReadingService: {
-    updateSession: vi.fn().mockRejectedValueOnce(new Error('Network error'))
-                          .mockResolvedValueOnce(undefined), // retry succeeds
+    updateSession: vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(undefined), // retry succeeds
     // ...
   },
 }));
@@ -535,19 +555,20 @@ vi.mock('../../services/scriptureReadingService', () => ({
 
 ## Technology Versions (Locked)
 
-| Technology | Version | Notes |
-|-----------|---------|-------|
-| React | 19.2.3 | Hooks only |
-| TypeScript | 5.9.3 | Strict mode |
-| Zustand | 5.0.10 | Slice composition |
-| Framer Motion | 12.27.1 | Existing — no new usage needed |
-| Vitest | 4.0.17 | Unit tests |
-| Testing Library | 16.3.2 | Component tests |
-| Tailwind CSS | 4.1.17 | Amber + purple theme tokens |
+| Technology      | Version | Notes                          |
+| --------------- | ------- | ------------------------------ |
+| React           | 19.2.3  | Hooks only                     |
+| TypeScript      | 5.9.3   | Strict mode                    |
+| Zustand         | 5.0.10  | Slice composition              |
+| Framer Motion   | 12.27.1 | Existing — no new usage needed |
+| Vitest          | 4.0.17  | Unit tests                     |
+| Testing Library | 16.3.2  | Component tests                |
+| Tailwind CSS    | 4.1.17  | Amber + purple theme tokens    |
 
 ## Project Structure Notes
 
 New files follow existing conventions:
+
 - `src/hooks/useAutoSave.ts` — custom hook (new hooks directory may need creation)
 - `src/hooks/useNetworkStatus.ts` — custom hook
 - Tests in `tests/unit/hooks/` matching src structure
@@ -564,14 +585,14 @@ New files follow existing conventions:
 
 ## Functional Requirements Traceability
 
-| AC | PRD Requirement | User Journey |
-|----|----------------|--------------|
-| #1 Save on exit | FR12 (save progress), FR13 (optimistic UI) | Journey 5: Time-Constrained |
-| #2 Resume | FR6 (resume incomplete), FR13 (cache performance) | Journey 5: Time-Constrained |
-| #3 Optimistic UI | FR13 (changes appear instant), NFR-P2 (<200ms perceived) | Journey 2: Solo — Quiet Reset |
-| #4 Offline | NFR-R4 (cache integrity), NFR-R5 (graceful degradation) | PRD: Offline Behavior — Solo Mode |
-| #5 Corruption | NFR-R4 (cache integrity), Architecture Decision 4 | Architecture: Caching Architecture |
-| #6 Retry | NFR-R2 (data sync reliability), FR13 (eventual connectivity) | Journey 6: Reconnection |
+| AC               | PRD Requirement                                              | User Journey                       |
+| ---------------- | ------------------------------------------------------------ | ---------------------------------- |
+| #1 Save on exit  | FR12 (save progress), FR13 (optimistic UI)                   | Journey 5: Time-Constrained        |
+| #2 Resume        | FR6 (resume incomplete), FR13 (cache performance)            | Journey 5: Time-Constrained        |
+| #3 Optimistic UI | FR13 (changes appear instant), NFR-P2 (<200ms perceived)     | Journey 2: Solo — Quiet Reset      |
+| #4 Offline       | NFR-R4 (cache integrity), NFR-R5 (graceful degradation)      | PRD: Offline Behavior — Solo Mode  |
+| #5 Corruption    | NFR-R4 (cache integrity), Architecture Decision 4            | Architecture: Caching Architecture |
+| #6 Retry         | NFR-R2 (data sync reliability), FR13 (eventual connectivity) | Journey 6: Reconnection            |
 
 ## References
 
@@ -601,4 +622,3 @@ New files follow existing conventions:
 ## Completion Notes List
 
 ## File List
-

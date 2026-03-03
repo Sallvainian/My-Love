@@ -5,6 +5,7 @@ This section defines what's in scope for MVP, what's deferred to future phases, 
 ## MVP — Minimum Viable Product
 
 **Must Have:**
+
 - Overview page with stats dashboard
 - Solo mode (full 17-step flow)
 - Together mode with lobby, roles, and real-time sync
@@ -14,6 +15,7 @@ This section defines what's in scope for MVP, what's deferred to future phases, 
 - 5 Supabase tables with RLS
 
 **Deferred from MVP:**
+
 - Streak tracking (intentionally omitted to avoid pressure)
 - Push notifications for partner activity
 - Historical trend charts for reflections

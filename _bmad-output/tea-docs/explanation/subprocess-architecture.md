@@ -39,6 +39,7 @@ Main Workflow (Orchestrator)
 **Objective**: Generate API and E2E tests simultaneously
 
 **Architecture**:
+
 ```
 automate workflow
 ├── Step 1: Analyze codebase & identify features
@@ -52,6 +53,7 @@ automate workflow
 ```
 
 **Subprocess A Input** (API Tests):
+
 ```json
 {
   "features": ["feature1", "feature2"],
@@ -64,6 +66,7 @@ automate workflow
 ```
 
 **Subprocess A Output**:
+
 ```json
 {
   "success": true,
@@ -80,6 +83,7 @@ automate workflow
 ```
 
 **Subprocess B Output** (E2E Tests):
+
 ```json
 {
   "success": true,
@@ -96,6 +100,7 @@ automate workflow
 ```
 
 **Aggregation Logic**:
+
 ```javascript
 const apiTests = JSON.parse(fs.readFileSync('/tmp/api-tests-{timestamp}.json', 'utf8'));
 const e2eTests = JSON.parse(fs.readFileSync('/tmp/e2e-tests-{timestamp}.json', 'utf8'));
@@ -119,6 +124,7 @@ const summary = {
 **Key Difference**: Tests intentionally fail before implementation exists. Subprocesses output includes `"expected_to_fail": true` in summaries.
 
 **Architecture**:
+
 ```
 atdd workflow
 ├── Step 1: Load story acceptance criteria
@@ -136,6 +142,7 @@ atdd workflow
 **Objective**: Run independent quality checks in parallel, aggregating into 0-100 score
 
 **Architecture**:
+
 ```
 test-review workflow
 ├── Step 1: Load test files & context
@@ -152,6 +159,7 @@ test-review workflow
 ```
 
 **Subprocess Output Format**:
+
 ```json
 {
   "dimension": "determinism",
@@ -173,6 +181,7 @@ test-review workflow
 ```
 
 **Aggregation Logic**:
+
 ```javascript
 const dimensions = ['determinism', 'isolation', 'maintainability', 'coverage', 'performance'];
 const results = dimensions.map((d) =>
@@ -184,11 +193,9 @@ const weights = {
   isolation: 0.25,
   maintainability: 0.2,
   coverage: 0.15,
-  performance: 0.15
+  performance: 0.15,
 };
-const totalScore = results.reduce((sum, r) =>
-  sum + r.score * weights[r.dimension], 0
-);
+const totalScore = results.reduce((sum, r) => sum + r.score * weights[r.dimension], 0);
 
 const allViolations = results.flatMap((r) => r.violations);
 const highSeverity = allViolations.filter((v) => v.severity === 'HIGH');
@@ -214,6 +221,7 @@ const report = {
 **Objective**: Assess independent non-functional requirement domains in parallel
 
 **Architecture**:
+
 ```
 nfr-assess workflow
 ├── Step 1: Load system context
@@ -229,6 +237,7 @@ nfr-assess workflow
 ```
 
 **Subprocess Output Format**:
+
 ```json
 {
   "domain": "security",
@@ -244,10 +253,7 @@ nfr-assess workflow
       "category": "Data Encryption",
       "status": "CONCERN",
       "description": "Database encryption at rest not enabled",
-      "recommendations": [
-        "Enable database encryption",
-        "Use AWS KMS for key management"
-      ]
+      "recommendations": ["Enable database encryption", "Use AWS KMS for key management"]
     }
   ],
   "compliance": {
@@ -260,6 +266,7 @@ nfr-assess workflow
 ```
 
 **Aggregation Logic**:
+
 ```javascript
 const domains = ['security', 'performance', 'reliability', 'scalability'];
 const assessments = domains.map((d) =>
@@ -296,6 +303,7 @@ const report = {
 **Note**: This pattern uses phase separation rather than parallel subprocesses; Phase 2 depends on Phase 1 output.
 
 **Architecture**:
+
 ```
 trace workflow
 ├── Phase 1: Coverage Matrix
@@ -310,6 +318,7 @@ trace workflow
 ```
 
 **Phase 1 Output Format**:
+
 ```json
 {
   "requirements": [
@@ -335,11 +344,12 @@ trace workflow
 ```
 
 **Phase 2: Gate Decision Logic**:
+
 ```javascript
 const matrix = JSON.parse(fs.readFileSync('/tmp/trace-matrix-{timestamp}.json', 'utf8'));
 
-const p0Coverage = matrix.requirements.filter((r) =>
-  r.priority === 'P0' && r.coverage === 'FULL'
+const p0Coverage = matrix.requirements.filter(
+  (r) => r.priority === 'P0' && r.coverage === 'FULL'
 ).length;
 const totalP0 = matrix.requirements.filter((r) => r.priority === 'P0').length;
 
@@ -369,16 +379,19 @@ const report = {
 ### Temp File Management
 
 **Naming Convention**:
+
 ```
 /tmp/{workflow}-{subprocess-name}-{timestamp}.json
 ```
 
 **Examples**:
+
 - `/tmp/automate-api-tests-20260127-143022.json`
 - `/tmp/test-review-determinism-20260127-143022.json`
 - `/tmp/nfr-security-20260127-143022.json`
 
 **Cleanup Strategy**:
+
 - Delete temp files after successful aggregation
 - Preserve files on error for debugging
 - Implement retry logic for temp file reads to handle race conditions
@@ -386,6 +399,7 @@ const report = {
 ### Error Handling
 
 Each subprocess JSON output must include:
+
 ```json
 {
   "success": true|false,
@@ -395,6 +409,7 @@ Each subprocess JSON output must include:
 ```
 
 Main workflow aggregation must:
+
 1. Check `success` field for each subprocess
 2. Aggregate error messages if any subprocess fails
 3. Decide whether to continue (partial success) or fail (critical subprocess failed)
@@ -402,11 +417,13 @@ Main workflow aggregation must:
 ### Performance Considerations
 
 **Subprocess Isolation**:
+
 - Each subprocess runs in separate 200k context container
 - No shared memory or state
 - Communication exclusively via JSON files
 
 **Parallelization**:
+
 - Use Claude Code's subprocess/agent launching capabilities
 - Ensure unique temp file paths (timestamp-based)
 - Implement proper synchronization (wait for all subprocesses to complete)
@@ -418,23 +435,27 @@ Main workflow aggregation must:
 For each workflow with subprocesses:
 
 **Unit Testing**:
+
 - Test each subprocess in isolation
 - Provide mock input JSON
 - Verify output JSON structure
 - Test error scenarios
 
 **Integration Testing**:
+
 - Launch all subprocesses
 - Verify parallel execution
 - Verify aggregation logic
 - Test with real project data
 
 **Performance Testing**:
+
 - Benchmark sequential vs parallel execution
 - Measure subprocess overhead
 - Verify memory usage acceptable
 
 **Error Handling Testing**:
+
 - One subprocess fails
 - Multiple subprocesses fail
 - Temp file read/write errors
@@ -443,16 +464,19 @@ For each workflow with subprocesses:
 ### Expected Performance Gains
 
 **automate**:
+
 - Sequential: ~5-10 minutes (API then E2E)
 - Parallel: ~3-6 minutes (both simultaneously)
 - **Speedup: ~40-50%**
 
 **test-review**:
+
 - Sequential: ~3-5 minutes (5 quality checks sequentially)
 - Parallel: ~1-2 minutes (all checks simultaneously)
 - **Speedup: ~60-70%**
 
 **nfr-assess**:
+
 - Sequential: ~8-12 minutes (4 NFR domains sequentially)
 - Parallel: ~3-5 minutes (all domains simultaneously)
 - **Speedup: ~60-70%**

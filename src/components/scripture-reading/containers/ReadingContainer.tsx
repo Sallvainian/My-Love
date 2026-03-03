@@ -152,7 +152,7 @@ export function ReadingContainer(): ReactElement | null {
   );
   const errorToastMessage = useAutoToast(
     scriptureError && scriptureError.code !== ScriptureErrorCode.VERSION_MISMATCH
-      ? (scriptureError.message.trim() || 'Something went wrong. Please try again.')
+      ? scriptureError.message.trim() || 'Something went wrong. Please try again.'
       : null,
     4000
   );

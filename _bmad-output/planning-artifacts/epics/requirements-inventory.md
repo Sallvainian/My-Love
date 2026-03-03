@@ -135,7 +135,7 @@
 - IndexedDB as read cache + optimistic UI pattern (reads: cache first -> fetch fresh -> update cache; writes: POST to server -> update cache)
 - Feature-scoped component subfolders (session/, reading/, reflection/) with centralized motion config
 - Session-based RLS access policies (consistent pattern across all scripture tables)
-- Supabase RPCs with scripture_ prefix (scripture_lock_in, scripture_advance_phase, scripture_submit_reflection, scripture_create_session)
+- Supabase RPCs with scripture\_ prefix (scripture_lock_in, scripture_advance_phase, scripture_submit_reflection, scripture_create_session)
 - Broadcast channel per session for real-time sync (scripture-session:{session_id})
 - Ephemeral presence channel with heartbeat (~10s intervals, ~20s TTL)
 - Error handling via ScriptureErrorCode enum + centralized handler

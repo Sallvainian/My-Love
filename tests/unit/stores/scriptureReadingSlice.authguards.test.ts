@@ -58,9 +58,7 @@ async function createStoreWithSession() {
   // Set up auth to succeed for createSession
   mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
 
-  const { scriptureReadingService } = await import(
-    '../../../src/services/scriptureReadingService'
-  );
+  const { scriptureReadingService } = await import('../../../src/services/scriptureReadingService');
   vi.mocked(scriptureReadingService.createSession).mockResolvedValueOnce({
     id: 'session-auth-001',
     mode: 'together',
@@ -95,9 +93,7 @@ describe('scriptureReadingSlice — auth guards', () => {
     const store = createTestStore();
     await store.getState().loadSession('some-session-id');
 
-    const { handleScriptureError } = await import(
-      '../../../src/services/scriptureReadingService'
-    );
+    const { handleScriptureError } = await import('../../../src/services/scriptureReadingService');
     expect(handleScriptureError).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'UNAUTHORIZED' })
     );
@@ -116,9 +112,7 @@ describe('scriptureReadingSlice — auth guards', () => {
     const store = createTestStore();
     await store.getState().loadSession('some-session-id');
 
-    const { handleScriptureError } = await import(
-      '../../../src/services/scriptureReadingService'
-    );
+    const { handleScriptureError } = await import('../../../src/services/scriptureReadingService');
     expect(handleScriptureError).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'UNAUTHORIZED' })
     );
@@ -179,10 +173,7 @@ describe('scriptureReadingSlice — auth guards', () => {
       expect.objectContaining({ code: 'UNAUTHORIZED' })
     );
     // RPC should NOT have been called
-    expect(mockRpc).not.toHaveBeenCalledWith(
-      'scripture_select_role',
-      expect.anything()
-    );
+    expect(mockRpc).not.toHaveBeenCalledWith('scripture_select_role', expect.anything());
   });
 
   test('loadSession sets UNAUTHORIZED when authError exists but user.id is also present', async () => {

@@ -5,6 +5,7 @@
 Fixture architecture in TEA represents a pattern for building reusable, testable, and composable test utilities. The core principle emphasizes: "build pure functions first, wrap in framework fixtures second."
 
 **The Pattern:**
+
 1. Write utility as pure function (unit-testable)
 2. Wrap in framework fixture (Playwright, Cypress)
 3. Compose fixtures with mergeTests (combine capabilities)
@@ -13,6 +14,7 @@ Fixture architecture in TEA represents a pattern for building reusable, testable
 ### Fixture Architecture Flow
 
 The documentation describes a four-step progression:
+
 - **Step 1: Pure Function** (`helpers/api-request.ts`) - Framework agnostic, unit testable
 - **Step 2: Fixture Wrapper** (`fixtures/api-request.ts`) - Injects framework dependencies
 - **Step 3: Composition** (`fixtures/index.ts`) - Uses mergeTests
@@ -70,6 +72,7 @@ export async function apiRequest({
 ```
 
 **Benefits:**
+
 - Unit testable (mock dependencies)
 - Framework-agnostic (works with any HTTP client)
 - Easy to reason about (pure function)
@@ -93,6 +96,7 @@ export { expect } from '@playwright/test';
 ```
 
 **Benefits:**
+
 - Fixture provides framework context (request)
 - Pure function handles logic
 - Clean separation of concerns
@@ -135,6 +139,7 @@ test('should update profile', async ({ apiRequest, authToken, log }) => {
 ```
 
 **Benefits:**
+
 - Use multiple fixtures in one test
 - No manual composition needed
 - Type-safe (TypeScript knows all fixture types)
@@ -163,6 +168,7 @@ tests/
 ### TEA Reviews Against This Pattern
 
 When running `test-review`, TEA checks:
+
 - Are utilities pure functions?
 - Are fixtures minimal wrappers?
 - Is composition used?
@@ -218,6 +224,7 @@ export const test = mergeTests(apiRequestFixture, authFixtureTest);
 ```
 
 **Why Playwright Utils:**
+
 - Already built, tested, and maintained
 - Consistent patterns across projects
 - 11 utilities available (API, auth, network, logging, files)
@@ -225,6 +232,7 @@ export const test = mergeTests(apiRequestFixture, authFixtureTest);
 - Regular updates and improvements
 
 **When to Build Your Own:**
+
 - Company-specific patterns
 - Custom authentication systems
 - Unique requirements not covered by utilities
@@ -251,6 +259,7 @@ export const test = base.extend({
 ```
 
 **Problems:**
+
 - Cannot test individual utilities
 - Cannot compose (all-or-nothing)
 - Cannot reuse specific utilities
@@ -274,6 +283,7 @@ export const test = mergeTests(apiRequestTest, authSessionTest, logTest);
 ```
 
 **Benefits:**
+
 - Each fixture is unit-testable
 - Compose only what you need
 - Reuse individual fixtures
@@ -282,6 +292,7 @@ export const test = mergeTests(apiRequestTest, authSessionTest, logTest);
 ## Technical Implementation
 
 The documentation references the knowledge base for detailed fixture architecture patterns:
+
 - Knowledge Base Index - Architecture & Fixtures
 - Complete Knowledge Base Index
 
@@ -290,12 +301,14 @@ The documentation references the knowledge base for detailed fixture architectur
 ### Always Use For:
 
 **Reusable utilities:**
+
 - API request helpers
 - Authentication handlers
 - File operations
 - Network mocking
 
 **Test infrastructure:**
+
 - Shared fixtures across teams
 - Packaged utilities (playwright-utils)
 - Company-wide test standards
@@ -324,24 +337,29 @@ function createTestUser(name: string) {
 ## Related Concepts
 
 **Core TEA Concepts:**
+
 - Test Quality Standards - Quality standards fixtures enforce
 - Knowledge Base System - Fixture patterns in knowledge base
 
 **Technical Patterns:**
+
 - Network-First Patterns - Network fixtures explained
 - Risk-Based Testing - Fixture complexity matches risk
 
 **Overview:**
+
 - TEA Overview - Fixture architecture in workflows
 - Testing as Engineering - Why fixtures matter
 
 ## Practical Guides
 
 **Setup Guides:**
+
 - How to Set Up Test Framework - TEA scaffolds fixtures
 - Integrate Playwright Utils - Production-ready fixtures
 
 **Workflow Guides:**
+
 - How to Run ATDD - Using fixtures in tests
 - How to Run Automate - Fixture composition examples
 

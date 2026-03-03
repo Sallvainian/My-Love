@@ -1,5 +1,13 @@
 ---
-stepsCompleted: ['step-01-load-context', 'step-02-define-thresholds', 'step-03-gather-evidence', 'step-04-evaluate-and-score', 'step-04e-aggregate-nfr', 'step-05-generate-report']
+stepsCompleted:
+  [
+    'step-01-load-context',
+    'step-02-define-thresholds',
+    'step-03-gather-evidence',
+    'step-04-evaluate-and-score',
+    'step-04e-aggregate-nfr',
+    'step-05-generate-report',
+  ]
 lastStep: 'step-05-generate-report'
 lastSaved: '2026-03-01'
 workflowType: 'testarch-nfr-assess'
@@ -48,9 +56,11 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 ## Step 1 — Context Loaded
 
 ### Configuration
+
 - `tea_browser_automation: auto` (CLI + MCP patterns available)
 
 ### Knowledge Fragments Loaded
+
 - `adr-quality-readiness-checklist.md` — 8-category, 29-criteria ADR checklist
 - `ci-burn-in.md` — CI pipeline and burn-in patterns
 - `test-quality.md` — Test quality definition of done
@@ -60,6 +70,7 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 - `nfr-criteria.md` — NFR review criteria (PASS/CONCERNS/FAIL definitions)
 
 ### Artifacts Loaded
+
 - **Epic:** `_bmad-output/planning-artifacts/epics/epic-4-together-mode-synchronized-reading.md` (3 stories: 4.1, 4.2, 4.3)
 - **PRD NFRs:** `_bmad-output/planning-artifacts/prd/non-functional-requirements.md`
 - **Test Design:** `_bmad-output/test-artifacts/test-design-epic-4.md` (46 tests, 13 risks, gate status: CONCERNS)
@@ -70,30 +81,33 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 - **Prior NFR Assessment:** `_bmad-output/test-artifacts/nfr-assessment.md` (Epic 3: PASS with CONCERNS, 20/29)
 
 ### Test Coverage Discovered
+
 - **E2E tests (Epic 4):** 5 spec files — `scripture-lobby-4.1.spec.ts`, `scripture-lobby-4.1-p2.spec.ts`, `scripture-reading-4.2.spec.ts`, `scripture-reconnect-4.3.spec.ts`, `scripture-rls-security.spec.ts`
 - **API tests:** `scripture-lobby-4.1.spec.ts` (API project)
 - **Unit tests (Epic 4):** `useScriptureBroadcast.test.ts`, `useScriptureBroadcast.reconnect.test.ts`, `useScripturePresence.test.ts`, `useScripturePresence.reconnect.test.ts`, `scriptureReadingSlice.lobby.test.ts`, `scriptureReadingSlice.lockin.test.ts`, `scriptureReadingSlice.reconnect.test.ts`
 - **Test Reviews (Epic 4):** Story 4.1, 4.2, 4.3 all reviewed
 
 ### Evidence Sources
-| Evidence Type | Source | Status |
-|---|---|---|
-| E2E tests (Epic 4) | 5 spec files across stories 4.1, 4.2, 4.3 | PRESENT |
-| API tests (Epic 4) | `tests/api/scripture-lobby-4.1.spec.ts` | PRESENT |
-| Unit tests (Epic 4) | 7 unit test files (broadcast, presence, lobby, lockin, reconnect) | PRESENT |
-| DB tests (pgTAP) | `supabase/tests/database/` (19 reliability tests + 14 RLS tests) | PRESENT |
-| Security: RLS tests | `tests/e2e/scripture/scripture-rls-security.spec.ts` | PRESENT |
-| Security: CodeQL | `.github/workflows/codeql.yml` (weekly + push/PR) | PRESENT |
-| Security: Dependency review | `.github/workflows/dependency-review.yml` (moderate+ fail) | PRESENT |
-| Security: npm audit | Local run: **0 critical, 0 high, 0 moderate, 0 low** | CLEAN |
-| CI pipeline | `.github/workflows/test.yml` (6-stage pipeline) | PRESENT |
-| Lighthouse | `.github/workflows/lighthouse.yml` (post-deploy) | PRESENT |
-| Test reviews | Stories 4.1 (96/100), 4.2 (91/100), 4.3 (78/100) | PRESENT |
-| Coverage thresholds | `vitest.config.ts`: 80% lines/functions/branches/statements | CONFIGURED |
-| Load testing (k6) | None | GAP (expected for MVP) |
-| APM / distributed tracing | None | GAP (expected for MVP) |
+
+| Evidence Type               | Source                                                            | Status                 |
+| --------------------------- | ----------------------------------------------------------------- | ---------------------- |
+| E2E tests (Epic 4)          | 5 spec files across stories 4.1, 4.2, 4.3                         | PRESENT                |
+| API tests (Epic 4)          | `tests/api/scripture-lobby-4.1.spec.ts`                           | PRESENT                |
+| Unit tests (Epic 4)         | 7 unit test files (broadcast, presence, lobby, lockin, reconnect) | PRESENT                |
+| DB tests (pgTAP)            | `supabase/tests/database/` (19 reliability tests + 14 RLS tests)  | PRESENT                |
+| Security: RLS tests         | `tests/e2e/scripture/scripture-rls-security.spec.ts`              | PRESENT                |
+| Security: CodeQL            | `.github/workflows/codeql.yml` (weekly + push/PR)                 | PRESENT                |
+| Security: Dependency review | `.github/workflows/dependency-review.yml` (moderate+ fail)        | PRESENT                |
+| Security: npm audit         | Local run: **0 critical, 0 high, 0 moderate, 0 low**              | CLEAN                  |
+| CI pipeline                 | `.github/workflows/test.yml` (6-stage pipeline)                   | PRESENT                |
+| Lighthouse                  | `.github/workflows/lighthouse.yml` (post-deploy)                  | PRESENT                |
+| Test reviews                | Stories 4.1 (96/100), 4.2 (91/100), 4.3 (78/100)                  | PRESENT                |
+| Coverage thresholds         | `vitest.config.ts`: 80% lines/functions/branches/statements       | CONFIGURED             |
+| Load testing (k6)           | None                                                              | GAP (expected for MVP) |
+| APM / distributed tracing   | None                                                              | GAP (expected for MVP) |
 
 ### CI Status (Latest)
+
 - Main branch: **Failing** (recent CI failures observed — likely related to Epic 4 in-progress work)
 - npm audit: **0 vulnerabilities** (clean)
 
@@ -103,43 +117,44 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 
 ### Standard Categories (ADR Quality Readiness Checklist)
 
-| # | Category | Source | Threshold | Status |
-|---|---|---|---|---|
-| 1 | **Testability & Automation** | TEA/ADR | Isolation (mocked deps), Headless (API-accessible), State Control (seeding), Sample Requests | Defined |
-| 2 | **Test Data Strategy** | TEA/ADR | Segregation (worker-isolated pairs), Generation (synthetic), Teardown (auto-cleanup) | Defined |
-| 3 | **Scalability & Availability** | PRD | "Not a priority for MVP. Standard Supabase scaling." | UNKNOWN/N/A |
-| 4 | **Disaster Recovery** | PRD | Platform-managed via Supabase | UNKNOWN/N/A |
-| 5 | **Security** | PRD NFR-S1/S2/S4 + E4-R06 | RLS on all tables, private broadcast channels, RLS on realtime.messages, participant-only access | Defined |
-| 6 | **Monitorability** | PRD | Console logging; no formal APM for MVP | UNKNOWN |
-| 7 | **QoS & QoE** | PRD NFR-P1/P2/P3/P4 | <500ms sync, <200ms transitions, <2s initial load, "Syncing..." indicators | Defined |
-| 8 | **Deployability** | PRD / CLAUDE.md | GitHub Pages atomic deploy, DB migrations independent | Defined |
+| #   | Category                       | Source                    | Threshold                                                                                        | Status      |
+| --- | ------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------ | ----------- |
+| 1   | **Testability & Automation**   | TEA/ADR                   | Isolation (mocked deps), Headless (API-accessible), State Control (seeding), Sample Requests     | Defined     |
+| 2   | **Test Data Strategy**         | TEA/ADR                   | Segregation (worker-isolated pairs), Generation (synthetic), Teardown (auto-cleanup)             | Defined     |
+| 3   | **Scalability & Availability** | PRD                       | "Not a priority for MVP. Standard Supabase scaling."                                             | UNKNOWN/N/A |
+| 4   | **Disaster Recovery**          | PRD                       | Platform-managed via Supabase                                                                    | UNKNOWN/N/A |
+| 5   | **Security**                   | PRD NFR-S1/S2/S4 + E4-R06 | RLS on all tables, private broadcast channels, RLS on realtime.messages, participant-only access | Defined     |
+| 6   | **Monitorability**             | PRD                       | Console logging; no formal APM for MVP                                                           | UNKNOWN     |
+| 7   | **QoS & QoE**                  | PRD NFR-P1/P2/P3/P4       | <500ms sync, <200ms transitions, <2s initial load, "Syncing..." indicators                       | Defined     |
+| 8   | **Deployability**              | PRD / CLAUDE.md           | GitHub Pages atomic deploy, DB migrations independent                                            | Defined     |
 
 ### Feature-Specific Thresholds (Epic 4 — Together Mode)
 
-| NFR | Source | Threshold |
-|---|---|---|
-| NFR-P1 | PRD | Real-time sync latency < 500ms (Together mode phase sync) |
-| NFR-P2 | PRD | Phase transition < 200ms (no blocking, fade transitions) |
-| NFR-P3 | PRD | Initial feature load < 2s on 3G; skeleton loading states |
-| NFR-P4 | PRD | Show "Syncing..." indicator under latency; no UI jitter |
-| NFR-S1 | PRD | Reflection data: user + linked partner only (RLS) |
-| NFR-S2 | PRD | Session data: participants only |
-| NFR-S4 | PRD | Encryption at rest + in transit |
-| NFR-R1 | PRD | Session state recovery: 100% (reconnects resume correctly) |
-| NFR-R2 | PRD | Data sync reliability: 99.9% (no lost reflections) |
-| NFR-R3 | PRD | Race condition prevention: zero double-advances (server-authoritative) |
-| NFR-R4 | PRD | Cache integrity: 100% |
-| NFR-R5 | PRD | Graceful degradation: feature remains usable if partner offline |
-| NFR-R6 | PRD | Reflection write idempotency (unique constraint) |
-| NFR-A1 | PRD | WCAG AA minimum |
-| NFR-A4 | PRD | Respect `prefers-reduced-motion` |
-| E4-R06 | Test Design | Private broadcast channels with RLS on `realtime.messages` |
+| NFR    | Source      | Threshold                                                              |
+| ------ | ----------- | ---------------------------------------------------------------------- |
+| NFR-P1 | PRD         | Real-time sync latency < 500ms (Together mode phase sync)              |
+| NFR-P2 | PRD         | Phase transition < 200ms (no blocking, fade transitions)               |
+| NFR-P3 | PRD         | Initial feature load < 2s on 3G; skeleton loading states               |
+| NFR-P4 | PRD         | Show "Syncing..." indicator under latency; no UI jitter                |
+| NFR-S1 | PRD         | Reflection data: user + linked partner only (RLS)                      |
+| NFR-S2 | PRD         | Session data: participants only                                        |
+| NFR-S4 | PRD         | Encryption at rest + in transit                                        |
+| NFR-R1 | PRD         | Session state recovery: 100% (reconnects resume correctly)             |
+| NFR-R2 | PRD         | Data sync reliability: 99.9% (no lost reflections)                     |
+| NFR-R3 | PRD         | Race condition prevention: zero double-advances (server-authoritative) |
+| NFR-R4 | PRD         | Cache integrity: 100%                                                  |
+| NFR-R5 | PRD         | Graceful degradation: feature remains usable if partner offline        |
+| NFR-R6 | PRD         | Reflection write idempotency (unique constraint)                       |
+| NFR-A1 | PRD         | WCAG AA minimum                                                        |
+| NFR-A4 | PRD         | Respect `prefers-reduced-motion`                                       |
+| E4-R06 | Test Design | Private broadcast channels with RLS on `realtime.messages`             |
 
 ---
 
 ## Step 3 — Evidence Gathered
 
 ### Security Evidence
+
 - **RLS Tests:** `tests/e2e/scripture/scripture-rls-security.spec.ts` — 7 E2E tests covering RLS for scripture_sessions, scripture_reflections, scripture_bookmarks. Verifies participant-only access, cross-couple isolation, is_shared visibility.
 - **pgTAP RLS:** `supabase/tests/database/02_rls_policies.sql` — 14 pgTAP tests verifying policy existence, command types, cross-user isolation, anon rejection.
 - **RPC Security:** pgTAP tests 4.1-DB-004, 4.2-DB-004, 4.3-DB-003 verify non-member rejection on all RPCs. All 7 RPCs use SECURITY INVOKER + SET search_path = ''.
@@ -151,6 +166,7 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 - **Total security-relevant tests:** ~58 across E2E (7), pgTAP (14+), unit (13).
 
 ### Performance Evidence
+
 - **Sync Latency (NFR-P1):** E2E tests validate broadcast/presence delivery across 2 browser contexts with generous CI-safe timeouts. Optimistic state ensures sub-frame UI response. Architecture guarantees <500ms for 2-user sessions.
 - **Phase Transitions (NFR-P2):** Zustand `set()` calls are synchronous (<16ms). 12 unit tests verify optimistic lock-in, stale-broadcast guards, version-based jitter prevention.
 - **Initial Load (NFR-P3):** Code splitting (React.lazy all routes), manual chunks, skeleton UIs, Lighthouse CI (warn-only 0.70), GitHub Pages CDN, PWA service worker. Gap: no hard CI gate, no explicit 3G test.
@@ -158,6 +174,7 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 - **Resource Cleanup:** Both hooks test removeChannel on unmount, duplicate subscription prevention, timer disposal, retry storm guard.
 
 ### Reliability Evidence
+
 - **Error Handling:** CHANNEL_ERROR recovery (3 unit tests), 409 conflict rollback with refetch (unit + pgTAP), generic RPC error graceful degradation, endSession error handling.
 - **Reconnection:** 20s presence TTL, auto-reconnect via retryCount cycling, stale payload discard, loadSession resync on re-subscribe. E2E covers full disconnect-reconnect flow.
 - **Race Conditions:** expected_version in lock-in RPC, version guard on broadcasts, ON CONFLICT upserts, self:false broadcast config. Server-authoritative: pgTAP DB-001/002/003.
@@ -167,6 +184,7 @@ Note: This assessment summarizes existing evidence; it does not run tests or CI 
 - **Total reliability-relevant tests:** 61 across unit (36), E2E (6), pgTAP (19).
 
 ### Scalability Evidence
+
 - **PRD:** "Not a priority for MVP. Standard Supabase scaling."
 - **Architecture:** Stateless SPA on GitHub Pages CDN. Supabase handles all backend scaling.
 - **Channel Scope:** Per-session channels (2 channels, 2 users max), private:true, UUID namespacing.
@@ -405,13 +423,13 @@ None. No release blockers identified.
 
 ## Evidence Gaps
 
-| Gap | Impact | Mitigation | Risk |
-|---|---|---|---|
-| No load testing (k6) | Cannot validate performance under load | 2-user MVP scope; Supabase handles scaling | LOW (expected for MVP) |
-| No APM / distributed tracing | Limited production observability | Sentry error tracking; console logging | LOW (expected for MVP) |
-| No explicit 3G throttle test | Cannot directly validate NFR-P3 threshold | Lighthouse simulated throttling partially covers | LOW |
-| No WebSocket-level channel join rejection E2E test | E4-R06 not tested at integration level | Supabase RLS on realtime.messages enforces; unit tests verify private:true | LOW |
-| Burn-in only runs changed files | Pre-existing flaky tests not caught per-PR | Weekly scheduled full pipeline run | LOW |
+| Gap                                                | Impact                                     | Mitigation                                                                 | Risk                   |
+| -------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------- | ---------------------- |
+| No load testing (k6)                               | Cannot validate performance under load     | 2-user MVP scope; Supabase handles scaling                                 | LOW (expected for MVP) |
+| No APM / distributed tracing                       | Limited production observability           | Sentry error tracking; console logging                                     | LOW (expected for MVP) |
+| No explicit 3G throttle test                       | Cannot directly validate NFR-P3 threshold  | Lighthouse simulated throttling partially covers                           | LOW                    |
+| No WebSocket-level channel join rejection E2E test | E4-R06 not tested at integration level     | Supabase RLS on realtime.messages enforces; unit tests verify private:true | LOW                    |
+| Burn-in only runs changed files                    | Pre-existing flaky tests not caught per-PR | Weekly scheduled full pipeline run                                         | LOW                    |
 
 ---
 
@@ -419,17 +437,17 @@ None. No release blockers identified.
 
 **Based on ADR Quality Readiness Checklist (8 categories, 29 criteria)**
 
-| Category | Criteria Met | PASS | CONCERNS | FAIL | Overall Status |
-|---|---|---|---|---|---|
-| 1. Testability & Automation | 4/4 | 4 | 0 | 0 | PASS |
-| 2. Test Data Strategy | 3/3 | 3 | 0 | 0 | PASS |
-| 3. Scalability & Availability | 2/4 | 2 | 0 | 0 | N/A (2 criteria N/A) |
-| 4. Disaster Recovery | 0/3 | 0 | 0 | 0 | N/A (platform-managed) |
-| 5. Security | 4/4 | 4 | 0 | 0 | PASS |
-| 6. Monitorability, Debuggability & Manageability | 2/4 | 2 | 2 | 0 | CONCERNS |
-| 7. QoS & QoE | 3/4 | 3 | 1 | 0 | CONCERNS |
-| 8. Deployability | 3/3 | 3 | 0 | 0 | PASS |
-| **Total** | **21/29** | **21** | **3** | **0** | **PASS with CONCERNS** |
+| Category                                         | Criteria Met | PASS   | CONCERNS | FAIL  | Overall Status         |
+| ------------------------------------------------ | ------------ | ------ | -------- | ----- | ---------------------- |
+| 1. Testability & Automation                      | 4/4          | 4      | 0        | 0     | PASS                   |
+| 2. Test Data Strategy                            | 3/3          | 3      | 0        | 0     | PASS                   |
+| 3. Scalability & Availability                    | 2/4          | 2      | 0        | 0     | N/A (2 criteria N/A)   |
+| 4. Disaster Recovery                             | 0/3          | 0      | 0        | 0     | N/A (platform-managed) |
+| 5. Security                                      | 4/4          | 4      | 0        | 0     | PASS                   |
+| 6. Monitorability, Debuggability & Manageability | 2/4          | 2      | 2        | 0     | CONCERNS               |
+| 7. QoS & QoE                                     | 3/4          | 3      | 1        | 0     | CONCERNS               |
+| 8. Deployability                                 | 3/3          | 3      | 0        | 0     | PASS                   |
+| **Total**                                        | **21/29**    | **21** | **3**    | **0** | **PASS with CONCERNS** |
 
 Note: 5 criteria scored N/A (Scalability: 2, Disaster Recovery: 3) due to MVP scope / platform-managed infrastructure. Effective score: 24/24 applicable criteria with 3 CONCERNS.
 

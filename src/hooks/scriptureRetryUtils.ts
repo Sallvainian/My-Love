@@ -25,10 +25,7 @@ export function scheduleRetry(
   config: typeof SCRIPTURE_RETRY_CONFIG = SCRIPTURE_RETRY_CONFIG
 ): boolean {
   if (retryCountRef.current >= config.maxRetries) return false;
-  const delay = Math.min(
-    config.baseDelay * Math.pow(2, retryCountRef.current),
-    config.maxDelay
-  );
+  const delay = Math.min(config.baseDelay * Math.pow(2, retryCountRef.current), config.maxDelay);
   retryCountRef.current++;
   retryTimerRef.current = setTimeout(() => setRetryCount((c) => c + 1), delay);
   return true;

@@ -38,34 +38,34 @@ Story 2.3 tests demonstrate strong engineering fundamentals — deterministic se
 
 ## Quality Dimension Scores
 
-| Dimension | Score | Grade | Weight | Weighted |
-|---|---|---|---|---|
-| Determinism | 96/100 | A | 25% | 24.00 |
-| Isolation | 93/100 | A | 25% | 23.25 |
-| Maintainability | 36/100 | F | 20% | 7.20 |
-| Coverage | 48/100 | F | 15% | 7.20 |
-| Performance | 92/100 | A | 15% | 13.80 |
-| **Overall** | **75/100** | **C** | **100%** | **75.45** |
+| Dimension       | Score      | Grade | Weight   | Weighted  |
+| --------------- | ---------- | ----- | -------- | --------- |
+| Determinism     | 96/100     | A     | 25%      | 24.00     |
+| Isolation       | 93/100     | A     | 25%      | 23.25     |
+| Maintainability | 36/100     | F     | 20%      | 7.20      |
+| Coverage        | 48/100     | F     | 15%      | 7.20      |
+| Performance     | 92/100     | A     | 15%      | 13.80     |
+| **Overall**     | **75/100** | **C** | **100%** | **75.45** |
 
 ---
 
 ## Quality Criteria Assessment
 
-| Criterion | Status | Violations | Notes |
-|---|---|---|---|
-| BDD Format (Given-When-Then) | ⚠️ WARN | 0 | Behavioral names but not formal GWT |
-| Test IDs | ✅ PASS | 0 | All tests have `data-testid` selectors |
-| Priority Markers (P0/P1/P2/P3) | ⚠️ WARN | 0 | Integration tests have IDs (2.3-INT-001), component tests don't |
-| Hard Waits (sleep, waitForTimeout) | ✅ PASS | 0 | Zero hard waits, all async uses vi.waitFor() |
-| Determinism (no random/time) | ✅ PASS | 2 | Minor: unmocked `new Date()` in mock return, shared mutable lets |
-| Isolation (cleanup, no shared state) | ✅ PASS | 3 | One MEDIUM: inline rAF override without afterEach protection |
-| Fixture Patterns | ⚠️ WARN | 4 | Inline mocks, no shared fixtures file, setup duplication |
-| Data Factories | ⚠️ WARN | 2 | `createMockSession` factory exists but magic numbers scattered |
-| Network-First Pattern | ✅ PASS | 0 | N/A for Vitest component tests |
-| Explicit Assertions | ✅ PASS | 0 | All tests have meaningful assertions |
-| Test Length (≤300 lines) | ⚠️ WARN | 1 | SoloReadingFlow at 1266 lines (but multi-story file) |
-| Test Duration (≤1.5 min) | ✅ PASS | 0 | All component tests are sub-second |
-| Flakiness Patterns | ✅ PASS | 0 | No race conditions or timing dependencies |
+| Criterion                            | Status  | Violations | Notes                                                            |
+| ------------------------------------ | ------- | ---------- | ---------------------------------------------------------------- |
+| BDD Format (Given-When-Then)         | ⚠️ WARN | 0          | Behavioral names but not formal GWT                              |
+| Test IDs                             | ✅ PASS | 0          | All tests have `data-testid` selectors                           |
+| Priority Markers (P0/P1/P2/P3)       | ⚠️ WARN | 0          | Integration tests have IDs (2.3-INT-001), component tests don't  |
+| Hard Waits (sleep, waitForTimeout)   | ✅ PASS | 0          | Zero hard waits, all async uses vi.waitFor()                     |
+| Determinism (no random/time)         | ✅ PASS | 2          | Minor: unmocked `new Date()` in mock return, shared mutable lets |
+| Isolation (cleanup, no shared state) | ✅ PASS | 3          | One MEDIUM: inline rAF override without afterEach protection     |
+| Fixture Patterns                     | ⚠️ WARN | 4          | Inline mocks, no shared fixtures file, setup duplication         |
+| Data Factories                       | ⚠️ WARN | 2          | `createMockSession` factory exists but magic numbers scattered   |
+| Network-First Pattern                | ✅ PASS | 0          | N/A for Vitest component tests                                   |
+| Explicit Assertions                  | ✅ PASS | 0          | All tests have meaningful assertions                             |
+| Test Length (≤300 lines)             | ⚠️ WARN | 1          | SoloReadingFlow at 1266 lines (but multi-story file)             |
+| Test Duration (≤1.5 min)             | ✅ PASS | 0          | All component tests are sub-second                               |
+| Flakiness Patterns                   | ✅ PASS | 0          | No race conditions or timing dependencies                        |
 
 **Total Violations**: 9 HIGH, 10 MEDIUM, 13 LOW (32 total)
 
@@ -144,10 +144,18 @@ AC #4 states: "Given a Solo session is completed by a linked user, When the part
 it('renders report with partner data when partner has completed (2.3-INT-ASYNC)', async () => {
   mockStoreState.partner = linkedPartner;
   mockStoreState.session = createMockSession({
-    currentPhase: 'report', status: 'complete', currentStepIndex: 16,
+    currentPhase: 'report',
+    status: 'complete',
+    currentStepIndex: 16,
   });
   mockGetMessagesBySession.mockResolvedValue([
-    { id: 'msg-2', sessionId: 'session-123', senderId: 'partner-1', message: 'Love you', createdAt: new Date('2026-02-01') }
+    {
+      id: 'msg-2',
+      sessionId: 'session-123',
+      senderId: 'partner-1',
+      message: 'Love you',
+      createdAt: new Date('2026-02-01'),
+    },
   ]);
   // ... render and verify partner message appears
 });
@@ -249,10 +257,10 @@ describe('Story 2.3: Daily Prayer Report', () => {
 
 ```typescript
 // ❌ Current — doesn't verify completedAt
-expect.objectContaining({ status: 'complete' })
+expect.objectContaining({ status: 'complete' });
 
 // ✅ Recommended
-expect.objectContaining({ status: 'complete', completedAt: expect.any(Date) })
+expect.objectContaining({ status: 'complete', completedAt: expect.any(Date) });
 ```
 
 ### 5. Fix Inline requestAnimationFrame Override
@@ -264,7 +272,10 @@ expect.objectContaining({ status: 'complete', completedAt: expect.any(Date) })
 ```typescript
 // ❌ Current — inline override not protected against test failure
 const origRAF = globalThis.requestAnimationFrame;
-globalThis.requestAnimationFrame = (cb) => { cb(0); return 0; };
+globalThis.requestAnimationFrame = (cb) => {
+  cb(0);
+  return 0;
+};
 // ... test logic ...
 globalThis.requestAnimationFrame = origRAF;
 
@@ -327,11 +338,11 @@ Both presentational components are tested in isolation with props-only interface
 
 ### File Metadata
 
-| File | Lines | Framework | Language | Tests |
-|---|---|---|---|---|
-| `MessageCompose.test.tsx` | 236 | Vitest + RTL | TypeScript | 16 |
-| `DailyPrayerReport.test.tsx` | 276 | Vitest + RTL | TypeScript | 16 |
-| `SoloReadingFlow.test.tsx` | 1266 | Vitest + RTL | TypeScript | 7 (Story 2.3) |
+| File                         | Lines | Framework    | Language   | Tests         |
+| ---------------------------- | ----- | ------------ | ---------- | ------------- |
+| `MessageCompose.test.tsx`    | 236   | Vitest + RTL | TypeScript | 16            |
+| `DailyPrayerReport.test.tsx` | 276   | Vitest + RTL | TypeScript | 16            |
+| `SoloReadingFlow.test.tsx`   | 1266  | Vitest + RTL | TypeScript | 7 (Story 2.3) |
 
 ### Test Structure (Story 2.3 scope)
 
@@ -351,13 +362,13 @@ Both presentational components are tested in isolation with props-only interface
 
 ### Acceptance Criteria Validation
 
-| AC | Tests | Status | Notes |
-|---|---|---|---|
-| AC #1: Message Composition (Linked) | 16 (MC) + 2 (INT) | ✅ Covered | Comprehensive happy-path coverage |
-| AC #2: Unlinked User Skip | 3 (INT) | ✅ Covered | Completion screen, session complete |
-| AC #3: Daily Prayer Report Display | 16 (DPR) + 3 (INT) | ✅ Covered | Ratings, bookmarks, partner message, waiting |
-| AC #4: Async Report Viewing | 0 | ❌ Missing | Zero tests at any level |
-| AC #5: Together Mode Report | 2 (DPR side-by-side) | ⚠️ Partial | Side-by-side tested, bookmark opt-in untested |
+| AC                                  | Tests                | Status     | Notes                                         |
+| ----------------------------------- | -------------------- | ---------- | --------------------------------------------- |
+| AC #1: Message Composition (Linked) | 16 (MC) + 2 (INT)    | ✅ Covered | Comprehensive happy-path coverage             |
+| AC #2: Unlinked User Skip           | 3 (INT)              | ✅ Covered | Completion screen, session complete           |
+| AC #3: Daily Prayer Report Display  | 16 (DPR) + 3 (INT)   | ✅ Covered | Ratings, bookmarks, partner message, waiting  |
+| AC #4: Async Report Viewing         | 0                    | ❌ Missing | Zero tests at any level                       |
+| AC #5: Together Mode Report         | 2 (DPR side-by-side) | ⚠️ Partial | Side-by-side tested, bookmark opt-in untested |
 
 **Coverage**: 3/5 criteria fully covered (60%)
 
@@ -428,30 +439,30 @@ Test quality scores 75/100 (C) overall, with excellent fundamentals in determini
 
 ### Violation Summary by Dimension
 
-| Dimension | HIGH | MEDIUM | LOW | Total | Score |
-|---|---|---|---|---|---|
-| Determinism | 0 | 0 | 2 | 2 | 96 |
-| Isolation | 0 | 1 | 2 | 3 | 93 |
-| Maintainability | 4 | 4 | 2 | 10 | 36 |
-| Coverage | 5 | 5 | 3 | 13 | 48 |
-| Performance | 0 | 0 | 4 | 4 | 92 |
-| **Total** | **9** | **10** | **13** | **32** | **75** |
+| Dimension       | HIGH  | MEDIUM | LOW    | Total  | Score  |
+| --------------- | ----- | ------ | ------ | ------ | ------ |
+| Determinism     | 0     | 0      | 2      | 2      | 96     |
+| Isolation       | 0     | 1      | 2      | 3      | 93     |
+| Maintainability | 4     | 4      | 2      | 10     | 36     |
+| Coverage        | 5     | 5      | 3      | 13     | 48     |
+| Performance     | 0     | 0      | 4      | 4      | 92     |
+| **Total**       | **9** | **10** | **13** | **32** | **75** |
 
 ### Quality Trends
 
-| Review Date | Story | Score | Grade | Critical | Trend |
-|---|---|---|---|---|---|
-| 2026-02-04 | 2.1 | 78/100 | C | 3 | — |
-| 2026-02-04 | 2.2 | — | — | — | — |
-| 2026-02-04 | 2.3 | 75/100 | C | 9 | ⬇️ Declined |
+| Review Date | Story | Score  | Grade | Critical | Trend       |
+| ----------- | ----- | ------ | ----- | -------- | ----------- |
+| 2026-02-04  | 2.1   | 78/100 | C     | 3        | —           |
+| 2026-02-04  | 2.2   | —      | —     | —        | —           |
+| 2026-02-04  | 2.3   | 75/100 | C     | 9        | ⬇️ Declined |
 
 ### Related Reviews
 
-| Story | Score | Grade | File |
-|---|---|---|---|
-| 2.1 | 78/100 | C | [test-review-story-2.1.md](test-review-story-2.1.md) |
-| 2.2 | — | — | [test-review-story-2.2.md](test-review-story-2.2.md) |
-| 2.3 | 75/100 | C | This review |
+| Story | Score  | Grade | File                                                 |
+| ----- | ------ | ----- | ---------------------------------------------------- |
+| 2.1   | 78/100 | C     | [test-review-story-2.1.md](test-review-story-2.1.md) |
+| 2.2   | —      | —     | [test-review-story-2.2.md](test-review-story-2.2.md) |
+| 2.3   | 75/100 | C     | This review                                          |
 
 ---
 

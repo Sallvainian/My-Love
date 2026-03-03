@@ -46,15 +46,15 @@ Love notes and mood history use `react-window` (v2.2.7) with `react-window-infin
 
 All uploaded images go through Canvas API compression. Configuration is centralized in `src/config/images.ts`:
 
-| Setting         | Value                               | Config Constant |
-| --------------- | ----------------------------------- | --------------- |
-| Max width       | 2048px                              | `IMAGE_COMPRESSION.MAX_WIDTH` |
-| Max height      | 2048px                              | `IMAGE_COMPRESSION.MAX_HEIGHT` |
-| JPEG quality    | 80% (0.8)                           | `IMAGE_COMPRESSION.QUALITY` |
-| Allowed formats | JPEG, PNG, WebP                     | `IMAGE_VALIDATION.ALLOWED_MIME_TYPES` |
-| Max upload size | 25MB                                | `IMAGE_VALIDATION.MAX_FILE_SIZE_BYTES` |
+| Setting         | Value                               | Config Constant                             |
+| --------------- | ----------------------------------- | ------------------------------------------- |
+| Max width       | 2048px                              | `IMAGE_COMPRESSION.MAX_WIDTH`               |
+| Max height      | 2048px                              | `IMAGE_COMPRESSION.MAX_HEIGHT`              |
+| JPEG quality    | 80% (0.8)                           | `IMAGE_COMPRESSION.QUALITY`                 |
+| Allowed formats | JPEG, PNG, WebP                     | `IMAGE_VALIDATION.ALLOWED_MIME_TYPES`       |
+| Max upload size | 25MB                                | `IMAGE_VALIDATION.MAX_FILE_SIZE_BYTES`      |
 | Large file warn | 10MB (may approach 3s limit)        | `IMAGE_VALIDATION.LARGE_FILE_WARNING_BYTES` |
-| Fallback        | Original image if compression fails | (hardcoded) |
+| Fallback        | Original image if compression fails | (hardcoded)                                 |
 
 The compression flow:
 
@@ -216,17 +216,17 @@ From `src/config/performance.ts` (all `as const` for literal types):
 
 ```typescript
 export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 20,      // Photos, messages
-  MAX_PAGE_SIZE: 100,          // Upper bound
-  MIN_PAGE_SIZE: 1,            // Lower bound
+  DEFAULT_PAGE_SIZE: 20, // Photos, messages
+  MAX_PAGE_SIZE: 100, // Upper bound
+  MIN_PAGE_SIZE: 1, // Lower bound
 };
 
 export const STORAGE_QUOTAS = {
-  WARNING_THRESHOLD_PERCENT: 80,   // Show warning banner
-  ERROR_THRESHOLD_PERCENT: 95,     // Block uploads
-  DEFAULT_QUOTA_MB: 50,            // Fallback for Storage API
+  WARNING_THRESHOLD_PERCENT: 80, // Show warning banner
+  ERROR_THRESHOLD_PERCENT: 95, // Block uploads
+  DEFAULT_QUOTA_MB: 50, // Fallback for Storage API
   DEFAULT_QUOTA_BYTES: 50 * 1024 * 1024,
-  MONITORING_INTERVAL_MS: 5 * 60 * 1000,  // 5 minutes
+  MONITORING_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
 };
 ```
 
@@ -234,15 +234,15 @@ From `src/config/images.ts`:
 
 ```typescript
 export const IMAGE_STORAGE = {
-  SIGNED_URL_EXPIRY_SECONDS: 3600,     // 1 hour
+  SIGNED_URL_EXPIRY_SECONDS: 3600, // 1 hour
   URL_REFRESH_BUFFER_MS: 5 * 60 * 1000, // Refresh 5 min before expiry
-  MAX_CACHE_SIZE: 100,                  // LRU cache limit
+  MAX_CACHE_SIZE: 100, // LRU cache limit
 };
 
 export const NOTES_CONFIG = {
-  PAGE_SIZE: 50,                       // Notes per page
-  RATE_LIMIT_MAX_MESSAGES: 10,         // Max messages per window
-  RATE_LIMIT_WINDOW_MS: 60000,         // 1 minute window
+  PAGE_SIZE: 50, // Notes per page
+  RATE_LIMIT_MAX_MESSAGES: 10, // Max messages per window
+  RATE_LIMIT_WINDOW_MS: 60000, // 1 minute window
 };
 ```
 

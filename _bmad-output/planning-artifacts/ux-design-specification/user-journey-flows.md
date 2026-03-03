@@ -10,6 +10,7 @@ Partners join lobby, ready-up, and sync through 17 verses with free navigation:
 4. **Report**: Write message → See partner's bookmarks & message
 
 **Key mechanics:**
+
 - Free navigation within each verse/response pair
 - Lock-in: Both must confirm to advance
 - Partner position indicator shows where they're viewing
@@ -101,6 +102,7 @@ Graceful degradation when partner doesn't join:
 4. Copy: "Continue solo" / "Try together another time"
 
 **No-Shame UX Copy:**
+
 - ✓ "Continue solo" (not "Partner didn't show up")
 - ✓ "Try together another time" (not "Partner abandoned you")
 - ✓ Prayer report still sent — builds connection asynchronously
@@ -131,16 +133,19 @@ flowchart TD
 ## Journey Patterns
 
 **Navigation Patterns:**
+
 - **Free navigation**: Move between verse ↔ response at will
 - **Lock-in advance**: Cannot proceed until partner confirms
 - **Position indicator**: Shows where partner is viewing
 
 **Decision Patterns:**
+
 - **Binary ready state**: Toggle ready/not ready (no ambiguity)
 - **Auto-save on exit**: Progress saves automatically; no prompt needed
 - **No-shame fallbacks**: All language is neutral and gentle
 
 **Feedback Patterns:**
+
 - **Partner presence**: Subtle indicator of partner's current view
 - **Progress indicator**: "Verse 5 of 17" (text-only, no progress bar — ritual, not task)
 - **Bookmark confirmation**: Brief animation when verse bookmarked

@@ -1,6 +1,7 @@
 # Subprocess Implementation Status
 
 ## Overview
+
 This documentation page tracks the implementation status of subprocess patterns across the Test Architect (TEA) workflows, dated 2026-01-27, in Phase 5.
 
 ## Completed Implementations
@@ -10,12 +11,14 @@ This documentation page tracks the implementation status of subprocess patterns 
 **Pattern**: Parallel API + E2E test generation
 
 **Files Created**:
+
 - `src/workflows/testarch/automate/steps-c/step-03a-subprocess-api.md`
 - `src/workflows/testarch/automate/steps-c/step-03b-subprocess-e2e.md`
 - `src/workflows/testarch/automate/steps-c/step-03c-aggregate.md`
 - Updated: `src/workflows/testarch/automate/steps-c/step-03-generate-tests.md`
 
 **Subprocesses**:
+
 - Subprocess A: API test generation -> `/tmp/tea-automate-api-tests-{{timestamp}}.json`
 - Subprocess B: E2E test generation -> `/tmp/tea-automate-e2e-tests-{{timestamp}}.json`
 - Aggregation: Reads both outputs, writes tests to disk, generates fixtures
@@ -27,12 +30,14 @@ This documentation page tracks the implementation status of subprocess patterns 
 **Pattern**: Parallel FAILING API + E2E test generation (TDD RED PHASE)
 
 **Files Created**:
+
 - `src/workflows/testarch/atdd/steps-c/step-04a-subprocess-api-failing.md`
 - `src/workflows/testarch/atdd/steps-c/step-04b-subprocess-e2e-failing.md`
 - `src/workflows/testarch/atdd/steps-c/step-04c-aggregate.md`
 - Updated: `src/workflows/testarch/atdd/steps-c/step-04-generate-tests.md`
 
 **Subprocesses**:
+
 - Subprocess A: API failing tests (with test.skip()) -> `/tmp/tea-atdd-api-tests-{{timestamp}}.json`
 - Subprocess B: E2E failing tests (with test.skip()) -> `/tmp/tea-atdd-e2e-tests-{{timestamp}}.json`
 - Aggregation: TDD red phase validation, writes tests, generates ATDD checklist
@@ -48,6 +53,7 @@ This documentation page tracks the implementation status of subprocess patterns 
 **Pattern**: 5 parallel quality dimension checks
 
 **Subprocess Architecture**:
+
 ```
 test-review/
 ├── step-XX-orchestrate.md (updated to launch subprocesses)
@@ -60,6 +66,7 @@ test-review/
 ```
 
 **Subprocess Output Format**:
+
 ```json
 {
   "dimension": "determinism",
@@ -80,6 +87,7 @@ test-review/
 ```
 
 **Aggregation Logic**:
+
 - Read all 5 dimension outputs
 - Calculate weighted score (0-100)
 - Aggregate violations by severity
@@ -88,6 +96,7 @@ test-review/
 **Performance**: ~60% faster (5 checks in parallel vs sequential)
 
 **Implementation Steps**:
+
 1. Create 5 subprocess step files (one per quality dimension)
 2. Each subprocess analyzes test files for its specific dimension
 3. Create aggregation step to calculate overall score
@@ -98,6 +107,7 @@ test-review/
 **Pattern**: 4 parallel NFR domain assessments
 
 **Subprocess Architecture**:
+
 ```
 nfr-assess/
 ├── step-XX-orchestrate.md (updated to launch subprocesses)
@@ -109,6 +119,7 @@ nfr-assess/
 ```
 
 **Subprocess Output Format**:
+
 ```json
 {
   "domain": "security",
@@ -137,6 +148,7 @@ nfr-assess/
 ```
 
 **Aggregation Logic**:
+
 - Read all 4 NFR domain outputs
 - Calculate overall risk (max of all domain risks)
 - Aggregate compliance status
@@ -146,6 +158,7 @@ nfr-assess/
 **Performance**: ~67% faster (4 domains in parallel vs sequential)
 
 **Implementation Steps**:
+
 1. Create 4 subprocess step files (one per NFR domain)
 2. Each subprocess assesses system for its specific domain
 3. Create aggregation step to synthesize findings
@@ -156,6 +169,7 @@ nfr-assess/
 **Pattern**: Two-phase workflow separation (not parallel, but clean separation)
 
 **Subprocess Architecture**:
+
 ```
 trace/
 ├── step-XX-phase-1-coverage-matrix.md (generates matrix -> temp file)
@@ -163,6 +177,7 @@ trace/
 ```
 
 **Phase 1 Output**:
+
 ```json
 {
   "requirements": [
@@ -188,6 +203,7 @@ trace/
 ```
 
 **Phase 2 Logic**:
+
 - Read Phase 1 coverage matrix
 - Apply decision tree:
   - P0 coverage == 100% AND overall >= 90% -> PASS
@@ -199,6 +215,7 @@ trace/
 **Performance**: Not about parallelization, but clean phase separation
 
 **Implementation Steps**:
+
 1. Split current trace workflow into 2 phases
 2. Phase 1: Generate coverage matrix to temp file
 3. Phase 2: Read matrix, apply gate logic, generate report
@@ -206,30 +223,34 @@ trace/
 
 ## Implementation Summary
 
-| Workflow | Status | Subprocesses | Performance Gain | Complexity |
-|----------|--------|--------------|-----------------|------------|
-| automate | Complete | 2 (API, E2E) | ~50% | Medium |
-| atdd | Complete | 2 (API RED, E2E RED) | ~50% | Medium |
-| test-review | To Implement | 5 (quality dimensions) | ~60% | High |
-| nfr-assess | To Implement | 4 (NFR domains) | ~67% | High |
-| trace | To Implement | 2 phases (sequential) | N/A | Medium |
+| Workflow    | Status       | Subprocesses           | Performance Gain | Complexity |
+| ----------- | ------------ | ---------------------- | ---------------- | ---------- |
+| automate    | Complete     | 2 (API, E2E)           | ~50%             | Medium     |
+| atdd        | Complete     | 2 (API RED, E2E RED)   | ~50%             | Medium     |
+| test-review | To Implement | 5 (quality dimensions) | ~60%             | High       |
+| nfr-assess  | To Implement | 4 (NFR domains)        | ~67%             | High       |
+| trace       | To Implement | 2 phases (sequential)  | N/A              | Medium     |
 
 ## Implementation Priority
 
 **Priority 1 (Highest Impact - Already Done)**:
+
 - automate - Most frequently used
 - atdd - Frequently used, TDD workflow
 
 **Priority 2 (Next to Implement)**:
+
 - test-review - Complex validation, clear parallelization benefit
 - nfr-assess - Independent domains, high parallelization benefit
 
 **Priority 3 (Good Separation)**:
+
 - trace - Two-phase separation, clean design
 
 ## Next Steps
 
 ### For test-review Implementation:
+
 1. Identify which step currently does quality checks
 2. Create 5 subprocess step files (determinism, isolation, maintainability, coverage, performance)
 3. Each subprocess analyzes test files for specific quality dimension
@@ -237,6 +258,7 @@ trace/
 5. Update orchestration step to launch all 5 in parallel
 
 ### For nfr-assess Implementation:
+
 1. Identify which step currently does NFR assessment
 2. Create 4 subprocess step files (security, performance, reliability, scalability)
 3. Each subprocess assesses system for specific NFR domain
@@ -244,6 +266,7 @@ trace/
 5. Update orchestration step to launch all 4 in parallel
 
 ### For trace Implementation:
+
 1. Identify current trace workflow structure
 2. Split into Phase 1 (coverage matrix) and Phase 2 (gate decision)
 3. Phase 1 outputs to temp file
@@ -253,6 +276,7 @@ trace/
 ## Testing Checklist
 
 After implementing each workflow:
+
 - Create subprocess step files
 - Update orchestration step
 - Test with real project data

@@ -152,37 +152,38 @@ So that we begin reading together with shared anticipation.
 
 ### What Already Exists — DO NOT Recreate
 
-| Component/File | What It Does | Location |
-|---|---|---|
-| `ScriptureOverview.tsx` | Mode selection, start button, partner detection, solo resume | `src/components/scripture-reading/containers/ScriptureOverview.tsx` |
-| `SoloReadingFlow.tsx` | Solo reading route — renders when `session.mode === 'solo'` | `src/components/scripture-reading/containers/SoloReadingFlow.tsx` |
-| `scriptureReadingSlice.ts` | All existing session state, createSession, loadSession, advanceStep | `src/stores/slices/scriptureReadingSlice.ts` |
-| `scriptureReadingService.ts` | IndexedDB + Supabase CRUD for sessions, reflections, bookmarks | `src/services/scriptureReadingService.ts` |
-| `scripture_sessions` table | Has `mode`, `current_phase`, `version`, `snapshot_json` — **no role/ready/countdown columns yet** | `supabase/migrations/20260128000001_scripture_reading.sql` |
-| `ScriptureSession` type | `{ id, mode, userId, partnerId?, currentPhase, currentStepIndex, status, version }` — **no role fields yet** | `src/services/dbSchema.ts` (line 32) |
-| `ScriptureSessionPhase` | `'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete'` — already includes lobby/countdown | `src/services/dbSchema.ts` (line 26) |
-| `ScriptureSessionMode` | `'solo' | 'together'` | `src/services/dbSchema.ts` (line 25) |
-| `useMotionConfig` hook | Motion presets (fade, spring, slideUp) respecting reduced-motion | `src/hooks/useMotionConfig.ts` |
-| `useNetworkStatus` hook | `{ isOnline }` | `src/hooks/useNetworkStatus.ts` |
-| `partnerSlice` | `partner: PartnerInfo | null` — has partner display name for lobby UI | `src/stores/slices/partnerSlice.ts` |
-| `scriptureTheme` tokens | `{ primary: '#A855F7', background: '#F3E5F5', surface: '#FAF5FF' }` | `ScriptureOverview.tsx` (line 38) — copy or import |
-| `FOCUS_RING` constant | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'` | `ScriptureOverview.tsx` (line 45) — copy or import |
-| `ModeCard` component | Purple glass-morphism card pattern — can reference for role selection card styling | `ScriptureOverview.tsx` (line 69) |
-| `handleStartTogether` | Already calls `createSession('together', partner.id)` — creates session and sets `session` in slice | `ScriptureOverview.tsx` (line 272) |
-| Zustand persist | Auto-persists slice state to localStorage — lobby state fields will also persist | `src/stores/useAppStore.ts` |
+| Component/File               | What It Does                                                                                                 | Location                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------ | ------------ | -------- | ---------------------------------------------- | ------------------------------------ |
+| `ScriptureOverview.tsx`      | Mode selection, start button, partner detection, solo resume                                                 | `src/components/scripture-reading/containers/ScriptureOverview.tsx` |
+| `SoloReadingFlow.tsx`        | Solo reading route — renders when `session.mode === 'solo'`                                                  | `src/components/scripture-reading/containers/SoloReadingFlow.tsx`   |
+| `scriptureReadingSlice.ts`   | All existing session state, createSession, loadSession, advanceStep                                          | `src/stores/slices/scriptureReadingSlice.ts`                        |
+| `scriptureReadingService.ts` | IndexedDB + Supabase CRUD for sessions, reflections, bookmarks                                               | `src/services/scriptureReadingService.ts`                           |
+| `scripture_sessions` table   | Has `mode`, `current_phase`, `version`, `snapshot_json` — **no role/ready/countdown columns yet**            | `supabase/migrations/20260128000001_scripture_reading.sql`          |
+| `ScriptureSession` type      | `{ id, mode, userId, partnerId?, currentPhase, currentStepIndex, status, version }` — **no role fields yet** | `src/services/dbSchema.ts` (line 32)                                |
+| `ScriptureSessionPhase`      | `'lobby'                                                                                                     | 'countdown'                                                         | 'reading'                            | 'reflection' | 'report' | 'complete'` — already includes lobby/countdown | `src/services/dbSchema.ts` (line 26) |
+| `ScriptureSessionMode`       | `'solo'                                                                                                      | 'together'`                                                         | `src/services/dbSchema.ts` (line 25) |
+| `useMotionConfig` hook       | Motion presets (fade, spring, slideUp) respecting reduced-motion                                             | `src/hooks/useMotionConfig.ts`                                      |
+| `useNetworkStatus` hook      | `{ isOnline }`                                                                                               | `src/hooks/useNetworkStatus.ts`                                     |
+| `partnerSlice`               | `partner: PartnerInfo                                                                                        | null` — has partner display name for lobby UI                       | `src/stores/slices/partnerSlice.ts`  |
+| `scriptureTheme` tokens      | `{ primary: '#A855F7', background: '#F3E5F5', surface: '#FAF5FF' }`                                          | `ScriptureOverview.tsx` (line 38) — copy or import                  |
+| `FOCUS_RING` constant        | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'`                           | `ScriptureOverview.tsx` (line 45) — copy or import                  |
+| `ModeCard` component         | Purple glass-morphism card pattern — can reference for role selection card styling                           | `ScriptureOverview.tsx` (line 69)                                   |
+| `handleStartTogether`        | Already calls `createSession('together', partner.id)` — creates session and sets `session` in slice          | `ScriptureOverview.tsx` (line 272)                                  |
+| Zustand persist              | Auto-persists slice state to localStorage — lobby state fields will also persist                             | `src/stores/useAppStore.ts`                                         |
 
 ### What Does NOT Exist Yet — You Must Create
 
-| File | Purpose |
-|---|---|
-| `src/hooks/useScriptureBroadcast.ts` | Broadcast channel lifecycle management (subscribe/unsubscribe, event dispatch) |
-| `src/components/scripture-reading/containers/LobbyContainer.tsx` | Role selection + lobby waiting + countdown orchestration |
-| `src/components/scripture-reading/session/Countdown.tsx` | 3...2...1 countdown UI component |
-| DB migration (new file) | Add role/ready/countdown columns to `scripture_sessions`, new RPCs, channel RLS |
+| File                                                             | Purpose                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/hooks/useScriptureBroadcast.ts`                             | Broadcast channel lifecycle management (subscribe/unsubscribe, event dispatch)  |
+| `src/components/scripture-reading/containers/LobbyContainer.tsx` | Role selection + lobby waiting + countdown orchestration                        |
+| `src/components/scripture-reading/session/Countdown.tsx`         | 3...2...1 countdown UI component                                                |
+| DB migration (new file)                                          | Add role/ready/countdown columns to `scripture_sessions`, new RPCs, channel RLS |
 
 ### Architecture Constraints
 
 **State Management:**
+
 - Lobby state belongs in `scriptureReadingSlice` — not local component state (must survive component re-renders, must be Zustand-persisted)
 - New state fields MUST be added to `ScriptureReadingState` interface and `initialScriptureState`
 - Use `useShallow` selectors in `LobbyContainer` for lobby state fields
@@ -190,6 +191,7 @@ So that we begin reading together with shared anticipation.
 - `myRole` and `partnerJoined` are client-local only — NOT synced to server (except `myRole` via the RPC)
 
 **Broadcast Channel Architecture (from `.claude/rules/use-realtime.md`):**
+
 - Channel name: `scripture-session:{session_id}` — granular, one channel per session
 - Set `private: true` on channel config (requires RLS on `realtime.messages`)
 - Call `await supabase.realtime.setAuth()` before `.subscribe()`
@@ -199,6 +201,7 @@ So that we begin reading together with shared anticipation.
 - Do NOT use `postgres_changes` — use Broadcast only (per realtime rules)
 
 **Broadcast Event Payloads:**
+
 ```typescript
 // partner_joined — sent when you join the channel
 { type: 'broadcast', event: 'partner_joined', payload: { user_id: string } }
@@ -214,24 +217,28 @@ So that we begin reading together with shared anticipation.
 ```
 
 **Server-Authoritative Countdown:**
+
 - When both users toggle ready, `scripture_toggle_ready` RPC sets `countdown_started_at = now()`, phase = 'countdown', broadcasts `state_updated` with snapshot including `countdownStartedAt`
 - Clients receive `state_updated`, extract `snapshot.countdownStartedAt` (server UTC ms), feed to `<Countdown startedAt={ts} />`
 - `<Countdown>` derives current display digit from `Math.max(0, Math.ceil(3 - (Date.now() - startedAt) / 1000))`
 - This auto-corrects clock skew: if this client receives the broadcast 0.5s late, countdown still shows correct digit
 
 **Import Discipline (from CLAUDE.md):**
+
 - Do NOT import `supabase` directly in components — use slice actions or dedicated hooks
 - `useScriptureBroadcast` is the ONLY place that imports `supabase` for Broadcast
 - Data flow: `LobbyContainer` → slice actions → `scriptureReadingService` / Supabase RPCs
 - `useScriptureBroadcast` dispatches to slice actions (not directly to components)
 
 **Error Handling:**
+
 - All RPC calls must handle errors via `handleScriptureError()` or re-throw — never empty catch blocks (CLAUDE.md rule)
 - `selectRole`, `toggleReady`, `convertToSolo` are write operations — show error state on failure, do NOT silently swallow errors
 - Optimistic UI for `myReady` only — roll back if RPC fails
 - Channel subscription error → `handleScriptureError({ code: ScriptureErrorCode.SYNC_FAILED, ... })`
 
 **Continue Solo Flow:**
+
 1. User taps "Continue solo"
 2. LobbyContainer calls `convertToSolo()` slice action
 3. Slice calls `scripture_convert_to_solo(session_id)` RPC → sets mode='solo', clears partner state
@@ -242,6 +249,7 @@ So that we begin reading together with shared anticipation.
 ### DB Schema Changes
 
 **New migration file** (create with current UTC timestamp):
+
 ```sql
 -- Add role selection and lobby state to scripture_sessions
 CREATE TYPE scripture_session_role AS ENUM ('reader', 'responder');
@@ -280,6 +288,7 @@ CREATE POLICY "scripture_session_members_can_send_broadcasts"
 ```
 
 **Required index (add to migration):**
+
 ```sql
 CREATE INDEX idx_scripture_sessions_user2_status
   ON public.scripture_sessions (user2_id, status)
@@ -290,11 +299,11 @@ CREATE INDEX idx_scripture_sessions_user2_status
 
 ```typescript
 // Add to ScriptureReadingState:
-myRole: SessionRole | null;         // This user's selected role
-partnerJoined: boolean;             // Partner has joined the broadcast channel
-myReady: boolean;                   // This user's ready toggle state (optimistic)
-partnerReady: boolean;              // Partner's ready state (from broadcast)
-countdownStartedAt: number | null;  // Server UTC ms timestamp — drives Countdown component
+myRole: SessionRole | null; // This user's selected role
+partnerJoined: boolean; // Partner has joined the broadcast channel
+myReady: boolean; // This user's ready toggle state (optimistic)
+partnerReady: boolean; // Partner's ready state (from broadcast)
+countdownStartedAt: number | null; // Server UTC ms timestamp — drives Countdown component
 
 // Add to exports:
 export type SessionRole = 'reader' | 'responder';
@@ -326,6 +335,7 @@ src/services/
 ### UX / Design Requirements
 
 **Role Selection Screen:**
+
 - Header: "How would you like to participate?" (Playfair Display, `text-purple-900`)
 - Two glass-morphism cards side by side (or stacked on mobile):
   - **Reader**: Icon (BookOpen), "Reader", "You read the verse" — secondary card style
@@ -334,6 +344,7 @@ src/services/
 - Same card styling as `ModeCard` in ScriptureOverview: `bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl`
 
 **Lobby Waiting Screen:**
+
 - Header: "Reading Together" (Playfair Display serif)
 - Partner status line: Animated pulse dot + "Waiting for [Partner Name]..." when partner not joined
 - Partner status line: Green check + "[Partner Name] has joined!" when `partnerJoined = true`
@@ -346,6 +357,7 @@ src/services/
 - `aria-live="polite"` region wrapping partner status + ready indicator
 
 **Countdown Screen:**
+
 - Full-screen overlay over lobby (or replaces lobby)
 - Large number centered: `text-8xl font-bold text-purple-700` (3, 2, 1)
 - Framer Motion: each digit exit with `scale: 0.5, opacity: 0`, enter with `scale: 1, opacity: 1`
@@ -357,6 +369,7 @@ src/services/
 ### Testing Requirements
 
 **Unit Test IDs:**
+
 - `lobby-role-selection` — role selection screen root
 - `lobby-role-reader` — Reader card button
 - `lobby-role-responder` — Responder card button
@@ -369,6 +382,7 @@ src/services/
 - `countdown-digit` — the displayed digit
 
 **Test Patterns from Story 3.1 to Follow:**
+
 - Import `{ test, expect }` from `tests/support/merged-fixtures` for E2E tests
 - `useShallow` selector for all Zustand state access in components
 - Co-locate component unit tests in `src/components/scripture-reading/__tests__/`
@@ -528,12 +542,12 @@ claude-sonnet-4-6, claude-opus-4-6
 - src/hooks/useScriptureBroadcast.ts (new)
 - src/hooks/index.ts (modified)
 - supabase/tests/database/10_scripture_lobby.sql (modified — converted from skip stubs to active assertions)
-- src/components/scripture-reading/__tests__/LobbyContainer.test.tsx (modified — converted from skip stubs to active tests)
-- src/components/scripture-reading/__tests__/Countdown.test.tsx (modified — converted from skip stubs to active tests)
+- src/components/scripture-reading/**tests**/LobbyContainer.test.tsx (modified — converted from skip stubs to active tests)
+- src/components/scripture-reading/**tests**/Countdown.test.tsx (modified — converted from skip stubs to active tests)
 - tests/unit/hooks/useScriptureBroadcast.test.ts (modified — converted from skip stubs to active tests)
 - tests/unit/stores/scriptureReadingSlice.lobby.test.ts (modified — converted from skip stubs to active tests)
 - tests/e2e/scripture/scripture-lobby-4.1.spec.ts (modified — removed test.skip wrappers; semantic ready assertion)
-- _bmad-output/implementation-artifacts/sprint-status.yaml (modified)
+- \_bmad-output/implementation-artifacts/sprint-status.yaml (modified)
 - src/stores/slices/scriptureReadingSlice.ts (modified — currentUserId state field, fixed onBroadcastReceived partnerReady mapping, added applySessionConverted action)
 - src/hooks/useScriptureBroadcast.ts (modified — use applySessionConverted for session_converted, send user_id in partner_joined payload)
 - supabase/tests/database/10_scripture_lobby.sql (modified — DB-004b: scripture_toggle_ready non-member assertion)
@@ -546,13 +560,13 @@ claude-sonnet-4-6, claude-opus-4-6
 
 ## Change Log
 
-| Date | Change | Author |
-|------|--------|--------|
-| 2026-02-21 | Addressed round 3 review findings (2 items): replaced unreachable E2E verse assertion with countdown-completion assertion (story 4.2 scope boundary), added 4 missing files to File List. Story re-submitted for review. | claude-opus-4-6 |
-| 2026-02-21 | Senior Developer Review Round 3 (AI): 2 real issues found (1 HIGH test bug, 1 MEDIUM doc gap); 5 of 7 original findings determined to be non-issues (scope boundaries or hallucinated risk). | claude-opus-4-6 |
-| 2026-02-21 | Addressed all 6 follow-up review findings: phase guards in 3 RPCs (new migration), myReady/myRole snapshot reconciliation, broadcast error routing through handleScriptureError, tightened E2E ready assertion, factory error enforcement. 690 unit tests pass. Story re-submitted for review. | claude-sonnet-4-6 |
-| 2026-02-21 | Senior Developer Follow-up Review (AI): created 6 new action items (3 High, 3 Medium), kept story in-progress, and synced sprint status to in-progress. | codex-gpt-5 |
-| 2026-02-21 | Addressed all 6 AI code review findings: fixed partnerReady mapping (user1/user2 aware), added applySessionConverted local transition, fixed partner_joined payload, extended DB-004 for toggle_ready, semantic E2E ready assertion, aligned AC copy with UX spec. 683 unit tests pass. Story re-submitted for review. | claude-sonnet-4-6 |
-| 2026-02-21 | Senior Developer Review (AI): changes requested; added 6 follow-up action items, set story status to in-progress, and synced sprint status back to in-progress. | codex-gpt-5 |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                     | Author            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 2026-02-21 | Addressed round 3 review findings (2 items): replaced unreachable E2E verse assertion with countdown-completion assertion (story 4.2 scope boundary), added 4 missing files to File List. Story re-submitted for review.                                                                                                                                   | claude-opus-4-6   |
+| 2026-02-21 | Senior Developer Review Round 3 (AI): 2 real issues found (1 HIGH test bug, 1 MEDIUM doc gap); 5 of 7 original findings determined to be non-issues (scope boundaries or hallucinated risk).                                                                                                                                                               | claude-opus-4-6   |
+| 2026-02-21 | Addressed all 6 follow-up review findings: phase guards in 3 RPCs (new migration), myReady/myRole snapshot reconciliation, broadcast error routing through handleScriptureError, tightened E2E ready assertion, factory error enforcement. 690 unit tests pass. Story re-submitted for review.                                                             | claude-sonnet-4-6 |
+| 2026-02-21 | Senior Developer Follow-up Review (AI): created 6 new action items (3 High, 3 Medium), kept story in-progress, and synced sprint status to in-progress.                                                                                                                                                                                                    | codex-gpt-5       |
+| 2026-02-21 | Addressed all 6 AI code review findings: fixed partnerReady mapping (user1/user2 aware), added applySessionConverted local transition, fixed partner_joined payload, extended DB-004 for toggle_ready, semantic E2E ready assertion, aligned AC copy with UX spec. 683 unit tests pass. Story re-submitted for review.                                     | claude-sonnet-4-6 |
+| 2026-02-21 | Senior Developer Review (AI): changes requested; added 6 follow-up action items, set story status to in-progress, and synced sprint status back to in-progress.                                                                                                                                                                                            | codex-gpt-5       |
 | 2026-02-21 | TEA review fix-up: added partnerStorageStatePath fixture (auth-setup.ts + worker-auth.ts), added unlinkTestPartners to factories, rewrote E2E spec with error-throwing .catch handlers, removed racy countdown-digit assertion, extracted shared predicate, used Promise.all for dual-page assertions, removed dead authenticateSecondaryContext function. | claude-sonnet-4-6 |
-| 2026-02-20 | Implemented all 11 tasks: DB migration (role ENUM, columns, RLS, 3 RPCs), slice lobby state/actions, useScriptureBroadcast hook, LobbyContainer (3 phases), Countdown component, ScriptureOverview routing, dbSchema types, pgTAP tests, unit tests, E2E tests. All 678 unit tests pass. | claude-sonnet-4-6 |
+| 2026-02-20 | Implemented all 11 tasks: DB migration (role ENUM, columns, RLS, 3 RPCs), slice lobby state/actions, useScriptureBroadcast hook, LobbyContainer (3 phases), Countdown component, ScriptureOverview routing, dbSchema types, pgTAP tests, unit tests, E2E tests. All 678 unit tests pass.                                                                   | claude-sonnet-4-6 |

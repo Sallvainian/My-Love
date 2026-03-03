@@ -39,34 +39,34 @@ The Story 2.1 test suite achieves acceptable quality with strong isolation and p
 
 ## Quality Dimension Scores
 
-| Dimension | Score | Grade | Weight | Weighted |
-|---|---|---|---|---|
-| Determinism | 50/100 | F | 25% | 12.50 |
-| Isolation | 95/100 | A | 25% | 23.75 |
-| Maintainability | 50/100 | F | 20% | 10.00 |
-| Coverage | 72/100 | C | 15% | 10.80 |
-| Performance | 94/100 | A | 15% | 14.10 |
-| **Overall** | **71/100** | **C** | **100%** | **71.15** |
+| Dimension       | Score      | Grade | Weight   | Weighted  |
+| --------------- | ---------- | ----- | -------- | --------- |
+| Determinism     | 50/100     | F     | 25%      | 12.50     |
+| Isolation       | 95/100     | A     | 25%      | 23.75     |
+| Maintainability | 50/100     | F     | 20%      | 10.00     |
+| Coverage        | 72/100     | C     | 15%      | 10.80     |
+| Performance     | 94/100     | A     | 15%      | 14.10     |
+| **Overall**     | **71/100** | **C** | **100%** | **71.15** |
 
 ---
 
 ## Quality Criteria Assessment
 
-| Criterion | Status | Violations | Notes |
-|---|---|---|---|
-| Hard Waits (sleep, waitForTimeout) | PASS | 0 | No hard waits in either file |
-| Determinism (no random/time) | FAIL | 3 | Math.random() and Date.now() in API test helpers |
-| Isolation (cleanup, no shared state) | WARN | 1 | E2E tests 003-006 lack cleanup for UI-created records |
-| Fixture Patterns | WARN | 1 | API tests use try/finally instead of Playwright fixtures |
-| Data Factories | WARN | 1 | Hardcoded password, non-deterministic helpers |
-| Network-First Pattern | PASS | 0 | Correctly applied in all E2E network interactions |
-| Explicit Assertions | PASS | 0 | Strong assertions throughout both files |
-| Test Length (<=300 lines) | WARN | 1 | E2E file at 361 lines exceeds 300-line threshold |
-| Test Duration (<=1.5 min) | PASS | 0 | No complexity concerns for duration |
-| Flakiness Patterns | FAIL | 3 | Math.random() in API tests creates flakiness risk |
-| Maintainability | FAIL | 7 | Duplicate code blocks, magic values, hardcoded password |
-| Coverage | WARN | 8 | Missing IndexedDB verification, planned tests not implemented |
-| Performance | PASS | 3 | Minor: parallel mode not configured, but no impact on correctness |
+| Criterion                            | Status | Violations | Notes                                                             |
+| ------------------------------------ | ------ | ---------- | ----------------------------------------------------------------- |
+| Hard Waits (sleep, waitForTimeout)   | PASS   | 0          | No hard waits in either file                                      |
+| Determinism (no random/time)         | FAIL   | 3          | Math.random() and Date.now() in API test helpers                  |
+| Isolation (cleanup, no shared state) | WARN   | 1          | E2E tests 003-006 lack cleanup for UI-created records             |
+| Fixture Patterns                     | WARN   | 1          | API tests use try/finally instead of Playwright fixtures          |
+| Data Factories                       | WARN   | 1          | Hardcoded password, non-deterministic helpers                     |
+| Network-First Pattern                | PASS   | 0          | Correctly applied in all E2E network interactions                 |
+| Explicit Assertions                  | PASS   | 0          | Strong assertions throughout both files                           |
+| Test Length (<=300 lines)            | WARN   | 1          | E2E file at 361 lines exceeds 300-line threshold                  |
+| Test Duration (<=1.5 min)            | PASS   | 0          | No complexity concerns for duration                               |
+| Flakiness Patterns                   | FAIL   | 3          | Math.random() in API tests creates flakiness risk                 |
+| Maintainability                      | FAIL   | 7          | Duplicate code blocks, magic values, hardcoded password           |
+| Coverage                             | WARN   | 8          | Missing IndexedDB verification, planned tests not implemented     |
+| Performance                          | PASS   | 3          | Minor: parallel mode not configured, but no impact on correctness |
 
 **Total Violations**: 0 Critical, 6 High, 7 Medium, 9 Low (22 total)
 
@@ -351,9 +351,9 @@ const value = await page.getByTestId('scripture-reflection-note').inputValue();
 expect(value.length).toBeLessThanOrEqual(200);
 
 // Test resize-none
-const resizeStyle = await page.getByTestId('scripture-reflection-note').evaluate(
-  (el) => getComputedStyle(el).resize
-);
+const resizeStyle = await page
+  .getByTestId('scripture-reflection-note')
+  .evaluate((el) => getComputedStyle(el).resize);
 expect(resizeStyle).toBe('none');
 ```
 
@@ -630,8 +630,8 @@ The E2E tests consistently set up waitForResponse promises before triggering cli
 
 ```typescript
 // Excellent pattern - waitForResponse set up BEFORE the click
-const responsePromise = page.waitForResponse(
-  (response) => response.url().includes('/rest/v1/rpc/upsert_reflection')
+const responsePromise = page.waitForResponse((response) =>
+  response.url().includes('/rest/v1/rpc/upsert_reflection')
 );
 await page.getByTestId('scripture-reflection-submit').click();
 const response = await responsePromise;
@@ -655,9 +655,9 @@ The E2E tests use fixed, hardcoded values (rating 4, literal note strings) rathe
 ```typescript
 // Excellent pattern - deterministic test data
 await page.getByTestId('scripture-reflection-rating-4').click();
-await page.getByTestId('scripture-reflection-note').fill(
-  'This step gave me a new perspective on the passage.'
-);
+await page
+  .getByTestId('scripture-reflection-note')
+  .fill('This step gave me a new perspective on the passage.');
 ```
 
 **Use as Reference**: The API tests should follow this same pattern instead of using Math.random().
@@ -723,18 +723,18 @@ try {
 
 ### Coverage Gaps vs Acceptance Criteria
 
-| AC Behavior | Test Coverage | Status | Notes |
-|---|---|---|---|
-| AC1: Bookmark toggle + server write | 2.1-E2E-002, 2.1-API-003 | PARTIAL | Server write verified, IndexedDB cache NOT verified |
-| AC2: 1-5 rating scale | 2.1-E2E-001, 2.1-API-001 | PASS | Rating selection and persistence verified |
-| AC2: Note textarea (max 200, auto-grow) | 2.1-E2E-001 | PARTIAL | Fill verified, constraints NOT verified |
-| AC2: Character counter at 200+ chars | None | MISSING | Planned as 2.1-COMP-001 |
-| AC3: Reflection submission + advance | 2.1-E2E-001, 2.1-API-001 | PASS | Server persistence and step advance verified |
-| AC3: IndexedDB cache update | None | MISSING | AC-specified, zero coverage |
-| AC3: Idempotent upsert | 2.1-API-001 | PASS | Second submission updates, not duplicates |
-| AC3: Step 17 end-of-session | None | MISSING | Boundary case, may be Story 2.2 |
-| Error handling (optimistic UI) | 2.1-E2E-005, 2.1-E2E-006 | PASS | Network error and error state verified |
-| Touch targets (48px minimum) | 2.1-E2E-004 | PASS | Bounding box assertions verified |
+| AC Behavior                             | Test Coverage            | Status  | Notes                                               |
+| --------------------------------------- | ------------------------ | ------- | --------------------------------------------------- |
+| AC1: Bookmark toggle + server write     | 2.1-E2E-002, 2.1-API-003 | PARTIAL | Server write verified, IndexedDB cache NOT verified |
+| AC2: 1-5 rating scale                   | 2.1-E2E-001, 2.1-API-001 | PASS    | Rating selection and persistence verified           |
+| AC2: Note textarea (max 200, auto-grow) | 2.1-E2E-001              | PARTIAL | Fill verified, constraints NOT verified             |
+| AC2: Character counter at 200+ chars    | None                     | MISSING | Planned as 2.1-COMP-001                             |
+| AC3: Reflection submission + advance    | 2.1-E2E-001, 2.1-API-001 | PASS    | Server persistence and step advance verified        |
+| AC3: IndexedDB cache update             | None                     | MISSING | AC-specified, zero coverage                         |
+| AC3: Idempotent upsert                  | 2.1-API-001              | PASS    | Second submission updates, not duplicates           |
+| AC3: Step 17 end-of-session             | None                     | MISSING | Boundary case, may be Story 2.2                     |
+| Error handling (optimistic UI)          | 2.1-E2E-005, 2.1-E2E-006 | PASS    | Network error and error state verified              |
+| Touch targets (48px minimum)            | 2.1-E2E-004              | PASS    | Bounding box assertions verified                    |
 
 ---
 
@@ -824,40 +824,40 @@ The E2E tests demonstrate excellent patterns that the API tests should follow. A
 
 #### tests/api/scripture-reflection-api.spec.ts
 
-| Line | ID | Severity | Dimension | Issue | Fix |
-|---|---|---|---|---|---|
-| 37 | MNT-003 | HIGH | Maintainability | Hardcoded test password | Shared constant |
-| 49 | DET-001 | HIGH | Determinism | Date.now() in helper | Deterministic factory |
-| 50 | DET-002 | HIGH | Determinism | Math.random() in helper | Deterministic factory |
-| 56 | DET-003 | HIGH | Determinism | Math.random() in generateRating | Fixed value or parameterized |
-| 59 | PRF-001 | LOW | Performance | No parallel mode config | Add configure({ mode: 'parallel' }) |
-| 69 | MNT-001 | HIGH | Maintainability | Duplicate session setup (3x) | beforeEach or fixture |
-| 76 | MNT-006 | LOW | Maintainability | Magic step index values | Named constant |
-| 82 | MNT-004 | MEDIUM | Maintainability | Duplicate try/finally (3x) | Playwright fixture |
-| 98 | MNT-007 | LOW | Maintainability | Repeated type assertions | Typed helper |
-| -- | COV-008 | LOW | Coverage | Missing perf benchmark test | Add 2.1-PERF-001 |
+| Line | ID      | Severity | Dimension       | Issue                           | Fix                                 |
+| ---- | ------- | -------- | --------------- | ------------------------------- | ----------------------------------- |
+| 37   | MNT-003 | HIGH     | Maintainability | Hardcoded test password         | Shared constant                     |
+| 49   | DET-001 | HIGH     | Determinism     | Date.now() in helper            | Deterministic factory               |
+| 50   | DET-002 | HIGH     | Determinism     | Math.random() in helper         | Deterministic factory               |
+| 56   | DET-003 | HIGH     | Determinism     | Math.random() in generateRating | Fixed value or parameterized        |
+| 59   | PRF-001 | LOW      | Performance     | No parallel mode config         | Add configure({ mode: 'parallel' }) |
+| 69   | MNT-001 | HIGH     | Maintainability | Duplicate session setup (3x)    | beforeEach or fixture               |
+| 76   | MNT-006 | LOW      | Maintainability | Magic step index values         | Named constant                      |
+| 82   | MNT-004 | MEDIUM   | Maintainability | Duplicate try/finally (3x)      | Playwright fixture                  |
+| 98   | MNT-007 | LOW      | Maintainability | Repeated type assertions        | Typed helper                        |
+| --   | COV-008 | LOW      | Coverage        | Missing perf benchmark test     | Add 2.1-PERF-001                    |
 
 #### tests/e2e/scripture/scripture-reflection.spec.ts
 
-| Line | ID | Severity | Dimension | Issue | Fix |
-|---|---|---|---|---|---|
-| 16 | PRF-002 | LOW | Performance | No parallel mode config | Add configure({ mode: 'parallel' }) |
-| 24 | MNT-002 | HIGH | Maintainability | Duplicate navigation (6x) | beforeEach or helper |
-| 24 | PRF-003 | LOW | Performance | Repeated navigation overhead | Extract to beforeEach |
-| 75 | COV-003 | MEDIUM | Coverage | No textarea constraint tests | Add max-length/resize tests |
-| 75 | COV-005 | LOW | Coverage | No character counter test | Add 2.1-COMP-001 |
-| 96 | COV-006 | LOW | Coverage | No step 17 boundary test | Add end-of-session test |
-| 98 | COV-001 | MEDIUM | Coverage | No IndexedDB cache check (reflection) | page.evaluate() assertion |
-| 137 | MNT-005 | MEDIUM | Maintainability | Magic numbers (48px, color) | Named constants |
-| 158 | COV-002 | MEDIUM | Coverage | No IndexedDB cache check (bookmark) | page.evaluate() assertion |
-| 199 | ISO-001 | MEDIUM | Isolation | E2E tests 003-006 no cleanup | testSession fixture |
-| -- | COV-007 | LOW | Coverage | Missing keyboard nav test | Add 2.1-E2E-007 |
+| Line | ID      | Severity | Dimension       | Issue                                 | Fix                                 |
+| ---- | ------- | -------- | --------------- | ------------------------------------- | ----------------------------------- |
+| 16   | PRF-002 | LOW      | Performance     | No parallel mode config               | Add configure({ mode: 'parallel' }) |
+| 24   | MNT-002 | HIGH     | Maintainability | Duplicate navigation (6x)             | beforeEach or helper                |
+| 24   | PRF-003 | LOW      | Performance     | Repeated navigation overhead          | Extract to beforeEach               |
+| 75   | COV-003 | MEDIUM   | Coverage        | No textarea constraint tests          | Add max-length/resize tests         |
+| 75   | COV-005 | LOW      | Coverage        | No character counter test             | Add 2.1-COMP-001                    |
+| 96   | COV-006 | LOW      | Coverage        | No step 17 boundary test              | Add end-of-session test             |
+| 98   | COV-001 | MEDIUM   | Coverage        | No IndexedDB cache check (reflection) | page.evaluate() assertion           |
+| 137  | MNT-005 | MEDIUM   | Maintainability | Magic numbers (48px, color)           | Named constants                     |
+| 158  | COV-002 | MEDIUM   | Coverage        | No IndexedDB cache check (bookmark)   | page.evaluate() assertion           |
+| 199  | ISO-001 | MEDIUM   | Isolation       | E2E tests 003-006 no cleanup          | testSession fixture                 |
+| --   | COV-007 | LOW      | Coverage        | Missing keyboard nav test             | Add 2.1-E2E-007                     |
 
 #### Missing Files
 
-| ID | Severity | Dimension | Issue | Fix |
-|---|---|---|---|---|
-| COV-004 | MEDIUM | Coverage | Missing bookmark debounce unit test | Create tests/unit/bookmark-debounce.spec.ts |
+| ID      | Severity | Dimension | Issue                               | Fix                                         |
+| ------- | -------- | --------- | ----------------------------------- | ------------------------------------------- |
+| COV-004 | MEDIUM   | Coverage  | Missing bookmark debounce unit test | Create tests/unit/bookmark-debounce.spec.ts |
 
 ---
 

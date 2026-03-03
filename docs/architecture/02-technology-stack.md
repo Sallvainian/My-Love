@@ -25,16 +25,16 @@
 
 ### Build and Tooling
 
-| Package                    | Version | Purpose                                       |
-| -------------------------- | ------- | --------------------------------------------- |
-| `vite`                     | ^7.3.1  | Build tool and dev server                     |
-| `@vitejs/plugin-react`     | ^5.1.4  | React Fast Refresh for Vite                   |
-| `typescript`               | ~5.9.3  | Type checking and compilation                 |
-| `vite-plugin-pwa`          | ^1.2.0  | PWA support (InjectManifest strategy)         |
-| `vite-plugin-checker`      | ^0.12.0 | In-editor type checking overlay               |
-| `@sentry/vite-plugin`      | ^5.0.0  | Sentry source map upload during build         |
-| `rollup-plugin-visualizer` | ^6.0.5  | Bundle size analysis                          |
-| `tsx`                      | ^4.21.0 | TypeScript execution for scripts              |
+| Package                    | Version | Purpose                               |
+| -------------------------- | ------- | ------------------------------------- |
+| `vite`                     | ^7.3.1  | Build tool and dev server             |
+| `@vitejs/plugin-react`     | ^5.1.4  | React Fast Refresh for Vite           |
+| `typescript`               | ~5.9.3  | Type checking and compilation         |
+| `vite-plugin-pwa`          | ^1.2.0  | PWA support (InjectManifest strategy) |
+| `vite-plugin-checker`      | ^0.12.0 | In-editor type checking overlay       |
+| `@sentry/vite-plugin`      | ^5.0.0  | Sentry source map upload during build |
+| `rollup-plugin-visualizer` | ^6.0.5  | Bundle size analysis                  |
+| `tsx`                      | ^4.21.0 | TypeScript execution for scripts      |
 
 ### CSS and Styling
 
@@ -48,33 +48,33 @@
 
 ### Testing
 
-| Package                              | Version  | Purpose                                  |
-| ------------------------------------ | -------- | ---------------------------------------- |
-| `vitest`                             | ^4.0.17  | Unit test runner (Vite-native)           |
-| `@vitest/coverage-v8`                | ^4.0.18  | Code coverage via V8                     |
-| `@vitest/ui`                         | ^4.0.17  | Browser-based test UI                    |
-| `@testing-library/react`             | ^16.3.2  | React component testing utilities        |
-| `@testing-library/jest-dom`          | ^6.9.1   | Custom DOM matchers                      |
-| `@testing-library/user-event`        | ^14.6.1  | User interaction simulation              |
-| `happy-dom`                          | ^20.7.0  | Lightweight DOM implementation for tests |
-| `fake-indexeddb`                     | ^6.2.5   | IndexedDB mock for unit tests            |
-| `@playwright/test`                   | ^1.58.2  | End-to-end test framework                |
-| `@seontechnologies/playwright-utils` | ^3.14.0  | Playwright fixture utilities             |
-| `@axe-core/playwright`               | ^4.11.1  | Accessibility testing                    |
-| `@faker-js/faker`                    | ^10.3.0  | Test data generation                     |
-| `tdd-guard-vitest`                   | ^0.1.6   | TDD enforcement plugin                   |
+| Package                              | Version | Purpose                                  |
+| ------------------------------------ | ------- | ---------------------------------------- |
+| `vitest`                             | ^4.0.17 | Unit test runner (Vite-native)           |
+| `@vitest/coverage-v8`                | ^4.0.18 | Code coverage via V8                     |
+| `@vitest/ui`                         | ^4.0.17 | Browser-based test UI                    |
+| `@testing-library/react`             | ^16.3.2 | React component testing utilities        |
+| `@testing-library/jest-dom`          | ^6.9.1  | Custom DOM matchers                      |
+| `@testing-library/user-event`        | ^14.6.1 | User interaction simulation              |
+| `happy-dom`                          | ^20.7.0 | Lightweight DOM implementation for tests |
+| `fake-indexeddb`                     | ^6.2.5  | IndexedDB mock for unit tests            |
+| `@playwright/test`                   | ^1.58.2 | End-to-end test framework                |
+| `@seontechnologies/playwright-utils` | ^3.14.0 | Playwright fixture utilities             |
+| `@axe-core/playwright`               | ^4.11.1 | Accessibility testing                    |
+| `@faker-js/faker`                    | ^10.3.0 | Test data generation                     |
+| `tdd-guard-vitest`                   | ^0.1.6  | TDD enforcement plugin                   |
 
 ### Linting and Formatting
 
-| Package                       | Version  | Purpose                            |
-| ----------------------------- | -------- | ---------------------------------- |
-| `eslint`                      | ^9.39.2  | Code linting (flat config)         |
-| `@eslint/js`                  | ^9.39.2  | ESLint core rules                  |
-| `typescript-eslint`           | ^8.56.1  | TypeScript-specific ESLint rules   |
-| `eslint-plugin-react-hooks`   | ^7.0.1   | React hooks linting                |
-| `eslint-plugin-react-refresh` | ^0.5.2   | Fast Refresh compatibility linting |
-| `prettier`                    | ^3.8.1   | Code formatter                     |
-| `globals`                     | ^16.5.0  | Global variable definitions        |
+| Package                       | Version | Purpose                            |
+| ----------------------------- | ------- | ---------------------------------- |
+| `eslint`                      | ^9.39.2 | Code linting (flat config)         |
+| `@eslint/js`                  | ^9.39.2 | ESLint core rules                  |
+| `typescript-eslint`           | ^8.56.1 | TypeScript-specific ESLint rules   |
+| `eslint-plugin-react-hooks`   | ^7.0.1  | React hooks linting                |
+| `eslint-plugin-react-refresh` | ^0.5.2  | Fast Refresh compatibility linting |
+| `prettier`                    | ^3.8.1  | Code formatter                     |
+| `globals`                     | ^16.5.0 | Global variable definitions        |
 
 ### Deployment
 
@@ -92,18 +92,18 @@
 
 ## Key Configuration Files
 
-| File                   | Purpose                                             |
-| ---------------------- | --------------------------------------------------- |
+| File                   | Purpose                                                        |
+| ---------------------- | -------------------------------------------------------------- |
 | `vite.config.ts`       | Vite build configuration, PWA plugin, base path, Sentry plugin |
-| `tsconfig.json`        | TypeScript compiler options                         |
-| `vitest.config.ts`     | Unit test configuration (path alias `@/` -> `src/`) |
-| `playwright.config.ts` | E2E test configuration with ES256 JWT re-signing    |
-| `eslint.config.js`     | ESLint flat config with scripture-reading guards    |
-| `.prettierrc`          | Prettier formatting rules                           |
-| `fnox.toml`            | Encrypted secrets via fnox with age provider        |
-| `.env.example`         | Template with placeholder values                    |
-| `.env.test`            | Plain-text local Supabase env for E2E tests         |
-| `.mise.toml`           | Tool versions (Node) + env vars (CODEX_HOME)        |
+| `tsconfig.json`        | TypeScript compiler options                                    |
+| `vitest.config.ts`     | Unit test configuration (path alias `@/` -> `src/`)            |
+| `playwright.config.ts` | E2E test configuration with ES256 JWT re-signing               |
+| `eslint.config.js`     | ESLint flat config with scripture-reading guards               |
+| `.prettierrc`          | Prettier formatting rules                                      |
+| `fnox.toml`            | Encrypted secrets via fnox with age provider                   |
+| `.env.example`         | Template with placeholder values                               |
+| `.env.test`            | Plain-text local Supabase env for E2E tests                    |
+| `.mise.toml`           | Tool versions (Node) + env vars (CODEX_HOME)                   |
 
 ## Secrets Management
 

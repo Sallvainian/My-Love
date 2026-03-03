@@ -7,6 +7,7 @@ TEA Academy is an interactive learning program offering 7 structured sessions de
 ## Key Features
 
 **Progressive Learning Structure**
+
 - 7 self-paced sessions spanning 1-2 weeks
 - Role-based customization (QA Engineers, Developers, Tech Leads, VPs/Managers)
 - Automatic progress tracking with resume capability

@@ -84,16 +84,16 @@ Secrets are managed by **fnox** with the **age** encryption provider:
 
 ### Secrets Inventory
 
-| Secret | Source | Purpose |
-|--------|--------|---------|
-| `VITE_SUPABASE_URL` | `fnox.toml` | Supabase project URL |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | `fnox.toml` | Supabase anon/public key |
-| `SUPABASE_SERVICE_KEY` | `fnox.toml` | Supabase service role key |
-| `SENTRY_AUTH_TOKEN` | `fnox.toml` | Sentry auth token for source map upload |
-| `SENTRY_ORG` | `fnox.toml` | Sentry organization slug |
-| `SENTRY_PROJECT` | `fnox.toml` | Sentry project slug |
-| `VITE_SENTRY_DSN` | `fnox.toml` | Sentry DSN for error tracking |
-| `SUPABASE_PAT` | `fnox.toml` | Supabase Personal Access Token |
+| Secret                                  | Source      | Purpose                                 |
+| --------------------------------------- | ----------- | --------------------------------------- |
+| `VITE_SUPABASE_URL`                     | `fnox.toml` | Supabase project URL                    |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | `fnox.toml` | Supabase anon/public key                |
+| `SUPABASE_SERVICE_KEY`                  | `fnox.toml` | Supabase service role key               |
+| `SENTRY_AUTH_TOKEN`                     | `fnox.toml` | Sentry auth token for source map upload |
+| `SENTRY_ORG`                            | `fnox.toml` | Sentry organization slug                |
+| `SENTRY_PROJECT`                        | `fnox.toml` | Sentry project slug                     |
+| `VITE_SENTRY_DSN`                       | `fnox.toml` | Sentry DSN for error tracking           |
+| `SUPABASE_PAT`                          | `fnox.toml` | Supabase Personal Access Token          |
 
 ## Sentry PII Protection (Epic 4)
 

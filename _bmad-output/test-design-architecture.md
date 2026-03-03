@@ -16,20 +16,24 @@
 **Scope:** Scripture Reading feature - Solo and Together modes with real-time sync, reflections, and Daily Prayer Report
 
 **Business Context** (from PRD):
+
 - **Revenue/Impact:** Couples engagement and retention - core relationship ritual
 - **Problem:** Couples need a "safe-to-be-honest" ritual for connection and repair
 - **GA Launch:** MVP timeline pending
 
 **Architecture** (from ADR):
+
 - **Key Decision 1:** Supabase Broadcast for real-time Together mode sync
 - **Key Decision 2:** Server-authoritative state with version-based concurrency control
 - **Key Decision 3:** IndexedDB as read cache with optimistic UI (server is source of truth)
 - **Key Decision 4:** Normalized 5-table schema with session-based RLS
 
 **Expected Scale** (from ADR):
+
 - Couples app with gradual growth; standard Supabase scaling sufficient
 
 **Risk Summary:**
+
 - **Total risks**: 9
 - **High-priority (score >=6)**: 3 risks requiring immediate mitigation
 - **Test effort**: ~100-150 tests (~3-5 weeks for 1 QA)
@@ -80,27 +84,27 @@
 
 #### High-Priority Risks (Score >=6) - IMMEDIATE ATTENTION
 
-| Risk ID | Category | Description | Probability | Impact | Score | Mitigation | Owner | Timeline |
-|---------|----------|-------------|-------------|--------|-------|------------|-------|----------|
-| **R-001** | **TECH** | No test data seeding APIs for sessions, reflections, messages | 3 | 3 | **9** | Implement `/api/test-data` endpoints (dev/staging only) | Backend Dev | Sprint 0 |
-| **R-002** | **TECH** | Supabase Broadcast cannot be mocked in CI | 3 | 2 | **6** | Create mock broadcast channel for CI tests | Backend Dev + QA | Sprint 0 |
-| **R-003** | **DATA** | Race conditions in Together mode lock-in and phase advancement | 2 | 3 | **6** | Version-based concurrency control already in ADR; extensive testing needed | QA | Sprint 1 |
+| Risk ID   | Category | Description                                                    | Probability | Impact | Score | Mitigation                                                                 | Owner            | Timeline |
+| --------- | -------- | -------------------------------------------------------------- | ----------- | ------ | ----- | -------------------------------------------------------------------------- | ---------------- | -------- |
+| **R-001** | **TECH** | No test data seeding APIs for sessions, reflections, messages  | 3           | 3      | **9** | Implement `/api/test-data` endpoints (dev/staging only)                    | Backend Dev      | Sprint 0 |
+| **R-002** | **TECH** | Supabase Broadcast cannot be mocked in CI                      | 3           | 2      | **6** | Create mock broadcast channel for CI tests                                 | Backend Dev + QA | Sprint 0 |
+| **R-003** | **DATA** | Race conditions in Together mode lock-in and phase advancement | 2           | 3      | **6** | Version-based concurrency control already in ADR; extensive testing needed | QA               | Sprint 1 |
 
 #### Medium-Priority Risks (Score 3-5)
 
-| Risk ID | Category | Description | Probability | Impact | Score | Mitigation | Owner |
-|---------|----------|-------------|-------------|--------|-------|------------|-------|
-| R-004 | TECH | Broadcast reconnection may lose state during network flaps | 2 | 2 | 4 | Server resync on reconnect (defined in ADR) | Backend Dev |
-| R-005 | DATA | IndexedDB cache corruption could block feature | 2 | 2 | 4 | Clear cache and refetch (defined in ADR) | Backend Dev |
-| R-006 | SEC | RLS policies may have gaps for partner data isolation | 2 | 2 | 4 | Session-based RLS pattern; penetration testing | Security + QA |
-| R-007 | PERF | Real-time sync latency may exceed 500ms target | 2 | 2 | 4 | Monitor P95 latency; optimize if needed | Backend Dev |
+| Risk ID | Category | Description                                                | Probability | Impact | Score | Mitigation                                     | Owner         |
+| ------- | -------- | ---------------------------------------------------------- | ----------- | ------ | ----- | ---------------------------------------------- | ------------- |
+| R-004   | TECH     | Broadcast reconnection may lose state during network flaps | 2           | 2      | 4     | Server resync on reconnect (defined in ADR)    | Backend Dev   |
+| R-005   | DATA     | IndexedDB cache corruption could block feature             | 2           | 2      | 4     | Clear cache and refetch (defined in ADR)       | Backend Dev   |
+| R-006   | SEC      | RLS policies may have gaps for partner data isolation      | 2           | 2      | 4     | Session-based RLS pattern; penetration testing | Security + QA |
+| R-007   | PERF     | Real-time sync latency may exceed 500ms target             | 2           | 2      | 4     | Monitor P95 latency; optimize if needed        | Backend Dev   |
 
 #### Low-Priority Risks (Score 1-2)
 
-| Risk ID | Category | Description | Probability | Impact | Score | Action |
-|---------|----------|-------------|-------------|--------|-------|--------|
-| R-008 | TECH | dbSchema.ts centralization is tech debt affecting reliability | 1 | 2 | 2 | Address in Sprint 0 as prerequisite |
-| R-009 | OPS | Feature flag for gradual rollout not defined | 1 | 1 | 1 | Add feature flag if needed post-MVP |
+| Risk ID | Category | Description                                                   | Probability | Impact | Score | Action                              |
+| ------- | -------- | ------------------------------------------------------------- | ----------- | ------ | ----- | ----------------------------------- |
+| R-008   | TECH     | dbSchema.ts centralization is tech debt affecting reliability | 1           | 2      | 2     | Address in Sprint 0 as prerequisite |
+| R-009   | OPS      | Feature flag for gradual rollout not defined                  | 1           | 1      | 1     | Add feature flag if needed post-MVP |
 
 #### Risk Category Legend
 
@@ -117,11 +121,11 @@
 
 #### 1. Blockers to Fast Feedback (WHAT WE NEED FROM ARCHITECTURE)
 
-| Concern | Impact | What Architecture Must Provide | Owner | Timeline |
-|---------|--------|--------------------------------|-------|----------|
-| **No test data seeding APIs** | Cannot create test sessions, reflections, or messages programmatically | `/api/test-data` endpoints: `POST /scripture/seed-session`, `POST /scripture/seed-reflection`, `POST /scripture/seed-message` | Backend Dev | Sprint 0 |
-| **Supabase Broadcast not mockable** | Cannot run Together mode tests in CI | Mock broadcast channel implementation OR Supabase local instance in CI | Backend Dev + DevOps | Sprint 0 |
-| **IndexedDB version management fragmented** | Existing VersionError flakiness affects all caching tests | Centralize to `src/services/dbSchema.ts` as specified in ADR | Backend Dev | Sprint 0 |
+| Concern                                     | Impact                                                                 | What Architecture Must Provide                                                                                                | Owner                | Timeline |
+| ------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
+| **No test data seeding APIs**               | Cannot create test sessions, reflections, or messages programmatically | `/api/test-data` endpoints: `POST /scripture/seed-session`, `POST /scripture/seed-reflection`, `POST /scripture/seed-message` | Backend Dev          | Sprint 0 |
+| **Supabase Broadcast not mockable**         | Cannot run Together mode tests in CI                                   | Mock broadcast channel implementation OR Supabase local instance in CI                                                        | Backend Dev + DevOps | Sprint 0 |
+| **IndexedDB version management fragmented** | Existing VersionError flakiness affects all caching tests              | Centralize to `src/services/dbSchema.ts` as specified in ADR                                                                  | Backend Dev          | Sprint 0 |
 
 #### 2. Architectural Improvements Needed (WHAT SHOULD BE CHANGED)
 
@@ -154,6 +158,7 @@
 #### Accepted Trade-offs (No Action Required)
 
 For Scripture Reading MVP, the following trade-offs are acceptable:
+
 - **No offline writes in Together mode** - Online-required; tests don't need offline sync scenarios
 - **No push notifications** - Keep calm UX; no notification testing needed for MVP
 
@@ -164,6 +169,7 @@ For Scripture Reading MVP, the following trade-offs are acceptable:
 #### R-001: No Test Data Seeding APIs (Score: 9) - CRITICAL
 
 **Mitigation Strategy:**
+
 1. Implement Supabase RPC `scripture_seed_test_data(session_count?, include_reflections?, include_messages?)`
 2. Restrict RPC to dev/staging environments only (check environment variable)
 3. Return created IDs for cleanup in test teardown
@@ -179,6 +185,7 @@ For Scripture Reading MVP, the following trade-offs are acceptable:
 #### R-002: Supabase Broadcast Not Mockable (Score: 6) - HIGH
 
 **Mitigation Strategy:**
+
 1. Option A: Run Supabase local instance in CI (preferred - realistic testing)
 2. Option B: Create broadcast channel mock that simulates message delivery
 3. Document mock behavior for QA to understand limitations
@@ -193,6 +200,7 @@ For Scripture Reading MVP, the following trade-offs are acceptable:
 #### R-003: Race Conditions in Together Mode (Score: 6) - HIGH
 
 **Mitigation Strategy:**
+
 1. ADR already specifies version-based concurrency control (`expected_version` in RPCs)
 2. QA will create dedicated race condition test suite:
    - Concurrent lock-ins from both partners
@@ -232,12 +240,14 @@ For Scripture Reading MVP, the following trade-offs are acceptable:
 **End of Architecture Document**
 
 **Next Steps for Architecture Team:**
+
 1. Review Quick Guide (BLOCKERS/HIGH PRIORITY/INFO ONLY) and prioritize blockers
 2. Assign owners and timelines for high-priority risks (>=6)
 3. Validate assumptions and dependencies
 4. Provide feedback to QA on testability gaps
 
 **Next Steps for QA Team:**
+
 1. Wait for Sprint 0 blockers to be resolved
 2. Refer to companion QA doc (test-design-qa.md) for test scenarios
 3. Begin test infrastructure setup (factories, fixtures, environments)

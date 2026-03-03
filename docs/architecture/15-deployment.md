@@ -70,18 +70,19 @@ This affects:
 
 Secrets are managed by [fnox](https://fnox.jdx.dev) using the **age** encryption provider. Encrypted ciphertext is stored inline in `fnox.toml` (committed to git). Decryption uses age keys stored at `~/.age/key.txt` on each machine.
 
-| Variable                                | Purpose                              |
-| --------------------------------------- | ------------------------------------ |
-| `VITE_SUPABASE_URL`                     | Supabase project URL                 |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key             |
-| `SUPABASE_SERVICE_KEY`                  | Supabase service role key            |
+| Variable                                | Purpose                                       |
+| --------------------------------------- | --------------------------------------------- |
+| `VITE_SUPABASE_URL`                     | Supabase project URL                          |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key                      |
+| `SUPABASE_SERVICE_KEY`                  | Supabase service role key                     |
 | `SENTRY_AUTH_TOKEN`                     | Sentry auth token (enables source map upload) |
-| `SENTRY_ORG`                            | Sentry organization slug             |
-| `SENTRY_PROJECT`                        | Sentry project slug                  |
-| `VITE_SENTRY_DSN`                       | Sentry DSN for error tracking        |
-| `SUPABASE_PAT`                          | Supabase Personal Access Token       |
+| `SENTRY_ORG`                            | Sentry organization slug                      |
+| `SENTRY_PROJECT`                        | Sentry project slug                           |
+| `VITE_SENTRY_DSN`                       | Sentry DSN for error tracking                 |
+| `SUPABASE_PAT`                          | Supabase Personal Access Token                |
 
 Key commands:
+
 - `fnox exec -- <command>` -- inject secrets and run
 - `fnox set KEY "value"` -- encrypt and store a secret
 - `fnox get KEY` -- decrypt and retrieve a secret

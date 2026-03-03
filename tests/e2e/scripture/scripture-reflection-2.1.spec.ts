@@ -247,37 +247,38 @@ test.describe('Per-Step Reflection System', () => {
       'should show non-blocking retry indicator when server returns 500',
       { annotation: [{ type: 'skipNetworkMonitoring' }] },
       async ({ page, interceptNetworkCall }) => {
-      // GIVEN: User is in a solo session
-      await startSoloSession(page);
+        // GIVEN: User is in a solo session
+        await startSoloSession(page);
 
-      // AND: The reflection write endpoint is intercepted to fail
-      // Set up route BEFORE the action that triggers the request
-      await page.route('**/rest/v1/rpc/scripture_submit_reflection', (route) =>
-        route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'Internal Server Error' }),
-        })
-      );
+        // AND: The reflection write endpoint is intercepted to fail
+        // Set up route BEFORE the action that triggers the request
+        await page.route('**/rest/v1/rpc/scripture_submit_reflection', (route) =>
+          route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ message: 'Internal Server Error' }),
+          })
+        );
 
-      // WHEN: User completes a step and reaches reflection screen
-      await page.getByTestId('scripture-next-verse-button').click();
-      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
+        // WHEN: User completes a step and reaches reflection screen
+        await page.getByTestId('scripture-next-verse-button').click();
+        await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
 
-      // AND: User fills in a rating and taps Continue
-      await page.getByTestId('scripture-rating-5').click();
-      await page.getByTestId('scripture-reflection-continue').click();
+        // AND: User fills in a rating and taps Continue
+        await page.getByTestId('scripture-rating-5').click();
+        await page.getByTestId('scripture-reflection-continue').click();
 
-      // THEN: Session still advances (optimistic UI, non-blocking)
-      // The reflection write failure should NOT block session progression
-      await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
+        // THEN: Session still advances (optimistic UI, non-blocking)
+        // The reflection write failure should NOT block session progression
+        await expect(page.getByTestId('scripture-verse-reference')).toBeVisible();
 
-      // AND: Retry indicator/toast is visible (non-blocking)
-      await expect(page.getByTestId('retry-banner')).toBeVisible();
+        // AND: Retry indicator/toast is visible (non-blocking)
+        await expect(page.getByTestId('retry-banner')).toBeVisible();
 
-      // AND: The retry UI does not block interaction with the next verse
-      await expect(page.getByTestId('scripture-next-verse-button')).toBeEnabled();
-    });
+        // AND: The retry UI does not block interaction with the next verse
+        await expect(page.getByTestId('scripture-next-verse-button')).toBeEnabled();
+      }
+    );
   });
 
   test.describe('2.1-E2E-005 [P2]: Bookmark aria-labels toggle correctly', () => {

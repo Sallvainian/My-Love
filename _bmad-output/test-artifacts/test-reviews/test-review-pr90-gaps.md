@@ -1,5 +1,12 @@
 ---
-stepsCompleted: ['step-01-load-context', 'step-02-discover-tests', 'step-03-quality-evaluation', 'step-03f-aggregate-scores', 'step-04-generate-report']
+stepsCompleted:
+  [
+    'step-01-load-context',
+    'step-02-discover-tests',
+    'step-03-quality-evaluation',
+    'step-03f-aggregate-scores',
+    'step-04-generate-report',
+  ]
 lastStep: 'step-04-generate-report'
 lastSaved: '2026-02-16'
 reviewScope: 'multi-file'
@@ -55,39 +62,39 @@ The main areas for improvement are structural — the SoloReadingFlow test file 
 
 ### Dimension Scores (Weighted)
 
-| Dimension | Score | Grade | Weight | Weighted |
-|-----------|-------|-------|--------|----------|
-| Determinism | 80/100 | B | 25% | 20.00 |
-| Isolation | 95/100 | A | 25% | 23.75 |
-| Maintainability | 75/100 | C | 20% | 15.00 |
-| Coverage | 85/100 | B | 15% | 12.75 |
-| Performance | 82/100 | B | 15% | 12.30 |
-| **Overall** | **84/100** | **B** | **100%** | **83.80** |
+| Dimension       | Score      | Grade | Weight   | Weighted  |
+| --------------- | ---------- | ----- | -------- | --------- |
+| Determinism     | 80/100     | B     | 25%      | 20.00     |
+| Isolation       | 95/100     | A     | 25%      | 23.75     |
+| Maintainability | 75/100     | C     | 20%      | 15.00     |
+| Coverage        | 85/100     | B     | 15%      | 12.75     |
+| Performance     | 82/100     | B     | 15%      | 12.30     |
+| **Overall**     | **84/100** | **B** | **100%** | **83.80** |
 
 ### Violation Summary
 
-| Severity | Count | Penalty Each | Total Deduction |
-|----------|-------|-------------|-----------------|
-| HIGH | 2 | 10 pts | -20 |
-| MEDIUM | 11 | 5 pts | -55 |
-| LOW | 8 | 2 pts | -16 |
-| **Total** | **21** | | |
+| Severity  | Count  | Penalty Each | Total Deduction |
+| --------- | ------ | ------------ | --------------- |
+| HIGH      | 2      | 10 pts       | -20             |
+| MEDIUM    | 11     | 5 pts        | -55             |
+| LOW       | 8      | 2 pts        | -16             |
+| **Total** | **21** |              |                 |
 
 ---
 
 ## Quality Criteria Assessment
 
-| Criterion | Status | Violations | Notes |
-|-----------|--------|------------|-------|
-| Hard Waits (sleep, waitForTimeout) | ⚠️ WARN | 2 | setTimeout in usePartnerMood:165, backgroundSync:350 |
-| Determinism (no conditionals) | ⚠️ WARN | 4 | Non-deterministic Date, hard waits, timing deps |
-| Isolation (cleanup, no shared state) | ✅ PASS | 3 | Minor: module-scoped mutables, clearAllMocks vs resetAllMocks |
-| Data Factories | ⚠️ WARN | 3 | Inline factories, magic values, duplicate setup |
-| Explicit Assertions | ✅ PASS | 0 | Good assertion coverage across all files |
-| Test Length (≤300 lines) | ❌ FAIL | 1 | SoloReadingFlow.test.tsx: 1,723 lines |
-| Flakiness Patterns | ⚠️ WARN | 2 | Timing-dependent waits, module-scoped mutation |
-| Fixture Patterns | ⚠️ WARN | 2 | Inline mocks, duplicate framer-motion mock |
-| Coverage Completeness | ✅ PASS | 3 | Minor edge cases remaining |
+| Criterion                            | Status  | Violations | Notes                                                         |
+| ------------------------------------ | ------- | ---------- | ------------------------------------------------------------- |
+| Hard Waits (sleep, waitForTimeout)   | ⚠️ WARN | 2          | setTimeout in usePartnerMood:165, backgroundSync:350          |
+| Determinism (no conditionals)        | ⚠️ WARN | 4          | Non-deterministic Date, hard waits, timing deps               |
+| Isolation (cleanup, no shared state) | ✅ PASS | 3          | Minor: module-scoped mutables, clearAllMocks vs resetAllMocks |
+| Data Factories                       | ⚠️ WARN | 3          | Inline factories, magic values, duplicate setup               |
+| Explicit Assertions                  | ✅ PASS | 0          | Good assertion coverage across all files                      |
+| Test Length (≤300 lines)             | ❌ FAIL | 1          | SoloReadingFlow.test.tsx: 1,723 lines                         |
+| Flakiness Patterns                   | ⚠️ WARN | 2          | Timing-dependent waits, module-scoped mutation                |
+| Fixture Patterns                     | ⚠️ WARN | 2          | Inline mocks, duplicate framer-motion mock                    |
+| Coverage Completeness                | ✅ PASS | 3          | Minor edge cases remaining                                    |
 
 ---
 
@@ -383,40 +390,40 @@ Test quality is good with 84/100 score. All 5 identified coverage gaps have been
 
 ### Violation Summary by Location
 
-| File | Line | Severity | Dimension | Issue | Fix |
-|------|------|----------|-----------|-------|-----|
-| usePartnerMood.test.ts | 28 | MEDIUM | Maintainability | Magic partner ID | Extract to constant |
-| usePartnerMood.test.ts | 33 | HIGH | Determinism | `new Date().toISOString()` | Use fixed timestamp |
-| usePartnerMood.test.ts | 165 | MEDIUM | Determinism | Hard wait setTimeout(100) | Use fake timers |
-| usePartnerMood.test.ts | 165 | MEDIUM | Performance | Hard wait for negative check | Use spy count |
-| SoloReadingFlow.test.tsx | 1 | HIGH | Maintainability | 1,723 lines | Split into 6-8 files |
-| SoloReadingFlow.test.tsx | 32 | LOW | Maintainability | Inline framer-motion mock | Extract to shared |
-| SoloReadingFlow.test.tsx | 64 | MEDIUM | Isolation | Module-scoped mutable | Factory pattern |
-| SoloReadingFlow.test.tsx | 79 | MEDIUM | Isolation | Module-scoped mutable | Factory pattern |
-| SoloReadingFlow.test.tsx | 87 | MEDIUM | Maintainability | Hardcoded IDs | Extract constants |
-| SoloReadingFlow.test.tsx | 206 | MEDIUM | Maintainability | Inline createMockSession | Extract to helper |
-| SoloReadingFlow.test.tsx | 215 | MEDIUM | Determinism | Timezone-dependent date | Use UTC string |
-| SoloReadingFlow.test.tsx | 404 | LOW | Performance | waitFor for sync ops | Direct await |
-| SoloReadingFlow.test.tsx | 1218 | MEDIUM | Coverage | Missing error path test | Add rejection test |
-| SoloReadingFlow.test.tsx | 1599 | LOW | Coverage | Partial JSON parse coverage | Test step-level |
-| backgroundSync.test.ts | 49 | MEDIUM | Maintainability | Duplicate mock setup | Extract to helper |
-| backgroundSync.test.ts | 178 | LOW | Determinism | Timing dependency | Use fake timers |
-| backgroundSync.test.ts | 350 | LOW | Performance | Hard wait 50ms | Document or drain |
+| File                     | Line | Severity | Dimension       | Issue                        | Fix                  |
+| ------------------------ | ---- | -------- | --------------- | ---------------------------- | -------------------- |
+| usePartnerMood.test.ts   | 28   | MEDIUM   | Maintainability | Magic partner ID             | Extract to constant  |
+| usePartnerMood.test.ts   | 33   | HIGH     | Determinism     | `new Date().toISOString()`   | Use fixed timestamp  |
+| usePartnerMood.test.ts   | 165  | MEDIUM   | Determinism     | Hard wait setTimeout(100)    | Use fake timers      |
+| usePartnerMood.test.ts   | 165  | MEDIUM   | Performance     | Hard wait for negative check | Use spy count        |
+| SoloReadingFlow.test.tsx | 1    | HIGH     | Maintainability | 1,723 lines                  | Split into 6-8 files |
+| SoloReadingFlow.test.tsx | 32   | LOW      | Maintainability | Inline framer-motion mock    | Extract to shared    |
+| SoloReadingFlow.test.tsx | 64   | MEDIUM   | Isolation       | Module-scoped mutable        | Factory pattern      |
+| SoloReadingFlow.test.tsx | 79   | MEDIUM   | Isolation       | Module-scoped mutable        | Factory pattern      |
+| SoloReadingFlow.test.tsx | 87   | MEDIUM   | Maintainability | Hardcoded IDs                | Extract constants    |
+| SoloReadingFlow.test.tsx | 206  | MEDIUM   | Maintainability | Inline createMockSession     | Extract to helper    |
+| SoloReadingFlow.test.tsx | 215  | MEDIUM   | Determinism     | Timezone-dependent date      | Use UTC string       |
+| SoloReadingFlow.test.tsx | 404  | LOW      | Performance     | waitFor for sync ops         | Direct await         |
+| SoloReadingFlow.test.tsx | 1218 | MEDIUM   | Coverage        | Missing error path test      | Add rejection test   |
+| SoloReadingFlow.test.tsx | 1599 | LOW      | Coverage        | Partial JSON parse coverage  | Test step-level      |
+| backgroundSync.test.ts   | 49   | MEDIUM   | Maintainability | Duplicate mock setup         | Extract to helper    |
+| backgroundSync.test.ts   | 178  | LOW      | Determinism     | Timing dependency            | Use fake timers      |
+| backgroundSync.test.ts   | 350  | LOW      | Performance     | Hard wait 50ms               | Document or drain    |
 
 ### Quality Trends
 
-| Review Date | Score | Grade | Critical Issues | Trend |
-|-------------|-------|-------|-----------------|-------|
-| 2026-02-04 (Story 2.1) | 78/100 | C | 3 | — Baseline |
-| 2026-02-16 (PR #90 Gaps) | 84/100 | B | 2 | ⬆️ Improved |
+| Review Date              | Score  | Grade | Critical Issues | Trend       |
+| ------------------------ | ------ | ----- | --------------- | ----------- |
+| 2026-02-04 (Story 2.1)   | 78/100 | C     | 3               | — Baseline  |
+| 2026-02-16 (PR #90 Gaps) | 84/100 | B     | 2               | ⬆️ Improved |
 
 ### Related Reviews
 
-| File | Score | Grade | Violations | Status |
-|------|-------|-------|------------|--------|
-| usePartnerMood.test.ts | 88 | B | 4 | Approved |
-| SoloReadingFlow.test.tsx | 78 | C | 13 | Approve w/ Comments |
-| backgroundSync.test.ts | 90 | A | 4 | Approved |
+| File                     | Score | Grade | Violations | Status              |
+| ------------------------ | ----- | ----- | ---------- | ------------------- |
+| usePartnerMood.test.ts   | 88    | B     | 4          | Approved            |
+| SoloReadingFlow.test.tsx | 78    | C     | 13         | Approve w/ Comments |
+| backgroundSync.test.ts   | 90    | A     | 4          | Approved            |
 
 **Suite Average**: 84/100 (B)
 

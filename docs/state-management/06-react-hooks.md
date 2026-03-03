@@ -57,9 +57,9 @@ interface UseLoveNotesResult {
 }
 ```
 
-| Parameter   | Type      | Default | Description                        |
-| ----------- | --------- | ------- | ---------------------------------- |
-| `autoFetch` | `boolean` | `true`  | Auto-fetch notes on mount          |
+| Parameter   | Type      | Default | Description               |
+| ----------- | --------- | ------- | ------------------------- |
+| `autoFetch` | `boolean` | `true`  | Auto-fetch notes on mount |
 
 **Behavior:**
 
@@ -113,10 +113,10 @@ interface UseAutoSaveOptions {
 }
 ```
 
-| Parameter     | Type                          | Description                      |
-| ------------- | ----------------------------- | -------------------------------- |
-| `session`     | `ScriptureSession \| null`    | Active session to monitor        |
-| `saveSession` | `() => Promise<void>`         | Save function from store         |
+| Parameter     | Type                       | Description               |
+| ------------- | -------------------------- | ------------------------- |
+| `session`     | `ScriptureSession \| null` | Active session to monitor |
+| `saveSession` | `() => Promise<void>`      | Save function from store  |
 
 **Behavior:**
 
@@ -143,13 +143,13 @@ interface UseMoodHistoryReturn {
 }
 ```
 
-| Return      | Type             | Description                  |
-| ----------- | ---------------- | ---------------------------- |
-| `moods`     | `SupabaseMood[]` | Loaded mood entries          |
-| `isLoading` | `boolean`        | True during fetch            |
-| `hasMore`   | `boolean`        | True if more pages available |
-| `loadMore`  | `() => Promise<void>` | Load next page          |
-| `error`     | `string \| null` | Error message if fetch fails |
+| Return      | Type                  | Description                  |
+| ----------- | --------------------- | ---------------------------- |
+| `moods`     | `SupabaseMood[]`      | Loaded mood entries          |
+| `isLoading` | `boolean`             | True during fetch            |
+| `hasMore`   | `boolean`             | True if more pages available |
+| `loadMore`  | `() => Promise<void>` | Load next page               |
+| `error`     | `string \| null`      | Error message if fetch fails |
 
 Page size: 50 entries. Uses offset-based pagination via `moodApi.getMoodHistory()`.
 
@@ -170,12 +170,12 @@ interface UsePartnerMoodResult {
 }
 ```
 
-| Return             | Type                                            | Description                  |
-| ------------------ | ----------------------------------------------- | ---------------------------- |
-| `partnerMood`      | `SupabaseMoodRecord \| null`                    | Partner's latest mood        |
-| `isLoading`        | `boolean`                                       | True during initial load     |
-| `connectionStatus` | `'connecting' \| 'connected' \| 'disconnected'` | Realtime channel state       |
-| `error`            | `string \| null`                                | Error message                |
+| Return             | Type                                            | Description              |
+| ------------------ | ----------------------------------------------- | ------------------------ |
+| `partnerMood`      | `SupabaseMoodRecord \| null`                    | Partner's latest mood    |
+| `isLoading`        | `boolean`                                       | True during initial load |
+| `connectionStatus` | `'connecting' \| 'connected' \| 'disconnected'` | Realtime channel state   |
+| `error`            | `string \| null`                                | Error message            |
 
 **Behavior:**
 
@@ -199,10 +199,10 @@ interface NetworkStatus {
 }
 ```
 
-| Return          | Type      | Description                                          |
-| --------------- | --------- | ---------------------------------------------------- |
-| `isOnline`      | `boolean` | True when browser reports network available           |
-| `isConnecting`  | `boolean` | True during brief transition from offline to online   |
+| Return         | Type      | Description                                         |
+| -------------- | --------- | --------------------------------------------------- |
+| `isOnline`     | `boolean` | True when browser reports network available         |
+| `isConnecting` | `boolean` | True during brief transition from offline to online |
 
 **Debounce:** 1.5 second delay on reconnection to prevent UI flicker during brief connectivity interruptions. Listens to `window.addEventListener('online')` and `window.addEventListener('offline')`.
 
@@ -245,14 +245,14 @@ function useMotionConfig(): {
 };
 ```
 
-| Return               | Type      | Description                                                   |
-| -------------------- | --------- | ------------------------------------------------------------- |
-| `shouldReduceMotion` | `boolean` | True if `prefers-reduced-motion: reduce` is active            |
-| `crossfade`          | `object`  | `{ duration: 0.2 }` or `{ duration: 0 }` if reduced motion  |
-| `slide`              | `object`  | `{ duration: 0.3, ease: 'easeInOut' }` or `{ duration: 0 }` |
+| Return               | Type      | Description                                                            |
+| -------------------- | --------- | ---------------------------------------------------------------------- |
+| `shouldReduceMotion` | `boolean` | True if `prefers-reduced-motion: reduce` is active                     |
+| `crossfade`          | `object`  | `{ duration: 0.2 }` or `{ duration: 0 }` if reduced motion             |
+| `slide`              | `object`  | `{ duration: 0.3, ease: 'easeInOut' }` or `{ duration: 0 }`            |
 | `spring`             | `object`  | `{ type: 'spring', stiffness: 100, damping: 15 }` or `{ duration: 0 }` |
-| `fadeIn`             | `object`  | `{ duration: 0.2 }` or `{ duration: 0 }`                    |
-| `modeReveal`         | `object`  | `{ duration: 0.2 }` or `{ duration: 0 }`                    |
+| `fadeIn`             | `object`  | `{ duration: 0.2 }` or `{ duration: 0 }`                               |
+| `modeReveal`         | `object`  | `{ duration: 0.2 }` or `{ duration: 0 }`                               |
 
 Uses Framer Motion's `useReducedMotion()` hook internally. All Scripture Reading components use this hook instead of raw `useReducedMotion`.
 
@@ -275,14 +275,14 @@ interface UseImageCompressionReturn {
 }
 ```
 
-| Return          | Type                                             | Description                 |
-| --------------- | ------------------------------------------------ | --------------------------- |
-| `compress`      | `(file: File) => Promise<CompressionResult \| null>` | Compress image         |
-| `result`        | `CompressionResult \| null`                      | Last compression result     |
-| `isCompressing` | `boolean`                                        | True during compression     |
-| `error`         | `string \| null`                                 | Error message if failed     |
-| `status`        | `CompressionStatus`                              | State machine status        |
-| `reset`         | `() => void`                                     | Reset state for next use    |
+| Return          | Type                                                 | Description              |
+| --------------- | ---------------------------------------------------- | ------------------------ |
+| `compress`      | `(file: File) => Promise<CompressionResult \| null>` | Compress image           |
+| `result`        | `CompressionResult \| null`                          | Last compression result  |
+| `isCompressing` | `boolean`                                            | True during compression  |
+| `error`         | `string \| null`                                     | Error message if failed  |
+| `status`        | `CompressionStatus`                                  | State machine status     |
+| `reset`         | `() => void`                                         | Reset state for next use |
 
 Status flow: `idle` -> `compressing` -> `complete` | `error`. Validates file before compression.
 
@@ -309,9 +309,9 @@ interface UsePhotosResult {
 }
 ```
 
-| Parameter  | Type      | Default | Description                        |
-| ---------- | --------- | ------- | ---------------------------------- |
-| `autoLoad` | `boolean` | `true`  | Auto-load photos on mount          |
+| Parameter  | Type      | Default | Description               |
+| ---------- | --------- | ------- | ------------------------- |
+| `autoLoad` | `boolean` | `true`  | Auto-load photos on mount |
 
 **Behavior:**
 
@@ -330,20 +330,20 @@ Supabase Realtime broadcast channel lifecycle hook for scripture together-mode s
 function useScriptureBroadcast(sessionId: string | null): void;
 ```
 
-| Parameter   | Type              | Description                             |
-| ----------- | ----------------- | --------------------------------------- |
-| `sessionId` | `string \| null`  | Active session ID, or null to disconnect|
+| Parameter   | Type             | Description                              |
+| ----------- | ---------------- | ---------------------------------------- |
+| `sessionId` | `string \| null` | Active session ID, or null to disconnect |
 
 **Side-effect hook** -- returns nothing. All state changes go through Zustand store actions.
 
 **Event Handlers:**
 
-| Broadcast Event            | Store Action Called            | Description                              |
-| -------------------------- | ----------------------------- | ---------------------------------------- |
-| `partner_joined`           | `onPartnerJoined()`           | Partner joined the channel               |
-| `state_updated`            | `onBroadcastReceived(payload)`| Version-checked session state snapshot   |
-| `session_converted`        | `applySessionConverted()`     | Session converted to solo (user2 ejected)|
-| `lock_in_status_changed`   | `onPartnerLockInChanged(locked)` | Partner lock-in status changed (Story 4.2) |
+| Broadcast Event          | Store Action Called              | Description                                |
+| ------------------------ | -------------------------------- | ------------------------------------------ |
+| `partner_joined`         | `onPartnerJoined()`              | Partner joined the channel                 |
+| `state_updated`          | `onBroadcastReceived(payload)`   | Version-checked session state snapshot     |
+| `session_converted`      | `applySessionConverted()`        | Session converted to solo (user2 ejected)  |
+| `lock_in_status_changed` | `onPartnerLockInChanged(locked)` | Partner lock-in status changed (Story 4.2) |
 
 **Reconnect Logic (Epic 4 Hardening -- Story 4.3):**
 
@@ -380,22 +380,23 @@ interface PartnerPresenceInfo {
 }
 ```
 
-| Parameter   | Type                       | Description                         |
-| ----------- | -------------------------- | ----------------------------------- |
-| `sessionId` | `string \| null`           | Session ID for channel name         |
-| `stepIndex` | `number`                   | Current reading step (0-based)      |
-| `view`      | `'verse' \| 'response'`   | Current view within the step        |
+| Parameter   | Type                    | Description                    |
+| ----------- | ----------------------- | ------------------------------ |
+| `sessionId` | `string \| null`        | Session ID for channel name    |
+| `stepIndex` | `number`                | Current reading step (0-based) |
+| `view`      | `'verse' \| 'response'` | Current view within the step   |
 
-| Return                | Type                              | Description                          |
-| --------------------- | --------------------------------- | ------------------------------------ |
-| `view`                | `'verse' \| 'response' \| null`  | Partner's current view               |
-| `stepIndex`           | `number \| null`                  | Partner's current step               |
-| `ts`                  | `number \| null`                  | Timestamp of last presence update    |
-| `isPartnerConnected`  | `boolean`                         | False if partner presence is stale   |
+| Return               | Type                            | Description                        |
+| -------------------- | ------------------------------- | ---------------------------------- |
+| `view`               | `'verse' \| 'response' \| null` | Partner's current view             |
+| `stepIndex`          | `number \| null`                | Partner's current step             |
+| `ts`                 | `number \| null`                | Timestamp of last presence update  |
+| `isPartnerConnected` | `boolean`                       | False if partner presence is stale |
 
 **Channel:** `scripture-presence:{sessionId}` with `{ broadcast: { self: false }, private: true }`.
 
 **Presence Broadcast Triggers:**
+
 - Immediately on channel `SUBSCRIBED`
 - On `view` prop change (verse / response)
 - On `stepIndex` change (resets partner presence state)

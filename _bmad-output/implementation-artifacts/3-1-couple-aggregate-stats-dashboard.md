@@ -94,6 +94,7 @@ So that I can see our progress without gamification pressure.
 ## Senior Developer Review (AI)
 
 ### Review Round 1 (2026-02-17)
+
 **Reviewer:** Sallvain
 **Outcome:** Changes Requested → All Resolved
 
@@ -108,6 +109,7 @@ So that I can see our progress without gamification pressure.
 - [x] **[LOW] L2:** formatRelativeDate uses manual math instead of Intl.RelativeTimeFormat
 
 ### Review Round 2 (2026-02-17)
+
 **Reviewer:** Sallvain
 **Outcome:** Changes Requested → All Resolved
 
@@ -133,21 +135,23 @@ So that I can see our progress without gamification pressure.
 
 **Risk-driven test priorities:**
 
-| Risk ID | Category | Score | Mitigation Test |
-|---------|----------|-------|-----------------|
-| E3-R01 | SEC | **6** | `3.1-DB-001` — pgTAP isolation: user A must never see couple B's stats |
-| E3-R02 | DATA | 4 | `3.1-DB-002` — pgTAP: verify each metric independently with seed data |
-| E3-R03 | PERF | 4 | `3.1-PERF-001` — RPC execution time <500ms |
-| E3-R04 | BUS | 2 | Documented — stale cache acceptable for informational stats |
-| E3-R05 | BUS | 2 | `3.1-UNIT-004` — zero-state rendering |
-| E3-R06 | SEC | 3 | Documented — partner detection well-tested in Epics 1-2 |
+| Risk ID | Category | Score | Mitigation Test                                                        |
+| ------- | -------- | ----- | ---------------------------------------------------------------------- |
+| E3-R01  | SEC      | **6** | `3.1-DB-001` — pgTAP isolation: user A must never see couple B's stats |
+| E3-R02  | DATA     | 4     | `3.1-DB-002` — pgTAP: verify each metric independently with seed data  |
+| E3-R03  | PERF     | 4     | `3.1-PERF-001` — RPC execution time <500ms                             |
+| E3-R04  | BUS      | 2     | Documented — stale cache acceptable for informational stats            |
+| E3-R05  | BUS      | 2     | `3.1-UNIT-004` — zero-state rendering                                  |
+| E3-R06  | SEC      | 3     | Documented — partner detection well-tested in Epics 1-2                |
 
 **Entry criteria (before starting tests):**
+
 - [x] `scripture_get_couple_stats` RPC migration applied locally
 - [x] Local Supabase running (`supabase start`)
 - [x] Epic 1-2 E2E tests still passing (no regressions)
 
 **Exit criteria (before merge):**
+
 - [x] All P0 tests passing (100%)
 - [x] All P1 tests passing (>=95%)
 - [x] E3-R01 security test passes — no cross-couple data leak
@@ -155,32 +159,34 @@ So that I can see our progress without gamification pressure.
 
 ### What Already Exists (DO NOT Recreate)
 
-| Component/File | What It Does | Location |
-|---|---|---|
-| `ScriptureOverview.tsx` | Overview page with Start button, partner detection, resume prompt, mode selection | `src/components/scripture-reading/containers/ScriptureOverview.tsx` |
-| `scriptureReadingService.ts` | IndexedDB + Supabase CRUD for sessions, reflections, bookmarks, messages | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingSlice.ts` | Zustand slice with session state management, phase transitions | `src/stores/slices/scriptureReadingSlice.ts` |
-| `scripture_sessions` table | Session metadata with RLS | `supabase/migrations/20260128000001_scripture_reading.sql` |
-| `scripture_reflections` table | Per-step reflections with rating, notes, is_shared | Same migration |
-| `scripture_bookmarks` table | Per-step bookmarks with share_with_partner | Same migration |
-| `is_scripture_session_member()` | Helper function for RLS session membership check | Same migration |
-| `ScriptureSession` type | `{ id, mode, userId, partnerId?, currentPhase, currentStepIndex, status, version, completedAt? }` | `src/services/dbSchema.ts` (line 32) |
-| `scriptureTheme` design tokens | `{ primary: '#A855F7', background: '#F3E5F5', surface: '#FAF5FF' }` | `ScriptureOverview.tsx` (line 37) |
-| `FOCUS_RING` constant | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'` | `ScriptureOverview.tsx` (line 44) |
-| `useMotionConfig` hook | Motion presets respecting `prefers-reduced-motion` | `src/hooks/useMotionConfig.ts` |
-| `useNetworkStatus` hook | `{ isOnline }` for offline detection | `src/hooks/useNetworkStatus.ts` |
-| `partnerSlice` | `partner: PartnerInfo \| null`, `isLoadingPartner`, `loadPartner()` | `src/stores/slices/partnerSlice.ts` |
-| Zustand persist middleware | Auto-persists slice state to localStorage — survives page reloads | `src/stores/useAppStore.ts` |
+| Component/File                  | What It Does                                                                                      | Location                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `ScriptureOverview.tsx`         | Overview page with Start button, partner detection, resume prompt, mode selection                 | `src/components/scripture-reading/containers/ScriptureOverview.tsx` |
+| `scriptureReadingService.ts`    | IndexedDB + Supabase CRUD for sessions, reflections, bookmarks, messages                          | `src/services/scriptureReadingService.ts`                           |
+| `scriptureReadingSlice.ts`      | Zustand slice with session state management, phase transitions                                    | `src/stores/slices/scriptureReadingSlice.ts`                        |
+| `scripture_sessions` table      | Session metadata with RLS                                                                         | `supabase/migrations/20260128000001_scripture_reading.sql`          |
+| `scripture_reflections` table   | Per-step reflections with rating, notes, is_shared                                                | Same migration                                                      |
+| `scripture_bookmarks` table     | Per-step bookmarks with share_with_partner                                                        | Same migration                                                      |
+| `is_scripture_session_member()` | Helper function for RLS session membership check                                                  | Same migration                                                      |
+| `ScriptureSession` type         | `{ id, mode, userId, partnerId?, currentPhase, currentStepIndex, status, version, completedAt? }` | `src/services/dbSchema.ts` (line 32)                                |
+| `scriptureTheme` design tokens  | `{ primary: '#A855F7', background: '#F3E5F5', surface: '#FAF5FF' }`                               | `ScriptureOverview.tsx` (line 37)                                   |
+| `FOCUS_RING` constant           | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'`                | `ScriptureOverview.tsx` (line 44)                                   |
+| `useMotionConfig` hook          | Motion presets respecting `prefers-reduced-motion`                                                | `src/hooks/useMotionConfig.ts`                                      |
+| `useNetworkStatus` hook         | `{ isOnline }` for offline detection                                                              | `src/hooks/useNetworkStatus.ts`                                     |
+| `partnerSlice`                  | `partner: PartnerInfo \| null`, `isLoadingPartner`, `loadPartner()`                               | `src/stores/slices/partnerSlice.ts`                                 |
+| Zustand persist middleware      | Auto-persists slice state to localStorage — survives page reloads                                 | `src/stores/useAppStore.ts`                                         |
 
 ### Architecture Constraints
 
 **Data Model:**
+
 - Scripture is **online-first** — Supabase RPC is source of truth, not IndexedDB
 - Stats are aggregate queries that MUST run server-side (no client-side computation from partial IndexedDB cache)
 - RPC uses `SECURITY DEFINER` because reflections/bookmarks RLS restricts visibility to own + shared partner data, but stats need ALL couple data regardless of sharing flags
 - The RPC validates session membership via `auth.uid()` checks internally (since DEFINER bypasses RLS)
 
 **State Management:**
+
 - Types for `CoupleStats` go in `src/stores/types.ts` (store types centralized — NOT in slice file)
 - `coupleStats` and `isStatsLoading` added to existing `ScriptureSlice` interface
 - Zustand persist middleware automatically caches `coupleStats` to localStorage — on page reload, stale cached stats are shown immediately while fresh data loads from server
@@ -189,23 +195,27 @@ So that I can see our progress without gamification pressure.
 - Boolean loading flags (`isStatsLoading`) — do NOT use status enums
 
 **Error Handling:**
+
 - `getCoupleStats()` is a READ operation → returns `null` on failure (per project convention)
 - No error toast for stats fetch failure — silently show cached data or zero-state
 - If offline, show cached stats from Zustand persist without attempting RPC call
 - Catch blocks must never be empty — catch → return null with logged warning
 
 **Caching Strategy:**
+
 - **Fast path:** Zustand persist hydrates from localStorage on mount → stale stats shown < 50ms
 - **Fresh path:** `loadCoupleStats()` fires after mount → calls RPC → updates slice state → Zustand persist saves to localStorage for next visit
 - No IndexedDB schema changes needed — stats cache lives in localStorage via Zustand persist
 - Cache invalidation: stats refresh on every overview page mount (simple, sufficient for couple app usage pattern)
 
 **Import Discipline:**
+
 - DO NOT import `supabase` directly in components — use service layer via slice actions
 - DO NOT import service modules directly in components
 - All data flows: Component → Zustand slice action → Service → Supabase RPC
 
 **RPC Implementation Requirements:**
+
 - Function name: `scripture_get_couple_stats`
 - `SECURITY DEFINER` with `set search_path = ''`
 - Use fully qualified names (e.g., `public.scripture_sessions`)
@@ -217,6 +227,7 @@ So that I can see our progress without gamification pressure.
 ### UX / Design Requirements
 
 **Stats Section Layout:**
+
 - Placed between header ("Scripture Reading") and partner status/start area
 - Section heading: "Your Journey" (centered, Inter 500, `text-purple-700`, `text-sm`)
 - 5 stat cards in vertical stack (single-column mobile, same max-w-md container)
@@ -227,20 +238,22 @@ So that I can see our progress without gamification pressure.
 
 **Stat Card Content:**
 
-| Metric | Value Format | Label | Icon |
-|---|---|---|---|
-| Total Sessions | Integer (e.g., "12") | "Sessions Completed" | `BookOpen` |
-| Total Steps | Integer (e.g., "204") | "Steps Completed" | `CheckCircle` |
-| Last Session | Relative date (e.g., "3 days ago") | "Last Completed" | `Calendar` |
-| Avg Rating | Decimal (e.g., "3.8") | "Average Rating" | `Star` |
-| Bookmarks | Integer (e.g., "47") | "Bookmarks Saved" | `Bookmark` |
+| Metric         | Value Format                       | Label                | Icon          |
+| -------------- | ---------------------------------- | -------------------- | ------------- |
+| Total Sessions | Integer (e.g., "12")               | "Sessions Completed" | `BookOpen`    |
+| Total Steps    | Integer (e.g., "204")              | "Steps Completed"    | `CheckCircle` |
+| Last Session   | Relative date (e.g., "3 days ago") | "Last Completed"     | `Calendar`    |
+| Avg Rating     | Decimal (e.g., "3.8")              | "Average Rating"     | `Star`        |
+| Bookmarks      | Integer (e.g., "47")               | "Bookmarks Saved"    | `Bookmark`    |
 
 **Zero-State:**
+
 - All metrics show "—" (em dash) instead of "0"
 - Below cards: "Begin your first reading" (centered, `text-sm text-purple-400 italic`)
 - No error states, no empty-state illustrations
 
 **Skeleton Loading:**
+
 - 5 skeleton cards matching stat card dimensions
 - Animated pulse (`animate-pulse`) with purple-200 fill
 - Stat value area: `h-8 w-16 bg-purple-200 rounded`
@@ -249,49 +262,52 @@ So that I can see our progress without gamification pressure.
 - If stale cached data exists, show it while refreshing — NO skeleton
 
 **No Gamification Language:**
+
 - Labels are neutral: "Sessions Completed" not "Sessions Crushed!"
 - No streaks, no "keep it up!", no "you're on fire!", no progress percentages
 - Tone: informational, calm, reflective
 
 **Value Formatting:**
 
-| Metric | Format | Notes |
-|---|---|---|
-| totalSessions | Integer: `"12"` | |
-| totalSteps | Integer: `"204"` | |
+| Metric        | Format                   | Notes                                    |
+| ------------- | ------------------------ | ---------------------------------------- |
+| totalSessions | Integer: `"12"`          |                                          |
+| totalSteps    | Integer: `"204"`         |                                          |
 | lastCompleted | Relative: `"3 days ago"` | Use `Intl.RelativeTimeFormat` or similar |
-| avgRating | 1 decimal: `"3.8"` | `toFixed(1)` |
-| bookmarkCount | Integer: `"47"` | |
+| avgRating     | 1 decimal: `"3.8"`       | `toFixed(1)`                             |
+| bookmarkCount | Integer: `"47"`          |                                          |
 
 ### File Locations
 
-| New File | Purpose |
-|---|---|
-| `supabase/migrations/YYYYMMDDHHMMSS_scripture_couple_stats.sql` | RPC + index for couple stats |
-| `src/components/scripture-reading/overview/StatsSection.tsx` | Stats presentational component |
-| `src/components/scripture-reading/__tests__/StatsSection.test.tsx` | Unit tests |
-| `tests/e2e/scripture/scripture-stats.spec.ts` | E2E tests |
-| `supabase/tests/database/scripture_couple_stats.test.sql` | pgTAP database tests (P0 security + correctness) |
+| New File                                                           | Purpose                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------ |
+| `supabase/migrations/YYYYMMDDHHMMSS_scripture_couple_stats.sql`    | RPC + index for couple stats                     |
+| `src/components/scripture-reading/overview/StatsSection.tsx`       | Stats presentational component                   |
+| `src/components/scripture-reading/__tests__/StatsSection.test.tsx` | Unit tests                                       |
+| `tests/e2e/scripture/scripture-stats.spec.ts`                      | E2E tests                                        |
+| `supabase/tests/database/scripture_couple_stats.test.sql`          | pgTAP database tests (P0 security + correctness) |
 
-| Modified File | Changes |
-|---|---|
-| `src/services/scriptureReadingService.ts` | Add `getCoupleStats()` method |
-| `src/stores/slices/scriptureReadingSlice.ts` | Add `coupleStats`, `isStatsLoading`, `loadCoupleStats()` |
-| `src/stores/types.ts` | Add `CoupleStats` interface |
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | Integrate StatsSection, call loadCoupleStats on mount |
-| `src/components/scripture-reading/index.ts` | Add barrel export for StatsSection |
-| `src/api/validation/supabaseSchemas.ts` | Add `CoupleStatsSchema` Zod validation |
+| Modified File                                                       | Changes                                                  |
+| ------------------------------------------------------------------- | -------------------------------------------------------- |
+| `src/services/scriptureReadingService.ts`                           | Add `getCoupleStats()` method                            |
+| `src/stores/slices/scriptureReadingSlice.ts`                        | Add `coupleStats`, `isStatsLoading`, `loadCoupleStats()` |
+| `src/stores/types.ts`                                               | Add `CoupleStats` interface                              |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | Integrate StatsSection, call loadCoupleStats on mount    |
+| `src/components/scripture-reading/index.ts`                         | Add barrel export for StatsSection                       |
+| `src/api/validation/supabaseSchemas.ts`                             | Add `CoupleStatsSchema` Zod validation                   |
 
 ### Testing Requirements
 
 **IMPORTANT: Follow the test design document** at `_bmad-output/test-artifacts/test-design-epic-3.md` for complete test specifications, priorities, and risk mitigations.
 
 **pgTAP Database Tests (`supabase/tests/database/scripture_couple_stats.test.sql`):**
+
 - `3.1-DB-001` (P0): RPC data isolation — create two couples with sessions, verify user A only sees couple A's stats, user B only sees couple B's stats. This is the **highest-priority security test** (E3-R01, score 6).
 - `3.1-DB-002` (P0): RPC returns correct aggregate metrics for known seed data — verify totalSessions, totalSteps, lastCompleted, avgRating, bookmarkCount each independently
 - `3.1-DB-003` (P2): RPC returns zeros/nulls for couple with no completed sessions
 
 **Unit Tests (StatsSection.test.tsx) — `3.1-UNIT-001` through `3.1-UNIT-012`:**
+
 - Renders 5 stat cards with correct values when stats provided
 - Shows skeleton loading when `isLoading=true` and `stats=null`
 - Shows cached stats (not skeleton) when `isLoading=true` but `stats` is non-null (stale-while-revalidate)
@@ -303,26 +319,31 @@ So that I can see our progress without gamification pressure.
 - All stat values have `aria-label` attributes
 
 **Unit Tests (service + slice) — `3.1-UNIT-005` through `3.1-UNIT-007`:**
+
 - `getCoupleStats()` calls `supabase.rpc('scripture_get_couple_stats')` and returns typed object
 - `getCoupleStats()` returns `null` on RPC failure
 - `loadCoupleStats()` sets `isStatsLoading=true`, calls service, updates `coupleStats`, sets `isStatsLoading=false`
 - Slice state initializes with `coupleStats: null`, `isStatsLoading: false`
 
 **Integration Tests (ScriptureOverview):**
+
 - Stats section appears on overview page
 - Stats load on mount
 - Skeleton shown while loading
 - Stats update after server response
 
 **E2E Tests (`tests/e2e/scripture/scripture-stats.spec.ts`) — `3.1-E2E-001`, `3.1-E2E-002`:**
+
 - `3.1-E2E-001` (P0): Overview shows stats after completing a session (full user journey with seeded completed sessions)
 - `3.1-E2E-002` (P1): Overview shows zero-state when no completed sessions
 
 **P3 Tests (lower priority):**
+
 - `3.1-PERF-001`: RPC execution time <500ms (performance baseline)
 - `3.1-UNIT-013`: Zod schema validates RPC response shape
 
 **Test IDs:**
+
 - `scripture-stats-section` — root container
 - `scripture-stats-skeleton` — skeleton loading container
 - `scripture-stats-sessions` — sessions completed card
@@ -345,6 +366,7 @@ So that I can see our progress without gamification pressure.
 ### Previous Story Intelligence (Epic 2)
 
 **Learnings from Story 2.3 implementation:**
+
 - Container/presentational pattern is well-established — `ScriptureOverview` is the container, `StatsSection` receives props
 - `useShallow` selectors are mandatory for Zustand store access in components
 - Non-blocking data fetching pattern: fire `loadCoupleStats()` on mount, don't block render
@@ -354,6 +376,7 @@ So that I can see our progress without gamification pressure.
 - Dancing Script font and `font-cursive` class already loaded — not needed for stats but confirms Tailwind config is reliable
 
 **Code review fixes from previous stories (avoid same mistakes):**
+
 - Do NOT import `supabase` directly in components — use service layer via slice actions
 - Include all actions in `useShallow` selectors — don't use `getState()` for actions
 - Always add `disabled` guard to submission handlers (not applicable to stats display, but pattern awareness)
@@ -363,6 +386,7 @@ So that I can see our progress without gamification pressure.
 ### Git Intelligence
 
 Recent commits show patterns:
+
 - Branch naming: `epic-3/stats-overview-dashboard` (already on this branch)
 - Commit prefix convention: `feat(epic-3): implement Story 3.1 couple aggregate stats`
 - Component files: PascalCase (`StatsSection.tsx`)
@@ -439,11 +463,13 @@ Claude Opus 4.6 (claude-opus-4-6)
 ### File List
 
 **New Files:**
+
 - `supabase/migrations/20260217150353_scripture_couple_stats.sql` — RPC + index
 - `supabase/migrations/20260217184551_optimize_couple_stats_rpc.sql` — R2-M1: CTE-optimized RPC (replaces 4 queries with 1)
 - `src/components/scripture-reading/overview/StatsSection.tsx` — Presentational stats component
 
 **Modified Files:**
+
 - `src/services/scriptureReadingService.ts` — Added `getCoupleStats()` method
 - `src/stores/slices/scriptureReadingSlice.ts` — Added stats state, `loadCoupleStats()` action
 - `src/stores/types.ts` — Re-exports `CoupleStats` type from supabaseSchemas (review fix: removed duplicate interface)
@@ -454,6 +480,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 - `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` — Added mock state for stats
 
 **Test Files:**
+
 - `supabase/tests/database/09_scripture_couple_stats.sql` — 13 pgTAP tests (DB-001 a-f, DB-002, DB-003)
 - `src/components/scripture-reading/__tests__/StatsSection.test.tsx` — 25 unit tests (UNIT-001 through UNIT-012)
 - `tests/unit/services/scriptureReadingService.stats.test.ts` — 9 unit tests (UNIT-005, UNIT-006, UNIT-013)

@@ -2,15 +2,15 @@
 
 ## Documents
 
-| #   | Document                                                           | Description                                                                          |
-| --- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| 01  | [Zustand Store Configuration](./01-zustand-store-configuration.md) | Store creation, persist middleware setup, custom serialization, hydration            |
-| 02  | [Slice Details](./02-slice-details.md)                             | All 10 slices: state fields, actions, validation, auth guards, cross-slice deps      |
-| 03  | [Cross-Slice Dependencies](./03-cross-slice-dependencies.md)       | Dependency graph, initialization coordination, circular import prevention            |
+| #   | Document                                                           | Description                                                                                              |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| 01  | [Zustand Store Configuration](./01-zustand-store-configuration.md) | Store creation, persist middleware setup, custom serialization, hydration                                |
+| 02  | [Slice Details](./02-slice-details.md)                             | All 10 slices: state fields, actions, validation, auth guards, cross-slice deps                          |
+| 03  | [Cross-Slice Dependencies](./03-cross-slice-dependencies.md)       | Dependency graph, initialization coordination, circular import prevention                                |
 | 04  | [Data Flow Patterns](./04-data-flow.md)                            | 7 data flow patterns: offline-first, online-first, realtime, cache, sync, hydration, broadcast reconnect |
-| 05  | [Persistence Strategy](./05-persistence-strategy.md)               | localStorage vs IndexedDB, what is persisted, Map serialization, corruption recovery |
-| 06  | [React Hooks](./06-react-hooks.md)                                 | All 14 custom hooks: auth, realtime, network, vibration, photos, moods, scripture broadcast/presence |
-| 07  | [Direct Store Access](./07-direct-store-access.md)                 | getState(), setState(), subscribe(), E2E testing via `window.__APP_STORE__`, cross-slice access |
+| 05  | [Persistence Strategy](./05-persistence-strategy.md)               | localStorage vs IndexedDB, what is persisted, Map serialization, corruption recovery                     |
+| 06  | [React Hooks](./06-react-hooks.md)                                 | All 14 custom hooks: auth, realtime, network, vibration, photos, moods, scripture broadcast/presence     |
+| 07  | [Direct Store Access](./07-direct-store-access.md)                 | getState(), setState(), subscribe(), E2E testing via `window.__APP_STORE__`, cross-slice access          |
 
 ## Quick Reference
 
@@ -63,19 +63,19 @@ src/hooks/
 
 ### Auth Guard Summary (Epic 4 Hardening)
 
-| Location                          | Action                    | Auth Method                         |
-| --------------------------------- | ------------------------- | ----------------------------------- |
-| `scriptureReadingSlice.ts`        | `loadSession`             | `supabase.auth.getUser()`           |
-| `scriptureReadingSlice.ts`        | `selectRole`              | `supabase.auth.getUser()`           |
-| `scriptureReadingSlice.ts`        | `checkForActiveSession`   | `supabase.auth.getUser()`           |
-| `moodSlice.ts`                    | `addMoodEntry`            | `getCurrentUserIdOfflineSafe()`     |
-| `useScriptureBroadcast.ts`        | channel subscribe         | `supabase.realtime.setAuth()` + `supabase.auth.getUser()` |
-| `useScripturePresence.ts`         | channel subscribe         | `supabase.realtime.setAuth()` + `supabase.auth.getUser()` |
+| Location                   | Action                  | Auth Method                                               |
+| -------------------------- | ----------------------- | --------------------------------------------------------- |
+| `scriptureReadingSlice.ts` | `loadSession`           | `supabase.auth.getUser()`                                 |
+| `scriptureReadingSlice.ts` | `selectRole`            | `supabase.auth.getUser()`                                 |
+| `scriptureReadingSlice.ts` | `checkForActiveSession` | `supabase.auth.getUser()`                                 |
+| `moodSlice.ts`             | `addMoodEntry`          | `getCurrentUserIdOfflineSafe()`                           |
+| `useScriptureBroadcast.ts` | channel subscribe       | `supabase.realtime.setAuth()` + `supabase.auth.getUser()` |
+| `useScripturePresence.ts`  | channel subscribe       | `supabase.realtime.setAuth()` + `supabase.auth.getUser()` |
 
 ### Reconnect Logic Summary (Epic 4 Hardening)
 
-| Hook                       | Channel Pattern                     | Retry Mechanism                  |
-| -------------------------- | ----------------------------------- | -------------------------------- |
-| `useScriptureBroadcast`    | `scripture-session:{sessionId}`     | `retryCount` state + useEffect re-run, `isRetryingRef` storm guard |
-| `useScripturePresence`     | `scripture-presence:{sessionId}`    | `retryCount` state + useEffect re-run                               |
-| `useRealtimeMessages`      | `love-notes:{userId}`              | Exponential backoff (1-30s), max 5 retries via `retryCountRef`      |
+| Hook                    | Channel Pattern                  | Retry Mechanism                                                    |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------------ |
+| `useScriptureBroadcast` | `scripture-session:{sessionId}`  | `retryCount` state + useEffect re-run, `isRetryingRef` storm guard |
+| `useScripturePresence`  | `scripture-presence:{sessionId}` | `retryCount` state + useEffect re-run                              |
+| `useRealtimeMessages`   | `love-notes:{userId}`            | Exponential backoff (1-30s), max 5 retries via `retryCountRef`     |

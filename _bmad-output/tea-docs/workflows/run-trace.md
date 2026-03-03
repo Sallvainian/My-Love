@@ -1,23 +1,27 @@
 # How to Run Trace with TEA - Complete Guide
 
 ## Overview
+
 TEA's `trace` workflow enables requirements traceability and quality gate decisions through a two-phase process: Phase 1 analyzes coverage, Phase 2 makes the go/no-go decision.
 
 ## When to Use This
 
 **Phase 1: Requirements Traceability**
+
 - Map acceptance criteria to implemented tests
 - Identify coverage gaps
 - Prioritize missing tests
 - Refresh coverage after each story/epic
 
 **Phase 2: Quality Gate Decision**
+
 - Make go/no-go decision for release
 - Validate coverage meets thresholds
 - Document gate decision with evidence
 - Support business-approved waivers
 
 ## Prerequisites
+
 - BMad Method installed
 - TEA agent available
 - Requirements defined (stories, acceptance criteria, test design)
@@ -27,35 +31,41 @@ TEA's `trace` workflow enables requirements traceability and quality gate decisi
 ## Steps
 
 ### 1. Run the Trace Workflow
+
 ```
 trace
 ```
 
 ### 2. Specify Phase
+
 TEA asks which phase you're running:
 
 **Phase 1: Requirements Traceability**
+
 - Analyze coverage
 - Identify gaps
 - Generate recommendations
 
 **Phase 2: Quality Gate Decision**
+
 - Make PASS/CONCERNS/FAIL/WAIVED decision
 - Requires Phase 1 complete
 
-*Typical flow:* Run Phase 1 first, review gaps, then run Phase 2 for gate decision.
+_Typical flow:_ Run Phase 1 first, review gaps, then run Phase 2 for gate decision.
 
 ## Phase 1: Requirements Traceability
 
 ### 3. Provide Requirements Source
 
 Options include:
+
 - **Story file** (e.g., `story-profile-management.md`) - Single story coverage
 - **Test design** (e.g., `test-design-epic-1.md`) - Epic coverage
 - **PRD** (e.g., `PRD.md`) - System-level coverage
 - **Multiple sources** - Comprehensive analysis
 
 Example response:
+
 ```
 Requirements:
 - story-profile-management.md (acceptance criteria)
@@ -65,6 +75,7 @@ Requirements:
 ### 4. Specify Test Location
 
 Example:
+
 ```
 Test location: tests/
 Include:
@@ -75,6 +86,7 @@ Include:
 ### 5. Specify Focus Areas (Optional)
 
 Example:
+
 ```
 Focus on:
 - Profile CRUD operations
@@ -85,6 +97,7 @@ Focus on:
 ### 6. Review Coverage Matrix
 
 TEA generates a comprehensive traceability matrix documenting:
+
 - Coverage summary with percentages
 - Coverage by priority (P0-P3)
 - Detailed requirement-to-test mapping
@@ -92,6 +105,7 @@ TEA generates a comprehensive traceability matrix documenting:
 - Actionable recommendations
 
 **Coverage Classifications:**
+
 - **FULL** - All acceptance criteria tested
 - **PARTIAL** - Some aspects tested
 - **NONE** - No tests exist
@@ -99,6 +113,7 @@ TEA generates a comprehensive traceability matrix documenting:
 ### Example: Bio Field Tests
 
 **Vanilla Playwright:**
+
 ```typescript
 // tests/e2e/profile-edit.spec.ts
 test('should edit bio field', async ({ page }) => {
@@ -121,6 +136,7 @@ test('should update bio via API', async ({ request }) => {
 ```
 
 **With Playwright Utils:**
+
 ```typescript
 import { test } from '../support/fixtures';
 
@@ -165,6 +181,7 @@ test('should accept valid image upload', async ({ request }) => {
 ## Next Steps
 
 After reviewing traceability:
+
 1. Fix critical gaps - Add tests for P0/P1 requirements
 2. Run `test-review` - Ensure new tests meet quality standards
 3. Run Phase 2 - Make gate decision after gaps addressed
@@ -172,12 +189,14 @@ After reviewing traceability:
 ## Phase 2: Quality Gate Decision
 
 Prerequisites:
+
 - Phase 1 traceability matrix complete
 - Test execution results available (must have test results)
 
-*Note:* Phase 2 skips if test execution results aren't provided.
+_Note:_ Phase 2 skips if test execution results aren't provided.
 
 ### 7. Run Phase 2
+
 ```
 trace
 Select "Phase 2: Quality Gate Decision"
@@ -188,16 +207,19 @@ Select "Phase 2: Quality Gate Decision"
 TEA asks for:
 
 **Gate Type:**
+
 - Story gate (small release)
 - Epic gate (larger release)
 - Release gate (production deployment)
 - Hotfix gate (emergency fix)
 
 **Decision Mode:**
+
 - **Deterministic** - Rule-based (coverage %, quality scores)
 - **Manual** - Team decision with TEA guidance
 
 Example:
+
 ```
 Gate type: Epic gate
 Decision mode: Deterministic
@@ -206,6 +228,7 @@ Decision mode: Deterministic
 ### 9. Provide Supporting Evidence
 
 TEA requests:
+
 - **Phase 1 Results:** `traceability-matrix.md`
 - **Test Quality (Optional):** `test-review.md`
 - **NFR Assessment (Optional):** `nfr-assessment.md`
@@ -213,6 +236,7 @@ TEA requests:
 ### 10. Review Gate Decision
 
 TEA creates `gate-decision-{gate_type}-{story_id}.md` with:
+
 - Go/no-go verdict (PASS/CONCERNS/FAIL/WAIVED)
 - Evidence summary
 - Approval signatures
@@ -222,16 +246,17 @@ TEA creates `gate-decision-{gate_type}-{story_id}.md` with:
 
 TEA uses deterministic rules when `decision_mode = "deterministic"`:
 
-| P0 Coverage | P1 Coverage | Overall Coverage | Decision |
-|-------------|-------------|------------------|----------|
-| 100%        | >=90%       | >=80%            | **PASS** |
+| P0 Coverage | P1 Coverage | Overall Coverage | Decision     |
+| ----------- | ----------- | ---------------- | ------------ |
+| 100%        | >=90%       | >=80%            | **PASS**     |
 | 100%        | 80-89%      | >=80%            | **CONCERNS** |
-| <100%       | Any         | Any              | **FAIL** |
-| Any         | <80%        | Any              | **FAIL** |
-| Any         | Any         | <80%             | **FAIL** |
-| Any         | Any         | Any              | **WAIVED** |
+| <100%       | Any         | Any              | **FAIL**     |
+| Any         | <80%        | Any              | **FAIL**     |
+| Any         | Any         | <80%             | **FAIL**     |
+| Any         | Any         | Any              | **WAIVED**   |
 
 **Detailed Rules:**
+
 - **PASS:** P0=100%, P1>=90%, Overall>=80%
 - **CONCERNS:** P0=100%, P1 80-89%, Overall>=80%
 - **FAIL:** P0<100% OR P1<80% OR Overall<80%
@@ -241,18 +266,21 @@ TEA uses deterministic rules when `decision_mode = "deterministic"`:
 **PASS**: All criteria met, ready to release
 
 **CONCERNS**: Some criteria not met, but:
+
 - Mitigation plan exists
 - Risk is acceptable
 - Team approves proceeding
 - Monitoring in place
 
 **FAIL**: Critical criteria not met:
+
 - P0 requirements not tested
 - Critical security vulnerabilities
 - System is broken
 - Cannot deploy
 
 **WAIVED**: Business approves proceeding despite concerns:
+
 - Documented business justification
 - Accepted risks quantified
 - Approver signatures
@@ -313,12 +341,14 @@ Cannot proceed until all blockers resolved.
 ## What You Get
 
 ### Phase 1: Traceability Matrix
+
 - Requirement-to-test mapping
 - Coverage classification (FULL/PARTIAL/NONE)
 - Gap identification with priorities
 - Actionable recommendations
 
 ### Phase 2: Gate Decision
+
 - Go/no-go verdict (PASS/CONCERNS/FAIL/WAIVED)
 - Evidence summary
 - Approval signatures
@@ -329,6 +359,7 @@ Cannot proceed until all blockers resolved.
 ### Greenfield Projects
 
 **Phase 3:**
+
 ```
 After architecture complete:
 1. Run test-design (system-level)
@@ -337,6 +368,7 @@ After architecture complete:
 ```
 
 **Phase 4:**
+
 ```
 After each epic/story:
 1. Run trace Phase 1 (refresh coverage)
@@ -345,6 +377,7 @@ After each epic/story:
 ```
 
 **Release Gate:**
+
 ```
 Before deployment:
 1. Run trace Phase 1 (final coverage check)
@@ -356,6 +389,7 @@ Before deployment:
 ### Brownfield Projects
 
 **Phase 2:**
+
 ```
 Before planning new work:
 1. Run trace Phase 1 (establish baseline)
@@ -364,6 +398,7 @@ Before planning new work:
 ```
 
 **Phase 4:**
+
 ```
 After each epic/story:
 1. Run trace Phase 1 (refresh)
@@ -372,6 +407,7 @@ After each epic/story:
 ```
 
 **Release Gate:**
+
 ```
 Before deployment:
 1. Run trace Phase 1 (final check)
@@ -385,6 +421,7 @@ Before deployment:
 ### Run Phase 1 Frequently
 
 Don't wait until release gate:
+
 ```
 After Story 1: trace Phase 1 (identify gaps early)
 After Story 2: trace Phase 1 (refresh)
@@ -392,11 +429,12 @@ After Story 3: trace Phase 1 (refresh)
 Before Release: trace Phase 1 + Phase 2 (final gate)
 ```
 
-*Benefit:* Catch gaps early when they're cheap to fix.
+_Benefit:_ Catch gaps early when they're cheap to fix.
 
 ### Use Coverage Trends
 
 Track improvement over time:
+
 ```
 ## Coverage Trend
 | Date       | Epic     | P0/P1 Coverage | Quality Score | Status         |
@@ -410,6 +448,7 @@ Track improvement over time:
 ### Set Coverage Targets by Priority
 
 Recommended targets:
+
 - **P0:** 100% (critical path must be tested)
 - **P1:** 90% (high-value scenarios)
 - **P2:** 50% (nice-to-have features)
@@ -418,20 +457,24 @@ Recommended targets:
 ### Use Classification Strategically
 
 **FULL**: Requirement completely tested
+
 - E2E test covers full user workflow
 - API test validates backend behavior
 - All acceptance criteria covered
 
 **PARTIAL**: Some aspects tested
+
 - E2E test exists but missing scenarios
 - API test exists but incomplete
 - Some acceptance criteria not covered
 
 **NONE**: No tests exist
+
 - Requirement identified but not tested
 - May be intentional (low priority) or oversight
 
 Classification helps prioritize:
+
 - Fix NONE coverage for P0/P1 requirements first
 - Enhance PARTIAL coverage for P0 requirements
 - Accept PARTIAL or NONE for P2/P3 if time-constrained
@@ -441,6 +484,7 @@ Classification helps prioritize:
 Use traceability in CI:
 
 `.github/workflows/gate-check.yml:`
+
 ```yaml
 - name: Check coverage
   run: |
@@ -458,6 +502,7 @@ If proceeding with WAIVED:
 
 ```markdown
 ## Waiver Documentation
+
 **Waived By:** VP Engineering, Product Lead
 **Date:** 2026-01-15
 **Gate Type:** Release Gate v1.2
@@ -467,21 +512,25 @@ Business critical to launch by Q1 for investor demo.
 Performance concerns acceptable for initial user base.
 
 **Conditions:**
+
 - Set monitoring alerts for P99 > 300ms
 - Plan optimization for v1.3 (due February 28)
 - Monitor user feedback closely
 
 **Accepted Risks:**
+
 - 1% of users may experience 350ms latency
 - Avatar upload feature incomplete
 - Profile export deferred to next release
 
 **Quantified Impact:**
+
 - Affects <100 users at current scale
 - Workaround exists (manual export)
 - Monitoring will catch issues early
 
 **Approvals:**
+
 - VP Engineering: [Signature] Date: 2026-01-15
 - Product Lead: [Signature] Date: 2026-01-15
 - QA Lead: [Signature] Date: 2026-01-15
@@ -494,12 +543,13 @@ Performance concerns acceptable for initial user base.
 **Problem:** Phase 1 shows 50 uncovered requirements.
 
 **Solution:** Prioritize ruthlessly:
+
 1. Fix all P0 gaps (critical path)
 2. Fix high-risk P1 gaps
 3. Accept low-risk P1 gaps with mitigation
 4. Defer all P2/P3 gaps
 
-*Don't try to fix everything* - focus on what matters for release.
+_Don't try to fix everything_ - focus on what matters for release.
 
 ### Can't Find Test Coverage
 
@@ -508,6 +558,7 @@ Performance concerns acceptable for initial user base.
 **Cause:** Tests don't reference requirements.
 
 **Solution:** Add traceability comments:
+
 ```typescript
 test('should display profile', async ({ page }) => {
   // Covers: Requirement 1 - User can view profile
@@ -518,6 +569,7 @@ test('should display profile', async ({ page }) => {
 ```
 
 Or use test IDs:
+
 ```typescript
 test('[REQ-1] should display profile', async ({ page }) => {
   // Test code...
@@ -527,6 +579,7 @@ test('[REQ-1] should display profile', async ({ page }) => {
 ### Unclear What "FULL" vs "PARTIAL" Means
 
 **FULL**: All acceptance criteria tested
+
 ```
 Requirement: User can edit profile
 Acceptance criteria:
@@ -538,6 +591,7 @@ Result: FULL coverage
 ```
 
 **PARTIAL**: Some criteria tested, some not
+
 ```
 Requirement: User can edit profile
 Acceptance criteria:
@@ -551,24 +605,27 @@ Result: PARTIAL coverage (3/4 criteria)
 ### Gate Decision Unclear
 
 **Use PASS** if:
+
 - All P0 requirements 100% covered
 - P1 requirements >90% covered
 - No critical issues
 - NFRs met
 
 **Use CONCERNS** if:
+
 - P1 coverage 85-90% (close to threshold)
 - Minor quality issues (score 70-79)
 - NFRs have mitigation plans
 - Team agrees risk is acceptable
 
 **Use FAIL** if:
+
 - P0 coverage <100% (critical path gaps)
 - P1 coverage <85%
 - Critical security/performance issues
 - No mitigation possible
 
-*When in doubt, use CONCERNS* and document the risk.
+_When in doubt, use CONCERNS_ and document the risk.
 
 ## Related Guides
 
@@ -588,4 +645,4 @@ Result: PARTIAL coverage (3/4 criteria)
 
 ---
 
-*Generated with BMad Method - TEA (Test Engineering Architect)*
+_Generated with BMad Method - TEA (Test Engineering Architect)_

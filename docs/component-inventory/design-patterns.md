@@ -4,20 +4,20 @@
 
 13 component directories use `index.ts` barrel exports for clean imports:
 
-| Folder                | Exports                                                                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `CountdownTimer/`     | `CountdownTimer`                                                                                                                        |
-| `DisplayNameSetup/`   | `DisplayNameSetup`                                                                                                                      |
-| `InteractionHistory/` | `InteractionHistory`                                                                                                                    |
-| `LoginScreen/`        | `LoginScreen`                                                                                                                           |
-| `MoodHistory/`        | `MoodHistoryCalendar`                                                                                                                   |
-| `PartnerMoodView/`    | `PartnerMoodView`                                                                                                                       |
-| `PokeKissInterface/`  | `PokeKissInterface`                                                                                                                     |
-| `RelationshipTimers/` | `TimeTogether`, `BirthdayCountdown`, `EventCountdown`, `RelationshipTimers`                                                             |
-| `Settings/`           | `Settings`, `AnniversarySettings`                                                                                                       |
-| `shared/`             | `NetworkStatusIndicator`, `NetworkStatusDot`, `SyncToast`, `SyncResult` (type)                                                          |
-| `love-notes/`         | `LoveNotes`, `LoveNoteMessage` (+ type), `MessageList` (+ type)                                                                         |
-| `ViewErrorBoundary/`  | `ViewErrorBoundary` (named + default)                                                                                                   |
+| Folder                | Exports                                                                                                                                                                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CountdownTimer/`     | `CountdownTimer`                                                                                                                                                                                                                                               |
+| `DisplayNameSetup/`   | `DisplayNameSetup`                                                                                                                                                                                                                                             |
+| `InteractionHistory/` | `InteractionHistory`                                                                                                                                                                                                                                           |
+| `LoginScreen/`        | `LoginScreen`                                                                                                                                                                                                                                                  |
+| `MoodHistory/`        | `MoodHistoryCalendar`                                                                                                                                                                                                                                          |
+| `PartnerMoodView/`    | `PartnerMoodView`                                                                                                                                                                                                                                              |
+| `PokeKissInterface/`  | `PokeKissInterface`                                                                                                                                                                                                                                            |
+| `RelationshipTimers/` | `TimeTogether`, `BirthdayCountdown`, `EventCountdown`, `RelationshipTimers`                                                                                                                                                                                    |
+| `Settings/`           | `Settings`, `AnniversarySettings`                                                                                                                                                                                                                              |
+| `shared/`             | `NetworkStatusIndicator`, `NetworkStatusDot`, `SyncToast`, `SyncResult` (type)                                                                                                                                                                                 |
+| `love-notes/`         | `LoveNotes`, `LoveNoteMessage` (+ type), `MessageList` (+ type)                                                                                                                                                                                                |
+| `ViewErrorBoundary/`  | `ViewErrorBoundary` (named + default)                                                                                                                                                                                                                          |
 | `scripture-reading/`  | `ScriptureOverview`, `SoloReadingFlow`, `LobbyContainer`, `ReadingContainer`, `Countdown`, `LockInButton`, `BookmarkFlag`, `RoleIndicator`, `PartnerPosition`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport`, `StatsSection` |
 
 ## Lazy Loading (Code Splitting)

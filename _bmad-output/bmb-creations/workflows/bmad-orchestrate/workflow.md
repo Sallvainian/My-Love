@@ -48,7 +48,7 @@ web_bundle: true
 
 ### 1. Configuration Loading
 
-Load and read full config from {project-root}/_bmad/core/config.yaml and resolve:
+Load and read full config from {project-root}/\_bmad/core/config.yaml and resolve:
 
 - `output_folder`, `user_name`, `communication_language`, `document_output_language`
 

@@ -1,5 +1,12 @@
 ---
-stepsCompleted: ['step-01-load-context', 'step-02-discover-tests', 'step-03-map-criteria', 'step-04-analyze-gaps', 'step-05-gate-decision']
+stepsCompleted:
+  [
+    'step-01-load-context',
+    'step-02-discover-tests',
+    'step-03-map-criteria',
+    'step-04-analyze-gaps',
+    'step-05-gate-decision',
+  ]
 lastStep: 'step-05-gate-decision'
 lastSaved: '2026-02-17'
 ---
@@ -21,6 +28,7 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 ## STEP 1 CONTEXT SUMMARY
 
 ### Knowledge Base Loaded
+
 - `test-priorities-matrix.md` — P0–P3 criteria, coverage targets
 - `risk-governance.md` — Risk scoring (probability × impact), gate decision rules
 - `probability-impact.md` — 1-3 scale, thresholds (BLOCK=9, MITIGATE=6-8, MONITOR=4-5, DOCUMENT=1-3)
@@ -29,25 +37,26 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### Acceptance Criteria Extracted
 
-| AC ID | Description | Priority |
-|-------|-------------|----------|
-| AC-1 | 5 couple-aggregate metrics displayed: totalSessions, totalSteps, lastCompleted, avgRating, bookmarkCount | P0 |
-| AC-2 | Zero-state shows zeros/dashes gracefully + "Begin your first reading" (no errors) | P0 |
-| AC-3 | Skeleton loading states shown; <2s on 3G; IndexedDB cache shown immediately then updated | P1 |
-| AC-4 | Metrics reflect BOTH partners' data (couple-level); RLS enforced | P0 |
-| AC-5 | Lavender Dreams glass morphism styling; single-column mobile, max-w-md on md+; no gamification | P2 |
+| AC ID | Description                                                                                              | Priority |
+| ----- | -------------------------------------------------------------------------------------------------------- | -------- |
+| AC-1  | 5 couple-aggregate metrics displayed: totalSessions, totalSteps, lastCompleted, avgRating, bookmarkCount | P0       |
+| AC-2  | Zero-state shows zeros/dashes gracefully + "Begin your first reading" (no errors)                        | P0       |
+| AC-3  | Skeleton loading states shown; <2s on 3G; IndexedDB cache shown immediately then updated                 | P1       |
+| AC-4  | Metrics reflect BOTH partners' data (couple-level); RLS enforced                                         | P0       |
+| AC-5  | Lavender Dreams glass morphism styling; single-column mobile, max-w-md on md+; no gamification           | P2       |
 
 ### Test Files Discovered
 
-| Test ID | File | Priority | Level |
-|---------|------|----------|-------|
-| 3.1-UNIT-001–004, 008–012 | `src/components/scripture-reading/__tests__/StatsSection.test.tsx` | P1/P2 | Unit/Component |
-| 3.1-UNIT-005, 006, 013 | `tests/unit/services/scriptureReadingService.stats.test.ts` | P1/P3 | Unit |
-| 3.1-UNIT-007 | `tests/unit/stores/scriptureReadingSlice.stats.test.ts` | P1 | Unit |
-| 3.1-E2E-001 | `tests/e2e/scripture/scripture-stats.spec.ts` | P0 | E2E |
-| 3.1-DB-001, 002, 003 | `supabase/tests/database/09_scripture_couple_stats.sql` | P0/P2 | Database (pgTAP) |
+| Test ID                   | File                                                               | Priority | Level            |
+| ------------------------- | ------------------------------------------------------------------ | -------- | ---------------- |
+| 3.1-UNIT-001–004, 008–012 | `src/components/scripture-reading/__tests__/StatsSection.test.tsx` | P1/P2    | Unit/Component   |
+| 3.1-UNIT-005, 006, 013    | `tests/unit/services/scriptureReadingService.stats.test.ts`        | P1/P3    | Unit             |
+| 3.1-UNIT-007              | `tests/unit/stores/scriptureReadingSlice.stats.test.ts`            | P1       | Unit             |
+| 3.1-E2E-001               | `tests/e2e/scripture/scripture-stats.spec.ts`                      | P0       | E2E              |
+| 3.1-DB-001, 002, 003      | `supabase/tests/database/09_scripture_couple_stats.sql`            | P0/P2    | Database (pgTAP) |
 
 ### Supporting Artifacts
+
 - **Epic:** `_bmad-output/planning-artifacts/epics/epic-3-stats-overview-dashboard.md`
 - **Test Design:** `_bmad-output/test-artifacts/test-design-epic-3.md`
 - **NFR Assessment:** `_bmad-output/test-artifacts/nfr-assessment.md` (PASS with CONCERNS)
@@ -58,9 +67,9 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### E2E Tests (1 test)
 
-| Test ID | File | Describe Block | Test Name | Priority | AC Coverage |
-|---------|------|---------------|-----------|----------|------------|
-| 3.1-E2E-001 | `tests/e2e/scripture/scripture-stats.spec.ts` | Scripture Stats Dashboard > 3.1-E2E-001: Stats visible after session completion | `[P0] should display stats section with non-zero values after completing a session` | P0 | AC-1, AC-4 |
+| Test ID     | File                                          | Describe Block                                                                  | Test Name                                                                           | Priority | AC Coverage |
+| ----------- | --------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- | ----------- |
+| 3.1-E2E-001 | `tests/e2e/scripture/scripture-stats.spec.ts` | Scripture Stats Dashboard > 3.1-E2E-001: Stats visible after session completion | `[P0] should display stats section with non-zero values after completing a session` | P0       | AC-1, AC-4  |
 
 **Note:** 3.1-E2E-002 (zero-state E2E) deliberately removed — duplicate of unit test 3.1-UNIT-004.
 
@@ -68,89 +77,89 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 #### StatsSection.test.tsx — `src/components/scripture-reading/__tests__/StatsSection.test.tsx`
 
-| Test ID | Describe Block | Test Name | Priority |
-|---------|---------------|-----------|----------|
-| 3.1-UNIT-001 | Populated state rendering | should render the stats section container | P1 |
-| 3.1-UNIT-001 | Populated state rendering | should render sessions completed card with value "12" | P1 |
-| 3.1-UNIT-001 | Populated state rendering | should render steps completed card with value "204" | P1 |
-| 3.1-UNIT-001 | Populated state rendering | should render last completed card with relative time | P1 |
-| 3.1-UNIT-001 | Populated state rendering | should render average rating card with value "3.8" | P1 |
-| 3.1-UNIT-001 | Populated state rendering | should render bookmarks card with value "47" | P1 |
-| 3.1-UNIT-001 | Populated state rendering | should render section heading "Your Journey" | P1 |
-| 3.1-UNIT-002 | Skeleton loading state | should show skeleton loading container when isLoading=true and stats=null | P1 |
-| 3.1-UNIT-002 | Skeleton loading state | should render skeleton cards with animate-pulse | P1 |
-| 3.1-UNIT-002 | Skeleton loading state | should have aria-busy="true" on skeleton section | P1 |
-| 3.1-UNIT-003 | Stale-while-revalidate | should show cached stats (not skeleton) when isLoading=true and stats exist | P1 |
-| 3.1-UNIT-004 | Zero-state rendering | should show em dashes for all metric values when stats are all zeros | P1 |
-| 3.1-UNIT-004 | Zero-state rendering | should show "Begin your first reading" zero-state message | P1 |
-| 3.1-UNIT-004 | Zero-state rendering | should NOT show zero-state message when stats have values | P1 |
-| 3.1-UNIT-008 | No gamification language | should use neutral stat labels without gamification language | P2 |
-| 3.1-UNIT-009 | Relative time formatting | should render last completed date as relative time | P2 |
-| 3.1-UNIT-009 | Relative time formatting | should show em dash for last completed when null with non-zero stats | P2 |
-| 3.1-UNIT-010 | Average rating formatting | should render average rating with 1 decimal place | P2 |
-| 3.1-UNIT-010 | Average rating formatting | should render whole number rating with 1 decimal (e.g., "4.0") | P2 |
-| 3.1-UNIT-011 | Glass morphism styling | should apply glass morphism classes to stat cards | P2 |
-| 3.1-UNIT-011 | Glass morphism styling | should apply glass morphism to all 5 stat cards | P2 |
-| 3.1-UNIT-012 | Accessibility | should have aria-label on stats section | P2 |
-| 3.1-UNIT-012 | Accessibility | should have aria-label on each stat value describing the metric | P2 |
-| 3.1-UNIT-012 | Accessibility | should have descriptive aria-labels for zero-state values | P2 |
-| (edge) | Null state (no data, not loading) | should show zero-state with dashes when stats is null and isLoading is false | P1 |
+| Test ID      | Describe Block                    | Test Name                                                                    | Priority |
+| ------------ | --------------------------------- | ---------------------------------------------------------------------------- | -------- |
+| 3.1-UNIT-001 | Populated state rendering         | should render the stats section container                                    | P1       |
+| 3.1-UNIT-001 | Populated state rendering         | should render sessions completed card with value "12"                        | P1       |
+| 3.1-UNIT-001 | Populated state rendering         | should render steps completed card with value "204"                          | P1       |
+| 3.1-UNIT-001 | Populated state rendering         | should render last completed card with relative time                         | P1       |
+| 3.1-UNIT-001 | Populated state rendering         | should render average rating card with value "3.8"                           | P1       |
+| 3.1-UNIT-001 | Populated state rendering         | should render bookmarks card with value "47"                                 | P1       |
+| 3.1-UNIT-001 | Populated state rendering         | should render section heading "Your Journey"                                 | P1       |
+| 3.1-UNIT-002 | Skeleton loading state            | should show skeleton loading container when isLoading=true and stats=null    | P1       |
+| 3.1-UNIT-002 | Skeleton loading state            | should render skeleton cards with animate-pulse                              | P1       |
+| 3.1-UNIT-002 | Skeleton loading state            | should have aria-busy="true" on skeleton section                             | P1       |
+| 3.1-UNIT-003 | Stale-while-revalidate            | should show cached stats (not skeleton) when isLoading=true and stats exist  | P1       |
+| 3.1-UNIT-004 | Zero-state rendering              | should show em dashes for all metric values when stats are all zeros         | P1       |
+| 3.1-UNIT-004 | Zero-state rendering              | should show "Begin your first reading" zero-state message                    | P1       |
+| 3.1-UNIT-004 | Zero-state rendering              | should NOT show zero-state message when stats have values                    | P1       |
+| 3.1-UNIT-008 | No gamification language          | should use neutral stat labels without gamification language                 | P2       |
+| 3.1-UNIT-009 | Relative time formatting          | should render last completed date as relative time                           | P2       |
+| 3.1-UNIT-009 | Relative time formatting          | should show em dash for last completed when null with non-zero stats         | P2       |
+| 3.1-UNIT-010 | Average rating formatting         | should render average rating with 1 decimal place                            | P2       |
+| 3.1-UNIT-010 | Average rating formatting         | should render whole number rating with 1 decimal (e.g., "4.0")               | P2       |
+| 3.1-UNIT-011 | Glass morphism styling            | should apply glass morphism classes to stat cards                            | P2       |
+| 3.1-UNIT-011 | Glass morphism styling            | should apply glass morphism to all 5 stat cards                              | P2       |
+| 3.1-UNIT-012 | Accessibility                     | should have aria-label on stats section                                      | P2       |
+| 3.1-UNIT-012 | Accessibility                     | should have aria-label on each stat value describing the metric              | P2       |
+| 3.1-UNIT-012 | Accessibility                     | should have descriptive aria-labels for zero-state values                    | P2       |
+| (edge)       | Null state (no data, not loading) | should show zero-state with dashes when stats is null and isLoading is false | P1       |
 
 #### scriptureReadingService.stats.test.ts — `tests/unit/services/scriptureReadingService.stats.test.ts`
 
-| Test ID | Describe Block | Test Name | Priority |
-|---------|---------------|-----------|----------|
-| 3.1-UNIT-005 | getCoupleStats success | should call supabase.rpc with scripture_get_couple_stats and return typed CoupleStats | P1 |
-| 3.1-UNIT-005 | getCoupleStats success | should validate RPC response against Zod schema and return null on invalid shape | P1 |
-| 3.1-UNIT-006 | getCoupleStats error handling | should return null on Supabase RPC error | P1 |
-| 3.1-UNIT-006 | getCoupleStats error handling | should return null on network exception | P1 |
-| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should accept a valid CoupleStats response | P3 |
-| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should accept lastCompleted as null (zero-state) | P3 |
-| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should reject invalid types (string for totalSessions) | P3 |
-| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should reject missing required fields | P3 |
-| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should reject negative numbers for count fields | P3 |
+| Test ID      | Describe Block                     | Test Name                                                                             | Priority |
+| ------------ | ---------------------------------- | ------------------------------------------------------------------------------------- | -------- |
+| 3.1-UNIT-005 | getCoupleStats success             | should call supabase.rpc with scripture_get_couple_stats and return typed CoupleStats | P1       |
+| 3.1-UNIT-005 | getCoupleStats success             | should validate RPC response against Zod schema and return null on invalid shape      | P1       |
+| 3.1-UNIT-006 | getCoupleStats error handling      | should return null on Supabase RPC error                                              | P1       |
+| 3.1-UNIT-006 | getCoupleStats error handling      | should return null on network exception                                               | P1       |
+| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should accept a valid CoupleStats response                                            | P3       |
+| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should accept lastCompleted as null (zero-state)                                      | P3       |
+| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should reject invalid types (string for totalSessions)                                | P3       |
+| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should reject missing required fields                                                 | P3       |
+| 3.1-UNIT-013 | CoupleStatsSchema — Zod validation | should reject negative numbers for count fields                                       | P3       |
 
 #### scriptureReadingSlice.stats.test.ts — `tests/unit/stores/scriptureReadingSlice.stats.test.ts`
 
-| Test ID | Describe Block | Test Name | Priority |
-|---------|---------------|-----------|----------|
-| (init) | initial stats state | should initialize with coupleStats=null and isStatsLoading=false | P1 |
-| 3.1-UNIT-007 | loadCoupleStats | should set isStatsLoading=true while loading | P1 |
-| 3.1-UNIT-007 | loadCoupleStats | should update coupleStats with service response on success | P1 |
-| 3.1-UNIT-007 | loadCoupleStats | should keep existing coupleStats when service returns null (silent failure) | P1 |
-| 3.1-UNIT-007 | loadCoupleStats | should call scriptureReadingService.getCoupleStats exactly once | P1 |
-| 3.1-UNIT-007 | loadCoupleStats | should set isStatsLoading=false even when service throws | P1 |
+| Test ID      | Describe Block      | Test Name                                                                   | Priority |
+| ------------ | ------------------- | --------------------------------------------------------------------------- | -------- |
+| (init)       | initial stats state | should initialize with coupleStats=null and isStatsLoading=false            | P1       |
+| 3.1-UNIT-007 | loadCoupleStats     | should set isStatsLoading=true while loading                                | P1       |
+| 3.1-UNIT-007 | loadCoupleStats     | should update coupleStats with service response on success                  | P1       |
+| 3.1-UNIT-007 | loadCoupleStats     | should keep existing coupleStats when service returns null (silent failure) | P1       |
+| 3.1-UNIT-007 | loadCoupleStats     | should call scriptureReadingService.getCoupleStats exactly once             | P1       |
+| 3.1-UNIT-007 | loadCoupleStats     | should set isStatsLoading=false even when service throws                    | P1       |
 
 ### Database Tests — pgTAP (13 plans)
 
 **File:** `supabase/tests/database/09_scripture_couple_stats.sql`
 
-| Test ID | Assertion | Priority |
-|---------|-----------|----------|
-| 3.1-DB-001a | User A sees only couple A completed sessions (2), not couple C | P0 |
-| 3.1-DB-001b | User C sees only couple C completed sessions (1), not couple A | P0 |
-| 3.1-DB-001c | User C sees only couple C bookmarks (3), not couple A | P0 |
-| 3.1-DB-001d | User C avg rating is 1.0, not contaminated by couple A ratings | P0 |
-| 3.1-DB-001e | User B (partner) sees both couple A sessions (2) via partner_id linkage | P0 |
-| 3.1-DB-001f | User D (partner, no own sessions) sees couple C session (1) via partner_id | P0 |
-| 3.1-DB-002a | totalSessions = 2 (excludes in_progress session) | P0 |
-| 3.1-DB-002b | totalSteps = 13 (5 from session 1 + 8 from session 2) | P0 |
-| 3.1-DB-002c | lastCompleted is session 2 completed_at | P0 |
-| 3.1-DB-002d | avgRating ≈ 3.92 (51/13 ratings across both partners) | P0 |
-| 3.1-DB-002e | bookmarkCount = 5 (2 + 3 across sessions) | P0 |
-| 3.1-DB-003a | Zero-state couple has totalSessions = 0 | P2 |
-| 3.1-DB-003b | Zero-state couple has lastCompleted = null | P2 |
+| Test ID     | Assertion                                                                  | Priority |
+| ----------- | -------------------------------------------------------------------------- | -------- |
+| 3.1-DB-001a | User A sees only couple A completed sessions (2), not couple C             | P0       |
+| 3.1-DB-001b | User C sees only couple C completed sessions (1), not couple A             | P0       |
+| 3.1-DB-001c | User C sees only couple C bookmarks (3), not couple A                      | P0       |
+| 3.1-DB-001d | User C avg rating is 1.0, not contaminated by couple A ratings             | P0       |
+| 3.1-DB-001e | User B (partner) sees both couple A sessions (2) via partner_id linkage    | P0       |
+| 3.1-DB-001f | User D (partner, no own sessions) sees couple C session (1) via partner_id | P0       |
+| 3.1-DB-002a | totalSessions = 2 (excludes in_progress session)                           | P0       |
+| 3.1-DB-002b | totalSteps = 13 (5 from session 1 + 8 from session 2)                      | P0       |
+| 3.1-DB-002c | lastCompleted is session 2 completed_at                                    | P0       |
+| 3.1-DB-002d | avgRating ≈ 3.92 (51/13 ratings across both partners)                      | P0       |
+| 3.1-DB-002e | bookmarkCount = 5 (2 + 3 across sessions)                                  | P0       |
+| 3.1-DB-003a | Zero-state couple has totalSessions = 0                                    | P2       |
+| 3.1-DB-003b | Zero-state couple has lastCompleted = null                                 | P2       |
 
 ### Test Count Summary
 
-| Level | Test File(s) | Test Count | Priority Breakdown |
-|-------|-------------|-----------|-------------------|
-| E2E | scripture-stats.spec.ts | 1 | 1 P0 |
-| Component | StatsSection.test.tsx | 25 | 14 P1, 10 P2, 1 edge |
-| Unit (service) | scriptureReadingService.stats.test.ts | 9 | 4 P1, 5 P3 |
-| Unit (slice) | scriptureReadingSlice.stats.test.ts | 6 | 6 P1 |
-| Database | 09_scripture_couple_stats.sql | 13 | 11 P0, 2 P2 |
-| **Total** | | **54** | **12 P0, 25 P1, 12 P2, 5 P3** |
+| Level          | Test File(s)                          | Test Count | Priority Breakdown            |
+| -------------- | ------------------------------------- | ---------- | ----------------------------- |
+| E2E            | scripture-stats.spec.ts               | 1          | 1 P0                          |
+| Component      | StatsSection.test.tsx                 | 25         | 14 P1, 10 P2, 1 edge          |
+| Unit (service) | scriptureReadingService.stats.test.ts | 9          | 4 P1, 5 P3                    |
+| Unit (slice)   | scriptureReadingSlice.stats.test.ts   | 6          | 6 P1                          |
+| Database       | 09_scripture_couple_stats.sql         | 13         | 11 P0, 2 P2                   |
+| **Total**      |                                       | **54**     | **12 P0, 25 P1, 12 P2, 5 P3** |
 
 ---
 
@@ -158,15 +167,16 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 
 ### Coverage Summary
 
-| Priority | Total Criteria | FULL Coverage | Coverage % | Status |
-|----------|----------------|---------------|------------|--------|
-| P0       | 3              | 3             | 100%       | ✅ PASS |
-| P1       | 1              | 1             | 100%       | ✅ PASS |
-| P2       | 1              | 0 (PARTIAL)   | 80%        | ⚠️ WARN |
-| P3       | 0              | 0             | N/A        | N/A    |
-| **Total**| **5**          | **4**         | **93%**    | **✅ PASS** |
+| Priority  | Total Criteria | FULL Coverage | Coverage % | Status      |
+| --------- | -------------- | ------------- | ---------- | ----------- |
+| P0        | 3              | 3             | 100%       | ✅ PASS     |
+| P1        | 1              | 1             | 100%       | ✅ PASS     |
+| P2        | 1              | 0 (PARTIAL)   | 80%        | ⚠️ WARN     |
+| P3        | 0              | 0             | N/A        | N/A         |
+| **Total** | **5**          | **4**         | **93%**    | **✅ PASS** |
 
 **Legend:**
+
 - ✅ PASS — Coverage meets quality gate threshold
 - ⚠️ WARN — Coverage below threshold but not critical
 - ❌ FAIL — Coverage below minimum threshold (blocker)
@@ -183,7 +193,7 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
     - **Given:** User completes a full solo reading session
     - **When:** User returns to scripture overview
     - **Then:** Stats section visible; sessions/steps/last-completed show non-zero values; zero-state not shown
-    - *Note: E2E validates 3/5 cards by value; all 5 visible (no em-dash check for avg-rating/bookmarks)*
+    - _Note: E2E validates 3/5 cards by value; all 5 visible (no em-dash check for avg-rating/bookmarks)_
   - `3.1-UNIT-001` — `src/components/scripture-reading/__tests__/StatsSection.test.tsx`
     - **Given:** StatsSection receives populated stats
     - **When:** Rendered with isLoading=false
@@ -326,6 +336,7 @@ Note: This workflow does not generate tests. If gaps exist, run `*atdd` or `*aut
 **54/54 tests (100%) exist and meet quality criteria** ✅
 
 Quality checks (from test-quality.md knowledge):
+
 - ✅ No hard waits in E2E (uses `await scriptureNav.*` fixture methods, element visibility checks)
 - ✅ Isolated: `vi.clearAllMocks()` in beforeEach; fake-indexeddb; worker-isolated E2E auth
 - ✅ Explicit assertions (all expect() in test bodies, not helpers)
@@ -350,13 +361,13 @@ None identified.
 
 ### Coverage by Test Level
 
-| Test Level | Tests | Criteria Covered | Coverage % |
-|------------|-------|-----------------|-----------|
-| E2E        | 1     | AC-1, AC-4      | P0: 67%   |
-| Database   | 13    | AC-1, AC-2, AC-4| P0: 100%  |
-| Component  | 25    | AC-1, AC-2, AC-3, AC-5 | P1: 100%, P2: 80% |
-| Unit       | 15    | AC-1, AC-3      | P1: 100%  |
-| **Total**  | **54**| **All 5 ACs**   | **93%**   |
+| Test Level | Tests  | Criteria Covered       | Coverage %        |
+| ---------- | ------ | ---------------------- | ----------------- |
+| E2E        | 1      | AC-1, AC-4             | P0: 67%           |
+| Database   | 13     | AC-1, AC-2, AC-4       | P0: 100%          |
+| Component  | 25     | AC-1, AC-2, AC-3, AC-5 | P1: 100%, P2: 80% |
+| Unit       | 15     | AC-1, AC-3             | P1: 100%          |
+| **Total**  | **54** | **All 5 ACs**          | **93%**           |
 
 ---
 
@@ -436,11 +447,13 @@ None required. All P0/P1 criteria fully covered.
 - **Test Results Source:** NFR Assessment + test file review (CI run not executed in this session)
 
 **Priority Breakdown:**
+
 - **P0 Tests**: 3/3 present, 0 gaps ✅
 - **P1 Tests**: 7/7 present, 0 gaps ✅
 - **P2 Tests**: 6/6 present, 0 gaps ✅
 
 **CI Evidence (from NFR Assessment):**
+
 - P0 gate (fast gate before full E2E): ✅ Configured
 - 2-shard E2E run: ✅ Configured
 - Burn-in: 5 iterations on changed specs before merge to main ✅
@@ -450,12 +463,14 @@ None required. All P0/P1 criteria fully covered.
 #### Coverage Summary (from Phase 1)
 
 **Requirements Coverage:**
+
 - **P0 Acceptance Criteria**: 3/3 covered (100%) ✅
 - **P1 Acceptance Criteria**: 1/1 covered (functional 100%; perf NFR gap — LOW risk) ✅
 - **P2 Acceptance Criteria**: 1/1 covered (80% — layout gap, cosmetic only)
 - **Overall Coverage**: 93%
 
 **Code Coverage** (from NFR Assessment):
+
 - **Threshold**: ≥80% (from vitest.config.ts)
 - **Status**: ✅ PASS (inferred — service, slice, component all have comprehensive unit tests)
 
@@ -466,21 +481,25 @@ None required. All P0/P1 criteria fully covered.
 #### Non-Functional Requirements (NFRs)
 
 **Security**: PASS ✅
+
 - E3-R01 (risk score 6) mitigated — 3.1-DB-001 passes with 6 isolation assertions
 - No cross-couple data exposure possible (SECURITY DEFINER RPC design)
 - Input validation via Zod schema (3.1-UNIT-013)
 
 **Performance**: CONCERNS ⚠️
+
 - Architecture compliant (cache-first + skeleton loading)
 - No formal <2s on 3G measurement (Lighthouse CI gap)
 - No regression in bundle (performance remediation completed 2026-02-07)
 
 **Reliability**: PASS ✅
+
 - Silent failure handling: getCoupleStats() returns null on error; cached stats retained
 - CI burn-in: 5 iterations configured
 - CI burn-in: 5 iterations configured
 
 **Maintainability**: PASS ✅
+
 - 2 rounds of senior review completed
 - ESLint/TypeScript strict compliance
 - Test files all under 300 lines
@@ -492,6 +511,7 @@ None required. All P0/P1 criteria fully covered.
 #### Flakiness Validation
 
 **Burn-in Results:**
+
 - **Burn-in Iterations**: 5 (per CI configuration)
 - **Status**: Configured ✅ (results from CI run not available in this session)
 - **Stability Pattern**: E2E test uses `scriptureNav` fixture (deterministic, no hard waits)
@@ -502,12 +522,12 @@ None required. All P0/P1 criteria fully covered.
 
 #### P0 Criteria (Must ALL Pass)
 
-| Criterion | Threshold | Actual | Status |
-|-----------|-----------|--------|--------|
-| P0 Coverage | 100% | 100% | ✅ PASS |
-| Security Issues | 0 | 0 | ✅ PASS |
-| Critical NFR Failures | 0 | 0 | ✅ PASS |
-| E3-R01 Security Test | PASS | 3.1-DB-001 covers 6 isolation assertions | ✅ PASS |
+| Criterion             | Threshold | Actual                                   | Status  |
+| --------------------- | --------- | ---------------------------------------- | ------- |
+| P0 Coverage           | 100%      | 100%                                     | ✅ PASS |
+| Security Issues       | 0         | 0                                        | ✅ PASS |
+| Critical NFR Failures | 0         | 0                                        | ✅ PASS |
+| E3-R01 Security Test  | PASS      | 3.1-DB-001 covers 6 isolation assertions | ✅ PASS |
 
 **P0 Evaluation:** ✅ ALL PASS
 
@@ -515,11 +535,11 @@ None required. All P0/P1 criteria fully covered.
 
 #### P1 Criteria (Required for PASS)
 
-| Criterion | Threshold | Actual | Status |
-|-----------|-----------|--------|--------|
-| P1 Coverage | ≥90% | 100% functional | ✅ PASS |
-| Overall Coverage | ≥90% | 93% | ✅ PASS |
-| P1 Tests Implemented | 100% | 7/7 (100%) | ✅ PASS |
+| Criterion            | Threshold | Actual          | Status  |
+| -------------------- | --------- | --------------- | ------- |
+| P1 Coverage          | ≥90%      | 100% functional | ✅ PASS |
+| Overall Coverage     | ≥90%      | 93%             | ✅ PASS |
+| P1 Tests Implemented | 100%      | 7/7 (100%)      | ✅ PASS |
 
 **P1 Evaluation:** ✅ ALL PASS
 
@@ -527,10 +547,10 @@ None required. All P0/P1 criteria fully covered.
 
 #### P2/P3 Criteria (Informational)
 
-| Criterion | Actual | Notes |
-|-----------|--------|-------|
-| P2 Test Coverage | 6/6 (100%) | All P2 tests implemented |
-| P3 Test Coverage | 1/2 (50%) | PERF-001 not automated; acceptable for P3 |
+| Criterion        | Actual     | Notes                                     |
+| ---------------- | ---------- | ----------------------------------------- |
+| P2 Test Coverage | 6/6 (100%) | All P2 tests implemented                  |
+| P3 Test Coverage | 1/2 (50%)  | PERF-001 not automated; acceptable for P3 |
 
 ---
 
@@ -596,8 +616,8 @@ NFR assessment independently concluded PASS with CONCERNS (no blockers).
 traceability_and_gate:
   # Phase 1: Traceability
   traceability:
-    story_id: "Epic 3 / Story 3.1"
-    date: "2026-02-17"
+    story_id: 'Epic 3 / Story 3.1'
+    date: '2026-02-17'
     coverage:
       overall: 93%
       p0: 100%
@@ -615,14 +635,14 @@ traceability_and_gate:
       blocker_issues: 0
       warning_issues: 2
     recommendations:
-      - "Add Lighthouse CI for formal <2s on 3G measurement (Quick Win, 2h)"
-      - "Add responsive layout test for AC-5 (optional, cosmetic)"
+      - 'Add Lighthouse CI for formal <2s on 3G measurement (Quick Win, 2h)'
+      - 'Add responsive layout test for AC-5 (optional, cosmetic)'
 
   # Phase 2: Gate Decision
   gate_decision:
-    decision: "PASS"
-    gate_type: "epic"
-    decision_mode: "deterministic"
+    decision: 'PASS'
+    gate_type: 'epic'
+    decision_mode: 'deterministic'
     criteria:
       p0_coverage: 100%
       p0_pass_rate: 100%
@@ -633,10 +653,10 @@ traceability_and_gate:
       min_p0_coverage: 100
       min_overall_coverage: 90
     evidence:
-      traceability: "_bmad-output/test-artifacts/traceability/traceability-matrix-epic-3.md"
-      nfr_assessment: "_bmad-output/test-artifacts/nfr-assessment.md"
-      coverage_matrix: "/tmp/tea-trace-coverage-matrix-20260217.json"
-    next_steps: "Proceed to deployment. Add Lighthouse CI and npm audit in next sprint."
+      traceability: '_bmad-output/test-artifacts/traceability/traceability-matrix-epic-3.md'
+      nfr_assessment: '_bmad-output/test-artifacts/nfr-assessment.md'
+      coverage_matrix: '/tmp/tea-trace-coverage-matrix-20260217.json'
+    next_steps: 'Proceed to deployment. Add Lighthouse CI and npm audit in next sprint.'
 ```
 
 ---

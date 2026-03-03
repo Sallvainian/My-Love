@@ -142,36 +142,37 @@ So that we can connect emotionally through shared vulnerability and encouragemen
 
 The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend, don't duplicate:**
 
-| Component/File | What It Does | Location |
-|---|---|---|
-| `ReflectionSummary.tsx` | End-of-session reflection form (standout verses, rating, note) | `src/components/scripture-reading/reflection/ReflectionSummary.tsx` |
-| `PerStepReflection.tsx` | Per-step rating + note form — **reuse visual patterns** | `src/components/scripture-reading/reflection/PerStepReflection.tsx` |
-| `scriptureReadingService.addMessage()` | Writes message to Supabase + IndexedDB cache (write-through) | `src/services/scriptureReadingService.ts` (line 466) |
-| `scriptureReadingService.getMessagesBySession()` | Reads messages (cache-first) | `src/services/scriptureReadingService.ts` (line 501) |
-| `scriptureReadingService.getReflectionsBySession()` | Reads all reflections for a session | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.getBookmarksBySession()` | Reads bookmarks (cache-first) | `src/services/scriptureReadingService.ts` |
-| `scriptureReadingService.updateSession()` | Updates session fields (phase, status, completedAt, etc.) | `src/services/scriptureReadingService.ts` (line 260) |
-| `scripture_messages` table | DB table with RLS policies, index on (session_id, created_at) | `supabase/migrations/20260128000001_scripture_reading.sql` (line 94) |
-| `ScriptureMessage` type | `{ id, sessionId, senderId, message, createdAt }` | `src/services/dbSchema.ts` (line 72) |
-| `SupabaseMessageSchema` | Zod validation for message responses | `src/validation/schemas.ts` (line 317) |
-| `ScriptureSession` type | `{ id, mode, userId, partnerId?, currentPhase, currentStepIndex, status, version, completedAt? }` | `src/services/dbSchema.ts` (line 32) |
-| `SCRIPTURE_STEPS` constant | Array of 17 steps with `{ stepIndex, sectionTheme, verseReference, verseText, responseText }` | `src/data/scriptureSteps.ts` |
-| `MAX_STEPS` constant | `17` | `src/data/scriptureSteps.ts` |
-| `SoloReadingFlow.tsx` | Container with verse/response/reflection subviews, bookmark state, phase routing | `src/components/scripture-reading/containers/SoloReadingFlow.tsx` |
-| `scriptureReadingSlice` | Zustand slice with `advanceStep()`, `updatePhase()`, `saveSession()`, `exitSession()` | `src/stores/slices/scriptureReadingSlice.ts` |
-| `partnerSlice` | Zustand slice with `partner: PartnerInfo \| null`, `hasPartner()` | `src/stores/slices/partnerSlice.ts` |
-| `PartnerInfo` type | `{ id, email, displayName, connectedAt }` | `src/api/partnerService.ts` (line 23) |
-| `useMotionConfig` hook | `crossfade` (200ms), `slide` (300ms), `fadeIn` (200ms), respects `prefers-reduced-motion` | `src/hooks/useMotionConfig.ts` |
-| `FOCUS_RING` constant | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'` | Used in `SoloReadingFlow.tsx`, `PerStepReflection.tsx` |
-| `MessageInput` component | Existing message input pattern in love-notes feature — reference for textarea patterns | `src/components/love-notes/MessageInput.tsx` |
-| `SyncToast` | Success/failure toast component | `src/components/shared/SyncToast` |
-| `isReportPhase` guard | Currently renders placeholder: "Daily Prayer Report coming in Story 2.3" | `SoloReadingFlow.tsx` |
-| IndexedDB `scripture-messages` store | Configured with `by-session` index | `src/services/dbSchema.ts` (line 148) |
-| Dancing Script font | Imported in `index.css`, configured as `font-cursive` in Tailwind config | `src/index.css`, `tailwind.config.js` |
+| Component/File                                      | What It Does                                                                                      | Location                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `ReflectionSummary.tsx`                             | End-of-session reflection form (standout verses, rating, note)                                    | `src/components/scripture-reading/reflection/ReflectionSummary.tsx`  |
+| `PerStepReflection.tsx`                             | Per-step rating + note form — **reuse visual patterns**                                           | `src/components/scripture-reading/reflection/PerStepReflection.tsx`  |
+| `scriptureReadingService.addMessage()`              | Writes message to Supabase + IndexedDB cache (write-through)                                      | `src/services/scriptureReadingService.ts` (line 466)                 |
+| `scriptureReadingService.getMessagesBySession()`    | Reads messages (cache-first)                                                                      | `src/services/scriptureReadingService.ts` (line 501)                 |
+| `scriptureReadingService.getReflectionsBySession()` | Reads all reflections for a session                                                               | `src/services/scriptureReadingService.ts`                            |
+| `scriptureReadingService.getBookmarksBySession()`   | Reads bookmarks (cache-first)                                                                     | `src/services/scriptureReadingService.ts`                            |
+| `scriptureReadingService.updateSession()`           | Updates session fields (phase, status, completedAt, etc.)                                         | `src/services/scriptureReadingService.ts` (line 260)                 |
+| `scripture_messages` table                          | DB table with RLS policies, index on (session_id, created_at)                                     | `supabase/migrations/20260128000001_scripture_reading.sql` (line 94) |
+| `ScriptureMessage` type                             | `{ id, sessionId, senderId, message, createdAt }`                                                 | `src/services/dbSchema.ts` (line 72)                                 |
+| `SupabaseMessageSchema`                             | Zod validation for message responses                                                              | `src/validation/schemas.ts` (line 317)                               |
+| `ScriptureSession` type                             | `{ id, mode, userId, partnerId?, currentPhase, currentStepIndex, status, version, completedAt? }` | `src/services/dbSchema.ts` (line 32)                                 |
+| `SCRIPTURE_STEPS` constant                          | Array of 17 steps with `{ stepIndex, sectionTheme, verseReference, verseText, responseText }`     | `src/data/scriptureSteps.ts`                                         |
+| `MAX_STEPS` constant                                | `17`                                                                                              | `src/data/scriptureSteps.ts`                                         |
+| `SoloReadingFlow.tsx`                               | Container with verse/response/reflection subviews, bookmark state, phase routing                  | `src/components/scripture-reading/containers/SoloReadingFlow.tsx`    |
+| `scriptureReadingSlice`                             | Zustand slice with `advanceStep()`, `updatePhase()`, `saveSession()`, `exitSession()`             | `src/stores/slices/scriptureReadingSlice.ts`                         |
+| `partnerSlice`                                      | Zustand slice with `partner: PartnerInfo \| null`, `hasPartner()`                                 | `src/stores/slices/partnerSlice.ts`                                  |
+| `PartnerInfo` type                                  | `{ id, email, displayName, connectedAt }`                                                         | `src/api/partnerService.ts` (line 23)                                |
+| `useMotionConfig` hook                              | `crossfade` (200ms), `slide` (300ms), `fadeIn` (200ms), respects `prefers-reduced-motion`         | `src/hooks/useMotionConfig.ts`                                       |
+| `FOCUS_RING` constant                               | `'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'`                | Used in `SoloReadingFlow.tsx`, `PerStepReflection.tsx`               |
+| `MessageInput` component                            | Existing message input pattern in love-notes feature — reference for textarea patterns            | `src/components/love-notes/MessageInput.tsx`                         |
+| `SyncToast`                                         | Success/failure toast component                                                                   | `src/components/shared/SyncToast`                                    |
+| `isReportPhase` guard                               | Currently renders placeholder: "Daily Prayer Report coming in Story 2.3"                          | `SoloReadingFlow.tsx`                                                |
+| IndexedDB `scripture-messages` store                | Configured with `by-session` index                                                                | `src/services/dbSchema.ts` (line 148)                                |
+| Dancing Script font                                 | Imported in `index.css`, configured as `font-cursive` in Tailwind config                          | `src/index.css`, `tailwind.config.js`                                |
 
 ## Architecture Constraints
 
 **State Management:**
+
 - Types co-located with `scriptureReadingSlice.ts` — do NOT create separate type files
 - `MessageCompose` and `DailyPrayerReport` are **presentational (dumb) components** — receive all data via props
 - Container logic (partner detection, service calls, phase transitions) stays in `SoloReadingFlow`
@@ -179,6 +180,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Use `updatePhase('complete')` from the slice to mark session complete
 
 **Message Data Model:**
+
 - Uses existing `scripture_messages` table — no new migrations needed
 - `addMessage(sessionId, senderId, message)` writes to server then caches in IndexedDB
 - No dedicated RPC — direct table insert via `addMessage()` service method (already handles write-through)
@@ -186,6 +188,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Messages are NOT idempotent (no unique constraint beyond PK) — guard against double-submission in UI with `disabled` prop
 
 **Session Completion:**
+
 - Session `status: 'complete'` and `completedAt` are set in THIS story (not before)
 - `updateSession(sessionId, { status: 'complete', completedAt: new Date() })` persists to server
 - `updatePhase('complete')` updates local slice state
@@ -193,18 +196,21 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - For unlinked users: skip compose, go directly to completion
 
 **Partner Detection:**
+
 - Check `useAppStore(state => state.partner)` — if `null`, user is unlinked
 - Also check `session.partnerId` — if `undefined`, session has no partner
 - Both conditions should align, but check `partner` from slice as primary (it has `displayName` for UI)
 - For Solo sessions with linked partner: partner may not have completed yet — show waiting state
 
 **Data Flow:**
+
 - Reads: messages via `getMessagesBySession()` (cache-first), reflections via `getReflectionsBySession()` (cache-first), bookmarks via `getBookmarksBySession()` (already loaded in `bookmarkedSteps`)
 - Writes: `addMessage()` → server → cache (non-blocking, fire-and-forget pattern)
 - Session complete: `updateSession()` → server → cache (this one IS blocking — wait for success before showing report)
 - Parse session-level reflection: filter reflections where `stepIndex === 17` (MAX_STEPS), parse `notes` field as JSON for `standoutVerses`
 
 **Error Handling:**
+
 - Use existing `ScriptureErrorCode` enum
 - Message write failures: non-blocking toast via `SyncToast`, don't block session completion
 - Session update failures: retry once, then show error toast and let user return to overview
@@ -213,6 +219,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 ## UX / Design Requirements
 
 **Message Composition Screen:**
+
 - Heading: "Write something for [Partner Name]" (centered, serif `font-serif`, `text-purple-900`)
 - Textarea: uses `.input` class pattern (soft blurred field), `min-h-[120px]`, `resize-none`, auto-grow to ~6 lines
 - Max 300 chars (per epic AC — note: this is different from the 200 char limit on reflection notes)
@@ -226,6 +233,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Same max-width (`max-w-md`) and padding as reading flow
 
 **Unlinked User Completion:**
+
 - Simple centered screen: "Session complete" (serif heading)
 - Subtext: "Your reflections have been saved" (muted purple)
 - "Return to Overview" button (primary, full-width)
@@ -233,6 +241,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Session marked complete on mount
 
 **Daily Prayer Report:**
+
 - Section heading: "Daily Prayer Report" (centered, serif, `text-purple-900`)
 - **Your Journey section:**
   - Subheading: "Your Reflections"
@@ -260,36 +269,39 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - "Return to Overview" button: full-width primary style at bottom, calls `exitSession()` from slice
 
 **Transitions:**
+
 - Reflection Summary → Message Compose: fade-through-white (400ms) via `crossfade`
 - Message Compose → Daily Prayer Report: fade-through-white (400ms)
 - All transitions: instant swap when `prefers-reduced-motion`
 - Focus moves to compose heading on entry, report heading after transition
 
 **Layout:**
+
 - Same max-width (`max-w-md`) and padding (`p-6`) as all other reading flow screens
 - Content vertically scrollable if needed (report can be longer than viewport)
 - "Return to Overview" button sticky at bottom or at end of scroll content
 
 ## File Locations
 
-| New File | Purpose |
-|---|---|
-| `src/components/scripture-reading/reflection/MessageCompose.tsx` | Message composition presentational component |
-| `src/components/scripture-reading/reflection/DailyPrayerReport.tsx` | Daily Prayer Report presentational component |
-| `src/components/scripture-reading/__tests__/MessageCompose.test.tsx` | Unit tests for MessageCompose |
-| `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx` | Unit tests for DailyPrayerReport |
+| New File                                                                | Purpose                                      |
+| ----------------------------------------------------------------------- | -------------------------------------------- |
+| `src/components/scripture-reading/reflection/MessageCompose.tsx`        | Message composition presentational component |
+| `src/components/scripture-reading/reflection/DailyPrayerReport.tsx`     | Daily Prayer Report presentational component |
+| `src/components/scripture-reading/__tests__/MessageCompose.test.tsx`    | Unit tests for MessageCompose                |
+| `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx` | Unit tests for DailyPrayerReport             |
 
-| Modified File | Changes |
-|---|---|
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | Replace report placeholder with MessageCompose/DailyPrayerReport flow; add partner detection; add session completion logic |
-| `src/components/scripture-reading/index.ts` | Add barrel exports for `MessageCompose`, `DailyPrayerReport` |
-| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Update report phase tests for new components |
-| `tests/e2e/scripture/scripture-reflection-2.3.spec.ts` | Add Story 2.3 E2E tests |
-| `tests/api/scripture-reflection-api.spec.ts` | Add Story 2.3 API tests (message persistence) |
+| Modified File                                                         | Changes                                                                                                                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`     | Replace report placeholder with MessageCompose/DailyPrayerReport flow; add partner detection; add session completion logic |
+| `src/components/scripture-reading/index.ts`                           | Add barrel exports for `MessageCompose`, `DailyPrayerReport`                                                               |
+| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | Update report phase tests for new components                                                                               |
+| `tests/e2e/scripture/scripture-reflection-2.3.spec.ts`                | Add Story 2.3 E2E tests                                                                                                    |
+| `tests/api/scripture-reflection-api.spec.ts`                          | Add Story 2.3 API tests (message persistence)                                                                              |
 
 ## Testing Requirements
 
 **Unit Tests (MessageCompose.test.tsx):**
+
 - Renders partner name in heading
 - Textarea accepts input up to 300 chars
 - Character counter visible at 250+ chars
@@ -300,6 +312,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Focus moves to textarea on mount
 
 **Unit Tests (DailyPrayerReport.test.tsx):**
+
 - Renders user's step-by-step ratings (17 rows)
 - Renders bookmarked verses with amber highlight
 - Renders standout verse selections as chips
@@ -311,6 +324,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Report heading has `tabIndex={-1}` for programmatic focus
 
 **Integration Tests (SoloReadingFlow.test.tsx):**
+
 - Linked user sees MessageCompose after reflection summary
 - Unlinked user sees completion screen (skips message compose)
 - Sending message calls addMessage service method
@@ -320,6 +334,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - "Return to Overview" calls exitSession
 
 **Test IDs:**
+
 - `scripture-message-compose-screen` — root container for message compose
 - `scripture-message-compose-heading` — heading element
 - `scripture-message-textarea` — textarea input
@@ -340,6 +355,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - `scripture-unlinked-return-btn` — return button for unlinked
 
 **Test file locations:**
+
 - `src/components/scripture-reading/__tests__/MessageCompose.test.tsx`
 - `src/components/scripture-reading/__tests__/DailyPrayerReport.test.tsx`
 - `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` (modified)
@@ -368,6 +384,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 ## Previous Story Intelligence (Stories 2.1 & 2.2)
 
 **Learnings from Story 2.1 implementation:**
+
 - `aria-disabled` pattern preferred over HTML `disabled` on Continue/Send buttons — allows click events to fire for validation display
 - Character counter threshold convention: appear ~50 chars before limit (150 for 200-char fields → 250 for 300-char field)
 - Reflection writes are fire-and-forget (non-blocking) — apply same pattern for message writes
@@ -375,6 +392,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - Screen reader announcements use `setTimeout(100ms)` + `setTimeout(1000ms)` clear pattern
 
 **Learnings from Story 2.2 implementation:**
+
 - `ReflectionSummary` established presentational component pattern: all data via props, callbacks for actions
 - H2 code review fix: always include `updatePhase` in `useShallow` selector — don't use `useAppStore.getState()` directly
 - H1 code review fix: always add `disabled` guard to submit handlers to prevent double-submission
@@ -383,6 +401,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 - `handleReflectionSummarySubmit` pattern: save data non-blocking → update phase → transition to next screen
 
 **Code review fixes from Stories 2.1 & 2.2 (avoid same mistakes):**
+
 - Do NOT import `supabase` directly in container components — use service layer methods
 - Avoid duplicate `aria-live` announcers — use the single dynamic announcer pattern
 - Always clean up timers on unmount
@@ -393,6 +412,7 @@ The following are already implemented from Stories 2.1, 2.2 and Epic 1. **Extend
 ## Git Intelligence
 
 Recent commits show established patterns:
+
 - Component files: PascalCase (`MessageCompose.tsx`, `DailyPrayerReport.tsx`)
 - Focus management: `useRef` + `requestAnimationFrame` for focus on mount/transition
 - `AnimatePresence` with `mode="wait"` for view transitions
@@ -462,6 +482,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 ## File List
 
 **Modified Files:**
+
 - `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
 - `src/components/scripture-reading/reflection/DailyPrayerReport.tsx`
 - `src/components/scripture-reading/reflection/ReflectionSummary.tsx`
@@ -480,4 +501,3 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 ## Change Log
 
 - 2026-02-08: Implemented Story 2.3 remediation for AC5 conformance and review findings closure; updated completion semantics, report payload/rendering, sharing controls, accessibility/motion behavior, and test/doc artifacts.
-

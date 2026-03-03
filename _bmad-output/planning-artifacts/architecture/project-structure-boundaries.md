@@ -84,74 +84,74 @@ tests/
 
 ## Existing Files Modified
 
-| File | Change |
-|------|--------|
-| `src/stores/useAppStore.ts` | Import and compose `scriptureReadingSlice` |
-| `src/stores/slices/navigationSlice.ts` | Add 'scripture' to ViewType |
-| `src/App.tsx` | Add scripture reading route/view |
-| `src/components/Navigation/BottomNavigation.tsx` | Add scripture tab |
-| `src/services/syncService.ts` | No changes needed for scripture (cache-only pattern) |
-| `src/services/moodService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
-| `src/services/customMessageService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
-| `src/services/photoStorageService.ts` | Import shared `dbSchema.ts` (tech debt fix) |
-| `src/sw-db.ts` | **⚠️ Manual sync:** Update DB_VERSION to 5, add scripture stores if Background Sync needed |
-| `src/types/database.types.ts` | Add scripture table type definitions |
-| `src/types/models.ts` | Add scripture app model interfaces |
-| `src/hooks/index.ts` | Export `useMotionConfig`, `useScriptureBroadcast`, `useScripturePresence` |
+| File                                             | Change                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `src/stores/useAppStore.ts`                      | Import and compose `scriptureReadingSlice`                                                 |
+| `src/stores/slices/navigationSlice.ts`           | Add 'scripture' to ViewType                                                                |
+| `src/App.tsx`                                    | Add scripture reading route/view                                                           |
+| `src/components/Navigation/BottomNavigation.tsx` | Add scripture tab                                                                          |
+| `src/services/syncService.ts`                    | No changes needed for scripture (cache-only pattern)                                       |
+| `src/services/moodService.ts`                    | Import shared `dbSchema.ts` (tech debt fix)                                                |
+| `src/services/customMessageService.ts`           | Import shared `dbSchema.ts` (tech debt fix)                                                |
+| `src/services/photoStorageService.ts`            | Import shared `dbSchema.ts` (tech debt fix)                                                |
+| `src/sw-db.ts`                                   | **⚠️ Manual sync:** Update DB_VERSION to 5, add scripture stores if Background Sync needed |
+| `src/types/database.types.ts`                    | Add scripture table type definitions                                                       |
+| `src/types/models.ts`                            | Add scripture app model interfaces                                                         |
+| `src/hooks/index.ts`                             | Export `useMotionConfig`, `useScriptureBroadcast`, `useScripturePresence`                  |
 
 ## Architectural Boundaries
 
 **API Boundaries:**
 
-| Boundary | Location | Protocol |
-|----------|----------|----------|
-| **Supabase Tables** | `supabase/migrations/` | SQL DDL |
-| **Supabase RPCs** | `supabase/migrations/` | SQL functions |
-| **Supabase Broadcast** | `src/hooks/useScriptureBroadcast.ts` | WebSocket |
-| **IndexedDB** | `src/services/scriptureReadingService.ts` | idb wrapper |
+| Boundary               | Location                                  | Protocol      |
+| ---------------------- | ----------------------------------------- | ------------- |
+| **Supabase Tables**    | `supabase/migrations/`                    | SQL DDL       |
+| **Supabase RPCs**      | `supabase/migrations/`                    | SQL functions |
+| **Supabase Broadcast** | `src/hooks/useScriptureBroadcast.ts`      | WebSocket     |
+| **IndexedDB**          | `src/services/scriptureReadingService.ts` | idb wrapper   |
 
 **Component Boundaries:**
 
-| Layer | Responsibility | Communication |
-|-------|---------------|---------------|
-| **Containers** | Connect to slice, pass props | Zustand selectors |
-| **Presentational** | Pure render, receive props | Props + callbacks |
-| **Slice** | State management | Actions + selectors |
-| **Service** | Data persistence | Async methods |
-| **Hooks** | Side effects (broadcast, motion) | React hooks |
+| Layer              | Responsibility                   | Communication       |
+| ------------------ | -------------------------------- | ------------------- |
+| **Containers**     | Connect to slice, pass props     | Zustand selectors   |
+| **Presentational** | Pure render, receive props       | Props + callbacks   |
+| **Slice**          | State management                 | Actions + selectors |
+| **Service**        | Data persistence                 | Async methods       |
+| **Hooks**          | Side effects (broadcast, motion) | React hooks         |
 
 **Data Boundaries:**
 
-| Data Type | Source of Truth | Cache Pattern |
-|-----------|-----------------|---------------|
-| Session state | Supabase (server) | Broadcast → Slice → IndexedDB cache |
-| Lock-in state | Supabase (server) | RPC → Broadcast |
-| Reflections | Supabase (server) | Write-through; IndexedDB cache for reads |
-| Bookmarks | Supabase (server) | Write-through; IndexedDB cache for reads |
-| Presence | Ephemeral broadcast | No persistence |
+| Data Type     | Source of Truth     | Cache Pattern                            |
+| ------------- | ------------------- | ---------------------------------------- |
+| Session state | Supabase (server)   | Broadcast → Slice → IndexedDB cache      |
+| Lock-in state | Supabase (server)   | RPC → Broadcast                          |
+| Reflections   | Supabase (server)   | Write-through; IndexedDB cache for reads |
+| Bookmarks     | Supabase (server)   | Write-through; IndexedDB cache for reads |
+| Presence      | Ephemeral broadcast | No persistence                           |
 
 ## Requirements to Structure Mapping
 
 **Feature Mapping:**
 
-| FR Category | Primary Files |
-|-------------|---------------|
-| **Session Management (FR1-7)** | `scriptureReadingSlice.ts`, `scriptureReadingService.ts`, `ScriptureReadingView.tsx` |
-| **Solo Mode Flow (FR8-13)** | `ReadingContainer.tsx`, `scriptureReadingService.ts`, `dbSchema.ts` |
-| **Together Mode Flow (FR14-29)** | `useScriptureBroadcast.ts`, `useScripturePresence.ts`, `LobbyContainer.tsx`, `ReadingContainer.tsx`, `LockInButton.tsx`, `RoleIndicator.tsx`, `PartnerPosition.tsx`, `Countdown.tsx` |
-| **Reflection System (FR30-33)** | `ReflectionSummary.tsx`, `BookmarkFlag.tsx`, `ReflectionContainer.tsx` |
-| **Daily Prayer Report (FR34-41)** | `DailyPrayerReport.tsx`, `ReflectionContainer.tsx` |
-| **Stats & Progress (FR42-46)** | `scriptureReadingService.ts`, `scriptureReadingSlice.ts`, `overview/StatsSection.tsx`, `scripture_get_couple_stats` RPC |
-| **Accessibility (FR50-54)** | `useMotionConfig.ts`, all presentational components |
+| FR Category                       | Primary Files                                                                                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Session Management (FR1-7)**    | `scriptureReadingSlice.ts`, `scriptureReadingService.ts`, `ScriptureReadingView.tsx`                                                                                                 |
+| **Solo Mode Flow (FR8-13)**       | `ReadingContainer.tsx`, `scriptureReadingService.ts`, `dbSchema.ts`                                                                                                                  |
+| **Together Mode Flow (FR14-29)**  | `useScriptureBroadcast.ts`, `useScripturePresence.ts`, `LobbyContainer.tsx`, `ReadingContainer.tsx`, `LockInButton.tsx`, `RoleIndicator.tsx`, `PartnerPosition.tsx`, `Countdown.tsx` |
+| **Reflection System (FR30-33)**   | `ReflectionSummary.tsx`, `BookmarkFlag.tsx`, `ReflectionContainer.tsx`                                                                                                               |
+| **Daily Prayer Report (FR34-41)** | `DailyPrayerReport.tsx`, `ReflectionContainer.tsx`                                                                                                                                   |
+| **Stats & Progress (FR42-46)**    | `scriptureReadingService.ts`, `scriptureReadingSlice.ts`, `overview/StatsSection.tsx`, `scripture_get_couple_stats` RPC                                                              |
+| **Accessibility (FR50-54)**       | `useMotionConfig.ts`, all presentational components                                                                                                                                  |
 
 **Cross-Cutting Concerns:**
 
-| Concern | Files |
-|---------|-------|
+| Concern            | Files                                                                             |
+| ------------------ | --------------------------------------------------------------------------------- |
 | **Real-time sync** | `useScriptureBroadcast.ts`, `useScripturePresence.ts`, `scriptureReadingSlice.ts` |
-| **Caching layer** | `dbSchema.ts`, `scriptureReadingService.ts` |
-| **Reduced motion** | `useMotionConfig.ts` (global, used by all animated components) |
-| **RLS policies** | `20260125_scripture_reading.sql` |
+| **Caching layer**  | `dbSchema.ts`, `scriptureReadingService.ts`                                       |
+| **Reduced motion** | `useMotionConfig.ts` (global, used by all animated components)                    |
+| **RLS policies**   | `20260125_scripture_reading.sql`                                                  |
 
 ## Integration Points
 
@@ -198,16 +198,17 @@ tests/
 
 **External Integrations:**
 
-| Integration | Protocol | Files |
-|-------------|----------|-------|
-| Supabase Auth | Existing | `authService.ts` (no changes) |
-| Supabase Database | PostgreSQL | `database.types.ts`, migration |
-| Supabase Realtime | Broadcast | `useScriptureBroadcast.ts` |
-| IndexedDB | idb wrapper | `dbSchema.ts`, `scriptureReadingService.ts` |
+| Integration       | Protocol    | Files                                       |
+| ----------------- | ----------- | ------------------------------------------- |
+| Supabase Auth     | Existing    | `authService.ts` (no changes)               |
+| Supabase Database | PostgreSQL  | `database.types.ts`, migration              |
+| Supabase Realtime | Broadcast   | `useScriptureBroadcast.ts`                  |
+| IndexedDB         | idb wrapper | `dbSchema.ts`, `scriptureReadingService.ts` |
 
 ## File Organization Patterns
 
 **New File Naming:**
+
 - Components: `PascalCase.tsx` (e.g., `LockInButton.tsx`)
 - Services: `camelCase.ts` (e.g., `scriptureReadingService.ts`)
 - Hooks: `useCamelCase.ts` (e.g., `useScriptureBroadcast.ts`)
@@ -215,6 +216,7 @@ tests/
 - Tests: `{filename}.test.ts(x)` mirroring src structure
 
 **Migration File:**
+
 - Single file: `20260125_scripture_reading.sql`
 - Contains: Tables, indexes, RLS policies, RPC functions
 - Idempotent: Uses `IF NOT EXISTS` where appropriate
@@ -248,7 +250,7 @@ export function upgradeDb(db: IDBPDatabase, oldVersion: number) {
   for (const [name, config] of Object.entries(STORES)) {
     if (!db.objectStoreNames.contains(name)) {
       const store = db.createObjectStore(name, { keyPath: config.keyPath });
-      config.indexes.forEach(idx => store.createIndex(idx, idx));
+      config.indexes.forEach((idx) => store.createIndex(idx, idx));
     }
   }
 }
@@ -265,12 +267,14 @@ const DB_VERSION = 5; // Must match DB_VERSION in src/services/dbSchema.ts
 ```
 
 **Scripture Reading Implementation Checklist:**
+
 1. ✅ Bump `DB_VERSION` to 5 in `dbSchema.ts`
 2. ✅ Add 5 new stores to `MyLoveDBSchema` interface
 3. ✅ Add upgrade logic in `scriptureReadingService.ts`
 4. ⚠️ Update `sw-db.ts` if Background Sync needs access to scripture data
 
 **Services to Update:**
+
 - `moodService.ts` → import `DB_NAME`, `DB_VERSION`, `upgradeDb`
 - `customMessageService.ts` → import shared config
 - `photoStorageService.ts` → import shared config

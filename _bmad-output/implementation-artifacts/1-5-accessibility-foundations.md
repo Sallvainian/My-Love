@@ -61,7 +61,9 @@ So that I can use Scripture Reading regardless of my abilities.
         shouldReduceMotion,
         crossfade: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
         slide: shouldReduceMotion ? { duration: 0 } : { duration: 0.3, ease: 'easeInOut' },
-        spring: shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 100, damping: 15 },
+        spring: shouldReduceMotion
+          ? { duration: 0 }
+          : { type: 'spring', stiffness: 100, damping: 15 },
         fadeIn: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
         modeReveal: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
       };
@@ -133,12 +135,7 @@ So that I can use Scripture Reading regardless of my abilities.
   - `data-testid="sr-announcer"`
   - Content is driven by state, updated only on semantic changes
   ```tsx
-  <div
-    className="sr-only"
-    aria-live="polite"
-    aria-atomic="true"
-    data-testid="sr-announcer"
-  >
+  <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
     {announcement}
   </div>
   ```
@@ -206,9 +203,13 @@ So that I can use Scripture Reading regardless of my abilities.
 - [x] 6.3 Add icon to error indicator
   - Add warning SVG icon before error message text in both SoloReadingFlow and ScriptureOverview error displays
   ```tsx
-  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+  <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+    />
   </svg>
   ```
 - [x] 6.4 Add disabled reason text when Next Verse is disabled
@@ -309,29 +310,29 @@ So that I can use Scripture Reading regardless of my abilities.
 
 Story 1.5 is a cross-cutting accessibility enhancement story. It touches every Scripture Reading component but builds on substantial accessibility work already done in Stories 1.2-1.4.
 
-| Capability | Status | Gap |
-|-----------|--------|-----|
-| `aria-label` on exit button | ✅ Done (Story 1.3) | None |
-| `aria-label` on progress indicator | ✅ Done (Story 1.3) | None |
-| `role="dialog"` + `aria-labelledby/describedby` on exit dialog | ✅ Done (Story 1.3) | Need focus trap |
-| `aria-hidden="true"` on decorative emoji | ✅ Done (Story 1.3) | None |
-| `role="status"` + `aria-live="polite"` on offline indicator | ✅ Done (Story 1.4) | None |
-| `role="alert"` on error display | ✅ Done (Story 1.3) | Need icon for color independence |
-| `useReducedMotion()` inline usage | ✅ Done (Stories 1.2-1.3) | Refactor to centralized `useMotionConfig` |
-| `autoFocus` on dialog Save button | ✅ Done (Story 1.3) | Need full focus trap |
-| Escape key handler for dialog | ✅ Done (Story 1.4) | None |
-| 48x48px+ touch targets | ✅ Done (Stories 1.2-1.3) | Verify "Setup partner link" |
-| `type="button"` on all buttons | ✅ Done (Stories 1.2-1.4) | None |
-| `<main>` semantic element | ✅ Done (SoloReadingFlow) | ScriptureOverview missing |
-| `aria-label` on section elements | ✅ Done (ScriptureOverview) | None |
-| **useMotionConfig hook** | ❌ New | Create + wire into all components |
-| **Focus-visible ring styles** | ❌ New | Add to all buttons |
-| **Phase transition announcements** | ❌ New | aria-live announcer region |
-| **Focus management on transitions** | ❌ New | Refs + programmatic focus |
-| **Dialog focus trap** | ❌ New | Trap + restore pattern |
-| **Color independence (error icon)** | ❌ New | Add icons to color indicators |
-| **Contrast fixes** | ❌ Audit needed | Verify purple-400/500 on lavender bg |
-| **Disabled reason text** | ❌ New | Show text when button disabled |
+| Capability                                                     | Status                      | Gap                                       |
+| -------------------------------------------------------------- | --------------------------- | ----------------------------------------- |
+| `aria-label` on exit button                                    | ✅ Done (Story 1.3)         | None                                      |
+| `aria-label` on progress indicator                             | ✅ Done (Story 1.3)         | None                                      |
+| `role="dialog"` + `aria-labelledby/describedby` on exit dialog | ✅ Done (Story 1.3)         | Need focus trap                           |
+| `aria-hidden="true"` on decorative emoji                       | ✅ Done (Story 1.3)         | None                                      |
+| `role="status"` + `aria-live="polite"` on offline indicator    | ✅ Done (Story 1.4)         | None                                      |
+| `role="alert"` on error display                                | ✅ Done (Story 1.3)         | Need icon for color independence          |
+| `useReducedMotion()` inline usage                              | ✅ Done (Stories 1.2-1.3)   | Refactor to centralized `useMotionConfig` |
+| `autoFocus` on dialog Save button                              | ✅ Done (Story 1.3)         | Need full focus trap                      |
+| Escape key handler for dialog                                  | ✅ Done (Story 1.4)         | None                                      |
+| 48x48px+ touch targets                                         | ✅ Done (Stories 1.2-1.3)   | Verify "Setup partner link"               |
+| `type="button"` on all buttons                                 | ✅ Done (Stories 1.2-1.4)   | None                                      |
+| `<main>` semantic element                                      | ✅ Done (SoloReadingFlow)   | ScriptureOverview missing                 |
+| `aria-label` on section elements                               | ✅ Done (ScriptureOverview) | None                                      |
+| **useMotionConfig hook**                                       | ❌ New                      | Create + wire into all components         |
+| **Focus-visible ring styles**                                  | ❌ New                      | Add to all buttons                        |
+| **Phase transition announcements**                             | ❌ New                      | aria-live announcer region                |
+| **Focus management on transitions**                            | ❌ New                      | Refs + programmatic focus                 |
+| **Dialog focus trap**                                          | ❌ New                      | Trap + restore pattern                    |
+| **Color independence (error icon)**                            | ❌ New                      | Add icons to color indicators             |
+| **Contrast fixes**                                             | ❌ Audit needed             | Verify purple-400/500 on lavender bg      |
+| **Disabled reason text**                                       | ❌ New                      | Show text when button disabled            |
 
 ## Existing ARIA Inventory
 
@@ -361,25 +362,26 @@ Story 1.5 is a cross-cutting accessibility enhancement story. It touches every S
 
 ## ARIA Gaps to Fill
 
-| Gap | Component | Fix |
-|-----|-----------|-----|
-| No phase transition announcements | SoloReadingFlow | Add sr-only aria-live announcer region |
-| No session state announcements | ScriptureOverview | Add sr-only aria-live announcer region |
-| No focus-visible ring styles | Both | Add `focus-visible:ring-2 ring-purple-400` classes |
-| No focus management on step/view transitions | SoloReadingFlow | Add refs + programmatic focus |
-| No focus trap in exit dialog | SoloReadingFlow | Add focus trap pattern |
-| No focus restoration on dialog close | SoloReadingFlow | Store + restore previous focus |
-| Error indicator lacks icon | Both | Add warning icon SVG |
-| Disabled button lacks reason text | SoloReadingFlow | Add helper text when offline |
-| `text-purple-400` may fail contrast | Both | Audit and darken if needed |
-| ScriptureOverview lacks `<main>` | ScriptureOverview | Add semantic `<main>` element |
-| No `aria-current="step"` on progress | SoloReadingFlow | Add to progress indicator |
+| Gap                                          | Component         | Fix                                                |
+| -------------------------------------------- | ----------------- | -------------------------------------------------- |
+| No phase transition announcements            | SoloReadingFlow   | Add sr-only aria-live announcer region             |
+| No session state announcements               | ScriptureOverview | Add sr-only aria-live announcer region             |
+| No focus-visible ring styles                 | Both              | Add `focus-visible:ring-2 ring-purple-400` classes |
+| No focus management on step/view transitions | SoloReadingFlow   | Add refs + programmatic focus                      |
+| No focus trap in exit dialog                 | SoloReadingFlow   | Add focus trap pattern                             |
+| No focus restoration on dialog close         | SoloReadingFlow   | Store + restore previous focus                     |
+| Error indicator lacks icon                   | Both              | Add warning icon SVG                               |
+| Disabled button lacks reason text            | SoloReadingFlow   | Add helper text when offline                       |
+| `text-purple-400` may fail contrast          | Both              | Audit and darken if needed                         |
+| ScriptureOverview lacks `<main>`             | ScriptureOverview | Add semantic `<main>` element                      |
+| No `aria-current="step"` on progress         | SoloReadingFlow   | Add to progress indicator                          |
 
 ## useMotionConfig Design
 
 The architecture spec (Decision 5: Component Architecture) defines `useMotionConfig` as a centralized motion configuration hook. Currently, both `SoloReadingFlow` and `ScriptureOverview` use `useReducedMotion()` from Framer Motion inline with duplicated transition objects.
 
 **Before (inline duplication):**
+
 ```typescript
 // SoloReadingFlow.tsx
 const shouldReduceMotion = useReducedMotion();
@@ -392,6 +394,7 @@ const fadeTransition = shouldReduceMotion ? { duration: 0 } : { duration: 0.2 };
 ```
 
 **After (centralized):**
+
 ```typescript
 // src/hooks/useMotionConfig.ts
 import { useReducedMotion } from 'framer-motion';
@@ -403,7 +406,9 @@ export function useMotionConfig() {
     shouldReduceMotion: !!shouldReduceMotion,
     crossfade: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
     slide: shouldReduceMotion ? { duration: 0 } : { duration: 0.3, ease: 'easeInOut' as const },
-    spring: shouldReduceMotion ? { duration: 0 } : { type: 'spring' as const, stiffness: 100, damping: 15 },
+    spring: shouldReduceMotion
+      ? { duration: 0 }
+      : { type: 'spring' as const, stiffness: 100, damping: 15 },
     fadeIn: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
     modeReveal: shouldReduceMotion ? { duration: 0 } : { duration: 0.2 },
   };
@@ -547,32 +552,32 @@ useEffect(() => {
 
 Colors to verify against lavender background (`#F3E5F5`):
 
-| Element | Color | Background | Ratio Needed | Likely Status |
-|---------|-------|------------|-------------|---------------|
-| Verse reference | `text-purple-500` (#A855F7) | `#F3E5F5` | 4.5:1 (small text) | ⚠️ Needs check |
-| Response reference | `text-purple-400` (#C084FC) | `#F3E5F5` | 4.5:1 (small text) | ❌ Likely fails |
-| Section theme | `text-purple-400` (#C084FC) | `#F3E5F5` | 4.5:1 (small text) | ❌ Likely fails |
-| Progress text | `text-purple-600` (#9333EA) | `#F3E5F5` | 4.5:1 | ✅ Likely passes |
-| Verse text | `text-purple-900` (#581C87) | `bg-white/80` | 4.5:1 | ✅ Passes |
-| Response text | `text-purple-800` (#6B21A8) | `bg-white/80` | 4.5:1 | ✅ Passes |
-| Body text | `text-purple-700` (#7E22CE) | `#F3E5F5` | 4.5:1 | ✅ Likely passes |
-| Syncing text | `text-purple-400` (#C084FC) | `#F3E5F5` | 4.5:1 | ❌ Likely fails |
-| Primary button | `text-white` (#FFF) | purple-500 (#A855F7) | 4.5:1 | ✅ Passes |
-| Secondary button | `text-purple-700` (#7E22CE) | `bg-white/80` | 4.5:1 | ✅ Passes |
+| Element            | Color                       | Background           | Ratio Needed       | Likely Status    |
+| ------------------ | --------------------------- | -------------------- | ------------------ | ---------------- |
+| Verse reference    | `text-purple-500` (#A855F7) | `#F3E5F5`            | 4.5:1 (small text) | ⚠️ Needs check   |
+| Response reference | `text-purple-400` (#C084FC) | `#F3E5F5`            | 4.5:1 (small text) | ❌ Likely fails  |
+| Section theme      | `text-purple-400` (#C084FC) | `#F3E5F5`            | 4.5:1 (small text) | ❌ Likely fails  |
+| Progress text      | `text-purple-600` (#9333EA) | `#F3E5F5`            | 4.5:1              | ✅ Likely passes |
+| Verse text         | `text-purple-900` (#581C87) | `bg-white/80`        | 4.5:1              | ✅ Passes        |
+| Response text      | `text-purple-800` (#6B21A8) | `bg-white/80`        | 4.5:1              | ✅ Passes        |
+| Body text          | `text-purple-700` (#7E22CE) | `#F3E5F5`            | 4.5:1              | ✅ Likely passes |
+| Syncing text       | `text-purple-400` (#C084FC) | `#F3E5F5`            | 4.5:1              | ❌ Likely fails  |
+| Primary button     | `text-white` (#FFF)         | purple-500 (#A855F7) | 4.5:1              | ✅ Passes        |
+| Secondary button   | `text-purple-700` (#7E22CE) | `bg-white/80`        | 4.5:1              | ✅ Passes        |
 
 **Fix:** Bump `text-purple-400` → `text-purple-600` and `text-purple-500` → `text-purple-600` where contrast fails. The visual impact is slightly darker muted text — still thematically consistent with Lavender Dreams.
 
 ## Source Files to Touch
 
-| File | Action | Notes |
-|------|--------|-------|
-| `src/hooks/useMotionConfig.ts` | **CREATE** | Centralized motion config hook |
-| `src/hooks/index.ts` | **MODIFY** | Add useMotionConfig export |
-| `src/hooks/__tests__/useMotionConfig.test.ts` | **CREATE** | Hook tests |
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | **MODIFY** | Focus styles, focus management, announcer, useMotionConfig, dialog focus trap, contrast fixes, error icon, disabled text |
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | **MODIFY** | Focus styles, useMotionConfig, semantic HTML, contrast fixes, error icon, announcer |
-| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | **MODIFY** | Update mocks for useMotionConfig, add accessibility tests |
-| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | **MODIFY** | Update mocks for useMotionConfig, add accessibility tests |
+| File                                                                    | Action     | Notes                                                                                                                    |
+| ----------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `src/hooks/useMotionConfig.ts`                                          | **CREATE** | Centralized motion config hook                                                                                           |
+| `src/hooks/index.ts`                                                    | **MODIFY** | Add useMotionConfig export                                                                                               |
+| `src/hooks/__tests__/useMotionConfig.test.ts`                           | **CREATE** | Hook tests                                                                                                               |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`       | **MODIFY** | Focus styles, focus management, announcer, useMotionConfig, dialog focus trap, contrast fixes, error icon, disabled text |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx`     | **MODIFY** | Focus styles, useMotionConfig, semantic HTML, contrast fixes, error icon, announcer                                      |
+| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`   | **MODIFY** | Update mocks for useMotionConfig, add accessibility tests                                                                |
+| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | **MODIFY** | Update mocks for useMotionConfig, add accessibility tests                                                                |
 
 ## Architecture Compliance Checklist
 
@@ -587,15 +592,15 @@ Colors to verify against lavender background (`#F3E5F5`):
 
 ## Technology Versions (Locked)
 
-| Technology | Version | Notes |
-|-----------|---------|-------|
-| React | 19.2.3 | Hooks, refs, useEffect |
-| TypeScript | 5.9.3 | Strict mode |
-| Zustand | 5.0.10 | No new slice state needed |
-| Framer Motion | 12.27.1 | useReducedMotion (wrapped by useMotionConfig) |
-| Vitest | 4.0.17 | Unit tests |
-| Testing Library | 16.3.2 | Component tests, a11y queries |
-| Tailwind CSS | 4.1.17 | focus-visible: utilities |
+| Technology      | Version | Notes                                         |
+| --------------- | ------- | --------------------------------------------- |
+| React           | 19.2.3  | Hooks, refs, useEffect                        |
+| TypeScript      | 5.9.3   | Strict mode                                   |
+| Zustand         | 5.0.10  | No new slice state needed                     |
+| Framer Motion   | 12.27.1 | useReducedMotion (wrapped by useMotionConfig) |
+| Vitest          | 4.0.17  | Unit tests                                    |
+| Testing Library | 16.3.2  | Component tests, a11y queries                 |
+| Tailwind CSS    | 4.1.17  | focus-visible: utilities                      |
 
 ## Project Structure Notes
 
@@ -608,20 +613,21 @@ Colors to verify against lavender background (`#F3E5F5`):
 
 **Unit test coverage targets:**
 
-| Area | Test Count (est.) | Priority |
-|------|-------------------|----------|
-| `useMotionConfig` hook | 3-5 tests | P0 |
-| Keyboard navigation (SoloReadingFlow) | 4 tests | P0 |
-| Screen reader announcements | 5 tests | P0 |
-| Focus management on transitions | 5 tests | P0 |
-| Dialog focus trap + restore | 4 tests | P0 |
-| Color independence (icons, text) | 3 tests | P1 |
-| Reduced motion via useMotionConfig | 3 tests | P1 |
-| ScriptureOverview accessibility | 4 tests | P1 |
-| Touch target verification | 2 tests | P2 |
-| **Total** | **~35 tests** | |
+| Area                                  | Test Count (est.) | Priority |
+| ------------------------------------- | ----------------- | -------- |
+| `useMotionConfig` hook                | 3-5 tests         | P0       |
+| Keyboard navigation (SoloReadingFlow) | 4 tests           | P0       |
+| Screen reader announcements           | 5 tests           | P0       |
+| Focus management on transitions       | 5 tests           | P0       |
+| Dialog focus trap + restore           | 4 tests           | P0       |
+| Color independence (icons, text)      | 3 tests           | P1       |
+| Reduced motion via useMotionConfig    | 3 tests           | P1       |
+| ScriptureOverview accessibility       | 4 tests           | P1       |
+| Touch target verification             | 2 tests           | P2       |
+| **Total**                             | **~35 tests**     |          |
 
 **Mock strategy for useMotionConfig:**
+
 ```typescript
 vi.mock('../../../hooks/useMotionConfig', () => ({
   useMotionConfig: () => ({
@@ -636,6 +642,7 @@ vi.mock('../../../hooks/useMotionConfig', () => ({
 ```
 
 **Focus testing pattern:**
+
 ```typescript
 import { fireEvent, screen } from '@testing-library/react';
 
@@ -651,6 +658,7 @@ it('focuses verse heading after Next Verse click', async () => {
 ```
 
 **Screen reader testing pattern:**
+
 ```typescript
 it('announces step change via aria-live region', async () => {
   // Render with session at step 0
@@ -664,13 +672,13 @@ it('announces step change via aria-live region', async () => {
 
 ## Functional Requirements Traceability
 
-| AC | PRD Requirement | UX Spec Section |
-|----|----------------|----------------|
-| #1 Keyboard Navigation | NFR-A1 (WCAG AA keyboard) | Responsive Design & Accessibility → Keyboard & Focus |
-| #2 Screen Reader | NFR-A1 (WCAG AA), NFR-A2 (screen reader testing) | Responsive Design & Accessibility → Screen Reader Announcements |
-| #3 Focus Management | NFR-A1 (WCAG AA focus management) | Responsive Design & Accessibility → Keyboard & Focus |
-| #4 Reduced Motion | NFR-A1 (prefers-reduced-motion) | Responsive Design & Accessibility → Reduced Motion |
-| #5 Color Independence | NFR-A1 (WCAG AA contrast), NFR-A3 (color independence) | Responsive Design & Accessibility → Color Contrast, Touch Target Requirements |
+| AC                     | PRD Requirement                                        | UX Spec Section                                                               |
+| ---------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| #1 Keyboard Navigation | NFR-A1 (WCAG AA keyboard)                              | Responsive Design & Accessibility → Keyboard & Focus                          |
+| #2 Screen Reader       | NFR-A1 (WCAG AA), NFR-A2 (screen reader testing)       | Responsive Design & Accessibility → Screen Reader Announcements               |
+| #3 Focus Management    | NFR-A1 (WCAG AA focus management)                      | Responsive Design & Accessibility → Keyboard & Focus                          |
+| #4 Reduced Motion      | NFR-A1 (prefers-reduced-motion)                        | Responsive Design & Accessibility → Reduced Motion                            |
+| #5 Color Independence  | NFR-A1 (WCAG AA contrast), NFR-A3 (color independence) | Responsive Design & Accessibility → Color Contrast, Touch Target Requirements |
 
 ## Validation Gates (Before Marking Complete)
 
@@ -728,18 +736,17 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## File List
 
-| File | Action |
-|------|--------|
-| `src/hooks/useMotionConfig.ts` | CREATED |
-| `src/hooks/__tests__/useMotionConfig.test.ts` | CREATED |
-| `src/hooks/index.ts` | MODIFIED |
-| `src/components/scripture-reading/containers/SoloReadingFlow.tsx` | MODIFIED |
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | MODIFIED |
-| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` | MODIFIED |
+| File                                                                    | Action   |
+| ----------------------------------------------------------------------- | -------- |
+| `src/hooks/useMotionConfig.ts`                                          | CREATED  |
+| `src/hooks/__tests__/useMotionConfig.test.ts`                           | CREATED  |
+| `src/hooks/index.ts`                                                    | MODIFIED |
+| `src/components/scripture-reading/containers/SoloReadingFlow.tsx`       | MODIFIED |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx`     | MODIFIED |
+| `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx`   | MODIFIED |
 | `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | MODIFIED |
 
 ## Change Log
 
 - **2026-01-31:** Implemented Story 1.5 Accessibility Foundations — created centralized `useMotionConfig` hook, added keyboard focus-visible rings to all interactive elements, implemented screen reader announcer regions with semantic-change-only announcements, added programmatic focus management on transitions, implemented dialog focus trap with focus restoration, fixed WCAG AA contrast ratios (purple-400 to purple-600), added error icons and disabled reason text for color independence, changed ScriptureOverview to semantic `<main>` element, added `aria-current="step"` to progress indicator. 32 new tests added, 456 total tests pass with zero regressions.
 - **2026-02-01 (Code Review):** Fixed 3 bugs found during adversarial review: (1) focus management on sub-view transitions was broken due to shared-ref race condition between announcement and focus effects — combined into single effects; (2) same race condition on step change focus management — combined into single effect; (3) completion announcement/focus called setState from render body via requestAnimationFrame — moved to useEffect. Added 3 new focus management tests verifying actual focus movement (Back to Verse after View Response, verse heading after Back to Verse, verse heading after step advancement). 459 total tests pass.
-

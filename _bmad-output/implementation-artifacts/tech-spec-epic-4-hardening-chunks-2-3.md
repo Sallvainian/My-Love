@@ -14,9 +14,9 @@ code_patterns:
   - 'setRetryCount(c => c + 1) — unbounded, no max cap or backoff (5 call sites across 2 hooks)'
   - 'isPartnerConnected: boolean defaults to true — false positive before first heartbeat'
   - '...initialScriptureState spread — shotgun reset nukes coupleStats, isStatsLoading, isInitialized'
-  - 'errorMessage.includes(''409'') — fragile string matching for version mismatch from RAISE EXCEPTION ''409: version mismatch'''
+  - "errorMessage.includes('409') — fragile string matching for version mismatch from RAISE EXCEPTION '409: version mismatch'"
   - 'dual triggeredBy/triggered_by keys in StateUpdatePayload — only triggered_by is ever sent (line 868)'
-  - 's.mode === ''solo'' filter at line 307 excludes together-mode from resume prompt'
+  - "s.mode === 'solo' filter at line 307 excludes together-mode from resume prompt"
   - 'retryFailedWrite reads session.currentStepIndex from get() — stale if user advanced between failure and retry'
   - 'useScripturePresence has no CLOSED handler — only CHANNEL_ERROR (line 157)'
   - 'useScripturePresence removeChannel at lines 174, 200 has no .catch() (same bug fixed in broadcast hook by Chunk 1)'
@@ -48,6 +48,7 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
 ### Scope
 
 **In Scope (Chunk 2 — Reconnection Resilience):**
+
 - C1: MAX_RETRIES + exponential backoff for `useScriptureBroadcast` (4 sites) and `useScripturePresence` (1 site)
 - E1: Fix `isPartnerConnected` initial state from `true` to `null` (unknown)
 - E6: Debounce `loadSession` to prevent rapid-fire refetch on reconnect
@@ -55,6 +56,7 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
 - S2: Extract `scheduleRetry` helper to deduplicate retry logic across both hooks
 
 **In Scope (Chunk 3 — State Correctness):**
+
 - C3: Version check before `end_session` state reset (guard before mutation)
 - I7: Scoped state reset preserving `coupleStats`, `isStatsLoading`, `isInitialized`
 - I10: Standardize `triggered_by` (snake_case), drop `triggeredBy` (camelCase)
@@ -64,6 +66,7 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
 - T1+T2: Lock-in version conflict + concurrent call tests
 
 **Out of Scope:**
+
 - Chunk 1 + Chunk 4: Already completed (`tech-spec-epic-4-hardening-chunks-1-4.md`)
 - Tech debt items E4-D1 through E4-D5 (slice splitting, hook extraction, configurable TTL, integration tests, ESLint warnings)
 - Full together-mode resume (presence re-establishment, version reconciliation, role reassignment — that's a feature, not hardening)
@@ -73,14 +76,17 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
 ### Codebase Patterns
 
 **Retry Logic (Current State — Problem):**
+
 - `useScriptureBroadcast.ts` uses `useState` for `retryCount` (line 51). Incrementing it triggers `useEffect` re-run (dependency at line 307) which creates a new channel subscription. 4 call sites: CHANNEL_ERROR `.then()` (line 236), CHANNEL_ERROR `.catch()` (line 249), CLOSED `.then()` (line 267), CLOSED `.catch()` (line 280). No max cap, no backoff delay.
 - `useScripturePresence.ts` uses same pattern (line 48). 1 call site: CHANNEL_ERROR handler (line 176). Also no max cap, no backoff. Additionally, `removeChannel` at lines 174 and 200 have no `.catch()` — same bug that Chunk 1 fixed in the broadcast hook.
 - **Reference pattern:** `useRealtimeMessages.ts` (lines 25-29) implements bounded retry correctly: `RETRY_CONFIG = { maxRetries: 5, baseDelay: 1000, maxDelay: 30000 }`, exponential backoff via `baseDelay * Math.pow(2, retryCountRef.current)` (line 113), max check at line 104, reset on successful SUBSCRIBED (line 95). Uses `useRef` for count tracking + `setTimeout` for backoff delay + `channel.subscribe()` for re-subscribe.
 
 **Presence CLOSED Handler (Current State — Problem):**
+
 - `useScripturePresence.ts` handles `CHANNEL_ERROR` at line 157-177 but has NO `CLOSED` handler. When the channel transitions to CLOSED state (e.g., server-side disconnect), the hook does nothing — no cleanup, no retry, no partner disconnect signal. Compare: `useScriptureBroadcast.ts` has a CLOSED handler at lines 252-282 with cleanup + retry.
 
 **isPartnerConnected Initial State (Current State — Problem):**
+
 - `useScripturePresence.ts:53`: `isPartnerConnected: true` — defaulting to `true` means the UI assumes partner is connected before any heartbeat arrives. The stale timer starts at line 149-156 (fires after 20s if no presence_update received), which would then flip to `false`. During that 20s window, the partner appears connected even if they never joined.
 - Consumer: `ReadingContainer.tsx:96-130` tracks transitions via `prevConnectedRef`. Changing to `boolean | null` (null = unknown) affects the transition logic:
   - `null → true` (first heartbeat arrives): Should set connected, no "Reconnected" toast (it's a first connect)
@@ -90,6 +96,7 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
   - The current `wasConnected && !isConnected` / `!wasConnected && isConnected` checks must be updated to strict equality (`=== true`, `=== false`) to correctly distinguish null from false.
 
 **State Reset (Current State — Problem):**
+
 - `...initialScriptureState` is used at 6 `set()` call sites in the slice (plus 1 initialization spread at line 207 that stays unchanged):
   - Line 275: `exitSession()` — user navigates away
   - Line 422: `saveAndExit()` — after successful save
@@ -101,10 +108,12 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
 - Fix approach: Create a `resetSessionState(get)` function **above** the slice creator (since the creator uses concise arrow `=> ({...})`, you cannot define functions inside the object literal). It accepts `get` as a parameter and spreads `initialScriptureState` while preserving the three cross-session fields.
 
 **Version Guard Ordering (Current State — Problem):**
+
 - `onBroadcastReceived()` at lines 748-756: The `end_session` / `complete` check fires FIRST (line 749-755) and resets all state via `set({ ...initialScriptureState })` BEFORE the version check at line 759. A stale broadcast with `triggered_by: 'end_session'` and an old version number would still nuke the session.
 - Fix: Move the version check BEFORE the end_session/complete check. If version is stale, drop the broadcast entirely.
 
 **triggered_by Standardization (Current State — Problem):**
+
 - `StateUpdatePayload` (lines 38-39) defines both `triggeredBy` (camelCase) and `triggered_by` (snake_case).
 - Only `triggered_by` is ever sent — one site at line 868: `triggered_by: 'lock_in'`.
 - The `onBroadcastReceived` handler checks both variants at lines 750-751: `payload.triggeredBy === 'end_session' || payload.triggered_by === 'end_session'`.
@@ -112,38 +121,42 @@ Apply bounded retry with exponential backoff matching the existing `useRealtimeM
 - Fix: Remove `triggeredBy` from the interface, keep only `triggered_by`. Update the check to only use `triggered_by`.
 
 **Version Mismatch Detection (Current State — Problem):**
+
 - `lockIn()` catch block at lines 874-916. Error from `callLobbyRpc` is `{ message: string }` (not an Error instance). The RPC raises `'409: version mismatch'` (SQL at migration line 326). Client checks `errorMessage.includes('409')` at line 882 — matches any error containing "409".
 - `isScriptureError()` helper already exists at lines 63-72 — checks for `code` and `message` fields with valid `ScriptureErrorCode`.
 - Fix: Before `throw error` at line 840, check if `error.message` starts with `'409:'` and throw a `ScriptureError` with `VERSION_MISMATCH` code instead. In the catch block, use `isScriptureError(error) && error.code === ScriptureErrorCode.VERSION_MISMATCH`.
 
 **Resume Filter (Current State — Problem):**
+
 - `checkForActiveSession()` at line 307: `.filter((s) => s.status === 'in_progress' && s.mode === 'solo')` — excludes together-mode sessions entirely.
 - Fix: Remove `&& s.mode === 'solo'` filter. The UI (`ScriptureOverview.tsx`) that renders the resume prompt will need a note indicating together-mode sessions will resume as solo.
 
 **retryFailedWrite Stale State (Current State — Problem):**
-- `retryFailedWrite()` at lines 487-531. For `advanceStep` / `saveSession` retries, it reads `session.currentStepIndex`, `session.currentPhase`, `session.status` from `get()` at call time (line 499-503). If the user advanced a step locally between the failed write and the retry, the retry sends the *current* state, not the state that failed to persist.
+
+- `retryFailedWrite()` at lines 487-531. For `advanceStep` / `saveSession` retries, it reads `session.currentStepIndex`, `session.currentPhase`, `session.status` from `get()` at call time (line 499-503). If the user advanced a step locally between the failed write and the retry, the retry sends the _current_ state, not the state that failed to persist.
 - For reflections, the data is correctly stored in `pendingRetry.reflectionData` (captured at failure time).
 - Fix: Add a `sessionData` field to `PendingRetry` that captures the session state at failure time. `retryFailedWrite` uses `pendingRetry.sessionData` instead of `get().session`.
 - The `pendingRetry` creation sites at lines 367, 399 would capture `{ currentStepIndex, currentPhase, status }` at failure time.
 
 **loadSession Concurrent Call Guard (Current State — Problem):**
+
 - `loadSession` is called from 3 sites: broadcast hook reconnect (`useScriptureBroadcast.ts:174`), resume flow (`ScriptureOverview.tsx:280`), and presence reconnect (`ReadingContainer.tsx:109`). No guard against concurrent calls — both reconnect paths could fire simultaneously on a network recovery event.
 - The `endSession()` action already has this guard: `if (!session || state.isSyncing) return;` (line 973).
 - Fix: Add `if (get().scriptureLoading) return;` at the top of `loadSession` (before line 229).
 
 ### Files to Reference
 
-| File | Purpose | Lines |
-| ---- | ------- | ----- |
-| `src/hooks/useScriptureBroadcast.ts` | Channel lifecycle, retry logic (4 unbounded sites), setBroadcastFn | 316 |
-| `src/hooks/useScripturePresence.ts` | Presence channel, isPartnerConnected, retry (1 site), no CLOSED handler | 227 |
-| `src/hooks/useRealtimeMessages.ts` | **Reference pattern** — bounded RETRY_CONFIG with exponential backoff | 175 |
-| `src/stores/slices/scriptureReadingSlice.ts` | State resets (7 sites), version guard, triggered_by, lockIn 409, retryFailedWrite, loadSession, resume filter | ~1008 |
-| `src/components/scripture-reading/containers/ReadingContainer.tsx` | isPartnerConnected consumer — transition tracking logic | ~250 |
-| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | Existing lock-in tests — mock pattern reference | ~200 |
-| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | Existing broadcast reconnect tests — mock pattern reference | ~200 |
-| `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | Existing presence reconnect tests — mock pattern reference | ~200 |
-| `supabase/migrations/20260301000200_remove_server_side_broadcasts.sql` | `RAISE EXCEPTION '409: version mismatch'` at line 326 — source of string-matched error | 580 |
+| File                                                                   | Purpose                                                                                                       | Lines |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----- |
+| `src/hooks/useScriptureBroadcast.ts`                                   | Channel lifecycle, retry logic (4 unbounded sites), setBroadcastFn                                            | 316   |
+| `src/hooks/useScripturePresence.ts`                                    | Presence channel, isPartnerConnected, retry (1 site), no CLOSED handler                                       | 227   |
+| `src/hooks/useRealtimeMessages.ts`                                     | **Reference pattern** — bounded RETRY_CONFIG with exponential backoff                                         | 175   |
+| `src/stores/slices/scriptureReadingSlice.ts`                           | State resets (7 sites), version guard, triggered_by, lockIn 409, retryFailedWrite, loadSession, resume filter | ~1008 |
+| `src/components/scripture-reading/containers/ReadingContainer.tsx`     | isPartnerConnected consumer — transition tracking logic                                                       | ~250  |
+| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts`               | Existing lock-in tests — mock pattern reference                                                               | ~200  |
+| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts`             | Existing broadcast reconnect tests — mock pattern reference                                                   | ~200  |
+| `tests/unit/hooks/useScripturePresence.reconnect.test.ts`              | Existing presence reconnect tests — mock pattern reference                                                    | ~200  |
+| `supabase/migrations/20260301000200_remove_server_side_broadcasts.sql` | `RAISE EXCEPTION '409: version mismatch'` at line 326 — source of string-matched error                        | 580   |
 
 ### Technical Decisions
 
@@ -170,6 +183,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
 - [x] **Task 1: Extract `scheduleRetry` helper and `SCRIPTURE_RETRY_CONFIG`** (S2 + C1 foundation)
   - File: `src/hooks/scriptureRetryUtils.ts` (new file)
   - Action: Create a shared utility with:
+
     ```typescript
     import type { Dispatch, SetStateAction } from 'react';
 
@@ -198,6 +212,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
       return true;
     }
     ```
+
   - Notes: Follows the same formula as `useRealtimeMessages.ts:112-114`. Both scripture hooks will import this. The `retryCountRef` is a `useRef` that persists across re-renders (unlike the `useState` retryCount which triggers re-renders). The `setTimeout` wrapper is the key difference from the current code — it adds the backoff delay before triggering the state update.
 
 - [x] **Task 2: Apply bounded retry to `useScriptureBroadcast`** (C1)
@@ -226,7 +241,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
     2. Add `const retryCountRef = useRef(0);` after line 48.
     3. In the SUBSCRIBED handler (line 139), add `retryCountRef.current = 0;` to reset on success.
     4. Replace the unbounded `setRetryCount((c) => c + 1)` at line 176 with bounded `scheduleRetry(retryCountRef, setRetryCount)` + max-exceeded error handling.
-    4b. In the CHANNEL_ERROR handler (line 164), add `staleTimerRef` cleanup alongside the existing `intervalRef` cleanup:
+       4b. In the CHANNEL_ERROR handler (line 164), add `staleTimerRef` cleanup alongside the existing `intervalRef` cleanup:
        ```typescript
        if (staleTimerRef.current) {
          clearTimeout(staleTimerRef.current);
@@ -294,6 +309,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
     2. Change initial state from `isPartnerConnected: true` to `isPartnerConnected: null` (line 53).
   - File: `src/components/scripture-reading/containers/ReadingContainer.tsx`
   - Action: Update the transition tracking effect (lines 96-119) to use strict equality:
+
     ```typescript
     const prevConnectedRef = useRef(partnerPresence.isPartnerConnected);
     useEffect(() => {
@@ -322,6 +338,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
       };
     }, [partnerPresence.isPartnerConnected, setPartnerDisconnected, loadSession, session?.id]);
     ```
+
   - Also update `handleKeepWaiting` (lines 122-130): `if (partnerPresence.isPartnerConnected === true)` instead of `if (partnerPresence.isPartnerConnected)`.
   - File: `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx`
   - Action: Update mock return value at line 76 from `isPartnerConnected: true` to `isPartnerConnected: null` (default) or `true` (connected) depending on the test scenario.
@@ -345,6 +362,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
 - [x] **Task 6: Create `resetSessionState` helper** (I7)
   - File: `src/stores/slices/scriptureReadingSlice.ts`
   - Action: Add helper function **above** the slice creator (before line 206). The slice creator uses a concise arrow `=> ({...})` which cannot contain function declarations or const bindings — the helper must be extracted outside it, accepting `get` as a parameter:
+
     ```typescript
     /** Reset session-scoped state while preserving cross-session fields. */
     function resetSessionState(
@@ -358,6 +376,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
       ...initialScriptureState,
       // ... rest unchanged
     ```
+
     Replace all 6 `set({ ...initialScriptureState })` calls with `set(resetSessionState(get))`:
     - Line 275: `exitSession()` → `set(resetSessionState(get));`
     - Line 422: `saveAndExit()` → `set(resetSessionState(get));`
@@ -366,11 +385,13 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
     - Line 818: `applySessionConverted()` → `set(resetSessionState(get));`
     - Line 990: `endSession()` → `set(resetSessionState(get));`
     - Line 207: Initial store state `...initialScriptureState` — stays unchanged (initialization, not a reset).
+
   - Notes: The helper is defined **outside** the concise arrow `=> ({...})` because TypeScript/JS does not allow function declarations inside object literals. It accepts `get` as a parameter to access current cross-session field values.
 
 - [x] **Task 7: Fix version guard ordering in `onBroadcastReceived`** (C3)
   - File: `src/stores/slices/scriptureReadingSlice.ts`
   - Action: Reorder lines 748-759 so the version check comes FIRST:
+
     ```typescript
     onBroadcastReceived: (payload) => {
       const state = get();
@@ -390,6 +411,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
 
       // ... rest unchanged (role mapping, step advance, etc.)
     ```
+
   - Notes: The version check must come before ANY state mutation. A stale end_session broadcast (version <= current) is harmless and should be silently dropped. This also incorporates the I10 fix (only `triggered_by`, no `triggeredBy`).
 
 - [x] **Task 8: Standardize `triggered_by` and remove `triggeredBy`** (I10)
@@ -457,6 +479,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
        ```
   - File: `src/components/scripture-reading/containers/ReadingContainer.tsx`
   - Action: Update the "Session updated" toast detection (line 147) and error-toast exclusion (line 159) to use code-based matching instead of string matching:
+
     ```typescript
     // Watch scriptureError for version mismatch toast (was: message === 'Session updated')
     useEffect(() => {
@@ -473,7 +496,9 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
       // ... rest unchanged
     }, [scriptureError]);
     ```
+
     Add `import { ScriptureErrorCode } from '../../../stores/slices/scriptureReadingSlice';` if not already imported.
+
   - Notes: The `satisfies ScriptureError` assertion ensures type safety. The `startsWith('409:')` is more specific than `includes('409')` and matches exactly what the SQL RPC raises (`'409: version mismatch'`). The catch block now uses `isScriptureError()` + code check — fully structured, no string matching. The error set on the version mismatch path now correctly uses `VERSION_MISMATCH` code instead of `SYNC_FAILED`. The downstream consumer (`ReadingContainer`) is also updated to use code-based matching, completing the end-to-end structured error flow.
 
 - [x] **Task 10: Include together-mode in resume prompt** (E8)
@@ -486,6 +511,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
          .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
        ```
     2. In `loadSession()`, after the session is loaded and set (line 260), add a mode mutation for together-mode sessions being resumed as solo:
+
        ```typescript
        // If resuming a together-mode session, convert to solo on both client and server.
        // This ensures ScriptureOverview routing (line 299: session.mode === 'solo')
@@ -506,6 +532,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
 
        set({ session, scriptureLoading: false, isInitialized: true, currentUserId });
        ```
+
   - File: `src/components/scripture-reading/containers/ScriptureOverview.tsx`
   - Action: In the resume prompt UI, add a conditional note when the active session (before resume) has mode `'together'`:
     - Find the resume prompt section (where `activeSession` is rendered).
@@ -653,6 +680,7 @@ Tasks are ordered by dependency. Chunk 2 tasks (1-5) and Chunk 3 tasks (6-12) ca
 - `PendingRetry.sessionData` fallback in Task 11 handles the deploy transition gracefully — existing in-flight retries without `sessionData` fall back to current session state (existing behavior).
 
 ## Review Notes
+
 - Adversarial review completed
 - Findings: 2 total, 1 fixed, 1 skipped
 - Resolution approach: auto-fix

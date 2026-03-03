@@ -97,19 +97,20 @@ So that I can easily find and start the feature.
 
 Story 1.1 created substantial infrastructure that this story builds upon. These files **already exist and should be MODIFIED, not recreated**:
 
-| File | Status | Notes |
-|------|--------|-------|
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | EXISTS (229 lines) | Enhance with Start button, resume prompt, session creation wiring |
-| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | EXISTS (45 tests) | Update/extend existing tests |
-| `src/components/scripture-reading/index.ts` | EXISTS | Barrel export, no change needed |
-| `src/stores/slices/navigationSlice.ts` | EXISTS | Already has `'scripture'` in ViewType |
-| `src/stores/slices/scriptureReadingSlice.ts` | EXISTS | Has `createSession`, `loadSession`, `exitSession` actions |
-| `src/components/Navigation/BottomNavigation.tsx` | EXISTS | Already has Scripture tab with `BookOpen` icon, purple-500 active color |
-| `src/App.tsx` | EXISTS | Already lazy-loads ScriptureOverview for `scripture` view |
+| File                                                                    | Status             | Notes                                                                   |
+| ----------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------- |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx`     | EXISTS (229 lines) | Enhance with Start button, resume prompt, session creation wiring       |
+| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | EXISTS (45 tests)  | Update/extend existing tests                                            |
+| `src/components/scripture-reading/index.ts`                             | EXISTS             | Barrel export, no change needed                                         |
+| `src/stores/slices/navigationSlice.ts`                                  | EXISTS             | Already has `'scripture'` in ViewType                                   |
+| `src/stores/slices/scriptureReadingSlice.ts`                            | EXISTS             | Has `createSession`, `loadSession`, `exitSession` actions               |
+| `src/components/Navigation/BottomNavigation.tsx`                        | EXISTS             | Already has Scripture tab with `BookOpen` icon, purple-500 active color |
+| `src/App.tsx`                                                           | EXISTS             | Already lazy-loads ScriptureOverview for `scripture` view               |
 
 ## Existing Component Anatomy (ScriptureOverview.tsx)
 
 The current ScriptureOverview already has:
+
 - **Design tokens:** `scriptureTheme` object with `primary`, `background`, `surface` colors
 - **PartnerStatus type:** `'loading' | 'linked' | 'unlinked' | 'error'`
 - **ModeCard component:** Reusable card with `primary`/`secondary` variants
@@ -141,8 +142,9 @@ The current ScriptureOverview already has:
   - [Source: docs/project-context.md#Component Architecture]
 
 - **Zustand selector pattern:** Use selector destructuring, never `useAppStore()` without selector.
+
   ```typescript
-  const { session, isLoading, createSession, loadSession, exitSession } = useAppStore(state => ({
+  const { session, isLoading, createSession, loadSession, exitSession } = useAppStore((state) => ({
     session: state.session,
     isLoading: state.isLoading,
     createSession: state.createSession,
@@ -150,6 +152,7 @@ The current ScriptureOverview already has:
     exitSession: state.exitSession,
   }));
   ```
+
   - [Source: docs/project-context.md#Framework-Specific Rules]
 
 - **No React Router:** Navigation via `setView()` from navigationSlice only.
@@ -170,6 +173,7 @@ The current ScriptureOverview already has:
 ## UI/UX Requirements
 
 **Lavender Dreams Theme (from UX spec):**
+
 - Purple gradients, glass morphism cards
 - Primary color: `#A855F7` (purple-500)
 - Background: `#F3E5F5` (light lavender)
@@ -177,6 +181,7 @@ The current ScriptureOverview already has:
 - Existing Tailwind config has full `lavender` scale (50-900)
 
 **Typography:**
+
 - Main heading: `Playfair Display` (font-serif in Tailwind config)
 - Body text: `Inter` (font-sans, default)
 - Heading: `text-2xl font-bold text-purple-900`
@@ -190,17 +195,20 @@ The current ScriptureOverview already has:
 | Tertiary | "Start fresh", dismiss | Text-only, muted |
 
 **Glass Morphism Pattern (existing in app):**
+
 ```
 bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl
 ```
 
 **Mobile-First Layout:**
+
 - `max-w-md mx-auto` for centered single-column
 - Touch targets: minimum 48x48px with 8px spacing
 - Bottom-anchored actions (thumb-friendly)
 - `min-h-screen` for full viewport
 
 **Phase Transition Animations:**
+
 - Crossfade for mode selection reveal: 200ms
 - Use Framer Motion (`AnimatePresence` + `motion.div`)
 - Respect `prefers-reduced-motion` via `useMotionConfig` hook (Story 1.5 creates this; for now use inline check or Framer's `useReducedMotion`)
@@ -221,6 +229,7 @@ bg-white/80 backdrop-blur-sm border border-purple-200/50 rounded-2xl
 - **Key learning:** Sprint 0 laid heavy infrastructure. Story 1.1 found and fixed a seed RPC bug (variable reuse in RETURNING clauses). All 240 tests pass with zero regressions.
 
 **Git Intelligence (Recent Commits):**
+
 - `b353aa5` — Centralized validation schemas (moved from service inline to `src/validation/schemas.ts`)
 - `eecacdc` — Added scripture reading slice, service, migration, and test infrastructure
 - Pattern: conventional commits (`feat:`, `refactor:`, `chore:`), descriptive messages
@@ -241,37 +250,41 @@ To implement AC#6 (resume prompt), the container needs to:
 ## File Structure Notes
 
 All changes are within existing directories:
+
 - `src/components/scripture-reading/containers/ScriptureOverview.tsx` — primary edit target
 - `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` — test update target
 - No new files needed for this story (unless extracting sub-components from ScriptureOverview, which is optional)
 
 Optional: If ScriptureOverview grows beyond ~300 lines, extract presentational components into:
+
 - `src/components/scripture-reading/ResumePrompt.tsx`
 - `src/components/scripture-reading/StartButton.tsx`
-These would be presentational (props only, no store access).
+  These would be presentational (props only, no store access).
 
 ## Technology Versions (Locked from Story 1.1)
 
-| Technology | Version | Notes |
-|-----------|---------|-------|
-| React | 19.2.3 | Hooks only, no class components |
-| TypeScript | 5.9.3 | Strict mode |
-| Zustand | 5.0.10 | Slice composition, selector pattern |
-| Tailwind CSS | 4.1.17 | Lavender theme configured |
-| Framer Motion | 12.27.1 | AnimatePresence, useReducedMotion |
-| Vitest | 4.0.17 | Unit tests |
-| Testing Library | 16.3.2 | Component tests |
-| Lucide React | (installed) | BookOpen icon for nav tab |
+| Technology      | Version     | Notes                               |
+| --------------- | ----------- | ----------------------------------- |
+| React           | 19.2.3      | Hooks only, no class components     |
+| TypeScript      | 5.9.3       | Strict mode                         |
+| Zustand         | 5.0.10      | Slice composition, selector pattern |
+| Tailwind CSS    | 4.1.17      | Lavender theme configured           |
+| Framer Motion   | 12.27.1     | AnimatePresence, useReducedMotion   |
+| Vitest          | 4.0.17      | Unit tests                          |
+| Testing Library | 16.3.2      | Component tests                     |
+| Lucide React    | (installed) | BookOpen icon for nav tab           |
 
 ## Testing Strategy
 
 **Existing tests to preserve (45 tests in ScriptureOverview.test.tsx):**
+
 - Partner status states (loading, linked, unlinked, error)
 - Mode card rendering and interaction
 - Navigation to partner setup
 - Accessibility (aria labels, test IDs)
 
 **New tests to add:**
+
 - Start button renders and triggers mode selection reveal
 - Mode selection hidden initially, shown after Start tap
 - Resume prompt renders when incomplete session exists
@@ -285,6 +298,7 @@ These would be presentational (props only, no store access).
 - Glass morphism / Lavender Dreams visual elements render correctly
 
 **Mock strategy:**
+
 ```typescript
 vi.mock('../../../stores/useAppStore', () => ({
   useAppStore: vi.fn(),
@@ -350,16 +364,16 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ## File List
 
-| File | Action | Notes |
-|------|--------|-------|
-| `src/components/scripture-reading/containers/ScriptureOverview.tsx` | Modified | Added Start button, mode show/hide, resume prompt, session creation wiring, Lavender Dreams theme, error display. Review: removed direct supabase/service calls (H2), removed dead OfflineIndicator/error code (M2), extracted animation constant (L3) |
-| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | Modified | 43 tests covering all ACs. Review: removed supabase/service mocks (H2), fixed act warnings (M1), added session check edge case tests (M3) |
-| `src/stores/slices/scriptureReadingSlice.ts` | Modified | Added `checkForActiveSession`, `clearActiveSession` actions, `activeSession`/`isCheckingSession` state (H2). Error handling via `handleScriptureError` (H3) |
-| `tests/unit/stores/scriptureReadingSlice.test.ts` | Modified | Added 6 tests for checkForActiveSession (success, no match, getUser fail, service fail, together-mode filter) and clearActiveSession (M3) |
-| `src/data/scriptureSteps.ts` | Modified | Removed `as const` from scripture steps array (Story 1.1 review L2 fix applied during Story 1.2 development) |
-| `src/services/dbSchema.ts` | Modified | Removed `synced: boolean` from 4 types (Story 1.1 review M1 fix applied during Story 1.2 development) |
-| `src/services/scriptureReadingService.ts` | Modified | Removed `synced` from transforms, used `validated.user1_id`, rewrote `updateSession` write-through, added `onRefresh` callback (Story 1.1 review fixes applied during Story 1.2 development) |
-| `tests/unit/services/scriptureReadingService.test.ts` | Modified | +647 lines of service-level tests (Story 1.1 review H2 fix applied during Story 1.2 development) |
+| File                                                                    | Action   | Notes                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/components/scripture-reading/containers/ScriptureOverview.tsx`     | Modified | Added Start button, mode show/hide, resume prompt, session creation wiring, Lavender Dreams theme, error display. Review: removed direct supabase/service calls (H2), removed dead OfflineIndicator/error code (M2), extracted animation constant (L3) |
+| `src/components/scripture-reading/__tests__/ScriptureOverview.test.tsx` | Modified | 43 tests covering all ACs. Review: removed supabase/service mocks (H2), fixed act warnings (M1), added session check edge case tests (M3)                                                                                                              |
+| `src/stores/slices/scriptureReadingSlice.ts`                            | Modified | Added `checkForActiveSession`, `clearActiveSession` actions, `activeSession`/`isCheckingSession` state (H2). Error handling via `handleScriptureError` (H3)                                                                                            |
+| `tests/unit/stores/scriptureReadingSlice.test.ts`                       | Modified | Added 6 tests for checkForActiveSession (success, no match, getUser fail, service fail, together-mode filter) and clearActiveSession (M3)                                                                                                              |
+| `src/data/scriptureSteps.ts`                                            | Modified | Removed `as const` from scripture steps array (Story 1.1 review L2 fix applied during Story 1.2 development)                                                                                                                                           |
+| `src/services/dbSchema.ts`                                              | Modified | Removed `synced: boolean` from 4 types (Story 1.1 review M1 fix applied during Story 1.2 development)                                                                                                                                                  |
+| `src/services/scriptureReadingService.ts`                               | Modified | Removed `synced` from transforms, used `validated.user1_id`, rewrote `updateSession` write-through, added `onRefresh` callback (Story 1.1 review fixes applied during Story 1.2 development)                                                           |
+| `tests/unit/services/scriptureReadingService.test.ts`                   | Modified | +647 lines of service-level tests (Story 1.1 review H2 fix applied during Story 1.2 development)                                                                                                                                                       |
 
 > **Note:** The four files above were modified as part of Story 1.1 code review follow-ups that were applied during Story 1.2 development (commit `b353aa5`). They are not Story 1.2 feature changes.
 
@@ -368,4 +382,3 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - 2026-01-31: Story 1.2 implementation complete — enhanced ScriptureOverview with Start entry point, session resume, Lavender Dreams theme, mode-to-session wiring, and comprehensive test coverage (40 tests, all passing)
 - 2026-01-31: **Code Review (AI)** — 3 HIGH, 4 MEDIUM, 3 LOW issues found. Key findings: 6 undocumented file changes, direct Supabase call in component bypasses store pattern, silent error swallowing in session detection, "Start fresh" doesn't clear server state. 9 action items created. Status → in-progress.
 - 2026-01-31: Addressed code review findings — 9 items resolved (3 HIGH, 4 MEDIUM, 2 LOW). Major changes: moved session detection to Zustand slice (H2/H3), removed dead OfflineIndicator code (M2), extracted animation constant (L3), fixed test act() warnings (M1), added 6 slice tests (M3), documented test count and M4 server-state decision. 295 tests pass (0 regressions). tsc --noEmit clean.
-

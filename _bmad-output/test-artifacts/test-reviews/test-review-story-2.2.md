@@ -37,21 +37,21 @@ The primary concerns are maintainability and determinism. Three API test helpers
 
 ## Quality Criteria Assessment
 
-| Criterion                            | Status  | Violations | Notes                                                     |
-| ------------------------------------ | ------- | ---------- | --------------------------------------------------------- |
-| BDD Format (Given-When-Then)         | PASS    | 0          | Descriptive test names follow behavioral patterns         |
-| Test IDs                             | PASS    | 0          | All tests use structured IDs (CMP-xxx, E2E-xxx, API-xxx)  |
-| Priority Markers (P0/P1/P2/P3)       | PASS    | 0          | Priority levels assigned in test design                   |
-| Hard Waits (sleep, waitForTimeout)   | PASS    | 0          | Zero hard waits; all waits are deterministic               |
-| Determinism (no conditionals)        | WARN    | 3          | Math.random() and Date.now() in API test helpers           |
-| Isolation (cleanup, no shared state) | PASS    | 1          | 1 LOW: two E2E tests missing testSession fixture           |
-| Fixture Patterns                     | PASS    | 0          | Proper fixture usage in E2E and API tests                  |
-| Data Factories                       | WARN    | 3          | Factories exist but use non-deterministic generation       |
-| Network-First Pattern                | PASS    | 0          | waitForResponse used before UI assertions                  |
-| Explicit Assertions                  | PASS    | 0          | All assertions are explicit with clear expectations        |
-| Test Length (<=300 lines)            | WARN    | 1          | E2E-002 at 122 lines (under 300 but too many concerns)     |
-| Test Duration (<=1.5 min)            | WARN    | 1          | 17-step UI navigation repeated 4x in E2E setup             |
-| Flakiness Patterns                   | PASS    | 0          | No flakiness patterns detected                             |
+| Criterion                            | Status | Violations | Notes                                                    |
+| ------------------------------------ | ------ | ---------- | -------------------------------------------------------- |
+| BDD Format (Given-When-Then)         | PASS   | 0          | Descriptive test names follow behavioral patterns        |
+| Test IDs                             | PASS   | 0          | All tests use structured IDs (CMP-xxx, E2E-xxx, API-xxx) |
+| Priority Markers (P0/P1/P2/P3)       | PASS   | 0          | Priority levels assigned in test design                  |
+| Hard Waits (sleep, waitForTimeout)   | PASS   | 0          | Zero hard waits; all waits are deterministic             |
+| Determinism (no conditionals)        | WARN   | 3          | Math.random() and Date.now() in API test helpers         |
+| Isolation (cleanup, no shared state) | PASS   | 1          | 1 LOW: two E2E tests missing testSession fixture         |
+| Fixture Patterns                     | PASS   | 0          | Proper fixture usage in E2E and API tests                |
+| Data Factories                       | WARN   | 3          | Factories exist but use non-deterministic generation     |
+| Network-First Pattern                | PASS   | 0          | waitForResponse used before UI assertions                |
+| Explicit Assertions                  | PASS   | 0          | All assertions are explicit with clear expectations      |
+| Test Length (<=300 lines)            | WARN   | 1          | E2E-002 at 122 lines (under 300 but too many concerns)   |
+| Test Duration (<=1.5 min)            | WARN   | 1          | 17-step UI navigation repeated 4x in E2E setup           |
+| Flakiness Patterns                   | PASS   | 0          | No flakiness patterns detected                           |
 
 **Total Violations**: 0 Critical, 6 High, 4 Medium, 7 Low
 
@@ -361,10 +361,10 @@ Tests are grouped under descriptive describe blocks that map to story acceptance
 
 ### Acceptance Criteria Validation
 
-| Acceptance Criterion                                    | Test IDs                          | Status  | Notes                                     |
-| ------------------------------------------------------- | --------------------------------- | ------- | ----------------------------------------- |
-| AC #1: Reflection summary screen with bookmarked verses | CMP-001..011, E2E-001, E2E-002   | Covered | Missing transition animation test (P2)    |
-| AC #2: Session-level reflection with rating and note    | CMP-006..010, E2E-002, API-001/2 | Covered | Missing write-failure negative test (P2)  |
+| Acceptance Criterion                                    | Test IDs                         | Status  | Notes                                      |
+| ------------------------------------------------------- | -------------------------------- | ------- | ------------------------------------------ |
+| AC #1: Reflection summary screen with bookmarked verses | CMP-001..011, E2E-001, E2E-002   | Covered | Missing transition animation test (P2)     |
+| AC #2: Session-level reflection with rating and note    | CMP-006..010, E2E-002, API-001/2 | Covered | Missing write-failure negative test (P2)   |
 | AC #3: Submission and data persistence                  | CMP-012/013, E2E-003, API-003    | Covered | Full happy path verified across all levels |
 
 **Coverage**: 3/3 criteria covered (100% functional coverage)
@@ -448,32 +448,32 @@ The two areas below 70 -- maintainability (61) and determinism (70) -- are addre
 
 ### Violation Summary by Location
 
-| File | Line | Severity | Dimension | Issue | Fix |
-| ---- | ---- | -------- | --------- | ----- | --- |
-| scripture-reflection-api.spec.ts | 49 | HIGH | Determinism | Date.now() in test data | Use incrementing counter |
-| scripture-reflection-api.spec.ts | 50 | HIGH | Determinism | Math.random() in test data | Use deterministic suffix |
-| scripture-reflection-api.spec.ts | 56 | HIGH | Determinism | Math.random() in generateRating | Accept rating as parameter |
-| scripture-reflection-api.spec.ts | 316 | HIGH | Maintainability | Duplicated 4-line setup | Extract to beforeEach |
-| ReflectionSummary.test.tsx | 69 | LOW | Maintainability | Mixed assertion styles | Standardize on jest-dom matchers |
-| ReflectionSummary.test.tsx | 186 | MEDIUM | Maintainability | Brittle CSS class assertions | Use behavioral assertions |
-| ReflectionSummary.test.tsx | 192 | HIGH | Maintainability | Magic numbers (150, 200, 48) | Extract to named constants |
-| ReflectionSummary.test.tsx | -- | LOW | Coverage | Missing aria-live test | Add a11y assertion |
-| ReflectionSummary.test.tsx | -- | LOW | Coverage | Missing 200-char boundary test | Test truncation at limit |
-| ReflectionSummary.test.tsx | -- | LOW | Coverage | Missing max bookmarks edge case | Test with 17 bookmarks |
-| SoloReadingFlow.test.tsx | -- | LOW | Coverage | Missing integration test | Add submission chain test |
-| scripture-reflection.spec.ts | 378 | MEDIUM | Performance | 17-step nav repeated 4x | API-seed for summary tests |
-| scripture-reflection.spec.ts | 421 | LOW | Isolation | Missing cleanup fixture | Add testSession to 2 tests |
-| scripture-reflection.spec.ts | 504 | HIGH | Maintainability | 122-line test, too many concerns | Split into 3 focused tests |
-| scripture-reflection.spec.ts | 529 | LOW | Maintainability | Magic CSS color value | Extract to constant |
-| scripture-reflection.spec.ts | -- | MEDIUM | Coverage | Missing transition animation test | Add AC #1 animation test |
-| scripture-reflection.spec.ts | -- | MEDIUM | Coverage | Missing write failure test | Add R2-001 negative test |
+| File                             | Line | Severity | Dimension       | Issue                             | Fix                              |
+| -------------------------------- | ---- | -------- | --------------- | --------------------------------- | -------------------------------- |
+| scripture-reflection-api.spec.ts | 49   | HIGH     | Determinism     | Date.now() in test data           | Use incrementing counter         |
+| scripture-reflection-api.spec.ts | 50   | HIGH     | Determinism     | Math.random() in test data        | Use deterministic suffix         |
+| scripture-reflection-api.spec.ts | 56   | HIGH     | Determinism     | Math.random() in generateRating   | Accept rating as parameter       |
+| scripture-reflection-api.spec.ts | 316  | HIGH     | Maintainability | Duplicated 4-line setup           | Extract to beforeEach            |
+| ReflectionSummary.test.tsx       | 69   | LOW      | Maintainability | Mixed assertion styles            | Standardize on jest-dom matchers |
+| ReflectionSummary.test.tsx       | 186  | MEDIUM   | Maintainability | Brittle CSS class assertions      | Use behavioral assertions        |
+| ReflectionSummary.test.tsx       | 192  | HIGH     | Maintainability | Magic numbers (150, 200, 48)      | Extract to named constants       |
+| ReflectionSummary.test.tsx       | --   | LOW      | Coverage        | Missing aria-live test            | Add a11y assertion               |
+| ReflectionSummary.test.tsx       | --   | LOW      | Coverage        | Missing 200-char boundary test    | Test truncation at limit         |
+| ReflectionSummary.test.tsx       | --   | LOW      | Coverage        | Missing max bookmarks edge case   | Test with 17 bookmarks           |
+| SoloReadingFlow.test.tsx         | --   | LOW      | Coverage        | Missing integration test          | Add submission chain test        |
+| scripture-reflection.spec.ts     | 378  | MEDIUM   | Performance     | 17-step nav repeated 4x           | API-seed for summary tests       |
+| scripture-reflection.spec.ts     | 421  | LOW      | Isolation       | Missing cleanup fixture           | Add testSession to 2 tests       |
+| scripture-reflection.spec.ts     | 504  | HIGH     | Maintainability | 122-line test, too many concerns  | Split into 3 focused tests       |
+| scripture-reflection.spec.ts     | 529  | LOW      | Maintainability | Magic CSS color value             | Extract to constant              |
+| scripture-reflection.spec.ts     | --   | MEDIUM   | Coverage        | Missing transition animation test | Add AC #1 animation test         |
+| scripture-reflection.spec.ts     | --   | MEDIUM   | Coverage        | Missing write failure test        | Add R2-001 negative test         |
 
 ### Quality Trends
 
-| Review Date | Score | Grade | Critical Issues | Trend |
-| ----------- | ----- | ----- | --------------- | ----- |
-| 2026-02-04 (Story 2.1) | 78/100 | C | 0 | -- |
-| 2026-02-04 (Story 2.2) | 81/100 | B | 0 | Improved |
+| Review Date            | Score  | Grade | Critical Issues | Trend    |
+| ---------------------- | ------ | ----- | --------------- | -------- |
+| 2026-02-04 (Story 2.1) | 78/100 | C     | 0               | --       |
+| 2026-02-04 (Story 2.2) | 81/100 | B     | 0               | Improved |
 
 ---
 

@@ -55,9 +55,7 @@ function createTestStore() {
 }
 
 async function createStoreWithReadingSession() {
-  const { scriptureReadingService } = await import(
-    '../../../src/services/scriptureReadingService'
-  );
+  const { scriptureReadingService } = await import('../../../src/services/scriptureReadingService');
   vi.mocked(scriptureReadingService.createSession).mockResolvedValueOnce({
     id: 'session-end-001',
     mode: 'together',

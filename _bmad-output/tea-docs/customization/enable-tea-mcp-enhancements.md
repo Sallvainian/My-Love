@@ -16,6 +16,7 @@ MCP servers enable AI agents to interact with live browsers during test generati
 ## When to Use This
 
 ### For UI Testing:
+
 - Exploratory mode in `test-design` for browser-based UI discovery
 - Recording mode in `atdd` or `automate` to verify selectors with live browser
 - Healing mode in `automate` for fixing tests with visual debugging
@@ -23,11 +24,13 @@ MCP servers enable AI agents to interact with live browsers during test generati
 - Debugging complex UI interactions
 
 ### For API Testing:
+
 - Healing mode in `automate` to analyze failures with trace data
 - Debugging test failures involving network responses and timing
 - Inspecting trace files for network traffic and race conditions
 
 ### For Both:
+
 - Visual debugging with trace viewer showing network and UI data
 - Test failure analysis with MCP running tests and extracting errors
 - Understanding complex failures combining network and DOM information
@@ -51,6 +54,7 @@ Two actively maintained Playwright MCP servers are available:
 **Command:** `npx @playwright/mcp@latest`
 
 **Capabilities:**
+
 - Navigate to URLs
 - Click elements
 - Fill forms
@@ -64,6 +68,7 @@ Two actively maintained Playwright MCP servers are available:
 **Command:** `npx playwright run-test-mcp-server`
 
 **Capabilities:**
+
 - Run test files
 - Analyze failures
 - Extract error messages
@@ -115,6 +120,7 @@ Ensure MCP servers are running in your IDE.
 ### test-design: Exploratory Mode
 
 **Without MCP:**
+
 - TEA infers UI functionality from documentation
 - Relies on user descriptions of features
 - May miss actual UI behavior
@@ -128,6 +134,7 @@ Ensure MCP servers are running in your IDE.
 - Design tests based on real functionality
 
 **Benefits:**
+
 - Test design based on actual UI
 - Discovery of undocumented features
 - Validation that test scenarios are possible
@@ -135,24 +142,28 @@ Ensure MCP servers are running in your IDE.
 ### atdd: Recording Mode
 
 **Without MCP:**
+
 - TEA generates selectors from best practices
 - Infers API patterns from documentation
 
 **With MCP:**
 
 **For UI Tests:**
+
 - Navigate to form with live browser
 - Inspect actual field labels and attributes
 - Use exact selectors from real DOM
 - Ensure tests work on first run
 
 **For API Tests:**
+
 - Analyze trace files from test runs
 - Inspect network requests and responses
 - Validate request/response patterns
 - Confirm required headers and data structures
 
 **Benefits:**
+
 - UI: Accurate selectors from real DOM
 - API: Validated request/response patterns from trace data
 - Both: Tests work on first run
@@ -160,6 +171,7 @@ Ensure MCP servers are running in your IDE.
 ### automate: Healing + Recording Modes
 
 **Without MCP:**
+
 - TEA analyzes test code only
 - Suggests fixes based on static analysis
 - Generates tests from documentation/code
@@ -167,18 +179,21 @@ Ensure MCP servers are running in your IDE.
 **With MCP:**
 
 **Healing Mode (UI + API):**
+
 - Open trace files
 - Analyze screenshots and network tab
 - Identify actual changes (selector updates, API response structure changes)
 - Verify fixes with trace analysis
 
 **Recording Mode (UI + API):**
+
 - Inspect actual DOM for verified selectors
 - Analyze network traffic for request/response patterns
 - Generate tests with verified patterns
 - Verify tests work on first run
 
 **Benefits:**
+
 - Visual debugging combined with trace analysis
 - Verified selectors for UI and network patterns for API
 - Tests verified against actual application behavior
@@ -243,11 +258,13 @@ Updated test with corrected selector.
 **Problem:** TEA indicates MCP enhancements aren't available.
 
 **Causes:**
+
 1. MCP servers not configured in IDE
 2. Config syntax error in JSON
 3. IDE not restarted after configuration
 
 **Solution:**
+
 ```bash
 # Verify MCP config file exists
 ls ~/.cursor/config.json
@@ -263,11 +280,13 @@ cat ~/.cursor/config.json | python -m json.tool
 **Problem:** MCP enabled but browser never opens.
 
 **Causes:**
+
 1. Playwright browsers not installed
 2. Headless mode enabled
 3. MCP server crashed
 
 **Solution:**
+
 ```bash
 # Install browsers
 npx playwright install
@@ -284,11 +303,13 @@ npx @playwright/mcp@latest
 **Problem:** Config shows `tea_use_mcp_enhancements: true` but TEA doesn't use browser.
 
 **Causes:**
+
 1. Config not saved
 2. Workflow run before config update
 3. MCP servers not running
 
 **Solution:**
+
 ```bash
 # Verify config
 grep tea_use_mcp_enhancements _bmad/tea/config.yaml
@@ -304,6 +325,7 @@ grep tea_use_mcp_enhancements _bmad/tea/config.yaml
 **Problem:** MCP can't find elements TEA is looking for.
 
 **Causes:**
+
 1. Page not fully loaded
 2. Element behind modal or overlay
 3. Element requires authentication
@@ -322,6 +344,7 @@ grep tea_use_mcp_enhancements _bmad/tea/config.yaml
 - **Disable for:** Simple features, well-known patterns, API-only testing
 
 Toggle in configuration:
+
 ```yaml
 # For complex UI feature
 tea_use_mcp_enhancements: true
@@ -333,14 +356,17 @@ tea_use_mcp_enhancements: false
 ## Related Guides
 
 **Getting Started:**
+
 - TEA Lite Quickstart Tutorial - Learn TEA basics
 
 **Workflow Guides (MCP-Enhanced):**
+
 - How to Run Test Design - Exploratory mode with browser
 - How to Run ATDD - Recording mode for accurate selectors
 - How to Run Automate - Healing mode for debugging
 
 **Other Customization:**
+
 - Integrate Playwright Utils - Production-ready utilities
 
 ## Understanding the Concepts

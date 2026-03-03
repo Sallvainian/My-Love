@@ -13,6 +13,7 @@ The experience consists of 17 scripture steps paired with couple-focused respons
 **Primary Users:** Committed couples (married or long-term relationships) seeking structured spiritual connection
 
 **User Contexts:**
+
 - **Post-conflict repair** — Using the reading to soften and reconnect after tension
 - **Long-distance connection** — Solo mode to feel spiritually connected when apart
 - **Regular practice** — Building a gentle habit of shared spiritual time

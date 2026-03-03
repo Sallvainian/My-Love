@@ -184,15 +184,13 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             // via channel.send() after RPC success (client-side broadcast).
             setBroadcastFn?.((event, payload) => {
               try {
-                void channel
-                  .send({ type: 'broadcast', event, payload })
-                  .catch((err: unknown) => {
-                    handleScriptureError({
-                      code: ScriptureErrorCode.SYNC_FAILED,
-                      message: 'Broadcast send failed',
-                      details: err,
-                    });
+                void channel.send({ type: 'broadcast', event, payload }).catch((err: unknown) => {
+                  handleScriptureError({
+                    code: ScriptureErrorCode.SYNC_FAILED,
+                    message: 'Broadcast send failed',
+                    details: err,
                   });
+                });
               } catch (err: unknown) {
                 handleScriptureError({
                   code: ScriptureErrorCode.SYNC_FAILED,

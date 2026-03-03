@@ -185,7 +185,7 @@ try {
 ### Initialization (`src/config/sentry.ts`)
 
 ```typescript
-initSentry()  // Called in main.tsx before React renders
+initSentry(); // Called in main.tsx before React renders
 ```
 
 - **No-op** when `VITE_SENTRY_DSN` is absent (local development)
@@ -197,11 +197,11 @@ initSentry()  // Called in main.tsx before React renders
 
 The following errors are ignored to reduce noise:
 
-| Error Type | Pattern | Reason |
-|-----------|---------|--------|
-| Chunk load errors | `ChunkLoadError`, `Loading chunk .* failed` | Expected during deployments when old chunks are invalidated |
-| Network errors | `Failed to fetch`, `NetworkError`, `Load failed` | Expected during offline/flaky connectivity |
-| ResizeObserver | `ResizeObserver loop` | Browser implementation noise, not actionable |
+| Error Type        | Pattern                                          | Reason                                                      |
+| ----------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+| Chunk load errors | `ChunkLoadError`, `Loading chunk .* failed`      | Expected during deployments when old chunks are invalidated |
+| Network errors    | `Failed to fetch`, `NetworkError`, `Load failed` | Expected during offline/flaky connectivity                  |
+| ResizeObserver    | `ResizeObserver loop`                            | Browser implementation noise, not actionable                |
 
 ### Source Maps
 
@@ -215,11 +215,11 @@ When `SENTRY_AUTH_TOKEN` is set, the build pipeline:
 
 ```typescript
 retryWithBackoff(operation, {
-  maxAttempts: 3,     // Default
-  baseDelay: 1000,    // 1 second
-  maxDelay: 30000,    // 30 seconds
-  multiplier: 2,      // Exponential
-})
+  maxAttempts: 3, // Default
+  baseDelay: 1000, // 1 second
+  maxDelay: 30000, // 30 seconds
+  multiplier: 2, // Exponential
+});
 ```
 
 Retries: 1s, 2s, 4s (capped at 30s). Only retries on network errors and transient Supabase errors, not on validation or auth failures.

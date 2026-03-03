@@ -1,10 +1,13 @@
 # Running TEA for Enterprise Projects
 
 ## Overview
+
 This guide enables Test Architect (TEA) deployment on enterprise projects requiring compliance, security, audit, and regulatory adherence. It addresses non-functional requirement (NFR) assessment, audit trail generation, and evidence collection workflows.
 
 ## When to Use This
+
 Apply this approach for:
+
 - Enterprise track projects (not Quick Flow)
 - Compliance-mandated systems (SOC 2, HIPAA, GDPR)
 - Security-critical applications (finance, healthcare, government)
@@ -12,6 +15,7 @@ Apply this approach for:
 - Strict NFR thresholds (performance, security, reliability)
 
 ## Prerequisites
+
 - BMad Method installed with Enterprise track selected
 - Available TEA agent
 - Documented compliance requirements
@@ -20,17 +24,20 @@ Apply this approach for:
 ## Enterprise-Specific TEA Workflows
 
 ### NFR Assessment (nfr-assess)
+
 **Purpose:** Validate non-functional requirements with supporting evidence
 
 **Execution Timing:** Phase 2 (early stage) and Release Gate
 
 **Enterprise Rationale:**
+
 - Compliance mandates specific performance thresholds
 - Audit trails needed for certification
 - Security requirements are contractually binding
 - Performance SLAs carry legal obligations
 
 **Implementation Example:**
+
 ```
 nfr-assess
 Categories: Security, Performance, Reliability, Maintainability
@@ -48,16 +55,19 @@ Evidence:
 **Deliverable:** NFR assessment document with PASS/CONCERNS/FAIL categorization
 
 ### Trace with Audit Evidence (trace)
+
 **Purpose:** Generate requirements traceability with audit trail documentation
 
 **Execution Timing:** Phase 2 (baseline), Phase 4 (refresh), Release Gate
 
 **Enterprise Rationale:**
+
 - Auditors require requirements-to-test mapping
 - Compliance certifications demand traceability documentation
 - Regulatory bodies expect evidence artifacts
 
 **Phase 1 Example:**
+
 ```
 trace Phase 1
 Requirements: PRD.md (includes compliance requirements)
@@ -70,6 +80,7 @@ Output: traceability-matrix.md containing:
 ```
 
 **Phase 2 (Release Gate) Example:**
+
 ```
 trace Phase 2
 Generate gate-decision-{gate_type}-{story_id}.md with:
@@ -82,16 +93,19 @@ Generate gate-decision-{gate_type}-{story_id}.md with:
 **Note:** Phase 2 requires test execution results. If unavailable, Phase 2 will be automatically skipped.
 
 ### Test Design with Compliance Focus (test-design)
+
 **Purpose:** Risk assessment emphasizing compliance and security architecture
 
 **Execution Timing:** Phase 3 (system-level), Phase 4 (epic-level)
 
 **Enterprise Rationale:**
+
 - Security architecture alignment validation
 - Compliance requirements must be testable
 - Performance requirements are contractually binding
 
 **System-Level Example:**
+
 ```
 test-design
 Mode: System-level
@@ -110,7 +124,9 @@ Output: TWO documents (system-level):
 ## Enterprise TEA Lifecycle
 
 ### Phase 1: Discovery (Optional but Recommended)
+
 Research compliance obligations:
+
 ```
 Analyst: research
 Topics:
@@ -122,6 +138,7 @@ Topics:
 ### Phase 2: Planning (Required)
 
 **Step 1: Define NFRs Early**
+
 ```
 PM: prd
 Include in PRD:
@@ -132,6 +149,7 @@ Include in PRD:
 ```
 
 **Step 2: Assess NFRs**
+
 ```
 TEA: nfr-assess
 Categories: All (Security, Performance, Reliability, Maintainability)
@@ -142,6 +160,7 @@ Output: nfr-assessment.md
 ```
 
 **Step 3: Baseline (Brownfield Only)**
+
 ```
 TEA: trace Phase 1
 Establish baseline coverage before new work
@@ -150,6 +169,7 @@ Establish baseline coverage before new work
 ### Phase 3: Solutioning (Required)
 
 **Step 1: Architecture with Testability Review**
+
 ```
 Architect: architecture
 TEA: test-design (system-level)
@@ -160,6 +180,7 @@ Focus:
 ```
 
 **Step 2: Test Infrastructure**
+
 ```
 TEA: framework
 Requirements:
@@ -169,6 +190,7 @@ Requirements:
 ```
 
 **Step 3: CI/CD with Compliance**
+
 ```
 TEA: ci
 Requirements:
@@ -179,7 +201,9 @@ Requirements:
 ```
 
 ### Phase 4: Implementation (Required)
+
 Per epic execution sequence:
+
 ```
 1. TEA: test-design (epic-level)
    Focus: Compliance, security, performance for THIS epic
@@ -197,6 +221,7 @@ Per epic execution sequence:
 ### Release Gate (Required)
 
 **Step 1: Final NFR Assessment**
+
 ```
 TEA: nfr-assess
 All categories (if not done earlier)
@@ -204,6 +229,7 @@ Latest evidence (performance tests, security scans)
 ```
 
 **Step 2: Final Quality Audit**
+
 ```
 TEA: test-review tests/
 Full suite review
@@ -211,6 +237,7 @@ Quality target: >85 for enterprise
 ```
 
 **Step 3: Gate Decision**
+
 ```
 TEA: trace Phase 2
 Evidence required:
@@ -223,6 +250,7 @@ Archive all artifacts for compliance audit
 ```
 
 **Step 4: Archive for Audit**
+
 ```
 Archive:
 - All test results
@@ -238,6 +266,7 @@ Retention: Per compliance requirements (7 years for HIPAA)
 ### Evidence Collection
 
 **Required Artifacts:**
+
 - Requirements traceability matrix
 - Test execution results (with timestamps)
 - NFR assessment reports
@@ -247,6 +276,7 @@ Retention: Per compliance requirements (7 years for HIPAA)
 - Approver signatures
 
 **Directory Structure Example:**
+
 ```
 compliance/
   2026-Q1/
@@ -261,6 +291,7 @@ compliance/
 ```
 
 **Retention Periods:**
+
 - HIPAA: 7 years
 - SOC 2: 3 years
 - Adjust per specific compliance needs
@@ -268,6 +299,7 @@ compliance/
 ### Approver Workflows
 
 **Multi-Level Approval Structure:**
+
 ```
 ## Gate Approvals Required
 ### Technical Approval
@@ -285,6 +317,7 @@ compliance/
 ### Compliance Checklists
 
 **SOC 2 Example:**
+
 ```
 ## SOC 2 Compliance Checklist
 ### Access Controls
@@ -306,6 +339,7 @@ compliance/
 ```
 
 **HIPAA Example:**
+
 ```
 ## HIPAA Compliance Checklist
 ### PHI Protection
@@ -327,6 +361,7 @@ compliance/
 ### Start with Security
 
 **Priority 1: Security Requirements**
+
 ```
 1. Document all security requirements
 2. Generate security tests with `atdd`
@@ -337,6 +372,7 @@ compliance/
 **Rationale:** Security failures block all enterprise initiatives
 
 **RBAC Testing Example - Vanilla Playwright:**
+
 ```javascript
 test('should enforce role-based access', async ({ request }) => {
   // Login as regular user
@@ -355,48 +391,46 @@ test('should enforce role-based access', async ({ request }) => {
 ```
 
 **RBAC Testing - With Playwright Utils (Recommended):**
+
 ```javascript
 import { test as base, expect } from '@playwright/test';
-import { test as apiRequestFixture }
-  from '@seontechnologies/playwright-utils/api-request/fixtures';
-import { createAuthFixtures }
-  from '@seontechnologies/playwright-utils/auth-session';
+import { test as apiRequestFixture } from '@seontechnologies/playwright-utils/api-request/fixtures';
+import { createAuthFixtures } from '@seontechnologies/playwright-utils/auth-session';
 import { mergeTests } from '@playwright/test';
 
 const authFixtureTest = base.extend(createAuthFixtures());
 export const testWithAuth = mergeTests(apiRequestFixture, authFixtureTest);
 
-testWithAuth('should enforce role-based access',
-  async ({ apiRequest, authToken }) => {
-    // Auth token from fixture (configured for 'user' role)
-    const { status } = await apiRequest({
-      method: 'GET',
-      path: '/api/admin/users', // Admin endpoint
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
+testWithAuth('should enforce role-based access', async ({ apiRequest, authToken }) => {
+  // Auth token from fixture (configured for 'user' role)
+  const { status } = await apiRequest({
+    method: 'GET',
+    path: '/api/admin/users', // Admin endpoint
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 
-    expect(status).toBe(403); // Regular user denied
+  expect(status).toBe(403); // Regular user denied
 });
 
-testWithAuth('admin can access admin endpoint',
-  async ({ apiRequest, authToken, authOptions }) => {
-    // Override to admin role
-    authOptions.userIdentifier = 'admin';
+testWithAuth('admin can access admin endpoint', async ({ apiRequest, authToken, authOptions }) => {
+  // Override to admin role
+  authOptions.userIdentifier = 'admin';
 
-    const { status, body } = await apiRequest({
-      method: 'GET',
-      path: '/api/admin/users',
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
+  const { status, body } = await apiRequest({
+    method: 'GET',
+    path: '/api/admin/users',
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
 
-    expect(status).toBe(200); // Admin allowed
-    expect(body).toBeInstanceOf(Array);
+  expect(status).toBe(200); // Admin allowed
+  expect(body).toBeInstanceOf(Array);
 });
 ```
 
 **Note:** Auth-session requires provider setup in global-setup.ts
 
 **Playwright Utils Benefits for Compliance:**
+
 - Multi-user authentication testing (regular, admin, etc.)
 - Token persistence (faster test execution)
 - Consistent authentication patterns (audit trail)
@@ -405,6 +439,7 @@ testWithAuth('admin can access admin endpoint',
 ### Set Higher Quality Thresholds
 
 **Enterprise Quality Targets:**
+
 - Test coverage: >85% (standard: 80%)
 - Quality score: >85 (standard: 75%)
 - P0 coverage: 100% (non-negotiable)
@@ -415,12 +450,14 @@ testWithAuth('admin can access admin endpoint',
 ### Document Everything
 
 **Auditor Requirements:**
+
 - Decision rationale (why decisions were made)
 - Approval authority (who approved)
 - Timestamps (when occurred)
 - Evidence artifacts (test results, scan reports)
 
 **TEA's Structured Support:**
+
 - Reports include timestamps
 - Decisions include rationale
 - Evidence is cross-referenced
@@ -429,12 +466,14 @@ testWithAuth('admin can access admin endpoint',
 ### Budget for Compliance Testing
 
 **Enterprise Testing Cost Factors:**
+
 - Penetration testing: $10,000-$50,000
 - Security audits: $5,000-$20,000
 - Performance testing tools: $500-$5,000/month
 - Compliance consulting: $200-$500/hour
 
 **Planning Recommendations:**
+
 - Include in project cost
 - Schedule 3+ months early
 - Consider non-optional (non-negotiable for compliance)
@@ -442,6 +481,7 @@ testWithAuth('admin can access admin endpoint',
 ### Use External Validators
 
 **Don't Self-Certify:**
+
 - Penetration testing: Hire external firm
 - Security audits: Independent auditor
 - Compliance: Certification body
@@ -450,6 +490,7 @@ testWithAuth('admin can access admin endpoint',
 **TEA's Role:** Prepare for external validation, not replace it
 
 ## Related Guides
+
 - How to Run NFR Assessment - Deep NFR analysis
 - How to Run Trace - Gate decisions
 - How to Run Test Review - Quality audits
@@ -458,12 +499,14 @@ testWithAuth('admin can access admin endpoint',
 - Integrate Playwright Utils - Production utilities
 
 ## Understanding the Concepts
+
 - Engagement Models - Enterprise model
 - Risk-Based Testing - Probability x impact scoring
 - Test Quality Standards - Enterprise thresholds
 - TEA Overview - Complete lifecycle
 
 ## Reference
+
 - TEA Command Reference - All workflows
 - TEA Configuration - Enterprise options
 - Knowledge Base Index - Testing patterns

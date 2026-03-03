@@ -7,16 +7,19 @@
 ## Naming Patterns
 
 **Database Naming (Inherited):**
+
 - Tables: `snake_case` plural (`scripture_sessions`, `scripture_reflections`)
 - Columns: `snake_case` (`step_index`, `user_id`, `is_shared`)
 - Foreign keys: `{table}_id` format (`session_id`, `sender_id`)
 
 **Broadcast Event Naming:**
+
 - Format: `snake_case`
 - Examples: `state_updated`, `presence_update`, `lock_in_confirmed`
 - Channel naming: `scripture-session:{session_id}`, `scripture-presence:{session_id}`
 
 **Supabase RPC Naming:**
+
 - Format: Action-oriented with `scripture_` prefix
 - Examples:
   - `scripture_lock_in(session_id, step_index, user_id, expected_version)`
@@ -26,6 +29,7 @@
   - `scripture_seed_test_data(session_count?, include_reflections?, include_messages?)` — test environments only
 
 **Code Naming (Inherited):**
+
 - Variables/functions: `camelCase` (`sessionId`, `handleLockIn`)
 - Components: `PascalCase` (`LockInButton`, `ReflectionSummary`)
 - Files: `PascalCase.tsx` for components, `camelCase.ts` for utilities
@@ -34,6 +38,7 @@
 ## Structure Patterns
 
 **Type Organization:**
+
 - Co-locate types with the Zustand slice
 - File: `src/store/slices/scriptureReadingSlice.ts`
 - Export types alongside slice actions and selectors
@@ -63,11 +68,13 @@ export const useScriptureReadingStore = create<ScriptureReadingState>(...);
 ```
 
 **Component Organization:**
+
 - Feature-scoped subfolders: `session/`, `reading/`, `reflection/`
 - Each component is a single file
 - Barrel exports via `index.ts`
 
 **Test Organization:**
+
 - Top-level `tests/` folder mirroring src structure
 - Path: `tests/unit/components/scripture-reading/{subfolder}/{Component}.test.tsx`
 - Service tests: `tests/unit/services/scriptureReadingService.test.ts`
@@ -76,6 +83,7 @@ export const useScriptureReadingStore = create<ScriptureReadingState>(...);
 ## Format Patterns
 
 **Error Handling:**
+
 - Use error codes enum + centralized handler
 - Location: `src/services/scriptureReadingService.ts`
 
@@ -108,6 +116,7 @@ export function handleScriptureError(error: ScriptureError): void {
 ```
 
 **Loading State Naming:**
+
 - Explicit boolean flags per async operation
 - Prefix with `is` for booleans, `pending` for in-flight actions
 
@@ -130,6 +139,7 @@ interface ScriptureReadingState {
 ## Communication Patterns
 
 **Broadcast Payload Structure:**
+
 ```typescript
 // State update broadcast
 interface StateUpdatePayload {
@@ -149,6 +159,7 @@ interface PresencePayload {
 ```
 
 **State Update Pattern:**
+
 - Slice receives broadcast → validates version → updates state
 - Never mutate state directly; always use slice actions
 - Optimistic updates only for local pending flags
@@ -158,12 +169,13 @@ interface PresencePayload {
 onBroadcastReceived: (payload: StateUpdatePayload) => {
   if (payload.version <= get().session?.version) return; // Ignore stale
   set({ session: payload.snapshot, isPendingLockIn: false });
-}
+};
 ```
 
 ## Process Patterns
 
 **Component Prop Pattern:**
+
 - Components receive data via props (dumb components)
 - Container components connect to slice
 - Callbacks passed as props for testability
@@ -204,6 +216,7 @@ function LockInButton({ isLocked, isPending, partnerLocked, onLockIn }: LockInBu
 ```
 
 **Cache & Optimistic UI Pattern:**
+
 - **Reads:** Return IndexedDB cache immediately → fetch fresh from server → update cache
 - **Writes:** Show optimistic success → POST to server → on success, update cache → on failure, retry with user feedback
 - **Recovery:** On cache corruption, clear IndexedDB and refetch from server
@@ -212,6 +225,7 @@ function LockInButton({ isLocked, isPending, partnerLocked, onLockIn }: LockInBu
 ## Enforcement Guidelines
 
 **All AI Agents MUST:**
+
 1. Use `snake_case` for all database columns and broadcast events
 2. Co-locate types with `scriptureReadingSlice.ts`
 3. Use explicit boolean flags for loading states (`isLoading`, `isPendingX`)
@@ -221,6 +235,7 @@ function LockInButton({ isLocked, isPending, partnerLocked, onLockIn }: LockInBu
 7. Use action-oriented RPC names with `scripture_` prefix
 
 **Pattern Verification:**
+
 - TypeScript will catch most naming violations
 - PR review checklist should include pattern compliance
 - Linting rules enforce file naming conventions
@@ -228,6 +243,7 @@ function LockInButton({ isLocked, isPending, partnerLocked, onLockIn }: LockInBu
 ## Pattern Examples
 
 **Good Examples:**
+
 ```typescript
 // ✓ Correct broadcast event
 channel.send({ type: 'broadcast', event: 'state_updated', payload });
@@ -246,6 +262,7 @@ const [isPendingLockIn, setIsPendingLockIn] = useState(false);
 ```
 
 **Anti-Patterns:**
+
 ```typescript
 // ✗ Wrong: dot notation for events
 channel.send({ event: 'session.stateUpdated' });

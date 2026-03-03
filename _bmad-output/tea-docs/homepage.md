@@ -12,6 +12,7 @@ Risk-based testing workflows, automation guidance, and release gates for BMad Me
 TEA (Test Engineering Architect) functions as a BMAD module addressing testing strategy and automation. The system delivers nine workflows spanning learning, setup, design, automation, review, and release gates.
 
 **Key Features:**
+
 - **Workflow-Driven**: Multiple workflows covering day-to-day test architect activities
 - **Consistent Outputs**: "Knowledge-base guidance keeps standards consistent, no matter the agent being used"
 - **Risk-Based**: P0-P3 prioritization using probability x impact calculation
@@ -27,6 +28,7 @@ npx bmad-method install
 ```
 
 Activate workflows through chat:
+
 ```
 tea         # Load TEA agent
 test-design # Run Test Design workflow
@@ -50,17 +52,17 @@ test-design # Run Test Design workflow
 
 ## Core Workflows
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| Teach Me Testing | TMT | Learn testing (7 sessions, 1-2 weeks) |
-| Framework Setup | TF | Scaffold test framework |
-| CI/CD Integration | CI | Set up quality pipeline |
-| Test Design | TD | Risk-based test planning |
-| ATDD | AT | Failing acceptance tests (TDD) |
-| Test Automation | TA | Expand automation coverage |
-| Test Review | RV | Quality audit with scoring |
-| Requirements Tracing | TR | Coverage mapping + gate decision |
-| NFR Assessment | NR | Non-functional requirements evaluation |
+| Workflow             | Trigger | Purpose                                |
+| -------------------- | ------- | -------------------------------------- |
+| Teach Me Testing     | TMT     | Learn testing (7 sessions, 1-2 weeks)  |
+| Framework Setup      | TF      | Scaffold test framework                |
+| CI/CD Integration    | CI      | Set up quality pipeline                |
+| Test Design          | TD      | Risk-based test planning               |
+| ATDD                 | AT      | Failing acceptance tests (TDD)         |
+| Test Automation      | TA      | Expand automation coverage             |
+| Test Review          | RV      | Quality audit with scoring             |
+| Requirements Tracing | TR      | Coverage mapping + gate decision       |
+| NFR Assessment       | NR      | Non-functional requirements evaluation |
 
 ---
 

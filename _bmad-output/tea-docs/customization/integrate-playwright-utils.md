@@ -25,6 +25,7 @@ A production-ready utility library providing:
 ## When to Use This
 
 **Use when:**
+
 - You want production-ready fixtures rather than DIY solutions
 - Your team benefits from standardized patterns
 - You need utilities like API testing, auth handling, network mocking
@@ -32,6 +33,7 @@ A production-ready utility library providing:
 - You're building reusable test infrastructure
 
 **Don't use if:**
+
 - You're learning testing (keep it simple first)
 - You have your own fixture library
 - You don't need the utilities
@@ -74,6 +76,7 @@ grep tea_use_playwright_utils _bmad/tea/config.yaml
 ```
 
 Should display:
+
 ```
 @seontechnologies/playwright-utils@2.x.x
 tea_use_playwright_utils: true
@@ -84,6 +87,7 @@ tea_use_playwright_utils: true
 ### `framework` Workflow
 
 **Vanilla Playwright:**
+
 ```javascript
 import { test, expect } from '@playwright/test';
 
@@ -95,6 +99,7 @@ test('api test', async ({ request }) => {
 ```
 
 **With Playwright Utils (Combined Fixtures):**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 import { expect } from '@playwright/test';
@@ -112,6 +117,7 @@ test('api test', async ({ apiRequest, authToken, log }) => {
 ```
 
 **With Playwright Utils (Selective Merge):**
+
 ```javascript
 import { mergeTests } from '@playwright/test';
 import { test as apiRequestFixture } from '@seontechnologies/playwright-utils/api-request/fixtures';
@@ -133,6 +139,7 @@ test('api test', async ({ apiRequest, log }) => {
 ### `atdd` and `automate` Workflows
 
 **Without Playwright Utils:**
+
 ```javascript
 test('should fetch profile', async ({ page, request }) => {
   const response = await request.get('/api/profile');
@@ -142,6 +149,7 @@ test('should fetch profile', async ({ page, request }) => {
 ```
 
 **With Playwright Utils:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/api-request/fixtures';
 
@@ -161,6 +169,7 @@ test('should fetch profile', async ({ apiRequest }) => {
 **Without Playwright Utils:** Reviews against generic Playwright patterns
 
 **With Playwright Utils:** Reviews against playwright-utils best practices including:
+
 - Fixture composition patterns
 - Utility usage (apiRequest, authSession, etc.)
 - Network-first patterns
@@ -169,12 +178,14 @@ test('should fetch profile', async ({ apiRequest }) => {
 ### `ci` Workflow
 
 **Without Playwright Utils:**
+
 - Parallel sharding
 - Burn-in loops (basic shell scripts)
 - CI triggers (PR, push, schedule)
 - Artifact collection
 
 **With Playwright Utils:** Enhanced with smart testing:
+
 - Burn-in utility (git diff-based, volume control)
 - Selective testing (skip config/docs/types changes)
 - Test prioritization by file changes
@@ -189,15 +200,16 @@ Typed HTTP client with schema validation.
 
 **Why Use This?**
 
-| Feature | Vanilla Playwright | api-request Utility |
-|---------|-------------------|-------------------|
-| JSON parsing | Manual `await response.json()` | Automatic JSON parsing |
-| Status & body | `response.status()` + separate parsing | Returns `{ status, body }` structure |
-| Retry logic | No built-in retry | Automatic retry for 5xx errors |
-| Schema validation | No built-in validation | Single-line `.validateSchema()` |
-| Syntax | Verbose status checking | Clean destructuring |
+| Feature           | Vanilla Playwright                     | api-request Utility                  |
+| ----------------- | -------------------------------------- | ------------------------------------ |
+| JSON parsing      | Manual `await response.json()`         | Automatic JSON parsing               |
+| Status & body     | `response.status()` + separate parsing | Returns `{ status, body }` structure |
+| Retry logic       | No built-in retry                      | Automatic retry for 5xx errors       |
+| Schema validation | No built-in validation                 | Single-line `.validateSchema()`      |
+| Syntax            | Verbose status checking                | Clean destructuring                  |
 
 **Usage:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/api-request/fixtures';
 import { expect } from '@playwright/test';
@@ -223,6 +235,7 @@ test('should create user', async ({ apiRequest }) => {
 ```
 
 **Benefits:**
+
 - Returns `{ status, body }` structure
 - Schema validation with `.validateSchema()` chained method
 - Automatic retry for 5xx errors
@@ -236,14 +249,15 @@ Authentication session management with token persistence.
 
 **Why Use This?**
 
-| Feature | Vanilla Playwright Auth | auth-session |
-|---------|------------------------|-------------|
-| Performance | Re-authenticate every test run (slow) | Authenticate once, persist to disk |
-| Multi-user | Single user per setup | Multi-user support (roles, accounts) |
-| Token expiry | No token expiration handling | Automatic token renewal |
-| Management | Manual session management | Provider pattern (flexible auth) |
+| Feature      | Vanilla Playwright Auth               | auth-session                         |
+| ------------ | ------------------------------------- | ------------------------------------ |
+| Performance  | Re-authenticate every test run (slow) | Authenticate once, persist to disk   |
+| Multi-user   | Single user per setup                 | Multi-user support (roles, accounts) |
+| Token expiry | No token expiration handling          | Automatic token renewal              |
+| Management   | Manual session management             | Provider pattern (flexible auth)     |
 
 **Usage:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/auth-session/fixtures';
 import { expect } from '@playwright/test';
@@ -261,8 +275,13 @@ test('should access protected route', async ({ page, authToken }) => {
 **Configuration required** (see auth-session docs for provider setup):
 
 global-setup.ts
+
 ```javascript
-import { authStorageInit, setAuthProvider, authGlobalInit } from '@seontechnologies/playwright-utils/auth-session';
+import {
+  authStorageInit,
+  setAuthProvider,
+  authGlobalInit,
+} from '@seontechnologies/playwright-utils/auth-session';
 
 async function globalSetup() {
   authStorageInit();
@@ -272,6 +291,7 @@ async function globalSetup() {
 ```
 
 **Benefits:**
+
 - Token fetched once, reused across all tests
 - Persisted to disk (faster subsequent runs)
 - Multi-user support via `authOptions.userIdentifier`
@@ -285,14 +305,15 @@ Record and replay network traffic (HAR) for offline testing.
 
 **Why Use This?**
 
-| Feature | Vanilla Playwright HAR | network-recorder |
-|---------|----------------------|------------------|
-| Setup | Manual `routeFromHAR()` configuration | Automatic HAR management with `PW_NET_MODE` |
-| Test files | Separate record/playback test files | Same test, switch env var |
-| Mocking | No CRUD detection | Stateful mocking (POST/PUT/DELETE work) |
-| File paths | Manual HAR file paths | Auto-organized by test name |
+| Feature    | Vanilla Playwright HAR                | network-recorder                            |
+| ---------- | ------------------------------------- | ------------------------------------------- |
+| Setup      | Manual `routeFromHAR()` configuration | Automatic HAR management with `PW_NET_MODE` |
+| Test files | Separate record/playback test files   | Same test, switch env var                   |
+| Mocking    | No CRUD detection                     | Stateful mocking (POST/PUT/DELETE work)     |
+| File paths | Manual HAR file paths                 | Auto-organized by test name                 |
 
 **Usage:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/network-recorder/fixtures';
 
@@ -313,6 +334,7 @@ test('should work with recorded traffic', async ({ page, context, networkRecorde
 ```
 
 **Switch modes:**
+
 ```bash
 # Record traffic
 PW_NET_MODE=record npx playwright test
@@ -322,6 +344,7 @@ PW_NET_MODE=playback npx playwright test
 ```
 
 **Benefits:**
+
 - Offline testing (no backend needed)
 - Deterministic responses (same every time)
 - Faster execution (no network latency)
@@ -335,14 +358,15 @@ Spy or stub network requests with automatic JSON parsing.
 
 **Why Use This?**
 
-| Feature | Vanilla Playwright | interceptNetworkCall |
-|---------|-------------------|---------------------|
-| Setup | Route setup + response waiting (separate steps) | Single declarative call |
-| Parsing | Manual `await response.json()` | Automatic JSON parsing (`responseJson`) |
-| Filtering | Complex filter predicates | Simple glob patterns (`**/api/**`) |
-| Syntax | Verbose syntax | Concise, readable API |
+| Feature   | Vanilla Playwright                              | interceptNetworkCall                    |
+| --------- | ----------------------------------------------- | --------------------------------------- |
+| Setup     | Route setup + response waiting (separate steps) | Single declarative call                 |
+| Parsing   | Manual `await response.json()`                  | Automatic JSON parsing (`responseJson`) |
+| Filtering | Complex filter predicates                       | Simple glob patterns (`**/api/**`)      |
+| Syntax    | Verbose syntax                                  | Concise, readable API                   |
 
 **Usage:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 
@@ -369,6 +393,7 @@ test('should handle API errors', async ({ page, interceptNetworkCall }) => {
 ```
 
 **Benefits:**
+
 - Automatic JSON parsing (`responseJson` ready to use)
 - Spy mode (observe real traffic) or stub mode (mock responses)
 - Glob pattern URL matching
@@ -382,14 +407,15 @@ Async polling for eventual consistency (Cypress-style).
 
 **Why Use This?**
 
-| Feature | Manual Polling | recurse Utility |
-|---------|--------------|-----------------|
+| Feature        | Manual Polling                      | recurse Utility                        |
+| -------------- | ----------------------------------- | -------------------------------------- |
 | Implementation | `while` loops with `waitForTimeout` | Smart polling with exponential backoff |
-| Configuration | Hard-coded retry logic | Configurable timeout/interval |
-| Logging | No logging visibility | Optional logging with custom messages |
-| Readability | Verbose, error-prone | Clean, readable API |
+| Configuration  | Hard-coded retry logic              | Configurable timeout/interval          |
+| Logging        | No logging visibility               | Optional logging with custom messages  |
+| Readability    | Verbose, error-prone                | Clean, readable API                    |
 
 **Usage:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/fixtures';
 
@@ -397,7 +423,7 @@ test('should wait for async job completion', async ({ apiRequest, recurse }) => 
   // Start async job
   const { body: job } = await apiRequest({
     method: 'POST',
-    path: '/api/jobs'
+    path: '/api/jobs',
   });
 
   // Poll until complete (smart waiting)
@@ -407,7 +433,7 @@ test('should wait for async job completion', async ({ apiRequest, recurse }) => 
     {
       timeout: 30000,
       interval: 2000,
-      log: 'Waiting for job to complete'
+      log: 'Waiting for job to complete',
     }
   );
 
@@ -416,6 +442,7 @@ test('should wait for async job completion', async ({ apiRequest, recurse }) => 
 ```
 
 **Benefits:**
+
 - Smart polling with configurable interval
 - Handles async jobs, background tasks
 - Optional logging for debugging
@@ -429,14 +456,15 @@ Structured logging that integrates with Playwright reports.
 
 **Why Use This?**
 
-| Feature | Console.log / print | log Utility |
-|---------|-------------------|------------|
-| Reports | Not in test reports | Integrated with Playwright reports |
-| Visualization | No step visualization | `.step()` shows in Playwright UI |
-| Formatting | Manual object formatting | Logs objects seamlessly |
-| Output | No structured output | JSON artifacts for debugging |
+| Feature       | Console.log / print      | log Utility                        |
+| ------------- | ------------------------ | ---------------------------------- |
+| Reports       | Not in test reports      | Integrated with Playwright reports |
+| Visualization | No step visualization    | `.step()` shows in Playwright UI   |
+| Formatting    | Manual object formatting | Logs objects seamlessly            |
+| Output        | No structured output     | JSON artifacts for debugging       |
 
 **Usage:**
+
 ```javascript
 import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '@playwright/test';
@@ -456,6 +484,7 @@ test('should login', async ({ page }) => {
 ```
 
 **Benefits:**
+
 - Direct import (no fixture needed for basic usage)
 - Structured logs in test reports
 - `.step()` shows in Playwright UI
@@ -470,14 +499,15 @@ Read and validate CSV, PDF, XLSX, ZIP files.
 
 **Why Use This?**
 
-| Feature | Vanilla Playwright | file-utils |
-|---------|-------------------|-----------|
-| Code lines | ~80 lines per CSV flow | ~10 lines end-to-end |
-| Download handling | Manual download event handling | `handleDownload()` encapsulates all |
-| Parsing | External parsing libraries | Auto-parsing (CSV, XLSX, PDF, ZIP) |
-| Validation | No validation helpers | Built-in validation (headers, row count) |
+| Feature           | Vanilla Playwright             | file-utils                               |
+| ----------------- | ------------------------------ | ---------------------------------------- |
+| Code lines        | ~80 lines per CSV flow         | ~10 lines end-to-end                     |
+| Download handling | Manual download event handling | `handleDownload()` encapsulates all      |
+| Parsing           | External parsing libraries     | Auto-parsing (CSV, XLSX, PDF, ZIP)       |
+| Validation        | No validation helpers          | Built-in validation (headers, row count) |
 
 **Usage:**
+
 ```javascript
 import { handleDownload, readCSV } from '@seontechnologies/playwright-utils/file-utils';
 import { expect } from '@playwright/test';
@@ -509,6 +539,7 @@ test('should export valid CSV', async ({ page }) => {
 ```
 
 **Benefits:**
+
 - Handles downloads automatically
 - Auto-parses CSV, XLSX, PDF, ZIP
 - Type-safe access to parsed data
@@ -522,16 +553,17 @@ Smart test selection with git diff analysis for CI optimization.
 
 **Why Use This?**
 
-| Feature | Playwright `--only-changed` | burn-in Utility |
-|---------|---------------------------|-----------------|
+| Feature        | Playwright `--only-changed`      | burn-in Utility                             |
+| -------------- | -------------------------------- | ------------------------------------------- |
 | Config changes | Config changes trigger all tests | Smart filtering (skip configs, types, docs) |
-| Flexibility | All or nothing | Volume control (run percentage) |
-| Customization | No customization | Custom dependency analysis |
-| Performance | Slow CI on minor changes | Fast CI with intelligent selection |
+| Flexibility    | All or nothing                   | Volume control (run percentage)             |
+| Customization  | No customization                 | Custom dependency analysis                  |
+| Performance    | Slow CI on minor changes         | Fast CI with intelligent selection          |
 
 **Usage:**
 
 scripts/burn-in-changed.ts
+
 ```javascript
 import { runBurnIn } from '@seontechnologies/playwright-utils/burn-in';
 
@@ -548,6 +580,7 @@ main().catch(console.error);
 **Config:**
 
 playwright.burn-in.config.ts
+
 ```javascript
 import type { BurnInConfig } from '@seontechnologies/playwright-utils/burn-in';
 
@@ -564,6 +597,7 @@ export default config;
 ```
 
 **Package script:**
+
 ```json
 {
   "scripts": {
@@ -573,6 +607,7 @@ export default config;
 ```
 
 **Benefits:**
+
 - Ensure flake-free tests upfront
 - Smart filtering (skip config, types, docs changes)
 - Volume control (run percentage of affected tests)
@@ -587,14 +622,15 @@ Automatically detect HTTP 4xx/5xx errors during tests.
 
 **Why Use This?**
 
-| Feature | Vanilla Playwright | network-error-monitor |
-|---------|-------------------|----------------------|
-| Error detection | UI passes, backend 500 ignored | Auto-fails on any 4xx/5xx |
-| Setup | Manual error checking | Zero boilerplate (auto-enabled) |
-| Silent failures | Silent failures slip through | Acts like Sentry for tests |
-| Cascading failures | No domino effect prevention | Limits cascading failures |
+| Feature            | Vanilla Playwright             | network-error-monitor           |
+| ------------------ | ------------------------------ | ------------------------------- |
+| Error detection    | UI passes, backend 500 ignored | Auto-fails on any 4xx/5xx       |
+| Setup              | Manual error checking          | Zero boilerplate (auto-enabled) |
+| Silent failures    | Silent failures slip through   | Acts like Sentry for tests      |
+| Cascading failures | No domino effect prevention    | Limits cascading failures       |
 
 **Usage:**
+
 ```javascript
 import { test } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures';
 
@@ -611,6 +647,7 @@ test('should not have API errors', async ({ page }) => {
 ```
 
 **Opt-out for validation tests:**
+
 ```javascript
 // When testing error scenarios, opt-out with annotation
 test(
@@ -620,7 +657,7 @@ test(
     await page.goto('/invalid-page'); // Will 404
     await expect(page.getByText('Page not found')).toBeVisible();
     // Test won't fail on 404 because of annotation
-  },
+  }
 );
 
 // Or opt-out entire describe block
@@ -632,6 +669,7 @@ test.describe('error handling', { annotation: [{ type: 'skipNetworkMonitoring' }
 ```
 
 **Benefits:**
+
 - Auto-enabled (zero setup)
 - Catches silent backend failures (500, 503, 504)
 - Prevents domino effect (limits cascading failures from one bad endpoint)
@@ -663,6 +701,7 @@ test('api test', async ({ apiRequest, interceptNetworkCall }) => {
 ### Option 2: Create Custom Merged Fixtures (Selective)
 
 **File 1: support/merged-fixtures.ts**
+
 ```javascript
 import { test as base, mergeTests } from '@playwright/test';
 import { test as apiRequest } from '@seontechnologies/playwright-utils/api-request/fixtures';
@@ -678,6 +717,7 @@ export { log };
 ```
 
 **File 2: tests/api/users.spec.ts**
+
 ```javascript
 import { test, expect, log } from '../support/merged-fixtures';
 
@@ -694,6 +734,7 @@ test('api test', async ({ apiRequest, interceptNetworkCall }) => {
 ```
 
 **Contrast:**
+
 - Option 1: All utilities available, zero setup
 - Option 2: Pick utilities you need, one central file
 
@@ -706,6 +747,7 @@ test('api test', async ({ apiRequest, interceptNetworkCall }) => {
 **Problem:** Cannot find module '@seontechnologies/playwright-utils/api-request'
 
 **Solution:**
+
 ```bash
 # Verify package installed
 npm list @seontechnologies/playwright-utils
@@ -722,11 +764,13 @@ npm install -D @seontechnologies/playwright-utils
 **Problem:** TEA generates tests without playwright-utils.
 
 **Causes:**
+
 1. Config not set: `tea_use_playwright_utils: false`
 2. Workflow run before config change
 3. Package not installed
 
 **Solution:**
+
 ```bash
 # Check config
 grep tea_use_playwright_utils _bmad/tea/config.yaml
@@ -742,6 +786,7 @@ grep tea_use_playwright_utils _bmad/tea/config.yaml
 **Cause:** No schema validation.
 
 **Solution:**
+
 ```javascript
 // Add Zod schema for type safety
 import { z } from 'zod';
@@ -764,15 +809,18 @@ expect(status).toBe(200);
 ## Related Guides
 
 **Getting Started:**
+
 - TEA Lite Quickstart Tutorial - Learn TEA basics
 - How to Set Up Test Framework - Initial framework setup
 
 **Workflow Guides:**
+
 - How to Run ATDD - Generate tests with utilities
 - How to Run Automate - Expand coverage with utilities
 - How to Run Test Review - Review against PW-Utils patterns
 
 **Other Customization:**
+
 - Enable MCP Enhancements - Live browser verification
 
 ## Understanding the Concepts

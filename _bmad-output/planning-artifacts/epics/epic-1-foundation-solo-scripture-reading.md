@@ -13,14 +13,15 @@ So that all frontend features have a reliable backend foundation.
 **Given** the existing My-Love Supabase project
 **When** the migration is applied
 **Then** the following tables exist with correct schemas:
+
 - `scripture_sessions` (id, mode, user1_id, user2_id, current_phase, current_step_index, status, version, snapshot_json, started_at, completed_at)
 - `scripture_step_states` (id, session_id, step_index, user1_locked_at, user2_locked_at, advanced_at)
 - `scripture_reflections` (id, session_id, step_index, user_id, rating, notes, is_shared, created_at)
 - `scripture_bookmarks` (id, session_id, step_index, user_id, share_with_partner, created_at)
 - `scripture_messages` (id, session_id, sender_id, message, created_at)
-**And** RLS policies enforce session-based access (only session participants can read/write)
-**And** RPCs exist: `scripture_create_session`, `scripture_submit_reflection`, `scripture_lock_in`, `scripture_advance_phase`
-**And** unique constraint exists on scripture_reflections (session_id, step_index, user_id) for idempotent writes
+  **And** RLS policies enforce session-based access (only session participants can read/write)
+  **And** RPCs exist: `scripture_create_session`, `scripture_submit_reflection`, `scripture_lock_in`, `scripture_advance_phase`
+  **And** unique constraint exists on scripture_reflections (session_id, step_index, user_id) for idempotent writes
 
 **Given** the existing IndexedDB services with version conflicts
 **When** `src/services/dbSchema.ts` is created
@@ -199,6 +200,7 @@ So that I can use Scripture Reading regardless of my abilities.
 **Given** the user transitions between phases (verse to response, step to step)
 **When** the transition completes
 **Then** focus moves to the logical target:
+
 - Verse screen: verse heading
 - Response screen: navigation button that was used
 - New step: verse heading

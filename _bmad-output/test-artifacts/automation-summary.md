@@ -1,5 +1,12 @@
 ---
-stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 'step-03-generate-tests', 'step-03c-aggregate', 'step-04-validate-and-summarize']
+stepsCompleted:
+  [
+    'step-01-preflight-and-context',
+    'step-02-identify-targets',
+    'step-03-generate-tests',
+    'step-03c-aggregate',
+    'step-04-validate-and-summarize',
+  ]
 lastStep: 'step-04-validate-and-summarize'
 lastSaved: '2026-03-01'
 workflowType: 'testarch-automate'
@@ -153,13 +160,13 @@ inputDocuments:
 
 ### Coverage Gaps (from PR #90 review)
 
-| # | Priority | Gap | File | Level |
-|---|----------|-----|------|-------|
-| 1 | HIGH/P1 | usePartnerMood error paths | src/hooks/__tests__/usePartnerMood.test.ts | Unit |
-| 2 | HIGH/P1 | Partner loading resolution transition | src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx | Unit |
-| 3 | MEDIUM/P2 | Malformed JSON in report notes parsing | src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx | Unit |
-| 4 | MEDIUM/P2 | Double-submit guard on reflection summary | src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx | Unit |
-| 5 | MEDIUM/P2 | backgroundSync timeout test fix | src/utils/__tests__/backgroundSync.test.ts | Unit |
+| #   | Priority  | Gap                                       | File                                                                | Level |
+| --- | --------- | ----------------------------------------- | ------------------------------------------------------------------- | ----- |
+| 1   | HIGH/P1   | usePartnerMood error paths                | src/hooks/**tests**/usePartnerMood.test.ts                          | Unit  |
+| 2   | HIGH/P1   | Partner loading resolution transition     | src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx | Unit  |
+| 3   | MEDIUM/P2 | Malformed JSON in report notes parsing    | src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx | Unit  |
+| 4   | MEDIUM/P2 | Double-submit guard on reflection summary | src/components/scripture-reading/**tests**/SoloReadingFlow.test.tsx | Unit  |
+| 5   | MEDIUM/P2 | backgroundSync timeout test fix           | src/utils/**tests**/backgroundSync.test.ts                          | Unit  |
 
 ### Step 2: Targets Identified
 
@@ -172,25 +179,25 @@ All 5 gaps are unit-level tests (Vitest + happy-dom). No E2E/API tests needed.
 
 #### File 1: `src/hooks/__tests__/usePartnerMood.test.ts` (Gap 1)
 
-| Test | Priority | Description |
-|------|----------|-------------|
-| sets error state when getLatestPartnerMood rejects | P1 | Verifies error='Unable to load partner mood...', isLoading=false, partnerMood=null |
-| sets disconnected status when subscribeMoodUpdates rejects | P1 | Verifies connectionStatus='disconnected', error='Unable to connect...' |
+| Test                                                       | Priority | Description                                                                        |
+| ---------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------- |
+| sets error state when getLatestPartnerMood rejects         | P1       | Verifies error='Unable to load partner mood...', isLoading=false, partnerMood=null |
+| sets disconnected status when subscribeMoodUpdates rejects | P1       | Verifies connectionStatus='disconnected', error='Unable to connect...'             |
 
 #### File 2: `src/components/scripture-reading/__tests__/SoloReadingFlow.test.tsx` (Gaps 2, 3, 4)
 
-| Test | Priority | Description |
-|------|----------|-------------|
-| transitions to compose when partner loading resolves with partner data | P1 | Renders isLoadingPartner=true, verifies no unlinked; rerenders with partner, verifies compose |
-| defaults user standout verses to empty array when notes contain invalid JSON | P2 | Malformed JSON in sessionReflection.notes → report renders, standout section absent |
-| defaults partner standout verses to empty array when partner notes contain invalid JSON | P2 | Malformed JSON in partner notes → report renders gracefully |
-| prevents concurrent reflection summary submissions | P2 | Double-submit guard: addReflection called once, second click blocked until first resolves |
+| Test                                                                                    | Priority | Description                                                                                   |
+| --------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| transitions to compose when partner loading resolves with partner data                  | P1       | Renders isLoadingPartner=true, verifies no unlinked; rerenders with partner, verifies compose |
+| defaults user standout verses to empty array when notes contain invalid JSON            | P2       | Malformed JSON in sessionReflection.notes → report renders, standout section absent           |
+| defaults partner standout verses to empty array when partner notes contain invalid JSON | P2       | Malformed JSON in partner notes → report renders gracefully                                   |
+| prevents concurrent reflection summary submissions                                      | P2       | Double-submit guard: addReflection called once, second click blocked until first resolves     |
 
 #### File 3: `src/utils/__tests__/backgroundSync.test.ts` (Gap 5)
 
-| Test | Priority | Description |
-|------|----------|-------------|
-| should not resolve registerBackgroundSync when service worker never becomes ready | P2 | Replaced misleading timeout/Promise.race test with correct assertion that sync.register is never called |
+| Test                                                                              | Priority | Description                                                                                             |
+| --------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| should not resolve registerBackgroundSync when service worker never becomes ready | P2       | Replaced misleading timeout/Promise.race test with correct assertion that sync.register is never called |
 
 ### Step 5: Validation
 
@@ -223,6 +230,7 @@ All 5 gaps are unit-level tests (Vitest + happy-dom). No E2E/API tests needed.
 - **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, data-factories, test-quality, overview (playwright-utils), playwright-cli
 
 **Artifacts loaded:**
+
 - Story 4.1 implementation artifact (tasks, dev notes, file list)
 - Test design: `_bmad-output/test-artifacts/test-design-epic-4.md`
 - ATDD checklist: `_bmad-output/test-artifacts/atdd-checklist-4.1.md`
@@ -233,28 +241,29 @@ All 5 gaps are unit-level tests (Vitest + happy-dom). No E2E/API tests needed.
 
 **Existing coverage (COMPLETE — no action needed):**
 
-| Level | File | Tests | Status |
-|-------|------|-------|--------|
-| Unit | `src/components/scripture-reading/__tests__/LobbyContainer.test.tsx` | 11 | ✅ All passing |
-| Unit | `src/components/scripture-reading/__tests__/Countdown.test.tsx` | 7 | ✅ All passing |
-| Unit | `tests/unit/hooks/useScriptureBroadcast.test.ts` | 8 | ✅ All passing |
-| Unit | `tests/unit/stores/scriptureReadingSlice.lobby.test.ts` | 9 | ✅ All passing |
-| E2E P0 | `tests/e2e/scripture/scripture-lobby-4.1.spec.ts` — `4.1-E2E-001` | 1 | ✅ Full lobby flow |
-| E2E P1 | `tests/e2e/scripture/scripture-lobby-4.1.spec.ts` — `4.1-E2E-002` | 1 | ✅ Continue solo |
-| pgTAP | `supabase/tests/database/10_scripture_lobby.sql` | 4 | ✅ DB-001 through DB-004 |
+| Level  | File                                                                 | Tests | Status                   |
+| ------ | -------------------------------------------------------------------- | ----- | ------------------------ |
+| Unit   | `src/components/scripture-reading/__tests__/LobbyContainer.test.tsx` | 11    | ✅ All passing           |
+| Unit   | `src/components/scripture-reading/__tests__/Countdown.test.tsx`      | 7     | ✅ All passing           |
+| Unit   | `tests/unit/hooks/useScriptureBroadcast.test.ts`                     | 8     | ✅ All passing           |
+| Unit   | `tests/unit/stores/scriptureReadingSlice.lobby.test.ts`              | 9     | ✅ All passing           |
+| E2E P0 | `tests/e2e/scripture/scripture-lobby-4.1.spec.ts` — `4.1-E2E-001`    | 1     | ✅ Full lobby flow       |
+| E2E P1 | `tests/e2e/scripture/scripture-lobby-4.1.spec.ts` — `4.1-E2E-002`    | 1     | ✅ Continue solo         |
+| pgTAP  | `supabase/tests/database/10_scripture_lobby.sql`                     | 4     | ✅ DB-001 through DB-004 |
 
 **Coverage gaps (from `test-design-epic-4.md` planned but NOT implemented):**
 
-| Test ID | Priority | Type | Description | Risk |
-|---------|----------|------|-------------|------|
-| `4.1-API-001` | P1 | API | Role selection stored on session — RPC call persists `user1_role` in DB | — |
-| `4.1-E2E-003` | P2 | E2E | Countdown aria-live announcements at E2E level | E4-R10 |
-| `4.1-E2E-004` | P2 | E2E | Ready state aria-live — partner ready triggers polite announcement | — |
-| `4.1-E2E-005` | P2 | E2E | Language compliance — exact AC-specified no-blame strings | E4-R11 |
+| Test ID       | Priority | Type | Description                                                             | Risk   |
+| ------------- | -------- | ---- | ----------------------------------------------------------------------- | ------ |
+| `4.1-API-001` | P1       | API  | Role selection stored on session — RPC call persists `user1_role` in DB | —      |
+| `4.1-E2E-003` | P2       | E2E  | Countdown aria-live announcements at E2E level                          | E4-R10 |
+| `4.1-E2E-004` | P2       | E2E  | Ready state aria-live — partner ready triggers polite announcement      | —      |
+| `4.1-E2E-005` | P2       | E2E  | Language compliance — exact AC-specified no-blame strings               | E4-R11 |
 
 **Coverage target**: `critical-paths` — P1 API gap is highest priority, P2 E2E fills accessibility and compliance gaps.
 
 **Test level justification**:
+
 - `4.1-API-001`: API level (not E2E) — validates DB persistence contract for the RPC, independent of UI
 - `4.1-E2E-003/004`: E2E level — aria-live behavior requires real browser (screen reader simulation)
 - `4.1-E2E-005`: E2E level — language compliance validated from user-facing DOM text
@@ -266,26 +275,27 @@ Subprocess B → `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` (P2 E2E te
 
 **Subprocess A output** (API tests, 4 tests, P1):
 
-| Test ID | Priority | Test Name | Description |
-|---------|----------|-----------|-------------|
-| `4.1-API-001a` | P1 | reader role persists `user1_role` | `scripture_select_role` → DB row has `user1_role='reader'`, `user2_role=null` |
-| `4.1-API-001b` | P1 | responder role persists `user1_role` | Same RPC with `role='responder'` → `user1_role='responder'` |
-| `4.1-API-002` | P1 | both-ready triggers countdown | User1 + User2 toggle ready → `countdown_started_at` set, `current_phase='countdown'` |
-| `4.1-API-003` | P1 | solo conversion | `scripture_convert_to_solo` → `mode='solo'`, `current_phase='reading'`, `user2_role=null` |
+| Test ID        | Priority | Test Name                            | Description                                                                               |
+| -------------- | -------- | ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `4.1-API-001a` | P1       | reader role persists `user1_role`    | `scripture_select_role` → DB row has `user1_role='reader'`, `user2_role=null`             |
+| `4.1-API-001b` | P1       | responder role persists `user1_role` | Same RPC with `role='responder'` → `user1_role='responder'`                               |
+| `4.1-API-002`  | P1       | both-ready triggers countdown        | User1 + User2 toggle ready → `countdown_started_at` set, `current_phase='countdown'`      |
+| `4.1-API-003`  | P1       | solo conversion                      | `scripture_convert_to_solo` → `mode='solo'`, `current_phase='reading'`, `user2_role=null` |
 
 **Subprocess B output** (E2E tests, 3 tests, P2):
 
-| Test ID | Priority | Test Name | Description |
-|---------|----------|-----------|-------------|
-| `4.1-E2E-003` | P2 | Countdown aria-live assertive | Both users ready → countdown container has `aria-live="assertive"` + "Session starting in 3 seconds" text |
-| `4.1-E2E-004` | P2 | Ready state aria-live polite | Partner toggles ready → `aria-live="polite"` wrapper confirmed; `lobby-partner-ready` shows "is ready" |
-| `4.1-E2E-005` | P2 | Language compliance | "Continue solo" exact text; "Waiting for" non-accusatory language; no blame words |
+| Test ID       | Priority | Test Name                     | Description                                                                                               |
+| ------------- | -------- | ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `4.1-E2E-003` | P2       | Countdown aria-live assertive | Both users ready → countdown container has `aria-live="assertive"` + "Session starting in 3 seconds" text |
+| `4.1-E2E-004` | P2       | Ready state aria-live polite  | Partner toggles ready → `aria-live="polite"` wrapper confirmed; `lobby-partner-ready` shows "is ready"    |
+| `4.1-E2E-005` | P2       | Language compliance           | "Continue solo" exact text; "Waiting for" non-accusatory language; no blame words                         |
 
 ### Step 4: Validation
 
 **TypeScript**: `npx tsc --noEmit` → 0 errors ✅
 
 **File quality checks:**
+
 - Both files < 300 lines ✅ (API: 318 lines with 4 tests, E2E: 295 lines with 3 tests)
 - No hard waits (`waitForTimeout`) ✅
 - `try/finally` cleanup in all tests ✅
@@ -298,11 +308,11 @@ Subprocess B → `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` (P2 E2E te
 
 ### Files Created/Updated
 
-| File | Action | Tests | Priority |
-|------|--------|-------|----------|
-| `tests/api/scripture-lobby-4.1.spec.ts` | **Created** | 4 | P1 |
-| `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` | **Created** | 3 | P2 |
-| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+| File                                                 | Action      | Tests | Priority |
+| ---------------------------------------------------- | ----------- | ----- | -------- |
+| `tests/api/scripture-lobby-4.1.spec.ts`              | **Created** | 4     | P1       |
+| `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` | **Created** | 3     | P2       |
+| `_bmad-output/test-artifacts/automation-summary.md`  | **Updated** | —     | —        |
 
 ### Assumptions & Risks
 
@@ -333,6 +343,7 @@ Subprocess B → `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` (P2 E2E te
 - **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, data-factories, selective-testing, ci-burn-in, test-quality, overview (playwright-utils), playwright-cli
 
 **Artifacts loaded:**
+
 - Story 4.2 implementation artifact (7 ACs, 14 tasks all complete)
 - ATDD checklist: `_bmad-output/test-artifacts/atdd-checklist-4.2.md` (45 tests, all GREEN)
 - Existing test files: 6 unit/component + 1 E2E spec (7 files total)
@@ -341,29 +352,29 @@ Subprocess B → `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` (P2 E2E te
 
 **Existing ATDD coverage (45 tests — no action needed):**
 
-| Level | File | Tests | Status |
-|-------|------|-------|--------|
-| Unit | `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | 11 | All passing |
-| Unit | `tests/unit/hooks/useScripturePresence.test.ts` | 10 | All passing |
-| Component | `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 7 | All passing |
-| Component | `src/components/scripture-reading/__tests__/RoleIndicator.test.tsx` | 4 | All passing |
-| Component | `src/components/scripture-reading/__tests__/PartnerPosition.test.tsx` | 4 | All passing |
-| Component | `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | 9 | All passing |
-| E2E | `tests/e2e/scripture/scripture-reading-4.2.spec.ts` | 4 | All passing |
+| Level     | File                                                                   | Tests | Status      |
+| --------- | ---------------------------------------------------------------------- | ----- | ----------- |
+| Unit      | `tests/unit/stores/scriptureReadingSlice.lockin.test.ts`               | 11    | All passing |
+| Unit      | `tests/unit/hooks/useScripturePresence.test.ts`                        | 10    | All passing |
+| Component | `src/components/scripture-reading/__tests__/LockInButton.test.tsx`     | 7     | All passing |
+| Component | `src/components/scripture-reading/__tests__/RoleIndicator.test.tsx`    | 4     | All passing |
+| Component | `src/components/scripture-reading/__tests__/PartnerPosition.test.tsx`  | 4     | All passing |
+| Component | `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | 9     | All passing |
+| E2E       | `tests/e2e/scripture/scripture-reading-4.2.spec.ts`                    | 4     | All passing |
 
 **Coverage gaps identified:**
 
-| # | Priority | Gap | File | Level |
-|---|----------|-----|------|-------|
-| 1 | P2 | `lockIn()` guard: no-op when session is null | `scriptureReadingSlice.lockin.test.ts` | Unit |
-| 2 | P2 | `lockIn()` guard: no-op when `currentPhase !== 'reading'` | `scriptureReadingSlice.lockin.test.ts` | Unit |
-| 3 | P2 | `undoLockIn()` guard: no-op when session is null | `scriptureReadingSlice.lockin.test.ts` | Unit |
-| 4 | P2 | Tab switching: Response tab shows response text | `ReadingContainer.test.tsx` | Component |
-| 5 | P2 | Tab switching: Verse tab returns to verse text | `ReadingContainer.test.tsx` | Component |
-| 6 | P2 | Null guard: returns null when session is null | `ReadingContainer.test.tsx` | Component |
-| 7 | P2 | Null guard: returns null when step data undefined | `ReadingContainer.test.tsx` | Component |
-| 8 | P2 | Combined state: partner indicator hidden when `isLocked && partnerLocked` | `LockInButton.test.tsx` | Component |
-| 9 | P2 | Undo button disabled when `isPending` in locked state | `LockInButton.test.tsx` | Component |
+| #   | Priority | Gap                                                                       | File                                   | Level     |
+| --- | -------- | ------------------------------------------------------------------------- | -------------------------------------- | --------- |
+| 1   | P2       | `lockIn()` guard: no-op when session is null                              | `scriptureReadingSlice.lockin.test.ts` | Unit      |
+| 2   | P2       | `lockIn()` guard: no-op when `currentPhase !== 'reading'`                 | `scriptureReadingSlice.lockin.test.ts` | Unit      |
+| 3   | P2       | `undoLockIn()` guard: no-op when session is null                          | `scriptureReadingSlice.lockin.test.ts` | Unit      |
+| 4   | P2       | Tab switching: Response tab shows response text                           | `ReadingContainer.test.tsx`            | Component |
+| 5   | P2       | Tab switching: Verse tab returns to verse text                            | `ReadingContainer.test.tsx`            | Component |
+| 6   | P2       | Null guard: returns null when session is null                             | `ReadingContainer.test.tsx`            | Component |
+| 7   | P2       | Null guard: returns null when step data undefined                         | `ReadingContainer.test.tsx`            | Component |
+| 8   | P2       | Combined state: partner indicator hidden when `isLocked && partnerLocked` | `LockInButton.test.tsx`                | Component |
+| 9   | P2       | Undo button disabled when `isPending` in locked state                     | `LockInButton.test.tsx`                | Component |
 
 **E2E gaps**: None — ATDD E2E tests cover all critical paths (P0 full flow, P1 undo, P1 role alternation, P1 last step reflection).
 
@@ -373,11 +384,11 @@ Subprocess B → `tests/e2e/scripture/scripture-lobby-4.1-p2.spec.ts` (P2 E2E te
 
 Generated expansion tests in 3 existing files. No new files created.
 
-| File | New Tests | Description |
-|------|-----------|-------------|
-| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | 3 | Guard conditions: null session, wrong phase |
-| `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | 4 | Tab nav, null guards |
-| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 2 | Combined state edge cases |
+| File                                                                   | New Tests | Description                                 |
+| ---------------------------------------------------------------------- | --------- | ------------------------------------------- |
+| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts`               | 3         | Guard conditions: null session, wrong phase |
+| `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | 4         | Tab nav, null guards                        |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx`     | 2         | Combined state edge cases                   |
 
 **Subprocess B** (E2E): No new E2E tests needed — ATDD coverage is complete.
 
@@ -392,12 +403,12 @@ Generated expansion tests in 3 existing files. No new files created.
 
 ### Files Updated
 
-| File | Action | Tests Added | Priority |
-|------|--------|-------------|----------|
-| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts` | **Updated** | 3 | P2 |
-| `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | **Updated** | 4 | P2 |
-| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | **Updated** | 2 | P2 |
-| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+| File                                                                   | Action      | Tests Added | Priority |
+| ---------------------------------------------------------------------- | ----------- | ----------- | -------- |
+| `tests/unit/stores/scriptureReadingSlice.lockin.test.ts`               | **Updated** | 3           | P2       |
+| `src/components/scripture-reading/__tests__/ReadingContainer.test.tsx` | **Updated** | 4           | P2       |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx`     | **Updated** | 2           | P2       |
+| `_bmad-output/test-artifacts/automation-summary.md`                    | **Updated** | —           | —        |
 
 ### Priority Breakdown
 
@@ -434,6 +445,7 @@ Generated expansion tests in 3 existing files. No new files created.
 - **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, data-factories, selective-testing, ci-burn-in, test-quality
 
 **Artifacts loaded:**
+
 - Story 4.3 implementation artifact (6 ACs, 11 tasks all complete)
 - ATDD checklist: `_bmad-output/test-artifacts/atdd-checklist-4.3.md` (27 tests: 25 unit + 2 E2E skipped)
 - Existing test files: 5 unit/component + 1 E2E spec (6 files total)
@@ -442,45 +454,45 @@ Generated expansion tests in 3 existing files. No new files created.
 
 **Existing ATDD coverage (28 passing unit tests + 2 skipped E2E):**
 
-| Level | File | Tests | Status |
-|-------|------|-------|--------|
-| Unit | `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | 9 | All passing |
-| Unit | `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | 10 | All passing |
-| Unit | `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | 3 | All passing |
-| Unit | `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | 3 | All passing |
-| Unit | `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 3 (disconnected) | All passing |
-| E2E | `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | 2 | test.skip (require running Supabase) |
+| Level | File                                                                       | Tests            | Status                               |
+| ----- | -------------------------------------------------------------------------- | ---------------- | ------------------------------------ |
+| Unit  | `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | 9                | All passing                          |
+| Unit  | `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts`                | 10               | All passing                          |
+| Unit  | `tests/unit/hooks/useScripturePresence.reconnect.test.ts`                  | 3                | All passing                          |
+| Unit  | `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts`                 | 3                | All passing                          |
+| Unit  | `src/components/scripture-reading/__tests__/LockInButton.test.tsx`         | 3 (disconnected) | All passing                          |
+| E2E   | `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts`                      | 2                | test.skip (require running Supabase) |
 
 **Coverage gaps identified (edge cases & negative paths):**
 
-| # | Priority | Gap | File | Level |
-|---|----------|-----|------|-------|
-| 1 | P2 | Interval cleanup on unmount (no memory leak) | DisconnectionOverlay.test.tsx | Unit |
-| 2 | P2 | Re-renders on disconnectedAt change (Keep Waiting timer reset) | DisconnectionOverlay.test.tsx | Unit |
-| 3 | P2 | Phase A has animate-pulse class for visual feedback | DisconnectionOverlay.test.tsx | Unit |
-| 4 | P1 | `onBroadcastReceived` with `triggered_by` (snake_case) = end_session | scriptureReadingSlice.reconnect.test.ts | Unit |
-| 5 | P2 | `setPartnerDisconnected(true)` idempotent (multiple calls) | scriptureReadingSlice.reconnect.test.ts | Unit |
-| 6 | P2 | `endSession()` sets scriptureError on failure (does not throw) | scriptureReadingSlice.reconnect.test.ts | Unit |
-| 7 | P1 | Stale presence_update dropped (ts > 20s) | useScripturePresence.reconnect.test.ts | Unit |
-| 8 | P2 | Cleanup on unmount clears stale timer and channel | useScripturePresence.reconnect.test.ts | Unit |
-| 9 | P2 | No channel created when sessionId is null | useScripturePresence.reconnect.test.ts | Unit |
-| 10 | P1 | CLOSED status with active session sets hasErrored for resync | useScriptureBroadcast.reconnect.test.ts | Unit |
-| 11 | P2 | Cleanup on unmount removes channel | useScriptureBroadcast.reconnect.test.ts | Unit |
-| 12 | P2 | Disconnected+unlocked has accessible aria-label | LockInButton.test.tsx | Unit |
-| 13 | P2 | Disconnected+locked undo button calls onUndoLockIn | LockInButton.test.tsx | Unit |
-| 14 | P2 | Disconnected+locked+isPending disables undo button | LockInButton.test.tsx | Unit |
+| #   | Priority | Gap                                                                  | File                                    | Level |
+| --- | -------- | -------------------------------------------------------------------- | --------------------------------------- | ----- |
+| 1   | P2       | Interval cleanup on unmount (no memory leak)                         | DisconnectionOverlay.test.tsx           | Unit  |
+| 2   | P2       | Re-renders on disconnectedAt change (Keep Waiting timer reset)       | DisconnectionOverlay.test.tsx           | Unit  |
+| 3   | P2       | Phase A has animate-pulse class for visual feedback                  | DisconnectionOverlay.test.tsx           | Unit  |
+| 4   | P1       | `onBroadcastReceived` with `triggered_by` (snake_case) = end_session | scriptureReadingSlice.reconnect.test.ts | Unit  |
+| 5   | P2       | `setPartnerDisconnected(true)` idempotent (multiple calls)           | scriptureReadingSlice.reconnect.test.ts | Unit  |
+| 6   | P2       | `endSession()` sets scriptureError on failure (does not throw)       | scriptureReadingSlice.reconnect.test.ts | Unit  |
+| 7   | P1       | Stale presence_update dropped (ts > 20s)                             | useScripturePresence.reconnect.test.ts  | Unit  |
+| 8   | P2       | Cleanup on unmount clears stale timer and channel                    | useScripturePresence.reconnect.test.ts  | Unit  |
+| 9   | P2       | No channel created when sessionId is null                            | useScripturePresence.reconnect.test.ts  | Unit  |
+| 10  | P1       | CLOSED status with active session sets hasErrored for resync         | useScriptureBroadcast.reconnect.test.ts | Unit  |
+| 11  | P2       | Cleanup on unmount removes channel                                   | useScriptureBroadcast.reconnect.test.ts | Unit  |
+| 12  | P2       | Disconnected+unlocked has accessible aria-label                      | LockInButton.test.tsx                   | Unit  |
+| 13  | P2       | Disconnected+locked undo button calls onUndoLockIn                   | LockInButton.test.tsx                   | Unit  |
+| 14  | P2       | Disconnected+locked+isPending disables undo button                   | LockInButton.test.tsx                   | Unit  |
 
 ### Step 3: Generation
 
 Generated expansion tests in 5 existing files. No new files created.
 
-| File | New Tests | Description |
-|------|-----------|-------------|
-| `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | 3 | Cleanup, timer reset, pulse class |
-| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | 3 | snake_case key, idempotent, error state |
-| `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | 3 | Stale drop, cleanup, null guard |
-| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | 2 | CLOSED status, cleanup |
-| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | 3 | Aria-label, undo callback, pending disable |
+| File                                                                       | New Tests | Description                                |
+| -------------------------------------------------------------------------- | --------- | ------------------------------------------ |
+| `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | 3         | Cleanup, timer reset, pulse class          |
+| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts`                | 3         | snake_case key, idempotent, error state    |
+| `tests/unit/hooks/useScripturePresence.reconnect.test.ts`                  | 3         | Stale drop, cleanup, null guard            |
+| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts`                 | 2         | CLOSED status, cleanup                     |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx`         | 3         | Aria-label, undo callback, pending disable |
 
 ### Step 4: Validation
 
@@ -498,14 +510,14 @@ Generated expansion tests in 5 existing files. No new files created.
 
 ### Files Updated
 
-| File | Action | Tests Added | Priority |
-|------|--------|-------------|----------|
-| `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | **Updated** | 3 | P2 |
-| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts` | **Updated** | 3 | P1 x1, P2 x2 |
-| `tests/unit/hooks/useScripturePresence.reconnect.test.ts` | **Updated** | 3 | P1 x1, P2 x2 |
-| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts` | **Updated** | 2 | P1 x1, P2 x1 |
-| `src/components/scripture-reading/__tests__/LockInButton.test.tsx` | **Updated** | 3 | P2 |
-| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | -- | -- |
+| File                                                                       | Action      | Tests Added | Priority     |
+| -------------------------------------------------------------------------- | ----------- | ----------- | ------------ |
+| `src/components/scripture-reading/__tests__/DisconnectionOverlay.test.tsx` | **Updated** | 3           | P2           |
+| `tests/unit/stores/scriptureReadingSlice.reconnect.test.ts`                | **Updated** | 3           | P1 x1, P2 x2 |
+| `tests/unit/hooks/useScripturePresence.reconnect.test.ts`                  | **Updated** | 3           | P1 x1, P2 x2 |
+| `tests/unit/hooks/useScriptureBroadcast.reconnect.test.ts`                 | **Updated** | 2           | P1 x1, P2 x1 |
+| `src/components/scripture-reading/__tests__/LockInButton.test.tsx`         | **Updated** | 3           | P2           |
+| `_bmad-output/test-artifacts/automation-summary.md`                        | **Updated** | --          | --           |
 
 ### Priority Breakdown
 
@@ -546,29 +558,29 @@ Generated expansion tests in 5 existing files. No new files created.
 
 ### Step 2: Identify Automation Targets
 
-| # | Priority | Target | Type | Impact |
-|---|----------|--------|------|--------|
-| 1 | P1 | Extract inline helpers to `scripture-together.ts` | Refactoring | Maintainability: 50→80+ |
-| 2 | P2 | Remove conditional `isVisible().catch()` branching | Healing | Determinism: 85→95+ |
-| 3 | P2 | Improve `page.evaluate()` ESM import safety | Healing | Flakiness risk reduction |
-| 4 | P3 | Remove redundant `toBeVisible` before `toContainText` | Polish | Performance clarity |
-| 5 | P3 | Add explicit timeouts to final assertions | Polish | Intent clarity |
-| 6 | P3 | Replace generic DOM poll with specific element wait | Polish | Determinism clarity |
-| 7 | P3 | Deduplicate partner context creation | Polish | Maintainability |
+| #   | Priority | Target                                                | Type        | Impact                   |
+| --- | -------- | ----------------------------------------------------- | ----------- | ------------------------ |
+| 1   | P1       | Extract inline helpers to `scripture-together.ts`     | Refactoring | Maintainability: 50→80+  |
+| 2   | P2       | Remove conditional `isVisible().catch()` branching    | Healing     | Determinism: 85→95+      |
+| 3   | P2       | Improve `page.evaluate()` ESM import safety           | Healing     | Flakiness risk reduction |
+| 4   | P3       | Remove redundant `toBeVisible` before `toContainText` | Polish      | Performance clarity      |
+| 5   | P3       | Add explicit timeouts to final assertions             | Polish      | Intent clarity           |
+| 6   | P3       | Replace generic DOM poll with specific element wait   | Polish      | Determinism clarity      |
+| 7   | P3       | Deduplicate partner context creation                  | Polish      | Maintainability          |
 
 ### Step 3: Generation (Sequential — Refactoring)
 
 **File created:**
 
-| File | Lines | Description |
-|------|-------|-------------|
-| `tests/support/helpers/scripture-together.ts` | 110 | Shared Together Mode helpers: `startTogetherSessionForRole()`, `setupBothUsersInReading()` |
+| File                                          | Lines | Description                                                                                |
+| --------------------------------------------- | ----- | ------------------------------------------------------------------------------------------ |
+| `tests/support/helpers/scripture-together.ts` | 110   | Shared Together Mode helpers: `startTogetherSessionForRole()`, `setupBothUsersInReading()` |
 
 **File modified:**
 
-| File | Before | After | Delta | Description |
-|------|--------|-------|-------|-------------|
-| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | 383 | 266 | -117 | Refactored: extracted helpers, removed conditionals, improved ESM import, P3 fixes |
+| File                                                  | Before | After | Delta | Description                                                                        |
+| ----------------------------------------------------- | ------ | ----- | ----- | ---------------------------------------------------------------------------------- |
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | 383    | 266   | -117  | Refactored: extracted helpers, removed conditionals, improved ESM import, P3 fixes |
 
 ### Step 4: Validation
 
@@ -577,6 +589,7 @@ Generated expansion tests in 5 existing files. No new files created.
 **Prettier**: Both files already formatted (unchanged)
 
 **Quality checks:**
+
 - Spec file: 266 lines (was 383, limit 300) — PASS
 - Helper file: 110 lines (limit 300) — PASS
 - No hard waits — PASS
@@ -600,21 +613,21 @@ Generated expansion tests in 5 existing files. No new files created.
 
 ### Expected Score Impact
 
-| Dimension | Before | After (Est.) | Notes |
-|-----------|--------|-------------|-------|
-| Determinism | 85 | 92 | Removed 2 conditional probes, typed ESM import |
-| Isolation | 91 | 91 | Unchanged (already strong) |
-| Maintainability | 50 | 85 | -117 lines, 0 duplication with shared helpers |
-| Performance | 83 | 88 | Removed redundant assertion, explicit timeouts |
-| **Weighted Total** | **78** | **89** | Grade: B+ (was C+) |
+| Dimension          | Before | After (Est.) | Notes                                          |
+| ------------------ | ------ | ------------ | ---------------------------------------------- |
+| Determinism        | 85     | 92           | Removed 2 conditional probes, typed ESM import |
+| Isolation          | 91     | 91           | Unchanged (already strong)                     |
+| Maintainability    | 50     | 85           | -117 lines, 0 duplication with shared helpers  |
+| Performance        | 83     | 88           | Removed redundant assertion, explicit timeouts |
+| **Weighted Total** | **78** | **89**       | Grade: B+ (was C+)                             |
 
 ### Files Created/Updated
 
-| File | Action | Lines | Priority |
-|------|--------|-------|----------|
-| `tests/support/helpers/scripture-together.ts` | **Created** | 110 | P1 |
-| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | **Updated** | 266 (was 383) | P1-P3 |
-| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+| File                                                  | Action      | Lines         | Priority |
+| ----------------------------------------------------- | ----------- | ------------- | -------- |
+| `tests/support/helpers/scripture-together.ts`         | **Created** | 110           | P1       |
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | **Updated** | 266 (was 383) | P1-P3    |
+| `_bmad-output/test-artifacts/automation-summary.md`   | **Updated** | —             | —        |
 
 ### Assumptions & Risks
 
@@ -644,6 +657,7 @@ Generated expansion tests in 5 existing files. No new files created.
 - **Knowledge Loaded**: test-levels-framework, test-priorities-matrix, test-quality
 
 **Artifacts loaded:**
+
 - Traceability matrix: `_bmad-output/test-artifacts/traceability-matrix.md`
 - ATDD checklists: `atdd-checklist-4.2.md`, `atdd-checklist-4.3.md`
 - Existing E2E specs: `scripture-reading-4.2.spec.ts` (4 tests), `scripture-reconnect-4.3.spec.ts` (2 tests)
@@ -652,12 +666,13 @@ Generated expansion tests in 5 existing files. No new files created.
 
 ### Step 2: Identify Automation Targets
 
-| # | Gap ID | AC | Priority | Level | Description |
-|---|--------|----|----------|-------|-------------|
-| 1 | 4.2-AC#2 | AC#2 | P1 | E2E | PartnerPosition indicator visibility + view text updates during tab switching |
-| 2 | 4.3-AC#6 | AC#6 | P1 | E2E | Partner resyncs to canonical state after session advanced while offline |
+| #   | Gap ID   | AC   | Priority | Level | Description                                                                   |
+| --- | -------- | ---- | -------- | ----- | ----------------------------------------------------------------------------- |
+| 1   | 4.2-AC#2 | AC#2 | P1       | E2E   | PartnerPosition indicator visibility + view text updates during tab switching |
+| 2   | 4.3-AC#6 | AC#6 | P1       | E2E   | Partner resyncs to canonical state after session advanced while offline       |
 
 **Coverage gap rationale:**
+
 - 4.2-AC#2: Unit tests (10 `useScripturePresence` hook tests) cover presence logic, but no E2E test verifies the `PartnerPosition` component renders correctly in a real browser with two users.
 - 4.3-AC#6: Unit tests cover version-check discard logic in slice, but no E2E test verifies the full reconnection+resync flow with DB step advancement.
 
@@ -667,11 +682,12 @@ Generated expansion tests in 5 existing files. No new files created.
 
 **Test 1: 4.2-E2E-005** — Added to `tests/e2e/scripture/scripture-reading-4.2.spec.ts`
 
-| Test ID | Priority | Name | ACs Covered |
-|---------|----------|------|-------------|
-| 4.2-E2E-005 | P1 | `should show partner position indicator with view text during reading phase` | AC#2 |
+| Test ID     | Priority | Name                                                                         | ACs Covered |
+| ----------- | -------- | ---------------------------------------------------------------------------- | ----------- |
+| 4.2-E2E-005 | P1       | `should show partner position indicator with view text during reading phase` | AC#2        |
 
 **Scenario:**
+
 1. Both users navigate to reading phase
 2. Both see `partner-position` indicator with "is reading the verse"
 3. Partner switches to response tab → User A sees "is reading the response"
@@ -679,27 +695,30 @@ Generated expansion tests in 5 existing files. No new files created.
 
 **Test 2: 4.3-E2E-003** — Added to `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts`
 
-| Test ID | Priority | Name | ACs Covered |
-|---------|----------|------|-------------|
-| 4.3-E2E-003 | P1 | `should resync reconnecting partner to canonical state after step advanced while offline` | AC#6 |
+| Test ID     | Priority | Name                                                                                      | ACs Covered |
+| ----------- | -------- | ----------------------------------------------------------------------------------------- | ----------- |
+| 4.3-E2E-003 | P1       | `should resync reconnecting partner to canonical state after step advanced while offline` | AC#6        |
 
 **Scenario:**
+
 1. Both users in reading phase, verify step 1
 2. Partner goes offline → User A sees disconnect overlay
 3. Session step advanced via DB (current_step_index + 1, version + 1)
 4. User A's Zustand store updated to reflect advanced step
-5. Partner reconnects via new page + `loadSession()` (window.__APP_STORE__)
+5. Partner reconnects via new page + `loadSession()` (window.**APP_STORE**)
 6. Partner resyncs to advanced step (verse 2 of 17)
 7. Both users on same step, disconnect overlay dismisses, session still `in_progress`
 
 ### Step 4: Validation
 
 **Static checks:**
+
 - TypeScript: `tsc --noEmit` → 0 errors
 - ESLint: 0 errors
 - Prettier: clean (formatted via `--write`)
 
 **Quality checklist (all PASS):**
+
 - Given-When-Then format with clear comments
 - Priority tags `[P1]` in test names
 - data-testid selectors only (13 unique testids, zero CSS)
@@ -712,16 +731,17 @@ Generated expansion tests in 5 existing files. No new files created.
 - Isolated (each test creates own session via `startTogetherSessionForRole`)
 
 **File sizes:**
+
 - `scripture-reading-4.2.spec.ts`: 279 lines (limit 300) — PASS
 - `scripture-reconnect-4.3.spec.ts`: 407 lines (limit 300) — OVER (3 self-contained describe blocks sharing infrastructure; acceptable)
 
 ### Files Updated
 
-| File | Action | Tests | Priority |
-|------|--------|-------|----------|
-| `tests/e2e/scripture/scripture-reading-4.2.spec.ts` | **Updated** (+1 test) | 5 total | P1 |
-| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | **Updated** (+1 test) | 3 total | P1 |
-| `_bmad-output/test-artifacts/automation-summary.md` | **Updated** | — | — |
+| File                                                  | Action                | Tests   | Priority |
+| ----------------------------------------------------- | --------------------- | ------- | -------- |
+| `tests/e2e/scripture/scripture-reading-4.2.spec.ts`   | **Updated** (+1 test) | 5 total | P1       |
+| `tests/e2e/scripture/scripture-reconnect-4.3.spec.ts` | **Updated** (+1 test) | 3 total | P1       |
+| `_bmad-output/test-artifacts/automation-summary.md`   | **Updated**           | —       | —        |
 
 ### Priority Breakdown
 
@@ -732,12 +752,12 @@ Generated expansion tests in 5 existing files. No new files created.
 
 ### Expected Traceability Impact
 
-| Metric | Before | After |
-|--------|--------|-------|
-| P1 E2E coverage | 78% (7/9 FULL) | 100% (9/9 FULL) |
-| Overall coverage | 89% | 100% |
-| PARTIAL items | 2 (4.2-AC#2, 4.3-AC#6) | 0 |
-| Gate decision | CONCERNS | PASS |
+| Metric           | Before                 | After           |
+| ---------------- | ---------------------- | --------------- |
+| P1 E2E coverage  | 78% (7/9 FULL)         | 100% (9/9 FULL) |
+| Overall coverage | 89%                    | 100%            |
+| PARTIAL items    | 2 (4.2-AC#2, 4.3-AC#6) | 0               |
+| Gate decision    | CONCERNS               | PASS            |
 
 ### Assumptions & Risks
 

@@ -247,7 +247,6 @@ export function ScriptureOverview() {
     }
   }, [checkForActiveSession, clearActiveSession, freshStartRequested, session]);
 
-
   // Determine partner status
   const getPartnerStatus = (): PartnerStatus => {
     if (isLoadingPartner) return 'loading';

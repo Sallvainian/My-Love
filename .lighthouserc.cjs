@@ -14,7 +14,7 @@ module.exports = {
       assertions: {
         // NFR-P3: < 2s on 3G (Lighthouse default mobile throttling)
         'first-contentful-paint': ['warn', { maxNumericValue: 2000 }],
-        'interactive': ['warn', { maxNumericValue: 5000 }],
+        interactive: ['warn', { maxNumericValue: 5000 }],
         'categories:performance': ['warn', { minScore: 0.7 }],
         'categories:accessibility': ['warn', { minScore: 0.9 }],
       },

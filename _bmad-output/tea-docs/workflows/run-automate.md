@@ -7,6 +7,7 @@ The `automate` workflow generates comprehensive tests for features that already 
 ## When to Use This Workflow
 
 **Ideal scenarios:**
+
 - Feature is already implemented and working
 - Need to add test coverage to existing code
 - Tests should pass on first run
@@ -14,6 +15,7 @@ The `automate` workflow generates comprehensive tests for features that already 
 - Adding tests to legacy systems
 
 **Not suitable for:**
+
 - Features that don't yet exist (use ATDD instead)
 - When you need failing tests to guide development
 
@@ -24,13 +26,14 @@ The `automate` workflow generates comprehensive tests for features that already 
 - Test framework setup completed
 - Working, implemented feature
 
-*Note: Examples use Playwright; Cypress syntax differs.*
+_Note: Examples use Playwright; Cypress syntax differs._
 
 ## Step-by-Step Process
 
 ### 1. Load TEA Agent
 
 Start fresh chat and load the agent:
+
 ```
 tea
 ```
@@ -54,12 +57,14 @@ Describe the application, specific features, and scenarios to cover without BMad
 ### 4. Specify Test Levels
 
 Choose test types:
+
 - **E2E tests** - Full browser workflows
 - **API tests** - Backend endpoint testing
 - **Component tests** - UI component isolation
 - **Mix** - Recommended combination
 
 Example approach:
+
 - P0 scenarios: API + E2E tests
 - P1 scenarios: API tests only
 - P2 scenarios: API happy path
@@ -160,6 +165,7 @@ testWithAuth.describe('Profile API', () => {
 ```
 
 **Key Playwright Utils advantages:**
+
 - Persistent auth token fixtures
 - Cleaner API response handling
 - Schema validation with Zod
@@ -260,6 +266,7 @@ export { expect } from '@playwright/test';
 ```
 
 **Fixture benefits:**
+
 - Persisted authentication tokens
 - Dynamic test data generation
 - Reusable patterns across files
@@ -275,21 +282,25 @@ export { expect } from '@playwright/test';
 ## Running Tests
 
 ### All Tests
+
 npm test
 
 ### Specific Levels
-npm run test:api       # API tests only
-npm run test:e2e       # E2E tests only
-npm run test:smoke     # Smoke tests (@smoke tag)
+
+npm run test:api # API tests only
+npm run test:e2e # E2E tests only
+npm run test:smoke # Smoke tests (@smoke tag)
 
 ### Single File
+
 npx playwright test tests/api/profile.spec.ts
 
 ## Test Structure
+
 tests/
-├── api/               # API tests (fast, reliable)
-├── e2e/               # E2E tests (full workflows)
-├── fixtures/          # Shared test utilities
+├── api/ # API tests (fast, reliable)
+├── e2e/ # E2E tests (full workflows)
+├── fixtures/ # Shared test utilities
 └── README.md
 ```
 
@@ -307,11 +318,13 @@ tests/
 ### 7. Run the Tests
 
 **Playwright execution:**
+
 ```bash
 npx playwright test
 ```
 
 **Cypress execution:**
+
 ```bash
 npx cypress run
 ```
@@ -329,6 +342,7 @@ npm run test:coverage
 ```
 
 Verify coverage against:
+
 - Acceptance criteria from stories
 - Test design priorities
 - Edge cases and error scenarios
@@ -336,6 +350,7 @@ Verify coverage against:
 ## What You Get
 
 ### Comprehensive Test Suite Includes:
+
 - API tests for fast, reliable backend testing
 - E2E tests covering critical user workflows
 - Component tests (framework-dependent)
@@ -343,20 +358,22 @@ Verify coverage against:
 
 ### Component Testing by Framework:
 
-| Framework | Tool | Location |
-|-----------|------|----------|
-| Cypress | Cypress Component Testing | `tests/component/` |
+| Framework  | Tool                           | Location                                  |
+| ---------- | ------------------------------ | ----------------------------------------- |
+| Cypress    | Cypress Component Testing      | `tests/component/`                        |
 | Playwright | Vitest + React Testing Library | `tests/component/` or `src/**/*.test.tsx` |
 
-*Component tests use separate tooling from E2E tests.*
+_Component tests use separate tooling from E2E tests._
 
 ### Quality Features:
+
 - Network-first patterns (wait for actual responses)
 - Deterministic, non-flaky tests
 - Self-cleaning test data
 - Concurrent execution safe
 
 ### Documentation Artifacts:
+
 - Updated README with execution instructions
 - Test structure explanations
 - Definition of Done quality standards
@@ -366,6 +383,7 @@ Verify coverage against:
 ### Start with Test Design First
 
 Run test design before automation:
+
 ```
 test-design   # Risk assessment and priorities
 automate      # Generate tests following priorities
@@ -376,6 +394,7 @@ This focuses TEA on valuable P0/P1 scenarios.
 ### Prioritize Test Levels Strategically
 
 Optimal approach:
+
 - **P0 scenarios:** API + E2E tests
 - **P1 scenarios:** API tests only
 - **P2 scenarios:** API happy path
@@ -400,6 +419,7 @@ TEA analyzes existing tests and generates only new scenarios.
 ### MCP Enhancements (Optional)
 
 When configured (`tea_use_mcp_enhancements: true`), TEA automatically uses MCPs for:
+
 - **Healing mode:** Fix broken selectors, update assertions, trace analysis
 - **Recording mode:** Verify selectors against live browser, capture network requests
 
@@ -410,22 +430,26 @@ No additional prompts needed--MCPs activate automatically. See Enable MCP Enhanc
 Build test coverage progressively:
 
 **Iteration 1:** Generate P0 tests only (critical path)
+
 ```
 automate
 ```
 
 **Iteration 2:** Add P1 tests while avoiding P0 duplication
+
 ```
 automate
 Tell TEA to avoid P0 coverage
 ```
 
 **Iteration 3:** Generate P2 tests if time permits
+
 ```
 automate
 ```
 
 Benefits:
+
 - Fast feedback cycles
 - Validate before proceeding
 - Focused generation scope
@@ -439,6 +463,7 @@ Benefits:
 **Root cause:** TEA lacked complete context.
 
 **Solution:** Provide comprehensive details:
+
 ```
 Generate tests for:
 - All acceptance criteria in story-profile.md
@@ -453,6 +478,7 @@ Generate tests for:
 **Root cause:** Priorities and scope unspecified.
 
 **Solution:** Be specific:
+
 ```
 Generate ONLY:
 - P0 and P1 scenarios
@@ -468,6 +494,7 @@ Generate ONLY:
 **Root cause:** Didn't specify existing test locations.
 
 **Solution:** Reference existing tests:
+
 ```
 We already have these tests:
 - tests/api/profile.spec.ts (GET /api/profile)

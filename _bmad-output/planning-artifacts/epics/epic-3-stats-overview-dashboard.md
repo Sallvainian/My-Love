@@ -13,6 +13,7 @@ So that I can see our progress without gamification pressure.
 **Given** the user navigates to the Scripture Reading overview page
 **When** the stats section renders
 **Then** the following couple-aggregate metrics are displayed:
+
 - Total sessions completed (count of sessions with status='complete' for the couple)
 - Total steps completed (sum of completed steps across all sessions)
 - Last session completion date (most recent completed_at)

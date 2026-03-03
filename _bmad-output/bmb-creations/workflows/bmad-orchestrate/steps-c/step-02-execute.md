@@ -36,7 +36,7 @@ To spawn a team agent in a fresh context window, instruct it to execute the sele
 - 🚫 FORBIDDEN to answer workflow questions on behalf of the agent
 - 💬 When relaying: clearly indicate what comes from the agent vs what comes from you
 - 🤖 ALWAYS spawn agent with `mode: "acceptEdits"` (NOT plan mode)
-- 🗣️ If voice mode (mcp__voicemode__converse) is available, relay agent updates via voice
+- 🗣️ If voice mode (mcp**voicemode**converse) is available, relay agent updates via voice
 
 ## EXECUTION PROTOCOLS:
 
@@ -80,6 +80,7 @@ Append to {outputFile}:
 
 ```markdown
 ### [timestamp] Agent Spawned
+
 - **Agent:** workflow-agent
 - **Mode:** acceptEdits
 - **Command:** {workflow_command}
@@ -92,7 +93,7 @@ Begin the message relay loop. Continue until the agent signals completion or the
 **For each message received from the agent:**
 
 1. **Relay to user:** Present the agent's message clearly, prefixed with a status indicator
-   - If voice mode is active, also relay via mcp__voicemode__converse
+   - If voice mode is active, also relay via mcp**voicemode**converse
 2. **Log key exchanges:** Append significant decisions, questions, and milestones to {outputFile}
    - Do NOT log every single message -- focus on decisions, questions to user, and milestones
 3. **Wait for user response** (if the agent asked a question)
@@ -103,6 +104,7 @@ Begin the message relay loop. Continue until the agent signals completion or the
 "**[Agent]** [agent's message content]"
 
 When forwarding user input to the agent:
+
 - Send the user's response directly via SendMessage
 - Do not add your own interpretation or commentary
 
@@ -119,6 +121,7 @@ If the agent reports an error or appears stuck:
 [error details]
 
 **Select an option:**
+
 - **[R]** Restart the workflow (spawn a new agent)
 - **[X]** Exit orchestrator"
 
@@ -134,6 +137,7 @@ When the agent signals that the workflow is complete:
 
 ```markdown
 ### [timestamp] Workflow Complete
+
 - **Status:** SUCCESS
 - **Summary:** [brief summary of what was accomplished]
 ```

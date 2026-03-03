@@ -211,6 +211,7 @@ No new fixtures needed — existing `workerAuthFixture`, `scriptureNavFixture`, 
 **Arguments:** `{ p_session_id: UUID }`
 
 **Success Response:**
+
 ```json
 {
   "data": {
@@ -224,6 +225,7 @@ No new fixtures needed — existing `workerAuthFixture`, `scriptureNavFixture`, 
 ```
 
 **Failure Response:**
+
 ```json
 {
   "data": null,
@@ -256,7 +258,9 @@ No new fixtures needed — existing `workerAuthFixture`, `scriptureNavFixture`, 
 **Implementation Example:**
 
 ```tsx
-{/* DisconnectionOverlay */}
+{
+  /* DisconnectionOverlay */
+}
 <div data-testid="disconnection-overlay">
   <div data-testid="disconnection-reconnecting">Partner reconnecting...</div>
   <div data-testid="disconnection-timeout">
@@ -264,10 +268,12 @@ No new fixtures needed — existing `workerAuthFixture`, `scriptureNavFixture`, 
     <button data-testid="disconnection-keep-waiting">Keep Waiting</button>
     <button data-testid="disconnection-end-session">End Session</button>
   </div>
-</div>
+</div>;
 
-{/* LockInButton disconnected state */}
-<button data-testid="lock-in-disconnected">Holding your place</button>
+{
+  /* LockInButton disconnected state */
+}
+<button data-testid="lock-in-disconnected">Holding your place</button>;
 ```
 
 ---

@@ -1,15 +1,19 @@
 # Getting Started with Test Architect - Complete Content
 
 ## Overview
+
 Test Architect (TEA) Lite enables beginners to quickly generate tests for existing features using the `automate` workflow within Claude Code or similar AI assistants.
 
 ## What You'll Build
+
 By completing this 30-minute tutorial, you will have:
+
 - A functional Playwright test framework
 - Your initial risk-based test plan
 - Passing tests for a demo application feature
 
 **Prerequisites:**
+
 - Node.js v20 or later
 - 30 minutes of focused time
 - TodoMVC demo app (https://todomvc.com/examples/react/dist/)
@@ -17,6 +21,7 @@ By completing this 30-minute tutorial, you will have:
 **Quick Path:** Load TEA -> scaffold framework -> create test plan -> generate tests -> run with `npx playwright test`
 
 ## TEA Approaches Explained
+
 Three distinct ways exist to implement TEA:
 
 1. **TEA Lite** - Beginner approach using only the `automate` workflow for testing existing features
@@ -32,6 +37,7 @@ Test TodoMVC, a standard demonstration application across testing documentation.
 **Demo App URL:** https://todomvc.com/examples/react/dist/
 
 No installation required. Open the link and:
+
 1. Add several todos (type and press Enter)
 2. Mark some as complete (click checkbox)
 3. Try "All", "Active", "Completed" filters
@@ -45,6 +51,7 @@ You've explored the features that will be tested.
 Execute the BMad installation command (see installation guide for current syntax).
 
 When prompted, make these selections:
+
 - **Select modules:** "BMM: BMad Method" (Space, then Enter)
 - **Project name:** Keep default or enter your project name
 - **Experience level:** Select "beginner" for this tutorial
@@ -89,6 +96,7 @@ A: "End-to-end (E2E) testing for a web application"
 A: "GitHub Actions" (or your preference)
 
 TEA generates:
+
 - `tests/` directory with Playwright configuration
 - `playwright.config.ts` with base setup
 - Sample test structure
@@ -228,6 +236,7 @@ test.describe('TodoMVC - Core Functionality', () => {
 ```
 
 TEA also generates:
+
 - **`tests/README.md`** - Test execution instructions and project conventions
 - **Definition of Done summary** - Criteria for test quality
 
@@ -273,6 +282,7 @@ test('should mark todo as complete', async ({ page, apiRequest }) => {
 ```
 
 **Playwright Utils benefits:**
+
 - Type-safe API responses (`{ status, body }`)
 - Automatic retry for 5xx errors
 - Built-in schema validation
@@ -306,6 +316,7 @@ npx playwright show-report
 ```
 
 Opens an interactive HTML report displaying:
+
 - Test execution timeline
 - Screenshots (if failures occurred)
 - Trace viewer for detailed debugging
@@ -325,12 +336,12 @@ This occurred within 30 minutes.
 
 ### Quick Reference
 
-| Command | Purpose |
-|---------|---------|
-| `tea` | Load the TEA agent |
-| `framework` | Scaffold test infrastructure |
-| `test-design` | Risk-based test planning |
-| `automate` | Generate tests for existing features |
+| Command       | Purpose                              |
+| ------------- | ------------------------------------ |
+| `tea`         | Load the TEA agent                   |
+| `framework`   | Scaffold test infrastructure         |
+| `test-design` | Risk-based test planning             |
+| `automate`    | Generate tests for existing features |
 
 ### TEA Principles
 
@@ -346,11 +357,13 @@ This occurred within 30 minutes.
 This tutorial employed the `automate` workflow to generate tests for **existing features** (tests pass immediately).
 
 **Use `automate` when:**
+
 - Feature already exists
 - You need test coverage addition
 - Tests should pass on first execution
 
 **Use `atdd` (Acceptance Test-Driven Development) when:**
+
 - Feature doesn't exist yet (Test-Driven Development workflow)
 - You want failing tests BEFORE implementation
 - Following red -> green -> refactor cycle
@@ -362,17 +375,20 @@ See the How to Run ATDD guide for the test-driven development approach.
 ### Level Up Your TEA Skills
 
 **How-To Guides** (task-oriented):
+
 - How to Run Test Design - Deep dive into risk assessment
 - How to Run ATDD - Generate failing tests first (TDD)
 - How to Set Up CI Pipeline - Automate test execution
 - How to Review Test Quality - Audit test quality
 
 **Explanation** (understanding-oriented):
+
 - TEA Overview - Complete TEA capabilities
 - Testing as Engineering - Why TEA exists (problem + solution)
 - Risk-Based Testing - How risk scoring works
 
 **Reference** (quick lookup):
+
 - TEA Command Reference - All 9 TEA workflows
 - TEA Configuration - Config options
 - Glossary - TEA terminology
@@ -380,6 +396,7 @@ See the How to Run ATDD guide for the test-driven development approach.
 ### Try TEA Solo
 
 Ready for standalone usage without full BMad Method? Use TEA Solo:
+
 - Run any TEA workflow independently
 - Bring your own requirements
 - Use on non-BMad projects
@@ -389,6 +406,7 @@ See TEA Overview for engagement models.
 ### Go Full TEA Integrated
 
 Want the complete quality operating model? Try TEA Integrated with BMad Method:
+
 - Phase 2: Planning with non-functional requirements (NFR) assessment
 - Phase 3: Architecture testability review
 - Phase 4: Per-epic test design -> `atdd` -> `automate`

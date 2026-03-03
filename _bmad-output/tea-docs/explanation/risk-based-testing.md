@@ -27,11 +27,13 @@ Teams lack data-driven frameworks for determining adequate test coverage. Conver
 Risk scores emerge from multiplying two dimensions:
 
 **Probability (failure likelihood):**
+
 - Level 1 (Low): Stable, well-tested, simple logic
 - Level 2 (Medium): Moderate complexity with some unknowns
 - Level 3 (High): Complex, untested, many edge cases
 
 **Impact (failure consequences):**
+
 - Level 1 (Low): Minor inconvenience affecting few users
 - Level 2 (Medium): Degraded experience with workarounds available
 - Level 3 (High): Critical path broken with business consequences
@@ -69,6 +71,7 @@ TEA assesses across six dimensions:
 Risk scores inform--but don't solely determine--test priorities:
 
 **P0 - Critical Path**
+
 - Risk scores typically 6-9
 - Considers revenue impact, security-criticality, regulatory compliance, usage frequency
 - Coverage target: 100%
@@ -76,6 +79,7 @@ Risk scores inform--but don't solely determine--test priorities:
 - Examples: Login, checkout, payment processing
 
 **P1 - High Value**
+
 - Risk scores typically 4-6
 - Considers core user journeys, complex logic, integration points
 - Coverage target: 90%
@@ -83,6 +87,7 @@ Risk scores inform--but don't solely determine--test priorities:
 - Examples: Profile editing, search, filters
 
 **P2 - Medium Value**
+
 - Risk scores typically 2-4
 - Considers secondary features, admin functionality, reporting
 - Coverage target: 50%
@@ -90,6 +95,7 @@ Risk scores inform--but don't solely determine--test priorities:
 - Examples: Export features, advanced settings
 
 **P3 - Low Value**
+
 - Risk scores typically 1-2
 - Considers rarely-used features, nice-to-have additions, cosmetic changes
 - Coverage target: 20% (smoke test)
@@ -115,6 +121,7 @@ Scores >=6 require documented mitigation strategies:
 ```
 
 **Gate rules:**
+
 - Score 9 (Critical): Mandatory FAIL--blocks release without mitigation
 - Score 6-8 (High): Requires mitigation plan; becomes CONCERNS if incomplete
 - Score 4-5 (Medium): Mitigation recommended but not required
@@ -173,15 +180,16 @@ Benefits: Six focused tests replace ten unfocused ones; effort matches business 
 
 Redesigning checkout from five steps to three steps creates multiple risk areas:
 
-| Component | Probability | Impact | Score | Priority | Testing |
-|-----------|-------------|--------|-------|----------|---------|
-| Payment processing | 3 | 3 | 9 | P0 | 15 E2E + 20 API tests |
-| Order validation | 2 | 3 | 6 | P1 | 5 E2E + 10 API tests |
-| Shipping calculation | 2 | 2 | 4 | P1 | 3 E2E + 8 API tests |
-| Promo code validation | 2 | 2 | 4 | P1 | 2 E2E + 5 API tests |
-| Gift message | 1 | 1 | 1 | P3 | 1 E2E smoke test |
+| Component             | Probability | Impact | Score | Priority | Testing               |
+| --------------------- | ----------- | ------ | ----- | -------- | --------------------- |
+| Payment processing    | 3           | 3      | 9     | P0       | 15 E2E + 20 API tests |
+| Order validation      | 2           | 3      | 6     | P1       | 5 E2E + 10 API tests  |
+| Shipping calculation  | 2           | 2      | 4     | P1       | 3 E2E + 8 API tests   |
+| Promo code validation | 2           | 2      | 4     | P1       | 2 E2E + 5 API tests   |
+| Gift message          | 1           | 1      | 1     | P3       | 1 E2E smoke test      |
 
 With 40-hour testing budget, allocation becomes:
+
 - Payment (Score 9): 20 hours (50%)
 - Order validation (Score 6): 8 hours (20%)
 - Shipping (Score 4): 6 hours (15%)
@@ -199,6 +207,7 @@ Without risk-based testing, equal eight-hour allocations per component waste eff
 Gate impact: FAIL--cannot deploy without mitigation.
 
 Required actions:
+
 - Comprehensive test suite (E2E, API, security)
 - Multiple test environments (dev, staging, prod-mirror)
 - Load testing and performance validation
@@ -214,6 +223,7 @@ Deployment is blocked until score is mitigated below 9.
 Gate impact: CONCERNS--can deploy with documented mitigation plan.
 
 Required actions:
+
 - Targeted test suite (happy path + critical errors)
 - Test environment setup
 - Monitoring plan
@@ -226,6 +236,7 @@ Deployment can proceed with approved mitigation plan.
 Gate impact: Advisory--does not affect gate decision.
 
 Suggested actions:
+
 - Basic test coverage
 - Standard monitoring
 - Document known limitations
@@ -237,6 +248,7 @@ Deployment occurs; mitigation recommended but not required.
 Gate impact: None.
 
 Optional actions:
+
 - Smoke test if desired
 - Feature flag for easy disable (optional)
 
@@ -258,6 +270,7 @@ b     Low  Med  High
 ```
 
 **Legend:**
+
 - Red (Score 9): CRITICAL--blocks release
 - Orange (Score 6-8): HIGH RISK--mitigation required
 - Yellow (Score 4-5): MEDIUM--mitigation recommended
@@ -265,12 +278,12 @@ b     Low  Med  High
 
 ### Gate Decision Rules
 
-| Score | Mitigation Required | Gate Impact |
-|-------|-------------------|-------------|
-| 9 | Mandatory, blocks release | FAIL if no mitigation |
-| 6-8 | Required, documented plan | CONCERNS if incomplete |
-| 4-5 | Recommended | Advisory only |
-| 1-3 | Optional | No impact |
+| Score | Mitigation Required       | Gate Impact            |
+| ----- | ------------------------- | ---------------------- |
+| 9     | Mandatory, blocks release | FAIL if no mitigation  |
+| 6-8   | Required, documented plan | CONCERNS if incomplete |
+| 4-5   | Recommended               | Advisory only          |
+| 1-3   | Optional                  | No impact              |
 
 ## Common Misconceptions
 
@@ -285,6 +298,7 @@ Example: Traditional spreads 50 tests equally; risk-based focuses 70 tests on P0
 **Incorrect.** P3 still receives smoke tests ensuring the feature functions.
 
 Correct approach:
+
 - P3: Smoke test (feature works)
 - P2: Happy path (feature works correctly)
 - P1: Happy path + error scenarios
@@ -295,6 +309,7 @@ Correct approach:
 **Incorrect.** Risk changes over time.
 
 Accurate view:
+
 - Initial launch: Payment scores 9 (untested integration)
 - After six months: Payment scores 6 (proven in production)
 - Quarterly risk re-assessment recommended
@@ -302,26 +317,31 @@ Accurate view:
 ## Related Concepts
 
 **Core TEA Concepts:**
+
 - Test Quality Standards--quality complements risk assessment
 - Engagement Models--when risk-based testing matters most
 - Knowledge Base System--how risk patterns are loaded
 
 **Technical Patterns:**
+
 - Fixture Architecture--building risk-appropriate test infrastructure
 - Network-First Patterns--quality patterns for high-risk features
 
 **Overview:**
+
 - TEA Overview--risk assessment in TEA lifecycle
 - Testing as Engineering--design philosophy
 
 ## Practical Guides
 
 **Workflow Guides:**
+
 - How to Run Test Design--apply risk scoring
 - How to Run Trace--gate decisions based on risk
 - How to Run NFR Assessment--NFR risk assessment
 
 **Use-Case Guides:**
+
 - Running TEA for Enterprise--enterprise risk management
 
 ## Reference

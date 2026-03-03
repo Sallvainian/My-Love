@@ -75,6 +75,7 @@ State updated, component re-renders
 ```
 
 Scripture together-mode variant:
+
 ```
 Broadcast channel: scripture-session:{sessionId}
     |
@@ -206,6 +207,7 @@ Session state reconciled, channel healthy
 ```
 
 **Key points:**
+
 - `isRetryingRef` prevents retry storms when CHANNEL_ERROR fires before removeChannel resolves
 - On reconnect success, `loadSession` fetches the authoritative session from DB to reconcile any missed broadcasts
 - The same pattern is used by `useScripturePresence` for the ephemeral presence channel

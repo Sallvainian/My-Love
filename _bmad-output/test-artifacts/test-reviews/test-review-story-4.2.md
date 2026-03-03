@@ -1,5 +1,12 @@
 ---
-stepsCompleted: ['step-01-load-context', 'step-02-discover-tests', 'step-03-quality-evaluation', 'step-03f-aggregate-scores', 'step-04-generate-report']
+stepsCompleted:
+  [
+    'step-01-load-context',
+    'step-02-discover-tests',
+    'step-03-quality-evaluation',
+    'step-03f-aggregate-scores',
+    'step-04-generate-report',
+  ]
 lastStep: 'step-04-generate-report'
 lastSaved: '2026-03-01'
 workflowType: 'testarch-test-review'
@@ -70,8 +77,8 @@ This test file demonstrates excellent E2E testing practices for a complex realti
 | Criterion                            | Status  | Violations | Notes                                                |
 | ------------------------------------ | ------- | ---------- | ---------------------------------------------------- |
 | BDD Format (Given-When-Then)         | ✅ PASS | 0          | Tests use GIVEN/WHEN/THEN comments consistently      |
-| Test IDs                             | ✅ PASS | 0          | All 4 tests have proper `4.2-E2E-XXX` IDs           |
-| Priority Markers (P0/P1/P2/P3)       | ✅ PASS | 0          | 1 P0, 3 P1 — matches ATDD priority                  |
+| Test IDs                             | ✅ PASS | 0          | All 4 tests have proper `4.2-E2E-XXX` IDs            |
+| Priority Markers (P0/P1/P2/P3)       | ✅ PASS | 0          | 1 P0, 3 P1 — matches ATDD priority                   |
 | Hard Waits (sleep, waitForTimeout)   | ✅ PASS | 0          | Zero hard waits                                      |
 | Determinism (no conditionals)        | ✅ PASS | 0          | No if/else, no try/catch flow control, no randomness |
 | Isolation (cleanup, no shared state) | ⚠️ WARN | 1          | Serial mode + direct DB mutation (both justified)    |
@@ -101,13 +108,13 @@ Dimension Scores (weighted evaluation):
 Grade:                   A (Excellent)
 ```
 
-| Dimension       | Score | Grade | Violations (H/M/L) |
-| --------------- | ----- | ----- | ------------------- |
-| Determinism     | 100   | A     | 0/0/0               |
-| Isolation       | 93    | A     | 0/1/1               |
-| Maintainability | 78    | C     | 1/2/1               |
-| Performance     | 93    | A     | 0/1/1               |
-| **Overall**     | **91**| **A** | **1/4/3**           |
+| Dimension       | Score  | Grade | Violations (H/M/L) |
+| --------------- | ------ | ----- | ------------------ |
+| Determinism     | 100    | A     | 0/0/0              |
+| Isolation       | 93     | A     | 0/1/1              |
+| Maintainability | 78     | C     | 1/2/1              |
+| Performance     | 93     | A     | 0/1/1              |
+| **Overall**     | **91** | **A** | **1/4/3**          |
 
 ---
 
@@ -148,10 +155,7 @@ await userALockIn;
 // ✅ Add to tests/support/helpers/scripture-lobby.ts or scripture-together.ts
 
 /** Click lock-in button and wait for RPC response. */
-export async function lockInAndWait(
-  page: Page,
-  label: string = 'User'
-): Promise<void> {
+export async function lockInAndWait(page: Page, label: string = 'User'): Promise<void> {
   const lockInResponse = page
     .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
     .catch((e: Error) => {
@@ -448,32 +452,32 @@ Test quality is excellent with 91/100 score (A grade). The file demonstrates exe
 
 ### Violation Summary by Location
 
-| Line | Severity | Dimension | Issue | Fix |
-|------|----------|-----------|-------|-----|
-| 1 | HIGH | Maintainability | File 273 lines (approaching threshold) | Consider splitting E2E-004 if file grows |
-| 27 | MEDIUM | Isolation | Serial mode cascade risk | Justified — document trade-off |
-| 27 | MEDIUM | Performance | Serial mode blocks parallel exec | Justified by session scoping |
-| 62 | MEDIUM | Maintainability | Lock-in pattern duplicated 6× | Extract `lockInAndWait` helper |
-| 215 | MEDIUM | Isolation | Direct DB mutation in test body | Well-scoped; extract to helper for reuse |
-| 221 | LOW | Maintainability | `jumpToLastStep` inline | Move to scripture-together.ts |
-| 52 | LOW | Performance | navigateBothToReadingPhase called 4× | Necessary for isolation |
-| — | LOW | Maintainability | Inconsistent error enrichment risk | Resolved by helper extraction |
+| Line | Severity | Dimension       | Issue                                  | Fix                                      |
+| ---- | -------- | --------------- | -------------------------------------- | ---------------------------------------- |
+| 1    | HIGH     | Maintainability | File 273 lines (approaching threshold) | Consider splitting E2E-004 if file grows |
+| 27   | MEDIUM   | Isolation       | Serial mode cascade risk               | Justified — document trade-off           |
+| 27   | MEDIUM   | Performance     | Serial mode blocks parallel exec       | Justified by session scoping             |
+| 62   | MEDIUM   | Maintainability | Lock-in pattern duplicated 6×          | Extract `lockInAndWait` helper           |
+| 215  | MEDIUM   | Isolation       | Direct DB mutation in test body        | Well-scoped; extract to helper for reuse |
+| 221  | LOW      | Maintainability | `jumpToLastStep` inline                | Move to scripture-together.ts            |
+| 52   | LOW      | Performance     | navigateBothToReadingPhase called 4×   | Necessary for isolation                  |
+| —    | LOW      | Maintainability | Inconsistent error enrichment risk     | Resolved by helper extraction            |
 
 ### Quality Trends
 
-| Review Date | Score | Grade | Critical Issues | Trend |
-|-------------|-------|-------|-----------------|-------|
-| 2026-02-28 | 89/100 | B | 0 | — (first review) |
-| 2026-03-01 | 93/100 | A | 0 | ⬆️ Improved |
-| 2026-03-01 | 95/100 | A | 0 | ⬆️ Improved (v3.0) |
-| 2026-03-01 | 91/100 | A | 0 | ⬇️ -4 (v4.0, stricter maintainability scoring) |
+| Review Date | Score  | Grade | Critical Issues | Trend                                          |
+| ----------- | ------ | ----- | --------------- | ---------------------------------------------- |
+| 2026-02-28  | 89/100 | B     | 0               | — (first review)                               |
+| 2026-03-01  | 93/100 | A     | 0               | ⬆️ Improved                                    |
+| 2026-03-01  | 95/100 | A     | 0               | ⬆️ Improved (v3.0)                             |
+| 2026-03-01  | 91/100 | A     | 0               | ⬇️ -4 (v4.0, stricter maintainability scoring) |
 
 ### Related Reviews
 
-| File | Score | Grade | Critical | Status |
-| ---- | ----- | ----- | -------- | ------ |
-| scripture-lobby-4.1.spec.ts | 96/100 | A | 0 | Approved |
-| scripture-reading-4.2.spec.ts | 91/100 | A | 0 | Approved with Comments |
+| File                          | Score  | Grade | Critical | Status                 |
+| ----------------------------- | ------ | ----- | -------- | ---------------------- |
+| scripture-lobby-4.1.spec.ts   | 96/100 | A     | 0        | Approved               |
+| scripture-reading-4.2.spec.ts | 91/100 | A     | 0        | Approved with Comments |
 
 **Suite Average**: 94/100 (A)
 

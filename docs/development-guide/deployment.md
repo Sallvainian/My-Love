@@ -62,19 +62,19 @@ permissions:
 
 All workflows are in `.github/workflows/`:
 
-| Workflow             | File                       | Trigger                                                       | Purpose                                                               |
-| -------------------- | -------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                               | Build, smoke test, deploy to GitHub Pages, health check               |
-| Tests                | `test.yml`                 | Push to `main`, PRs, weekly Sunday 2 AM UTC, manual           | Lint, unit, db, E2E (P0 gate + sharded), Lighthouse CI, burn-in      |
-| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                        | Migration validation with local Supabase                              |
-| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                              | Claude Code AI assistance                                             |
-| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                                  | Automated PR code review with Claude                                  |
-| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                               | On-demand commit summarization or security review                     |
-| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs      | Auto-fix CI failures with Claude Code                                 |
-| Bundle Size          | `bundle-size.yml`          | PRs to `main`/`develop`                                       | Brotli-compressed bundle size comparison                              |
-| CodeQL               | `codeql.yml`               | Push to `main`, PRs to `main`/`develop`, weekly Monday 10 AM  | CodeQL security analysis (javascript-typescript)                      |
-| Dependency Review    | `dependency-review.yml`    | PRs to `main`/`develop`                                       | Dependency vulnerability review (fail on moderate+ severity)          |
-| Lighthouse           | `lighthouse.yml`           | After deploy workflow completes, manual                       | Lighthouse PWA audit against live site (2 runs)                       |
+| Workflow             | File                       | Trigger                                                      | Purpose                                                         |
+| -------------------- | -------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                              | Build, smoke test, deploy to GitHub Pages, health check         |
+| Tests                | `test.yml`                 | Push to `main`, PRs, weekly Sunday 2 AM UTC, manual          | Lint, unit, db, E2E (P0 gate + sharded), Lighthouse CI, burn-in |
+| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                       | Migration validation with local Supabase                        |
+| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                             | Claude Code AI assistance                                       |
+| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                                 | Automated PR code review with Claude                            |
+| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                              | On-demand commit summarization or security review               |
+| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs     | Auto-fix CI failures with Claude Code                           |
+| Bundle Size          | `bundle-size.yml`          | PRs to `main`/`develop`                                      | Brotli-compressed bundle size comparison                        |
+| CodeQL               | `codeql.yml`               | Push to `main`, PRs to `main`/`develop`, weekly Monday 10 AM | CodeQL security analysis (javascript-typescript)                |
+| Dependency Review    | `dependency-review.yml`    | PRs to `main`/`develop`                                      | Dependency vulnerability review (fail on moderate+ severity)    |
+| Lighthouse           | `lighthouse.yml`           | After deploy workflow completes, manual                      | Lighthouse PWA audit against live site (2 runs)                 |
 
 ### Test Pipeline Stages
 
@@ -111,17 +111,17 @@ The `test.yml` workflow runs a multi-stage pipeline (see [Testing](./testing.md#
 
 ## Required GitHub Secrets
 
-| Secret                                    | Description                                                                               |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`                       | Supabase project URL for production builds                                                |
-| `VITE_SUPABASE_ANON_KEY`                  | Supabase anon/public key for production builds                                            |
-| `VITE_SENTRY_DSN`                         | Sentry DSN for error tracking in production                                               |
-| `SENTRY_AUTH_TOKEN`                       | Sentry auth token for source map uploads during build                                     |
-| `SENTRY_ORG`                              | Sentry organization slug                                                                  |
-| `SENTRY_PROJECT`                          | Sentry project slug                                                                       |
-| `SUPABASE_ACCESS_TOKEN`                   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
-| `CLAUDE_CODE_OAUTH_TOKEN`                 | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |
-| `CLAUDE_PAT`                              | GitHub personal access token for Claude bot commits and PR operations                     |
+| Secret                    | Description                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`       | Supabase project URL for production builds                                                |
+| `VITE_SUPABASE_ANON_KEY`  | Supabase anon/public key for production builds                                            |
+| `VITE_SENTRY_DSN`         | Sentry DSN for error tracking in production                                               |
+| `SENTRY_AUTH_TOKEN`       | Sentry auth token for source map uploads during build                                     |
+| `SENTRY_ORG`              | Sentry organization slug                                                                  |
+| `SENTRY_PROJECT`          | Sentry project slug                                                                       |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations                     |
 
 ## Manual Deployment
 
