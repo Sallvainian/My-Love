@@ -24,18 +24,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
-      - name: Install dotenvx
-        run: curl -sfS https://dotenvx.sh | sh
-
-      - name: Load secrets into environment
-        run: dotenvx run -- env | grep -E '^(VITE_|SENTRY_)' >> $GITHUB_ENV
-        env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
-
       - name: Check compressed bundle size
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         uses: preactjs/compressed-size-action@v2
         with:
           build-script: build

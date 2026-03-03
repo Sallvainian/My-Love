@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - name: Install dependencies
@@ -38,13 +38,15 @@ jobs:
             --project-id xojempkrugifnaveqtqc \
             > src/types/database.types.ts
 
-      - name: Install dotenvx
-        run: curl -sfS https://dotenvx.sh | sh
-
       - name: Build application
-        run: dotenvx run -- npm run build
+        run: npm run build
         env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_RELEASE: my-love@${{ github.sha }}
           VITE_SENTRY_RELEASE: my-love@${{ github.sha }}
 
@@ -77,10 +79,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
-
-      - name: Install dotenvx
-        run: curl -sfS https://dotenvx.sh | sh
+          node-version-file: '.mise.toml'
 
       - name: Install dependencies for health check
         run: npm install --no-save @supabase/supabase-js
@@ -160,11 +159,12 @@ jobs:
 
       - name: Health Check - Supabase Connection
         env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           echo "🔍 Checking Supabase connection..."
 
-          # Create health check script (env vars injected by dotenvx)
+          # Create health check script
           cat > health-check-supabase.mjs << 'EOF'
           import { createClient } from '@supabase/supabase-js';
 
@@ -209,8 +209,7 @@ jobs:
           }
           EOF
 
-          # Run health check script (dotenvx injects env vars)
-          dotenvx run -- node health-check-supabase.mjs
+          node health-check-supabase.mjs
 
       - name: Health Check Summary
         if: success()

@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - run: npm ci
@@ -62,7 +62,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - run: npm ci
@@ -92,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - run: npm ci
@@ -124,7 +124,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -186,7 +186,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -248,7 +248,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -275,11 +275,13 @@ jobs:
 
       - name: Run burn-in (5 iterations)
         if: steps.changed-tests.outputs.specs != ''
+        env:
+          SPECS: ${{ steps.changed-tests.outputs.specs }}
         run: |
           echo "Running 5 iterations on changed test files"
           for i in {1..5}; do
             echo "--- Burn-in iteration $i/5 ---"
-            npx playwright test ${{ steps.changed-tests.outputs.specs }} || exit 1
+            npx playwright test $SPECS || exit 1
           done
           echo "Burn-in passed: 5/5 stable"
 
@@ -316,7 +318,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - run: npm ci
