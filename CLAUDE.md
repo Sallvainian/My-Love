@@ -85,29 +85,25 @@ Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices via t
 - `photosSlice` - photo gallery
 - `scriptureReadingSlice` - scripture reading sessions
 
-### Environment Variables
+### Environment Variables & Secrets
 
-Uses [dotenvx](https://dotenvx.com) for local encryption and [dotenvx-ops](https://dotenvx.com/ops) for cloud key backup/sync. Docs: https://dotenvx.com/docs/ops/quickstart
+Uses [fnox](https://fnox.jdx.dev) with the `age` provider for local secrets (encrypted inline in `fnox.toml`) and GitHub Secrets for CI. Tool versions managed by [mise](https://mise.jdx.dev) via `.mise.toml`.
 
-**How it works:**
-- Secrets live in `.env` files, encrypted locally via `dotenvx encrypt`
-- Private decryption keys are stored in `.env.keys` (gitignored)
-- `dotenvx-ops backup` syncs private keys to the dotenvx-ops cloud
-- `.env.x` contains the project ID linking to dotenvx-ops (committed to git)
-- To decrypt/run locally: `dotenvx run -- <command>` (reads `.env.keys` automatically)
-- To add/change a secret: `dotenvx set KEY=value` then `dotenvx encrypt`, then `dotenvx-ops backup`
+**Local development:**
+- `fnox exec -- npm run dev` — decrypts secrets via age, starts dev server
+- `fnox exec -- npm run build` — local production build with secrets
+- `fnox check` — verify all secrets resolve
+- `fnox set KEY value` — encrypt and store a secret
 
-**Files — what's committed vs gitignored:**
+**Files:**
 | File | Committed | Contents |
 |------|-----------|----------|
-| `.env` | Yes | Encrypted secrets (safe to commit) |
-| `.env.x` | Yes | dotenvx-ops project ID |
+| `.mise.toml` | Yes | Tool versions (Node) + env vars (CODEX_HOME) |
+| `fnox.toml` | Yes | Age-encrypted secret ciphertext + recipient public keys |
 | `.env.example` | Yes | Template with placeholder values |
 | `.env.test` | Yes | Local Supabase test values |
-| `.env.keys` | **No** (gitignored) | Private decryption keys — backed up to dotenvx-ops cloud |
-| `.envrc` | **No** (gitignored) | direnv config |
 
-**Project secrets (in `.env`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VITE_SENTRY_DSN`, `SUPABASE_PAT`
+**Project secrets (in `fnox.toml`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VITE_SENTRY_DSN`, `SUPABASE_PAT`
 
 ### Base Path
 
@@ -116,7 +112,7 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 ## Key Conventions
 
 - Package manager: **npm** (see `package-lock.json`)
-- Node version: **v24.13.0** (see `.nvmrc`)
+- Node version: **v24.13.0** (see `.mise.toml`)
 - Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
 - Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
 - ESLint enforces `no-explicit-any` as error

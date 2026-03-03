@@ -24,7 +24,7 @@ cleanup() {
 # Trap signals
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start vite in the background (env vars loaded by direnv via dotenvx)
+# Start vite in the background (env vars loaded by mise + fnox)
 echo "🚀 Starting Vite dev server..."
 npx vite &
 VITE_PID=$!
