@@ -58,6 +58,7 @@ function createTestStore() {
 describe('scriptureReadingSlice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } }, error: null });
   });
 
   describe('initial state', () => {
@@ -957,10 +958,9 @@ describe('scriptureReadingSlice', () => {
       await store.getState().retryFailedWrite();
       expect(store.getState().pendingRetry!.attempts).toBe(2);
 
-      // retry 2 → attempt 3 (max reached)
+      // retry 2 → attempt 3 (max reached) — pendingRetry cleared, error preserved
       await store.getState().retryFailedWrite();
-      expect(store.getState().pendingRetry!.attempts).toBe(3);
-      expect(store.getState().pendingRetry!.maxAttempts).toBe(3);
+      expect(store.getState().pendingRetry).toBeNull();
       expect(store.getState().scriptureError).not.toBeNull();
     });
 

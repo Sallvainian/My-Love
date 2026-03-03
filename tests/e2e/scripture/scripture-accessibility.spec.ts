@@ -84,8 +84,6 @@ test.describe('Scripture Accessibility', () => {
       await startSoloSession(page);
 
       // WHEN: User tabs through all elements multiple times
-      const startFocus = await page.evaluate(() => document.activeElement?.tagName);
-
       // Tab 20 times
       for (let i = 0; i < 20; i++) {
         await page.keyboard.press('Tab');

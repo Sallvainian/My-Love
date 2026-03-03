@@ -200,7 +200,7 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(state.session?.currentPhase).toBe('reading');
   });
 
-  test('[P1] applySessionConverted resets lobby state locally without calling RPC', async () => {
+  test('[P1] applySessionConverted resets to initial state locally without calling RPC', async () => {
     const store = await createStoreWithTogetherSession();
 
     store.getState().onPartnerJoined();
@@ -210,13 +210,13 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     store.getState().applySessionConverted();
 
     const state = store.getState();
+    // Resets entirely — the removed partner (user2) should see the overview, not a session
     expect(state.myRole).toBeNull();
     expect(state.partnerJoined).toBe(false);
     expect(state.myReady).toBe(false);
     expect(state.partnerReady).toBe(false);
     expect(state.countdownStartedAt).toBeNull();
-    expect(state.session?.mode).toBe('solo');
-    expect(state.session?.currentPhase).toBe('reading');
+    expect(state.session).toBeNull();
     // RPC was never called (convertToSolo path) — verify by checking mockRpc call count
     expect(mockRpc).not.toHaveBeenCalled();
   });

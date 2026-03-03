@@ -1030,11 +1030,11 @@ describe('SoloReadingFlow', () => {
       expect(theme.className.includes('text-purple-400')).toBe(false);
     });
 
-    it('verse reference uses text-purple-600', () => {
+    it('verse reference uses text-purple-700', () => {
       render(<SoloReadingFlow />);
       const verseRef = screen.getByTestId('scripture-verse-reference');
-      expect(verseRef.className.includes('text-purple-600')).toBe(true);
-      expect(verseRef.className.includes('text-purple-500')).toBe(false);
+      expect(verseRef.className.includes('text-purple-700')).toBe(true);
+      expect(verseRef.className.includes('text-purple-600')).toBe(false);
     });
 
     it('syncing indicator uses text-purple-600', () => {

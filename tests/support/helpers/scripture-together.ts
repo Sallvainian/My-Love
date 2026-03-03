@@ -10,11 +10,9 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { TypedSupabaseClient } from '../factories';
-import { ensureScriptureOverview } from '../helpers';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
   READY_BROADCAST_TIMEOUT_MS,
-  SESSION_CREATE_TIMEOUT_MS,
   STEP_ADVANCE_TIMEOUT_MS,
   isToggleReadyResponse,
   navigateToTogetherRoleSelection,

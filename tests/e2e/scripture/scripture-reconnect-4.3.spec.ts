@@ -15,7 +15,6 @@ import { test, expect } from '../../support/merged-fixtures';
 import {
   SESSION_CREATE_TIMEOUT_MS,
   STEP_ADVANCE_TIMEOUT_MS,
-  lockInAndWait,
 } from '../../support/helpers/scripture-lobby';
 import {
   startTogetherSessionForRole,

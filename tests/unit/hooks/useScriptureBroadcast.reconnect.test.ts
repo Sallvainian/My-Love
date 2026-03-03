@@ -73,6 +73,10 @@ async function flushPromises(): Promise<void> {
 describe('useScriptureBroadcast — channel reconnection (Story 4.3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-apply mock implementations after clearAllMocks — send/removeChannel must return Promises
+    mockChannel.send.mockResolvedValue(undefined);
+    mockChannel.on.mockReturnThis();
+    mockRemoveChannel.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
