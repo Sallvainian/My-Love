@@ -48,6 +48,9 @@ jobs:
       - name: Prettier
         run: npm run format:check
 
+      - name: Security audit
+        run: npm audit --audit-level=high
+
   # ============================================
   # Stage 2: Unit Tests (Vitest)
   # ============================================
@@ -225,6 +228,46 @@ jobs:
           path: |
             test-results/
             playwright-report/
+          retention-days: 30
+
+  # ============================================
+  # Stage 4c: Lighthouse CI (Performance)
+  # NFR-P3: < 2s initial load on 3G
+  # Warns on regression, does not block pipeline
+  # ============================================
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.mise.toml'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: http://localhost:54321
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: placeholder-for-lighthouse-ci
+        run: npm run build
+
+      - name: Lighthouse CI
+        run: npx --yes @lhci/cli autorun
+        continue-on-error: true
+
+      - name: Upload Lighthouse report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
           retention-days: 30
 
   # ============================================
