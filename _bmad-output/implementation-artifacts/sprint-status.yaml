@@ -119,20 +119,8 @@ retro_action_items:
 
   # Epic 4 process improvements
   e4-p1-error-pipeline-standard:
-    status: pending
+    status: done
     owner: Charlie (Senior Dev)
     priority: high
     source: epic-4-retro-2026-03-02
     description: Establish error pipeline standard — all error handlers must include Sentry integration, not just console logging
-  e4-p2-channel-lifecycle-review-checklist:
-    status: pending
-    owner: Dana (QA)
-    priority: medium
-    source: epic-4-retro-2026-03-02
-    description: Add channel lifecycle to code review checklist — every Supabase Realtime operation must have error handling
-  e4-p3-external-llm-review-standard:
-    status: pending
-    owner: Bob (SM)
-    priority: medium
-    source: epic-4-retro-2026-03-02
-    description: External LLM code review as standard practice — run at least once per epic on the final PR
