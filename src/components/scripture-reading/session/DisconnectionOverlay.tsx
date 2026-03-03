@@ -10,7 +10,7 @@
  * No blame or alarm language in visible text.
  */
 
-import { useState, useEffect, type ReactElement } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactElement } from 'react';
 import { WifiOff } from 'lucide-react';
 
 const TIMEOUT_MS = 30_000;
@@ -34,6 +34,8 @@ export function DisconnectionOverlay({
 }: DisconnectionOverlayProps): ReactElement {
   const [elapsed, setElapsed] = useState(() => Math.max(0, Date.now() - disconnectedAt));
   const [isConfirmingEndSession, setIsConfirmingEndSession] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setElapsed(Math.max(0, Date.now() - disconnectedAt));
@@ -44,12 +46,71 @@ export function DisconnectionOverlay({
     return () => clearInterval(interval);
   }, [disconnectedAt]);
 
+  // Save previous focus and auto-focus first button when interactive content appears
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, []);
+
+  // Focus first button when timeout or confirmation phase starts
+  useEffect(() => {
+    if (elapsed >= TIMEOUT_MS) {
+      const firstButton = dialogRef.current?.querySelector('button');
+      firstButton?.focus();
+    }
+  }, [elapsed >= TIMEOUT_MS, isConfirmingEndSession]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Focus trap: keep Tab cycling within the dialog
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isConfirmingEndSession) {
+          setIsConfirmingEndSession(false);
+        } else if (elapsed >= TIMEOUT_MS) {
+          onKeepWaiting();
+        }
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+
+      const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusableElements || focusableElements.length === 0) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    },
+    [isConfirmingEndSession, elapsed, onKeepWaiting]
+  );
+
   const isTimeout = elapsed >= TIMEOUT_MS;
 
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${partnerName} disconnected`}
       data-testid="disconnection-overlay"
+      onKeyDown={handleKeyDown}
+      ref={dialogRef}
     >
       {/* Accessible announcement */}
       <div role="status" aria-live="polite" className="sr-only">

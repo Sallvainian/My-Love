@@ -1,5 +1,6 @@
 import { openDB } from 'idb';
 import { z } from 'zod/v4';
+import * as Sentry from '@sentry/react';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import {
   type MyLoveDBSchema,
@@ -49,24 +50,66 @@ export function handleScriptureError(error: ScriptureError): void {
   switch (error.code) {
     case ScriptureErrorCode.VERSION_MISMATCH:
       console.warn('[Scripture] Version mismatch — refetch session state');
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        scope.setLevel('warning');
+        if (error.details !== undefined) scope.setExtra('details', error.details);
+        Sentry.captureMessage(error.message);
+      });
       break;
     case ScriptureErrorCode.SYNC_FAILED:
       console.warn('[Scripture] Sync failed — queue for retry');
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        scope.setLevel('warning');
+        if (error.details !== undefined) scope.setExtra('details', error.details);
+        Sentry.captureMessage(error.message);
+      });
       break;
     case ScriptureErrorCode.CACHE_CORRUPTED:
       console.error('[Scripture] Cache corrupted — clearing and refetching');
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        Sentry.captureException(new Error(error.message), {
+          extra: { details: error.details },
+        });
+      });
       break;
     case ScriptureErrorCode.SESSION_NOT_FOUND:
       console.error('[Scripture] Session not found');
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        Sentry.captureException(new Error(error.message), {
+          extra: { details: error.details },
+        });
+      });
       break;
     case ScriptureErrorCode.UNAUTHORIZED:
       console.error('[Scripture] Unauthorized access');
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        Sentry.captureException(new Error(error.message), {
+          extra: { details: error.details },
+        });
+      });
       break;
     case ScriptureErrorCode.OFFLINE:
       console.warn('[Scripture] Device is offline');
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        scope.setLevel('warning');
+        if (error.details !== undefined) scope.setExtra('details', error.details);
+        Sentry.captureMessage(error.message);
+      });
       break;
     case ScriptureErrorCode.VALIDATION_FAILED:
       console.error('[Scripture] Validation failed:', error.details);
+      Sentry.withScope((scope) => {
+        scope.setTag('scripture_error_code', error.code);
+        Sentry.captureException(new Error(error.message), {
+          extra: { details: error.details },
+        });
+      });
       break;
   }
 }

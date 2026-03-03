@@ -229,6 +229,20 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
+      // Auth check FIRST — before any network call
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user?.id) {
+        const scriptureError: ScriptureError = {
+          code: ScriptureErrorCode.UNAUTHORIZED,
+          message: 'Failed to verify user identity',
+          details: authError,
+        };
+        handleScriptureError(scriptureError);
+        set({ scriptureError, scriptureLoading: false });
+        return;
+      }
+      const currentUserId = authData.user.id;
+
       const session = await scriptureReadingService.getSession(sessionId, (refreshed) =>
         set({ session: refreshed })
       );
@@ -243,7 +257,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
-      set({ session, scriptureLoading: false, isInitialized: true });
+      set({ session, scriptureLoading: false, isInitialized: true, currentUserId });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -501,11 +515,11 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       handleScriptureError(scriptureError);
 
       if (newAttempts >= pendingRetry.maxAttempts) {
-        // Max attempts reached — clear retry but keep error
+        // Max attempts reached — clear retry, keep error
         set({
           scriptureError,
           isSyncing: false,
-          pendingRetry: { ...pendingRetry, attempts: newAttempts },
+          pendingRetry: null,
         });
       } else {
         set({
@@ -549,13 +563,25 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     const { session } = state;
     if (!session) return;
 
-    // Optimistic update: set myRole immediately so UI transitions without waiting for RPC
-    set({ myRole: role, scriptureLoading: true, scriptureError: null });
+    set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      // Capture current user ID now so onBroadcastReceived can distinguish user1 vs user2
-      const { data: authData } = await supabase.auth.getUser();
-      const currentUserId = authData.user?.id ?? null;
+      // Auth check FIRST — before optimistic update so UI doesn't flash role then revert
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user?.id) {
+        const scriptureError: ScriptureError = {
+          code: ScriptureErrorCode.UNAUTHORIZED,
+          message: 'Failed to verify user identity for role selection',
+          details: authError,
+        };
+        handleScriptureError(scriptureError);
+        set({ scriptureLoading: false, scriptureError });
+        return;
+      }
+      const currentUserId = authData.user.id;
+
+      // Optimistic update: set myRole now that auth is confirmed
+      set({ myRole: role });
 
       const { data, error } = await callLobbyRpc('scripture_select_role', {
         p_session_id: session.id,
@@ -624,9 +650,9 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               version: snapshot.version,
             }
           : null,
-        // Update countdownStartedAt if server triggered countdown
+        // Update countdownStartedAt if server triggered countdown (use !== undefined so explicit null propagates)
         countdownStartedAt:
-          snapshot.countdownStartedAt != null
+          snapshot.countdownStartedAt !== undefined
             ? snapshot.countdownStartedAt
             : currentState.countdownStartedAt,
       }));
@@ -774,9 +800,9 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         currentUserId !== null
           ? ((isUser1 ? payload.user1Role : payload.user2Role) ?? currentState.myRole)
           : currentState.myRole,
-      // Update countdownStartedAt if server set it
+      // Update countdownStartedAt if server set it (use !== undefined so explicit null propagates)
       countdownStartedAt:
-        payload.countdownStartedAt != null
+        payload.countdownStartedAt !== undefined
           ? payload.countdownStartedAt
           : currentState.countdownStartedAt,
       // Story 4.2: Clear lock-in flags when step advances
@@ -784,27 +810,12 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     }));
   },
 
-  // Called when partner broadcasts 'session_converted' — apply local state transition only.
-  // Do NOT call scripture_convert_to_solo RPC: user2 has been removed from the session
-  // (user2_id is null after the RPC) so calling it again would throw an access-denied error.
+  // Called when partner broadcasts 'session_converted' — the removed partner (user2) has been
+  // detached from the session (user2_id is null). Reset to initial state so the UI navigates
+  // back to overview rather than showing an active session the user no longer belongs to.
   applySessionConverted: () => {
-    const state = get();
-    const { session } = state;
-    if (!session) return;
-
-    set({
-      myRole: null,
-      partnerJoined: false,
-      myReady: false,
-      partnerReady: false,
-      countdownStartedAt: null,
-      session: {
-        ...session,
-        mode: 'solo' as SessionMode,
-        currentPhase: 'reading' as SessionPhase,
-        status: 'in_progress',
-      },
-    });
+    if (!get().session) return;
+    set({ ...initialScriptureState });
   },
 
   // ============================================================

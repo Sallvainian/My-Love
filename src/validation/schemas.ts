@@ -281,7 +281,7 @@ export const SupabaseSessionSchema = z.object({
   user2_id: z.string().uuid().nullable(),
   current_phase: z.enum(['lobby', 'countdown', 'reading', 'reflection', 'report', 'complete']),
   current_step_index: z.number().int().min(0),
-  status: z.enum(['pending', 'in_progress', 'complete', 'abandoned']),
+  status: z.enum(['pending', 'in_progress', 'complete', 'abandoned', 'ended_early']),
   version: z.number().int().min(1),
   snapshot_json: z.record(z.string(), z.unknown()).nullable().optional(),
   started_at: z.string(),

@@ -30,7 +30,7 @@ export type ScriptureSessionPhase =
   | 'reflection'
   | 'report'
   | 'complete';
-export type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
+export type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned' | 'ended_early';
 
 /** Story 4.1: Role a participant takes in a together-mode lobby */
 export type ScriptureSessionRole = 'reader' | 'responder';

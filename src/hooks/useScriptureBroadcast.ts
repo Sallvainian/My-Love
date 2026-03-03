@@ -155,7 +155,14 @@ export function useScriptureBroadcast(sessionId: string | null): void {
         if (authError) {
           throw authError;
         }
-        const userId = authData.user?.id ?? '';
+        const userId = authData.user?.id;
+        if (!userId) {
+          handleScriptureError({
+            code: ScriptureErrorCode.UNAUTHORIZED,
+            message: 'No user ID available for broadcast channel',
+          });
+          return;
+        }
 
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
@@ -171,16 +178,40 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             // Wire broadcast function so Zustand slice actions can broadcast
             // via channel.send() after RPC success (client-side broadcast).
             setBroadcastFn?.((event, payload) => {
-              void channel.send({ type: 'broadcast', event, payload });
+              try {
+                void channel
+                  .send({ type: 'broadcast', event, payload })
+                  .catch((err: unknown) => {
+                    handleScriptureError({
+                      code: ScriptureErrorCode.SYNC_FAILED,
+                      message: 'Broadcast send failed',
+                      details: err,
+                    });
+                  });
+              } catch (err: unknown) {
+                handleScriptureError({
+                  code: ScriptureErrorCode.SYNC_FAILED,
+                  message: 'Broadcast send threw synchronously',
+                  details: err,
+                });
+              }
             });
 
             // Broadcast our own join on every successful subscription so peers
             // can clear disconnected UI after a reconnection.
-            void channel.send({
-              type: 'broadcast',
-              event: 'partner_joined',
-              payload: { user_id: userId },
-            });
+            void channel
+              .send({
+                type: 'broadcast',
+                event: 'partner_joined',
+                payload: { user_id: userId },
+              })
+              .catch((err: unknown) => {
+                handleScriptureError({
+                  code: ScriptureErrorCode.SYNC_FAILED,
+                  message: 'Broadcast send failed',
+                  details: err,
+                });
+              });
           } else if (status === 'CHANNEL_ERROR') {
             const scriptureError: ScriptureError = {
               code: ScriptureErrorCode.SYNC_FAILED,
@@ -194,28 +225,60 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             // Guard: do not re-subscribe if session has ended or already retrying
             if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
               isRetryingRef.current = true;
-              void supabase.removeChannel(channel).then(() => {
-                if (channelRef.current === channel) {
-                  channelRef.current = null;
-                }
-                isRetryingRef.current = false;
-                // Increment retry counter to trigger useEffect re-run → new channel subscription
-                setRetryCount((c) => c + 1);
-              });
+              void supabase
+                .removeChannel(channel)
+                .then(() => {
+                  if (channelRef.current === channel) {
+                    channelRef.current = null;
+                  }
+                  isRetryingRef.current = false;
+                  // Increment retry counter to trigger useEffect re-run → new channel subscription
+                  setRetryCount((c) => c + 1);
+                })
+                .catch((removeErr: unknown) => {
+                  handleScriptureError({
+                    code: ScriptureErrorCode.SYNC_FAILED,
+                    message: 'Channel cleanup failed',
+                    details: removeErr,
+                  });
+                  isRetryingRef.current = false;
+                  // Still attempt retry so channel doesn't stay permanently broken
+                  if (channelRef.current === channel) {
+                    channelRef.current = null;
+                  }
+                  setRetryCount((c) => c + 1);
+                });
             }
           } else if (status === 'CLOSED') {
             // Story 4.3: Channel closed — remove stale channel before re-subscribe
             if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
               hasErroredRef.current = true;
               isRetryingRef.current = true;
-              void supabase.removeChannel(channel).then(() => {
-                if (channelRef.current === channel) {
-                  channelRef.current = null;
-                }
-                isRetryingRef.current = false;
-                // Increment retry counter to trigger useEffect re-run → new channel subscription
-                setRetryCount((c) => c + 1);
-              });
+              void supabase
+                .removeChannel(channel)
+                .then(() => {
+                  if (channelRef.current === channel) {
+                    channelRef.current = null;
+                  }
+                  isRetryingRef.current = false;
+                  // Guard: session may have ended while removeChannel was in-flight
+                  if (!identityRef.current.sessionIdFromStore) return;
+                  // Increment retry counter to trigger useEffect re-run → new channel subscription
+                  setRetryCount((c) => c + 1);
+                })
+                .catch((removeErr: unknown) => {
+                  handleScriptureError({
+                    code: ScriptureErrorCode.SYNC_FAILED,
+                    message: 'Channel cleanup failed',
+                    details: removeErr,
+                  });
+                  isRetryingRef.current = false;
+                  // Still attempt retry so channel doesn't stay permanently broken
+                  if (channelRef.current === channel) {
+                    channelRef.current = null;
+                  }
+                  setRetryCount((c) => c + 1);
+                });
             }
           }
         });
@@ -233,7 +296,9 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       // Clear broadcast function so slice actions don't try to broadcast on a dead channel
       setBroadcastFn?.(null);
       if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
+        void supabase.removeChannel(channelRef.current).catch(() => {
+          // Swallow cleanup errors on unmount — component is already gone
+        });
         channelRef.current = null;
       }
     };
