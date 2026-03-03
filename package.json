@@ -68,7 +68,6 @@
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.17",
     "autoprefixer": "^10.4.27",
-    "@dotenvx/dotenvx-ops": "^0.30.3",
     "eslint": "^9.39.2",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",

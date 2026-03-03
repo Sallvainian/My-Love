@@ -1,6 +1,3 @@
-# direnv
-.envrc
-
 # Logs
 logs
 *.log
@@ -22,10 +19,11 @@ dev-dist
 coverage/
 .nyc_output/
 
-# dotenvx: Keep .env.keys secret (contains decryption key)
-# Encrypted .env files are now safe to commit
+# fnox — secrets stored in macOS Keychain, not files
+# fnox.toml is safe to commit (declarations only, no values)
+fnox.local.toml
+.env
 .env.keys
-.envrc
 
 # Playwright test artifacts
 /test-results/
@@ -74,11 +72,9 @@ _bmad/
 .playwright-mcp/
 .serena/
 
-# Test environment - .env.test is encrypted with dotenvx and safe to commit
-# The decryption key (DOTENV_PRIVATE_KEY_TEST) is stored in .env.keys and GitHub Secrets
+# Test environment - .env.test contains local Supabase dev values (safe to commit)
 
 # Additional env files without dot prefix
-env.keys
 env.test
 .agentvibes/
 .vscode/
@@ -111,3 +107,7 @@ skills/
 logs/security/
 CLAUDE.md
 AGENTS.md
+
+# Working directories (image generation, temp files)
+output/
+tmp/
