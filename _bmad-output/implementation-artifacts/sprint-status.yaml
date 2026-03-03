@@ -62,11 +62,11 @@ development_status:
   epic-3-retrospective: done
 
   # Epic 4: Together Mode — Synchronized Reading
-  epic-4: in-progress
+  epic-4: done
   4-1-lobby-role-selection-and-countdown: done
   4-2-synchronized-reading-with-lock-in: done
   4-3-reconnection-and-graceful-degradation: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
 retro_action_items:
   # Carry-over from Epic 1 retrospective (must complete before Epic 3)
@@ -116,3 +116,23 @@ retro_action_items:
     priority: low
     source: epic-3-retro-2026-02-17
     description: Add StatsSection.tsx to project-structure-boundaries.md for FR42-46 overview/ subfolder
+
+  # Epic 4 process improvements
+  e4-p1-error-pipeline-standard:
+    status: pending
+    owner: Charlie (Senior Dev)
+    priority: high
+    source: epic-4-retro-2026-03-02
+    description: Establish error pipeline standard — all error handlers must include Sentry integration, not just console logging
+  e4-p2-channel-lifecycle-review-checklist:
+    status: pending
+    owner: Dana (QA)
+    priority: medium
+    source: epic-4-retro-2026-03-02
+    description: Add channel lifecycle to code review checklist — every Supabase Realtime operation must have error handling
+  e4-p3-external-llm-review-standard:
+    status: pending
+    owner: Bob (SM)
+    priority: medium
+    source: epic-4-retro-2026-03-02
+    description: External LLM code review as standard practice — run at least once per epic on the final PR
