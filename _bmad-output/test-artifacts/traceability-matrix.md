@@ -23,7 +23,7 @@ inputDocuments:
 
 **Epic:** Epic 4 — Together Mode — Synchronized Reading (Stories 4.1, 4.2, 4.3)
 **Date:** 2026-03-03
-**Evaluator:** TEA Agent (automated)
+**Evaluator:** Sallvain (TEA workflow, agent-assisted)
 
 ---
 

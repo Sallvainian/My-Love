@@ -6,9 +6,9 @@ The following secrets must be configured in **GitHub → Repository Settings →
 
 ### Currently Required
 
-| Secret | Used By | Required? | Notes |
-|--------|---------|-----------|-------|
-| _(none)_ | — | — | The pipeline uses local Supabase; no external secrets needed for tests |
+| Secret   | Used By | Required? | Notes                                                                  |
+| -------- | ------- | --------- | ---------------------------------------------------------------------- |
+| _(none)_ | —       | —         | The pipeline uses local Supabase; no external secrets needed for tests |
 
 ### Supabase Local Setup
 

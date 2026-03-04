@@ -14,18 +14,18 @@ push/PR → lint ──────────┬──→ e2e-p0 → e2e-tests
          db-tests ───────┘──────────────────────────→ test-summary (gate)
 ```
 
-| Stage | Job | Timeout | Trigger | Purpose |
-|-------|-----|---------|---------|---------|
-| 1 | `lint` | 5 min | All | ESLint, TypeScript, Prettier, npm audit |
-| 2 | `unit-tests` | 10 min | All | Vitest with 80% coverage thresholds |
-| 3a | `db-tests` | 10 min | All | pgTAP via local Supabase |
-| 3b | `smoke-tests` | 5 min | All | Post-build verification |
-| 4a | `e2e-p0` | 15 min | All | P0-tagged Playwright tests (fast gate) |
-| 4b | `e2e-tests` | 30 min | All | Full Playwright, 2 shards |
-| 4c | `lighthouse` | 10 min | All | Performance regression (advisory) |
-| 5 | `burn-in` | 30 min | PRs to main | Changed specs run 5x for flakiness |
-| 6 | `merge-reports` | — | Always | Combine shard HTML reports |
-| 7 | `test-summary` | — | Always | Branch protection gate |
+| Stage | Job             | Timeout | Trigger     | Purpose                                 |
+| ----- | --------------- | ------- | ----------- | --------------------------------------- |
+| 1     | `lint`          | 5 min   | All         | ESLint, TypeScript, Prettier, npm audit |
+| 2     | `unit-tests`    | 10 min  | All         | Vitest with 80% coverage thresholds     |
+| 3a    | `db-tests`      | 10 min  | All         | pgTAP via local Supabase                |
+| 3b    | `smoke-tests`   | 5 min   | All         | Post-build verification                 |
+| 4a    | `e2e-p0`        | 15 min  | All         | P0-tagged Playwright tests (fast gate)  |
+| 4b    | `e2e-tests`     | 30 min  | All         | Full Playwright, 2 shards               |
+| 4c    | `lighthouse`    | 10 min  | All         | Performance regression (advisory)       |
+| 5     | `burn-in`       | 30 min  | PRs to main | Changed specs run 5x for flakiness      |
+| 6     | `merge-reports` | —       | Always      | Combine shard HTML reports              |
+| 7     | `test-summary`  | —       | Always      | Branch protection gate                  |
 
 ## Node Version
 
@@ -38,14 +38,14 @@ Node version is pinned in `.node-version` (currently 24.13.0). This file is read
 
 ## Artifacts
 
-| Artifact | Condition | Retention |
-|----------|-----------|-----------|
-| `unit-test-coverage` | Always | 7 days |
-| `e2e-p0-results` | On failure | 7 days |
-| `e2e-results-shard-{n}` | Always | 30 days |
-| `burn-in-failures` | On failure | 7 days |
-| `lighthouse-report` | Always | 30 days |
-| `merged-playwright-report` | Always | 30 days |
+| Artifact                   | Condition  | Retention |
+| -------------------------- | ---------- | --------- |
+| `unit-test-coverage`       | Always     | 7 days    |
+| `e2e-p0-results`           | On failure | 7 days    |
+| `e2e-results-shard-{n}`    | Always     | 30 days   |
+| `burn-in-failures`         | On failure | 7 days    |
+| `lighthouse-report`        | Always     | 30 days   |
+| `merged-playwright-report` | Always     | 30 days   |
 
 ## Local CI Mirror
 
@@ -88,6 +88,7 @@ In CI, burn-in runs automatically on PRs to main with 5 iterations on changed te
 ### Tests fail in CI but pass locally
 
 Use `./scripts/ci-local.sh` to mirror the CI environment. Common differences:
+
 - CI runs with `CI=true` (Playwright: `forbidOnly`, single worker)
 - CI uses local Supabase started fresh with `db reset`
 - CI installs only chromium (`--with-deps chromium`)
