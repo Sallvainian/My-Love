@@ -18,10 +18,14 @@ import {
   SeedResult,
 } from '../factories';
 import { navigateToTogetherRoleSelection } from '../helpers/scripture-lobby';
+import {
+  getAuthToken,
+  getStorageStatePath,
+} from '@seontechnologies/playwright-utils/auth-session';
 
 // Import the fixture files that provide our deps so TypeScript knows the types
 import { test as customFixtures } from './index';
-import { test as workerAuthFixture } from './worker-auth';
+import { test as authFixture } from './auth';
 
 export type TogetherModeContext = {
   /** Seed result — has test_user1_id, test_user2_id, session_ids */
@@ -47,11 +51,14 @@ type TogetherModeFixtures = {
   togetherMode: TogetherModeContext;
 };
 
-// Build a base that already has supabaseAdmin and partnerStorageStatePath
-const togetherModeBase = mergeTests(customFixtures, workerAuthFixture);
+// Build a base that already has supabaseAdmin and auth fixtures
+const togetherModeBase = mergeTests(customFixtures, authFixture);
 
 export const test = togetherModeBase.extend<TogetherModeFixtures>({
-  togetherMode: async ({ page, browser, supabaseAdmin, partnerStorageStatePath }, use) => {
+  togetherMode: async (
+    { page, browser, supabaseAdmin, partnerUserIdentifier, request },
+    use
+  ) => {
     // 1. Seed test data
     const seed = await createTestSession(supabaseAdmin, {
       sessionCount: 1,
@@ -80,10 +87,19 @@ export const test = togetherModeBase.extend<TogetherModeFixtures>({
     const uiSessionA = await navigateToTogetherRoleSelection(page);
     if (uiSessionA) sessionIdsToClean.push(uiSessionA);
 
-    // 7. Create partner browser context
+    // 7. Ensure partner auth token exists on disk, then create partner context
+    await getAuthToken(request, {
+      environment: 'local',
+      userIdentifier: partnerUserIdentifier,
+    });
+    const partnerStoragePath = getStorageStatePath({
+      environment: 'local',
+      userIdentifier: partnerUserIdentifier,
+    });
+
     const baseURL = new URL(page.url()).origin;
     const partnerContext = await browser.newContext({
-      storageState: partnerStorageStatePath,
+      storageState: partnerStoragePath,
       baseURL,
     });
     const partnerPage = await partnerContext.newPage();
