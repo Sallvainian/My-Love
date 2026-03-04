@@ -55,7 +55,7 @@ test.describe('Scripture Session - Save & Resume', () => {
       // GIVEN: User is in a solo session at step 5
       await startSoloSession(page);
 
-      // Advance to step 5 (4 full verse→reflection cycles)
+      // Advance to step 5 (4 step advances)
       for (let i = 0; i < 4; i++) {
         await advanceOneStep(page);
       }

@@ -347,16 +347,17 @@ export async function startSoloSession(page: Page): Promise<string> {
  * @param page - Playwright page
  */
 export async function advanceOneStep(page: Page) {
-  await page.getByTestId('scripture-next-verse-button').click();
-
-  // Wait for step advance to persist
-  await page.waitForResponse(
+  // Intercept-before-click pattern to avoid race conditions
+  const patchResponse = page.waitForResponse(
     (resp) =>
       resp.url().includes('/rest/v1/scripture_sessions') &&
       resp.request().method() === 'PATCH' &&
       resp.status() >= 200 &&
       resp.status() < 300
   );
+
+  await page.getByTestId('scripture-next-verse-button').click();
+  await patchResponse;
 
   // Wait for next verse screen to appear
   await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
