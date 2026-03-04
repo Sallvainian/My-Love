@@ -3,11 +3,6 @@
  *
  * Reusable helpers for E2E tests. Import from this file
  * to avoid duplicating navigation and session setup logic.
- *
- * IMPORTANT: The scripture reading flow per-step is:
- *   verse screen → (click "Next Verse") → reflection screen → (rate + click Continue) → next verse screen
- * "Next Verse" does NOT advance the step directly — it transitions to the reflection sub-view.
- * Only submitting the reflection (rating + Continue) advances the step.
  */
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -345,33 +340,23 @@ export async function startSoloSession(page: Page): Promise<string> {
 }
 
 /**
- * Advance one full step in the scripture reading flow.
+ * Advance one step in the scripture reading flow.
  *
- * The flow is: verse → (click Next Verse) → reflection → (rate + Continue) → next verse.
- * This helper completes one full cycle: clicks Next Verse, rates, and submits.
+ * Clicks Next Verse and waits for the next verse to appear.
  *
  * @param page - Playwright page
- * @param rating - Rating to select (1-5), defaults to 3
  */
-export async function advanceOneStep(page: Page, rating: number = 3) {
-  // Click Next Verse → transitions to reflection sub-view
+export async function advanceOneStep(page: Page) {
   await page.getByTestId('scripture-next-verse-button').click();
 
-  // Wait for reflection screen
-  await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
-
-  // Select rating
-  await page.getByTestId(`scripture-rating-${rating}`).click();
-
-  // Wait for reflection submission to complete
-  const responsePromise = page.waitForResponse(
+  // Wait for step advance to persist
+  await page.waitForResponse(
     (resp) =>
-      resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+      resp.url().includes('/rest/v1/scripture_sessions') &&
+      resp.request().method() === 'PATCH' &&
+      resp.status() >= 200 &&
+      resp.status() < 300
   );
-
-  await page.getByTestId('scripture-reflection-continue').click();
-
-  await responsePromise;
 
   // Wait for next verse screen to appear
   await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
@@ -380,7 +365,7 @@ export async function advanceOneStep(page: Page, rating: number = 3) {
 /**
  * Complete all 17 scripture steps to reach the reflection summary screen.
  *
- * Navigates through start → solo → 17 verse/reflection cycles.
+ * Navigates through start → solo → 17 verses via Next Verse.
  * Optionally bookmarks specific steps along the way.
  *
  * @param page - Playwright page
@@ -408,25 +393,22 @@ export async function completeAllStepsToReflectionSummary(
       );
     }
 
-    // Advance to reflection screen
+    // Click Next Verse to advance
     await page.getByTestId('scripture-next-verse-button').click();
-    await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
 
-    // Select a rating and submit reflection
-    await page.getByTestId('scripture-rating-3').click();
-
-    // Wait for reflection submission to complete
-    const responsePromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
-    );
-
-    await page.getByTestId('scripture-reflection-continue').click();
-
-    await responsePromise;
+    if (step < 16) {
+      // Wait for step advance to persist
+      await page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.request().method() === 'PATCH' &&
+          resp.status() >= 200 &&
+          resp.status() < 300
+      );
+    }
   }
 
-  // After step 17 (index 16) reflection, the reflection summary should appear
+  // After step 17 (index 16), the completion/reflection summary should appear
   return sessionId;
 }
 

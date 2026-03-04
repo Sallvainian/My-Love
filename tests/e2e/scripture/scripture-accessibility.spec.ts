@@ -19,7 +19,7 @@
  * NOTE: exit-button has aria-label="Exit reading".
  * NOTE: view-response-button and next-verse-button have NO explicit aria-label
  *       — they use visible button text ("View Response", "Next Verse").
- * NOTE: "Next Verse" transitions to the reflection sub-view, NOT directly to the next verse.
+ * NOTE: "Next Verse" advances directly to the next verse.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { startSoloSession } from '../../support/helpers';
@@ -74,9 +74,8 @@ test.describe('Scripture Accessibility', () => {
       // WHEN: User presses Space
       await page.keyboard.press('Space');
 
-      // THEN: Transitions to reflection sub-view (NOT directly to verse 2)
-      // The per-verse reflection flow is: verse → (Next Verse) → reflection → (rate + Continue)
-      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
+      // THEN: Advances directly to verse 2
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
     });
 
     test('should have no keyboard traps', async ({ page, interceptNetworkCall }) => {
@@ -141,20 +140,18 @@ test.describe('Scripture Accessibility', () => {
       const liveRegion = page.getByTestId('sr-announcer');
       await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
 
-      // WHEN: User advances through full verse→reflection→continue cycle
+      // WHEN: User clicks Next Verse to advance to verse 2
       await page.getByTestId('scripture-next-verse-button').click();
-      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
-      await page.getByTestId('scripture-rating-3').click();
 
-      const reflectionResponse = page.waitForResponse(
+      await page.waitForResponse(
         (response) =>
-          response.url().includes('/rest/v1/rpc/scripture_submit_reflection') &&
-          response.status() === 200
+          response.url().includes('/rest/v1/scripture_sessions') &&
+          response.request().method() === 'PATCH' &&
+          response.status() >= 200 &&
+          response.status() < 300
       );
-      await page.getByTestId('scripture-reflection-continue').click();
-      await reflectionResponse;
 
-      // THEN: Live region announces the transition after completing the step
+      // THEN: Live region announces the transition
       await expect(liveRegion).toContainText(/verse 2/i);
     });
   });
@@ -184,24 +181,22 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-005/P2-006: Focus management after transitions', () => {
-    test('should manage focus after navigating to reflection sub-view', async ({ page }) => {
+    test('should manage focus after Next Verse advances step', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
-      // WHEN: User clicks Next Verse (transitions to reflection sub-view)
+      // WHEN: User clicks Next Verse (advances to verse 2)
       await page.getByTestId('scripture-next-verse-button').click();
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
-      // THEN: Reflection screen appears
-      await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
-
-      // AND: Focus has moved to an element within the reflection screen
+      // THEN: Focus has moved to an element within the verse screen
       const focusedElement = await page.evaluate(
         () =>
           document.activeElement?.getAttribute('data-testid') ||
           document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid') ||
           document.activeElement?.tagName
       );
-      // Focus should be on or within the reflection screen (not stuck on a hidden button)
+      // Focus should be on or within the verse screen (not stuck on a hidden button)
       expect(focusedElement).toBeTruthy();
     });
 

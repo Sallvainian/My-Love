@@ -128,7 +128,7 @@ tests/
 │   │   ├── index.ts                # Generic utilities (waitFor, getTestId, expectToast, retry)
 │   │   ├── supabase.ts             # Supabase admin client, token acquisition
 │   │   └── scripture-lobby.ts      # Together mode lobby navigation helpers
-│   └── helpers.ts                  # Scripture flow helpers (startSoloSession, advanceOneStep)
+│   └── helpers.ts                  # Scripture flow helpers (startSoloSession, advanceOneStep, submitReflectionSummary)
 ├── e2e-archive/                    # Archived/superseded specs
 ├── setup.ts                        # Vitest setup (browser API mocks)
 └── README.md
