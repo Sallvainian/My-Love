@@ -23,6 +23,10 @@ import {
   reconnectPartnerAndLoadSession,
 } from '../../support/helpers/scripture-together';
 import { cleanupTestSession } from '../../support/factories';
+import {
+  getAuthToken,
+  getStorageStatePath,
+} from '@seontechnologies/playwright-utils/auth-session';
 
 // ---------------------------------------------------------------------------
 // Timeout constants
@@ -38,10 +42,21 @@ const DISCONNECTION_PHASE_B_TIMEOUT_MS = 35_000; // Phase B starts at 30s elapse
 async function createPartnerContext(
   browser: import('@playwright/test').Browser,
   originPage: import('@playwright/test').Page,
-  partnerStorageStatePath: string
+  request: import('@playwright/test').APIRequestContext,
+  partnerUserIdentifier: string
 ) {
+  // Ensure partner token exists on disk
+  await getAuthToken(request, {
+    environment: 'local',
+    userIdentifier: partnerUserIdentifier,
+  });
+  const partnerStoragePath = getStorageStatePath({
+    environment: 'local',
+    userIdentifier: partnerUserIdentifier,
+  });
+
   const baseURL = new URL(originPage.url()).origin;
-  const context = await browser.newContext({ storageState: partnerStorageStatePath, baseURL });
+  const context = await browser.newContext({ storageState: partnerStoragePath, baseURL });
   const page = await context.newPage();
   return { context, page };
 }
@@ -55,7 +70,8 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     page,
     browser,
     supabaseAdmin,
-    partnerStorageStatePath,
+    partnerUserIdentifier,
+    request,
   }) => {
     test.setTimeout(120_000);
     const sessionIdsToClean = new Set<string>();
@@ -65,7 +81,7 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     sessionIdsToClean.add(primarySessionId);
 
     // GIVEN: User B (partner) joins and selects Responder
-    const partner = await createPartnerContext(browser, page, partnerStorageStatePath);
+    const partner = await createPartnerContext(browser, page, request, partnerUserIdentifier);
 
     try {
       const partnerSessionId = await startTogetherSessionForRole(
@@ -160,7 +176,8 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     page,
     browser,
     supabaseAdmin,
-    partnerStorageStatePath,
+    partnerUserIdentifier,
+    request,
   }) => {
     test.setTimeout(120_000);
     const sessionIdsToClean = new Set<string>();
@@ -169,7 +186,7 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
-    const partner = await createPartnerContext(browser, page, partnerStorageStatePath);
+    const partner = await createPartnerContext(browser, page, request, partnerUserIdentifier);
 
     try {
       const partnerSessionId = await startTogetherSessionForRole(
@@ -259,7 +276,8 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     page,
     browser,
     supabaseAdmin,
-    partnerStorageStatePath,
+    partnerUserIdentifier,
+    request,
   }) => {
     test.setTimeout(120_000);
     const sessionIdsToClean = new Set<string>();
@@ -268,7 +286,7 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
-    const partner = await createPartnerContext(browser, page, partnerStorageStatePath);
+    const partner = await createPartnerContext(browser, page, request, partnerUserIdentifier);
 
     try {
       const partnerSessionId = await startTogetherSessionForRole(
