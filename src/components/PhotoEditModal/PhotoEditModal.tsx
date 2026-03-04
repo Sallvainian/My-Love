@@ -103,7 +103,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       scheduleUrlUpdate(objectUrl);
       return () => {
         cancelled = true;
-        URL.revokeObjectURL(objectUrl);
+        URL.revokeObjectURL(objectUrl!);
       };
     }
 
