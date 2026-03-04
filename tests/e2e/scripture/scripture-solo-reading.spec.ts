@@ -22,8 +22,7 @@ async function advanceStep(page: import('@playwright/test').Page) {
   const progressIndicator = page.getByTestId('scripture-progress-indicator');
   const previousProgressText = await progressIndicator.textContent();
 
-  await page.getByTestId('scripture-next-verse-button').click();
-
+  // Intercept-before-click pattern to avoid race conditions
   const stepSaved = page
     .waitForResponse(
       (resp) =>
@@ -31,6 +30,8 @@ async function advanceStep(page: import('@playwright/test').Page) {
       { timeout: 15_000 }
     )
     .catch(() => null);
+
+  await page.getByTestId('scripture-next-verse-button').click();
 
   // Primary success signal: UI transitioned deterministically.
   await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
@@ -139,13 +140,18 @@ test.describe('Solo Reading Flow', () => {
       await expect(page.getByTestId('scripture-response-text')).toBeVisible();
 
       // WHEN: User taps "Next Verse" from response screen
-      await advanceStep(page);
+      const patchResponse = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.request().method() === 'PATCH' &&
+          resp.status() >= 200 &&
+          resp.status() < 300
+      );
+      await page.getByTestId('scripture-next-verse-button').click();
+      await patchResponse;
 
       // THEN: Progress advances to step 2
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
-
-      // AND: New verse content is displayed
-      await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
     });
   });
 

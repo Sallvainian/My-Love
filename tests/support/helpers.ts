@@ -393,19 +393,17 @@ export async function completeAllStepsToReflectionSummary(
       );
     }
 
-    // Click Next Verse to advance
-    await page.getByTestId('scripture-next-verse-button').click();
+    // Click Next Verse to advance (intercept-before-click pattern)
+    const patchResponse = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/rest/v1/scripture_sessions') &&
+        resp.request().method() === 'PATCH' &&
+        resp.status() >= 200 &&
+        resp.status() < 300
+    );
 
-    if (step < 16) {
-      // Wait for step advance to persist
-      await page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.request().method() === 'PATCH' &&
-          resp.status() >= 200 &&
-          resp.status() < 300
-      );
-    }
+    await page.getByTestId('scripture-next-verse-button').click();
+    await patchResponse;
   }
 
   // After step 17 (index 16), the completion/reflection summary should appear
