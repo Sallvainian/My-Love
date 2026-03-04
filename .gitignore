@@ -32,6 +32,7 @@ fnox.local.toml
 tests/e2e/.auth/storageState.json
 tests/e2e/.auth/auth-failure.png
 tests/.auth/
+/.auth/
 
 # Editor directories and files
 .vscode/*

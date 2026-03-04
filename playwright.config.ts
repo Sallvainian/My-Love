@@ -75,6 +75,7 @@ if (!process.env.SUPABASE_URL) {
  * See tests/support/merged-fixtures.ts for fixture composition.
  */
 export default defineConfig({
+  globalSetup: './tests/support/auth/global-setup.ts',
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -105,24 +106,16 @@ export default defineConfig({
   outputDir: 'test-results',
 
   projects: [
-    // Auth setup — runs once, saves storageState for E2E tests
-    {
-      name: 'setup',
-      testMatch: /auth-setup\.ts/,
-      testDir: './tests/support',
-    },
     {
       name: 'chromium',
       testDir: './tests/e2e',
       use: {
         ...devices['Desktop Chrome'],
       },
-      dependencies: ['setup'],
     },
     {
       name: 'api',
       testDir: './tests/api',
-      dependencies: ['setup'],
     },
     // Uncomment for cross-browser testing
     // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
