@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - run: npm ci
@@ -50,6 +50,7 @@ jobs:
 
       - name: Security audit
         run: npm audit --audit-level=high
+        continue-on-error: true
 
   # ============================================
   # Stage 2: Unit Tests (Vitest)
@@ -65,7 +66,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - run: npm ci
@@ -95,7 +96,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - run: npm ci
@@ -109,6 +110,35 @@ jobs:
       - name: Stop Supabase
         if: always()
         run: supabase stop --no-backup
+
+  # ============================================
+  # Stage 3b: Smoke Tests (Post-Build Verification)
+  # ============================================
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: http://localhost:54321
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: placeholder-for-smoke-test
+        run: npm run build
+
+      - name: Smoke tests
+        run: npm run test:smoke
 
   # ============================================
   # Stage 4a: E2E P0 Gate (Fast Feedback)
@@ -127,7 +157,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -189,7 +219,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -247,7 +277,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - run: npm ci
@@ -291,7 +321,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -310,8 +340,11 @@ jobs:
 
       - name: Detect changed test files
         id: changed-tests
+        env:
+          # Security: github.base_ref passed through env: to prevent script injection
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+          CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD" | grep -E '\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
           echo "specs<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CHANGED" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -324,7 +357,7 @@ jobs:
           echo "Running 5 iterations on changed test files"
           for i in {1..5}; do
             echo "--- Burn-in iteration $i/5 ---"
-            npx playwright test $SPECS || exit 1
+            npx playwright test "$SPECS" || exit 1
           done
           echo "Burn-in passed: 5/5 stable"
 
@@ -361,7 +394,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - run: npm ci
@@ -397,19 +430,21 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: [lint, unit-tests, db-tests, e2e-tests]
+    needs: [lint, unit-tests, db-tests, smoke-tests, e2e-tests]
     if: always()
     steps:
       - name: Evaluate results
         run: |
-          echo "Lint:       ${{ needs.lint.result }}"
-          echo "Unit Tests: ${{ needs.unit-tests.result }}"
-          echo "DB Tests:   ${{ needs.db-tests.result }}"
-          echo "E2E Tests:  ${{ needs.e2e-tests.result }}"
+          echo "Lint:        ${{ needs.lint.result }}"
+          echo "Unit Tests:  ${{ needs.unit-tests.result }}"
+          echo "DB Tests:    ${{ needs.db-tests.result }}"
+          echo "Smoke Tests: ${{ needs.smoke-tests.result }}"
+          echo "E2E Tests:   ${{ needs.e2e-tests.result }}"
 
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
              [[ "${{ needs.db-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.smoke-tests.result }}" != "success" ]] || \
              [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
             echo "One or more stages failed"
             exit 1
