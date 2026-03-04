@@ -1,13 +1,9 @@
 /**
  * P0/P1 API: Scripture Reading - Reflection & Bookmark API Tests
  *
- * Story 2.1: Per-Step Reflection System
- * Tests reflection upsert idempotency, field persistence, and bookmark toggle.
+ * Tests reflection RPC upsert idempotency, field persistence, and bookmark toggle.
  *
- * Test IDs: 2.1-API-001 (P0), plus supporting P0/P1 scenarios
  * Risk Links: R2-002 (idempotency constraint), R2-005 (bookmark toggle)
- *
- * TDD Phase: GREEN — all tests activated, implementation complete
  */
 import { test, expect } from '../support/merged-fixtures';
 import { createTestSession, cleanupTestSession } from '../support/factories';
@@ -30,12 +26,12 @@ function generateRating(): number {
   return faker.number.int({ min: 1, max: 5 });
 }
 
-test.describe('Scripture Reflection API - Story 2.1', () => {
+test.describe('Scripture Reflection API - RPC Validation', () => {
   // ============================================
-  // 2.1-API-001: Reflection Upsert Idempotency
+  // Reflection Upsert Idempotency
   // Risk: R2-002 (Score: 6)
   // ============================================
-  test.describe('2.1-API-001: Reflection upsert idempotency', () => {
+  test.describe('Reflection upsert idempotency', () => {
     test('[P0] duplicate reflection submit returns success with updated data', async ({
       supabaseAdmin,
       apiRequest,
@@ -423,7 +419,7 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       }
     });
 
-    test('[P1] session-level reflection (stepIndex 17) coexists with per-step reflections under unique constraint', async ({
+    test('[P1] reflections at different step indices coexist under unique constraint', async ({
       supabaseAdmin,
       apiRequest,
     }) => {
@@ -435,9 +431,9 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       const userId = seedResult.test_user1_id;
       const userToken = await getUserAccessToken(supabaseAdmin, userId);
 
-      const perStepIndex = 2;
-      const perStepRating = generateRating();
-      const perStepNote = generateReflectionNote('per-step');
+      const firstStepIndex = 2;
+      const firstStepRating = generateRating();
+      const firstStepNote = generateReflectionNote('step-2');
 
       const sessionStepIndex = 17; // MAX_STEPS sentinel
       const sessionRating = generateRating();
@@ -451,8 +447,8 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
       const anonKey = process.env.SUPABASE_ANON_KEY!;
 
       try {
-        // WHEN: User submits a per-step reflection for step 2
-        const perStepResponse = await apiRequest({
+        // WHEN: User submits a reflection for step 2
+        const firstStepResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_submit_reflection',
           baseUrl: baseURL,
@@ -463,16 +459,16 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
           },
           body: {
             p_session_id: sessionId,
-            p_step_index: perStepIndex,
-            p_rating: perStepRating,
-            p_notes: perStepNote,
+            p_step_index: firstStepIndex,
+            p_rating: firstStepRating,
+            p_notes: firstStepNote,
             p_is_shared: false,
           },
           responseSchema: SupabaseReflectionSchema,
         });
 
-        expect(perStepResponse.status).toBe(200);
-        expect(perStepResponse.body).toBeTruthy();
+        expect(firstStepResponse.status).toBe(200);
+        expect(firstStepResponse.body).toBeTruthy();
 
         // AND: User submits a session-level reflection with stepIndex 17
         const sessionResponse = await apiRequest({
@@ -509,11 +505,11 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         expect(queryError).toBeNull();
         expect(allReflections).toBeTruthy();
 
-        // AND: Per-step reflection at step 2 is intact
-        const perStepRow = allReflections!.find((r) => r.step_index === perStepIndex);
-        expect(perStepRow).toBeTruthy();
-        expect(perStepRow!.rating).toBe(perStepRating);
-        expect(perStepRow!.notes).toBe(perStepNote);
+        // AND: Reflection at step 2 is intact
+        const firstStepRow = allReflections!.find((r) => r.step_index === firstStepIndex);
+        expect(firstStepRow).toBeTruthy();
+        expect(firstStepRow!.rating).toBe(firstStepRating);
+        expect(firstStepRow!.notes).toBe(firstStepNote);
 
         // AND: Session-level reflection at step 17 is intact
         const sessionRow = allReflections!.find((r) => r.step_index === sessionStepIndex);
@@ -523,10 +519,10 @@ test.describe('Scripture Reflection API - Story 2.2', () => {
         expect(sessionRow!.notes).toBe(sessionJsonNotes);
 
         // AND: The two reflections have different IDs (separate rows)
-        expect(perStepRow!.id).not.toBe(sessionRow!.id);
+        expect(firstStepRow!.id).not.toBe(sessionRow!.id);
 
         // AND: Unique constraint allows both because step_index differs (2 vs 17)
-        expect(perStepResponse.body.step_index).toBe(2);
+        expect(firstStepResponse.body.step_index).toBe(2);
         expect(sessionResponse.body.step_index).toBe(17);
       } finally {
         // Cleanup

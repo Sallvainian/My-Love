@@ -32,13 +32,12 @@ export type ScriptureNavFixture = {
   startSoloSession: () => Promise<string>;
 
   /**
-   * Advance one full step (verse → reflection → next verse).
-   * @param rating - Rating to select (1-5), defaults to 3
+   * Advance to the next verse by clicking Next Verse.
    */
-  advanceOneStep: (rating?: number) => Promise<void>;
+  advanceOneStep: () => Promise<void>;
 
   /**
-   * Complete all 17 steps to reach reflection summary.
+   * Complete all 17 steps (clicking Next Verse) to reach reflection summary.
    * @param bookmarkSteps - Set of step indices (0-16) to bookmark
    * @returns Session ID
    */
@@ -68,7 +67,7 @@ export const test = base.extend<ScriptureNavFixtures>({
     const fixture: ScriptureNavFixture = {
       ensureOverview: async () => ensureScriptureOverview(page),
       startSoloSession: async () => startSoloSession(page),
-      advanceOneStep: async (rating = 3) => advanceOneStep(page, rating),
+      advanceOneStep: async () => advanceOneStep(page),
       completeAllSteps: async (bookmarkSteps = new Set([0, 5, 12])) =>
         completeAllStepsToReflectionSummary(page, bookmarkSteps),
       submitSummary: async () => submitReflectionSummary(page),
