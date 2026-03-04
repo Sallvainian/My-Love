@@ -132,7 +132,10 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-003: aria-live region for verse transitions', () => {
-    test('should announce verse transitions via aria-live polite', async ({ page }) => {
+    test('should announce verse transitions via aria-live polite', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -141,15 +144,13 @@ test.describe('Scripture Accessibility', () => {
       await expect(liveRegion).toHaveAttribute('aria-live', 'polite');
 
       // WHEN: User clicks Next Verse to advance to verse 2
-      await page.getByTestId('scripture-next-verse-button').click();
+      const stepAdvance = interceptNetworkCall({
+        method: 'PATCH',
+        url: '**/rest/v1/scripture_sessions*',
+      });
 
-      await page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/scripture_sessions') &&
-          response.request().method() === 'PATCH' &&
-          response.status() >= 200 &&
-          response.status() < 300
-      );
+      await page.getByTestId('scripture-next-verse-button').click();
+      await stepAdvance;
 
       // THEN: Live region announces the transition
       await expect(liveRegion).toContainText(/verse 2/i);
