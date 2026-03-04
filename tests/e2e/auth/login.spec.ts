@@ -9,7 +9,7 @@ import { test, expect } from '../../support/merged-fixtures';
 test.describe('Login Flow', () => {
   // Auth tests must run WITHOUT the shared authenticated storage state
   // so they can see the login screen (unauthenticated).
-  test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ authSessionEnabled: false });
 
   test('[P0] should display login screen when not authenticated', async ({ page }) => {
     // GIVEN: User is not authenticated

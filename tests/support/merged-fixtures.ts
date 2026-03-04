@@ -19,7 +19,7 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
 import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
-import { test as workerAuthFixture } from './fixtures/worker-auth';
+import { test as authFixture } from './fixtures/auth';
 import { test as togetherModeFixture } from './fixtures/together-mode';
 
 /**
@@ -48,10 +48,8 @@ const networkMonitorFixture = base.extend(
  * - networkErrorMonitor: Automatic HTTP 4xx/5xx detection
  * - Plus any custom fixtures from ./fixtures
  *
- * NOTE: Auth fixtures (authToken/authOptions) require a custom auth provider.
- * To add auth support, see:
- *   - @seontechnologies/playwright-utils/auth-session documentation
- *   - Create auth-provider.ts with setAuthProvider() call
+ * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
+ * Each worker gets a unique user identity via authOptions (worker-scoped).
  */
 export const test = mergeTests(
   apiRequestFixture,
@@ -61,7 +59,7 @@ export const test = mergeTests(
   networkMonitorFixture,
   customFixtures,
   scriptureNavFixture,
-  workerAuthFixture,
+  authFixture,
   togetherModeFixture
 );
 
