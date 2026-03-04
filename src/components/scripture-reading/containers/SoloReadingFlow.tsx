@@ -34,7 +34,6 @@ import { useAutoSave } from '../../../hooks/useAutoSave';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
-import { PerStepReflection } from '../reflection/PerStepReflection';
 import { ReflectionSummary } from '../reflection/ReflectionSummary';
 import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
 import { MessageCompose } from '../reflection/MessageCompose';
@@ -52,8 +51,8 @@ const scriptureTheme = {
   surface: '#FAF5FF',
 };
 
-// Sub-view within a step: verse, response, or reflection
-type StepSubView = 'verse' | 'response' | 'reflection';
+// Sub-view within a step: verse or response
+type StepSubView = 'verse' | 'response';
 
 // Story 2.3: Sub-phase within report phase
 type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked' | 'completion-error';
@@ -589,53 +588,10 @@ export function SoloReadingFlow() {
   }, [reportSubPhase, session, reportReloadKey]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
-  // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
-  const handleNextVerse = useCallback(() => {
-    setSubView('reflection');
-  }, []);
-
-  // Story 2.1: Handle reflection submission — save reflection then advance step
-  const handleReflectionSubmit = useCallback(
-    async (rating: number, notes: string) => {
-      if (!session) return;
-
-      // Advance step first (non-blocking UX)
-      setSlideDirection('left');
-      setSubView('verse');
-
-      // Save reflection in background (non-blocking per AC)
-      void (async () => {
-        const isShared = session.mode === 'together';
-        try {
-          await scriptureReadingService.addReflection(
-            session.id,
-            session.currentStepIndex,
-            rating,
-            notes,
-            isShared
-          );
-        } catch {
-          useAppStore.setState({
-            pendingRetry: {
-              type: 'reflection',
-              attempts: 1,
-              maxAttempts: 3,
-              reflectionData: {
-                sessionId: session.id,
-                stepIndex: session.currentStepIndex,
-                rating,
-                notes,
-                isShared,
-              },
-            },
-          });
-        }
-      })();
-
-      await advanceStep();
-    },
-    [session, advanceStep]
-  );
+  const handleNextVerse = useCallback(async () => {
+    setSlideDirection('left');
+    await advanceStep();
+  }, [advanceStep]);
 
   const handleViewResponse = useCallback(() => {
     setSubView('response');
@@ -728,16 +684,6 @@ export function SoloReadingFlow() {
         setAnnouncement(`Viewing response for verse ${(session?.currentStepIndex ?? 0) + 1}`);
         focusRaf = requestAnimationFrame(() => {
           backToVerseRef.current?.focus();
-        });
-      } else if (subView === 'reflection') {
-        // Story 2.1: Focus reflection heading on transition
-        setAnnouncement('Reflect on this verse');
-        focusRaf = requestAnimationFrame(() => {
-          // Focus the reflection prompt heading via data-testid
-          const reflectionPrompt = document.querySelector<HTMLElement>(
-            '[data-testid="scripture-reflection-prompt"]'
-          );
-          reflectionPrompt?.focus();
         });
       } else if (prevSubViewRef.current === 'response') {
         setAnnouncement(`Back to verse ${(session?.currentStepIndex ?? 0) + 1}`);
@@ -1161,13 +1107,7 @@ export function SoloReadingFlow() {
               initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
               animate={subView === 'verse' ? 'center' : { opacity: 1 }}
               exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
-              transition={
-                subView === 'reflection'
-                  ? { duration: 0.4 }
-                  : subView === 'verse'
-                    ? slide
-                    : crossfade
-              }
+              transition={subView === 'verse' ? slide : crossfade}
               className="flex w-full flex-1 flex-col justify-center pb-32"
             >
               {subView === 'verse' ? (
@@ -1202,7 +1142,7 @@ export function SoloReadingFlow() {
                     </p>
                   </blockquote>
                 </div>
-              ) : subView === 'response' ? (
+              ) : (
                 /* Response Screen */
                 <div className="flex w-full flex-col space-y-6" data-testid="response-screen">
                   {/* Verse reference (context) — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
@@ -1222,11 +1162,6 @@ export function SoloReadingFlow() {
                       {currentStep.responseText}
                     </p>
                   </div>
-                </div>
-              ) : (
-                /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
-                <div data-testid="reflection-subview">
-                  <PerStepReflection onSubmit={handleReflectionSubmit} disabled={isSyncing} />
                 </div>
               )}
             </m.div>
@@ -1317,72 +1252,70 @@ export function SoloReadingFlow() {
           )}
 
           {/* Action buttons - bottom anchored for thumb-friendly access */}
-          {subView !== 'reflection' && (
-            <div className="space-y-3 pt-4">
-              {subView === 'verse' ? (
-                <>
-                  {/* View Response - secondary button */}
-                  <button
-                    onClick={handleViewResponse}
-                    className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
-                    data-testid="scripture-view-response-button"
-                    type="button"
-                  >
-                    View Response
-                  </button>
+          <div className="space-y-3 pt-4">
+            {subView === 'verse' ? (
+              <>
+                {/* View Response - secondary button */}
+                <button
+                  onClick={handleViewResponse}
+                  className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
+                  data-testid="scripture-view-response-button"
+                  type="button"
+                >
+                  View Response
+                </button>
 
-                  {/* Next Verse - primary button */}
-                  <button
-                    onClick={handleNextVerse}
-                    disabled={isNextDisabled}
-                    className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
-                    data-testid="scripture-next-verse-button"
-                    type="button"
-                  >
-                    {isLastStep ? 'Complete Reading' : 'Next Verse'}
-                  </button>
+                {/* Next Verse - primary button */}
+                <button
+                  onClick={handleNextVerse}
+                  disabled={isNextDisabled}
+                  className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+                  data-testid="scripture-next-verse-button"
+                  type="button"
+                >
+                  {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                </button>
 
-                  {/* Story 1.5: Disabled reason text (AC #5) */}
-                  {!isOnline && (
-                    <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
-                      Connect to internet to continue
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Back to Verse - secondary button */}
-                  <button
-                    ref={backToVerseRef}
-                    onClick={handleBackToVerse}
-                    className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
-                    data-testid="scripture-back-to-verse-button"
-                    type="button"
-                  >
-                    Back to Verse
-                  </button>
+                {/* Story 1.5: Disabled reason text (AC #5) */}
+                {!isOnline && (
+                  <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
+                    Connect to internet to continue
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Back to Verse - secondary button */}
+                <button
+                  ref={backToVerseRef}
+                  onClick={handleBackToVerse}
+                  className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
+                  data-testid="scripture-back-to-verse-button"
+                  type="button"
+                >
+                  Back to Verse
+                </button>
 
-                  {/* Next Verse - primary button (also available on response screen) */}
-                  <button
-                    onClick={handleNextVerse}
-                    disabled={isNextDisabled}
-                    className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
-                    data-testid="scripture-next-verse-button"
-                    type="button"
-                  >
-                    {isLastStep ? 'Complete Reading' : 'Next Verse'}
-                  </button>
+                {/* Next Verse - primary button (also available on response screen) */}
+                <button
+                  onClick={handleNextVerse}
+                  disabled={isNextDisabled}
+                  className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+                  data-testid="scripture-next-verse-button"
+                  type="button"
+                >
+                  {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                </button>
 
-                  {/* Story 1.5: Disabled reason text (AC #5) */}
-                  {!isOnline && (
-                    <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
-                      Connect to internet to continue
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                {/* Story 1.5: Disabled reason text (AC #5) */}
+                {!isOnline && (
+                  <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
+                    Connect to internet to continue
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Exit Confirmation Dialog */}
