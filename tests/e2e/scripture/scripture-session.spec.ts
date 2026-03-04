@@ -8,8 +8,6 @@
  *
  * Epic 1, Stories 1.3, 1.4
  *
- * IMPORTANT: The flow per step is: verse → (Next Verse) → reflection → (rate + Continue) → next verse.
- * "Next Verse" transitions to the reflection sub-view; the step only advances after reflection submit.
  * The exit button data-testid is "exit-button" (not "scripture-exit-button").
  * The exit dialog data-testid is "exit-confirm-dialog" (not "scripture-exit-dialog").
  */
@@ -203,14 +201,8 @@ test.describe('Scripture Session - Save & Resume', () => {
           return route.continue();
         });
 
-        // WHEN: User advances a step (complete the full verse→reflection→continue cycle)
-        // Click Next Verse → reflection screen
+        // WHEN: User advances a step by clicking Next Verse
         await page.getByTestId('scripture-next-verse-button').click();
-        await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
-
-        // Select rating and submit reflection
-        await page.getByTestId('scripture-rating-3').click();
-        await page.getByTestId('scripture-reflection-continue').click();
 
         // THEN: UI shows next step optimistically
         await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');

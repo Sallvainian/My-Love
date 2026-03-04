@@ -6,7 +6,7 @@
  * Features:
  * - Displays bookmarked verses as selectable chips (multi-select)
  * - No-bookmark fallback message
- * - Session-level rating scale (1-5) matching PerStepReflection pattern
+ * - Session-level rating scale (1-5)
  * - Optional note textarea (max 200 chars, auto-grow)
  * - Continue button: aria-disabled until requirements met
  * - Quiet validation messages
