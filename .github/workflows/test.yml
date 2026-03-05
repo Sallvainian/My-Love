@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - run: npm ci
@@ -62,7 +62,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - run: npm ci
@@ -92,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - run: npm ci
@@ -121,7 +121,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - run: npm ci
@@ -160,7 +160,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - run: npm ci
@@ -202,7 +202,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -264,7 +264,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -326,7 +326,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - name: Cache Playwright browsers
@@ -396,7 +396,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: '.mise.toml'
+          node-version: '24'
           cache: 'npm'
 
       - run: npm ci
