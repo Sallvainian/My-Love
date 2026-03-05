@@ -10,11 +10,9 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { TypedSupabaseClient } from '../factories';
-import { ensureScriptureOverview } from '../helpers';
 import {
   REALTIME_SYNC_TIMEOUT_MS,
   READY_BROADCAST_TIMEOUT_MS,
-  SESSION_CREATE_TIMEOUT_MS,
   STEP_ADVANCE_TIMEOUT_MS,
   isToggleReadyResponse,
   navigateToTogetherRoleSelection,
@@ -39,27 +37,13 @@ export async function startTogetherSessionForRole(
 
   await page.getByTestId(roleTestId).click();
 
-  // Wait for any post-role state: waiting for partner, ready button, or reading
-  await expect
-    .poll(
-      async () => {
-        const isWaiting = await page
-          .getByText(/waiting for/i)
-          .isVisible()
-          .catch(() => false);
-        const isReady = await page
-          .getByRole('button', { name: /i'?m ready/i })
-          .isVisible()
-          .catch(() => false);
-        const isReading = await page
-          .getByTestId('reading-container')
-          .isVisible()
-          .catch(() => false);
-        return isWaiting || isReady || isReading;
-      },
-      { timeout: STEP_ADVANCE_TIMEOUT_MS }
-    )
-    .toBe(true);
+  // Wait for any post-role state: waiting for partner, ready button, or reading.
+  // Uses locator.or() instead of polling .isVisible().catch() on each locator.
+  const anyPostRoleState = page
+    .getByText(/waiting for/i)
+    .or(page.getByRole('button', { name: /i'?m ready/i }))
+    .or(page.getByTestId('reading-container'));
+  await expect(anyPostRoleState).toBeVisible({ timeout: STEP_ADVANCE_TIMEOUT_MS });
 
   return sessionId;
 }

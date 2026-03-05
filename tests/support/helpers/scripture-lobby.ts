@@ -175,8 +175,9 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
   }
 
   // Wait for ALL re-render-triggering API calls to complete before interacting.
-  // Swallow rejections — stats may not fire if partner is unlinked, but the
-  // important thing is we gave the full chain time to settle.
+  // Best-effort: swallow rejections — these APIs may not fire if partner is
+  // unlinked (no couple stats) or if the user has no partner row yet. This is
+  // NOT flow control; we just need to give the render chain time to settle.
   await Promise.all([
     partnerLoaded.catch(() => {}),
     statsLoaded.catch(() => {}),

@@ -11,28 +11,6 @@ import type { Page, Locator } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 
 /**
- * Wait for a condition with polling
- * @param condition - Function that returns true when condition is met
- * @param options - Timeout and interval options
- */
-export async function waitFor(
-  condition: () => boolean | Promise<boolean>,
-  options: { timeout?: number; interval?: number } = {}
-): Promise<void> {
-  const { timeout = 10000, interval = 100 } = options;
-  const start = Date.now();
-
-  while (Date.now() - start < timeout) {
-    if (await condition()) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error(`Condition not met within ${timeout}ms`);
-}
-
-/**
  * Generate a unique test email
  */
 export function generateTestEmail(prefix = 'test'): string {
@@ -148,53 +126,3 @@ export function randomString(length = 8): string {
   return faker.string.alphanumeric(length);
 }
 
-/**
- * Sleep for a specified duration (use sparingly - prefer Playwright auto-waiting)
- * @param ms - Milliseconds to sleep
- */
-export async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Retry an async operation with exponential backoff
- * @param fn - Async function to retry
- * @param options - Retry configuration
- * @returns Result of the function
- * @example
- * const data = await retry(
- *   () => fetchData(),
- *   { maxAttempts: 3, initialDelay: 1000 }
- * );
- */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  options: {
-    maxAttempts?: number;
-    initialDelay?: number;
-    backoffMultiplier?: number;
-    maxDelay?: number;
-  } = {}
-): Promise<T> {
-  const { maxAttempts = 3, initialDelay = 1000, backoffMultiplier = 2, maxDelay = 10000 } = options;
-
-  let lastError: Error | undefined;
-  let delay = initialDelay;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error as Error;
-
-      if (attempt === maxAttempts) {
-        throw new Error(`Failed after ${maxAttempts} attempts. Last error: ${lastError.message}`);
-      }
-
-      await sleep(Math.min(delay, maxDelay));
-      delay *= backoffMultiplier;
-    }
-  }
-
-  throw lastError; // TypeScript needs this, though unreachable
-}
