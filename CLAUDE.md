@@ -53,6 +53,10 @@ npx playwright test --grep "mood tracker"
 # Database tests (pgTAP via Supabase CLI)
 npm run test:db                # supabase test db
 
+# Failure analysis (AI-friendly Markdown summary of failed tests)
+npm run test:failures          # Groups by root cause, extracts test IDs/priority/API paths
+npm run test:failures > failures-ai.md  # Save to file
+
 # Smoke tests (post-build verification)
 npm run test:smoke
 ```
