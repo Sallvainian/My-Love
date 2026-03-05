@@ -186,15 +186,15 @@ supabase/
 
 ## Planning Artifacts
 
-| Document                                                                       | Description                              | Date       |
-| ------------------------------------------------------------------------------ | ---------------------------------------- | ---------- |
-| [PRD](../_bmad-output/planning-artifacts/prd/index.md)                                         | Product Requirements Document (11 shards) | 2026-01-25 |
-| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification/index.md)               | UX Design Specification (11 shards)       | 2026-01-25 |
-| [Architecture](../_bmad-output/planning-artifacts/architecture/index.md)                       | Feature Architecture (5 shards)           | 2026-01-26 |
-| [Epics & Stories](../_bmad-output/planning-artifacts/epics/index.md)                           | Implementation breakdown (8 shards)       | 2026-01-26 |
-| [Test Design - Arch](../_bmad-output/test-design-architecture.md)              | Test architecture & risks                | 2026-01-27 |
-| [Test Design - QA](../_bmad-output/test-design-qa.md)                          | QA execution recipe                      | 2026-01-27 |
-| [Sprint Status](../_bmad-output/implementation-artifacts/sprint-status.yaml)   | Current sprint progress                  | —          |
+| Document                                                                         | Description                               | Date       |
+| -------------------------------------------------------------------------------- | ----------------------------------------- | ---------- |
+| [PRD](../_bmad-output/planning-artifacts/prd/index.md)                           | Product Requirements Document (11 shards) | 2026-01-25 |
+| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification/index.md) | UX Design Specification (11 shards)       | 2026-01-25 |
+| [Architecture](../_bmad-output/planning-artifacts/architecture/index.md)         | Feature Architecture (5 shards)           | 2026-01-26 |
+| [Epics & Stories](../_bmad-output/planning-artifacts/epics/index.md)             | Implementation breakdown (8 shards)       | 2026-01-26 |
+| [Test Design - Arch](../_bmad-output/test-design-architecture.md)                | Test architecture & risks                 | 2026-01-27 |
+| [Test Design - QA](../_bmad-output/test-design-qa.md)                            | QA execution recipe                       | 2026-01-27 |
+| [Sprint Status](../_bmad-output/implementation-artifacts/sprint-status.yaml)     | Current sprint progress                   | —          |
 
 ---
 

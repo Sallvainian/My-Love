@@ -74,9 +74,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     return null;
   }
 
-  extractCookies(
-    _tokenData: Record<string, unknown>
-  ): Array<{
+  extractCookies(_tokenData: Record<string, unknown>): Array<{
     name: string;
     value: string;
     domain?: string;

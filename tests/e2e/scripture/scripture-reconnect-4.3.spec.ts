@@ -23,10 +23,7 @@ import {
   reconnectPartnerAndLoadSession,
 } from '../../support/helpers/scripture-together';
 import { cleanupTestSession } from '../../support/factories';
-import {
-  getAuthToken,
-  getStorageStatePath,
-} from '@seontechnologies/playwright-utils/auth-session';
+import { getAuthToken, getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 
 // ---------------------------------------------------------------------------
 // Timeout constants

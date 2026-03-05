@@ -20,12 +20,12 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 
 ## Custom Enum Types
 
-| Enum                       | Values                                                              | Added In            |
-| -------------------------- | ------------------------------------------------------------------- | ------------------- |
-| `scripture_session_mode`   | `solo`, `together`                                                  | Migration 8 (01-28) |
-| `scripture_session_phase`  | `lobby`, `countdown`, `reading`, `reflection`, `report`, `complete` | Migration 8 (01-28) |
-| `scripture_session_status` | `pending`, `in_progress`, `complete`, `abandoned`, `ended_early`    | Migration 8 + 19    |
-| `scripture_session_role`   | `reader`, `responder`                                               | Migration 15 (02-20)|
+| Enum                       | Values                                                              | Added In             |
+| -------------------------- | ------------------------------------------------------------------- | -------------------- |
+| `scripture_session_mode`   | `solo`, `together`                                                  | Migration 8 (01-28)  |
+| `scripture_session_phase`  | `lobby`, `countdown`, `reading`, `reflection`, `report`, `complete` | Migration 8 (01-28)  |
+| `scripture_session_status` | `pending`, `in_progress`, `complete`, `abandoned`, `ended_early`    | Migration 8 + 19     |
+| `scripture_session_role`   | `reader`, `responder`                                               | Migration 15 (02-20) |
 
 > **Note:** The `ended_early` value was added to `scripture_session_status` in migration 19 (`20260228000001`) via `ALTER TYPE ... ADD VALUE IF NOT EXISTS`.
 
@@ -40,23 +40,23 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 
 ## RPC Functions (Summary)
 
-| Function | Security | Purpose |
-|----------|----------|---------|
-| `accept_partner_request` | DEFINER | Atomic partner linking |
-| `decline_partner_request` | DEFINER | Decline with validation |
-| `get_my_partner_id` | DEFINER | RLS recursion breaker |
-| `is_scripture_session_member` | DEFINER | RLS membership helper |
-| `sync_user_profile` | DEFINER | auth.users trigger |
-| `scripture_create_session` | DEFINER | Session creation with lobby reuse |
-| `scripture_submit_reflection` | DEFINER | Idempotent reflection upsert |
-| `scripture_seed_test_data` | DEFINER | Test data seeding with presets |
-| `scripture_get_couple_stats` | DEFINER | Couple statistics (CTE-optimized) |
-| `scripture_select_role` | INVOKER | Lobby role selection |
-| `scripture_toggle_ready` | INVOKER | Lobby ready state with countdown |
-| `scripture_convert_to_solo` | INVOKER | Convert together to solo |
-| `scripture_lock_in` | INVOKER | Synchronized reading step lock |
-| `scripture_undo_lock_in` | INVOKER | Undo step lock |
-| `scripture_end_session` | INVOKER | Graceful early termination |
+| Function                      | Security | Purpose                           |
+| ----------------------------- | -------- | --------------------------------- |
+| `accept_partner_request`      | DEFINER  | Atomic partner linking            |
+| `decline_partner_request`     | DEFINER  | Decline with validation           |
+| `get_my_partner_id`           | DEFINER  | RLS recursion breaker             |
+| `is_scripture_session_member` | DEFINER  | RLS membership helper             |
+| `sync_user_profile`           | DEFINER  | auth.users trigger                |
+| `scripture_create_session`    | DEFINER  | Session creation with lobby reuse |
+| `scripture_submit_reflection` | DEFINER  | Idempotent reflection upsert      |
+| `scripture_seed_test_data`    | DEFINER  | Test data seeding with presets    |
+| `scripture_get_couple_stats`  | DEFINER  | Couple statistics (CTE-optimized) |
+| `scripture_select_role`       | INVOKER  | Lobby role selection              |
+| `scripture_toggle_ready`      | INVOKER  | Lobby ready state with countdown  |
+| `scripture_convert_to_solo`   | INVOKER  | Convert together to solo          |
+| `scripture_lock_in`           | INVOKER  | Synchronized reading step lock    |
+| `scripture_undo_lock_in`      | INVOKER  | Undo step lock                    |
+| `scripture_end_session`       | INVOKER  | Graceful early termination        |
 
 ## Key Schema Patterns
 

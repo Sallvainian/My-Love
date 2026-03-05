@@ -108,10 +108,10 @@ Every push to `main` triggers the GitHub Actions workflow (`.github/workflows/de
 
 Configure in **Settings** → **Secrets and variables** → **Actions**:
 
-| Secret                  | Description                                 |
-| ----------------------- | ------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`    | dotenvx private key for decrypting `.env`   |
-| `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types             |
+| Secret                  | Description                               |
+| ----------------------- | ----------------------------------------- |
+| `DOTENV_PRIVATE_KEY`    | dotenvx private key for decrypting `.env` |
+| `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types           |
 
 ### GitHub Pages Setup
 

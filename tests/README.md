@@ -238,7 +238,7 @@ Use `data-testid` attributes for stability:
 
 ```tsx
 // Component
-<button data-testid="submit-button">Submit</button>
+<button data-testid="submit-button">Submit</button>;
 
 // Test — prefer getByTestId over CSS selectors
 await page.getByTestId('submit-button').click();
@@ -359,13 +359,13 @@ npm run test:ci-local          # Simulate CI locally
 
 ## Test Levels
 
-| Level | Directory | Framework | What it tests |
-|-------|-----------|-----------|---------------|
-| Unit | `tests/unit/` | Vitest + happy-dom | Pure functions, hooks, stores, services |
+| Level       | Directory            | Framework               | What it tests                                       |
+| ----------- | -------------------- | ----------------------- | --------------------------------------------------- |
+| Unit        | `tests/unit/`        | Vitest + happy-dom      | Pure functions, hooks, stores, services             |
 | Integration | `tests/integration/` | Playwright (no browser) | Supabase RPCs, cross-table operations, RLS policies |
-| API | `tests/api/` | Playwright (no browser) | REST endpoint contracts via Supabase PostgREST |
-| E2E | `tests/e2e/` | Playwright (Chromium) | Full user journeys with browser |
-| Database | `supabase/tests/` | pgTAP | SQL-level schema constraints, function correctness |
+| API         | `tests/api/`         | Playwright (no browser) | REST endpoint contracts via Supabase PostgREST      |
+| E2E         | `tests/e2e/`         | Playwright (Chromium)   | Full user journeys with browser                     |
+| Database    | `supabase/tests/`    | pgTAP                   | SQL-level schema constraints, function correctness  |
 
 ## Knowledge Base References
 

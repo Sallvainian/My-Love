@@ -107,23 +107,23 @@ Photo gallery metadata. Actual image files are stored in the `photos` Supabase S
 
 Scripture reading session state and progress tracking. Supports solo and together (partner) modes.
 
-| Column                 | Type                       | Nullable | Default             | Constraints                              |
-| ---------------------- | -------------------------- | -------- | ------------------- | ---------------------------------------- |
-| `id`                   | `uuid`                     | No       | `gen_random_uuid()` | PK                                       |
-| `mode`                 | `scripture_session_mode`   | No       | --                  | `solo` or `together`                     |
-| `user1_id`             | `uuid`                     | No       | --                  | FK to `auth.users(id)` ON DELETE CASCADE |
-| `user2_id`             | `uuid`                     | Yes      | `NULL`              | FK to `auth.users(id)` ON DELETE CASCADE |
-| `current_phase`        | `scripture_session_phase`  | No       | `'lobby'`           | Session lifecycle phase                  |
-| `current_step_index`   | `integer`                  | No       | `0`                 | Current reading step position            |
-| `status`               | `scripture_session_status` | No       | `'pending'`         | Overall session status                   |
-| `version`              | `integer`                  | No       | `1`                 | Optimistic concurrency control           |
-| `snapshot_json`        | `jsonb`                    | Yes      | `NULL`              | Arbitrary session state snapshot         |
-| `started_at`           | `timestamptz`              | No       | `now()`             |                                          |
-| `completed_at`         | `timestamptz`              | Yes      | `NULL`              |                                          |
-| `user1_role`           | `scripture_session_role`   | Yes      | `NULL`              | Role selected by user1 (reader/responder); null until selected |
-| `user2_role`           | `scripture_session_role`   | Yes      | `NULL`              | Role selected by user2 (reader/responder); null until selected |
-| `user1_ready`          | `boolean`                  | No       | `false`             | Whether user1 has toggled Ready in the lobby |
-| `user2_ready`          | `boolean`                  | No       | `false`             | Whether user2 has toggled Ready in the lobby |
+| Column                 | Type                       | Nullable | Default             | Constraints                                                                       |
+| ---------------------- | -------------------------- | -------- | ------------------- | --------------------------------------------------------------------------------- |
+| `id`                   | `uuid`                     | No       | `gen_random_uuid()` | PK                                                                                |
+| `mode`                 | `scripture_session_mode`   | No       | --                  | `solo` or `together`                                                              |
+| `user1_id`             | `uuid`                     | No       | --                  | FK to `auth.users(id)` ON DELETE CASCADE                                          |
+| `user2_id`             | `uuid`                     | Yes      | `NULL`              | FK to `auth.users(id)` ON DELETE CASCADE                                          |
+| `current_phase`        | `scripture_session_phase`  | No       | `'lobby'`           | Session lifecycle phase                                                           |
+| `current_step_index`   | `integer`                  | No       | `0`                 | Current reading step position                                                     |
+| `status`               | `scripture_session_status` | No       | `'pending'`         | Overall session status                                                            |
+| `version`              | `integer`                  | No       | `1`                 | Optimistic concurrency control                                                    |
+| `snapshot_json`        | `jsonb`                    | Yes      | `NULL`              | Arbitrary session state snapshot                                                  |
+| `started_at`           | `timestamptz`              | No       | `now()`             |                                                                                   |
+| `completed_at`         | `timestamptz`              | Yes      | `NULL`              |                                                                                   |
+| `user1_role`           | `scripture_session_role`   | Yes      | `NULL`              | Role selected by user1 (reader/responder); null until selected                    |
+| `user2_role`           | `scripture_session_role`   | Yes      | `NULL`              | Role selected by user2 (reader/responder); null until selected                    |
+| `user1_ready`          | `boolean`                  | No       | `false`             | Whether user1 has toggled Ready in the lobby                                      |
+| `user2_ready`          | `boolean`                  | No       | `false`             | Whether user2 has toggled Ready in the lobby                                      |
 | `countdown_started_at` | `timestamptz`              | Yes      | `NULL`              | Server UTC timestamp set when both users are ready; drives synchronized countdown |
 
 **Indexes:** `idx_scripture_sessions_user1` (user1_id, started_at DESC), `idx_scripture_sessions_user2` (user2_id, started_at DESC), `idx_scripture_sessions_user2_status` (user2_id, status) WHERE user2_id IS NOT NULL

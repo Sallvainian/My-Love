@@ -48,8 +48,7 @@ export const isConvertToSoloResponse = (resp: {
   request(): { method(): string };
 }): boolean =>
   (resp.url().includes('/rest/v1/rpc/scripture_convert_to_solo') ||
-    (resp.url().includes('/rest/v1/scripture_sessions') &&
-      resp.request().method() === 'PATCH')) &&
+    (resp.url().includes('/rest/v1/scripture_sessions') && resp.request().method() === 'PATCH')) &&
   resp.status() >= 200 &&
   resp.status() < 300;
 

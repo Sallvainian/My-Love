@@ -130,17 +130,17 @@ export abstract class BaseIndexedDBService<
   protected db: IDBPDatabase<DBTypes> | null = null;
   protected initPromise: Promise<void> | null = null;
 
-  async init(): Promise<void>;                            // Guard against concurrent init
-  protected abstract _doInit(): Promise<void>;            // Service-specific DB setup
-  protected abstract getStoreName(): StoreName;           // Store name for operations
+  async init(): Promise<void>; // Guard against concurrent init
+  protected abstract _doInit(): Promise<void>; // Service-specific DB setup
+  protected abstract getStoreName(): StoreName; // Store name for operations
 
-  protected async add(item: Omit<T, 'id'>): Promise<T>;  // Protected: force validation via create()
-  async get(id: number | string): Promise<T | null>;      // Returns null on not-found or error
-  async getAll(): Promise<T[]>;                           // Returns [] on error
+  protected async add(item: Omit<T, 'id'>): Promise<T>; // Protected: force validation via create()
+  async get(id: number | string): Promise<T | null>; // Returns null on not-found or error
+  async getAll(): Promise<T[]>; // Returns [] on error
   async update(id: number | string, updates: Partial<T>): Promise<void>;
-  async delete(id: number | string): Promise<void>;       // Throws on failure
-  async clear(): Promise<void>;                           // Throws on failure
-  async getPage(offset: number, limit: number): Promise<T[]>;  // Cursor-based pagination
+  async delete(id: number | string): Promise<void>; // Throws on failure
+  async clear(): Promise<void>; // Throws on failure
+  async getPage(offset: number, limit: number): Promise<T[]>; // Cursor-based pagination
   protected handleError(operation: string, error: Error): never;
   protected handleQuotaExceeded(): never;
 }
@@ -148,19 +148,19 @@ export abstract class BaseIndexedDBService<
 
 **Error strategy split:**
 
-| Operation Type | Behavior on Error | Rationale |
-|---------------|------------------|-----------|
-| Read (`get`, `getAll`, `getPage`) | Return `null` or `[]` | Graceful degradation; missing data is recoverable |
-| Write (`add`, `update`, `delete`, `clear`) | Throw | Data integrity; silent write failures cause corruption |
+| Operation Type                             | Behavior on Error     | Rationale                                              |
+| ------------------------------------------ | --------------------- | ------------------------------------------------------ |
+| Read (`get`, `getAll`, `getPage`)          | Return `null` or `[]` | Graceful degradation; missing data is recoverable      |
+| Write (`add`, `update`, `delete`, `clear`) | Throw                 | Data integrity; silent write failures cause corruption |
 
 Concrete implementations:
 
-| Service | Extends | Overrides | Extra Methods |
-|---------|---------|-----------|---------------|
-| `MoodService` | `BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods'>` | None | `create()`, `getMoodForDate()`, `getMoodsInRange()`, `getUnsyncedMoods()`, `markAsSynced()` |
-| `CustomMessageService` | `BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'>` | `getAll()` (filtering) | `create()`, `getActiveCustomMessages()`, `exportMessages()`, `importMessages()` |
-| `PhotoStorageService` | `BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'>` | `getAll()`, `getPage()`, `update()` | `create()`, `getStorageSize()`, `estimateQuotaRemaining()` |
-| `ScriptureReadingService` | `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>` | None | Session/Reflection/Bookmark/Message CRUD, cache helpers, corruption recovery |
+| Service                   | Extends                                                                        | Overrides                           | Extra Methods                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `MoodService`             | `BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods'>`                     | None                                | `create()`, `getMoodForDate()`, `getMoodsInRange()`, `getUnsyncedMoods()`, `markAsSynced()` |
+| `CustomMessageService`    | `BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'>`                    | `getAll()` (filtering)              | `create()`, `getActiveCustomMessages()`, `exportMessages()`, `importMessages()`             |
+| `PhotoStorageService`     | `BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'>`                        | `getAll()`, `getPage()`, `update()` | `create()`, `getStorageSize()`, `estimateQuotaRemaining()`                                  |
+| `ScriptureReadingService` | `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>` | None                                | Session/Reflection/Bookmark/Message CRUD, cache helpers, corruption recovery                |
 
 ## Pattern 7: Validation at Service Boundaries
 

@@ -18,10 +18,7 @@ import {
   SeedResult,
 } from '../factories';
 import { navigateToTogetherRoleSelection } from '../helpers/scripture-lobby';
-import {
-  getAuthToken,
-  getStorageStatePath,
-} from '@seontechnologies/playwright-utils/auth-session';
+import { getAuthToken, getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 
 // Import the fixture files that provide our deps so TypeScript knows the types
 import { test as customFixtures } from './index';
@@ -55,10 +52,7 @@ type TogetherModeFixtures = {
 const togetherModeBase = mergeTests(customFixtures, authFixture);
 
 export const test = togetherModeBase.extend<TogetherModeFixtures>({
-  togetherMode: async (
-    { page, browser, supabaseAdmin, partnerUserIdentifier, request },
-    use
-  ) => {
+  togetherMode: async ({ page, browser, supabaseAdmin, partnerUserIdentifier, request }, use) => {
     // 1. Seed test data
     const seed = await createTestSession(supabaseAdmin, {
       sessionCount: 1,
