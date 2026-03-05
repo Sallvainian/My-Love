@@ -1,7 +1,7 @@
 ---
 stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 'step-03-generate-tests', 'step-03c-aggregate', 'step-04-validate-and-summarize']
 lastStep: 'step-04-validate-and-summarize'
-lastSaved: '2026-03-01'
+lastSaved: '2026-03-04'
 workflowType: 'testarch-automate'
 inputDocuments:
   - '_bmad-output/test-artifacts/traceability-matrix.md'
@@ -752,3 +752,164 @@ Generated expansion tests in 5 existing files. No new files created.
 2. Update traceability matrix: `_bmad-output/test-artifacts/traceability-matrix.md` — change 4.2-AC#2 and 4.3-AC#6 from PARTIAL to FULL, update gate decision to PASS
 3. `test-review` on Stories 4.2 and 4.3 to validate expanded E2E quality
 4. NFR re-assessment if gate decision changes to PASS
+
+---
+
+## Update: 2026-03-04 (Post-Epic 4 — Standalone Coverage Expansion)
+
+- Workflow: `testarch-automate` (Standalone mode)
+- Scope: Expand test automation coverage across the codebase — critical-paths target
+
+### Step 1: Preflight & Context
+
+- **Stack**: fullstack (explicit config)
+- **Framework**: Playwright v1.58.2+ with @seontechnologies/playwright-utils v3.14.0 + Vitest v4.0.17 with happy-dom, 80% coverage thresholds
+- **Mode**: Standalone (`standalone_mode: true`)
+- **TEA Config**: `tea_use_playwright_utils: true`, `tea_use_pactjs_utils: false`, `tea_pact_mcp: none`, `tea_browser_automation: auto`
+
+**Existing test inventory:**
+- Unit: 21 files in `tests/unit/` (stores, hooks, services, utils, validation, data)
+- Component: Multiple files in `src/components/*/__tests__/`
+- E2E: 20+ files in `tests/e2e/` (auth, home, navigation, partner, notes, scripture, mood, photos, offline)
+- API: 2 files in `tests/api/`
+- Integration: 1 file in `tests/integration/`
+
+**Knowledge fragments loaded (8):**
+- Core: test-levels-framework, test-priorities-matrix, data-factories, selective-testing, ci-burn-in, test-quality
+- Playwright Utils: overview, fixtures-composition
+
+### Step 2: Identify Automation Targets
+
+**Coverage gap analysis** — 8 store slices, 10 services, 6 hooks, and 12 utils have zero test coverage. Focusing on `critical-paths` target.
+
+**Targets selected (P1 — critical path, high impact):**
+
+| # | Priority | File | LOC | Level | Justification |
+|---|----------|------|-----|-------|---------------|
+| 1 | P1 | `src/services/moodService.ts` | 270 | Unit | Core mood CRUD with IndexedDB + Zod validation. Zero tests. |
+| 2 | P1 | `src/stores/slices/moodSlice.ts` | 364 | Unit | Mood state management (add/update/load/sync). Zero tests. |
+| 3 | P1 | `src/utils/messageRotation.ts` | 174 | Unit | Deterministic daily message algo. Pure functions. Zero tests. |
+| 4 | P1 | `src/utils/messageValidation.ts` | 70 | Unit | XSS sanitization + content validation. Security boundary. |
+| 5 | P1 | `src/utils/interactionValidation.ts` | 121 | Unit | UUID + interaction type validation. Security input boundary. |
+| 6 | P1 | `src/utils/offlineErrorHandler.ts` | 225 | Unit | Offline error handling. Error boundary for all writes. |
+
+**Not in scope (P2/P3 — deferred):**
+- `notesSlice.ts` (641 LOC) — complex, needs Supabase mocking
+- `messagesSlice.ts` (547 LOC) — lower risk, read-mostly
+- `interactionsSlice.ts` (257 LOC) — simple, lower frequency
+- `photoService.ts` / `photosSlice.ts` — secondary feature
+- Hooks without tests — most are thin wrappers around slices
+
+**Test level justification:**
+- All targets are Unit level (Vitest + happy-dom)
+- Pure functions (#3-6): No mocks needed, fast, deterministic
+- Service (#1): IndexedDB via fake-indexeddb/auto (already in test setup)
+- Store slice (#2): Zustand slice testing with mocked services
+
+**Duplicate coverage avoidance:**
+- No E2E overlap — mood tracker E2E exists (`tests/e2e/mood/mood-tracker.spec.ts`) but tests UI flow, not service/store logic
+- No existing unit tests for any of these 6 targets
+
+### Step 3: Generation (Sequential Mode)
+
+**Execution mode:** Sequential (no subagent/agent-team support in this runtime)
+
+| # | File | Action | Tests | Priority |
+|---|------|--------|-------|----------|
+| 1 | `tests/unit/utils/messageRotation.test.ts` | **Created** | 35 | P1 |
+| 2 | `tests/unit/utils/messageValidation.test.ts` | **Created** | 13 | P1 |
+| 3 | `tests/unit/utils/interactionValidation.test.ts` | **Created** | 20 | P1 |
+| 4 | `tests/unit/utils/offlineErrorHandler.test.ts` | **Created** | 20 | P1 |
+| 5 | `tests/unit/services/moodService.test.ts` | **Created** | 19 | P1 |
+| 6 | `tests/unit/stores/moodSlice.test.ts` | **Created** | 21 | P1 |
+
+**Test breakdown by target:**
+
+**Target 1 — `messageRotation.ts` (35 tests):**
+- `formatDate`: 3 tests (YYYY-MM-DD format, padding, edge cases)
+- `hashDateString`: 3 tests (non-negative, deterministic, unique per date)
+- `getDailyMessage`: 5 tests (pool membership, empty pool throw, determinism, variety, default date)
+- `getMessageForDate`: 1 test (alias validation)
+- `getAvailableHistoryDays`: 4 tests (days since start, 30-day cap, config cap, undefined default)
+- `isNewDay`: 3 tests (null, today, yesterday)
+- `getDaysSinceStart`: 3 tests (today, past date, target date param)
+- `formatRelationshipDuration`: 6 tests (days, singular day, months, singular month, years+months, years)
+- Legacy functions: 7 tests (getDailyMessageId, getTodayMessage, getNextMessage, getPreviousMessage)
+
+**Target 2 — `messageValidation.ts` (13 tests):**
+- `validateMessageContent`: 6 tests (valid, empty, whitespace, over-limit, at-limit, constant export)
+- `sanitizeMessageContent`: 7 tests (plain text, HTML strips, script strip, event handler strip, nested HTML, anchor strip, empty)
+
+**Target 3 — `interactionValidation.ts` (20 tests):**
+- `isValidUUID`: 6 tests (valid, uppercase, empty, non-string, malformed, whitespace trim)
+- `isValidInteractionType`: 3 tests (poke, kiss, unknown)
+- `validatePartnerId`: 3 tests (valid, null, malformed)
+- `validateInteraction`: 4 tests (valid poke/kiss, null partner, bad type, validation order)
+- `sanitizeInput`: 3 tests (trim, truncate, empty)
+- `INTERACTION_ERRORS`: 1 test (all keys present)
+
+**Target 4 — `offlineErrorHandler.ts` (20 tests):**
+- `OfflineError`: 3 tests (default message, custom message, instanceof Error)
+- `isOfflineError`: 4 tests (instance, regular Error, duck-type, null/undefined)
+- `isOnline/isOffline`: 2 tests (online, offline via navigator.onLine)
+- `createOfflineErrorHandler`: 1 test (retry action)
+- `withOfflineCheck`: 4 tests (online exec, offline throw, operation name, error propagation)
+- `safeOfflineOperation`: 4 tests (success, offline result, error result, non-Error wrapping)
+- Constants: 2 tests
+
+**Target 5 — `moodService.ts` (19 tests):**
+- `create`: 6 tests (fields, multi-mood, note, empty note, invalid mood, long note validation)
+- `updateMood`: 4 tests (mood update, note update, not found, invalid validation)
+- `getMoodForDate`: 2 tests (found, not found)
+- `getMoodsInRange`: 2 tests (in range, empty range)
+- `getUnsyncedMoods`: 2 tests (unsynced default, empty)
+- `markAsSynced`: 2 tests (mark success, not found)
+- `getAll`: 1 test
+
+**Target 6 — `moodSlice.ts` (21 tests):**
+- Initial state: 2 tests (empty arrays, default syncStatus)
+- `addMoodEntry`: 4 tests (create+state, unauthenticated throw, update existing, sync failure grace)
+- `getMoodForDate`: 2 tests (found, not found)
+- `loadMoods`: 2 tests (load success, error grace)
+- `updateSyncStatus`: 1 test (pending count)
+- `syncPendingMoods`: 3 tests (isSyncing lifecycle, return counts, error re-throw)
+- `fetchPartnerMoods`: 5 tests (transform, offline skip, no partner, error grace, mood_type fallback)
+- `getPartnerMoodForDate`: 2 tests (found, not found)
+
+### Step 4: Validation
+
+**Test results:**
+```
+6 test files, 128 tests, 0 failures
+- messageRotation.test.ts: 35 passed
+- messageValidation.test.ts: 13 passed
+- interactionValidation.test.ts: 20 passed
+- offlineErrorHandler.test.ts: 20 passed
+- moodService.test.ts: 19 passed
+- moodSlice.test.ts: 21 passed
+```
+
+**Full test suite:** 883 passed, 1 pre-existing failure (scriptureReadingSlice.lobby.test.ts `applySessionConverted` — not related to this run)
+**TypeScript:** `tsc --noEmit` clean (0 errors)
+
+### Priority Breakdown
+
+- P0: 0 new tests (no P0 gaps identified — existing ATDD/E2E coverage is complete)
+- P1: 128 new tests (utils, service, store — all critical-path coverage)
+- P2: 0 new tests (deferred: notesSlice, messagesSlice, interactionsSlice)
+- **Total**: 128 new tests across 6 files
+- **Grand total unit tests**: ~1011 (883 existing + 128 new)
+
+### Assumptions & Risks
+
+- `moodService.test.ts` uses `fake-indexeddb/auto` (from test setup) with `moodService.clear()` between tests instead of DB deletion — avoids singleton reinitialization timeouts
+- `moodSlice.test.ts` creates a standalone store-like object from the slice factory — tests slice logic in isolation without full Zustand store
+- `messageValidation.test.ts` depends on `dompurify` which works in happy-dom; DOMPurify behavior may differ slightly from browser implementations
+- Pre-existing test failure in `scriptureReadingSlice.lobby.test.ts` (`applySessionConverted`) is not caused by this run
+
+### Next Recommended Workflow
+
+1. Fix pre-existing `applySessionConverted` test failure in `scriptureReadingSlice.lobby.test.ts`
+2. Expand coverage to P2 targets: `notesSlice.ts` (641 LOC), `messagesSlice.ts` (547 LOC), `interactionsSlice.ts` (257 LOC)
+3. `test-review` on new test files to assess quality scores
+4. Consider `traceability` update to reflect expanded unit coverage
