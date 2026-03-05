@@ -15,8 +15,8 @@ import {
   DB_VERSION,
   STORE_NAMES,
   upgradeDb,
-  MyLoveDBSchema,
 } from '../../../src/services/dbSchema';
+import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 
 // Mock import.meta.env.DEV to suppress console logs during tests
 vi.stubGlobal('import', {

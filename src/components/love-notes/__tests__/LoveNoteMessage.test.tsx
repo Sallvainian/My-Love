@@ -16,7 +16,7 @@ import type { LoveNote } from '../../../types/models';
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
 
 interface FullScreenImageViewerMockProps {
-  imageUrl: string | null;
+  imageUrl: string | null | undefined;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -40,7 +40,7 @@ vi.mock('../FullScreenImageViewer', () => ({
   FullScreenImageViewer: ({ imageUrl, isOpen, onClose }: FullScreenImageViewerMockProps) =>
     isOpen ? (
       <div data-testid="fullscreen-viewer" onClick={onClose}>
-        <img src={imageUrl} alt="Fullscreen" />
+        <img src={imageUrl ?? undefined} alt="Fullscreen" />
       </div>
     ) : null,
 }));

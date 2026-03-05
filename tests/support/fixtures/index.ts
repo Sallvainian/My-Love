@@ -12,9 +12,8 @@ import {
   createTestSession,
   cleanupTestSession,
   linkTestPartners,
-  SeedResult,
-  TypedSupabaseClient,
 } from '../factories';
+import type { SeedResult, TypedSupabaseClient } from '../factories';
 import { createSupabaseAdminClient } from '../helpers/supabase';
 
 /**

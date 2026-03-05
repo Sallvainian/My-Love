@@ -30,7 +30,7 @@ function createSessionResponse(accessToken: string | null): SessionResponse {
         : null,
     },
     error: null,
-  };
+  } as unknown as SessionResponse;
 }
 
 function createStorageBucket(overrides: Partial<StorageBucket> = {}): StorageBucket {
