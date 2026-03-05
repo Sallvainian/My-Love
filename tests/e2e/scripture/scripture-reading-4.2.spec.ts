@@ -23,12 +23,6 @@ import {
 import { jumpToStep } from '../../support/helpers/scripture-together';
 
 // ---------------------------------------------------------------------------
-// All tests in this file share the same test user pair and must run serially
-// to avoid session contamination via scripture_create_session reuse.
-// ---------------------------------------------------------------------------
-test.describe.configure({ mode: 'serial' });
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -47,7 +41,7 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     page,
     togetherMode: { partnerPage },
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
 
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
@@ -136,7 +130,7 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
     page,
     togetherMode: { partnerPage },
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
 
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
@@ -173,7 +167,7 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     supabaseAdmin,
     togetherMode: { partnerPage, uiSessionId },
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
 
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
@@ -222,7 +216,7 @@ test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
     page,
     togetherMode: { partnerPage },
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
 
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
