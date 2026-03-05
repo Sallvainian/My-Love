@@ -15,7 +15,7 @@ import { test, expect } from '../support/merged-fixtures';
 import { createTestSession, cleanupTestSession } from '../support/factories';
 
 test.describe('Integration: Scripture Session Lifecycle', () => {
-  test('scripture_seed_test_data RPC creates session with correct structure', async ({
+  test('[P2] [INT-001] scripture_seed_test_data RPC creates session with correct structure', async ({
     supabaseAdmin,
   }) => {
     // GIVEN: A clean test environment
@@ -47,7 +47,7 @@ test.describe('Integration: Scripture Session Lifecycle', () => {
     }
   });
 
-  test('cleanup removes all related data in FK order', async ({ supabaseAdmin }) => {
+  test('[P2] [INT-002] cleanup removes all related data in FK order', async ({ supabaseAdmin }) => {
     // GIVEN: A seeded session with reflections and messages
     const result = await createTestSession(supabaseAdmin, {
       sessionCount: 1,
