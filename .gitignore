@@ -6,7 +6,6 @@ gha-creds-*.json
 
 # Gemini GitHub Action workflows (auto-generated)
 .github/commands/
-.github/workflows/gemini-*.yml
 
 # Test failure reports
 failures-ai.md
