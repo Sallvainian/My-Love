@@ -116,7 +116,7 @@ function LoveNoteMessageComponent({
     // Use preview URL for optimistic display
     if (message.imagePreviewUrl) {
       scheduleStateUpdate(() => {
-        setImageUrl(message.imagePreviewUrl);
+        setImageUrl(message.imagePreviewUrl ?? null);
         setImageLoading(false);
         setImageError(false);
       });
