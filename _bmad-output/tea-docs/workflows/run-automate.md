@@ -118,10 +118,7 @@ test.describe('Profile API', () => {
 #### API Tests with Playwright Utils:
 
 ```typescript
-import { test as base, expect } from '@playwright/test';
-import { test as apiRequestFixture } from '@seontechnologies/playwright-utils/api-request/fixtures';
-import { createAuthFixtures } from '@seontechnologies/playwright-utils/auth-session';
-import { mergeTests } from '@playwright/test';
+import { test, expect } from '../support/merged-fixtures';
 import { z } from 'zod';
 
 const ProfileSchema = z.object({
@@ -130,15 +127,14 @@ const ProfileSchema = z.object({
   email: z.string().email(),
 });
 
-const authFixtureTest = base.extend(createAuthFixtures());
-export const testWithAuth = mergeTests(apiRequestFixture, authFixtureTest);
+// All fixtures (apiRequest, auth, interceptNetworkCall, etc.) are
+// already composed in merged-fixtures.ts via mergeTests.
 
-testWithAuth.describe('Profile API', () => {
-  testWithAuth('should fetch user profile', async ({ apiRequest, authToken }) => {
+test.describe('Profile API', () => {
+  test('should fetch user profile', async ({ apiRequest }) => {
     const { status, body } = await apiRequest({
       method: 'GET',
       path: '/api/profile',
-      headers: { Authorization: `Bearer ${authToken}` },
     }).validateSchema(ProfileSchema);
 
     expect(status).toBe(200);
@@ -230,9 +226,11 @@ export const test = base.extend<ProfileFixtures>({
 
 ```typescript
 import { test as base } from '@playwright/test';
-import { createAuthFixtures } from '@seontechnologies/playwright-utils/auth-session';
 import { mergeTests } from '@playwright/test';
 import { faker } from '@faker-js/faker';
+
+// Note: Auth fixtures are already composed in merged-fixtures.ts.
+// This example shows how to ADD custom fixtures on top of that composition.
 
 type ProfileFixtures = {
   testProfile: {

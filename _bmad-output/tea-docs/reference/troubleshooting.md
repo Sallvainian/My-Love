@@ -137,7 +137,7 @@ Tests reference utilities but imports fail
 **Resolution**:
 1. Install package: `npm install @seontechnologies/playwright-utils`
 2. Verify installation: `npm ls @seontechnologies/playwright-utils`
-3. Validate import statements: Should use `import { expect, test } from '@seontechnologies/playwright-utils'`
+3. Validate import statements: Test files should use `import { test, expect } from '../support/merged-fixtures'` (not direct PW-utils imports)
 
 ### MCP Enhancements Not Applying
 MCP variable enabled but features absent from outputs

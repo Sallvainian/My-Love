@@ -64,8 +64,7 @@
 **Factory pattern example:**
 
 ```typescript
-import { test, expect } from '@playwright/test';
-import { apiRequest } from '@seontechnologies/playwright-utils/api-request/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 import { faker } from '@faker-js/faker';
 
 // Session factory
@@ -340,8 +339,7 @@ export function createTestReflection(sessionId: string, userId: string, stepInde
 **Playwright Tags for Selective Execution:**
 
 ```typescript
-import { test, expect } from '@playwright/test';
-import { apiRequest } from '@seontechnologies/playwright-utils/api-request/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 // P0 critical security test
 test('@P0 @API @Security unauthenticated request returns 401', async ({ request }) => {
