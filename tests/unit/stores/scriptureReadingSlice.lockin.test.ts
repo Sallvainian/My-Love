@@ -60,10 +60,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createTestStore() {
-  return create<ScriptureSlice>()((...args) => ({
-    ...createScriptureReadingSlice(...args),
-  }));
+  return create<ScriptureSlice>()(createScriptureReadingSlice as any);
 }
 
 // Helper to set up a store with an active together session in reading phase
@@ -163,7 +162,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
       currentPhase: 'reading',
       version: 3,
       currentStepIndex: 1, // Advance from 0 to 1
-      triggeredBy: 'lock_in',
+      triggered_by: 'lock_in',
       user1Ready: false,
       user2Ready: false,
     });
@@ -292,7 +291,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
       sessionId: 'session-reading-001',
       currentPhase: 'reflection',
       version: 10,
-      triggeredBy: 'lock_in',
+      triggered_by: 'lock_in',
       user1Ready: false,
       user2Ready: false,
     });
