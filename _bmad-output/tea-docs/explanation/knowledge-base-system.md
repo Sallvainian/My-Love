@@ -113,10 +113,10 @@ Each fragment follows a standardized format for consistency.
 
 Example 1: Deterministic Test
 ```typescript
-// Wait for actual response, not timeout
-const promise = page.waitForResponse(matcher);
+// Intercept before action, await after — no race condition
+const call = interceptNetworkCall({ url: '**/api/endpoint' });
 await page.click('button');
-await promise;
+const { status, responseJson } = await call;
 ```
 
 Example 2: Isolated Test
@@ -197,7 +197,7 @@ Result: Inconsistent quality, random patterns.
 
 Session 1 and 2 (Identical):
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/api-request/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 test('should fetch users', async ({ apiRequest }) => {
   const { status, body } = await apiRequest({
@@ -326,7 +326,7 @@ Result: 3 different patterns, all suboptimal.
 
 All developers:
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 test('job completion', async ({ apiRequest, recurse }) => {
   // Start async job

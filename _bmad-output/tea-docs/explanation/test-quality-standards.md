@@ -27,9 +27,7 @@ Without guardrails, AI-generated tests produce redundant, flaky, and untrusted o
 
 **Bad approach:** Using `waitForTimeout(2000)` with conditional element checking and try-catch blocks that mask failures.
 
-**Good approach:** Wait for actual API responses or specific DOM conditions using `waitForResponse()` or `waitForSelector()`.
-
-With Playwright Utils, use `interceptNetworkCall()` for cleaner response handling with automatic JSON parsing.
+**Good approach:** Use `interceptNetworkCall()` from `merged-fixtures` to wait for actual API responses with automatic JSON parsing and glob pattern matching. For DOM conditions, use `waitForSelector()` or Playwright's built-in auto-waiting assertions.
 
 ### 2. Isolation (No Dependencies)
 
