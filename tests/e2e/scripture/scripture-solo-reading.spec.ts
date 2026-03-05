@@ -18,18 +18,23 @@ import { getScriptureSessionSnapshot, startSoloSession } from '../../support/hel
 /**
  * Helper: Click Next Verse and wait for the step to advance.
  */
-async function advanceStep(page: import('@playwright/test').Page) {
+async function advanceStep(
+  page: import('@playwright/test').Page,
+  interceptNetworkCall: (opts: {
+    method: string;
+    url: string;
+    timeout?: number;
+  }) => Promise<{ status: number; responseJson: unknown }>
+) {
   const progressIndicator = page.getByTestId('scripture-progress-indicator');
   const previousProgressText = await progressIndicator.textContent();
 
-  // Intercept-before-click pattern to avoid race conditions
-  const stepSaved = page
-    .waitForResponse(
-      (resp) =>
-        resp.url().includes('/rest/v1/scripture_sessions') && resp.request().method() === 'PATCH',
-      { timeout: 15_000 }
-    )
-    .catch(() => null);
+  // Network-first: set up intercept BEFORE clicking
+  const stepSaved = interceptNetworkCall({
+    method: 'PATCH',
+    url: '**/rest/v1/scripture_sessions*',
+    timeout: 15_000,
+  });
 
   await page.getByTestId('scripture-next-verse-button').click();
 
@@ -52,8 +57,11 @@ async function advanceToCompletion(page: import('@playwright/test').Page) {
 
 test.describe('Solo Reading Flow', () => {
   test.describe('[P0-009] Advance through 17 steps sequentially', () => {
-    test('should complete full solo reading flow from step 1 to 17', async ({ page }) => {
-      test.setTimeout(180_000); // Extended timeout for 17-step traversal
+    test('should complete full solo reading flow from step 1 to 17', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      test.setTimeout(90_000);
 
       // GIVEN: User navigates to scripture and starts a solo session
       await startSoloSession(page);
@@ -74,7 +82,7 @@ test.describe('Solo Reading Flow', () => {
 
         // Advance to next step (except on last step)
         if (step < 17) {
-          await advanceStep(page);
+          await advanceStep(page, interceptNetworkCall);
         }
       }
 
@@ -166,17 +174,20 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('[P1-012] Progress indicator updates', () => {
-    test('should update progress text on each step advance', async ({ page }) => {
+    test('should update progress text on each step advance', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
       // GIVEN: User starts a solo session
       await startSoloSession(page);
 
       // WHEN/THEN: Progress updates with each advance
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
 
-      await advanceStep(page);
+      await advanceStep(page, interceptNetworkCall);
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
-      await advanceStep(page);
+      await advanceStep(page, interceptNetworkCall);
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 3 of 17');
     });
   });
@@ -190,7 +201,7 @@ test.describe('Solo Reading Flow', () => {
       const sessionId = await startSoloSession(page);
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
 
-      await advanceStep(page);
+      await advanceStep(page, interceptNetworkCall);
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
       // WHEN: User opens exit dialog and chooses save
@@ -219,13 +230,11 @@ test.describe('Solo Reading Flow', () => {
 
       // AND: Resume prompt is visible on revisit
       // Network-first: intercept the session check API before navigating.
-      const sessionCheck = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.status() >= 200 &&
-          resp.status() < 300,
-        { timeout: 15_000 }
-      );
+      const sessionCheck = interceptNetworkCall({
+        method: 'GET',
+        url: '**/rest/v1/scripture_sessions*',
+        timeout: 15_000,
+      });
       await page.goto('/scripture');
       await sessionCheck;
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
@@ -243,15 +252,18 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('[P2-012] Session completion boundary', () => {
-    test('should transition to completion phase after step 17', async ({ page }) => {
-      test.setTimeout(180_000); // Extended timeout for 17-step traversal
+    test('should transition to completion phase after step 17', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      test.setTimeout(90_000);
 
       // GIVEN: User starts a solo session
       await startSoloSession(page);
 
       // Advance through all 16 intermediate steps (1→2, 2→3, ..., 16→17)
       for (let i = 0; i < 16; i++) {
-        await advanceStep(page);
+        await advanceStep(page, interceptNetworkCall);
       }
 
       // Verify we're at step 17
