@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
+    "composite": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "types": ["vitest/globals", "node", "@testing-library/jest-dom/vitest"]
