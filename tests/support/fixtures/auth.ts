@@ -34,17 +34,20 @@ function getAuthPoolSize(): number {
 
 const provider = new SupabaseAuthProvider();
 
-type AuthFixtures = {
-  authOptions: AuthOptions;
+type AuthTestFixtures = {
   authSessionEnabled: boolean;
   authToken: string;
+};
+
+type AuthWorkerFixtures = {
+  authOptions: AuthOptions;
   partnerUserIdentifier: string;
 };
 
-export const test = base.extend<AuthFixtures>({
+export const test = base.extend<AuthTestFixtures, AuthWorkerFixtures>({
   // Worker-scoped: map workerIndex → user identifier
   authOptions: [
-    async ({}, use: (value: any) => Promise<void>, workerInfo: any) => {
+    async ({}, use, workerInfo) => {
       const poolSize = getAuthPoolSize();
       const normalizedIndex = ((workerInfo.workerIndex % poolSize) + poolSize) % poolSize;
       await use({
@@ -53,7 +56,7 @@ export const test = base.extend<AuthFixtures>({
       });
     },
     { scope: 'worker' },
-  ] as any,
+  ],
 
   authSessionEnabled: [true, { option: true }],
 
@@ -90,11 +93,11 @@ export const test = base.extend<AuthFixtures>({
 
   // Worker-scoped: partner user identifier for together-mode tests
   partnerUserIdentifier: [
-    async ({}, use: (value: any) => Promise<void>, workerInfo: any) => {
+    async ({}, use, workerInfo) => {
       const poolSize = getAuthPoolSize();
       const normalizedIndex = ((workerInfo.workerIndex % poolSize) + poolSize) % poolSize;
       await use(`worker-${normalizedIndex}-partner`);
     },
     { scope: 'worker' },
-  ] as any,
+  ],
 });
