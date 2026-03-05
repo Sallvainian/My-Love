@@ -159,7 +159,7 @@ describe('useScripturePresence', () => {
     mocks.send.mockClear();
 
     await act(async () => {
-      rerender({ view: 'response' });
+      rerender({ view: 'response' as any });
     });
 
     // Should have re-sent presence with updated view
@@ -285,8 +285,7 @@ describe('useScripturePresence', () => {
   });
 
   test('[P1] heartbeat uses latest step/view after props change', async () => {
-    let rerender: ((props: { stepIndex: number; view: 'verse' | 'response' }) => void) | null =
-      null;
+    let rerender: ((props: { stepIndex: number; view: any }) => void) | null = null;
 
     await act(async () => {
       const hook = renderHook(
@@ -301,7 +300,7 @@ describe('useScripturePresence', () => {
     });
 
     await act(async () => {
-      rerender?.({ stepIndex: 1, view: 'response' });
+      rerender?.({ stepIndex: 1, view: 'response' as any });
     });
 
     mocks.send.mockClear();

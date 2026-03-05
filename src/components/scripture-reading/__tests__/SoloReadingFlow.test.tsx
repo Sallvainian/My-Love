@@ -42,7 +42,7 @@ vi.mock('framer-motion', () => ({
         custom: _custom,
         ...htmlProps
       } = props;
-      return <div {...htmlProps}>{children}</div>;
+      return <div {...htmlProps}>{children as React.ReactNode}</div>;
     },
     section: ({ children, ...props }: Record<string, unknown>) => {
       const {
@@ -52,7 +52,7 @@ vi.mock('framer-motion', () => ({
         transition: _transition,
         ...htmlProps
       } = props;
-      return <section {...htmlProps}>{children}</section>;
+      return <section {...htmlProps}>{children as React.ReactNode}</section>;
     },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,

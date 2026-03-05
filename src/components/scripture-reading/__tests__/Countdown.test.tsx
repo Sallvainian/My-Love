@@ -37,7 +37,7 @@ vi.mock('../../../hooks/useMotionConfig', () => ({
 }));
 
 describe('Countdown', () => {
-  let onComplete: ReturnType<typeof vi.fn>;
+  let onComplete: () => void;
 
   beforeEach(() => {
     vi.clearAllMocks();

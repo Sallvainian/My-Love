@@ -111,7 +111,7 @@ describe('usePartnerMood', () => {
 
     // Simulate broadcast received
     if (broadcastCallback !== null) {
-      broadcastCallback(updatedMood);
+      (broadcastCallback as any)(updatedMood);
     }
 
     await waitFor(() => {
@@ -158,7 +158,7 @@ describe('usePartnerMood', () => {
 
     // Simulate broadcast from different user
     if (broadcastCallback !== null) {
-      broadcastCallback(otherUserMood);
+      (broadcastCallback as any)(otherUserMood);
     }
 
     // Wait a bit to ensure it doesn't update
@@ -245,7 +245,7 @@ describe('usePartnerMood', () => {
 
     // Simulate subscription success
     if (statusCallback !== null) {
-      statusCallback('SUBSCRIBED');
+      (statusCallback as any)('SUBSCRIBED');
     }
 
     await waitFor(() => {
@@ -254,7 +254,7 @@ describe('usePartnerMood', () => {
 
     // Simulate connection error
     if (statusCallback !== null) {
-      statusCallback('CHANNEL_ERROR');
+      (statusCallback as any)('CHANNEL_ERROR');
     }
 
     await waitFor(() => {
