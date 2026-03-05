@@ -41,7 +41,6 @@ const mockedGetCurrentUserId = vi.mocked(getCurrentUserIdOfflineSafe);
 
 /** Create a standalone store-like object from the slice */
 function createTestStore() {
-  let state: MoodSlice;
   const stateRef = { current: null as MoodSlice | null };
 
   const get = () => stateRef.current!;
@@ -51,7 +50,7 @@ function createTestStore() {
   };
   const api = {} as never;
 
-  state = createMoodSlice(set as never, get as never, api);
+  const state = createMoodSlice(set as never, get as never, api);
   stateRef.current = state;
   return { get, set };
 }
