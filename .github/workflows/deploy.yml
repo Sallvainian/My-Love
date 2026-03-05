@@ -36,6 +36,7 @@ jobs:
         run: |
           npx supabase gen types typescript \
             --project-id xojempkrugifnaveqtqc \
+            | grep -v '^Connecting to' \
             > src/types/database.types.ts
 
       - name: Build application
