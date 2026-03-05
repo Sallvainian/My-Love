@@ -39,12 +39,7 @@ async function advanceStep(page: import('@playwright/test').Page) {
     await expect(progressIndicator).not.toHaveText(previousProgressText);
   }
 
-  const stepResponse = await stepSaved;
-  if (!stepResponse) {
-    console.warn(
-      '[scripture-solo-reading] Step transition relied on UI-ready signal; network response was not observed within diagnostic timeout'
-    );
-  }
+  await stepSaved;
 }
 
 /**
@@ -110,7 +105,7 @@ test.describe('Solo Reading Flow', () => {
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
     });
 
-    test('should navigate to response screen and back', async ({ page, interceptNetworkCall }) => {
+    test('should navigate to response screen and back', async ({ page }) => {
       // GIVEN: User is on a verse screen
       await startSoloSession(page);
 
@@ -133,20 +128,20 @@ test.describe('Solo Reading Flow', () => {
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
     });
 
-    test('should advance from response screen via Next Verse', async ({ page }) => {
+    test('should advance from response screen via Next Verse', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
       // GIVEN: User is on the response screen of step 1
       await startSoloSession(page);
       await page.getByTestId('scripture-view-response-button').click();
       await expect(page.getByTestId('scripture-response-text')).toBeVisible();
 
       // WHEN: User taps "Next Verse" from response screen
-      const patchResponse = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.request().method() === 'PATCH' &&
-          resp.status() >= 200 &&
-          resp.status() < 300
-      );
+      const patchResponse = interceptNetworkCall({
+        method: 'PATCH',
+        url: '**/rest/v1/scripture_sessions*',
+      });
       await page.getByTestId('scripture-next-verse-button').click();
       await patchResponse;
 
@@ -189,6 +184,7 @@ test.describe('Solo Reading Flow', () => {
   test.describe('[P1-013] Exit with Save persistence', () => {
     test('should save progress and keep session in-progress when exiting solo reading', async ({
       page,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User starts a solo session and advances to Verse 2
       const sessionId = await startSoloSession(page);
@@ -198,16 +194,11 @@ test.describe('Solo Reading Flow', () => {
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
 
       // WHEN: User opens exit dialog and chooses save
-      const savePromise = page
-        .waitForResponse(
-          (resp) =>
-            resp.url().includes('/rest/v1/scripture_sessions') &&
-            resp.request().method() === 'PATCH' &&
-            resp.status() >= 200 &&
-            resp.status() < 300,
-          { timeout: 15_000 }
-        )
-        .catch(() => null);
+      const savePromise = interceptNetworkCall({
+        method: 'PATCH',
+        url: '**/rest/v1/scripture_sessions*',
+        timeout: 15_000,
+      });
 
       await page.getByTestId('exit-button').click();
       const exitDialog = page.getByTestId('exit-confirm-dialog');
@@ -227,20 +218,24 @@ test.describe('Solo Reading Flow', () => {
       expect(sessionSnapshot?.current_step_index ?? -1).toBeGreaterThanOrEqual(1);
 
       // AND: Resume prompt is visible on revisit
+      // Network-first: intercept the session check API before navigating.
+      const sessionCheck = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.status() >= 200 &&
+          resp.status() < 300,
+        { timeout: 15_000 }
+      );
       await page.goto('/scripture');
+      await sessionCheck;
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
 
       // Cleanup: abandon resumed state so this test does not pollute later runs
-      const abandonPromise = page
-        .waitForResponse(
-          (resp) =>
-            resp.url().includes('/rest/v1/scripture_sessions') &&
-            resp.request().method() === 'PATCH' &&
-            resp.status() >= 200 &&
-            resp.status() < 300,
-          { timeout: 15_000 }
-        )
-        .catch(() => null);
+      const abandonPromise = interceptNetworkCall({
+        method: 'PATCH',
+        url: '**/rest/v1/scripture_sessions*',
+        timeout: 15_000,
+      });
 
       await page.getByTestId('resume-start-fresh').click();
       await abandonPromise;

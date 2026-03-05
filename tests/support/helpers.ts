@@ -244,15 +244,54 @@ export async function ensureScriptureOverview(page: Page): Promise<ScriptureEntr
   // Defensive reset: a prior test may have toggled context offline.
   await page.context().setOffline(false);
 
+  // Network-first: intercept ALL API calls that trigger re-renders BEFORE
+  // navigating. loadPartner (GET /users) and loadCoupleStats (POST /rpc/
+  // scripture_get_couple_stats) each cause re-renders that can detach the
+  // start button mid-click. Wait for the LAST response to guarantee stability.
+  const partnerLoaded = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/rest/v1/users') && resp.status() >= 200 && resp.status() < 300,
+    { timeout: 20_000 }
+  );
+  const statsLoaded = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/rest/v1/rpc/scripture_get_couple_stats') &&
+      resp.status() >= 200 &&
+      resp.status() < 300,
+    { timeout: 20_000 }
+  );
+
   await page.goto('/scripture?fresh=true');
 
   const startButton = page.getByTestId('scripture-start-button');
   const readingFlow = page.getByTestId('solo-reading-flow');
+  const loginScreen = page.getByTestId('login-screen');
+
+  // Wait for the page to settle into a known state: overview, reading flow, or login.
+  // Detecting login early prevents a 20s timeout when auth is missing/expired.
+  const overviewOrReading = page.getByTestId('scripture-overview').or(readingFlow);
+  const firstVisible = overviewOrReading.or(loginScreen);
+
+  await expect(firstVisible).toBeVisible({ timeout: 20_000 });
+
+  // Fail fast if we landed on the login screen (auth token missing or expired)
+  if (await loginScreen.isVisible()) {
+    throw new Error(
+      '[ensureScriptureOverview] Page rendered login screen instead of scripture overview. Auth token may be expired or missing.'
+    );
+  }
+
+  // Wait for ALL re-render-triggering API calls to complete before interacting.
+  // Swallow rejections — stats may not fire if partner is unlinked.
+  await Promise.all([
+    partnerLoaded.catch(() => {}),
+    statsLoaded.catch(() => {}),
+  ]);
 
   try {
     const state = await Promise.any<ScriptureEntryState>([
-      startButton.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'overview' as const),
-      readingFlow.waitFor({ state: 'visible', timeout: 20_000 }).then(() => 'active-flow' as const),
+      startButton.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'overview' as const),
+      readingFlow.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'active-flow' as const),
     ]);
 
     if (state === 'overview') {
@@ -263,12 +302,26 @@ export async function ensureScriptureOverview(page: Page): Promise<ScriptureEntr
 
     return state;
   } catch {
+    // If the overview is visible but start button isn't yet, the session check
+    // may still be in progress. Wait a bit longer for the start button.
+    const overviewVisible = await page.getByTestId('scripture-overview').isVisible();
+    if (overviewVisible) {
+      try {
+        await startButton.waitFor({ state: 'visible', timeout: 10_000 });
+        await expect(startButton).toBeEnabled();
+        return 'overview';
+      } catch {
+        // Fall through to diagnostics
+      }
+    }
+
     const diagnostics = {
       startButtonVisible: await startButton.isVisible(),
       readingFlowVisible: await readingFlow.isVisible(),
-      overviewVisible: await page.getByTestId('scripture-overview').isVisible(),
+      overviewVisible,
       resumePromptVisible: await page.getByTestId('resume-prompt').isVisible(),
       sessionLoadingVisible: await page.getByTestId('session-loading').isVisible(),
+      sessionCheckLoadingVisible: await page.getByTestId('session-check-loading').isVisible(),
     };
 
     throw new Error(

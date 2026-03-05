@@ -13,45 +13,11 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { startSoloSession, advanceOneStep } from '../../support/helpers';
-
-async function clearClientScriptureCache(
-  page: Parameters<typeof startSoloSession>[0]
-): Promise<void> {
-  await page.evaluate(async () => {
-    localStorage.removeItem('my-love-storage');
-
-    const factory = indexedDB as IDBFactory & {
-      databases?: () => Promise<Array<{ name?: string }>>;
-    };
-
-    const dbNames = new Set<string>(['my-love-db']);
-    if (typeof factory.databases === 'function') {
-      const databases = await factory.databases();
-      for (const db of databases) {
-        if (db.name) dbNames.add(db.name);
-      }
-    }
-
-    await Promise.all(
-      [...dbNames].map(
-        (dbName) =>
-          new Promise<void>((resolve) => {
-            const request = indexedDB.deleteDatabase(dbName);
-            request.onsuccess = () => resolve();
-            request.onerror = () => resolve();
-            request.onblocked = () => resolve();
-          })
-      )
-    );
-  });
-}
+import { clearClientScriptureCache } from '../../support/helpers/scripture-cache';
 
 test.describe('Scripture Session - Save & Resume', () => {
   test.describe('P0-010: Session save on exit', () => {
-    test('should persist step index to server when saving and exiting', async ({
-      page,
-      interceptNetworkCall,
-    }) => {
+    test('should persist step index to server when saving and exiting', async ({ page }) => {
       // GIVEN: User is in a solo session at step 5
       await startSoloSession(page);
 
@@ -77,11 +43,7 @@ test.describe('Scripture Session - Save & Resume', () => {
   });
 
   test.describe('P0-011: Session resume loads correct step', () => {
-    test('should resume at correct step after save and exit', async ({
-      page,
-      interceptNetworkCall,
-      supabaseAdmin,
-    }) => {
+    test('should resume at correct step after save and exit', async ({ page, supabaseAdmin }) => {
       // GIVEN: User saved a session at step 5
       // Start and advance to step 5
       const sessionId = await startSoloSession(page);
@@ -117,15 +79,25 @@ test.describe('Scripture Session - Save & Resume', () => {
       // this test's saved session the newest candidate for resume lookup.
       const { error: prioritizeSessionError } = await supabaseAdmin
         .from('scripture_sessions')
-        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .update({ started_at: '2099-01-01T00:00:00.000Z' })
         .eq('id', sessionId);
       expect(prioritizeSessionError).toBeNull();
 
       // Clear client-side cache so active-session lookup re-reads from server.
       await clearClientScriptureCache(page);
 
+      // Network-first: intercept the session check API before navigating.
+      const sessionCheck = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.status() >= 200 &&
+          resp.status() < 300,
+        { timeout: 15_000 }
+      );
+
       // Re-open without `fresh=true` to exercise resume behavior.
       await page.goto('/scripture');
+      await sessionCheck;
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
       // WHEN: User returns and taps "Continue"
@@ -141,10 +113,7 @@ test.describe('Scripture Session - Save & Resume', () => {
   });
 
   test.describe('P2-011: Exit confirmation dialog', () => {
-    test('should show exit confirmation with save option', async ({
-      page,
-      interceptNetworkCall,
-    }) => {
+    test('should show exit confirmation with save option', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -164,7 +133,7 @@ test.describe('Scripture Session - Save & Resume', () => {
       await expect(page.getByTestId('cancel-exit-button')).toBeVisible();
     });
 
-    test('should dismiss exit dialog when user cancels', async ({ page, interceptNetworkCall }) => {
+    test('should dismiss exit dialog when user cancels', async ({ page }) => {
       // GIVEN: Exit dialog is showing
       await startSoloSession(page);
       await page.getByTestId('exit-button').click();
@@ -191,14 +160,14 @@ test.describe('Scripture Session - Save & Resume', () => {
         await startSoloSession(page);
 
         // Simulate network failure on step advancement
-        await page.route('**/rest/v1/rpc/scripture_advance_phase', (route) =>
-          route.fulfill({ status: 500, body: 'Internal Server Error' })
-        );
-        await page.route('**/rest/v1/scripture_sessions*', (route) => {
-          if (route.request().method() === 'PATCH') {
-            return route.fulfill({ status: 500, body: 'Internal Server Error' });
-          }
-          return route.continue();
+        interceptNetworkCall({
+          url: '**/rest/v1/rpc/scripture_advance_phase',
+          fulfillResponse: { status: 500, body: 'Internal Server Error' },
+        });
+        interceptNetworkCall({
+          method: 'PATCH',
+          url: '**/rest/v1/scripture_sessions*',
+          fulfillResponse: { status: 500, body: 'Internal Server Error' },
         });
 
         // WHEN: User advances a step by clicking Next Verse
@@ -214,7 +183,7 @@ test.describe('Scripture Session - Save & Resume', () => {
   );
 
   test.describe('P2-009/P2-010: Offline handling', () => {
-    test('should show offline indicator when offline', async ({ page, interceptNetworkCall }) => {
+    test('should show offline indicator when offline', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -228,7 +197,7 @@ test.describe('Scripture Session - Save & Resume', () => {
       await page.context().setOffline(false);
     });
 
-    test('should block step advancement when offline', async ({ page, interceptNetworkCall }) => {
+    test('should block step advancement when offline', async ({ page }) => {
       // GIVEN: User is in a solo session, offline
       await startSoloSession(page);
       await page.context().setOffline(true);
