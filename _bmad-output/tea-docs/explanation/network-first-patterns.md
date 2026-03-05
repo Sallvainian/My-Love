@@ -13,12 +13,15 @@ await expect(page.locator('.success')).toBeVisible();
 
 **Network-first approach (deterministic):**
 ```typescript
-const responsePromise = page.waitForResponse((resp) =>
-  resp.url().includes('/api/submit') && resp.ok()
-);
-await page.click('button');
-await responsePromise;
-await expect(page.locator('.success')).toBeVisible();
+import { test, expect } from '../support/merged-fixtures';
+
+test('submit form', async ({ page, interceptNetworkCall }) => {
+  const submitCall = interceptNetworkCall({ url: '**/api/submit' });
+  await page.click('button');
+  const { status, responseJson } = await submitCall;
+  expect(status).toBe(200);
+  await expect(page.locator('.success')).toBeVisible();
+});
 ```
 
 ## The Problem
@@ -55,30 +58,10 @@ The test checks for UI before the API responds, failing intermittently.
 
 ### Wait for Response Before Asserting
 
-Set up the wait listener BEFORE triggering navigation or actions:
+Set up the intercept BEFORE triggering navigation or actions:
 
 ```typescript
-const dashboardPromise = page.waitForResponse((resp) =>
-  resp.url().includes('/api/dashboard') && resp.ok()
-);
-await page.goto('/dashboard');
-const response = await dashboardPromise;
-const data = await response.json();
-await expect(page.locator('.data-table')).toBeVisible();
-await expect(page.locator('.data-table tr')).toHaveCount(data.items.length);
-```
-
-Benefits:
-- Wait established BEFORE navigation (no race condition)
-- Waits for actual API response (deterministic)
-- No fixed timeout (adapts to network speed)
-- Validates API response (catches backend errors)
-
-### With Playwright Utils (Cleaner Syntax)
-
-```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
-import { expect } from '@playwright/test';
+import { test, expect } from '../support/merged-fixtures';
 
 test('should load dashboard data', async ({ page, interceptNetworkCall }) => {
   const dashboardCall = interceptNetworkCall({
@@ -98,26 +81,43 @@ test('should load dashboard data', async ({ page, interceptNetworkCall }) => {
 });
 ```
 
-Playwright Utils benefits:
+Benefits:
+- Intercept established BEFORE navigation (no race condition)
 - Automatic JSON parsing (no manual `await response.json()`)
 - Returns structured `{ status, responseJson, requestJson }`
-- Cleaner API without response status checking
-- Same intercept-before-navigate pattern
+- Glob pattern matching (simpler than URL predicates)
+- Waits for actual API response (deterministic)
+- Validates API response (catches backend errors)
+
+### Vanilla Playwright Equivalent (for reference)
+
+Without `interceptNetworkCall`, the same pattern requires more boilerplate:
+
+```typescript
+const dashboardPromise = page.waitForResponse((resp) =>
+  resp.url().includes('/api/dashboard') && resp.ok()
+);
+await page.goto('/dashboard');
+const response = await dashboardPromise;
+const data = await response.json();
+await expect(page.locator('.data-table')).toBeVisible();
+await expect(page.locator('.data-table tr')).toHaveCount(data.items.length);
+```
 
 ### Intercept-Before-Navigate Pattern
 
 The core pattern: **Intercept -> Action -> Await**
 
 ```typescript
-const promise = page.waitForResponse(matcher);
+const call = interceptNetworkCall({ url: '**/api/endpoint' });
 await page.click('button');
-await promise;
+const { status, responseJson } = await call;
 ```
 
 Order matters:
-1. `waitForResponse()` starts listening immediately
+1. `interceptNetworkCall()` sets up the listener immediately
 2. Then trigger the action making the request
-3. Then wait for the promise to resolve
+3. Then await the result (auto-parsed JSON, status included)
 4. No race condition possible
 
 ## How It Works in TEA
@@ -148,8 +148,7 @@ test('should create user', async ({ page }) => {
 **With Playwright Utils (if `tea_use_playwright_utils: true`):**
 
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
-import { expect } from '@playwright/test';
+import { test, expect } from '../support/merged-fixtures';
 
 test('should create user', async ({ page, interceptNetworkCall }) => {
   const createUserCall = interceptNetworkCall({
@@ -351,7 +350,7 @@ test('offline testing - PLAYBACK', async ({ page, context }) => {
 **With Playwright Utils (Automatic HAR Management):**
 
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/network-recorder/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 // Set environment variable: PW_NET_MODE=record
 
@@ -399,7 +398,7 @@ test('should handle API error', async ({ page }) => {
 
 **With Playwright Utils:**
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 test('should handle API error', async ({ page, interceptNetworkCall }) => {
   const usersCall = interceptNetworkCall({
@@ -447,30 +446,7 @@ Failure modes:
 
 **Network-First (Deterministic):**
 ```typescript
-test('dashboard loads data', async ({ page }) => {
-  const apiPromise = page.waitForResponse((resp) =>
-    resp.url().includes('/api/dashboard') && resp.ok()
-  );
-
-  await page.goto('/dashboard');
-
-  const response = await apiPromise;
-  const { items } = await response.json();
-
-  expect(items).toHaveLength(5);
-  await expect(page.locator('table tr')).toHaveCount(items.length);
-});
-```
-
-Benefits:
-- Waits exactly as long as needed
-- Validates API response
-- Validates UI matches API
-- Works in any environment
-
-**With Playwright Utils:**
-```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 test('dashboard loads data', async ({ page, interceptNetworkCall }) => {
   const dashboardCall = interceptNetworkCall({
@@ -489,6 +465,12 @@ test('dashboard loads data', async ({ page, interceptNetworkCall }) => {
 });
 ```
 
+Benefits:
+- Waits exactly as long as needed
+- Automatic JSON parsing
+- Validates API response and UI together
+- Works in any environment
+
 ### Form Submission
 
 **Traditional (Flaky):**
@@ -503,27 +485,7 @@ test('form submission', async ({ page }) => {
 
 **Network-First (Deterministic):**
 ```typescript
-test('form submission', async ({ page }) => {
-  const submitPromise = page.waitForResponse(
-    (resp) => resp.url().includes('/api/submit') &&
-      resp.request().method() === 'POST' &&
-      resp.ok(),
-  );
-
-  await page.fill('#email', 'test@example.com');
-  await page.click('button[type="submit"]');
-
-  const response = await submitPromise;
-  const result = await response.json();
-
-  expect(result.success).toBe(true);
-  await expect(page.locator('.success')).toBeVisible();
-});
-```
-
-**With Playwright Utils:**
-```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 test('form submission', async ({ page, interceptNetworkCall }) => {
   const submitCall = interceptNetworkCall({
@@ -594,7 +556,7 @@ test('test 2', async ({ page }) => {
 
 **With Playwright Utils (Cleaner):**
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/fixtures';
+import { test, expect } from '../support/merged-fixtures';
 
 test('test 1', async ({ page, interceptNetworkCall }) => {
   const submitCall = interceptNetworkCall({ url: '**/api/submit' });

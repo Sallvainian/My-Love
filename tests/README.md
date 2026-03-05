@@ -1,6 +1,8 @@
 # My-Love Test Suite
 
-Production-ready test infrastructure using Playwright with `@seontechnologies/playwright-utils`.
+Production-ready **fullstack** test infrastructure using Playwright with `@seontechnologies/playwright-utils`.
+
+**Stack**: React 19 + Vite 7 + Supabase (21 migrations, RPCs, RLS policies, pgTAP)
 
 ## Quick Start
 
@@ -86,6 +88,8 @@ tests/
 ├── api/                            # API-level tests (separate Playwright project)
 │   ├── scripture-lobby-4.1.spec.ts
 │   └── scripture-reflection-api.spec.ts
+├── integration/                    # Integration tests — RPC business logic, no browser
+│   └── example-rpc.spec.ts         # Sample: Supabase RPC lifecycle validation
 ├── unit/                           # Unit tests (Vitest + happy-dom)
 │   ├── data/
 │   │   └── scriptureSteps.test.ts
@@ -138,7 +142,7 @@ tests/
 
 ### Fixture Composition Pattern
 
-All E2E tests import from `merged-fixtures.ts` which combines 9 fixtures via `mergeTests`:
+All E2E, API, and integration tests import from `merged-fixtures.ts` which combines 9 fixtures via `mergeTests`:
 
 **playwright-utils fixtures:**
 
@@ -224,7 +228,7 @@ See `playwright.config.ts` for full configuration:
 - **Browser**: Chromium (Firefox/WebKit available but commented out)
 - **Reporter**: HTML + JUnit + list
 - **Dev Server**: Auto-starts via `npx vite --mode test`
-- **Projects**: `setup` (auth) → `chromium` (E2E) + `api` (API tests)
+- **Projects**: `setup` (auth) → `chromium` (E2E) + `api` (API tests) + `integration` (RPC tests)
 
 ## Best Practices
 
@@ -251,15 +255,29 @@ Each test should:
 
 ### Network-First Patterns
 
-Wait for API responses before asserting UI state:
+Use the `interceptNetworkCall` fixture (from `@seontechnologies/playwright-utils`) to wait
+for API responses before asserting UI state. Set up the intercept **before** the action:
 
 ```typescript
-const responsePromise = page.waitForResponse(
-  (resp) => resp.url().includes('/rest/v1/rpc/my_endpoint') && resp.status() === 200
-);
+// Spy on real traffic — intercept BEFORE the action
+const call = interceptNetworkCall({ url: '**/rest/v1/rpc/my_endpoint' });
 await page.getByTestId('submit-button').click();
-await responsePromise;
+const { responseJson, status } = await call;
+
+expect(status).toBe(200);
 await expect(page.getByTestId('success-message')).toBeVisible();
+```
+
+For mocking/stubbing responses:
+
+```typescript
+const call = interceptNetworkCall({
+  url: '**/rest/v1/rpc/my_endpoint',
+  fulfillResponse: { status: 500, body: { error: 'Server Error' } },
+});
+await page.goto('/dashboard');
+await call;
+await expect(page.getByText('Something went wrong')).toBeVisible();
 ```
 
 ### Logging
@@ -327,6 +345,9 @@ npm run test:unit:watch        # Watch mode
 npm run test:unit:ui           # Vitest UI
 npm run test:unit:coverage     # With coverage (80% threshold)
 
+# Integration tests (Playwright — no browser, requires local Supabase)
+npm run test:integration           # RPC business logic tests
+
 # Database tests (pgTAP)
 npm run test:db
 
@@ -336,6 +357,16 @@ npm run test:burn-in           # Flakiness detection
 npm run test:ci-local          # Simulate CI locally
 ```
 
+## Test Levels
+
+| Level | Directory | Framework | What it tests |
+|-------|-----------|-----------|---------------|
+| Unit | `tests/unit/` | Vitest + happy-dom | Pure functions, hooks, stores, services |
+| Integration | `tests/integration/` | Playwright (no browser) | Supabase RPCs, cross-table operations, RLS policies |
+| API | `tests/api/` | Playwright (no browser) | REST endpoint contracts via Supabase PostgREST |
+| E2E | `tests/e2e/` | Playwright (Chromium) | Full user journeys with browser |
+| Database | `supabase/tests/` | pgTAP | SQL-level schema constraints, function correctness |
+
 ## Knowledge Base References
 
 - `_bmad/tea/testarch/knowledge/overview.md` — Playwright utils overview
@@ -344,3 +375,5 @@ npm run test:ci-local          # Simulate CI locally
 - `_bmad/tea/testarch/knowledge/network-first.md` — Network testing patterns
 - `_bmad/tea/testarch/knowledge/auth-session.md` — Auth session management
 - `_bmad/tea/testarch/knowledge/network-error-monitor.md` — HTTP error detection
+- `_bmad/tea/testarch/knowledge/test-levels-framework.md` — Unit/integration/E2E selection guide
+- `_bmad/tea/testarch/knowledge/api-testing-patterns.md` — Pure API testing without browser
