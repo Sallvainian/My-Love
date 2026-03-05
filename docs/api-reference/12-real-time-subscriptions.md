@@ -14,11 +14,11 @@
 
 The application uses three real-time patterns, chosen based on RLS compatibility:
 
-| Pattern                                 | Used For                                      | Module                                                              |
-| --------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------- |
-| **Broadcast API** (client-to-client)    | Mood updates, love notes, scripture state      | `moodSyncService`, `useRealtimeMessages`, `useScriptureBroadcast`  |
-| **Broadcast API** (ephemeral presence)  | Partner reading position                       | `useScripturePresence`                                              |
-| **postgres_changes** (server-to-client) | Incoming interactions (poke/kiss)              | `interactionService`, `realtimeService`                             |
+| Pattern                                 | Used For                                  | Module                                                            |
+| --------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| **Broadcast API** (client-to-client)    | Mood updates, love notes, scripture state | `moodSyncService`, `useRealtimeMessages`, `useScriptureBroadcast` |
+| **Broadcast API** (ephemeral presence)  | Partner reading position                  | `useScripturePresence`                                            |
+| **postgres_changes** (server-to-client) | Incoming interactions (poke/kiss)         | `interactionService`, `realtimeService`                           |
 
 **Why Broadcast for moods and scripture?** RLS policies on the `moods` table use partner subqueries that Supabase Realtime cannot evaluate for `postgres_changes`. Scripture channels use private Broadcast with `realtime.messages` RLS for authorization.
 
@@ -106,12 +106,12 @@ supabase.channel(`scripture-session:${sessionId}`, {
 
 ### Event Handlers
 
-| Event                      | Payload Type                | Zustand Action                | Description                              |
-| -------------------------- | --------------------------- | ----------------------------- | ---------------------------------------- |
-| `partner_joined`           | `{ user_id: string }`       | `onPartnerJoined()`          | Partner connected/reconnected            |
-| `state_updated`            | `StateUpdatePayload`        | `onBroadcastReceived(payload)`| Session state change from partner's RPC  |
-| `session_converted`        | `{ mode: 'solo', sessionId }` | `applySessionConverted()`  | Partner converted session to solo mode   |
-| `lock_in_status_changed`   | `{ step_index, user1_locked, user2_locked }` | `onPartnerLockInChanged(locked)` | Partner locked/unlocked a step |
+| Event                    | Payload Type                                 | Zustand Action                   | Description                             |
+| ------------------------ | -------------------------------------------- | -------------------------------- | --------------------------------------- |
+| `partner_joined`         | `{ user_id: string }`                        | `onPartnerJoined()`              | Partner connected/reconnected           |
+| `state_updated`          | `StateUpdatePayload`                         | `onBroadcastReceived(payload)`   | Session state change from partner's RPC |
+| `session_converted`      | `{ mode: 'solo', sessionId }`                | `applySessionConverted()`        | Partner converted session to solo mode  |
+| `lock_in_status_changed` | `{ step_index, user1_locked, user2_locked }` | `onPartnerLockInChanged(locked)` | Partner locked/unlocked a step          |
 
 ### Lifecycle
 
@@ -161,20 +161,20 @@ Manages an ephemeral broadcast channel `scripture-presence:{sessionId}` for part
 ```typescript
 interface PartnerPresenceInfo {
   view: 'verse' | 'response' | null; // Which content panel partner is viewing
-  stepIndex: number | null;           // Which reading step partner is on
-  ts: number | null;                  // Timestamp of last presence update
-  isPartnerConnected: boolean;        // Whether partner is active (not stale)
+  stepIndex: number | null; // Which reading step partner is on
+  ts: number | null; // Timestamp of last presence update
+  isPartnerConnected: boolean; // Whether partner is active (not stale)
 }
 ```
 
 ### Broadcast Behavior
 
-| Trigger               | When                                           |
-| --------------------- | ---------------------------------------------- |
-| Channel subscribed    | Immediately on `SUBSCRIBED` status             |
-| View change           | When user switches between verse and response  |
-| Step change           | When step index changes (also resets partner presence) |
-| Heartbeat             | Every 10 seconds via `setInterval`             |
+| Trigger            | When                                                   |
+| ------------------ | ------------------------------------------------------ |
+| Channel subscribed | Immediately on `SUBSCRIBED` status                     |
+| View change        | When user switches between verse and response          |
+| Step change        | When step index changes (also resets partner presence) |
+| Heartbeat          | Every 10 seconds via `setInterval`                     |
 
 ### Payload Format
 
@@ -232,12 +232,12 @@ interface UseRealtimeMessagesOptions {
 
 On `CHANNEL_ERROR` or `TIMED_OUT`:
 
-| Config            | Value      |
-| ----------------- | ---------- |
-| `maxRetries`      | 5          |
-| `baseDelay`       | 1000ms     |
-| `maxDelay`        | 30000ms    |
-| `backoff`         | Exponential (2^retryCount) |
+| Config       | Value                      |
+| ------------ | -------------------------- |
+| `maxRetries` | 5                          |
+| `baseDelay`  | 1000ms                     |
+| `maxDelay`   | 30000ms                    |
+| `backoff`    | Exponential (2^retryCount) |
 
 Schedule: 1s, 2s, 4s, 8s, 16s (capped at 30s).
 
@@ -297,11 +297,11 @@ interface UsePartnerMoodResult {
 
 ## Channel Summary
 
-| Channel Name                        | Type            | Private | Purpose                               | Managed By                |
-| ----------------------------------- | --------------- | ------- | ------------------------------------- | ------------------------- |
-| `scripture-session:{sessionId}`     | Broadcast       | Yes     | Session state sync between partners   | `useScriptureBroadcast`   |
-| `scripture-presence:{sessionId}`    | Broadcast       | Yes     | Ephemeral partner position tracking   | `useScripturePresence`    |
-| `love-notes:{userId}`              | Broadcast       | No      | Love note delivery to recipient       | `useRealtimeMessages`     |
-| `mood-updates:{userId}`            | Broadcast       | No      | Partner mood notifications            | `moodSyncService`         |
-| `incoming-interactions`             | postgres_changes| No      | Poke/kiss interaction notifications   | `interactionService`      |
-| `moods-{userId}`                   | postgres_changes| No      | Own mood changes (general)            | `realtimeService`         |
+| Channel Name                     | Type             | Private | Purpose                             | Managed By              |
+| -------------------------------- | ---------------- | ------- | ----------------------------------- | ----------------------- |
+| `scripture-session:{sessionId}`  | Broadcast        | Yes     | Session state sync between partners | `useScriptureBroadcast` |
+| `scripture-presence:{sessionId}` | Broadcast        | Yes     | Ephemeral partner position tracking | `useScripturePresence`  |
+| `love-notes:{userId}`            | Broadcast        | No      | Love note delivery to recipient     | `useRealtimeMessages`   |
+| `mood-updates:{userId}`          | Broadcast        | No      | Partner mood notifications          | `moodSyncService`       |
+| `incoming-interactions`          | postgres_changes | No      | Poke/kiss interaction notifications | `interactionService`    |
+| `moods-{userId}`                 | postgres_changes | No      | Own mood changes (general)          | `realtimeService`       |

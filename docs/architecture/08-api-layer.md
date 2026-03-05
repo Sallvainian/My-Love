@@ -55,15 +55,15 @@ Class-based API with Zod-validated responses. All methods check `isOnline()` bef
 
 Custom error class: `ApiValidationError` wraps `ZodError` for cases where Supabase returns unexpected data shapes.
 
-| Method                                         | Return Type               | Description                                    |
-| ---------------------------------------------- | ------------------------- | ---------------------------------------------- |
-| `create(moodData: MoodInsert)`                 | `Promise<SupabaseMood>`   | Insert mood, validate response                 |
-| `fetchByUser(userId, limit?)`                  | `Promise<SupabaseMood[]>` | Fetch user's moods (default limit 50)          |
-| `fetchByDateRange(userId, startDate, endDate)` | `Promise<SupabaseMood[]>` | Date-range query for calendar view             |
+| Method                                         | Return Type                     | Description                                  |
+| ---------------------------------------------- | ------------------------------- | -------------------------------------------- |
+| `create(moodData: MoodInsert)`                 | `Promise<SupabaseMood>`         | Insert mood, validate response               |
+| `fetchByUser(userId, limit?)`                  | `Promise<SupabaseMood[]>`       | Fetch user's moods (default limit 50)        |
+| `fetchByDateRange(userId, startDate, endDate)` | `Promise<SupabaseMood[]>`       | Date-range query for calendar view           |
 | `fetchById(moodId)`                            | `Promise<SupabaseMood \| null>` | Single mood by ID (handles PGRST116 as null) |
-| `update(moodId, updates)`                      | `Promise<SupabaseMood>`   | Partial update with validated response         |
-| `delete(moodId)`                               | `Promise<void>`           | Delete mood entry                              |
-| `getMoodHistory(userId, offset?, limit?)`       | `Promise<SupabaseMood[]>` | Paginated fetch using `.range()`               |
+| `update(moodId, updates)`                      | `Promise<SupabaseMood>`         | Partial update with validated response       |
+| `delete(moodId)`                               | `Promise<void>`                 | Delete mood entry                            |
+| `getMoodHistory(userId, offset?, limit?)`      | `Promise<SupabaseMood[]>`       | Paginated fetch using `.range()`             |
 
 Exported as singleton: `export const moodApi = new MoodApi()`.
 
@@ -71,14 +71,14 @@ Exported as singleton: `export const moodApi = new MoodApi()`.
 
 Class-based service managing poke/kiss interactions between partners. Uses `postgres_changes` realtime for incoming interaction notifications.
 
-| Method                                         | Return Type                       | Description                                     |
-| ---------------------------------------------- | --------------------------------- | ----------------------------------------------- |
-| `sendPoke(partnerId)`                          | `Promise<SupabaseInteractionRecord>` | Send poke (delegates to private `sendInteraction`) |
-| `sendKiss(partnerId)`                          | `Promise<SupabaseInteractionRecord>` | Send kiss (delegates to private `sendInteraction`) |
-| `subscribeInteractions(callback)`              | `Promise<() => void>`            | Realtime subscription for incoming interactions; returns unsubscribe function |
-| `getInteractionHistory(limit?, offset?)`       | `Promise<Interaction[]>`          | Fetch interactions where user is sender or recipient |
-| `getUnviewedInteractions()`                    | `Promise<Interaction[]>`          | Fetch interactions received but not yet viewed  |
-| `markAsViewed(interactionId)`                  | `Promise<void>`                   | Mark single interaction as viewed               |
+| Method                                   | Return Type                          | Description                                                                   |
+| ---------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `sendPoke(partnerId)`                    | `Promise<SupabaseInteractionRecord>` | Send poke (delegates to private `sendInteraction`)                            |
+| `sendKiss(partnerId)`                    | `Promise<SupabaseInteractionRecord>` | Send kiss (delegates to private `sendInteraction`)                            |
+| `subscribeInteractions(callback)`        | `Promise<() => void>`                | Realtime subscription for incoming interactions; returns unsubscribe function |
+| `getInteractionHistory(limit?, offset?)` | `Promise<Interaction[]>`             | Fetch interactions where user is sender or recipient                          |
+| `getUnviewedInteractions()`              | `Promise<Interaction[]>`             | Fetch interactions received but not yet viewed                                |
+| `markAsViewed(interactionId)`            | `Promise<void>`                      | Mark single interaction as viewed                                             |
 
 The realtime subscription uses `postgres_changes` with a `to_user_id=eq.{userId}` filter to receive only interactions directed at the current user.
 
@@ -124,28 +124,28 @@ export class SupabaseServiceError extends Error {
 
 **Error code mapping:**
 
-| PostgreSQL/PostgREST Code | User-Friendly Message |
-|---------------------------|----------------------|
-| `23505` | "This record already exists" |
-| `23503` | "Referenced record not found" |
-| `23502` | "Required field is missing" |
-| `42501` | "Permission denied - check Row Level Security policies" |
-| `42P01` | "Table not found - database schema may be out of sync" |
-| `PGRST116` | "No rows found" |
-| `PGRST301` | "Invalid request parameters" |
+| PostgreSQL/PostgREST Code | User-Friendly Message                                   |
+| ------------------------- | ------------------------------------------------------- |
+| `23505`                   | "This record already exists"                            |
+| `23503`                   | "Referenced record not found"                           |
+| `23502`                   | "Required field is missing"                             |
+| `42501`                   | "Permission denied - check Row Level Security policies" |
+| `42P01`                   | "Table not found - database schema may be out of sync"  |
+| `PGRST116`                | "No rows found"                                         |
+| `PGRST301`                | "Invalid request parameters"                            |
 
 **Utilities:**
 
-| Function | Purpose |
-|----------|---------|
-| `isOnline()` | Network check via `navigator.onLine` |
-| `handleSupabaseError(error, context?)` | Transform `PostgrestError` to `SupabaseServiceError` |
-| `handleNetworkError(error, context?)` | Create `SupabaseServiceError` with `isNetworkError: true` |
-| `isPostgrestError(error)` | Type guard for `PostgrestError` |
-| `isSupabaseServiceError(error)` | Type guard for `SupabaseServiceError` |
-| `logSupabaseError(context, error)` | Structured console.error with context prefix |
+| Function                               | Purpose                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| `isOnline()`                           | Network check via `navigator.onLine`                                         |
+| `handleSupabaseError(error, context?)` | Transform `PostgrestError` to `SupabaseServiceError`                         |
+| `handleNetworkError(error, context?)`  | Create `SupabaseServiceError` with `isNetworkError: true`                    |
+| `isPostgrestError(error)`              | Type guard for `PostgrestError`                                              |
+| `isSupabaseServiceError(error)`        | Type guard for `SupabaseServiceError`                                        |
+| `logSupabaseError(context, error)`     | Structured console.error with context prefix                                 |
 | `retryWithBackoff(operation, config?)` | Exponential backoff retry (default: 3 attempts, 1s-30s delay, 2x multiplier) |
-| `createOfflineMessage(operation)` | User-friendly offline message generator |
+| `createOfflineMessage(operation)`      | User-friendly offline message generator                                      |
 
 ## Supabase Validation Schemas
 
@@ -155,28 +155,30 @@ export class SupabaseServiceError extends Error {
 
 ```typescript
 const UUIDSchema = z.string().uuid('Invalid UUID format');
-const TimestampSchema = z.string().refine(
-  (val) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/.test(val),
-  { message: 'Invalid timestamp format' }
-);
+const TimestampSchema = z
+  .string()
+  .refine(
+    (val) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/.test(val),
+    { message: 'Invalid timestamp format' }
+  );
 ```
 
 **Schema inventory:**
 
-| Schema | Type | Validates |
-|--------|------|-----------|
-| `SupabaseUserSchema` | Row | User records (id, partner_name, device_id, partner_id, email, display_name) |
-| `UserInsertSchema` / `UserUpdateSchema` | Input | User write payloads |
-| `SupabaseMoodSchema` | Row | Mood records (id, user_id, mood_type, mood_types, note, timestamps) |
-| `MoodInsertSchema` / `MoodUpdateSchema` | Input | Mood write payloads (note max 200 chars) |
-| `SupabaseInteractionSchema` | Row | Interaction records (id, type, from/to user IDs, viewed) |
-| `InteractionInsertSchema` / `InteractionUpdateSchema` | Input | Interaction write payloads |
-| `SupabaseMessageSchema` | Row | Message records (placeholder for future sync) |
-| `SupabasePhotoSchema` | Row | Photo records (placeholder for future sync) |
-| `MoodArraySchema` | Array | `z.array(SupabaseMoodSchema)` |
-| `InteractionArraySchema` | Array | `z.array(SupabaseInteractionSchema)` |
-| `UserArraySchema` | Array | `z.array(SupabaseUserSchema)` |
-| `CoupleStatsSchema` | RPC | Scripture stats (totalSessions, totalSteps, lastCompleted, avgRating, bookmarkCount) |
+| Schema                                                | Type  | Validates                                                                            |
+| ----------------------------------------------------- | ----- | ------------------------------------------------------------------------------------ |
+| `SupabaseUserSchema`                                  | Row   | User records (id, partner_name, device_id, partner_id, email, display_name)          |
+| `UserInsertSchema` / `UserUpdateSchema`               | Input | User write payloads                                                                  |
+| `SupabaseMoodSchema`                                  | Row   | Mood records (id, user_id, mood_type, mood_types, note, timestamps)                  |
+| `MoodInsertSchema` / `MoodUpdateSchema`               | Input | Mood write payloads (note max 200 chars)                                             |
+| `SupabaseInteractionSchema`                           | Row   | Interaction records (id, type, from/to user IDs, viewed)                             |
+| `InteractionInsertSchema` / `InteractionUpdateSchema` | Input | Interaction write payloads                                                           |
+| `SupabaseMessageSchema`                               | Row   | Message records (placeholder for future sync)                                        |
+| `SupabasePhotoSchema`                                 | Row   | Photo records (placeholder for future sync)                                          |
+| `MoodArraySchema`                                     | Array | `z.array(SupabaseMoodSchema)`                                                        |
+| `InteractionArraySchema`                              | Array | `z.array(SupabaseInteractionSchema)`                                                 |
+| `UserArraySchema`                                     | Array | `z.array(SupabaseUserSchema)`                                                        |
+| `CoupleStatsSchema`                                   | RPC   | Scripture stats (totalSessions, totalSteps, lastCompleted, avgRating, bookmarkCount) |
 
 **Inferred types exported:** `SupabaseUser`, `SupabaseMood`, `SupabaseInteraction`, `MoodInsert`, `MoodUpdate`, `InteractionInsert`, `InteractionUpdate`, `CoupleStats`, and others via `z.infer<>`.
 

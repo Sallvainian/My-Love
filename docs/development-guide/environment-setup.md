@@ -4,23 +4,23 @@ The project uses [dotenvx](https://dotenvx.com) for secrets management. Environm
 
 ## How Secrets Are Injected
 
-| Context       | Mechanism                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| Local dev     | `dotenvx run -- <command>` decrypts `.env` using `.env.keys`                                      |
-| CI build      | `dotenvx run -- npm run build` with `DOTENV_PRIVATE_KEY` GitHub Secret                            |
-| CI tests      | Tests use local Supabase — no production secrets needed                                           |
-| E2E tests     | Playwright config parses `supabase status -o env` for local Supabase connection values            |
+| Context   | Mechanism                                                                              |
+| --------- | -------------------------------------------------------------------------------------- |
+| Local dev | `dotenvx run -- <command>` decrypts `.env` using `.env.keys`                           |
+| CI build  | `dotenvx run -- npm run build` with `DOTENV_PRIVATE_KEY` GitHub Secret                 |
+| CI tests  | Tests use local Supabase — no production secrets needed                                |
+| E2E tests | Playwright config parses `supabase status -o env` for local Supabase connection values |
 
 ## Environment Files
 
-| File           | Purpose                                                        | In Git? |
-| -------------- | -------------------------------------------------------------- | ------- |
-| `.env`         | Encrypted secrets (Supabase, Sentry, etc.)                     | Yes     |
-| `.env.keys`    | Private decryption key — backed up to dotenvx-ops cloud        | No (gitignored) |
-| `.env.x`       | dotenvx-ops project ID                                         | Yes     |
-| `.env.test`    | Plain-text local Supabase values for E2E testing               | Yes     |
-| `.env.example` | Template showing required variable names                       | Yes     |
-| `.envrc`       | direnv config (loads dotenvx secrets into the shell)           | No (gitignored) |
+| File           | Purpose                                                 | In Git?         |
+| -------------- | ------------------------------------------------------- | --------------- |
+| `.env`         | Encrypted secrets (Supabase, Sentry, etc.)              | Yes             |
+| `.env.keys`    | Private decryption key — backed up to dotenvx-ops cloud | No (gitignored) |
+| `.env.x`       | dotenvx-ops project ID                                  | Yes             |
+| `.env.test`    | Plain-text local Supabase values for E2E testing        | Yes             |
+| `.env.example` | Template showing required variable names                | Yes             |
+| `.envrc`       | direnv config (loads dotenvx secrets into the shell)    | No (gitignored) |
 
 ## Getting Started with Environment Variables
 

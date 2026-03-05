@@ -36,8 +36,8 @@ npx vitest run tests/unit/services/moodService.test.ts --silent  # Single file
 The global setup file configures:
 
 ```typescript
-import '@testing-library/jest-dom';  // Custom DOM matchers
-import 'fake-indexeddb/auto';        // IndexedDB mock (auto-injected)
+import '@testing-library/jest-dom'; // Custom DOM matchers
+import 'fake-indexeddb/auto'; // IndexedDB mock (auto-injected)
 
 // Browser API mocks:
 // - window.matchMedia  (responsive components)

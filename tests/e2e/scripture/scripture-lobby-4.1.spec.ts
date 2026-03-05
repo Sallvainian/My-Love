@@ -58,9 +58,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     // Note: The togetherMode fixture navigates both users before the test body,
     // so the partner broadcast may have already fired — accept either state.
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
-    await expect(page.getByTestId('lobby-partner-status')).toContainText(
-      /waiting for|has joined/i
-    );
+    await expect(page.getByTestId('lobby-partner-status')).toContainText(/waiting for|has joined/i);
     await expect(page.getByTestId('lobby-continue-solo')).toBeVisible();
 
     // -----------------------------------------------------------------------

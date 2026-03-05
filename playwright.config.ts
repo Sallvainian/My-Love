@@ -37,7 +37,7 @@ if (!process.env.SUPABASE_URL) {
     // Detect HS256/ES256 mismatch: if GoTrue has GOTRUE_JWT_KEYS, re-sign tokens.
     try {
       const jwtKeysRaw = execSync(
-        'docker inspect supabase_auth_My-Love --format \'{{range .Config.Env}}{{println .}}{{end}}\' 2>/dev/null',
+        "docker inspect supabase_auth_My-Love --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null",
         { encoding: 'utf-8' }
       );
       const jwtKeysLine = jwtKeysRaw.split('\n').find((l) => l.startsWith('GOTRUE_JWT_KEYS='));

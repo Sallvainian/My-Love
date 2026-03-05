@@ -35,13 +35,13 @@ Runs after deployment:
 
 ## Required GitHub Secrets
 
-| Secret                    | Description                                                           |
-| ------------------------- | --------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (build, deploy, health check)   |
-| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                    |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                          |
-| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations     |
-| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                 |
+| Secret                    | Description                                                             |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (build, deploy, health check) |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                  |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                        |
+| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations   |
+| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting               |
 
 ## GitHub Pages Configuration
 

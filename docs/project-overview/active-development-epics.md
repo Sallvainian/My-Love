@@ -10,11 +10,11 @@ The project uses the BMAD method for planning. All planning documents are in `_b
 
 ## Epic Status
 
-| Epic | Name                                  | Status      | Stories | Branch                                    |
-| ---- | ------------------------------------- | ----------- | ------- | ----------------------------------------- |
-| 1    | Foundation and Solo Scripture Reading | Done        | 5/5     | merged to main                            |
-| 2    | Reflection and Daily Prayer Report    | Done        | 3/3     | merged to main                            |
-| 3    | Stats and Overview Dashboard          | Done        | 1/1     | merged to main                            |
+| Epic | Name                                  | Status      | Stories | Branch                                      |
+| ---- | ------------------------------------- | ----------- | ------- | ------------------------------------------- |
+| 1    | Foundation and Solo Scripture Reading | Done        | 5/5     | merged to main                              |
+| 2    | Reflection and Daily Prayer Report    | Done        | 3/3     | merged to main                              |
+| 3    | Stats and Overview Dashboard          | Done        | 1/1     | merged to main                              |
 | 4    | Together Mode -- Synchronized Reading | In Progress | 2/3     | `epic-4/together-mode-synchronized-reading` |
 
 ## Epic 1: Foundation and Solo Scripture Reading (Done)
@@ -23,13 +23,13 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 
 **Stories (all done)**:
 
-| Story | Name                                     | Status |
-| ----- | ---------------------------------------- | ------ |
+| Story | Name                                       | Status |
+| ----- | ------------------------------------------ | ------ |
 | 1.1   | Database Schema and Backend Infrastructure | Done   |
-| 1.2   | Navigation and Overview Page              | Done   |
-| 1.3   | Solo Reading Flow                         | Done   |
-| 1.4   | Save, Resume, and Optimistic UI           | Done   |
-| 1.5   | Accessibility Foundations                 | Done   |
+| 1.2   | Navigation and Overview Page               | Done   |
+| 1.3   | Solo Reading Flow                          | Done   |
+| 1.4   | Save, Resume, and Optimistic UI            | Done   |
+| 1.5   | Accessibility Foundations                  | Done   |
 
 **FRs covered**: FR1, FR1a, FR2, FR3, FR4, FR5, FR6, FR7, FR8, FR9, FR10, FR12, FR13, FR26, FR47-FR54
 
@@ -67,11 +67,11 @@ Couples can read scripture together in real-time with a lobby, Reader/Responder 
 
 **Stories**:
 
-| Story | Name                                    | Status      |
-| ----- | --------------------------------------- | ----------- |
-| 4.1   | Lobby, Role Selection, and Countdown    | Done        |
-| 4.2   | Synchronized Reading with Lock-In       | Done        |
-| 4.3   | Reconnection and Graceful Degradation   | In Progress |
+| Story | Name                                  | Status      |
+| ----- | ------------------------------------- | ----------- |
+| 4.1   | Lobby, Role Selection, and Countdown  | Done        |
+| 4.2   | Synchronized Reading with Lock-In     | Done        |
+| 4.3   | Reconnection and Graceful Degradation | In Progress |
 
 **Retrospective**: Optional (epic not yet complete)
 
@@ -91,17 +91,17 @@ Handles network interruptions during together-mode sessions with graceful fallba
 
 All retrospective action items from Epics 1-3 have been completed:
 
-| Action Item                            | Source  | Status |
-| -------------------------------------- | ------- | ------ |
-| Claude error handling rule             | Epic 1  | Done   |
-| Claude container-store rule            | Epic 1  | Done   |
-| Claude scope creep rule                | Epic 1  | Done   |
-| Project context combined effects rule  | Epic 1  | Done   |
-| ESLint recurring review patterns       | Epic 2  | Done   |
-| Execute retro actions immediately      | Epic 2  | Done   |
-| pgTAP couple relationship checklist    | Epic 3  | Done   |
-| Architecture doc as exit criterion     | Epic 3  | Done   |
-| Update structure boundaries doc        | Epic 3  | Done   |
+| Action Item                           | Source | Status |
+| ------------------------------------- | ------ | ------ |
+| Claude error handling rule            | Epic 1 | Done   |
+| Claude container-store rule           | Epic 1 | Done   |
+| Claude scope creep rule               | Epic 1 | Done   |
+| Project context combined effects rule | Epic 1 | Done   |
+| ESLint recurring review patterns      | Epic 2 | Done   |
+| Execute retro actions immediately     | Epic 2 | Done   |
+| pgTAP couple relationship checklist   | Epic 3 | Done   |
+| Architecture doc as exit criterion    | Epic 3 | Done   |
+| Update structure boundaries doc       | Epic 3 | Done   |
 
 ## PRD User Journeys
 

@@ -19,12 +19,12 @@ The `__WB_MANIFEST` array is injected at build time by Vite's PWA plugin. It inc
 
 ### Cache Strategies
 
-| Resource Type     | Strategy     | Cache Name           | Config                              | Rationale                                                       |
-| ----------------- | ------------ | -------------------- | ----------------------------------- | --------------------------------------------------------------- |
-| JS/CSS bundles    | NetworkOnly  | (none)               | (none)                              | Always serve latest code; prevents stale code after deployments |
-| Navigation (HTML) | NetworkFirst | `navigation-cache`   | `networkTimeoutSeconds: 3`          | Show latest content, fall back to precached version when offline |
-| Images/Fonts      | CacheFirst   | `static-assets-v2`   | `maxEntries: 100`, `maxAge: 30d`    | Static assets rarely change; fast cached response               |
-| Google Fonts      | CacheFirst   | `google-fonts-v2`    | `maxEntries: 30`, `maxAge: 365d`, `statuses: [0, 200]` | Cross-origin fonts cached with 1-year expiry |
+| Resource Type     | Strategy     | Cache Name         | Config                                                 | Rationale                                                        |
+| ----------------- | ------------ | ------------------ | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| JS/CSS bundles    | NetworkOnly  | (none)             | (none)                                                 | Always serve latest code; prevents stale code after deployments  |
+| Navigation (HTML) | NetworkFirst | `navigation-cache` | `networkTimeoutSeconds: 3`                             | Show latest content, fall back to precached version when offline |
+| Images/Fonts      | CacheFirst   | `static-assets-v2` | `maxEntries: 100`, `maxAge: 30d`                       | Static assets rarely change; fast cached response                |
+| Google Fonts      | CacheFirst   | `google-fonts-v2`  | `maxEntries: 30`, `maxAge: 365d`, `statuses: [0, 200]` | Cross-origin fonts cached with 1-year expiry                     |
 
 ### Background Sync
 

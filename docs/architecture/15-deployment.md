@@ -68,14 +68,14 @@ This affects:
 
 Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git:
 
-| Variable                                | Purpose                              |
-| --------------------------------------- | ------------------------------------ |
-| `VITE_SUPABASE_URL`                     | Supabase project URL                 |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key             |
+| Variable                                | Purpose                                       |
+| --------------------------------------- | --------------------------------------------- |
+| `VITE_SUPABASE_URL`                     | Supabase project URL                          |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key                      |
 | `SENTRY_AUTH_TOKEN`                     | Sentry auth token (enables sourcemaps upload) |
-| `SENTRY_ORG`                            | Sentry organization slug             |
-| `SENTRY_PROJECT`                        | Sentry project slug                  |
-| `SENTRY_RELEASE`                        | Release name for Sentry tracking     |
+| `SENTRY_ORG`                            | Sentry organization slug                      |
+| `SENTRY_PROJECT`                        | Sentry project slug                           |
+| `SENTRY_RELEASE`                        | Release name for Sentry tracking              |
 
 The `.env.keys` file contains the decryption key and is gitignored.
 
