@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 
@@ -47,9 +47,10 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
 }));
 
 // Create a test store with just the scripture slice
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createTestStore() {
-  return create<ScriptureSlice>()(createScriptureReadingSlice as any);
+  return create<ScriptureSlice>()(
+    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
+  );
 }
 
 describe('scriptureReadingSlice — coupleStats', () => {

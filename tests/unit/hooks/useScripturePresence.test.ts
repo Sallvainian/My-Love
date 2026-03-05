@@ -149,7 +149,7 @@ describe('useScripturePresence', () => {
 
   test('[P1] re-sends presence when view prop changes', async () => {
     const { rerender } = renderHook(({ view }) => useScripturePresence('session-abc', 0, view), {
-      initialProps: { view: 'verse' as const },
+      initialProps: { view: 'verse' as 'verse' | 'response' },
     });
 
     await act(async () => {
@@ -159,7 +159,7 @@ describe('useScripturePresence', () => {
     mocks.send.mockClear();
 
     await act(async () => {
-      rerender({ view: 'response' as any });
+      rerender({ view: 'response' });
     });
 
     // Should have re-sent presence with updated view
@@ -285,12 +285,12 @@ describe('useScripturePresence', () => {
   });
 
   test('[P1] heartbeat uses latest step/view after props change', async () => {
-    let rerender: ((props: { stepIndex: number; view: any }) => void) | null = null;
+    let rerender: ((props: { stepIndex: number; view: 'verse' | 'response' }) => void) | null = null;
 
     await act(async () => {
       const hook = renderHook(
         ({ stepIndex, view }) => useScripturePresence('session-abc', stepIndex, view),
-        { initialProps: { stepIndex: 0, view: 'verse' as const } }
+        { initialProps: { stepIndex: 0, view: 'verse' as 'verse' | 'response' } }
       );
       rerender = hook.rerender;
     });
@@ -300,7 +300,7 @@ describe('useScripturePresence', () => {
     });
 
     await act(async () => {
-      rerender?.({ stepIndex: 1, view: 'response' as any });
+      rerender!({ stepIndex: 1, view: 'response' });
     });
 
     mocks.send.mockClear();

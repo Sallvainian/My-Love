@@ -126,6 +126,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
       - name: Setup Supabase Local
         uses: ./.github/actions/setup-supabase
 
@@ -164,6 +167,9 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
 
       - name: Setup Supabase Local
         uses: ./.github/actions/setup-supabase

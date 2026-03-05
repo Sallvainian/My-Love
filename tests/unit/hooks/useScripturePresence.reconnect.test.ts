@@ -107,7 +107,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
     // Simulate reconnect — new presence_update arrives
     // Find the presence_update handler registered via channel.on()
     const presenceHandler = mockChannel.on.mock.calls.find(
-      (call: unknown[]) => (call[1] as any)?.event === 'presence_update'
+      (call: unknown[]) => (call[1] as { event?: string })?.event === 'presence_update'
     )?.[2];
 
     if (presenceHandler) {
@@ -170,7 +170,7 @@ describe('useScripturePresence — isPartnerConnected (Story 4.3)', () => {
 
     // Find the presence_update handler
     const presenceHandler = mockChannel.on.mock.calls.find(
-      (call: unknown[]) => (call[1] as any)?.event === 'presence_update'
+      (call: unknown[]) => (call[1] as { event?: string })?.event === 'presence_update'
     )?.[2];
 
     // Send a stale presence_update (ts is 25s in the past)

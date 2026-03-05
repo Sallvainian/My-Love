@@ -110,9 +110,7 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toEqual(initialMood);
 
     // Simulate broadcast received
-    if (broadcastCallback !== null) {
-      (broadcastCallback as any)(updatedMood);
-    }
+    broadcastCallback!(updatedMood);
 
     await waitFor(() => {
       expect(result.current.partnerMood).toEqual(updatedMood);
@@ -157,9 +155,7 @@ describe('usePartnerMood', () => {
     expect(result.current.partnerMood).toEqual(initialMood);
 
     // Simulate broadcast from different user
-    if (broadcastCallback !== null) {
-      (broadcastCallback as any)(otherUserMood);
-    }
+    broadcastCallback!(otherUserMood);
 
     // Wait a bit to ensure it doesn't update
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -244,18 +240,14 @@ describe('usePartnerMood', () => {
     });
 
     // Simulate subscription success
-    if (statusCallback !== null) {
-      (statusCallback as any)('SUBSCRIBED');
-    }
+    statusCallback!('SUBSCRIBED');
 
     await waitFor(() => {
       expect(result.current.connectionStatus).toBe('connected');
     });
 
     // Simulate connection error
-    if (statusCallback !== null) {
-      (statusCallback as any)('CHANNEL_ERROR');
-    }
+    statusCallback!('CHANNEL_ERROR');
 
     await waitFor(() => {
       expect(result.current.connectionStatus).toBe('disconnected');

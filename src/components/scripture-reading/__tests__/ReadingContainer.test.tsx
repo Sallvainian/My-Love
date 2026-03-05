@@ -233,7 +233,7 @@ describe('ReadingContainer', () => {
 
     expect(mockLockIn).toHaveBeenCalledTimes(1);
 
-    (resolveLockIn as any)?.();
+    resolveLockIn!();
   });
 
   // ===========================================================================
