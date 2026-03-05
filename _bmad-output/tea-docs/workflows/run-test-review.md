@@ -117,14 +117,12 @@ test('show banner for new users', async ({ page }) => {
 Move duplicated login sequences into reusable fixtures. With Playwright Utils:
 
 ```typescript
-import { test as base } from '@playwright/test';
-import { createAuthFixtures } from '@seontechnologies/playwright-utils/auth-session';
+// All fixtures (auth, apiRequest, interceptNetworkCall, etc.) are
+// already composed in merged-fixtures.ts — just import from there:
+import { test, expect } from '../support/merged-fixtures';
 
-export const test = base.extend(createAuthFixtures());
-
-// Use in tests:
-test('example', async ({ page, authToken }) => {
-  // Already authenticated via persisted token
+test('example', async ({ page }) => {
+  // Already authenticated via workerAuth fixture (worker-isolated storage state)
   await page.goto('/dashboard');
 });
 ```
