@@ -47,10 +47,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
 }));
 
 // Create a test store with just the scripture slice
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createTestStore() {
-  return create<ScriptureSlice>()((...args) => ({
-    ...createScriptureReadingSlice(...args),
-  }));
+  return create<ScriptureSlice>()(createScriptureReadingSlice as any);
 }
 
 describe('scriptureReadingSlice — coupleStats', () => {
@@ -80,7 +79,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
         await import('../../../src/services/scriptureReadingService');
 
       // Make getCoupleStats hang so we can check loading state
-      let resolveStats!: (value: unknown) => void;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let resolveStats!: (value: any) => void;
       vi.mocked(scriptureReadingService.getCoupleStats).mockReturnValue(
         new Promise((resolve) => {
           resolveStats = resolve;

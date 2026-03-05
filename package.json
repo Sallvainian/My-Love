@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "./scripts/dev-with-cleanup.sh",
     "dev:raw": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -p tsconfig.app.json && vite build",
     "perf:build": "mkdir -p docs/performance && npm run typecheck && vite build 2>&1 | tee docs/performance/perf-build.log",
     "perf:bundle-report": "npm run perf:build && node scripts/perf-bundle-report.mjs",
     "typecheck": "tsc --noEmit",

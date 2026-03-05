@@ -16,7 +16,6 @@ import 'fake-indexeddb/auto';
 import { create } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
-
 // Mock supabase client
 const mockGetUser = vi.fn();
 vi.mock('../../../src/api/supabaseClient', () => ({
@@ -49,10 +48,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
 }));
 
 // Create a test store with just the scripture slice
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createTestStore() {
-  return create<ScriptureSlice>()((...args) => ({
-    ...createScriptureReadingSlice(...args),
-  }));
+  return create<ScriptureSlice>()(createScriptureReadingSlice as any);
 }
 
 describe('scriptureReadingSlice', () => {
@@ -85,7 +83,8 @@ describe('scriptureReadingSlice', () => {
         await import('../../../src/services/scriptureReadingService');
 
       // Make createSession hang so we can check loading state
-      let resolveCreate: (value: unknown) => void;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let resolveCreate: (value: any) => void;
       vi.mocked(scriptureReadingService.createSession).mockReturnValue(
         new Promise((resolve) => {
           resolveCreate = resolve;
