@@ -43,10 +43,6 @@ function getWorkerPartnerEmail(workerIndex: number): string {
   return `testworker${workerIndex}-partner@test.example.com`;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function ensureUser(
   admin: ReturnType<typeof createClient>,
   email: string,
@@ -109,7 +105,7 @@ async function getAppUserIdByEmail(
         `Could not resolve app user for ${email} after ${maxAttempts} attempts: ${error?.message ?? 'not found'}`
       );
     }
-    await sleep(250);
+    await new Promise((r) => setTimeout(r, 250));
   }
   throw new Error('unreachable');
 }

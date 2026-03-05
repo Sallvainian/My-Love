@@ -20,10 +20,6 @@ const AUTH_READINESS_MAX_ATTEMPTS = 5;
 const AUTH_READINESS_RETRY_MS = 300;
 const NETWORK_DIAGNOSTIC_TIMEOUT_MS = 12_000;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function getSupabaseAuthContext(page: Page): Promise<{
   apiUrl: string;
   anonKey: string;
@@ -94,7 +90,7 @@ async function waitForAuthReadiness(page: Page): Promise<void> {
     const authContext = await getSupabaseAuthContext(page);
     if (!authContext) {
       diagnostics.push(`attempt ${attempt}: missing auth context`);
-      await sleep(AUTH_READINESS_RETRY_MS * attempt);
+      await new Promise((r) => setTimeout(r, AUTH_READINESS_RETRY_MS * attempt));
       continue;
     }
 
@@ -112,7 +108,7 @@ async function waitForAuthReadiness(page: Page): Promise<void> {
     }
 
     diagnostics.push(`attempt ${attempt}: status ${response?.status() ?? 'network-error'}`);
-    await sleep(AUTH_READINESS_RETRY_MS * attempt);
+    await new Promise((r) => setTimeout(r, AUTH_READINESS_RETRY_MS * attempt));
   }
 
   throw new Error(
@@ -211,7 +207,13 @@ async function normalizeOverviewFromActiveFlow(page: Page): Promise<void> {
   await page.getByTestId('save-and-exit-button').click();
   await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
+  const startButton = page.getByTestId('scripture-start-button');
   const resumePrompt = page.getByTestId('resume-prompt');
+
+  // Wait for either the start button or the resume prompt to appear.
+  await expect(startButton.or(resumePrompt)).toBeVisible();
+
+  // If the resume prompt appeared, click "start fresh" and wait for the abandon PATCH.
   if (await resumePrompt.isVisible()) {
     const abandonPromise = page
       .waitForResponse(
@@ -222,14 +224,15 @@ async function normalizeOverviewFromActiveFlow(page: Page): Promise<void> {
           resp.status() < 300,
         { timeout: NETWORK_DIAGNOSTIC_TIMEOUT_MS }
       )
+      // Best-effort: the PATCH may not fire if there is no session to abandon.
       .catch(() => null);
 
     await page.getByTestId('resume-start-fresh').click();
     await abandonPromise;
   }
 
-  await expect(page.getByTestId('scripture-start-button')).toBeVisible();
-  await expect(page.getByTestId('scripture-start-button')).toBeEnabled();
+  await expect(startButton).toBeVisible();
+  await expect(startButton).toBeEnabled();
 }
 
 /**
@@ -282,7 +285,9 @@ export async function ensureScriptureOverview(page: Page): Promise<ScriptureEntr
   }
 
   // Wait for ALL re-render-triggering API calls to complete before interacting.
-  // Swallow rejections — stats may not fire if partner is unlinked.
+  // Best-effort: swallow rejections — these APIs may not fire if partner is
+  // unlinked (no couple stats) or if the user has no partner row yet. This is
+  // NOT flow control; we just need to give the render chain time to settle.
   await Promise.all([
     partnerLoaded.catch(() => {}),
     statsLoaded.catch(() => {}),
