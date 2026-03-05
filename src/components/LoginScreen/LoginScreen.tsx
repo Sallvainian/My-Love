@@ -105,7 +105,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="login-screen">
+    <div className="login-screen" data-testid="login-screen">
       <div className="login-container">
         <div className="login-header">
           <h1 className="login-title">Welcome Back</h1>
@@ -114,7 +114,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
         <form className="login-form" onSubmit={handleSubmit}>
           {error && (
-            <div className="login-error" role="alert" aria-live="polite">
+            <div className="login-error" data-testid="login-error" role="alert" aria-live="polite">
               <svg
                 className="error-icon"
                 xmlns="http://www.w3.org/2000/svg"
@@ -157,6 +157,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </label>
             <input
               id="password"
+              data-testid="password-input"
               type="password"
               className="form-input"
               placeholder="Enter your password"
@@ -174,6 +175,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <button
             type="submit"
             className="submit-button"
+            data-testid="submit-button"
             disabled={isLoading || isGoogleLoading || !email || !password}
           >
             {isLoading ? (
@@ -216,6 +218,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         <button
           type="button"
           className="google-signin-button"
+          data-testid="google-signin-button"
           onClick={handleGoogleSignIn}
           disabled={isLoading || isGoogleLoading}
         >

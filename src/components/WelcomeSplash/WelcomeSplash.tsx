@@ -24,7 +24,10 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
   const hearts = useMemo(() => generateHearts(), []);
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-pink-50 via-rose-50 to-purple-50 px-4">
+    <div
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-pink-50 via-rose-50 to-purple-50 px-4"
+      data-testid="welcome-splash"
+    >
       {/* Raining hearts animation */}
       <div className="pointer-events-none fixed inset-0 z-0">
         {hearts.map((heart) => (
@@ -103,6 +106,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
               onClick={onContinue}
+              data-testid="welcome-continue-button"
               className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-8 py-4 text-lg font-medium text-white transition-all duration-300 hover:scale-105 hover:shadow-xl"
             >
               Continue

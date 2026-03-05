@@ -1,3 +1,8 @@
+# Test failure reports
+failures-ai.md
+playwright-results.json
+_bmad-output/pw-test-results/
+
 # Logs
 logs
 *.log
@@ -113,3 +118,4 @@ AGENTS.md
 # Working directories (image generation, temp files)
 output/
 tmp/
+test-results.json

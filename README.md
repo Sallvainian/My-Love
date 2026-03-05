@@ -58,12 +58,12 @@ npm run format           # Prettier write
 
 The project uses a fullstack test strategy with four tiers:
 
-| Tier | Tool | Command | Scope |
-|------|------|---------|-------|
-| Unit | Vitest + happy-dom | `npm run test:unit` | Components, stores, services |
-| Integration | Playwright (browserless) | `npm run test:integration` | Supabase RPC, API contracts |
-| E2E | Playwright (Chromium) | `npm run test:e2e` | Full user flows with browser |
-| Database | pgTAP via Supabase CLI | `npm run test:db` | SQL functions, RLS policies |
+| Tier        | Tool                     | Command                    | Scope                        |
+| ----------- | ------------------------ | -------------------------- | ---------------------------- |
+| Unit        | Vitest + happy-dom       | `npm run test:unit`        | Components, stores, services |
+| Integration | Playwright (browserless) | `npm run test:integration` | Supabase RPC, API contracts  |
+| E2E         | Playwright (Chromium)    | `npm run test:e2e`         | Full user flows with browser |
+| Database    | pgTAP via Supabase CLI   | `npm run test:db`          | SQL functions, RLS policies  |
 
 ```bash
 # Unit
@@ -101,12 +101,12 @@ Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices:
 
 Uses [fnox](https://fnox.jdx.dev) with the `age` provider. Secrets are encrypted inline in `fnox.toml` (safe to commit) and decrypted at runtime via age keys.
 
-| File | Committed | Purpose |
-|------|-----------|---------|
-| `.mise.toml` | Yes | Tool versions (Node) + env vars |
-| `fnox.toml` | Yes | Age-encrypted secrets |
-| `.env.example` | Yes | Template with placeholder values |
-| `.env.test` | Yes | Local Supabase test values |
+| File           | Committed | Purpose                          |
+| -------------- | --------- | -------------------------------- |
+| `.mise.toml`   | Yes       | Tool versions (Node) + env vars  |
+| `fnox.toml`    | Yes       | Age-encrypted secrets            |
+| `.env.example` | Yes       | Template with placeholder values |
+| `.env.test`    | Yes       | Local Supabase test values       |
 
 ```bash
 fnox exec -- <command>    # Run with decrypted secrets
@@ -196,11 +196,11 @@ On push to `main`: build → smoke test → deploy to GitHub Pages → health ch
 
 ### GitHub Secrets
 
-| Secret | Purpose |
-|--------|---------|
-| `VITE_SUPABASE_URL` | Supabase project URL (build-time) |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key (build-time) |
-| `SUPABASE_ACCESS_TOKEN` | CLI auth for type generation |
+| Secret                                  | Purpose                           |
+| --------------------------------------- | --------------------------------- |
+| `VITE_SUPABASE_URL`                     | Supabase project URL (build-time) |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key (build-time)    |
+| `SUPABASE_ACCESS_TOKEN`                 | CLI auth for type generation      |
 
 ### GitHub Pages
 

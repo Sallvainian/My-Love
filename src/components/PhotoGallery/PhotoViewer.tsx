@@ -379,6 +379,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         ref={containerRef}
         // AC 6.4.1: Full-screen modal overlay with black background
         className="fixed inset-0 z-50 flex items-center justify-center bg-black"
+        data-testid="photo-viewer-overlay"
         role="dialog"
         aria-modal="true"
         aria-label="Photo viewer"

@@ -116,6 +116,13 @@ export default defineConfig({
     {
       name: 'api',
       testDir: './tests/api',
+      use: {
+        baseURL: process.env.SUPABASE_URL,
+        extraHTTPHeaders: {
+          apikey: process.env.SUPABASE_ANON_KEY ?? '',
+          'Content-Type': 'application/json',
+        },
+      },
     },
     {
       name: 'integration',
