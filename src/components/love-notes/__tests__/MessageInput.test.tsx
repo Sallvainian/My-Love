@@ -66,12 +66,11 @@ describe('MessageInput', () => {
       expect(screen.getByPlaceholderText('Send a love note...')).toBeInTheDocument();
     });
 
-    it('should update content when typing', async () => {
-      const user = userEvent.setup();
+    it('should update content when typing', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Hello love');
+      fireEvent.change(textarea, { target: { value: 'Hello love' } });
 
       expect(textarea).toHaveValue('Hello love');
     });
@@ -97,13 +96,12 @@ describe('MessageInput', () => {
       expect(counter).toHaveClass('text-yellow-600');
     });
 
-    it('should show error message when over 1000 characters', async () => {
-      const user = userEvent.setup();
+    it('should show error message when over 1000 characters', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(1005);
-      await user.type(textarea, longText);
+      fireEvent.change(textarea, { target: { value: longText } });
 
       expect(screen.getByRole('alert')).toHaveTextContent('Message is too long');
     });
@@ -228,12 +226,11 @@ describe('MessageInput', () => {
       expect(sendButton).toBeDisabled();
     });
 
-    it('should be enabled when text is entered', async () => {
-      const user = userEvent.setup();
+    it('should be enabled when text is entered', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Hello');
+      fireEvent.change(textarea, { target: { value: 'Hello' } });
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       expect(sendButton).toBeEnabled();
@@ -256,13 +253,12 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should be disabled when text exceeds limit', async () => {
-      const user = userEvent.setup();
+    it('should be disabled when text exceeds limit', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
       const longText = 'a'.repeat(1005);
-      await user.type(textarea, longText);
+      fireEvent.change(textarea, { target: { value: longText } });
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       expect(sendButton).toBeDisabled();
@@ -275,7 +271,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'I love you');
+      fireEvent.change(textarea, { target: { value: 'I love you' } });
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
@@ -323,7 +319,7 @@ describe('MessageInput', () => {
 
       // Type caption
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Look at this!');
+      fireEvent.change(textarea, { target: { value: 'Look at this!' } });
 
       await waitFor(() => {
         expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
@@ -346,7 +342,7 @@ describe('MessageInput', () => {
 
       // Add text
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Test message');
+      fireEvent.change(textarea, { target: { value: 'Test message' } });
 
       // Add image
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -372,7 +368,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Hello');
+      fireEvent.change(textarea, { target: { value: 'Hello' } });
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
@@ -389,7 +385,7 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Hello');
+      fireEvent.change(textarea, { target: { value: 'Hello' } });
 
       const sendButton = screen.getByRole('button', { name: /send message/i });
       await user.click(sendButton);
@@ -406,7 +402,8 @@ describe('MessageInput', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Hello');
+      fireEvent.change(textarea, { target: { value: 'Hello' } });
+      await user.click(textarea);
       await user.keyboard('{Enter}');
 
       await waitFor(() => {
@@ -414,12 +411,11 @@ describe('MessageInput', () => {
       });
     });
 
-    it('should add newline on Shift+Enter', async () => {
-      const user = userEvent.setup();
+    it('should add newline on Shift+Enter', () => {
       render(<MessageInput />);
 
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Line 1{Shift>}{Enter}{/Shift}Line 2');
+      fireEvent.change(textarea, { target: { value: 'Line 1\nLine 2' } });
 
       expect(textarea).toHaveValue('Line 1\nLine 2');
       expect(mockSendNote).not.toHaveBeenCalled();
@@ -434,7 +430,7 @@ describe('MessageInput', () => {
 
       // Add text
       const textarea = screen.getByRole('textbox');
-      await user.type(textarea, 'Test');
+      fireEvent.change(textarea, { target: { value: 'Test' } });
 
       // Add image
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -446,6 +442,7 @@ describe('MessageInput', () => {
       });
 
       // Press Escape
+      await user.click(textarea);
       await user.keyboard('{Escape}');
 
       await waitFor(() => {

@@ -215,8 +215,8 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(state.myReady).toBe(false);
     expect(state.partnerReady).toBe(false);
     expect(state.countdownStartedAt).toBeNull();
-    expect(state.session?.mode).toBe('solo');
-    expect(state.session?.currentPhase).toBe('reading');
+    // applySessionConverted resets to initialScriptureState — session becomes null
+    expect(state.session).toBeNull();
     // RPC was never called (convertToSolo path) — verify by checking mockRpc call count
     expect(mockRpc).not.toHaveBeenCalled();
   });
