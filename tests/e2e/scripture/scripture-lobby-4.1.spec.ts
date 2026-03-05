@@ -18,7 +18,6 @@ import {
   COUNTDOWN_APPEAR_TIMEOUT_MS,
   isToggleReadyResponse,
   isSelectRoleResponse,
-  isConvertToSoloResponse,
   navigateToTogetherRoleSelection,
 } from '../../support/helpers/scripture-lobby';
 import { createTestSession, cleanupTestSession } from '../../support/factories';
@@ -37,6 +36,7 @@ const VERSE_LOAD_TIMEOUT_MS = 15_000;
 test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
   test('[P0] should complete full lobby flow: role selection → both ready → countdown → verse', async ({
     page,
+    interceptNetworkCall,
     togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
@@ -49,7 +49,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(page.getByTestId('lobby-role-responder')).toContainText('You read the response');
 
     // WHEN: User A selects Reader role
-    const userASelectRole = page.waitForResponse(isSelectRoleResponse);
+    const userASelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
     await page.getByTestId('lobby-role-reader').click();
     await userASelectRole;
 
@@ -92,11 +92,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     // WHEN: User A clicks Ready
     // -----------------------------------------------------------------------
     // Network-first: watch for ready state RPC before clicking
-    const userAReadyBroadcast = page
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_toggle_ready RPC (User A) did not fire: ${e.message}`);
-      });
+    const userAReadyBroadcast = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_toggle_ready', timeout: READY_BROADCAST_TIMEOUT_MS });
 
     await page.getByTestId('lobby-ready-button').click();
     await userAReadyBroadcast;
@@ -155,6 +151,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
 test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
   test('[P1] should convert together-mode session to solo when user taps "Continue solo"', async ({
     page,
+    interceptNetworkCall,
     supabaseAdmin,
   }) => {
     test.setTimeout(30_000);
@@ -176,7 +173,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
 
       // WHEN: User selects a role (Reader)
-      const soloSelectRole = page.waitForResponse(isSelectRoleResponse);
+      const soloSelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
       await page.getByTestId('lobby-role-reader').click();
       await soloSelectRole;
 
@@ -194,11 +191,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // WHEN: User taps "Continue solo" without partner joining
       // -----------------------------------------------------------------------
       // Network-first: watch for session mode conversion RPC
-      const conversionResponse = page
-        .waitForResponse(isConvertToSoloResponse, { timeout: CONVERSION_TIMEOUT_MS })
-        .catch((e: Error) => {
-          throw new Error(`scripture_convert_to_solo RPC did not fire: ${e.message}`);
-        });
+      const conversionResponse = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_convert_to_solo', timeout: CONVERSION_TIMEOUT_MS });
 
       await page.getByTestId('lobby-continue-solo').click();
       await conversionResponse;

@@ -27,12 +27,13 @@ import { createTestSession, cleanupTestSession } from '../../support/factories';
 test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
   test('[P2] should announce "Session starting in 3 seconds" via aria-live assertive when countdown begins', async ({
     page,
+    interceptNetworkCall,
     togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
 
     // GIVEN: User A navigates to Together mode and selects Reader role
-    const userASelectRole = page.waitForResponse(isSelectRoleResponse);
+    const userASelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
     await page.getByTestId('lobby-role-reader').click();
     await userASelectRole;
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
@@ -49,21 +50,14 @@ test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
     });
 
     // WHEN: User A clicks Ready
-    const userAReadyBroadcast = page
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_toggle_ready RPC (User A) did not fire: ${e.message}`);
-      });
+    const userAReadyBroadcast = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_toggle_ready', timeout: READY_BROADCAST_TIMEOUT_MS });
 
     await page.getByTestId('lobby-ready-button').click();
     await userAReadyBroadcast;
 
     // WHEN: User B (partner) clicks Ready — both ready triggers countdown
     const partnerReadyBroadcast = partnerPage
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_toggle_ready RPC (User B) did not fire: ${e.message}`);
-      });
+      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
 
     await partnerPage.getByTestId('lobby-ready-button').click();
     await partnerReadyBroadcast;
@@ -93,12 +87,13 @@ test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
 test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
   test('[P2] should announce partner ready state via aria-live polite region when partner toggles ready', async ({
     page,
+    interceptNetworkCall,
     togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
 
     // GIVEN: User A navigates to Together mode and selects Reader role
-    const userASelectRole = page.waitForResponse(isSelectRoleResponse);
+    const userASelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
     await page.getByTestId('lobby-role-reader').click();
     await userASelectRole;
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
@@ -123,10 +118,7 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
 
     // WHEN: User B (partner) toggles ready
     const partnerReadyBroadcast = partnerPage
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_toggle_ready RPC (partner) did not fire: ${e.message}`);
-      });
+      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
 
     await partnerPage.getByTestId('lobby-ready-button').click();
     await partnerReadyBroadcast;
@@ -148,6 +140,7 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
 test.describe('[4.1-E2E-005] Language Compliance', () => {
   test('[P2] should display "Continue solo" button and non-accusatory waiting language in lobby', async ({
     page,
+    interceptNetworkCall,
     supabaseAdmin,
   }) => {
     test.setTimeout(30_000);
@@ -175,7 +168,7 @@ test.describe('[4.1-E2E-005] Language Compliance', () => {
       await expect(continueSoloOnRoleSelection).toHaveText('Continue solo');
 
       // WHEN: User selects Reader role — transitions to lobby waiting screen
-      const langSelectRole = page.waitForResponse(isSelectRoleResponse);
+      const langSelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
       await page.getByTestId('lobby-role-reader').click();
       await langSelectRole;
       await expect(page.getByTestId('lobby-waiting')).toBeVisible();
