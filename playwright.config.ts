@@ -117,6 +117,10 @@ export default defineConfig({
       name: 'api',
       testDir: './tests/api',
     },
+    {
+      name: 'integration',
+      testDir: './tests/integration',
+    },
     // Uncomment for cross-browser testing
     // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     // { name: 'webkit', use: { ...devices['Desktop Safari'] } },
