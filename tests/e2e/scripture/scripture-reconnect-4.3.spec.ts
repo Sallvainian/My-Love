@@ -23,7 +23,7 @@ import {
   reconnectPartnerAndLoadSession,
 } from '../../support/helpers/scripture-together';
 import { cleanupTestSession } from '../../support/factories';
-import { getAuthToken, getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
+import { createClient } from '@supabase/supabase-js';
 
 // ---------------------------------------------------------------------------
 // Timeout constants
@@ -32,30 +32,106 @@ import { getAuthToken, getStorageStatePath } from '@seontechnologies/playwright-
 const DISCONNECTION_DETECT_TIMEOUT_MS = 25_000; // Heartbeat 10s + stale TTL 20s + buffer
 const DISCONNECTION_PHASE_B_TIMEOUT_MS = 35_000; // Phase B starts at 30s elapsed
 
+const TEST_USER_PASSWORD = 'testpassword123';
+
+/** Map worker-N-partner → email. */
+function partnerEmail(identifier: string): string {
+  const m = identifier.match(/^worker-(\d+)-partner$/);
+  if (m) return `testworker${m[1]}-partner@test.example.com`;
+  return `${identifier}@test.example.com`;
+}
+
 // ---------------------------------------------------------------------------
-// Shared helper: create a partner browser context
+// Shared helper: create a partner browser context with fresh auth
 // ---------------------------------------------------------------------------
 
+/**
+ * Bypass the token cache entirely and do a fresh signInWithPassword.
+ * Reconnect tests mess with session states, so cached tokens are unreliable.
+ */
 async function createPartnerContext(
   browser: import('@playwright/test').Browser,
   originPage: import('@playwright/test').Page,
-  request: import('@playwright/test').APIRequestContext,
+  _request: import('@playwright/test').APIRequestContext,
   partnerUserIdentifier: string
 ) {
-  // Ensure partner token exists on disk
-  await getAuthToken(request, {
-    environment: 'local',
-    userIdentifier: partnerUserIdentifier,
-  });
-  const partnerStoragePath = getStorageStatePath({
-    environment: 'local',
-    userIdentifier: partnerUserIdentifier,
-  });
+  const supabaseUrl = process.env.SUPABASE_URL!;
+  const anonKey = process.env.SUPABASE_ANON_KEY!;
+  const email = partnerEmail(partnerUserIdentifier);
 
+  // Fresh sign-in — no cache, guaranteed valid JWT
+  const client = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false },
+  });
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password: TEST_USER_PASSWORD,
+  });
+  if (error || !data.session) {
+    throw new Error(
+      `[createPartnerContext] signInWithPassword failed for ${email}: ${error?.message ?? 'missing session'}`
+    );
+  }
+
+  // Build inline storageState with the fresh token
+  const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`;
   const baseURL = new URL(originPage.url()).origin;
-  const context = await browser.newContext({ storageState: partnerStoragePath, baseURL });
+  const storageState = {
+    cookies: [] as never[],
+    origins: [
+      {
+        origin: baseURL,
+        localStorage: [
+          { name: storageKey, value: JSON.stringify(data.session) },
+          { name: 'lastWelcomeView', value: Date.now().toString() },
+        ],
+      },
+    ],
+  };
+
+  const context = await browser.newContext({ storageState, baseURL });
   const page = await context.newPage();
   return { context, page };
+}
+
+/**
+ * Create a partner context and start a together-mode session with retry.
+ *
+ * Retries once if the partner page redirects to login (transient auth token race).
+ * On retry, re-fetches the auth token and creates a fresh browser context.
+ */
+async function createPartnerAndStartSession(
+  browser: import('@playwright/test').Browser,
+  originPage: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext,
+  partnerUserIdentifier: string,
+  roleTestId: 'lobby-role-reader' | 'lobby-role-responder'
+): Promise<{
+  context: import('@playwright/test').BrowserContext;
+  page: import('@playwright/test').Page;
+  sessionId: string;
+}> {
+  const maxAttempts = 2;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const partner = await createPartnerContext(browser, originPage, request, partnerUserIdentifier);
+    try {
+      const sessionId = await startTogetherSessionForRole(partner.page, roleTestId);
+      return { context: partner.context, page: partner.page, sessionId };
+    } catch (err) {
+      await partner.context.close().catch(() => {});
+      if (attempt >= maxAttempts) {
+        throw new Error(
+          `[createPartnerAndStartSession] Failed after ${maxAttempts} attempts: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+      // Retry with a fresh signInWithPassword (no cache involved)
+    }
+  }
+
+  throw new Error('[createPartnerAndStartSession] Unexpected exit from retry loop');
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +145,7 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     supabaseAdmin,
     partnerUserIdentifier,
     request,
+    interceptNetworkCall,
   }) => {
     test.setTimeout(120_000);
     const sessionIdsToClean = new Set<string>();
@@ -77,15 +154,17 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
-    // GIVEN: User B (partner) joins and selects Responder
-    const partner = await createPartnerContext(browser, page, request, partnerUserIdentifier);
+    // GIVEN: User B (partner) joins and selects Responder (with auth retry)
+    const partner = await createPartnerAndStartSession(
+      browser,
+      page,
+      request,
+      partnerUserIdentifier,
+      'lobby-role-responder'
+    );
 
     try {
-      const partnerSessionId = await startTogetherSessionForRole(
-        partner.page,
-        'lobby-role-responder'
-      );
-      sessionIdsToClean.add(partnerSessionId);
+      sessionIdsToClean.add(partner.sessionId);
 
       // Both enter reading phase
       await setupBothUsersInReading(page, partner.page);
@@ -123,17 +202,11 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
       // -----------------------------------------------------------------------
       // WHEN: User A taps "End Session"
       // -----------------------------------------------------------------------
-      const endSessionResponse = page
-        .waitForResponse(
-          (resp) =>
-            resp.url().includes('/rest/v1/rpc/scripture_end_session') &&
-            resp.status() >= 200 &&
-            resp.status() < 300,
-          { timeout: SESSION_CREATE_TIMEOUT_MS }
-        )
-        .catch((e: Error) => {
-          throw new Error(`scripture_end_session RPC did not fire: ${e.message}`);
-        });
+      const endSessionResponse = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_end_session',
+        timeout: SESSION_CREATE_TIMEOUT_MS,
+      });
 
       await page.getByTestId('disconnection-end-session').click();
       await expect(page.getByTestId('disconnection-confirmation')).toBeVisible();
@@ -183,14 +256,16 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
-    const partner = await createPartnerContext(browser, page, request, partnerUserIdentifier);
+    const partner = await createPartnerAndStartSession(
+      browser,
+      page,
+      request,
+      partnerUserIdentifier,
+      'lobby-role-responder'
+    );
 
     try {
-      const partnerSessionId = await startTogetherSessionForRole(
-        partner.page,
-        'lobby-role-responder'
-      );
-      sessionIdsToClean.add(partnerSessionId);
+      sessionIdsToClean.add(partner.sessionId);
 
       await setupBothUsersInReading(page, partner.page);
 
@@ -283,14 +358,16 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     const primarySessionId = await startTogetherSessionForRole(page, 'lobby-role-reader');
     sessionIdsToClean.add(primarySessionId);
 
-    const partner = await createPartnerContext(browser, page, request, partnerUserIdentifier);
+    const partner = await createPartnerAndStartSession(
+      browser,
+      page,
+      request,
+      partnerUserIdentifier,
+      'lobby-role-responder'
+    );
 
     try {
-      const partnerSessionId = await startTogetherSessionForRole(
-        partner.page,
-        'lobby-role-responder'
-      );
-      sessionIdsToClean.add(partnerSessionId);
+      sessionIdsToClean.add(partner.sessionId);
 
       await setupBothUsersInReading(page, partner.page);
 
