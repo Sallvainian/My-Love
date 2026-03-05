@@ -60,10 +60,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createTestStore() {
-  return create<ScriptureSlice>()((...args) => ({
-    ...createScriptureReadingSlice(...args),
-  }));
+  return create<ScriptureSlice>()(createScriptureReadingSlice as any);
 }
 
 // Helper to set up a store with an active together session in reading phase
@@ -204,7 +203,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
       sessionId: 'session-reconnect-001',
       currentPhase: 'complete',
       version: 10,
-      triggeredBy: 'end_session',
+      triggered_by: 'end_session',
     });
 
     // Session should be cleared

@@ -44,7 +44,8 @@ function getWorkerPartnerEmail(workerIndex: number): string {
 }
 
 async function ensureUser(
-  admin: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: ReturnType<typeof createClient<any, any, any>>,
   email: string,
   password: string,
   displayName: string
@@ -93,7 +94,8 @@ async function ensureUser(
 }
 
 async function getAppUserIdByEmail(
-  admin: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: ReturnType<typeof createClient<any, any, any>>,
   email: string
 ): Promise<string> {
   const maxAttempts = 10;
@@ -111,7 +113,8 @@ async function getAppUserIdByEmail(
 }
 
 async function linkUserPair(
-  admin: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: ReturnType<typeof createClient<any, any, any>>,
   firstEmail: string,
   secondEmail: string
 ): Promise<void> {

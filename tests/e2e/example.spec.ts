@@ -5,7 +5,7 @@
  * These are basic smoke tests - see other test files for feature-specific tests.
  */
 import { test, expect } from '../support/merged-fixtures';
-import { getTestId, fillForm } from '../support/helpers';
+
 
 test.describe('Homepage', () => {
   test('should load and display the application', async ({ page }) => {
@@ -62,7 +62,7 @@ test.describe('API Integration', () => {
     const { status } = await apiRequest({
       method: 'GET',
       path: '/rest/v1/',
-      baseURL,
+      baseUrl: baseURL,
     });
 
     // Accept both 200 and 404 - we're just checking connectivity

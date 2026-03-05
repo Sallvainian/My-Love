@@ -54,10 +54,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createTestStore() {
-  return create<ScriptureSlice>()((...args) => ({
-    ...createScriptureReadingSlice(...args),
-  }));
+  return create<ScriptureSlice>()(createScriptureReadingSlice as any);
 }
 
 // Helper to set up a store with an active together session
