@@ -6,7 +6,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { ensureScriptureOverview } from '../helpers';
+
 
 // ---------------------------------------------------------------------------
 // Shared timeout constants
@@ -127,12 +127,74 @@ export async function navigateBothToReadingPhase(
 /**
  * Navigate to /scripture and start Together mode.
  * Waits for the role selection screen to become visible.
- * Returns the session ID from the create-session RPC response.
+ * Returns the session ID from the create-session RPC response,
+ * or empty string if the user auto-joined an existing session
+ * (partner navigating after User A already created a session).
  */
 export async function navigateToTogetherRoleSelection(page: Page): Promise<string> {
-  await ensureScriptureOverview(page);
+  // Network-first: intercept ALL API calls that trigger re-renders BEFORE
+  // navigating. On mount, ScriptureOverview fires loadPartner (2x GET /users)
+  // then loadCoupleStats (POST /rpc/scripture_get_couple_stats). Each response
+  // causes a re-render that can detach the start button mid-click.
+  // We must wait for the LAST response (couple stats) to guarantee stability.
+  const partnerLoaded = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/rest/v1/users') && resp.status() >= 200 && resp.status() < 300,
+    { timeout: 20_000 }
+  );
+  const statsLoaded = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/rest/v1/rpc/scripture_get_couple_stats') &&
+      resp.status() >= 200 &&
+      resp.status() < 300,
+    { timeout: 20_000 }
+  );
 
-  // Network-first: watch for the create-session RPC before clicking
+  await page.goto('/scripture?fresh=true');
+
+  const lobbyRoleSelection = page.getByTestId('lobby-role-selection');
+  const scriptureOverview = page.getByTestId('scripture-overview');
+  const readingFlow = page.getByTestId('solo-reading-flow');
+  const loginScreen = page.getByTestId('login-screen');
+
+  await expect(
+    lobbyRoleSelection.or(scriptureOverview).or(readingFlow).or(loginScreen)
+  ).toBeVisible({ timeout: 20_000 });
+
+  // Fail fast on login screen (auth token missing or expired)
+  if (await loginScreen.isVisible()) {
+    throw new Error(
+      '[navigateToTogetherRoleSelection] Page rendered login screen. Auth token may be expired or missing.'
+    );
+  }
+
+  // Partner auto-joined an active together session — already at role selection.
+  // No new session was created; return empty string.
+  if (await lobbyRoleSelection.isVisible()) {
+    return '';
+  }
+
+  // Wait for ALL re-render-triggering API calls to complete before interacting.
+  // Swallow rejections — stats may not fire if partner is unlinked, but the
+  // important thing is we gave the full chain time to settle.
+  await Promise.all([
+    partnerLoaded.catch(() => {}),
+    statsLoaded.catch(() => {}),
+  ]);
+
+  // Normal flow: overview → Start → Together → create session
+  const startButton = page.getByTestId('scripture-start-button');
+  await expect(startButton).toBeEnabled();
+  await startButton.click({ timeout: 10_000 });
+
+  // Wait for Together mode button to be visible AND enabled.
+  // The button is disabled while partner data is loading (partnerStatus !== 'linked').
+  // Without this wait, clicking the disabled button silently does nothing — no RPC fires.
+  const togetherButton = page.getByTestId('scripture-mode-together');
+  await expect(togetherButton).toBeVisible();
+  await expect(togetherButton).toBeEnabled({ timeout: SESSION_CREATE_TIMEOUT_MS });
+
+  // Network-first: watch for the create-session RPC before clicking Together
   const sessionResponse = page
     .waitForResponse(
       (resp) =>
@@ -146,17 +208,13 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
       throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
     });
 
-  await page.getByTestId('scripture-start-button').click();
-
-  // Select Together mode (not Solo)
-  await expect(page.getByTestId('scripture-mode-together')).toBeVisible();
-  await page.getByTestId('scripture-mode-together').click();
+  await togetherButton.click();
 
   const response = await sessionResponse;
   const payload = (await response.json()) as { id?: string };
 
   // Role selection screen must be visible
-  await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
+  await expect(lobbyRoleSelection).toBeVisible();
 
   return payload.id ?? '';
 }

@@ -18,6 +18,7 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { ensureScriptureOverview, startSoloSession, advanceOneStep } from '../../support/helpers';
+import { clearClientScriptureCache } from '../../support/helpers/scripture-cache';
 import type { Page } from '@playwright/test';
 
 async function saveSoloSessionAtStep(page: Page, step: number): Promise<string> {
@@ -33,36 +34,6 @@ async function saveSoloSessionAtStep(page: Page, step: number): Promise<string> 
   await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
   return sessionId;
-}
-
-async function clearClientScriptureCache(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    localStorage.removeItem('my-love-storage');
-
-    const factory = indexedDB as IDBFactory & {
-      databases?: () => Promise<Array<{ name?: string }>>;
-    };
-
-    const dbNames = new Set<string>(['my-love-db']);
-    if (typeof factory.databases === 'function') {
-      const databases = await factory.databases();
-      for (const db of databases) {
-        if (db.name) dbNames.add(db.name);
-      }
-    }
-
-    await Promise.all(
-      [...dbNames].map(
-        (dbName) =>
-          new Promise<void>((resolve) => {
-            const request = indexedDB.deleteDatabase(dbName);
-            request.onsuccess = () => resolve();
-            request.onerror = () => resolve();
-            request.onblocked = () => resolve();
-          })
-      )
-    );
-  });
 }
 
 test.describe('Scripture Navigation & Overview', () => {
@@ -141,22 +112,29 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-006: Mode selection - no partner disables Together', () => {
-    test('should disable Together mode when user has no linked partner', async ({ page }) => {
+    test('should disable Together mode when user has no linked partner', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
       // GIVEN: User has no linked partner (partner_id is null)
       // Intercept partner lookup query to simulate no-partner state.
-      await page.route('**/rest/v1/users*', (route) => {
-        const url = route.request().url();
-        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              partner_id: null,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-        }
-        return route.continue();
+      interceptNetworkCall({
+        url: '**/rest/v1/users*',
+        handler: async (route, request) => {
+          const url = request.url();
+          if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                partner_id: null,
+                updated_at: '2026-01-01T00:00:00.000Z',
+              }),
+            });
+          } else {
+            await route.continue();
+          }
+        },
       });
 
       await ensureScriptureOverview(page);
@@ -181,39 +159,43 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-007: Mode selection - partner enables both modes', () => {
-    test('should enable both modes when user has linked partner', async ({ page }) => {
+    test('should enable both modes when user has linked partner', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
       // GIVEN: User has a linked partner (partner_id is not null)
       const partnerId = '11111111-1111-4111-8111-111111111111';
-      await page.route('**/rest/v1/users*', (route) => {
-        const url = route.request().url();
+      interceptNetworkCall({
+        url: '**/rest/v1/users*',
+        handler: async (route, request) => {
+          const url = request.url();
 
-        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              partner_id: partnerId,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-        }
-
-        if (
-          url.includes('select=id,email,display_name') ||
-          url.includes('select=id%2Cemail%2Cdisplay_name')
-        ) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              id: partnerId,
-              email: 'linked.partner@example.com',
-              display_name: 'Linked Partner',
-            }),
-          });
-        }
-
-        return route.continue();
+          if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                partner_id: partnerId,
+                updated_at: '2026-01-01T00:00:00.000Z',
+              }),
+            });
+          } else if (
+            url.includes('select=id,email,display_name') ||
+            url.includes('select=id%2Cemail%2Cdisplay_name')
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                id: partnerId,
+                email: 'linked.partner@example.com',
+                display_name: 'Linked Partner',
+              }),
+            });
+          } else {
+            await route.continue();
+          }
+        },
       });
 
       await ensureScriptureOverview(page);
@@ -253,15 +235,25 @@ test.describe('Scripture Navigation & Overview', () => {
       // this test's saved session the newest candidate for resume lookup.
       const { error: prioritizeSessionError } = await supabaseAdmin
         .from('scripture_sessions')
-        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .update({ started_at: '2099-01-01T00:00:00.000Z' })
         .eq('id', sessionId);
       expect(prioritizeSessionError).toBeNull();
 
       // Clear client-side cache so active-session lookup re-reads from server.
       await clearClientScriptureCache(page);
 
+      // Network-first: intercept the session check API before navigating.
+      const sessionCheck = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.status() >= 200 &&
+          resp.status() < 300,
+        { timeout: 15_000 }
+      );
+
       // Re-open once after prioritize update so session check reads the target row.
       await page.goto('/scripture');
+      await sessionCheck;
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
       // WHEN: The overview page loads
@@ -282,7 +274,11 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-009: Start fresh clears saved state', () => {
-    test('should clear saved state and begin new session', async ({ page, supabaseAdmin }) => {
+    test('should clear saved state and begin new session', async ({
+      page,
+      supabaseAdmin,
+      interceptNetworkCall,
+    }) => {
       // GIVEN: User has an incomplete session and sees the resume prompt
       const sessionId = await saveSoloSessionAtStep(page, 5);
       const { data: targetSession, error: targetSessionError } = await supabaseAdmin
@@ -306,15 +302,25 @@ test.describe('Scripture Navigation & Overview', () => {
       // this test's saved session the newest candidate for resume lookup.
       const { error: prioritizeSessionError } = await supabaseAdmin
         .from('scripture_sessions')
-        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+        .update({ started_at: '2099-01-01T00:00:00.000Z' })
         .eq('id', sessionId);
       expect(prioritizeSessionError).toBeNull();
 
       // Clear client-side cache so active-session lookup re-reads from server.
       await clearClientScriptureCache(page);
 
+      // Network-first: intercept the session check API before navigating.
+      const sessionCheck = page.waitForResponse(
+        (resp) =>
+          resp.url().includes('/rest/v1/scripture_sessions') &&
+          resp.status() >= 200 &&
+          resp.status() < 300,
+        { timeout: 15_000 }
+      );
+
       // Re-open once after prioritize update so session check reads the target row.
       await page.goto('/scripture');
+      await sessionCheck;
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
@@ -353,10 +359,10 @@ test.describe('Scripture Navigation & Overview', () => {
       await expect(page.getByTestId('mode-selection')).toBeVisible();
 
       // AND: After selecting Solo, session starts at step 1
-      const sessionCreated = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/rpc/scripture_create_session') && resp.status() === 200
-      );
+      const sessionCreated = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_create_session',
+      });
       await page.getByTestId('scripture-mode-solo').click();
       await sessionCreated;
 

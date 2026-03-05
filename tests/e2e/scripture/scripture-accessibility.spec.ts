@@ -52,7 +52,7 @@ test.describe('Scripture Accessibility', () => {
       expect(focusedElements).toContain('scripture-next-verse-button');
     });
 
-    test('should activate buttons with Enter and Space', async ({ page, interceptNetworkCall }) => {
+    test('should activate buttons with Enter and Space', async ({ page }) => {
       // GIVEN: User is in a solo session with focus on View Response button
       await startSoloSession(page);
 
@@ -78,7 +78,7 @@ test.describe('Scripture Accessibility', () => {
       await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 2 of 17');
     });
 
-    test('should have no keyboard traps', async ({ page, interceptNetworkCall }) => {
+    test('should have no keyboard traps', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -119,7 +119,7 @@ test.describe('Scripture Accessibility', () => {
       await expect(page.getByTestId('scripture-view-response-button')).toHaveText('View Response');
     });
 
-    test('should have aria-label on progress indicator', async ({ page, interceptNetworkCall }) => {
+    test('should have aria-label on progress indicator', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -158,7 +158,7 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-004: Announcements only on semantic state changes', () => {
-    test('should not fire announcements on re-renders', async ({ page, interceptNetworkCall }) => {
+    test('should not fire announcements on re-renders', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
@@ -170,8 +170,9 @@ test.describe('Scripture Accessibility', () => {
       // WHEN: View Response (not a semantic state change in terms of step)
       await page.getByTestId('scripture-view-response-button').click();
 
-      // Wait briefly for any potential update
-      await page.waitForTimeout(300);
+      // Wait for the response screen to render — proves the click took effect
+      // and gives the aria-live region time to update if it was going to.
+      await expect(page.getByTestId('response-screen')).toBeVisible();
 
       // THEN: Live region text should NOT change for sub-step navigation
       // (Only step changes should trigger announcements)
@@ -260,7 +261,7 @@ test.describe('Scripture Accessibility', () => {
   });
 
   test.describe('P2-014: WCAG AA color contrast', () => {
-    test('should pass automated accessibility audit', async ({ page, interceptNetworkCall }) => {
+    test('should pass automated accessibility audit', async ({ page }) => {
       // GIVEN: User is in a solo session
       await startSoloSession(page);
 
