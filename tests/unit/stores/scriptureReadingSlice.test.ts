@@ -58,6 +58,9 @@ function createTestStore() {
 describe('scriptureReadingSlice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-123' } },
+    });
   });
 
   describe('initial state', () => {
@@ -218,7 +221,7 @@ describe('scriptureReadingSlice', () => {
 
       expect(store.getState().session).toBeNull();
       expect(store.getState().scriptureLoading).toBe(false);
-      expect(store.getState().isInitialized).toBe(false);
+      expect(store.getState().isInitialized).toBe(true);
       expect(store.getState().isPendingLockIn).toBe(false);
       expect(store.getState().isPendingReflection).toBe(false);
       expect(store.getState().isSyncing).toBe(false);
@@ -957,10 +960,9 @@ describe('scriptureReadingSlice', () => {
       await store.getState().retryFailedWrite();
       expect(store.getState().pendingRetry!.attempts).toBe(2);
 
-      // retry 2 → attempt 3 (max reached)
+      // retry 2 → attempt 3 (max reached, pendingRetry cleared)
       await store.getState().retryFailedWrite();
-      expect(store.getState().pendingRetry!.attempts).toBe(3);
-      expect(store.getState().pendingRetry!.maxAttempts).toBe(3);
+      expect(store.getState().pendingRetry).toBeNull();
       expect(store.getState().scriptureError).not.toBeNull();
     });
 

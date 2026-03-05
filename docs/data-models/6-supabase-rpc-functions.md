@@ -177,13 +177,13 @@ Returns couple reading statistics using CTE-optimized queries.
 
 **Returned metrics:**
 
-| Metric                | Description                                        |
-| --------------------- | -------------------------------------------------- |
-| `total_sessions`      | All sessions for the pair                          |
-| `completed_sessions`  | Sessions with `status = 'complete'`                |
-| `total_reflections`   | All reflections across pair sessions               |
-| `shared_reflections`  | Reflections with `is_shared = true`                |
-| `total_messages`      | All prayer report messages across pair sessions    |
+| Metric               | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `total_sessions`     | All sessions for the pair                       |
+| `completed_sessions` | Sessions with `status = 'complete'`             |
+| `total_reflections`  | All reflections across pair sessions            |
+| `shared_reflections` | Reflections with `is_shared = true`             |
+| `total_messages`     | All prayer report messages across pair sessions |
 
 ## 6.11 `scripture_select_role(p_session_id UUID, p_role TEXT)` -> `JSONB`
 
@@ -194,10 +194,10 @@ Returns couple reading statistics using CTE-optimized queries.
 
 Sets the calling user's role in the together-mode lobby.
 
-| Parameter      | Type   | Description                            |
-| -------------- | ------ | -------------------------------------- |
-| `p_session_id` | `UUID` | Session ID                             |
-| `p_role`       | `TEXT` | `'reader'` or `'responder'`            |
+| Parameter      | Type   | Description                 |
+| -------------- | ------ | --------------------------- |
+| `p_session_id` | `UUID` | Session ID                  |
+| `p_role`       | `TEXT` | `'reader'` or `'responder'` |
 
 **Flow:**
 
@@ -220,10 +220,10 @@ Sets the calling user's role in the together-mode lobby.
 
 Toggles the calling user's ready state in the lobby. If both users become ready, starts the countdown.
 
-| Parameter      | Type      | Description              |
-| -------------- | --------- | ------------------------ |
-| `p_session_id` | `UUID`    | Session ID               |
-| `p_is_ready`   | `BOOLEAN` | New ready state          |
+| Parameter      | Type      | Description     |
+| -------------- | --------- | --------------- |
+| `p_session_id` | `UUID`    | Session ID      |
+| `p_is_ready`   | `BOOLEAN` | New ready state |
 
 **Flow:**
 
@@ -264,11 +264,11 @@ Converts a together-mode session to solo mode. Called when one partner taps "Con
 
 Locks in a user for the current reading step. When both users lock, automatically advances to the next step.
 
-| Parameter            | Type   | Description                         |
-| -------------------- | ------ | ----------------------------------- |
-| `p_session_id`       | `UUID` | Session ID                          |
-| `p_step_index`       | `INT`  | Current step index                  |
-| `p_expected_version` | `INT`  | Optimistic concurrency check value  |
+| Parameter            | Type   | Description                        |
+| -------------------- | ------ | ---------------------------------- |
+| `p_session_id`       | `UUID` | Session ID                         |
+| `p_step_index`       | `INT`  | Current step index                 |
+| `p_expected_version` | `INT`  | Optimistic concurrency check value |
 
 **Flow:**
 
@@ -328,10 +328,10 @@ Or for partial lock:
 
 Clears a user's lock-in for the given step.
 
-| Parameter       | Type   | Description    |
-| --------------- | ------ | -------------- |
-| `p_session_id`  | `UUID` | Session ID     |
-| `p_step_index`  | `INT`  | Step index     |
+| Parameter      | Type   | Description |
+| -------------- | ------ | ----------- |
+| `p_session_id` | `UUID` | Session ID  |
+| `p_step_index` | `INT`  | Step index  |
 
 **Flow:**
 
@@ -353,9 +353,9 @@ Clears a user's lock-in for the given step.
 
 Ends a together-mode session early. Called when a user taps "End Session" after partner disconnects.
 
-| Parameter       | Type   | Description |
-| --------------- | ------ | ----------- |
-| `p_session_id`  | `UUID` | Session ID  |
+| Parameter      | Type   | Description |
+| -------------- | ------ | ----------- |
+| `p_session_id` | `UUID` | Session ID  |
 
 **Flow:**
 
@@ -367,10 +367,10 @@ Ends a together-mode session early. Called when a user taps "End Session" after 
 
 ## Security Model Summary
 
-| Pattern | Functions | Notes |
-|---------|-----------|-------|
-| `SECURITY DEFINER` | `accept_partner_request`, `decline_partner_request`, `get_my_partner_id`, `is_scripture_session_member`, `sync_user_profile`, `scripture_create_session`, `scripture_submit_reflection`, `scripture_seed_test_data`, `scripture_get_couple_stats` | Bypass RLS for atomic operations or internal helpers |
-| `SECURITY INVOKER` | `scripture_select_role`, `scripture_toggle_ready`, `scripture_convert_to_solo`, `scripture_lock_in`, `scripture_undo_lock_in`, `scripture_end_session` | RLS applies to calling user; combined with `FOR UPDATE` row locking |
-| `SET search_path = ''` | All scripture RPCs | Prevents schema-injection attacks; all table references fully qualified |
-| Phase/status guards | All scripture INVOKER RPCs | Prevents out-of-order state transitions |
-| Optimistic concurrency | `scripture_lock_in` | `p_expected_version` parameter checked before mutation |
+| Pattern                | Functions                                                                                                                                                                                                                                         | Notes                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `SECURITY DEFINER`     | `accept_partner_request`, `decline_partner_request`, `get_my_partner_id`, `is_scripture_session_member`, `sync_user_profile`, `scripture_create_session`, `scripture_submit_reflection`, `scripture_seed_test_data`, `scripture_get_couple_stats` | Bypass RLS for atomic operations or internal helpers                    |
+| `SECURITY INVOKER`     | `scripture_select_role`, `scripture_toggle_ready`, `scripture_convert_to_solo`, `scripture_lock_in`, `scripture_undo_lock_in`, `scripture_end_session`                                                                                            | RLS applies to calling user; combined with `FOR UPDATE` row locking     |
+| `SET search_path = ''` | All scripture RPCs                                                                                                                                                                                                                                | Prevents schema-injection attacks; all table references fully qualified |
+| Phase/status guards    | All scripture INVOKER RPCs                                                                                                                                                                                                                        | Prevents out-of-order state transitions                                 |
+| Optimistic concurrency | `scripture_lock_in`                                                                                                                                                                                                                               | `p_expected_version` parameter checked before mutation                  |

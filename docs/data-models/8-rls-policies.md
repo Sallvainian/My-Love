@@ -133,19 +133,19 @@ RLS on `realtime.messages` controls who can send/receive on private broadcast ch
 
 ### Scripture Session Broadcast Channel (`scripture-session:{uuid}`)
 
-| Policy                                                   | Operation | Rule                                                                                                                                                    |
-| -------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| scripture_session_members_can_receive_broadcasts         | SELECT    | `topic LIKE 'scripture-session:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
-| scripture_session_members_can_send_broadcasts             | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                              |
+| Policy                                           | Operation | Rule                                                                                                                                                               |
+| ------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| scripture_session_members_can_receive_broadcasts | SELECT    | `topic LIKE 'scripture-session:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
+| scripture_session_members_can_send_broadcasts    | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                                        |
 
 The topic format is `scripture-session:{session_uuid}`. The policy extracts the UUID from the topic using `split_part(topic, ':', 2)` and verifies the user is a member of that session.
 
 ### Scripture Presence Channel (`scripture-presence:{uuid}`)
 
-| Policy                                                   | Operation | Rule                                                                                                                                                      |
-| -------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| scripture_presence_members_can_receive                   | SELECT    | `topic LIKE 'scripture-presence:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
-| scripture_presence_members_can_send                       | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                                |
+| Policy                                 | Operation | Rule                                                                                                                                                                |
+| -------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| scripture_presence_members_can_receive | SELECT    | `topic LIKE 'scripture-presence:%' AND split_part(topic, ':', 2)::uuid IN (SELECT id FROM scripture_sessions WHERE user1_id = auth.uid() OR user2_id = auth.uid())` |
+| scripture_presence_members_can_send    | INSERT    | Same as SELECT but with `WITH CHECK` clause                                                                                                                         |
 
 Added in migration 18 (`20260222000001`) for partner position tracking during reading.
 
