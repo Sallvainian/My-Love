@@ -49,20 +49,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       await linkTestPartners(supabaseAdmin, user1Id, user2Id);
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
-      const baseURL = process.env.SUPABASE_URL!;
-      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
 
       try {
         // WHEN: User1 calls scripture_select_role with role='reader'
         const response = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_select_role',
-          baseUrl: baseURL,
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${user1Token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${user1Token}` },
           body: {
             p_session_id: sessionId,
             p_role: 'reader',
@@ -108,20 +102,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       await linkTestPartners(supabaseAdmin, user1Id, user2Id);
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
-      const baseURL = process.env.SUPABASE_URL!;
-      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
 
       try {
         // WHEN: User1 selects role 'responder'
         const response = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_select_role',
-          baseUrl: baseURL,
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${user1Token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${user1Token}` },
           body: {
             p_session_id: sessionId,
             p_role: 'responder',
@@ -163,20 +151,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
 
       // Use user2's token — exercises the user2_id code path in the RPC
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
-      const baseURL = process.env.SUPABASE_URL!;
-      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
 
       try {
         // WHEN: User2 calls scripture_select_role with role='responder'
         const response = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_select_role',
-          baseUrl: baseURL,
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${user2Token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${user2Token}` },
           body: {
             p_session_id: sessionId,
             p_role: 'responder',
@@ -229,20 +211,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
-      const baseURL = process.env.SUPABASE_URL!;
-      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
 
       try {
         // WHEN: User1 toggles ready = true
         const user1ReadyResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_toggle_ready',
-          baseUrl: baseURL,
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${user1Token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${user1Token}` },
           body: {
             p_session_id: sessionId,
             p_is_ready: true,
@@ -271,12 +247,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         const user2ReadyResponse = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_toggle_ready',
-          baseUrl: baseURL,
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${user2Token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${user2Token}` },
           body: {
             p_session_id: sessionId,
             p_is_ready: true,
@@ -327,20 +298,14 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       const user1Id = seedResult.test_user1_id;
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
-      const baseURL = process.env.SUPABASE_URL!;
-      const anonKey = process.env.SUPABASE_ANON_KEY!;
+
 
       try {
         // WHEN: User1 calls scripture_convert_to_solo
         const response = await apiRequest({
           method: 'POST',
           path: '/rest/v1/rpc/scripture_convert_to_solo',
-          baseUrl: baseURL,
-          headers: {
-            apikey: anonKey,
-            Authorization: `Bearer ${user1Token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { Authorization: `Bearer ${user1Token}` },
           body: {
             p_session_id: sessionId,
           },

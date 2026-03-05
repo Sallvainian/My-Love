@@ -22,6 +22,7 @@ test.describe('Daily Prayer Report — Send & View', () => {
     test('should show message compose after reflection summary, then report after sending', async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User has completed all 17 steps with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
@@ -71,12 +72,10 @@ test.describe('Daily Prayer Report — Send & View', () => {
       await textarea.fill('Praying for you today. You are loved.');
 
       // AND: User clicks Send — wait for the INSERT request (not report-data GETs)
-      const messageResponse = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/scripture_messages') &&
-          response.request().method() === 'POST' &&
-          response.ok()
-      );
+      const messageResponse = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/scripture_messages*',
+      });
       await sendButton.click();
       await messageResponse;
 
@@ -144,21 +143,26 @@ test.describe('Daily Prayer Report — Send & View', () => {
     test('should show completion screen without partner card when user is unlinked', async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User is treated as unlinked in this test scope
-      await page.route('**/rest/v1/users*', (route) => {
-        const url = route.request().url();
-        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              partner_id: null,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-        }
-        return route.continue();
+      interceptNetworkCall({
+        url: '**/rest/v1/users*',
+        handler: async (route, request) => {
+          const url = request.url();
+          if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                partner_id: null,
+                updated_at: '2026-01-01T00:00:00.000Z',
+              }),
+            });
+          } else {
+            await route.continue();
+          }
+        },
       });
 
       // AND: User has completed all 17 steps

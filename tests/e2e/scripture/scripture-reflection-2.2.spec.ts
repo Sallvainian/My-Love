@@ -197,6 +197,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     test('should save session-level reflection and advance to report phase', async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User is on the reflection summary screen with bookmarks on steps 0, 5, and 12
       const bookmarkedStepIndices = new Set([0, 5, 12]);
@@ -241,11 +242,10 @@ test.describe('End-of-Session Reflection Summary', () => {
 
       // WHEN: User taps Continue to submit the reflection summary
       // Set up response listener BEFORE clicking to avoid race condition
-      const summaryResponse = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/rpc/scripture_submit_reflection') &&
-          response.status() === 200
-      );
+      const summaryResponse = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_submit_reflection',
+      });
       await continueButton.click();
       await summaryResponse;
 
@@ -292,6 +292,7 @@ test.describe('End-of-Session Reflection Summary', () => {
     test('should show no-bookmarks message and enable Continue with just rating', async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User has completed all 17 steps WITHOUT bookmarking any verses
       const sessionId = await completeAllStepsToReflectionSummary(page, new Set()); // empty bookmark set
@@ -319,11 +320,10 @@ test.describe('End-of-Session Reflection Summary', () => {
       await expect(continueButton).not.toHaveAttribute('aria-disabled', 'true');
 
       // WHEN: User submits
-      const summaryResponse = page.waitForResponse(
-        (response) =>
-          response.url().includes('/rest/v1/rpc/scripture_submit_reflection') &&
-          response.status() === 200
-      );
+      const summaryResponse = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_submit_reflection',
+      });
       await continueButton.click();
       await summaryResponse;
 
