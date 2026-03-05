@@ -7,7 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
-import { DB_NAME, DB_VERSION, upgradeDb, MyLoveDBSchema } from '../../../src/services/dbSchema';
+import { DB_NAME, DB_VERSION, upgradeDb } from '../../../src/services/dbSchema';
+import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 
 // Mock import.meta.env.DEV
 vi.stubGlobal('import', {

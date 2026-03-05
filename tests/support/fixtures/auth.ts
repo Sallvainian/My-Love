@@ -44,7 +44,7 @@ type AuthFixtures = {
 export const test = base.extend<AuthFixtures>({
   // Worker-scoped: map workerIndex → user identifier
   authOptions: [
-    async ({}, use, workerInfo) => {
+    async ({}, use: (value: any) => Promise<void>, workerInfo: any) => {
       const poolSize = getAuthPoolSize();
       const normalizedIndex = ((workerInfo.workerIndex % poolSize) + poolSize) % poolSize;
       await use({
@@ -53,7 +53,7 @@ export const test = base.extend<AuthFixtures>({
       });
     },
     { scope: 'worker' },
-  ],
+  ] as any,
 
   authSessionEnabled: [true, { option: true }],
 
@@ -90,11 +90,11 @@ export const test = base.extend<AuthFixtures>({
 
   // Worker-scoped: partner user identifier for together-mode tests
   partnerUserIdentifier: [
-    async ({}, use, workerInfo) => {
+    async ({}, use: (value: any) => Promise<void>, workerInfo: any) => {
       const poolSize = getAuthPoolSize();
       const normalizedIndex = ((workerInfo.workerIndex % poolSize) + poolSize) % poolSize;
       await use(`worker-${normalizedIndex}-partner`);
     },
     { scope: 'worker' },
-  ],
+  ] as any,
 });
