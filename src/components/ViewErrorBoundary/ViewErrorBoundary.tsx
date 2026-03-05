@@ -29,7 +29,10 @@ function ViewErrorFallback({
   const showOfflineMessage = isOffline || isChunkError;
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
+    <div
+      className="flex min-h-[60vh] items-center justify-center px-4"
+      data-testid="view-error-boundary"
+    >
       <div className="w-full max-w-md rounded-lg bg-white p-6 text-center shadow-lg dark:bg-gray-800">
         <div className="mb-4 text-5xl">{showOfflineMessage ? '📴' : '⚠️'}</div>
         <h2 className="mb-2 text-xl font-bold text-gray-800 dark:text-gray-100">
@@ -48,12 +51,14 @@ function ViewErrorFallback({
         <div className="flex justify-center gap-3">
           <button
             onClick={onNavigateHome}
+            data-testid="error-go-home"
             className="rounded-lg bg-gray-200 px-4 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           >
             Go Home
           </button>
           <button
             onClick={onRetry}
+            data-testid="error-try-again"
             className="rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2 font-medium text-white shadow-md transition-all hover:from-pink-600 hover:to-rose-600 hover:shadow-lg"
           >
             Try Again

@@ -104,8 +104,8 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
   }
 
   return (
-    <div className="display-name-setup-overlay">
-      <div className="display-name-setup-modal">
+    <div className="display-name-setup-overlay" data-testid="display-name-setup">
+      <div className="display-name-setup-modal" data-testid="display-name-modal">
         <div className="modal-header">
           <h2 className="modal-title">Welcome! 👋</h2>
           <p className="modal-subtitle">What would you like to be called?</p>
@@ -113,7 +113,12 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
 
         <form className="modal-form" onSubmit={handleSubmit}>
           {error && (
-            <div className="error-message" role="alert" aria-live="polite">
+            <div
+              className="error-message"
+              data-testid="display-name-error"
+              role="alert"
+              aria-live="polite"
+            >
               <svg
                 className="error-icon"
                 xmlns="http://www.w3.org/2000/svg"
@@ -156,6 +161,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
           <button
             type="submit"
             className="submit-button"
+            data-testid="display-name-submit"
             disabled={isLoading || !displayName.trim()}
           >
             {isLoading ? (
