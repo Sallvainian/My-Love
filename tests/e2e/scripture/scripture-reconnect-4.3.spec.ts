@@ -13,18 +13,18 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import {
-  SESSION_CREATE_TIMEOUT_MS,
-  STEP_ADVANCE_TIMEOUT_MS,
   navigateBothToReadingPhase,
+  waitForDisconnectionTimeout,
+  waitForPartnerDisconnected,
+  waitForPartnerReconnected,
+  waitForReadingStep,
 } from '../../support/helpers/scripture-lobby';
 import { reconnectPartnerAndLoadSession } from '../../support/helpers/scripture-together';
-
-// ---------------------------------------------------------------------------
-// Timeout constants
-// ---------------------------------------------------------------------------
-
-const DISCONNECTION_DETECT_TIMEOUT_MS = 25_000; // Heartbeat 10s + stale TTL 20s + buffer
-const DISCONNECTION_PHASE_B_TIMEOUT_MS = 35_000; // Phase B starts at 30s elapsed
+import {
+  getScriptureStoreSnapshot,
+  waitForScriptureRpc,
+  waitForScriptureStore,
+} from '../../support/helpers';
 
 // ---------------------------------------------------------------------------
 // 4.3-E2E-001: End Session Flow (P0)
@@ -35,7 +35,6 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     page,
     supabaseAdmin,
     togetherMode: { partnerPage, uiSessionId },
-    interceptNetworkCall,
   }) => {
     test.setTimeout(90_000);
 
@@ -50,10 +49,7 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     // -----------------------------------------------------------------------
     // THEN: AC#1 — User A sees "Partner reconnecting..." overlay
     // -----------------------------------------------------------------------
-    await expect(page.getByTestId('disconnection-overlay')).toBeVisible({
-      timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
-    });
-    await expect(page.getByTestId('disconnection-reconnecting')).toBeVisible();
+    await waitForPartnerDisconnected(page);
 
     // AC#1 — Lock-in button shows "Holding your place"
     await expect(page.getByTestId('lock-in-disconnected')).toContainText(/holding your place/i);
@@ -61,25 +57,17 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     // -----------------------------------------------------------------------
     // WHEN: 30s timeout reached → Phase B
     // -----------------------------------------------------------------------
-    await expect(page.getByTestId('disconnection-timeout')).toBeVisible({
-      timeout: DISCONNECTION_PHASE_B_TIMEOUT_MS,
-    });
+    await waitForDisconnectionTimeout(page);
 
     // AC#2 — Timeout options appear with neutral language
     await expect(page.getByTestId('disconnection-keep-waiting')).toBeVisible();
     await expect(page.getByTestId('disconnection-end-session')).toBeVisible();
-    await expect(page.getByTestId('disconnection-timeout')).toContainText(
-      /your partner seems to have stepped away/i
-    );
+    await expect(page.getByText(/your partner seems to have stepped away/i)).toBeVisible();
 
     // -----------------------------------------------------------------------
     // WHEN: User A taps "End Session"
     // -----------------------------------------------------------------------
-    const endSessionResponse = interceptNetworkCall({
-      method: 'POST',
-      url: '**/rest/v1/rpc/scripture_end_session',
-      timeout: SESSION_CREATE_TIMEOUT_MS,
-    });
+    const endSessionResponse = waitForScriptureRpc(page, 'scripture_end_session');
 
     await page.getByTestId('disconnection-end-session').click();
     await expect(page.getByTestId('disconnection-confirmation')).toBeVisible();
@@ -89,12 +77,8 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
     // -----------------------------------------------------------------------
     // THEN: AC#4 — Session ends, user returns to scripture overview
     // -----------------------------------------------------------------------
-    await expect(page.getByTestId('reading-container')).not.toBeVisible({
-      timeout: SESSION_CREATE_TIMEOUT_MS,
-    });
-    await expect(page.getByTestId('scripture-mode-together')).toBeVisible({
-      timeout: SESSION_CREATE_TIMEOUT_MS,
-    });
+    await expect(page.getByTestId('reading-container')).not.toBeVisible();
+    await expect(page.getByTestId('scripture-mode-together')).toBeVisible();
 
     // Verify session status in DB: ended_early
     const { data: sessionData } = await supabaseAdmin
@@ -127,22 +111,28 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     await partnerPage.close();
 
     // THEN: User A sees disconnect overlay
-    await expect(page.getByTestId('disconnection-overlay')).toBeVisible({
-      timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
-    });
+    await waitForPartnerDisconnected(page);
 
     // Wait for Phase B timeout
-    await expect(page.getByTestId('disconnection-timeout')).toBeVisible({
-      timeout: DISCONNECTION_PHASE_B_TIMEOUT_MS,
-    });
+    await waitForDisconnectionTimeout(page);
 
     // -----------------------------------------------------------------------
     // WHEN: User A taps "Keep Waiting"
     // -----------------------------------------------------------------------
+    const beforeKeepWaiting = (await getScriptureStoreSnapshot(page)).partnerDisconnectedAt;
     await page.getByTestId('disconnection-keep-waiting').click();
 
     // AC#3 — Overlay stays (returned to reconnecting state)
     await expect(page.getByTestId('disconnection-overlay')).toBeVisible();
+    await waitForScriptureStore(
+      page,
+      'keep waiting to reset disconnect timer',
+      (snapshot) =>
+        snapshot.partnerDisconnected &&
+        snapshot.partnerDisconnectedAt !== null &&
+        snapshot.partnerDisconnectedAt !== beforeKeepWaiting
+    );
+    await expect(page.getByTestId('disconnection-reconnecting')).toBeVisible();
 
     // -----------------------------------------------------------------------
     // WHEN: Partner B comes back online (new tab, navigate to scripture)
@@ -161,17 +151,11 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
     // -----------------------------------------------------------------------
     // THEN: AC#5 — Both resume reading, overlay dismisses
     // -----------------------------------------------------------------------
-    await expect(page.getByTestId('disconnection-overlay')).not.toBeVisible({
-      timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
-    });
+    await waitForPartnerReconnected(page);
 
     // Both users still see reading container (session intact)
-    await expect(page.getByTestId('reading-container')).toBeVisible({
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
-    await expect(reconnectedPartnerPage.getByTestId('reading-container')).toBeVisible({
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
+    await expect(page.getByTestId('reading-container')).toBeVisible();
+    await expect(reconnectedPartnerPage.getByTestId('reading-container')).toBeVisible();
 
     // Verify session is still in_progress (not ended)
     const { data: sessionData } = await supabaseAdmin
@@ -200,9 +184,7 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     await navigateBothToReadingPhase(page, partnerPage);
 
     // Both users start on step 1 (Verse 1 of 17)
-    await expect(page.getByTestId('reading-step-progress')).toContainText(/verse 1 of 17/i, {
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
+    await waitForReadingStep(page, 0, 17);
 
     // -----------------------------------------------------------------------
     // WHEN: Partner B goes offline (close tab to stop presence heartbeat)
@@ -210,9 +192,7 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     await partnerPage.close();
 
     // User A sees disconnect overlay
-    await expect(page.getByTestId('disconnection-overlay')).toBeVisible({
-      timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
-    });
+    await waitForPartnerDisconnected(page);
 
     // -----------------------------------------------------------------------
     // WHILE PARTNER IS OFFLINE: Advance the session step via DB
@@ -249,9 +229,7 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     );
 
     // Dismiss the disconnect overlay so User A can continue
-    await expect(page.getByTestId('disconnection-timeout')).toBeVisible({
-      timeout: DISCONNECTION_PHASE_B_TIMEOUT_MS,
-    });
+    await waitForDisconnectionTimeout(page);
     await page.getByTestId('disconnection-keep-waiting').click();
 
     // -----------------------------------------------------------------------
@@ -264,21 +242,13 @@ test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
     // -----------------------------------------------------------------------
     // THEN: AC#6 — Partner resyncs to the advanced step (step 2)
     // -----------------------------------------------------------------------
-    const advancedStepPattern = new RegExp(`verse ${newStepIndex + 1} of 17`, 'i');
-    await expect(reconnectedPartnerPage.getByTestId('reading-step-progress')).toContainText(
-      advancedStepPattern,
-      { timeout: STEP_ADVANCE_TIMEOUT_MS }
-    );
+    await waitForReadingStep(reconnectedPartnerPage, newStepIndex, 17);
 
     // User A should also be on the advanced step
-    await expect(page.getByTestId('reading-step-progress')).toContainText(advancedStepPattern, {
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
+    await waitForReadingStep(page, newStepIndex, 17);
 
     // Disconnect overlay should dismiss when partner comes back online
-    await expect(page.getByTestId('disconnection-overlay')).not.toBeVisible({
-      timeout: DISCONNECTION_DETECT_TIMEOUT_MS,
-    });
+    await waitForPartnerReconnected(page);
 
     // Session is still in_progress (not ended)
     const { data: sessionData } = await supabaseAdmin

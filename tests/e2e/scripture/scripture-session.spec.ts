@@ -12,7 +12,11 @@
  * The exit dialog data-testid is "exit-confirm-dialog" (not "scripture-exit-dialog").
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { startSoloSession, advanceOneStep } from '../../support/helpers';
+import {
+  startSoloSession,
+  advanceOneStep,
+  waitForScriptureSessionRequest,
+} from '../../support/helpers';
 import { clearClientScriptureCache } from '../../support/helpers/scripture-cache';
 
 test.describe('Scripture Session - Save & Resume', () => {
@@ -87,13 +91,7 @@ test.describe('Scripture Session - Save & Resume', () => {
       await clearClientScriptureCache(page);
 
       // Network-first: intercept the session check API before navigating.
-      const sessionCheck = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.status() >= 200 &&
-          resp.status() < 300,
-        { timeout: 15_000 }
-      );
+      const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
 
       // Re-open without `fresh=true` to exercise resume behavior.
       await page.goto('/scripture');

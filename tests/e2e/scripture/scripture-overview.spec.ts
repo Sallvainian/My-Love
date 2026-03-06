@@ -17,7 +17,12 @@
  *   The "Together" card is the second ModeCard in mode-selection.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { ensureScriptureOverview, startSoloSession, advanceOneStep } from '../../support/helpers';
+import {
+  ensureScriptureOverview,
+  startSoloSession,
+  advanceOneStep,
+  waitForScriptureSessionRequest,
+} from '../../support/helpers';
 import { clearClientScriptureCache } from '../../support/helpers/scripture-cache';
 import type { Page } from '@playwright/test';
 
@@ -243,13 +248,7 @@ test.describe('Scripture Navigation & Overview', () => {
       await clearClientScriptureCache(page);
 
       // Network-first: intercept the session check API before navigating.
-      const sessionCheck = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.status() >= 200 &&
-          resp.status() < 300,
-        { timeout: 15_000 }
-      );
+      const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
 
       // Re-open once after prioritize update so session check reads the target row.
       await page.goto('/scripture');
@@ -310,13 +309,7 @@ test.describe('Scripture Navigation & Overview', () => {
       await clearClientScriptureCache(page);
 
       // Network-first: intercept the session check API before navigating.
-      const sessionCheck = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.status() >= 200 &&
-          resp.status() < 300,
-        { timeout: 15_000 }
-      );
+      const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
 
       // Re-open once after prioritize update so session check reads the target row.
       await page.goto('/scripture');
@@ -345,7 +338,6 @@ test.describe('Scripture Navigation & Overview', () => {
             expect(abandonedSessionError).toBeNull();
             return abandonedSession?.status ?? null;
           },
-          { timeout: 15_000 }
         )
         .toBe('abandoned');
 
