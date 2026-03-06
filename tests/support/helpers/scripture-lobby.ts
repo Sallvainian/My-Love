@@ -2,82 +2,170 @@
  * Scripture Lobby Test Helpers
  *
  * Shared helpers for Together Mode lobby E2E tests (Story 4.1+).
- * Import these instead of re-defining them in each lobby spec file.
+ * Import these instead of re-defining synchronization logic in each spec.
  */
 import { expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
+import { waitForScriptureRpc, waitForScriptureStore } from '../helpers';
 
+type SuccessfulResponse = Pick<Response, 'url' | 'status' | 'request'>;
 
-// ---------------------------------------------------------------------------
-// Shared timeout constants
-// ---------------------------------------------------------------------------
-
-export const SESSION_CREATE_TIMEOUT_MS = 15_000;
-export const STEP_ADVANCE_TIMEOUT_MS = 15_000;
-export const REALTIME_SYNC_TIMEOUT_MS = 20_000;
-export const READY_BROADCAST_TIMEOUT_MS = 10_000;
-export const COUNTDOWN_APPEAR_TIMEOUT_MS = 10_000;
-export const LOCK_IN_BROADCAST_TIMEOUT_MS = 15_000;
-
-// ---------------------------------------------------------------------------
-// Shared predicates
-// ---------------------------------------------------------------------------
+const DISCONNECT_DETECT_WINDOW_MS = 25_000;
+const DISCONNECT_PHASE_B_WINDOW_MS = 35_000;
 
 /** Matches a scripture_toggle_ready RPC 2xx response. */
-export const isToggleReadyResponse = (resp: { url(): string; status(): number }): boolean =>
+export const isToggleReadyResponse = (resp: SuccessfulResponse): boolean =>
   resp.url().includes('/rest/v1/rpc/scripture_toggle_ready') &&
   resp.status() >= 200 &&
   resp.status() < 300;
 
 /** Matches a scripture_select_role RPC 2xx response. */
-export const isSelectRoleResponse = (resp: { url(): string; status(): number }): boolean =>
+export const isSelectRoleResponse = (resp: SuccessfulResponse): boolean =>
   resp.url().includes('/rest/v1/rpc/scripture_select_role') &&
   resp.status() >= 200 &&
   resp.status() < 300;
 
 /** Matches a scripture_lock_in RPC 2xx response. */
-export const isLockInResponse = (resp: { url(): string; status(): number }): boolean =>
+export const isLockInResponse = (resp: SuccessfulResponse): boolean =>
   resp.url().includes('/rest/v1/rpc/scripture_lock_in') &&
   resp.status() >= 200 &&
   resp.status() < 300;
 
 /** Matches a scripture_convert_to_solo RPC or a PATCH to scripture_sessions (2xx). */
-export const isConvertToSoloResponse = (resp: {
-  url(): string;
-  status(): number;
-  request(): { method(): string };
-}): boolean =>
+export const isConvertToSoloResponse = (resp: SuccessfulResponse): boolean =>
   (resp.url().includes('/rest/v1/rpc/scripture_convert_to_solo') ||
     (resp.url().includes('/rest/v1/scripture_sessions') && resp.request().method() === 'PATCH')) &&
   resp.status() >= 200 &&
   resp.status() < 300;
 
-// ---------------------------------------------------------------------------
-// Shared lock-in helper
-// ---------------------------------------------------------------------------
+async function waitForScriptureResponse(
+  page: Page,
+  label: string,
+  matcher: (resp: SuccessfulResponse) => boolean
+): Promise<Response> {
+  try {
+    return await page.waitForResponse((resp) => matcher(resp));
+  } catch (error) {
+    throw new Error(
+      `[waitForScriptureResponse] ${label} did not resolve: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+export async function waitForPartnerJoined(page: Page): Promise<void> {
+  await waitForScriptureStore(page, 'partner to join the lobby', (snapshot) => snapshot.partnerJoined);
+  await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i);
+}
+
+export async function waitForCountdownStarted(page: Page): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    'countdown phase to start',
+    (snapshot) =>
+      snapshot.session?.currentPhase === 'countdown' && snapshot.countdownStartedAt !== null
+  );
+  await expect(page.getByTestId('countdown-container')).toBeVisible();
+}
+
+export async function waitForReadingPhase(page: Page): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    'reading phase to be active',
+    (snapshot) => snapshot.session?.currentPhase === 'reading'
+  );
+  await expect(page.getByTestId('reading-container')).toBeVisible();
+}
+
+export async function waitForReadingStep(
+  page: Page,
+  stepIndex: number,
+  totalVerses: number
+): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    `reading step ${stepIndex + 1}`,
+    (snapshot) => snapshot.session?.currentStepIndex === stepIndex
+  );
+  await expect(page.getByTestId('reading-step-progress')).toContainText(
+    new RegExp(`verse ${stepIndex + 1} of ${totalVerses}`, 'i')
+  );
+}
+
+export async function waitForPartnerPosition(
+  page: Page,
+  expectedText?: string | RegExp
+): Promise<void> {
+  const partnerPosition = page.getByTestId('partner-position');
+  await expect(partnerPosition).toBeVisible();
+
+  if (expectedText) {
+    await expect(partnerPosition).toContainText(expectedText);
+  }
+}
+
+export async function waitForPartnerLocked(page: Page): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    'partner lock-in broadcast',
+    (snapshot) => snapshot.partnerLocked
+  );
+  await expect(page.getByTestId('partner-locked-indicator')).toBeVisible();
+}
+
+export async function waitForReflectionPhase(page: Page): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    'reflection phase to be active',
+    (snapshot) => snapshot.session?.currentPhase === 'reflection'
+  );
+  await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
+}
+
+export async function waitForPartnerDisconnected(page: Page): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    'partner disconnection overlay',
+    (snapshot) => snapshot.partnerDisconnected && snapshot.partnerDisconnectedAt !== null,
+    { timeout: DISCONNECT_DETECT_WINDOW_MS }
+  );
+  await expect(page.getByTestId('disconnection-overlay')).toBeVisible();
+  await expect(page.getByTestId('disconnection-reconnecting')).toBeVisible();
+}
+
+export async function waitForDisconnectionTimeout(page: Page): Promise<void> {
+  await expect(page.getByText(/your partner seems to have stepped away/i)).toBeVisible({
+    timeout: DISCONNECT_PHASE_B_WINDOW_MS,
+  });
+  await expect(page.getByTestId('disconnection-keep-waiting')).toBeVisible();
+  await expect(page.getByTestId('disconnection-end-session')).toBeVisible();
+}
+
+export async function waitForPartnerReconnected(page: Page): Promise<void> {
+  await waitForScriptureStore(
+    page,
+    'partner reconnection cleanup',
+    (snapshot) => !snapshot.partnerDisconnected,
+    { timeout: DISCONNECT_DETECT_WINDOW_MS }
+  );
+  await expect(page.getByTestId('disconnection-overlay')).not.toBeVisible();
+}
 
 /**
  * Click the lock-in button and wait for the RPC response.
- * Enriches the error with the given `label` on timeout.
+ * Enriches the error with the given `label` on failure.
  */
 export async function lockInAndWait(page: Page, label: string): Promise<void> {
-  const lockInResponse = page
-    .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-    .catch((e: Error) => {
-      throw new Error(`scripture_lock_in RPC (${label}) did not fire: ${e.message}`);
-    });
+  const lockInResponse = waitForScriptureResponse(page, `scripture_lock_in RPC (${label})`, isLockInResponse);
 
   await page.getByTestId('lock-in-button').click();
   await lockInResponse;
 }
 
-// ---------------------------------------------------------------------------
-// Shared navigation helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Navigate both users through lobby → role selection → ready → countdown → reading phase.
- * Returns when both users see the reading-container.
+ * Returns when both users see the reading-container and presence indicator.
  */
 export async function navigateBothToReadingPhase(
   page: Page,
@@ -87,49 +175,52 @@ export async function navigateBothToReadingPhase(
     userB: 'responder',
   }
 ): Promise<void> {
+  const userASelectRole = waitForScriptureResponse(page, 'scripture_select_role RPC (User A)', isSelectRoleResponse);
   await page.getByTestId(`lobby-role-${roles.userA}`).click();
+  await userASelectRole;
+  await expect(page.getByTestId('lobby-waiting')).toBeVisible();
+
+  const userBSelectRole = waitForScriptureResponse(
+    partnerPage,
+    'scripture_select_role RPC (User B)',
+    isSelectRoleResponse
+  );
   await partnerPage.getByTestId(`lobby-role-${roles.userB}`).click();
+  await userBSelectRole;
   await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
-  await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-    timeout: REALTIME_SYNC_TIMEOUT_MS,
-  });
-  const userAReady = page.waitForResponse(isToggleReadyResponse, {
-    timeout: READY_BROADCAST_TIMEOUT_MS,
-  });
+  await waitForPartnerJoined(page);
+
+  const userAReady = waitForScriptureResponse(page, 'scripture_toggle_ready RPC (User A)', isToggleReadyResponse);
   await page.getByTestId('lobby-ready-button').click();
   await userAReady;
-  const partnerReady = partnerPage.waitForResponse(isToggleReadyResponse, {
-    timeout: READY_BROADCAST_TIMEOUT_MS,
-  });
+  await waitForScriptureStore(page, 'current user ready state', (snapshot) => snapshot.myReady);
+
+  const partnerReady = waitForScriptureResponse(
+    partnerPage,
+    'scripture_toggle_ready RPC (User B)',
+    isToggleReadyResponse
+  );
   await partnerPage.getByTestId('lobby-ready-button').click();
   await partnerReady;
 
-  await expect(page.getByTestId('reading-container')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-  await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
+  await waitForCountdownStarted(page);
+  await waitForCountdownStarted(partnerPage);
+  await waitForReadingPhase(page);
+  await waitForReadingPhase(partnerPage);
 
-  // Confirm realtime broadcast channel is live on both sides by waiting for the
-  // presence-driven partner-position indicator. This element only renders when
-  // the partner's presence channel has subscribed and broadcast — guaranteeing
-  // the broadcast channel (same async setAuth → subscribe flow) is also ready.
-  await expect(page.getByTestId('partner-position')).toBeVisible({
-    timeout: REALTIME_SYNC_TIMEOUT_MS,
-  });
-  await expect(partnerPage.getByTestId('partner-position')).toBeVisible({
-    timeout: REALTIME_SYNC_TIMEOUT_MS,
-  });
+  // Confirm the presence channel is live on both sides by waiting for the
+  // presence-driven partner-position indicator. This is the primary realtime
+  // fallback when no additional HTTP response exists for presence propagation.
+  await waitForPartnerPosition(page);
+  await waitForPartnerPosition(partnerPage);
 }
 
 /**
  * Navigate to /scripture and start Together mode.
  * Waits for the role selection screen to become visible.
  * Returns the session ID from the create-session RPC response,
- * or empty string if the user auto-joined an existing session
- * (partner navigating after User A already created a session).
+ * or empty string if the user auto-joined an existing session.
  */
 export async function navigateToTogetherRoleSelection(page: Page): Promise<string> {
   // Network-first: intercept ALL API calls that trigger re-renders BEFORE
@@ -159,20 +250,26 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
 
   await expect(
     lobbyRoleSelection.or(scriptureOverview).or(readingFlow).or(loginScreen)
-  ).toBeVisible({ timeout: 20_000 });
+  ).toBeVisible();
 
-  // Fail fast on login screen (auth token missing or expired)
   if (await loginScreen.isVisible()) {
     throw new Error(
       '[navigateToTogetherRoleSelection] Page rendered login screen. Auth token may be expired or missing.'
     );
   }
 
-  // Partner auto-joined an active together session — already at role selection.
-  // No new session was created; return empty string.
   if (await lobbyRoleSelection.isVisible()) {
     return '';
   }
+
+  const startButton = page.getByTestId('scripture-start-button');
+  await expect(startButton).toBeVisible();
+  await expect(startButton).toBeEnabled();
+  await startButton.click();
+
+  const togetherButton = page.getByTestId('scripture-mode-together');
+  await expect(togetherButton).toBeVisible();
+  await expect(togetherButton).toBeEnabled();
 
   // Wait for ALL re-render-triggering API calls to complete before interacting.
   // Best-effort: swallow rejections — these APIs may not fire if partner is
@@ -183,38 +280,18 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
     statsLoaded.catch(() => {}),
   ]);
 
-  // Normal flow: overview → Start → Together → create session
-  const startButton = page.getByTestId('scripture-start-button');
-  await expect(startButton).toBeEnabled();
-  await startButton.click({ timeout: 10_000 });
-
-  // Wait for Together mode button to be visible AND enabled.
-  // The button is disabled while partner data is loading (partnerStatus !== 'linked').
-  // Without this wait, clicking the disabled button silently does nothing — no RPC fires.
-  const togetherButton = page.getByTestId('scripture-mode-together');
-  await expect(togetherButton).toBeVisible();
-  await expect(togetherButton).toBeEnabled({ timeout: SESSION_CREATE_TIMEOUT_MS });
-
-  // Network-first: watch for the create-session RPC before clicking Together
-  const sessionResponse = page
-    .waitForResponse(
-      (resp) =>
-        resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-        resp.request().method() === 'POST' &&
-        resp.status() >= 200 &&
-        resp.status() < 300,
-      { timeout: SESSION_CREATE_TIMEOUT_MS }
-    )
-    .catch((e: Error) => {
-      throw new Error(`scripture_create_session RPC did not fire: ${e.message}`);
-    });
-
+  const sessionResponse = waitForScriptureRpc(page, 'scripture_create_session');
   await togetherButton.click();
 
   const response = await sessionResponse;
   const payload = (await response.json()) as { id?: string };
 
-  // Role selection screen must be visible
+  await waitForScriptureStore(
+    page,
+    'together-mode lobby role selection',
+    (snapshot) =>
+      snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'lobby'
+  );
   await expect(lobbyRoleSelection).toBeVisible();
 
   return payload.id ?? '';
