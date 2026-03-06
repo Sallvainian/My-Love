@@ -29,17 +29,24 @@ test.describe('Scripture Stats Dashboard', () => {
     test('[P0] should display stats section with non-zero values after completing a session', async ({
       page,
       scriptureNav,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User completes a full solo reading session through the UI
       await scriptureNav.completeAllSteps();
       await scriptureNav.completeSession();
 
       // WHEN: User returns to the scripture overview
+      const statsCall = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_get_couple_stats',
+      });
       await scriptureNav.ensureOverview();
+      const { status } = await statsCall;
+      expect(status).toBe(200);
 
       // THEN: The stats section renders with real data
       const statsSection = page.getByTestId('scripture-stats-section');
-      await expect(statsSection).toBeVisible({ timeout: 10_000 });
+      await expect(statsSection).toBeVisible();
 
       // AND: Sessions completed card shows at least 1
       const sessionsCard = page.getByTestId('scripture-stats-sessions');
