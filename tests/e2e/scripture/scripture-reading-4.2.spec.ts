@@ -15,10 +15,13 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import {
-  REALTIME_SYNC_TIMEOUT_MS,
-  STEP_ADVANCE_TIMEOUT_MS,
   lockInAndWait,
   navigateBothToReadingPhase,
+  waitForPartnerLocked,
+  waitForPartnerPosition,
+  waitForReadingPhase,
+  waitForReadingStep,
+  waitForReflectionPhase,
 } from '../../support/helpers/scripture-lobby';
 import { jumpToStep } from '../../support/helpers/scripture-together';
 
@@ -26,7 +29,6 @@ import { jumpToStep } from '../../support/helpers/scripture-together';
 // Constants
 // ---------------------------------------------------------------------------
 
-const REFLECTION_LOAD_TIMEOUT_MS = 20_000;
 const LAST_STEP_INDEX = 16;
 const TOTAL_VERSES = 17;
 
@@ -61,9 +63,7 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     await expect(page.getByTestId('lock-in-undo')).toBeVisible();
 
     // AC#4 — Partner sees "[PartnerName] is ready" indicator
-    await expect(partnerPage.getByTestId('partner-locked-indicator')).toBeVisible({
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerLocked(partnerPage);
 
     // -----------------------------------------------------------------------
     // WHEN: User B taps "Ready for next verse" (both locked → advance)
@@ -71,14 +71,8 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
     await lockInAndWait(partnerPage, 'User B');
 
     // AC#5 — Both advance to step 2 (verse text changes)
-    const verseStep2Pattern = new RegExp(`verse 2 of ${TOTAL_VERSES}`, 'i');
-    await expect(page.getByTestId('reading-step-progress')).toContainText(verseStep2Pattern, {
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
-    await expect(partnerPage.getByTestId('reading-step-progress')).toContainText(
-      verseStep2Pattern,
-      { timeout: STEP_ADVANCE_TIMEOUT_MS }
-    );
+    await waitForReadingStep(page, 1, TOTAL_VERSES);
+    await waitForReadingStep(partnerPage, 1, TOTAL_VERSES);
 
     // AC#1 — Role alternation: User A (Reader on step 1) is now Responder on step 2
     await expect(page.getByTestId('role-indicator')).toContainText('Partner reads this');
@@ -113,9 +107,7 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
     await expect(page.getByTestId('lock-in-button')).toContainText(/ready for next verse/i);
 
     // THEN: Partner's indicator disappears
-    await expect(partnerPage.getByTestId('partner-locked-indicator')).not.toBeVisible({
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await expect(partnerPage.getByTestId('partner-locked-indicator')).not.toBeVisible();
   });
 });
 
@@ -144,10 +136,7 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
     await lockInAndWait(partnerPage, 'User B');
 
     // Wait for step advance
-    await expect(page.getByTestId('reading-step-progress')).toContainText(
-      new RegExp(`verse 2 of ${TOTAL_VERSES}`, 'i'),
-      { timeout: STEP_ADVANCE_TIMEOUT_MS }
-    );
+    await waitForReadingStep(page, 1, TOTAL_VERSES);
 
     // Step 2: Roles alternate — User A is now Responder, Partner is Reader
     await expect(page.getByTestId('role-indicator')).toContainText('Partner reads this');
@@ -175,18 +164,11 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
     // Advance the session to the last step via DB + Zustand store.
     await jumpToStep(supabaseAdmin, uiSessionId, page, partnerPage, LAST_STEP_INDEX);
 
-    await expect(page.getByTestId('reading-container')).toBeVisible({
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
-    await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
-      timeout: STEP_ADVANCE_TIMEOUT_MS,
-    });
+    await waitForReadingPhase(page);
+    await waitForReadingPhase(partnerPage);
 
     // Should be on the last step
-    await expect(page.getByTestId('reading-step-progress')).toContainText(
-      new RegExp(`verse ${TOTAL_VERSES} of ${TOTAL_VERSES}`, 'i'),
-      { timeout: STEP_ADVANCE_TIMEOUT_MS }
-    );
+    await waitForReadingStep(page, LAST_STEP_INDEX, TOTAL_VERSES);
 
     // Both lock in on last step → reflection phase
     await lockInAndWait(page, 'User A');
@@ -194,15 +176,9 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
 
     // THEN: Both users see reflection phase UI
     // Together-mode reflection routes to SoloReadingFlow → ReflectionSummary
-    await expect(page.getByTestId('reading-container')).not.toBeVisible({
-      timeout: REFLECTION_LOAD_TIMEOUT_MS,
-    });
-    await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible({
-      timeout: REFLECTION_LOAD_TIMEOUT_MS,
-    });
-    await expect(partnerPage.getByTestId('scripture-reflection-summary-screen')).toBeVisible({
-      timeout: REFLECTION_LOAD_TIMEOUT_MS,
-    });
+    await waitForReflectionPhase(page);
+    await waitForReflectionPhase(partnerPage);
+    await expect(page.getByTestId('reading-container')).not.toBeVisible();
   });
 });
 
@@ -230,24 +206,13 @@ test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
     // THEN: AC#2 — User A sees partner's position indicator
     // The presence channel broadcasts partner's current view. The
     // PartnerPosition component renders "[Name] is reading the verse".
-    // We wait with REALTIME_SYNC_TIMEOUT_MS to account for the initial
+    // We wait on the shared presence helper to account for the initial
     // presence broadcast arriving via the ephemeral presence channel.
     // -----------------------------------------------------------------------
-    await expect(page.getByTestId('partner-position')).toBeVisible({
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
-    await expect(page.getByTestId('partner-position')).toContainText(/is reading the verse/i, {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerPosition(page, /is reading the verse/i);
 
     // Verify the indicator also appears on the partner's page for User A
-    await expect(partnerPage.getByTestId('partner-position')).toBeVisible({
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
-    await expect(partnerPage.getByTestId('partner-position')).toContainText(
-      /is reading the verse/i,
-      { timeout: REALTIME_SYNC_TIMEOUT_MS }
-    );
+    await waitForPartnerPosition(partnerPage, /is reading the verse/i);
 
     // -----------------------------------------------------------------------
     // WHEN: Partner switches to the response tab
@@ -255,9 +220,7 @@ test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
     await partnerPage.getByTestId('reading-tab-response').click();
 
     // THEN: User A's indicator updates to show "is reading the response"
-    await expect(page.getByTestId('partner-position')).toContainText(/is reading the response/i, {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerPosition(page, /is reading the response/i);
 
     // -----------------------------------------------------------------------
     // WHEN: Partner switches back to the verse tab
@@ -265,8 +228,6 @@ test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
     await partnerPage.getByTestId('reading-tab-verse').click();
 
     // THEN: User A's indicator reverts to "is reading the verse"
-    await expect(page.getByTestId('partner-position')).toContainText(/is reading the verse/i, {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerPosition(page, /is reading the verse/i);
   });
 });
