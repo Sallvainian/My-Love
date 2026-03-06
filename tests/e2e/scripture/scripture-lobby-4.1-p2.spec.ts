@@ -10,14 +10,12 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import {
-  REALTIME_SYNC_TIMEOUT_MS,
-  READY_BROADCAST_TIMEOUT_MS,
-  COUNTDOWN_APPEAR_TIMEOUT_MS,
-  isToggleReadyResponse,
-  isSelectRoleResponse,
   navigateToTogetherRoleSelection,
+  waitForCountdownStarted,
+  waitForPartnerJoined,
 } from '../../support/helpers/scripture-lobby';
 import { createTestSession, cleanupTestSession } from '../../support/factories';
+import { waitForScriptureRpc, waitForScriptureStore } from '../../support/helpers';
 
 // ---------------------------------------------------------------------------
 // 4.1-E2E-003: Countdown aria-live announcements (P2)
@@ -27,44 +25,41 @@ import { createTestSession, cleanupTestSession } from '../../support/factories';
 test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
   test('[P2] should announce "Session starting in 3 seconds" via aria-live assertive when countdown begins', async ({
     page,
-    interceptNetworkCall,
     togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
 
     // GIVEN: User A navigates to Together mode and selects Reader role
-    const userASelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
+    const userASelectRole = waitForScriptureRpc(page, 'scripture_select_role');
     await page.getByTestId('lobby-role-reader').click();
     await userASelectRole;
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
     // GIVEN: User B (partner) is already on the role selection screen (fixture)
-    const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
+    const partnerSelectRole = waitForScriptureRpc(partnerPage, 'scripture_select_role');
     await partnerPage.getByTestId('lobby-role-responder').click();
     await partnerSelectRole;
     await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
     // THEN: User A sees partner has joined
-    await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerJoined(page);
 
     // WHEN: User A clicks Ready
-    const userAReadyBroadcast = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_toggle_ready', timeout: READY_BROADCAST_TIMEOUT_MS });
+    const userAReadyBroadcast = waitForScriptureRpc(page, 'scripture_toggle_ready');
 
     await page.getByTestId('lobby-ready-button').click();
     await userAReadyBroadcast;
 
     // WHEN: User B (partner) clicks Ready — both ready triggers countdown
-    const partnerReadyBroadcast = partnerPage
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+    const partnerReadyBroadcast = waitForScriptureRpc(partnerPage, 'scripture_toggle_ready');
 
     await partnerPage.getByTestId('lobby-ready-button').click();
     await partnerReadyBroadcast;
 
     // THEN (AC#5): countdown-container appears
     const countdownContainer = page.getByTestId('countdown-container');
-    await expect(countdownContainer).toBeVisible({ timeout: COUNTDOWN_APPEAR_TIMEOUT_MS });
+    await waitForCountdownStarted(page);
+    await expect(countdownContainer).toBeVisible();
 
     // AC#5 — The sr-only assertive region is a CHILD of countdown-container
     // (countdown-container itself has aria-label="Countdown", not aria-live)
@@ -87,27 +82,24 @@ test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
 test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
   test('[P2] should announce partner ready state via aria-live polite region when partner toggles ready', async ({
     page,
-    interceptNetworkCall,
     togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
 
     // GIVEN: User A navigates to Together mode and selects Reader role
-    const userASelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
+    const userASelectRole = waitForScriptureRpc(page, 'scripture_select_role');
     await page.getByTestId('lobby-role-reader').click();
     await userASelectRole;
     await expect(page.getByTestId('lobby-waiting')).toBeVisible();
 
     // GIVEN: User B (partner) is already on the role selection screen (fixture)
-    const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
+    const partnerSelectRole = waitForScriptureRpc(partnerPage, 'scripture_select_role');
     await partnerPage.getByTestId('lobby-role-responder').click();
     await partnerSelectRole;
     await expect(partnerPage.getByTestId('lobby-waiting')).toBeVisible();
 
     // THEN: User A sees that partner has joined
-    await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerJoined(page);
 
     // AC#3 — The partner-status region must be wrapped in aria-live="polite"
     const ariaLiveWrapper = page.locator('[aria-live="polite"]').filter({
@@ -117,15 +109,19 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
     await expect(ariaLiveWrapper).toHaveAttribute('aria-live', 'polite');
 
     // WHEN: User B (partner) toggles ready
-    const partnerReadyBroadcast = partnerPage
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS });
+    const partnerReadyBroadcast = waitForScriptureRpc(partnerPage, 'scripture_toggle_ready');
 
     await partnerPage.getByTestId('lobby-ready-button').click();
     await partnerReadyBroadcast;
 
     // THEN (AC#3): lobby-partner-ready shows partner's ready state
     const partnerReadyIndicator = page.getByTestId('lobby-partner-ready');
-    await expect(partnerReadyIndicator).toBeVisible({ timeout: REALTIME_SYNC_TIMEOUT_MS });
+    await waitForScriptureStore(
+      page,
+      'partner ready indicator after partner toggles ready',
+      (snapshot) => snapshot.partnerReady
+    );
+    await expect(partnerReadyIndicator).toBeVisible();
 
     // AC#3 — "is ready" text must be present for screen readers to announce it
     await expect(partnerReadyIndicator).toContainText(/is ready/i);
@@ -140,7 +136,6 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
 test.describe('[4.1-E2E-005] Language Compliance', () => {
   test('[P2] should display "Continue solo" button and non-accusatory waiting language in lobby', async ({
     page,
-    interceptNetworkCall,
     supabaseAdmin,
   }) => {
     test.setTimeout(30_000);
@@ -168,7 +163,7 @@ test.describe('[4.1-E2E-005] Language Compliance', () => {
       await expect(continueSoloOnRoleSelection).toHaveText('Continue solo');
 
       // WHEN: User selects Reader role — transitions to lobby waiting screen
-      const langSelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
+      const langSelectRole = waitForScriptureRpc(page, 'scripture_select_role');
       await page.getByTestId('lobby-role-reader').click();
       await langSelectRole;
       await expect(page.getByTestId('lobby-waiting')).toBeVisible();

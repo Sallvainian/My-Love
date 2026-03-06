@@ -3,19 +3,16 @@
  *
  * Shared helpers for Together Mode E2E tests that need to start sessions
  * and navigate both users through the lobby to the reading phase.
- *
- * These build on scripture-lobby.ts helpers and eliminate duplication
- * across Together Mode spec files (Stories 4.2, 4.3+).
  */
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { TypedSupabaseClient } from '../factories';
+import { waitForScriptureRpc, waitForScriptureStore } from '../helpers';
 import {
-  REALTIME_SYNC_TIMEOUT_MS,
-  READY_BROADCAST_TIMEOUT_MS,
-  STEP_ADVANCE_TIMEOUT_MS,
-  isToggleReadyResponse,
   navigateToTogetherRoleSelection,
+  waitForCountdownStarted,
+  waitForPartnerJoined,
+  waitForReadingPhase,
 } from './scripture-lobby';
 
 /**
@@ -24,10 +21,6 @@ import {
  * Navigates to /scripture, clicks Start → Together, waits for
  * scripture_create_session RPC, then selects the given role and
  * waits for the lobby to advance past role selection.
- *
- * @param page - Playwright page (authenticated user)
- * @param roleTestId - data-testid for the role button
- * @returns The session ID from the create-session RPC
  */
 export async function startTogetherSessionForRole(
   page: Page,
@@ -35,15 +28,15 @@ export async function startTogetherSessionForRole(
 ): Promise<string> {
   const sessionId = await navigateToTogetherRoleSelection(page);
 
+  const selectRole = waitForScriptureRpc(page, 'scripture_select_role');
   await page.getByTestId(roleTestId).click();
+  await selectRole;
 
-  // Wait for any post-role state: waiting for partner, ready button, or reading.
-  // Uses locator.or() instead of polling .isVisible().catch() on each locator.
   const anyPostRoleState = page
     .getByText(/waiting for/i)
     .or(page.getByRole('button', { name: /i'?m ready/i }))
     .or(page.getByTestId('reading-container'));
-  await expect(anyPostRoleState).toBeVisible({ timeout: STEP_ADVANCE_TIMEOUT_MS });
+  await expect(anyPostRoleState).toBeVisible();
 
   return sessionId;
 }
@@ -52,46 +45,25 @@ export async function startTogetherSessionForRole(
  * Navigate both users through lobby ready-up to the reading phase.
  *
  * Assumes both users are already in the lobby (post-role-selection).
- * Waits for partner join, both users ready up (network-first), and
- * both see the reading container.
- *
- * @param page - User A's page
- * @param partnerPage - User B's page
  */
 export async function setupBothUsersInReading(page: Page, partnerPage: Page): Promise<void> {
-  // Wait for the ready button to appear on User A's page (lobby loaded)
-  await expect(page.getByTestId('lobby-ready-button')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
+  await expect(page.getByTestId('lobby-ready-button')).toBeVisible();
+  await waitForPartnerJoined(page);
 
-  // Wait for partner to see that User A has joined before readying up
-  await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-    timeout: REALTIME_SYNC_TIMEOUT_MS,
-  });
-
-  // Both users ready up → countdown → reading phase (network-first)
-  const pageReadyResponse = page.waitForResponse(isToggleReadyResponse, {
-    timeout: READY_BROADCAST_TIMEOUT_MS,
-  });
+  const pageReadyResponse = waitForScriptureRpc(page, 'scripture_toggle_ready');
   await page.getByTestId('lobby-ready-button').click();
   await pageReadyResponse;
+  await waitForScriptureStore(page, 'current user ready state', (snapshot) => snapshot.myReady);
 
-  await expect(partnerPage.getByTestId('lobby-ready-button')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-  const partnerReadyResponse = partnerPage.waitForResponse(isToggleReadyResponse, {
-    timeout: READY_BROADCAST_TIMEOUT_MS,
-  });
+  await expect(partnerPage.getByTestId('lobby-ready-button')).toBeVisible();
+  const partnerReadyResponse = waitForScriptureRpc(partnerPage, 'scripture_toggle_ready');
   await partnerPage.getByTestId('lobby-ready-button').click();
   await partnerReadyResponse;
 
-  // Wait for reading container on both pages (countdown completes → reading)
-  await expect(page.getByTestId('reading-container')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
-  await expect(partnerPage.getByTestId('reading-container')).toBeVisible({
-    timeout: STEP_ADVANCE_TIMEOUT_MS,
-  });
+  await waitForCountdownStarted(page);
+  await waitForCountdownStarted(partnerPage);
+  await waitForReadingPhase(page);
+  await waitForReadingPhase(partnerPage);
 }
 
 /**
@@ -120,52 +92,38 @@ export async function jumpToStep(
 
   await page.evaluate(injectStep, stepIndex);
   await partnerPage.evaluate(injectStep, stepIndex);
+
+  await waitForScriptureStore(page, `page step ${stepIndex}`, (snapshot) => {
+    return snapshot.session?.currentStepIndex === stepIndex;
+  });
+  await waitForScriptureStore(partnerPage, `partner page step ${stepIndex}`, (snapshot) => {
+    return snapshot.session?.currentStepIndex === stepIndex;
+  });
 }
 
 /**
  * Reconnect a partner to an existing together-mode session.
  *
- * Navigates to /scripture, waits for the app store to be available,
- * calls loadSession(), then deterministically waits for the store
- * state to settle before asserting the DOM.
- *
  * Together-mode sessions are not auto-detected on navigation
  * (checkForActiveSession only finds solo sessions), so we call
  * loadSession() via window.__APP_STORE__.
  */
-export async function reconnectPartnerAndLoadSession(
-  page: Page,
-  sessionId: string,
-  options: { timeout?: number } = {}
-): Promise<void> {
-  const timeout = options.timeout ?? STEP_ADVANCE_TIMEOUT_MS;
-
-  // 1. Navigate and wait for app to load
+export async function reconnectPartnerAndLoadSession(page: Page, sessionId: string): Promise<void> {
   await page.goto('/scripture');
-  await expect(page.getByTestId('scripture-overview')).toBeVisible({ timeout });
+  await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
-  // 2. Guard: wait for __APP_STORE__ on fresh page
-  await page.waitForFunction(() => typeof window.__APP_STORE__ !== 'undefined', { timeout: 5_000 });
+  await waitForScriptureStore(page, 'scripture store availability', (snapshot) => snapshot.hasStore);
 
-  // 3. Call loadSession
   await page.evaluate(async (sid) => {
     const store = window.__APP_STORE__;
     if (!store) throw new Error('__APP_STORE__ not found');
     await store.getState().loadSession(sid);
   }, sessionId);
 
-  // 4. Deterministic wait: poll store until session is together-mode reading
-  //    (matches ScriptureOverview routing condition)
-  await page.waitForFunction(
-    () => {
-      const store = window.__APP_STORE__;
-      if (!store) return false;
-      const s = store.getState().session;
-      return s !== null && s.mode === 'together' && s.currentPhase === 'reading';
-    },
-    { timeout, polling: 250 }
+  await waitForScriptureStore(
+    page,
+    'reconnected partner reading session',
+    (snapshot) => snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'reading'
   );
-
-  // 5. DOM confirmation (near-instant since store is already correct)
-  await expect(page.getByTestId('reading-container')).toBeVisible({ timeout });
+  await expect(page.getByTestId('reading-container')).toBeVisible();
 }

@@ -13,21 +13,13 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import {
-  REALTIME_SYNC_TIMEOUT_MS,
-  READY_BROADCAST_TIMEOUT_MS,
-  COUNTDOWN_APPEAR_TIMEOUT_MS,
-  isToggleReadyResponse,
-  isSelectRoleResponse,
   navigateToTogetherRoleSelection,
+  waitForCountdownStarted,
+  waitForPartnerJoined,
+  waitForReadingPhase,
 } from '../../support/helpers/scripture-lobby';
 import { createTestSession, cleanupTestSession } from '../../support/factories';
-
-// ---------------------------------------------------------------------------
-// Timeout constants (spec-local — not shared with P2 spec)
-// ---------------------------------------------------------------------------
-
-const CONVERSION_TIMEOUT_MS = 12_000;
-const VERSE_LOAD_TIMEOUT_MS = 15_000;
+import { waitForScriptureRpc, waitForScriptureStore } from '../../support/helpers';
 
 // ---------------------------------------------------------------------------
 // 4.1-E2E-001: Full Lobby Flow (P0)
@@ -36,7 +28,6 @@ const VERSE_LOAD_TIMEOUT_MS = 15_000;
 test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
   test('[P0] should complete full lobby flow: role selection → both ready → countdown → verse', async ({
     page,
-    interceptNetworkCall,
     togetherMode: { partnerPage },
   }) => {
     test.setTimeout(60_000);
@@ -49,7 +40,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(page.getByTestId('lobby-role-responder')).toContainText('You read the response');
 
     // WHEN: User A selects Reader role
-    const userASelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
+    const userASelectRole = waitForScriptureRpc(page, 'scripture_select_role');
     await page.getByTestId('lobby-role-reader').click();
     await userASelectRole;
 
@@ -70,7 +61,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(partnerPage.getByTestId('lobby-role-responder')).toBeVisible();
 
     // Partner selects Responder role
-    const partnerSelectRole = partnerPage.waitForResponse(isSelectRoleResponse);
+    const partnerSelectRole = waitForScriptureRpc(partnerPage, 'scripture_select_role');
     await partnerPage.getByTestId('lobby-role-responder').click();
     await partnerSelectRole;
 
@@ -80,9 +71,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     // -----------------------------------------------------------------------
     // THEN (AC#3): User A sees partner has joined via realtime broadcast
     // -----------------------------------------------------------------------
-    await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i, {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForPartnerJoined(page);
 
     // AC#4 — Ready toggle button visible for both users
     await expect(page.getByTestId('lobby-ready-button')).toBeVisible();
@@ -92,7 +81,7 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     // WHEN: User A clicks Ready
     // -----------------------------------------------------------------------
     // Network-first: watch for ready state RPC before clicking
-    const userAReadyBroadcast = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_toggle_ready', timeout: READY_BROADCAST_TIMEOUT_MS });
+    const userAReadyBroadcast = waitForScriptureRpc(page, 'scripture_toggle_ready');
 
     await page.getByTestId('lobby-ready-button').click();
     await userAReadyBroadcast;
@@ -102,18 +91,17 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     await expect(page.getByTestId('lobby-ready-button')).toContainText('Ready ✓');
 
     // AC#4 — Partner sees User A is ready via realtime (semantic text, not just visibility)
-    await expect(partnerPage.getByTestId('lobby-partner-ready')).toContainText('is ready', {
-      timeout: REALTIME_SYNC_TIMEOUT_MS,
-    });
+    await waitForScriptureStore(
+      partnerPage,
+      'partner ready indicator after User A toggles ready',
+      (snapshot) => snapshot.partnerReady
+    );
+    await expect(partnerPage.getByTestId('lobby-partner-ready')).toContainText('is ready');
 
     // -----------------------------------------------------------------------
     // WHEN: User B (partner) clicks Ready — both now ready → countdown starts
     // -----------------------------------------------------------------------
-    const partnerReadyBroadcast = partnerPage
-      .waitForResponse(isToggleReadyResponse, { timeout: READY_BROADCAST_TIMEOUT_MS })
-      .catch((e: Error) => {
-        throw new Error(`scripture_toggle_ready RPC (User B) did not fire: ${e.message}`);
-      });
+    const partnerReadyBroadcast = waitForScriptureRpc(partnerPage, 'scripture_toggle_ready');
 
     await partnerPage.getByTestId('lobby-ready-button').click();
     await partnerReadyBroadcast;
@@ -121,26 +109,14 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
     // -----------------------------------------------------------------------
     // THEN (AC#5): Countdown appears on BOTH pages concurrently
     // -----------------------------------------------------------------------
-    await Promise.all([
-      expect(page.getByTestId('countdown-container')).toBeVisible({
-        timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
-      }),
-      expect(partnerPage.getByTestId('countdown-container')).toBeVisible({
-        timeout: COUNTDOWN_APPEAR_TIMEOUT_MS,
-      }),
-    ]);
+    await Promise.all([waitForCountdownStarted(page), waitForCountdownStarted(partnerPage)]);
 
     // AC#5 — After countdown completes, countdown container disappears on both pages.
     // Note: Together-mode reading view (scripture-verse-text) is Story 4.2 scope.
     // Story 4.1 delivers the session in currentPhase='reading' after countdown.
-    await Promise.all([
-      expect(page.getByTestId('countdown-container')).not.toBeVisible({
-        timeout: VERSE_LOAD_TIMEOUT_MS,
-      }),
-      expect(partnerPage.getByTestId('countdown-container')).not.toBeVisible({
-        timeout: VERSE_LOAD_TIMEOUT_MS,
-      }),
-    ]);
+    await Promise.all([waitForReadingPhase(page), waitForReadingPhase(partnerPage)]);
+    await expect(page.getByTestId('countdown-container')).not.toBeVisible();
+    await expect(partnerPage.getByTestId('countdown-container')).not.toBeVisible();
   });
 });
 
@@ -151,7 +127,6 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
 test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
   test('[P1] should convert together-mode session to solo when user taps "Continue solo"', async ({
     page,
-    interceptNetworkCall,
     supabaseAdmin,
   }) => {
     test.setTimeout(30_000);
@@ -163,6 +138,11 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
     const sessionIdsToClean = [...seed.session_ids];
 
     try {
+      await supabaseAdmin
+        .from('scripture_sessions')
+        .update({ status: 'complete', current_phase: 'complete' })
+        .in('id', seed.session_ids);
+
       // -----------------------------------------------------------------------
       // GIVEN: User navigates to /scripture and starts Together mode
       // -----------------------------------------------------------------------
@@ -173,7 +153,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
 
       // WHEN: User selects a role (Reader)
-      const soloSelectRole = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_select_role' });
+      const soloSelectRole = waitForScriptureRpc(page, 'scripture_select_role');
       await page.getByTestId('lobby-role-reader').click();
       await soloSelectRole;
 
@@ -191,7 +171,7 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // WHEN: User taps "Continue solo" without partner joining
       // -----------------------------------------------------------------------
       // Network-first: watch for session mode conversion RPC
-      const conversionResponse = interceptNetworkCall({ method: 'POST', url: '**/rest/v1/rpc/scripture_convert_to_solo', timeout: CONVERSION_TIMEOUT_MS });
+      const conversionResponse = waitForScriptureRpc(page, 'scripture_convert_to_solo');
 
       await page.getByTestId('lobby-continue-solo').click();
       await conversionResponse;
@@ -199,9 +179,13 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // -----------------------------------------------------------------------
       // THEN (AC#6): Session converts to solo; first verse is visible
       // -----------------------------------------------------------------------
-      await expect(page.getByTestId('scripture-verse-text')).toBeVisible({
-        timeout: VERSE_LOAD_TIMEOUT_MS,
-      });
+      await waitForScriptureStore(
+        page,
+        'together session to convert to solo reading',
+        (snapshot) =>
+          snapshot.session?.mode === 'solo' && snapshot.session.currentPhase === 'reading'
+      );
+      await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // Lobby container should no longer be visible
       await expect(page.getByTestId('lobby-waiting')).not.toBeVisible();
