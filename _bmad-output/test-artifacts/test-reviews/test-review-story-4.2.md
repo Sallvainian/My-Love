@@ -1,31 +1,31 @@
 ---
 stepsCompleted: ['step-01-load-context', 'step-02-discover-tests', 'step-03-quality-evaluation', 'step-03f-aggregate-scores', 'step-04-generate-report']
 lastStep: 'step-04-generate-report'
-lastSaved: '2026-03-01'
+lastSaved: '2026-03-07'
 workflowType: 'testarch-test-review'
 inputDocuments:
   - tests/e2e/scripture/scripture-reading-4.2.spec.ts
   - tests/support/helpers/scripture-lobby.ts
   - tests/support/helpers/scripture-together.ts
-  - src/stores/slices/scriptureReadingSlice.ts
+  - tests/support/fixtures/together-mode.ts
+  - tests/support/merged-fixtures.ts
+  - tests/support/helpers.ts
   - _bmad-output/test-artifacts/atdd-checklist-4.2.md
+  - _bmad-output/planning-artifacts/epics/epic-4-together-mode-synchronized-reading.md
   - _bmad/tea/testarch/knowledge/test-quality.md
   - _bmad/tea/testarch/knowledge/data-factories.md
   - _bmad/tea/testarch/knowledge/test-levels-framework.md
   - _bmad/tea/testarch/knowledge/selector-resilience.md
   - _bmad/tea/testarch/knowledge/test-healing-patterns.md
-  - _bmad/tea/testarch/knowledge/selective-testing.md
-  - _bmad/tea/testarch/knowledge/timing-debugging.md
-  - _bmad/tea/testarch/knowledge/overview.md
 ---
 
-# Test Quality Review: Story 4.2 — scripture-reading-4.2.spec.ts (Re-Review v4.0)
+# Test Quality Review: Story 4.2 — scripture-reading-4.2.spec.ts (Re-Review v5.0)
 
-**Quality Score**: 91/100 (A — Excellent)
-**Review Date**: 2026-03-01
-**Review Scope**: single (1 E2E file, 4 tests, 273 lines)
+**Quality Score**: 95/100 (A — Excellent)
+**Review Date**: 2026-03-07
+**Review Scope**: single (1 E2E file, 6 tests, 267 lines)
 **Reviewer**: TEA Agent (claude-opus-4-6)
-**Prior Review**: v3.0 scored 95/100
+**Prior Review**: v4.0 scored 91/100 (2026-03-01)
 
 ---
 
@@ -42,48 +42,48 @@ inputDocuments:
 
 ### Key Strengths
 
-- Network-first pattern applied consistently — all 4 tests use `waitForResponse` with typed `isLockInResponse` predicate before asserting UI state
-- Excellent fixture architecture — `togetherMode` fixture encapsulates seed/link/navigate/cleanup lifecycle
-- All tests have proper IDs (`4.2-E2E-001` through `004`) and priority markers (`[P0]`, `[P1]`)
-- Zero hard waits — no `waitForTimeout` or `sleep` anywhere
-- Clean selector strategy — 100% `getByTestId()` usage
-- Lobby navigation extracted to `navigateBothToReadingPhase` shared helper with realtime readiness gate
-- Named constants (`LAST_STEP_INDEX`, `TOTAL_VERSES`, `LOCK_IN_BROADCAST_TIMEOUT_MS`) replace all magic numbers
-- DB + Zustand injection shortcut in E2E-004 avoids 16-step navigation — excellent performance optimization
+- Prior P1 recommendation fully implemented: `lockInAndWait` helper extracted to `scripture-lobby.ts` — eliminates 6x duplication
+- Prior P2 recommendation fully implemented: `jumpToStep` extracted to `scripture-together.ts` with DB + Zustand + store-poll verification
+- Two new well-structured tests added: 4.2-E2E-005 (PartnerPosition visibility) and 4.2-ERR-001 (error injection)
+- Serial mode removed — all tests now parallel-safe via independent fixture sessions
+- Zero hard waits, zero conditionals, zero try-catch flow control
+- 100% `getByTestId` selector strategy — maximum resilience
+- Hybrid sync pattern consistently applied: network-first (RPC wait) + store-poll (Zustand) + UI assertion (expect)
+- `interceptNetworkCall` fixture used for error injection with proper `skipNetworkMonitoring` annotation
 - AC traceability comments throughout (AC#1-AC#7)
 
 ### Key Weaknesses
 
-- Lock-in sequence (waitForResponse + click + await) repeated 6 times across 3 tests — DRY violation
-- File is 273 lines (acceptable but approaching threshold)
-- `jumpToLastStep` function defined inline instead of in helper file
-- Serial mode creates cascade risk (justified but notable)
+- 4.2-ERR-001 test missing from file header test ID list (header lists 5 IDs but file has 6 tests)
+- 4.2-ERR-001 test title lacks priority marker (other 5 tests use [P0]/[P1])
+- Some verification assertions delegated to wait-helpers (reduced test-body assertion visibility)
+- `test.setTimeout(60_000)` repeated in all 6 tests (minor — could use describe-level config)
 
 ### Summary
 
-This test file demonstrates excellent E2E testing practices for a complex realtime multi-user feature. The `togetherMode` fixture cleanly handles setup/teardown, and all tests use network-first patterns with typed predicates. The main improvement opportunity is extracting the repeated lock-in pattern to a helper function, which would eliminate ~42 lines of boilerplate and ensure consistent error enrichment. All 7 acceptance criteria for Story 4.2 are covered.
+This re-review shows significant improvement from the v4.0 review (91 -> 95). Both prior recommendations (P1 lockInAndWait extraction, P2 jumpToStep extraction) have been fully implemented. The file gained two new tests covering PartnerPosition indicator visibility (AC#2) and error injection for the lock-in 500 scenario, bringing total AC coverage to all 7 acceptance criteria plus error handling. The remaining findings are all documentation-level (missing header entry, missing priority marker) with no correctness or reliability concerns.
 
 ---
 
 ## Quality Criteria Assessment
 
-| Criterion                            | Status  | Violations | Notes                                                |
-| ------------------------------------ | ------- | ---------- | ---------------------------------------------------- |
-| BDD Format (Given-When-Then)         | ✅ PASS | 0          | Tests use GIVEN/WHEN/THEN comments consistently      |
-| Test IDs                             | ✅ PASS | 0          | All 4 tests have proper `4.2-E2E-XXX` IDs           |
-| Priority Markers (P0/P1/P2/P3)       | ✅ PASS | 0          | 1 P0, 3 P1 — matches ATDD priority                  |
-| Hard Waits (sleep, waitForTimeout)   | ✅ PASS | 0          | Zero hard waits                                      |
-| Determinism (no conditionals)        | ✅ PASS | 0          | No if/else, no try/catch flow control, no randomness |
-| Isolation (cleanup, no shared state) | ⚠️ WARN | 1          | Serial mode + direct DB mutation (both justified)    |
-| Fixture Patterns                     | ✅ PASS | 0          | `togetherMode` fixture with `mergeTests` composition |
-| Data Factories                       | ⚠️ WARN | 0          | No explicit factories; fixture-provided seed data    |
-| Network-First Pattern                | ✅ PASS | 0          | `waitForResponse` before all RPC assertions          |
-| Explicit Assertions                  | ✅ PASS | 0          | ~30 `expect()` calls visible in test bodies          |
-| Test Length (<=300 lines)            | ✅ PASS | 0          | 273 lines total — under 300 threshold                |
-| Test Duration (<=1.5 min)            | ✅ PASS | 0          | Max timeout 90s — within quality limit               |
-| Flakiness Patterns                   | ✅ PASS | 0          | No flakiness anti-patterns detected                  |
+| Criterion                            | Status  | Violations | Notes                                                     |
+| ------------------------------------ | ------- | ---------- | --------------------------------------------------------- |
+| BDD Format (Given-When-Then)         | PASS    | 0          | Tests use GIVEN/WHEN/THEN comments consistently           |
+| Test IDs                             | WARN    | 1          | 4.2-ERR-001 missing from file header comment              |
+| Priority Markers (P0/P1/P2/P3)      | WARN    | 1          | 4.2-ERR-001 test title lacks priority marker              |
+| Hard Waits (sleep, waitForTimeout)   | PASS    | 0          | Zero hard waits anywhere                                  |
+| Determinism (no conditionals)        | PASS    | 0          | No if/else, no try/catch flow control, no randomness      |
+| Isolation (cleanup, no shared state) | PASS    | 0          | Fixture auto-cleanup in finally block; no serial mode     |
+| Fixture Patterns                     | PASS    | 0          | `togetherMode` fixture with mergeTests composition        |
+| Data Factories                       | PASS    | 0          | Fixture-provided seed data via `createTestSession`        |
+| Network-First Pattern                | PASS    | 0          | Hybrid sync: RPC wait + store-poll + UI assertion         |
+| Explicit Assertions                  | WARN    | 1          | Some assertions in wait-helpers (justified for complexity) |
+| Test Length (<=300 lines)            | PASS    | 0          | 267 lines total — under 300 threshold                     |
+| Test Duration (<=1.5 min)            | PASS    | 0          | Max timeout 60s — within quality limit                    |
+| Flakiness Patterns                   | PASS    | 0          | No flakiness anti-patterns detected                       |
 
-**Total Violations**: 0 Critical, 1 High, 4 Medium, 3 Low
+**Total Violations**: 0 Critical, 0 High, 2 Medium, 4 Low
 
 ---
 
@@ -92,257 +92,227 @@ This test file demonstrates excellent E2E testing practices for a complex realti
 ```
 Dimension Scores (weighted evaluation):
   Determinism (30%):     100/100  x  0.30  =  30.00
-  Isolation (30%):        93/100  x  0.30  =  27.90
-  Maintainability (25%):  78/100  x  0.25  =  19.50
-  Performance (15%):      93/100  x  0.15  =  13.95
+  Isolation (30%):        98/100  x  0.30  =  29.40
+  Maintainability (25%):  86/100  x  0.25  =  21.50
+  Performance (15%):      95/100  x  0.15  =  14.25
                                              --------
-  Weighted Total:                             91.35 -> 91/100
+  Weighted Total:                             95.15 -> 95/100
 
 Grade:                   A (Excellent)
 ```
 
-| Dimension       | Score | Grade | Violations (H/M/L) |
-| --------------- | ----- | ----- | ------------------- |
-| Determinism     | 100   | A     | 0/0/0               |
-| Isolation       | 93    | A     | 0/1/1               |
-| Maintainability | 78    | C     | 1/2/1               |
-| Performance     | 93    | A     | 0/1/1               |
-| **Overall**     | **91**| **A** | **1/4/3**           |
+| Dimension       | Score  | Grade | Violations (H/M/L) |
+| --------------- | ------ | ----- | ------------------- |
+| Determinism     | 100    | A     | 0/0/0               |
+| Isolation       | 98     | A     | 0/0/1               |
+| Maintainability | 86     | B     | 0/2/2               |
+| Performance     | 95     | A     | 0/0/1               |
+| **Overall**     | **95** | **A** | **0/2/4**           |
 
 ---
 
 ## Critical Issues (Must Fix)
 
-No critical issues detected. ✅
+No critical issues detected.
 
 ---
 
 ## Recommendations (Should Fix)
 
-### 1. Extract Lock-In Helper Function
+### 1. Add 4.2-ERR-001 to File Header Test ID List
 
-**Severity**: P1 (High)
-**Location**: `scripture-reading-4.2.spec.ts:62-69, 83-90, 125-131, 168-174, 245-251, 253-258`
-**Criterion**: Maintainability (DRY)
+**Severity**: P2 (Medium)
+**Location**: `scripture-reading-4.2.spec.ts:1-15`
+**Criterion**: Maintainability (Documentation)
 **Knowledge Base**: [test-quality.md](../../../_bmad/tea/testarch/knowledge/test-quality.md)
 
 **Issue Description**:
-The lock-in sequence (set up waitForResponse with error enrichment, click lock-in button, await response) is repeated 6 times across 3 tests. Each instance is ~8 lines with only the page target and error label varying.
+The file header comment lists 5 test IDs (4.2-E2E-001 through 4.2-E2E-005) but the file contains 6 tests. The error injection test 4.2-ERR-001 is not documented in the header, making it invisible when scanning test inventories.
 
 **Current Code**:
 
 ```typescript
-// ⚠️ Repeated 6 times with minor variations
-const userALockIn = page
-  .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-  .catch((e: Error) => {
-    throw new Error(`scripture_lock_in RPC (User A) did not fire: ${e.message}`);
-  });
-await page.getByTestId('lock-in-button').click();
-await userALockIn;
+// Current header (lines 1-15)
+/**
+ * Test IDs: 4.2-E2E-001 (P0), 4.2-E2E-002 (P1), 4.2-E2E-003 (P1), 4.2-E2E-004 (P1),
+ *           4.2-E2E-005 (P1)
+ *
+ * Acceptance Criteria covered:
+ *   AC#1 — Role indicator ...
 ```
 
-**Recommended Improvement**:
+**Recommended Fix**:
 
 ```typescript
-// ✅ Add to tests/support/helpers/scripture-lobby.ts or scripture-together.ts
-
-/** Click lock-in button and wait for RPC response. */
-export async function lockInAndWait(
-  page: Page,
-  label: string = 'User'
-): Promise<void> {
-  const lockInResponse = page
-    .waitForResponse(isLockInResponse, { timeout: LOCK_IN_BROADCAST_TIMEOUT_MS })
-    .catch((e: Error) => {
-      throw new Error(`scripture_lock_in RPC (${label}) did not fire: ${e.message}`);
-    });
-  await page.getByTestId('lock-in-button').click();
-  await lockInResponse;
-}
-
-// Usage in tests:
-await lockInAndWait(page, 'User A');
-await lockInAndWait(partnerPage, 'User B');
+/**
+ * Test IDs: 4.2-E2E-001 (P0), 4.2-E2E-002 (P1), 4.2-E2E-003 (P1), 4.2-E2E-004 (P1),
+ *           4.2-E2E-005 (P1), 4.2-ERR-001 (P1)
+ *
+ * Acceptance Criteria covered:
+ *   AC#1 — Role indicator ...
+ *   ...
+ *   AC#6 — 409 rollback (partial — 500 error path tested via 4.2-ERR-001)
 ```
 
-**Benefits**:
-Reduces ~48 lines to ~12 lines across the file. Guarantees consistent error enrichment. Single point of update if lock-in UI or RPC changes.
-
-**Priority**:
-P1 — The duplication is significant (6 instances) and will grow with Story 4.3+ tests that also use lock-in.
+**Priority**: P2 — Documentation consistency. Quick 1-line fix.
 
 ---
 
-### 2. Move jumpToLastStep to Helper File
+### 2. Add Priority Marker to 4.2-ERR-001 Test Title
 
 **Severity**: P2 (Medium)
-**Location**: `scripture-reading-4.2.spec.ts:221-227`
-**Criterion**: Maintainability
-**Knowledge Base**: [data-factories.md](../../../_bmad/tea/testarch/knowledge/data-factories.md)
+**Location**: `scripture-reading-4.2.spec.ts:243`
+**Criterion**: Maintainability (Convention consistency)
+**Knowledge Base**: [test-priorities-matrix.md](../../../_bmad/tea/testarch/knowledge/test-priorities-matrix.md)
 
 **Issue Description**:
-The `jumpToLastStep` function is defined inline in test E2E-004. It accesses `window.__APP_STORE__` to mutate the Zustand store. This pattern will likely be needed in Story 4.3+ tests for similar shortcut scenarios.
+All 5 E2E tests follow the convention `[P0]` or `[P1]` in the test title. The error injection test omits this marker, breaking pattern consistency and making priority-based filtering (`--grep "\[P1\]"`) miss this test.
 
 **Current Code**:
 
 ```typescript
-// ⚠️ Inline function — reuse impossible
-const jumpToLastStep = (lastStep: number) => {
-  const store = window.__APP_STORE__;
-  if (!store) throw new Error('__APP_STORE__ not found');
-  const session = store.getState().session;
-  if (!session) throw new Error('session is null in store');
-  store.setState({ session: { ...session, currentStepIndex: lastStep } });
-};
-await page.evaluate(jumpToLastStep, LAST_STEP_INDEX);
+// Line 243
+test('should show error toast when lock-in RPC fails with 500', async ({
 ```
 
-**Recommended Improvement**:
+**Recommended Fix**:
 
 ```typescript
-// ✅ Add to tests/support/helpers/scripture-together.ts
-
-/** Jump both pages to a specific step via DB + Zustand injection. */
-export async function jumpToStep(
-  supabaseAdmin: SupabaseClient,
-  sessionId: string,
-  page: Page,
-  partnerPage: Page,
-  stepIndex: number
-): Promise<void> {
-  await supabaseAdmin
-    .from('scripture_sessions')
-    .update({ current_step_index: stepIndex })
-    .eq('id', sessionId);
-
-  const injectStep = (step: number) => {
-    const store = window.__APP_STORE__;
-    if (!store) throw new Error('__APP_STORE__ not found');
-    const session = store.getState().session;
-    if (!session) throw new Error('session is null in store');
-    store.setState({ session: { ...session, currentStepIndex: step } });
-  };
-  await page.evaluate(injectStep, stepIndex);
-  await partnerPage.evaluate(injectStep, stepIndex);
-}
+test('[P1] should show error toast when lock-in RPC fails with 500', async ({
 ```
 
-**Priority**: P2 — Anticipates reuse in Story 4.3 reconnection tests.
+**Priority**: P2 — Convention consistency. 4-character addition.
 
 ---
 
-### 3. Document Serial Mode Justification
-
-**Severity**: P2 (Medium)
-**Location**: `scripture-reading-4.2.spec.ts:27`
-**Criterion**: Isolation
-**Knowledge Base**: [test-quality.md](../../../_bmad/tea/testarch/knowledge/test-quality.md)
-
-**Issue Description**:
-The file uses `test.describe.configure({ mode: 'serial' })` with a comment explaining session contamination risk. The comment is adequate, but the cascade risk (one failure breaks subsequent tests) should be acknowledged in documentation.
-
-**Current Code**:
-
-```typescript
-// All tests in this file share the same test user pair and must run serially
-// to avoid session contamination via scripture_create_session reuse.
-test.describe.configure({ mode: 'serial' });
-```
-
-**Recommendation**:
-The existing comment is sufficient. No code change needed — this is an informational finding. If serial mode causes CI flakiness due to cascade failures, consider restructuring the fixture to provide independent sessions per test.
-
-**Priority**: P2 — Awareness item, not a code change.
-
----
-
-### 4. Inconsistent Error Enrichment
+### 3. Consider Reducing Assertion Delegation to Helpers
 
 **Severity**: P3 (Low)
-**Location**: `scripture-reading-4.2.spec.ts` (all .catch blocks)
-**Criterion**: Maintainability (consistency)
+**Location**: Various — `waitForPartnerLocked`, `waitForPartnerPosition`, `waitForReflectionPhase`
+**Criterion**: Maintainability (Assertion visibility)
+**Knowledge Base**: [test-quality.md](../../../_bmad/tea/testarch/knowledge/test-quality.md)
 
 **Issue Description**:
-All 6 lock-in `waitForResponse` calls have `.catch()` error enrichment, which is excellent. However, this consistency would be automatically guaranteed by extracting the `lockInAndWait` helper (Recommendation #1).
+Several wait-helpers contain `expect()` assertions that serve dual purposes: synchronization AND verification. For example, `waitForPartnerLocked(partnerPage)` asserts `partner-locked-indicator` visibility, which verifies AC#4. When this assertion fails, the error trace points to the helper file rather than the test body.
 
-**Priority**: P3 — Resolved by implementing Recommendation #1.
+This is a *justified* trade-off for together-mode tests where synchronization and verification are intertwined. The helpers are clearly named and their assertions are predictable. No code change required — this is an awareness item.
+
+**Priority**: P3 — Informational. The current approach is the right trade-off for multi-user realtime tests.
+
+---
+
+### 4. Use Describe-Level Timeout Configuration
+
+**Severity**: P3 (Low)
+**Location**: `scripture-reading-4.2.spec.ts:46, 95, 125, 159, 194, 248`
+**Criterion**: Maintainability (DRY)
+
+**Issue Description**:
+`test.setTimeout(60_000)` is called in all 6 test bodies. A single describe-level configuration would reduce repetition.
+
+**Current Code**:
+
+```typescript
+// Repeated in each test body
+test.setTimeout(60_000);
+```
+
+**Recommended Alternative**:
+
+```typescript
+// At top of file, or in a wrapping describe block:
+test.describe.configure({ timeout: 60_000 });
+```
+
+**Priority**: P3 — Minor DRY improvement. Current approach is explicit and correct.
 
 ---
 
 ## Best Practices Found
 
-### 1. Network-First Pattern with Typed Predicates
+### 1. Extracted lockInAndWait Helper (Prior P1 Resolved)
 
-**Location**: `scripture-lobby.ts:38-41`, used in `scripture-reading-4.2.spec.ts:62-69`
-**Pattern**: Reusable typed response predicates
+**Location**: `tests/support/helpers/scripture-lobby.ts:159-164`
+**Pattern**: Network-first helper with error enrichment
 **Knowledge Base**: [test-quality.md](../../../_bmad/tea/testarch/knowledge/test-quality.md)
 
 **Why This Is Good**:
-The `isLockInResponse` predicate is typed, reusable, checks both URL pattern and status code range, and is shared via the helper file. This eliminates race conditions.
+The prior review's P1 recommendation (6x lock-in duplication) has been fully resolved. The `lockInAndWait` helper encapsulates the entire lock-in interaction: set up `waitForScriptureResponse` with enriched error label, click lock-in button, await response. Tests now call `await lockInAndWait(page, 'User A')` — clean, consistent, one point of maintenance.
 
 ```typescript
-// ✅ Excellent: Typed predicate for network-first pattern
-export const isLockInResponse = (resp: { url(): string; status(): number }): boolean =>
-  resp.url().includes('/rest/v1/rpc/scripture_lock_in') &&
-  resp.status() >= 200 &&
-  resp.status() < 300;
+export async function lockInAndWait(page: Page, label: string): Promise<void> {
+  const lockInResponse = waitForScriptureResponse(
+    page, `scripture_lock_in RPC (${label})`, isLockInResponse
+  );
+  await page.getByTestId('lock-in-button').click();
+  await lockInResponse;
+}
 ```
 
-**Use as Reference**: Adopt for all Supabase RPC interactions in E2E tests.
-
 ---
 
-### 2. Together-Mode Fixture with Auto-Cleanup
+### 2. Extracted jumpToStep Helper with Triple Verification (Prior P2 Resolved)
 
-**Location**: `tests/support/fixtures/together-mode.ts`
-**Pattern**: Fixture lifecycle management
-**Knowledge Base**: [overview.md](../../../_bmad/tea/testarch/knowledge/overview.md)
-
-**Why This Is Good**:
-Encapsulates full multi-user lifecycle. Tests receive both users at role selection and only handle assertions. Cleanup runs in `finally` block regardless of test outcome.
-
----
-
-### 3. DB + Zustand Injection Shortcut
-
-**Location**: `scripture-reading-4.2.spec.ts:215-229`
-**Pattern**: API-first test setup optimization
+**Location**: `tests/support/helpers/scripture-together.ts:73-102`
+**Pattern**: DB + Zustand injection with store-poll verification
 **Knowledge Base**: [data-factories.md](../../../_bmad/tea/testarch/knowledge/data-factories.md)
 
 **Why This Is Good**:
-Test E2E-004 uses `supabaseAdmin.update()` + `page.evaluate()` to jump directly to step 17, avoiding 16 lock-in cycles. This keeps the test within the 90s timeout while still exercising the full last-step → reflection transition. The dual-layer approach (DB for server state, Zustand for client state) ensures consistency.
+The prior review's P2 recommendation (inline jumpToLastStep) has been fully resolved AND improved. The new `jumpToStep` helper does three things: (1) updates the DB row via supabaseAdmin, (2) injects the step into both pages' Zustand stores via `page.evaluate`, and (3) polls both stores to confirm the step was applied. This triple verification eliminates race conditions between DB update and store injection.
+
+```typescript
+export async function jumpToStep(
+  supabaseAdmin: TypedSupabaseClient,
+  sessionId: string,
+  page: Page,
+  partnerPage: Page,
+  stepIndex: number
+): Promise<void> {
+  await supabaseAdmin.from('scripture_sessions').update({ current_step_index: stepIndex }).eq('id', sessionId);
+  // ... evaluate on both pages, then store-poll both
+}
+```
 
 ---
 
-### 4. Shared Helper with Realtime Readiness Gate
+### 3. Error Injection via interceptNetworkCall Fixture
 
-**Location**: `scripture-lobby.ts:84-93`
-**Pattern**: Broadcast channel readiness verification
-**Knowledge Base**: [timing-debugging.md](../../../_bmad/tea/testarch/knowledge/timing-debugging.md)
+**Location**: `scripture-reading-4.2.spec.ts:239-266`
+**Pattern**: Deterministic error path testing
+**Knowledge Base**: [test-healing-patterns.md](../../../_bmad/tea/testarch/knowledge/test-healing-patterns.md)
 
 **Why This Is Good**:
-`navigateBothToReadingPhase` waits for the `partner-position` indicator on both pages before returning. This guarantees the realtime broadcast channel is live and subscribed — preventing lock-in RPCs from firing before the channel is ready to receive broadcasts.
+Test 4.2-ERR-001 uses the `interceptNetworkCall` fixture from `@seontechnologies/playwright-utils` to inject a 500 response on the lock-in RPC. This is the canonical pattern for testing error handling: set up intercept AFTER navigation but BEFORE action, fulfill with error status, then assert error UI. The `skipNetworkMonitoring` annotation prevents the network error monitor from failing the test on the intentional 500.
 
 ```typescript
-// ✅ Readiness gate — ensures broadcast channel is live
-await expect(page.getByTestId('partner-position')).toBeVisible({
-  timeout: REALTIME_SYNC_TIMEOUT_MS,
-});
-await expect(partnerPage.getByTestId('partner-position')).toBeVisible({
-  timeout: REALTIME_SYNC_TIMEOUT_MS,
+interceptNetworkCall({
+  method: 'POST',
+  url: '**/rest/v1/rpc/scripture_lock_in',
+  fulfillResponse: { status: 500, body: 'Internal Server Error' },
 });
 ```
 
 ---
 
-### 5. AC Traceability Comments
+### 4. PartnerPosition Presence Channel Verification
 
-**Location**: Throughout `scripture-reading-4.2.spec.ts`
-**Pattern**: Inline acceptance criteria mapping
+**Location**: `scripture-reading-4.2.spec.ts:190-233`
+**Pattern**: Ephemeral presence testing
+**Knowledge Base**: [timing-debugging.md](../../../_bmad/tea/testarch/knowledge/timing-debugging.md)
 
 **Why This Is Good**:
-Every test section is annotated with the specific AC being tested (e.g., `// AC#1 — Role indicator`, `// AC#3 — Lock-in`, `// AC#5 — Both advance`). This creates direct traceability from test assertions to story requirements without needing a separate traceability matrix.
+Test 4.2-E2E-005 verifies the PartnerPosition indicator across tab switches (verse -> response -> verse). This exercises the ephemeral presence channel (`scripture-presence:{session_id}`) with real Supabase Realtime. The test waits for presence text changes via `waitForPartnerPosition(page, /is reading the verse/i)` — a deterministic regex match on the presence-driven UI rather than a timing-based approach.
+
+---
+
+### 5. Together-Mode Fixture with Fresh signInWithPassword
+
+**Location**: `tests/support/fixtures/together-mode.ts:96-156`
+**Pattern**: Worker-isolated auth with retry
+**Knowledge Base**: [overview.md](../../../_bmad/tea/testarch/knowledge/overview.md)
+
+**Why This Is Good**:
+The `togetherMode` fixture bypasses the token cache entirely for the partner user by performing a fresh `signInWithPassword` per test. This eliminates the class of flakiness where cached tokens are invalidated by parallel workers or session manipulation. The retry loop (max 2 attempts) handles transient navigation failures gracefully.
 
 ---
 
@@ -351,33 +321,32 @@ Every test section is annotated with the specific AC being tested (e.g., `// AC#
 ### File Metadata
 
 - **File Path**: `tests/e2e/scripture/scripture-reading-4.2.spec.ts`
-- **File Size**: 273 lines
+- **File Size**: 267 lines
 - **Test Framework**: Playwright (via merged-fixtures with mergeTests)
 - **Language**: TypeScript
 
 ### Test Structure
 
-- **Describe Blocks**: 4
-- **Test Cases**: 4
-- **Average Test Length**: ~55 lines per test (within test body)
-- **Fixtures Used**: 3 (`page`, `togetherMode`, `supabaseAdmin`)
+- **Describe Blocks**: 6
+- **Test Cases**: 6
+- **Average Test Length**: ~35 lines per test body
+- **Fixtures Used**: 4 (`page`, `togetherMode`, `supabaseAdmin`, `interceptNetworkCall`)
 - **Data Factories Used**: 0 (fixture-provided seed data via `createTestSession`)
 
 ### Test Scope
 
-- **Test IDs**: 4.2-E2E-001, 4.2-E2E-002, 4.2-E2E-003, 4.2-E2E-004
+- **Test IDs**: 4.2-E2E-001, 4.2-E2E-002, 4.2-E2E-003, 4.2-E2E-004, 4.2-E2E-005, 4.2-ERR-001
 - **Priority Distribution**:
   - P0 (Critical): 1 test (E2E-001: Full lock-in flow)
-  - P1 (High): 3 tests (E2E-002: Undo, E2E-003: Alternation, E2E-004: Reflection)
-  - P2 (Medium): 0 tests
-  - P3 (Low): 0 tests
-  - Unknown: 0 tests
+  - P1 (High): 4 tests (E2E-002: Undo, E2E-003: Alternation, E2E-004: Reflection, E2E-005: PartnerPosition)
+  - Unmarked: 1 test (ERR-001: Error injection)
+  - P2/P3: 0 tests
 
 ### Assertions Analysis
 
-- **Total Assertions**: ~30
-- **Assertions per Test**: 7.5 (avg)
-- **Assertion Types**: `toBeVisible`, `toContainText`, `not.toBeVisible`
+- **Total Assertions**: ~35 (in test bodies) + ~15 (in wait-helpers)
+- **Assertions per Test**: ~6 visible in test body (avg)
+- **Assertion Types**: `toBeVisible`, `toContainText`, `not.toBeVisible`, regex matchers
 
 ---
 
@@ -385,14 +354,22 @@ Every test section is annotated with the specific AC being tested (e.g., `// AC#
 
 ### Related Artifacts
 
-- **ATDD Checklist**: [atdd-checklist-4.2.md](../../test-artifacts/atdd-checklist-4.2.md) — 45 tests total (34 unit + 4 E2E + 7 pgTAP)
+- **ATDD Checklist**: [atdd-checklist-4.2.md](../../test-artifacts/atdd-checklist-4.2.md) — 45 tests total (34 unit + 4 E2E original + 7 pgTAP)
 - **Story**: 4.2 — Synchronized Reading with Lock-In (7 ACs)
-- **Acceptance Criteria Mapped**: AC#1-AC#7 all covered by these 4 E2E tests
+- **Epic**: [epic-4-together-mode-synchronized-reading.md](../../planning-artifacts/epics/epic-4-together-mode-synchronized-reading.md)
+- **Acceptance Criteria Mapped**: AC#1-AC#7 all covered by the 6 E2E tests
 
-### Supporting Files Changed
+### Changes Since Prior Review (v4.0)
 
-- **scripture-lobby.ts**: `navigateBothToReadingPhase` — added readiness gate for partner-position indicator
-- **scriptureReadingSlice.ts**: `lockIn()` local state update, `partnerJoined` derivation logic
+| Change | Impact |
+|--------|--------|
+| `lockInAndWait` extracted to `scripture-lobby.ts` | P1 resolved: eliminated 6x duplication |
+| `jumpToStep` extracted to `scripture-together.ts` | P2 resolved: reusable with store-poll verification |
+| Serial mode removed | Parallel-safe; no cascade risk |
+| 4.2-E2E-005 added (PartnerPosition) | Fills AC#2 coverage gap (PARTIAL -> FULL) |
+| 4.2-ERR-001 added (Error injection) | New error path coverage for lock-in 500 |
+| `waitForPartnerLocked` helper added | Cleaner synchronization for partner lock state |
+| `waitForPartnerPosition` helper added | Deterministic presence channel verification |
 
 ---
 
@@ -402,10 +379,9 @@ This review consulted the following knowledge base fragments:
 
 - **[test-quality.md](../../../_bmad/tea/testarch/knowledge/test-quality.md)** — DoD: no hard waits, <300 lines, <1.5 min, self-cleaning
 - **[data-factories.md](../../../_bmad/tea/testarch/knowledge/data-factories.md)** — Factory functions, API-first setup
-- **[test-healing-patterns.md](../../../_bmad/tea/testarch/knowledge/test-healing-patterns.md)** — Race condition patterns
-- **[selector-resilience.md](../../../_bmad/tea/testarch/knowledge/selector-resilience.md)** — data-testid hierarchy
-- **[timing-debugging.md](../../../_bmad/tea/testarch/knowledge/timing-debugging.md)** — Network-first, deterministic waits
-- **[overview.md](../../../_bmad/tea/testarch/knowledge/overview.md)** — Playwright Utils, mergeTests
+- **[test-levels-framework.md](../../../_bmad/tea/testarch/knowledge/test-levels-framework.md)** — E2E appropriateness for multi-user realtime flows
+- **[selector-resilience.md](../../../_bmad/tea/testarch/knowledge/selector-resilience.md)** — data-testid hierarchy validation
+- **[test-healing-patterns.md](../../../_bmad/tea/testarch/knowledge/test-healing-patterns.md)** — Error injection pattern, network failure handling
 
 See [tea-index.csv](../../../_bmad/tea/testarch/tea-index.csv) for complete knowledge base.
 
@@ -415,21 +391,22 @@ See [tea-index.csv](../../../_bmad/tea/testarch/tea-index.csv) for complete know
 
 ### Immediate Actions (Before Merge)
 
-None required — all issues are P1-P3 recommendations, not blockers.
+None required — all findings are P2/P3 recommendations, not blockers.
 
 ### Follow-up Actions (Future PRs)
 
-1. **Extract `lockInAndWait` helper** — Deduplicate lock-in boilerplate (~48 lines → ~12)
-   - Priority: P1
-   - Target: Before Story 4.3 tests (which will also use lock-in)
-
-2. **Move `jumpToLastStep` to scripture-together.ts** — Enable reuse in 4.3 reconnection tests
+1. **Add 4.2-ERR-001 to file header + add [P1] priority marker** — Documentation consistency
    - Priority: P2
-   - Target: Next refactoring pass
+   - Target: Next touch of this file
+   - Estimated Effort: 2 minutes
+
+2. **Consider describe-level timeout** — Minor DRY cleanup
+   - Priority: P3
+   - Target: Backlog
 
 ### Re-Review Needed?
 
-✅ No re-review needed — approve as-is. P1 recommendation is for future DRY improvement, not a correctness issue.
+No re-review needed — approve as-is. All prior P1/P2 recommendations resolved. Remaining findings are documentation-level.
 
 ---
 
@@ -438,9 +415,9 @@ None required — all issues are P1-P3 recommendations, not blockers.
 **Recommendation**: Approve with Comments
 
 **Rationale**:
-Test quality is excellent with 91/100 score (A grade). The file demonstrates exemplary E2E testing patterns: network-first with typed predicates, comprehensive fixture architecture with auto-cleanup, proper test IDs and priorities, zero hard waits, clean selector strategy, shared helpers, named constants, and innovative DB+Zustand injection for performance optimization. The primary improvement opportunity is extracting the repeated lock-in pattern to a helper — this is a P1 DRY recommendation that will become more impactful as Story 4.3+ tests add more lock-in scenarios. All 7 acceptance criteria for Story 4.2 are covered by the 4 E2E tests.
+Test quality is excellent with 95/100 score (A grade), a +4 improvement from the prior v4.0 review (91/100). Both prior recommendations have been fully implemented: the `lockInAndWait` helper eliminates all lock-in duplication, and the `jumpToStep` helper is reusable with triple verification (DB + Zustand + store-poll). Two new tests strengthen coverage: 4.2-E2E-005 fills the AC#2 PartnerPosition gap, and 4.2-ERR-001 adds deterministic error path testing via `interceptNetworkCall`. Serial mode has been removed, making all tests parallel-safe. The only remaining findings are documentation-level (missing header entry and priority marker on the error test). Tests are production-ready and follow best practices consistently.
 
-> Test quality is excellent with 91/100 score. Tests are production-ready. The `lockInAndWait` helper extraction is recommended before Story 4.3 to prevent further duplication.
+> Test quality is excellent with 95/100 score. All prior recommendations resolved. Two new tests added with strong patterns. Approve as-is with minor documentation fixes.
 
 ---
 
@@ -448,34 +425,33 @@ Test quality is excellent with 91/100 score (A grade). The file demonstrates exe
 
 ### Violation Summary by Location
 
-| Line | Severity | Dimension | Issue | Fix |
-|------|----------|-----------|-------|-----|
-| 1 | HIGH | Maintainability | File 273 lines (approaching threshold) | Consider splitting E2E-004 if file grows |
-| 27 | MEDIUM | Isolation | Serial mode cascade risk | Justified — document trade-off |
-| 27 | MEDIUM | Performance | Serial mode blocks parallel exec | Justified by session scoping |
-| 62 | MEDIUM | Maintainability | Lock-in pattern duplicated 6× | Extract `lockInAndWait` helper |
-| 215 | MEDIUM | Isolation | Direct DB mutation in test body | Well-scoped; extract to helper for reuse |
-| 221 | LOW | Maintainability | `jumpToLastStep` inline | Move to scripture-together.ts |
-| 52 | LOW | Performance | navigateBothToReadingPhase called 4× | Necessary for isolation |
-| — | LOW | Maintainability | Inconsistent error enrichment risk | Resolved by helper extraction |
+| Line | Severity | Dimension       | Issue                                          | Fix                              |
+| ---- | -------- | --------------- | ---------------------------------------------- | -------------------------------- |
+| 1    | MEDIUM   | Maintainability | 4.2-ERR-001 missing from header test ID list   | Add to header comment            |
+| 243  | MEDIUM   | Maintainability | ERR-001 test title lacks priority marker        | Add `[P1]` prefix               |
+| 46   | LOW      | Maintainability | test.setTimeout repeated 6x                    | Consider describe-level config   |
+| 96   | LOW      | Maintainability | Assertions in wait-helpers (justified)          | Informational — no change needed |
+| 165  | LOW      | Isolation       | DB mutation via jumpToStep (well-scoped)        | Informational — correct pattern  |
+| 46   | LOW      | Performance     | 60s timeout generous for ~30-40s tests          | Acceptable safety margin         |
 
 ### Quality Trends
 
-| Review Date | Score | Grade | Critical Issues | Trend |
-|-------------|-------|-------|-----------------|-------|
-| 2026-02-28 | 89/100 | B | 0 | — (first review) |
-| 2026-03-01 | 93/100 | A | 0 | ⬆️ Improved |
-| 2026-03-01 | 95/100 | A | 0 | ⬆️ Improved (v3.0) |
-| 2026-03-01 | 91/100 | A | 0 | ⬇️ -4 (v4.0, stricter maintainability scoring) |
+| Review Date | Score    | Grade | Critical Issues | Trend                                                     |
+| ----------- | -------- | ----- | --------------- | --------------------------------------------------------- |
+| 2026-02-28  | 89/100   | B     | 0               | — (first review)                                          |
+| 2026-03-01  | 93/100   | A     | 0               | Improved                                                  |
+| 2026-03-01  | 95/100   | A     | 0               | Improved (v3.0)                                           |
+| 2026-03-01  | 91/100   | A     | 0               | -4 (v4.0, stricter maintainability scoring)               |
+| 2026-03-07  | 95/100   | A     | 0               | +4 (v5.0, P1+P2 resolved, 2 new tests, serial removed)   |
 
 ### Related Reviews
 
-| File | Score | Grade | Critical | Status |
-| ---- | ----- | ----- | -------- | ------ |
-| scripture-lobby-4.1.spec.ts | 96/100 | A | 0 | Approved |
-| scripture-reading-4.2.spec.ts | 91/100 | A | 0 | Approved with Comments |
+| File                           | Score    | Grade | Critical | Status                 |
+| ------------------------------ | -------- | ----- | -------- | ---------------------- |
+| scripture-lobby-4.1.spec.ts    | 96/100   | A     | 0        | Approved               |
+| scripture-reading-4.2.spec.ts  | 95/100   | A     | 0        | Approved with Comments |
 
-**Suite Average**: 94/100 (A)
+**Suite Average**: 96/100 (A)
 
 ---
 
@@ -483,11 +459,12 @@ Test quality is excellent with 91/100 score (A grade). The file demonstrates exe
 
 **Generated By**: BMad TEA Agent (Test Architect)
 **Workflow**: testarch-test-review v5.0 (Step-File Architecture)
-**Review ID**: test-review-scripture-reading-4.2-20260301-v4
-**Timestamp**: 2026-03-01
+**Review ID**: test-review-scripture-reading-4.2-20260307-v5
+**Timestamp**: 2026-03-07
 **Story**: 4.2 — Synchronized Reading with Lock-In
-**Branch**: epic-4/together-mode-synchronized-reading
-**Version**: 4.0 (suite re-review with stricter maintainability scoring for DRY violations)
+**Branch**: epic-4/working-reset
+**Version**: 5.0 (re-review after P1+P2 resolution, 2 new tests, serial mode removal)
+**Execution Mode**: Sequential (all context pre-loaded)
 
 ---
 
@@ -499,4 +476,4 @@ If you have questions or feedback on this review:
 2. Consult tea-index.csv for detailed guidance
 3. Request clarification on specific violations
 
-This review is guidance, not rigid rules. Context matters - if a pattern is justified, document it with a comment.
+This review is guidance, not rigid rules. Context matters — if a pattern is justified, document it with a comment.
