@@ -472,9 +472,14 @@ export async function startSoloSession(page: Page): Promise<string> {
 
   const response = await responsePromise;
   const data = (await response.json()) as { id?: string };
+  await waitForScriptureStore(
+    page,
+    'solo session to enter reading phase',
+    (snapshot) =>
+      snapshot.session?.mode === 'solo' && snapshot.session.currentPhase === 'reading'
+  );
 
-  // Network-first: RPC response above confirms server created the session.
-  // UI assertion below confirms the client rendered the reading flow.
+  // Primary success signal: deterministic UI readiness after the create-session RPC.
   await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
 
   if (typeof data?.id === 'string') {
