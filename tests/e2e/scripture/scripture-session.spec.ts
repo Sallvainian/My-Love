@@ -15,6 +15,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import {
   startSoloSession,
   advanceOneStep,
+  ensureScriptureOverview,
   waitForScriptureSessionRequest,
 } from '../../support/helpers';
 import { clearClientScriptureCache } from '../../support/helpers/scripture-cache';
@@ -211,4 +212,33 @@ test.describe('Scripture Session - Save & Resume', () => {
       await page.context().setOffline(false);
     });
   });
+
+  test.describe(
+    'Session creation 500 shows error on overview',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    () => {
+      test('should show session error when create session RPC fails with 500', async ({
+        page,
+        interceptNetworkCall,
+      }) => {
+        // GIVEN: User is on scripture overview
+        await ensureScriptureOverview(page);
+
+        // WHEN: Inject 500 on create session RPC
+        interceptNetworkCall({
+          method: 'POST',
+          url: '**/rest/v1/rpc/scripture_create_session',
+          fulfillResponse: { status: 500, body: 'Internal Server Error' },
+        });
+
+        // Click Start → Solo
+        await page.getByTestId('scripture-start-button').click();
+        await expect(page.getByTestId('scripture-mode-solo')).toBeVisible();
+        await page.getByTestId('scripture-mode-solo').click();
+
+        // THEN: Error is displayed on the overview
+        await expect(page.getByTestId('session-error')).toBeVisible();
+      });
+    }
+  );
 });
