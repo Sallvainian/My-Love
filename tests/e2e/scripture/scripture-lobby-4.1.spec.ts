@@ -179,12 +179,8 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
       // -----------------------------------------------------------------------
       // THEN (AC#6): Session converts to solo; first verse is visible
       // -----------------------------------------------------------------------
-      await waitForScriptureStore(
-        page,
-        'together session to convert to solo reading',
-        (snapshot) =>
-          snapshot.session?.mode === 'solo' && snapshot.session.currentPhase === 'reading'
-      );
+      // Network-first: RPC response above confirms server converted the session.
+      // UI assertion below confirms the reading view rendered.
       await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
       // Lobby container should no longer be visible
