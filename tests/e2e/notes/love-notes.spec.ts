@@ -60,11 +60,10 @@ test.describe('Love Notes', () => {
     const messageInput = page.getByLabel(/love note message input/i);
     await messageInput.fill(uniqueMessage);
 
-    // Use waitForResponse instead of interceptNetworkCall for the POST
-    // since the message uses optimistic UI update
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/rest/v1/love_notes') && resp.request().method() === 'POST'
-    );
+    const sendCall = interceptNetworkCall({
+      method: 'POST',
+      url: '**/rest/v1/love_notes**',
+    });
 
     await page.getByLabel(/send message/i).click();
 
@@ -72,7 +71,7 @@ test.describe('Love Notes', () => {
     await expect(page.getByTestId('love-note-message').getByText(uniqueMessage)).toBeVisible();
 
     // The POST call should complete successfully
-    const response = await responsePromise;
-    expect(response.status()).toBeLessThan(400);
+    const { status } = await sendCall;
+    expect(status).toBeLessThan(400);
   });
 });

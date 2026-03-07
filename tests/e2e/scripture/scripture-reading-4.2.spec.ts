@@ -231,3 +231,36 @@ test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
     await waitForPartnerPosition(page, /is reading the verse/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Error Injection: Lock-In 500 → Error Toast
+// ---------------------------------------------------------------------------
+
+test.describe(
+  '[4.2-ERR-001] Lock-In 500 Error Toast',
+  { annotation: [{ type: 'skipNetworkMonitoring' }] },
+  () => {
+    test('should show error toast when lock-in RPC fails with 500', async ({
+      page,
+      interceptNetworkCall,
+      togetherMode: { partnerPage },
+    }) => {
+      test.setTimeout(60_000);
+
+      // GIVEN: Both users navigate through lobby to reading phase
+      await navigateBothToReadingPhase(page, partnerPage);
+
+      // WHEN: Inject 500 on lock-in RPC and click lock-in
+      interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_lock_in',
+        fulfillResponse: { status: 500, body: 'Internal Server Error' },
+      });
+
+      await page.getByTestId('lock-in-button').click();
+
+      // THEN: Error toast appears in the reading container
+      await expect(page.getByTestId('session-error-toast')).toBeVisible();
+    });
+  }
+);

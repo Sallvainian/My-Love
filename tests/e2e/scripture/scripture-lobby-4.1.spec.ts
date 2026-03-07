@@ -195,3 +195,60 @@ test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Error Injection: Role Selection 500 → Rollback
+// ---------------------------------------------------------------------------
+
+test.describe(
+  '[4.1-ERR-001] Role Selection 500 Rollback',
+  { annotation: [{ type: 'skipNetworkMonitoring' }] },
+  () => {
+    test('should rollback role selection when RPC fails with 500', async ({
+      page,
+      interceptNetworkCall,
+      supabaseAdmin,
+    }) => {
+      test.setTimeout(30_000);
+
+      // SETUP: Create session so the overview has no stale resume state
+      const seed = await createTestSession(supabaseAdmin, { sessionCount: 1 });
+      const sessionIdsToClean = [...seed.session_ids];
+
+      try {
+        await supabaseAdmin
+          .from('scripture_sessions')
+          .update({ status: 'complete', current_phase: 'complete' })
+          .in('id', seed.session_ids);
+
+        // GIVEN: User navigates to together-mode role selection
+        const uiSessionId = await navigateToTogetherRoleSelection(page);
+        if (uiSessionId) sessionIdsToClean.push(uiSessionId);
+
+        await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
+
+        // WHEN: Inject 500 on role selection RPC and click a role
+        interceptNetworkCall({
+          method: 'POST',
+          url: '**/rest/v1/rpc/scripture_select_role',
+          fulfillResponse: { status: 500, body: 'Internal Server Error' },
+        });
+
+        await page.getByTestId('lobby-role-reader').click();
+
+        // THEN: Role selection remains visible (optimistic myRole rolled back)
+        // Note: LobbyContainer does not render scriptureError; the rollback
+        // keeps the user on the role selection screen to retry.
+        await waitForScriptureStore(
+          page,
+          'role selection error sets scriptureError on store',
+          (snapshot) => snapshot.scriptureErrorMessage !== null && !snapshot.scriptureLoading
+        );
+
+        await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
+      } finally {
+        await cleanupTestSession(supabaseAdmin, sessionIdsToClean);
+      }
+    });
+  }
+);

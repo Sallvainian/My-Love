@@ -42,8 +42,20 @@ export type ScriptureStoreSnapshot = {
   scriptureErrorMessage: string | null;
 };
 
-const AUTH_READINESS_MAX_ATTEMPTS = 5;
-const AUTH_READINESS_RETRY_MS = 300;
+/**
+ * Hybrid Sync Pattern (3-layer wait)
+ *
+ * Use all three layers after any mutation that changes server + client state:
+ *
+ *   1. NETWORK: waitForScriptureRpc / interceptNetworkCall — confirms server processed the request
+ *   2. STORE:   waitForScriptureStore — confirms Zustand ingested the response
+ *   3. UI:      expect(locator).toBeVisible() — confirms React re-rendered
+ *
+ * Polling guide:
+ *   - waitForScriptureStore: Scripture store state (well-typed, diagnostic snapshots)
+ *   - expect.poll(): Simple boolean conditions in helpers (no fixture access needed)
+ *   - recurse fixture: Complex polling in test bodies needing Playwright report logging
+ */
 
 async function getSupabaseAuthContext(page: Page): Promise<{
   apiUrl: string;
@@ -109,38 +121,36 @@ async function getSupabaseAuthContext(page: Page): Promise<{
 }
 
 async function waitForAuthReadiness(page: Page): Promise<void> {
-  const diagnostics: string[] = [];
+  let lastStatus = 'not-started';
 
-  for (let attempt = 1; attempt <= AUTH_READINESS_MAX_ATTEMPTS; attempt++) {
-    const authContext = await getSupabaseAuthContext(page);
-    if (!authContext) {
-      diagnostics.push(`attempt ${attempt}: missing auth context`);
-      await new Promise((r) => setTimeout(r, AUTH_READINESS_RETRY_MS * attempt));
-      continue;
-    }
+  try {
+    await expect
+      .poll(
+        async () => {
+          const authContext = await getSupabaseAuthContext(page);
+          if (!authContext) {
+            lastStatus = 'missing auth context';
+            return false;
+          }
 
-    const response = await page.request
-      .get(`${authContext.apiUrl}/auth/v1/user`, {
-        headers: {
-          apikey: authContext.anonKey,
-          Authorization: `Bearer ${authContext.accessToken}`,
+          const response = await page.request
+            .get(`${authContext.apiUrl}/auth/v1/user`, {
+              headers: {
+                apikey: authContext.anonKey,
+                Authorization: `Bearer ${authContext.accessToken}`,
+              },
+            })
+            .catch(() => null);
+
+          lastStatus = `status ${response?.status() ?? 'network-error'}`;
+          return response?.ok() ?? false;
         },
-      })
-      .catch(() => null);
-
-    if (response?.ok()) {
-      return;
-    }
-
-    diagnostics.push(`attempt ${attempt}: status ${response?.status() ?? 'network-error'}`);
-    await new Promise((r) => setTimeout(r, AUTH_READINESS_RETRY_MS * attempt));
+        { timeout: 5000 }
+      )
+      .toBe(true);
+  } catch {
+    throw new Error(`[startSoloSession] Auth readiness failed (last: ${lastStatus})`);
   }
-
-  throw new Error(
-    `[startSoloSession] Auth readiness failed after ${AUTH_READINESS_MAX_ATTEMPTS} attempts (${diagnostics.join(
-      '; '
-    )})`
-  );
 }
 
 export async function getScriptureStoreSnapshot(page: Page): Promise<ScriptureStoreSnapshot> {
@@ -237,6 +247,13 @@ function isSuccessfulScriptureResponse(
   return resp.status() >= 200 && resp.status() < 300;
 }
 
+/**
+ * Wait for a successful scripture RPC response.
+ *
+ * Uses vanilla `page.waitForResponse()` — acceptable in helpers that only
+ * receive `page: Page` (no fixture access). In test bodies with fixture
+ * access, prefer `interceptNetworkCall` for consistency.
+ */
 export async function waitForScriptureRpc(
   page: Page,
   rpcName: string,
@@ -602,6 +619,13 @@ export async function submitReflectionSummary(
   await page.getByTestId('scripture-reflection-summary-continue').click();
 
   await responsePromise;
+
+  // Store-poll: wait for Zustand to reflect the optimistic phase transition to 'report'
+  await waitForScriptureStore(
+    page,
+    'reflection summary phase transition to report',
+    (snapshot) => snapshot.session?.currentPhase === 'report'
+  );
 }
 
 /**
@@ -622,6 +646,13 @@ export async function skipMessageAndCompleteSession(page: Page): Promise<void> {
   await page.getByTestId('scripture-message-skip-btn').click();
 
   await patchResponse;
+
+  // Store-poll: wait for Zustand to reflect session completion
+  await waitForScriptureStore(
+    page,
+    'session completion',
+    (snapshot) => snapshot.session?.status === 'complete'
+  );
 
   await expect(page.getByTestId('scripture-report-screen')).toBeVisible();
 }
