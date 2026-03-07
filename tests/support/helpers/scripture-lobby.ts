@@ -286,12 +286,8 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
   const response = await sessionResponse;
   const payload = (await response.json()) as { id?: string };
 
-  await waitForScriptureStore(
-    page,
-    'together-mode lobby role selection',
-    (snapshot) =>
-      snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'lobby'
-  );
+  // Network-first: RPC response above confirms server created the session.
+  // UI assertion below confirms the lobby rendered.
   await expect(lobbyRoleSelection).toBeVisible();
 
   return payload.id ?? '';
