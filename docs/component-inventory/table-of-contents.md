@@ -30,7 +30,6 @@
 4. [Shared and Utility Components](./shared-and-utility-components.md)
    - [NetworkStatusIndicator / NetworkStatusDot](./shared-and-utility-components.md#networkstatusindicator)
    - [SyncToast](./shared-and-utility-components.md#synctoast)
-   - [charCounter](./shared-and-utility-components.md#charcounter)
    - [LoadingSpinner (inline)](./shared-and-utility-components.md#loadingspinner)
 5. [Design Patterns](./design-patterns.md)
    - Barrel Exports

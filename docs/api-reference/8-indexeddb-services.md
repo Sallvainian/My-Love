@@ -7,6 +7,7 @@
 - `src/services/moodService.ts` (mood tracking)
 - `src/services/customMessageService.ts` (love messages)
 - `src/services/photoStorageService.ts` (photo gallery)
+- `src/services/scriptureReadingService.ts` (scripture reading -- see [Doc 13](./13-scripture-reading-service.md))
 
 ## Overview
 

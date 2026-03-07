@@ -107,6 +107,11 @@ Cached scripture reading sessions for offline support.
 | `snapshotJson`     | `Record<string, unknown>?` |                                                                     |
 | `startedAt`        | `Date`                     |                                                                     |
 | `completedAt`      | `Date?`                    |                                                                     |
+| `myRole`           | `ScriptureSessionRole?`   | `'reader'` or `'responder'` (from server snapshot)                  |
+| `partnerRole`      | `ScriptureSessionRole?`   | Partner's role (from server snapshot)                               |
+| `user1Ready`       | `boolean?`                 | User1 ready state (from server snapshot)                            |
+| `user2Ready`       | `boolean?`                 | User2 ready state (from server snapshot)                            |
+| `countdownStartedAt` | `Date?`                  | Server UTC when both users ready (from server snapshot)             |
 
 **Indexes:** `by-user` (userId)
 

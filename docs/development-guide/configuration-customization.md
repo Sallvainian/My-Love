@@ -22,7 +22,7 @@ export const PARTNER_NAME = APP_CONFIG.defaultPartnerName; // Backward-compatibl
 After changing these values, rebuild and redeploy:
 
 ```bash
-npm run build
+fnox exec -- npm run build
 npm run deploy
 ```
 
@@ -55,6 +55,14 @@ manualChunks: {
 
 This produces separate cached chunks for major dependencies, improving cache hit rates on repeat visits.
 
+### Source Maps and Sentry
+
+```typescript
+sourcemap: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
+```
+
+Source maps are only generated when `SENTRY_AUTH_TOKEN` is present. When generated, they are uploaded to Sentry and deleted from the build output.
+
 ### Plugins
 
 | Plugin                      | Purpose                                                                |
@@ -63,6 +71,7 @@ This produces separate cached chunks for major dependencies, improving cache hit
 | `vite-plugin-checker`       | TypeScript type checking overlay in the browser during development     |
 | `vite-plugin-pwa` (VitePWA) | PWA manifest generation, service worker compilation via InjectManifest |
 | `rollup-plugin-visualizer`  | Bundle size analysis output at `dist/stats.html`                       |
+| `@sentry/vite-plugin`       | Source map upload to Sentry (conditional on `SENTRY_AUTH_TOKEN`)       |
 
 ### PWA Configuration
 
@@ -150,7 +159,9 @@ fontFamily: {
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/__tests__/**"]
@@ -161,10 +172,14 @@ fontFamily: {
 
 Covers `vite.config.ts` and `vitest.config.ts` with ES2022 target.
 
+### Test Configuration (`tsconfig.test.json`)
+
+Extends `tsconfig.app.json` with relaxed unused variable checks and test-specific types (`vitest/globals`, `@testing-library/jest-dom/vitest`).
+
 ### Path Aliases
 
+- **In application code**: `@/` maps to `src/` (configured in `tsconfig.app.json` via `paths`)
 - **In tests**: `@/` maps to `src/` (configured in `vitest.config.ts` via the `resolve.alias` option)
-- **In application code**: No path alias configured in `vite.config.ts`; use relative imports
 
 ## PostCSS Configuration
 
@@ -180,3 +195,19 @@ export default {
 ```
 
 `@tailwindcss/postcss` is the Tailwind CSS v4 PostCSS plugin. `autoprefixer` adds vendor prefixes for broader browser compatibility.
+
+## Performance Constants
+
+`src/config/performance.ts` centralizes magic numbers for pagination, storage quotas, and validation limits:
+
+| Category          | Constant                   | Value  | Purpose                                      |
+| ----------------- | -------------------------- | ------ | -------------------------------------------- |
+| Pagination        | `DEFAULT_PAGE_SIZE`        | 20     | Default items per page (photos, messages)    |
+| Pagination        | `MAX_PAGE_SIZE`            | 100    | Maximum page size                            |
+| Storage Quotas    | `WARNING_THRESHOLD_PERCENT`| 80     | Display warning banner at this quota %       |
+| Storage Quotas    | `ERROR_THRESHOLD_PERCENT`  | 95     | Block uploads at this quota %                |
+| Storage Quotas    | `DEFAULT_QUOTA_MB`         | 50     | Fallback quota when Storage API unavailable  |
+| Validation Limits | `MESSAGE_TEXT_MAX_LENGTH`   | 1000   | Maximum message text length                  |
+| Validation Limits | `CAPTION_MAX_LENGTH`       | 500    | Maximum photo caption length                 |
+| Validation Limits | `NOTE_MAX_LENGTH`          | 1000   | Maximum mood note length                     |
+| Validation Limits | `PARTNER_NAME_MAX_LENGTH`  | 50     | Maximum partner name length                  |

@@ -2,7 +2,7 @@
 
 ## Barrel Exports
 
-9 component directories use `index.ts` barrel exports for clean imports:
+13 component directories use `index.ts` barrel exports for clean imports:
 
 | Folder                | Exports                                                                                                                                                                                                                                                        |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -204,6 +204,7 @@ Several components implement optimistic updates:
 - **SoloReadingFlow phase updates**: `updatePhase('report')` optimistically, persist to server in background
 - **LoveNoteMessage**: Optimistic send with `sending` flag, error state with retry
 - **PartnerMoodView**: Optimistic request actions
+- **Scripture lobby**: `selectRole` and `toggleReady` set state before RPC, rollback on error
 
 ## XSS Sanitization
 
@@ -226,6 +227,7 @@ Multiple components create Object URLs for image previews and clean them up:
 - `PhotoEditModal`: `URL.revokeObjectURL()` in cleanup function
 - `ImagePreview`: `URL.revokeObjectURL()` in effect cleanup
 - `LoveNoteMessage`: `URL.revokeObjectURL()` in effect cleanup (for preview URLs)
+- `NotesSlice`: `revokePreviewUrlsFromNotes()` helper cleans up all blob URLs on fetch/unmount
 
 Pattern uses `queueMicrotask` for state updates to avoid React warnings:
 

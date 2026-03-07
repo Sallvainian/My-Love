@@ -4,7 +4,7 @@ The Zustand store (`useAppStore`) is composed of 10 slices. Below maps each comp
 
 ## Access Patterns
 
-Components access the store in two ways:
+Components access the store in three ways:
 
 1. **Direct**: `useAppStore((state) => state.field)` or destructured `useAppStore()`
 2. **Via `useShallow`**: `useAppStore(useShallow((state) => ({ ... })))` -- prevents re-renders when unrelated state changes (used by ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer)
@@ -15,7 +15,7 @@ Components access the store in two ways:
 **File**: `src/stores/slices/appSlice.ts`
 
 **State**: `isLoading`, `error`, `__isHydrated`
-**Actions**: `setLoading`, `setError`, `initializeApp`
+**Actions**: `setLoading`, `setError`, `setHydrated`
 
 | Component      | Fields Used                  | Access Pattern     |
 | -------------- | ---------------------------- | ------------------ |
@@ -26,8 +26,8 @@ Components access the store in two ways:
 
 **File**: `src/stores/slices/messagesSlice.ts`
 
-**State**: `messages`, `currentMessage`, `messageHistory`, `customMessages`, `customMessagesLoaded`
-**Actions**: `toggleFavorite`, `navigateToPreviousMessage`, `navigateToNextMessage`, `canNavigateBack`, `canNavigateForward`, `loadCustomMessages`, `createCustomMessage`, `updateCustomMessage`, `deleteCustomMessage`, `exportCustomMessages`, `importCustomMessages`
+**State**: `messages`, `currentMessage`, `messageHistory`, `currentDayOffset`, `customMessages`, `customMessagesLoaded`
+**Actions**: `loadMessages`, `addMessage`, `toggleFavorite`, `updateCurrentMessage`, `navigateToPreviousMessage`, `navigateToNextMessage`, `canNavigateBack`, `canNavigateForward`, `loadCustomMessages`, `createCustomMessage`, `updateCustomMessage`, `deleteCustomMessage`, `getCustomMessages`, `exportCustomMessages`, `importCustomMessages`
 
 | Component             | Fields Used                                                                                                                                         | Access Pattern             |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
@@ -42,8 +42,8 @@ Components access the store in two ways:
 
 **File**: `src/stores/slices/photosSlice.ts`
 
-**State**: `photos`, `selectedPhotoId`, `storageWarning`, `isUploading`, `uploadProgress`, `error`
-**Actions**: `loadPhotos`, `uploadPhoto`, `updatePhoto`, `deletePhoto`, `selectPhoto`, `clearPhotoSelection`, `clearError`, `clearStorageWarning`
+**State**: `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress`, `error`, `storageWarning`
+**Actions**: `uploadPhoto`, `loadPhotos`, `deletePhoto`, `updatePhoto`, `selectPhoto`, `clearPhotoSelection`, `clearError`, `clearStorageWarning`
 
 | Component       | Fields Used                                                                                                                                           | Access Pattern       |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -57,7 +57,7 @@ Components access the store in two ways:
 **File**: `src/stores/slices/settingsSlice.ts`
 
 **State**: `settings`, `isOnboarded`
-**Actions**: `updateSettings`, `addAnniversary`, `removeAnniversary`
+**Actions**: `initializeApp`, `setSettings`, `updateSettings`, `setOnboarded`, `addAnniversary`, `removeAnniversary`, `setTheme`
 
 | Component             | Fields Used                                                         | Access Pattern             |
 | --------------------- | ------------------------------------------------------------------- | -------------------------- |
@@ -70,7 +70,7 @@ Components access the store in two ways:
 **File**: `src/stores/slices/navigationSlice.ts`
 
 **State**: `currentView`
-**Actions**: `setView`, `navigateHome`
+**Actions**: `setView`, `navigateHome`, `navigatePhotos`, `navigateMood`, `navigatePartner`, `navigateNotes`, `navigateScripture`
 
 | Component           | Fields Used                                                 | Access Pattern                               |
 | ------------------- | ----------------------------------------------------------- | -------------------------------------------- |
@@ -84,7 +84,7 @@ Components access the store in two ways:
 **File**: `src/stores/slices/moodSlice.ts`
 
 **State**: `moods`, `partnerMoods`, `syncStatus`
-**Actions**: `addMoodEntry`, `getMoodForDate`, `loadMoods`, `syncPendingMoods`, `updateSyncStatus`, `fetchPartnerMoods`, `getPartnerMoodForDate`
+**Actions**: `addMoodEntry`, `getMoodForDate`, `updateMoodEntry`, `loadMoods`, `updateSyncStatus`, `syncPendingMoods`, `fetchPartnerMoods`, `getPartnerMoodForDate`
 
 | Component         | Fields Used                                                                     | Access Pattern                                |
 | ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -96,8 +96,8 @@ Components access the store in two ways:
 
 **File**: `src/stores/slices/interactionsSlice.ts`
 
-**State**: `unviewedCount`
-**Actions**: `sendPoke`, `sendKiss`, `getUnviewedInteractions`, `markInteractionViewed`, `subscribeToInteractions`, `getInteractionHistory`, `loadInteractionHistory`
+**State**: `interactions`, `unviewedCount`, `isSubscribed`
+**Actions**: `sendPoke`, `sendKiss`, `markInteractionViewed`, `getUnviewedInteractions`, `getInteractionHistory`, `loadInteractionHistory`, `subscribeToInteractions`, `addIncomingInteraction`
 
 | Component            | Fields Used                                                                                                            | Access Pattern |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------- |
@@ -123,8 +123,8 @@ Components access the store in two ways:
 
 **File**: `src/stores/slices/notesSlice.ts`
 
-**State**: `notes`, `notesIsLoading`, `notesError`, `notesHasMore`
-**Actions**: `fetchNotes`, `fetchOlderNotes`, `clearNotesError`, `sendNote`, `retryFailedMessage`, `removeFailedMessage`, `cleanupPreviewUrls`
+**State**: `notes`, `notesIsLoading`, `notesError`, `notesHasMore`, `sentMessageTimestamps`
+**Actions**: `fetchNotes`, `fetchOlderNotes`, `addNote`, `setNotes`, `setNotesError`, `clearNotesError`, `checkRateLimit`, `sendNote`, `retryFailedMessage`, `cleanupPreviewUrls`, `removeFailedMessage`
 
 All access is through the `useLoveNotes` custom hook (`src/hooks/useLoveNotes.ts`), which wraps store selectors with memoized callbacks and integrates with `useRealtimeMessages` for live Supabase Broadcast subscriptions.
 
@@ -137,8 +137,8 @@ All access is through the `useLoveNotes` custom hook (`src/hooks/useLoveNotes.ts
 
 **File**: `src/stores/slices/scriptureReadingSlice.ts`
 
-**State**: `session`, `scriptureLoading`, `scriptureError`, `activeSession`, `isCheckingSession`, `isSyncing`, `pendingRetry`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `isPendingLockIn`, `partnerLocked`, `partnerDisconnected`, `partnerDisconnectedAt`, `coupleStats`, `isStatsLoading`
-**Actions**: `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession`, `advanceStep`, `saveAndExit`, `saveSession`, `exitSession`, `retryFailedWrite`, `updatePhase`, `selectRole`, `toggleReady`, `convertToSolo`, `lockIn`, `undoLockIn`, `endSession`, `setPartnerDisconnected`, `loadCoupleStats`
+**State**: `session`, `scriptureLoading`, `isInitialized`, `isPendingLockIn`, `isPendingReflection`, `isSyncing`, `scriptureError`, `activeSession`, `isCheckingSession`, `pendingRetry`, `coupleStats`, `isStatsLoading`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `currentUserId`, `partnerLocked`, `partnerDisconnected`, `partnerDisconnectedAt`, `_broadcastFn`
+**Actions**: `createSession`, `loadSession`, `exitSession`, `updatePhase`, `clearScriptureError`, `checkForActiveSession`, `clearActiveSession`, `advanceStep`, `saveAndExit`, `saveSession`, `abandonSession`, `retryFailedWrite`, `loadCoupleStats`, `selectRole`, `toggleReady`, `convertToSolo`, `applySessionConverted`, `onPartnerJoined`, `onPartnerReady`, `onCountdownStarted`, `onBroadcastReceived`, `lockIn`, `undoLockIn`, `onPartnerLockInChanged`, `setPartnerDisconnected`, `endSession`, `setBroadcastFn`
 
 | Component           | Fields Used                                                                                                                                                                                                                                                                                                   | Access Pattern |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |

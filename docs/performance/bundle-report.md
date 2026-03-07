@@ -99,4 +99,6 @@ The remaining chunks (`vendor-supabase`, `vendor-animation`, `vendor-icons`, rou
 npm run perf:bundle-report
 ```
 
-This runs a clean build and generates this report using `scripts/perf-bundle-report.mjs`. The raw build output is also captured in `docs/performance/perf-build.log`.
+This runs a clean build and generates this report using `scripts/perf-bundle-report.mjs`. The script measures raw and gzip sizes for target chunks (index, vendor-supabase, vendor-animation, vendor-state) and all CSS files. The raw build output is also captured in `docs/performance/perf-build.log`.
+
+The script targets these chunk prefixes for detailed reporting: `index-`, `vendor-supabase-`, `vendor-animation-`, `vendor-state-`. Build warnings are extracted from the build log and included in the report.

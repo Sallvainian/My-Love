@@ -4,7 +4,7 @@
 
 ## Overview
 
-The Supabase client is a **singleton** instance typed against the auto-generated `Database` schema from `src/types/database.types.ts`. It is imported by every API module and provides access to Auth, Postgres, Storage, and Realtime.
+The Supabase client is a **singleton** instance typed against the auto-generated `Database` schema from `src/types/database.types.ts`. It is imported by every API module and provides access to Auth, Postgres, Storage, and Realtime. Uses `@supabase/supabase-js` v2.97.0.
 
 ## Environment Variables
 
