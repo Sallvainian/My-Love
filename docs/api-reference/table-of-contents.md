@@ -3,7 +3,7 @@
 ## 1. Supabase Client Configuration
 
 - Environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`)
-- Singleton client instance with `Database` typing
+- Singleton client instance with `Database` typing (supabase-js 2.97.0)
 - Auth config: `persistSession`, `autoRefreshToken`, `detectSessionInUrl`
 - Realtime config: `eventsPerSecond: 10`
 - `getPartnerId()` -- query partner_id from users table
@@ -107,7 +107,7 @@
 
 ## 10. Validation Layer
 
-- API schemas (`src/api/validation/supabaseSchemas.ts`): User, Mood, Interaction, Message, Photo
+- API schemas (`src/api/validation/supabaseSchemas.ts`): User, Mood, Interaction, Message, Photo, CoupleStats
 - Local schemas (`src/validation/schemas.ts`): Message, Photo, Mood, Settings, Export, Scripture
 - Error utilities (`src/validation/errorMessages.ts`): `ValidationError`, `formatZodError`, `getFieldErrors`
 - 12 mood types, 5 message categories, 3 photo MIME types
@@ -122,7 +122,31 @@
 ## 12. Real-Time Subscriptions
 
 - `RealtimeService` -- channel management with Map tracking
-- `subscribeMoodChanges(userId, onMoodChange, onError?)` -- postgres_changes
-- Broadcast API for partner mood notifications
+- `useScriptureBroadcast` -- private broadcast channel for session state sync
+- `useScripturePresence` -- ephemeral partner position tracking with heartbeat and stale detection
+- `useRealtimeMessages` -- love notes delivery via Broadcast API
+- `usePartnerMood` -- partner mood updates via Broadcast API
 - Interaction realtime via postgres_changes INSERT events
-- Channel lifecycle: subscribe, track, unsubscribe, cleanup
+- 6 channel types: scripture-session, scripture-presence, love-notes, mood-updates, incoming-interactions, moods
+
+## 13. Scripture Reading Service
+
+- `ScriptureReadingService` extends `BaseIndexedDBService<ScriptureSession>`
+- Cache-first read pattern: IndexedDB -> return -> background refresh from Supabase
+- Write-through pattern: Supabase RPC/table first -> update IndexedDB cache
+- Session CRUD: `createSession`, `getSession` (with onRefresh callback), `getUserSessions`, `updateSession`
+- Reflection CRUD: `addReflection` (via RPC), `getReflectionsBySession`
+- Bookmark CRUD: `addBookmark`, `toggleBookmark`, `getBookmarksBySession`, `updateSessionBookmarkSharing`
+- Message CRUD: `addMessage`, `getMessagesBySession`
+- `getCoupleStats()` -- RPC call with `CoupleStatsSchema` validation
+- `getSessionReportData()` -- server-fresh parallel fetch for Daily Prayer Report
+- Corruption recovery: `recoverAllCaches()`, per-store and per-session scoped recovery
+- `ScriptureErrorCode` enum: VERSION_MISMATCH, SESSION_NOT_FOUND, UNAUTHORIZED, SYNC_FAILED, OFFLINE, CACHE_CORRUPTED, VALIDATION_FAILED
+
+## 14. Additional Services
+
+- `performanceMonitor` -- Web Performance API timing with min/max/avg/total stats, `measureAsync()`, `getReport()`
+- `migrateCustomMessagesFromLocalStorage()` -- one-time LocalStorage to IndexedDB migration with duplicate detection and Zod validation
+- `storageService` (legacy) -- direct IndexedDB photo/message operations, predates BaseIndexedDBService pattern
+- `localStorageHelper` -- type-safe localStorage get/set/remove/clear with error handling
+- `syncService` -- parallel `Promise.all` batch mood sync with `SyncSummary` reporting

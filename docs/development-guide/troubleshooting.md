@@ -27,7 +27,7 @@
 
 ## ConstraintError in Console
 
-**Cause**: IndexedDB schema conflict from a previous database version. The current schema is version 5 (defined in `src/services/dbSchema.ts`).
+**Cause**: IndexedDB schema conflict from a previous database version.
 
 **Fix**: Clear IndexedDB via DevTools > Application > IndexedDB > delete the `my-love-db` database, then reload the page. The app will recreate the database with the current schema.
 
@@ -40,26 +40,31 @@ location.reload();
 
 ## Dev Server Will Not Start
 
-**Cause**: Wrong Node version, corrupted dependencies, or missing `.env.keys` file.
+**Cause**: Wrong Node version, corrupted dependencies, or missing secrets.
 
 **Fix**:
 
 ```bash
-nvm use                  # Switch to Node v24.13.0 (reads .nvmrc)
+mise install              # Switch to Node v24.13.0 (reads .mise.toml)
 rm -rf node_modules
 npm install
-npm run dev
+fnox exec -- npm run dev
 ```
 
-If environment variables are not being injected, verify your dotenvx setup:
+If fnox is not configured (no age key), start without production secrets:
 
 ```bash
-cat .env.keys            # Confirm .env.keys exists with DOTENV_PRIVATE_KEY
-dotenvx run -- printenv  # Test decryption
-direnv allow             # Allow direnv to load .envrc
+npm run dev:raw
 ```
 
-If you do not have `.env.keys`, restore it from dotenvx-ops: `npx dotenvx-ops login && npx dotenvx-ops sync`. If that's unavailable, use `npm run dev:raw` instead (starts Vite directly, but Supabase features will not work without env vars).
+The app will start but Supabase features will not work without env vars.
+
+If you need to verify fnox is working:
+
+```bash
+fnox check               # Verify all secrets resolve
+fnox get VITE_SUPABASE_URL  # Test single secret decryption
+```
 
 ## Build Fails
 
@@ -73,13 +78,14 @@ npm run lint             # Identify ESLint errors
 npm install              # Ensure all dependencies are installed
 ```
 
-If the build fails because Supabase env vars are missing, verify your dotenvx setup:
+If the build fails because Supabase env vars are missing, verify your fnox setup:
 
 ```bash
-dotenvx run -- printenv | grep VITE_SUPABASE   # Check that secrets are available
+fnox check               # Verify secrets resolve
+fnox exec -- printenv | grep VITE_SUPABASE   # Check that secrets are available
 ```
 
-If dotenvx is not configured or `.env.keys` is missing, set the variables manually:
+If fnox is not configured, set the variables manually:
 
 ```bash
 export VITE_SUPABASE_URL="https://your-project.supabase.co"
@@ -90,7 +96,7 @@ npm run build
 If TypeScript reports errors in `src/types/database.types.ts`, regenerate the types:
 
 ```bash
-supabase gen types typescript --local > src/types/database.types.ts
+supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts
 ```
 
 ## PWA Not Installing
@@ -135,7 +141,7 @@ To test PWA behavior locally, you can temporarily set `devOptions.enabled: true`
 ```bash
 npx playwright install           # Install browsers
 supabase start                   # Start local Supabase (requires Docker)
-supabase db reset                # Reset database and apply all migrations + seed
+supabase db reset                # Reset database and apply all 21 migrations + seed
 npm run test:e2e                 # Run with cleanup script
 ```
 
@@ -145,7 +151,7 @@ The Playwright config automatically reads Supabase connection details from `supa
 rm -rf tests/.auth/
 ```
 
-Then run the tests again. The auth setup project will recreate test users and auth state.
+Then run the tests again. The global setup will recreate test users and auth state.
 
 ## E2E Tests Hanging or Timing Out
 
@@ -205,26 +211,7 @@ Then run the tests again. The auth setup project will recreate test users and au
 3. Open DevTools > Application > Cache Storage and delete all caches
 4. Hard refresh the page
 
-Alternatively, run this in the browser console (from `scripts/clear-caches.js`):
-
-```javascript
-// Unregister all service workers
-const registrations = await navigator.serviceWorker.getRegistrations();
-for (const reg of registrations) await reg.unregister();
-
-// Clear all caches
-const cacheNames = await caches.keys();
-for (const name of cacheNames) await caches.delete(name);
-
-// Clear IndexedDB
-indexedDB.deleteDatabase('my-love-db');
-
-// Clear localStorage
-localStorage.clear();
-
-// Reload
-location.reload();
-```
+Alternatively, run the cleanup script from `scripts/clear-caches.js` in the browser console. This clears service workers, IndexedDB, localStorage, sessionStorage, and Cache Storage.
 
 ## Database Migration Conflicts
 
@@ -280,6 +267,27 @@ test: {
    ```bash
    npx playwright test tests/e2e/path/to/test.spec.ts --debug
    ```
-2. Add explicit waits for async operations instead of relying on implicit timing.
+2. Use the hybrid sync pattern (network wait, store poll, UI assertion) after mutations.
 3. Ensure tests use worker-isolated auth (import `test` from `tests/support/merged-fixtures.ts`, not `@playwright/test`).
 4. Check for shared database state between tests. Each test should create its own data and clean up after itself.
+
+## fnox Cannot Decrypt Secrets
+
+**Cause**: Missing age key file, wrong key, or key not in recipients list.
+
+**Fix**:
+
+1. Verify the age key file exists:
+   ```bash
+   ls ~/.age/key.txt
+   ```
+2. Verify `FNOX_AGE_KEY_FILE` is set:
+   ```bash
+   echo $FNOX_AGE_KEY_FILE
+   ```
+3. Verify your public key is in the recipients list in `fnox.toml`:
+   ```bash
+   cat ~/.age/key.txt | grep "public key"
+   # Compare with recipients in fnox.toml
+   ```
+4. If your key is not in the recipients list, ask an existing team member to add it and re-encrypt all secrets.

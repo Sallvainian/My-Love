@@ -44,7 +44,7 @@
 ## 5. Zod Validation Schemas
 
 - 5.1 Local Validation (`validation/schemas.ts`) -- MessageSchema, PhotoSchema, MoodEntrySchema, SettingsSchema, CustomMessagesExportSchema, Scripture schemas
-- 5.2 Supabase API Validation (`api/validation/supabaseSchemas.ts`) -- User, Mood, Interaction Row/Insert/Update schemas, array schemas, UUID/Timestamp/MoodType common schemas
+- 5.2 Supabase API Validation (`api/validation/supabaseSchemas.ts`) -- User, Mood, Interaction Row/Insert/Update schemas, array schemas, UUID/Timestamp/MoodType common schemas, CoupleStatsSchema
 
 ## 6. Supabase RPC Functions
 

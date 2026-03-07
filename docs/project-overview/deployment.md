@@ -11,10 +11,10 @@ Every push to `main` triggers `.github/workflows/deploy.yml`:
 ### Build Job (`ubuntu-latest`)
 
 1. Checkout code
-2. Setup Node.js 20 with npm cache
+2. Setup Node.js (version from `.mise.toml`) with npm cache
 3. `npm ci`
 4. Generate TypeScript types from remote Supabase schema: `supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts`
-5. `dotenvx run -- npm run build` (dotenvx decrypts `.env` via `DOTENV_PRIVATE_KEY`, runs `tsc -b && vite build`)
+5. `npm run build` with environment variables injected via GitHub Secrets (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY, Sentry config)
 6. `npm run test:smoke` (validates dist/ directory structure, index.html, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -35,13 +35,16 @@ Runs after deployment:
 
 ## Required GitHub Secrets
 
-| Secret                    | Description                                                             |
-| ------------------------- | ----------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (build, deploy, health check) |
-| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                  |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                        |
-| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations   |
-| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting               |
+| Secret                                   | Description                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                      | Supabase project URL (injected at build time)                         |
+| `VITE_SUPABASE_ANON_KEY`                 | Supabase anon/public key (mapped to VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY) |
+| `SUPABASE_ACCESS_TOKEN`                  | Supabase CLI auth token for TypeScript type generation                |
+| `VITE_SENTRY_DSN`                        | Sentry DSN for error tracking                                        |
+| `SENTRY_AUTH_TOKEN`                      | Sentry auth token for source map upload                              |
+| `SENTRY_ORG`                             | Sentry organization slug                                             |
+| `SENTRY_PROJECT`                         | Sentry project slug                                                  |
+| `CLAUDE_CODE_OAUTH_TOKEN`                | Claude Code OAuth token for AI-powered workflows                     |
 
 ## GitHub Pages Configuration
 
@@ -80,6 +83,10 @@ Informational (does not block deployment). Checks:
 base: mode === 'production' ? '/My-Love/' : '/',
 ```
 
+### Source Maps
+
+Source maps are generated as `hidden` when `SENTRY_AUTH_TOKEN` is present (uploaded to Sentry, then deleted from dist/). Otherwise source maps are disabled.
+
 ### Manual Chunks (Code Splitting)
 
 | Chunk Name         | Libraries               |
@@ -106,6 +113,16 @@ base: mode === 'production' ? '/My-Love/' : '/',
 - Precached: `**/*.{png,jpg,jpeg,svg,woff2,ico}` only
 - Excluded from precache: `**/*.js`, `**/*.css`, `**/*.html`
 - `index.html` included with timestamp-based revision for forced SW updates
+
+### Vite Plugins
+
+| Plugin                  | Purpose                                          |
+| ----------------------- | ------------------------------------------------ |
+| `@vitejs/plugin-react`  | React JSX transform and HMR                      |
+| `vite-plugin-checker`   | In-browser TypeScript error overlay               |
+| `vite-plugin-pwa`       | PWA service worker (InjectManifest)               |
+| `rollup-plugin-visualizer` | Bundle analysis (`dist/stats.html`)           |
+| `@sentry/vite-plugin`   | Source map upload to Sentry (conditional)         |
 
 ### Bundle Analysis
 

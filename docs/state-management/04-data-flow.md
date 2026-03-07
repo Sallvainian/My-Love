@@ -1,71 +1,65 @@
 # Data Flow Patterns
 
-## Pattern 1: Component -> Slice -> IndexedDB (Offline-First)
+## Pattern 1: Offline-First (Component -> Slice -> IndexedDB)
 
 Used by: Mood tracking, Custom messages
 
 ```
 Component (e.g., MoodTracker)
-    |
-    | calls useAppStore().addMoodEntry(moods, note)
+    | calls addMoodEntry(moods, note)
     v
 MoodSlice.addMoodEntry()
-    |
     | 1. getCurrentUserIdOfflineSafe()  -- cached session
     | 2. moodService.create(userId, moods, note)
     |    |-- MoodEntrySchema.parse()  -- Zod validation
     |    |-- indexedDB.add()  -- synced: false
-    | 3. set({ moods: [...state.moods, created] })  -- optimistic update
+    | 3. set({ moods: [...state.moods, created] })  -- optimistic
     | 4. updateSyncStatus()  -- count pending
     | 5. if (online) syncPendingMoods()  -- immediate sync attempt
     v
 State updated, component re-renders
 ```
 
-**Key point:** The IndexedDB write happens before the state update. If the write fails (validation error), the state is never updated.
+IndexedDB write happens BEFORE state update. If validation fails, state is never updated.
 
-## Pattern 2: Component -> Slice -> Supabase (Online-First)
+## Pattern 2: Online-First (Component -> Slice -> Supabase)
 
 Used by: Love notes, Photos, Partner data
 
 ```
-Component (e.g., LoveNotes MessageInput)
-    |
-    | calls useAppStore().sendNote(text, imageFile?)
+Component (e.g., MessageInput)
+    | calls sendNote(text, imageFile?)
     v
 NotesSlice.sendNote()
-    |
-    | 1. Rate limit check (10 msgs/min)
-    | 2. sanitizeMessageContent(text)  -- DOMPurify
-    | 3. if (imageFile) compress + upload via Edge Function
-    | 4. supabase.from('love_notes').insert(...)
-    | 5. set({ notes: [...state.notes, tempNote] })  -- optimistic with tempId
-    | 6. Replace tempId with real ID on Supabase confirmation
+    | 1. checkRateLimit() (10 msgs/min)
+    | 2. Create optimistic note with tempId
+    | 3. set({ notes: [...notes, optimisticNote] })  -- immediate UI
+    | 4. if (imageFile): compress + uploadCompressedBlob()
+    | 5. supabase.from('love_notes').insert(...)
+    | 6. Replace tempId with real ID on success
+    | 7. Broadcast to partner channel
     v
 State updated, component re-renders
 ```
 
-**Key point:** The optimistic update uses a temporary ID. If the Supabase insert fails, the note may be rolled back or shown in an error state.
+On failure: note stays in state with `error: true`, retry available via `retryFailedMessage`.
 
-## Pattern 3: Realtime -> Slice -> State
+## Pattern 3: Realtime Inbound (Supabase -> Hook -> Slice)
 
 Used by: Love notes (incoming), Partner mood, Interactions
 
 ```
-Supabase Realtime (Broadcast/postgres_changes)
-    |
-    | Event received by hook (e.g., useRealtimeMessages)
+Supabase Realtime Broadcast
+    | Event received by hook (useRealtimeMessages)
     v
 Hook callback
-    |
-    | calls useAppStore().addIncomingNote(note)
+    | calls addNote(note) or addIncomingInteraction(record)
     v
-NotesSlice.addIncomingNote()
-    |
-    | set({ notes: [...state.notes, note] })
+Slice action
+    | Deduplication check (by ID)
+    | set({ notes: [...notes, note] })
     v
 State updated, component re-renders
-    |
     | navigator.vibrate()  -- haptic feedback
 ```
 
@@ -74,23 +68,17 @@ State updated, component re-renders
 Used by: Scripture reading sessions
 
 ```
-Component requests session data
-    |
+Component requests loadSession(sessionId)
     v
-ScriptureReadingSlice action
-    |
+ScriptureReadingSlice.loadSession()
     v
-ScriptureReadingService
-    |
+scriptureReadingService.getSession(sessionId, refreshCallback)
     | 1. Check IndexedDB cache
-    |    |-- Cache hit: return cached data
+    |    |-- Cache hit: return cached, fire background refresh
     |    |-- Cache miss: fetch from Supabase
-    | 2. Fire-and-forget background refresh
-    |    |-- Fetch latest from Supabase
-    |    |-- Write to IndexedDB cache
-    |    |-- Update slice state if data changed
+    | 2. Background refresh writes to IndexedDB + calls refreshCallback
     v
-State updated with cached or fresh data
+set({ session })  -- immediate from cache or Supabase
 ```
 
 ## Pattern 5: Background Sync (Service Worker)
@@ -98,24 +86,18 @@ State updated with cached or fresh data
 Used by: Mood sync when app is backgrounded
 
 ```
-Service Worker receives 'sync' event
-    |
+Service Worker 'sync' event
+    | sw.ts syncPendingMoods()
+    | 1. getPendingMoods() from IndexedDB
+    | 2. getAuthToken() from sw-auth store
+    | 3. For each unsynced: fetch() to Supabase REST
+    | 4. On success: markMoodSynced(id, supabaseId)
+    | 5. postMessage({ type: 'BACKGROUND_SYNC_COMPLETED' })
     v
-sw.ts syncPendingMoods()
-    |
-    | 1. sw-db.ts getPendingMoods()  -- direct IndexedDB read
-    | 2. sw-db.ts getAuthToken()  -- JWT from sw-auth store
-    | 3. For each unsynced mood:
-    |    |-- fetch() to Supabase REST API
-    |    |-- On success: markMoodSynced(id, supabaseId)
-    | 4. postMessage to all clients
-    v
-Main app receives BACKGROUND_SYNC_COMPLETED
-    |
+Main app receives message
     | setupServiceWorkerListener callback
     v
-MoodSlice.loadMoods()  -- refresh state from IndexedDB
-MoodSlice.updateSyncStatus()  -- refresh counts
+MoodSlice.loadMoods() + updateSyncStatus()
 ```
 
 ## Pattern 6: Hydration -> Initialization
@@ -124,26 +106,22 @@ Occurs once on app startup:
 
 ```
 Browser loads app
-    |
     v
 Zustand persist middleware
-    |
     | 1. Read localStorage('my-love-storage')
-    | 2. Deserialize (custom Map handling)
+    | 2. validateHydratedState() -- pre-hydration check
     | 3. Merge with default state
-    | 4. Set __isHydrated = true
+    | 4. onRehydrateStorage: deserialize Map, set __isHydrated = true
     v
 App.tsx useEffect
-    |
     | calls initializeApp()
     v
 SettingsSlice.initializeApp()
-    |
-    | 1. Check __isHydrated
+    | 1. Check __isHydrated (fail-safe for corrupted storage)
     | 2. storageService.init()  -- open IndexedDB
     | 3. Load messages from IndexedDB
-    | 4. If empty: seed default messages
-    | 5. updateCurrentMessage()
+    | 4. If empty: seed default messages + reload
+    | 5. updateCurrentMessage()  -- compute today's message
     | 6. setLoading(false)
     v
 App renders main content
@@ -151,28 +129,17 @@ App renders main content
 
 ## State Update Semantics
 
-### Immer-Style Updaters
-
-Some slices use the updater function form for complex state updates:
-
+**Updater function** (for state-dependent updates):
 ```typescript
-set((state) => ({
-  moods: [...state.moods, created],
-}));
+set((state) => ({ moods: [...state.moods, created] }));
 ```
 
-### Direct State Setting
-
-Simple updates use direct object spread:
-
+**Direct object** (for simple updates):
 ```typescript
 set({ currentView: view });
 ```
 
-### Nested Object Updates
-
-Settings updates require manual nested spreading:
-
+**Nested spread** (for deeply nested updates like settings):
 ```typescript
 set({
   settings: {
@@ -184,6 +151,8 @@ set({
   },
 });
 ```
+
+No immer middleware -- all nested updates require manual spreading.
 
 ## Related Documentation
 

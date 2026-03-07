@@ -133,12 +133,27 @@ InteractionArraySchema = z.array(SupabaseInteractionSchema);
 UserArraySchema = z.array(SupabaseUserSchema);
 ```
 
+### CoupleStatsSchema
+
+Validates the JSONB response from the `scripture_get_couple_stats` RPC:
+
+```typescript
+export const CoupleStatsSchema = z.object({
+  totalSessions: z.number().int().min(0),
+  totalSteps: z.number().int().min(0),
+  lastCompleted: TimestampSchema.nullable(),
+  avgRating: z.number().min(0).max(5),
+  bookmarkCount: z.number().int().min(0),
+});
+```
+
 ### Exported Types
 
 All schemas export inferred TypeScript types via `z.infer<typeof Schema>`:
 
 - `SupabaseUser`, `SupabaseMood`, `SupabaseInteraction`, `SupabaseMessage`, `SupabasePhoto`
 - `UserInsert`, `UserUpdate`, `MoodInsert`, `MoodUpdate`, `InteractionInsert`, `InteractionUpdate`
+- `CoupleStats`
 
 ## 5.3 Error Transformation (`validation/errorMessages.ts`)
 

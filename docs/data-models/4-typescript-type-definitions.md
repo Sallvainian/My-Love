@@ -145,6 +145,8 @@ From `photoService`: `SupabasePhoto`, `PhotoWithUrls`, `StorageQuota`, `PhotoUpl
 
 From `dbSchema`: `ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, `ScriptureSessionMode`, `ScriptureSessionPhase`, `ScriptureSessionStatus`
 
+From `api/validation/supabaseSchemas`: `CoupleStats` (inferred from `CoupleStatsSchema`)
+
 ### LoveNote Interface
 
 ```typescript

@@ -68,10 +68,11 @@ Zod v4 schemas validate data at every service boundary, preventing data corrupti
 
 ## Environment Variable Security
 
-- Environment variables are encrypted with **dotenvx** and committed to git
-- The `.env.keys` file (decryption key) is gitignored
+- Secrets are encrypted with **fnox** using the age encryption provider and committed to git in `fnox.toml`
+- Age private keys (`~/.age/key.txt`) are never committed to the repository
 - E2E tests use plain-text `.env.test` with local Supabase credentials only
 - Environment variables are validated at module load time in `supabaseClient.ts`
+- In CI, GitHub Secrets are injected directly as environment variables
 
 ## Service Worker Auth Token Management
 

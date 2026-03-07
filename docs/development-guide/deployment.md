@@ -11,13 +11,15 @@ Every push to `main` triggers the `.github/workflows/deploy.yml` pipeline with t
 ### Job 1: Build (`ubuntu-latest`)
 
 1. Checkout code
-2. Setup Node.js 20 with npm cache
+2. Setup Node.js (reads version from `.mise.toml`) with npm cache
 3. `npm ci` (clean install from lock file)
 4. Generate TypeScript types from remote Supabase schema:
    ```bash
-   npx supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts
+   npx supabase gen types typescript --project-id xojempkrugifnaveqtqc \
+     | grep -v '^Connecting to' \
+     > src/types/database.types.ts
    ```
-5. `dotenvx run -- npm run build` (dotenvx decrypts `.env` via `DOTENV_PRIVATE_KEY`, runs `tsc -b && vite build`)
+5. `npm run build` with GitHub Secrets injected as environment variables (Supabase URL, anon key, Sentry credentials)
 6. `npm run test:smoke` (validates `dist/` directory structure, `index.html`, manifest, icons, JS bundles, service worker)
 7. Upload `dist/` as GitHub Pages artifact
 
@@ -36,7 +38,7 @@ Runs after deployment completes:
    - Verifies JavaScript bundle reference exists in HTML
    - Verifies PWA manifest is accessible (HTTP 200 for `manifest.webmanifest`)
 3. **Supabase connection verification**:
-   - Creates a Supabase client using decrypted credentials
+   - Creates a Supabase client using GitHub Secrets credentials
    - Verifies auth endpoint returns a valid response
 
 ### Concurrency
@@ -62,55 +64,48 @@ permissions:
 
 All workflows are in `.github/workflows/`:
 
-| Workflow             | File                       | Trigger                                                  | Purpose                                                      |
-| -------------------- | -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
-| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                          | Build, smoke test, deploy to GitHub Pages, health check      |
-| Tests                | `test.yml`                 | Push to `main`/`develop`, PRs, daily 2 AM UTC, manual    | Lint, unit, E2E P0 gate, E2E sharded, burn-in, merge reports |
-| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                   | Migration validation with local Supabase                     |
-| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                         | Claude Code AI assistance                                    |
-| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                             | Automated PR code review with Claude                         |
-| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                          | On-demand commit summarization or security review            |
-| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code                        |
+| Workflow             | File                       | Trigger                                                             | Purpose                                                               |
+| -------------------- | -------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Deploy               | `deploy.yml`               | Push to `main`, manual dispatch                                     | Build, smoke test, deploy to GitHub Pages, health check               |
+| Tests                | `test.yml`                 | Push to `main`, PRs, weekly Sunday 2 AM UTC, manual                 | Lint, unit, DB, integration, API, E2E P0 gate, E2E sharded, burn-in  |
+| Supabase Migrations  | `supabase-migrations.yml`  | PRs touching `supabase/` paths, manual                              | Migration validation with local Supabase                              |
+| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs                                    | Claude Code AI assistance (model: claude-opus-4-6)                    |
+| Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready                                        | Automated PR code review with Claude                                  |
+| Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch                                                     | On-demand commit summarization or security review                     |
+| CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs            | Auto-fix CI failures with Claude Code                                 |
+| Bundle Size          | `bundle-size.yml`          | Push to `main`, PRs                                                 | Bundle size tracking and regression detection                         |
+| Lighthouse           | `lighthouse.yml`           | Manual dispatch                                                     | Lighthouse performance audit                                          |
+| CodeQL               | `codeql.yml`               | Push, PRs                                                           | Security analysis (security-extended + security-and-quality)          |
+| Dependency Review    | `dependency-review.yml`    | PRs                                                                 | Dependency vulnerability scanning                                     |
+| BMAD Story Sync      | `bmad-story-sync.yml`      | Story-related triggers                                              | BMAD workflow story synchronization                                   |
 
 ### Test Pipeline Stages
 
-The `test.yml` workflow runs a 5-stage pipeline (see [Testing](./testing.md#ci-test-pipeline) for full details):
+The `test.yml` workflow runs an 8-stage pipeline (see [Testing](./testing.md#ci-test-pipeline) for full details):
 
-1. **Lint and Type Check** (5-min timeout) -- ESLint, `tsc --noEmit`, Prettier check
-2. **Unit Tests** (10-min timeout) -- Vitest with coverage
-3. **E2E P0 Gate** (15-min timeout) -- P0-tagged Playwright tests with local Supabase
-4. **E2E Sharded** (30-min timeout) -- Full E2E suite sharded across 2 workers
-5. **Burn-In** (20-min timeout) -- Flaky detection on changed test files (PRs to `main` only)
-6. **Merge Reports** -- Combines shard artifacts into unified HTML report
-
-### Dependabot
-
-`.github/dependabot.yml` configures weekly dependency updates on Mondays:
-
-| Ecosystem      | Groups                                                                    |
-| -------------- | ------------------------------------------------------------------------- |
-| npm            | `production-dependencies` (minor/patch), `dev-dependencies` (minor/patch) |
-| GitHub Actions | All action updates grouped together                                       |
-
-- PR limit: 10 open pull requests maximum
-- Labels: `dependencies` + ecosystem-specific (`npm` or `github-actions`)
-
-### CodeQL Security Analysis
-
-`.github/codeql/codeql-config.yml` configures GitHub CodeQL:
-
-- Query suites: `security-extended`, `security-and-quality`
-- Excluded queries: `js/xss-through-dom`
+1. **Lint and Type Check** (5-min timeout)
+2. **Unit Tests** (10-min timeout)
+3. **Database Tests** (10-min timeout)
+4. **Integration Tests** (15-min timeout)
+5. **API Tests** (15-min timeout)
+6. **E2E P0 Gate** (15-min timeout) -- P0-tagged Playwright tests with local Supabase
+7. **E2E Sharded** (30-min timeout) -- Full E2E suite sharded across 2 workers
+8. **Burn-In** (30-min timeout) -- Flaky detection on changed test files (PRs to `main` only)
+9. **Merge Reports** -- Combines shard artifacts into unified HTML report
+10. **Test Summary** -- Branch protection target, evaluates all stages
 
 ## Required GitHub Secrets
 
-| Secret                    | Description                                                                               |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `DOTENV_PRIVATE_KEY`      | dotenvx private key for decrypting `.env` (build, deploy, health check)                   |
-| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema                 |
-| `CURRENTS_RECORD_KEY`     | Currents.dev recording key for Playwright cloud reporting                                 |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows (`claude.yml`, `claude-code-review.yml`) |
-| `CLAUDE_PAT`              | GitHub personal access token for Claude bot commits and PR operations                     |
+| Secret                            | Description                                                           |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`              | Supabase project URL for production builds                            |
+| `VITE_SUPABASE_ANON_KEY`         | Supabase anon key (mapped to `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) |
+| `VITE_SENTRY_DSN`                | Sentry DSN for error tracking                                         |
+| `SENTRY_AUTH_TOKEN`              | Sentry auth token for source map uploads                              |
+| `SENTRY_ORG`                     | Sentry organization slug                                              |
+| `SENTRY_PROJECT`                 | Sentry project slug                                                   |
+| `SUPABASE_ACCESS_TOKEN`          | Supabase CLI auth token for TypeScript type generation                |
+| `CLAUDE_CODE_OAUTH_TOKEN`        | Claude Code OAuth token for AI-powered workflows                      |
 
 ## Manual Deployment
 
@@ -123,6 +118,12 @@ This executes three steps automatically via npm lifecycle scripts:
 1. **`predeploy`**: `npm run build && npm run test:smoke` -- Build and validate
 2. **`deploy`**: `gh-pages -d dist` -- Publish `dist/` to GitHub Pages via the `gh-pages` package
 3. **`postdeploy`**: Prints post-deployment instructions
+
+For manual deployment with secrets:
+
+```bash
+fnox exec -- npm run deploy
+```
 
 ## Post-Deploy Verification
 

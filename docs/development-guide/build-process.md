@@ -3,22 +3,22 @@
 ## Build Command
 
 ```bash
-npm run build
+fnox exec -- npm run build
 ```
 
 This executes:
 
 ```bash
-tsc -b && vite build
+tsc -p tsconfig.app.json && vite build
 ```
 
-Environment variables are decrypted by [dotenvx](https://dotenvx.com) before the build runs. Locally, direnv + dotenvx decrypt secrets automatically. In CI, `dotenvx run -- npm run build` is used (see `deploy.yml`).
+Environment variables are decrypted by fnox (using the age provider) before the build runs. Locally, `fnox exec` decrypts secrets from `fnox.toml`. In CI, secrets are provided directly as GitHub Secrets environment variables without fnox.
 
 ## Build Stages
 
-### Stage 1: TypeScript Compilation
+### Stage 1: TypeScript Type Check
 
-`tsc -b` runs the TypeScript compiler in build mode, checking types across the project references defined in `tsconfig.json` (which references `tsconfig.app.json` and `tsconfig.node.json`).
+`tsc -p tsconfig.app.json` runs the TypeScript compiler against the application config, checking types for all source files in `src/` (excluding test files).
 
 Key TypeScript settings for the build:
 
@@ -27,6 +27,7 @@ Key TypeScript settings for the build:
 - **Strict mode**: enabled with `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
 - **noEmit**: true (Vite handles bundling, TypeScript only type-checks)
 - **Incremental**: true with `.tsbuildinfo` cached in `node_modules/.tmp/`
+- **Path aliases**: `@/*` maps to `src/*` (in `tsconfig.app.json`)
 
 ### Stage 2: Vite Build
 
@@ -38,6 +39,8 @@ Key TypeScript settings for the build:
 4. **Bundle analysis** output at `dist/stats.html`
 5. **CSS extraction** and minification via PostCSS (Tailwind CSS v4 + autoprefixer)
 6. **Tree shaking** via Rollup
+7. **Source maps** (hidden) when `SENTRY_AUTH_TOKEN` is present, uploaded to Sentry and then deleted from `dist/`
+8. **Sentry release** creation when Sentry credentials are configured
 
 The production base path is set to `/My-Love/` for GitHub Pages deployment.
 
@@ -93,6 +96,18 @@ The service worker is compiled from `src/sw.ts` using the InjectManifest strateg
 - **`index.html`** is included in precache with a timestamp-based revision, forcing service worker updates on every build
 
 The `workbox` section in VitePWA config is intentionally omitted because InjectManifest ignores it. All runtime caching behavior is controlled in `src/sw.ts`.
+
+## Sentry Integration
+
+When `SENTRY_AUTH_TOKEN` is present in the environment:
+
+- Source maps are generated as `hidden` (not referenced in the output JS files)
+- The `@sentry/vite-plugin` uploads source maps to Sentry for error tracking
+- Source map files are deleted from `dist/` after upload (via `filesToDeleteAfterUpload`)
+- A Sentry release is created with the name from `SENTRY_RELEASE` (typically `my-love@<commit-sha>`)
+- Plugin telemetry is disabled
+
+When `SENTRY_AUTH_TOKEN` is absent (e.g., local development), source maps are not generated and Sentry integration is completely disabled.
 
 ## Bundle Analysis
 

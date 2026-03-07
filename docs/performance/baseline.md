@@ -110,3 +110,40 @@ The project uses manual chunks in `vite.config.ts` to split vendor dependencies 
 **Static data chunks**:
 
 - `defaultMessages` contains pre-loaded daily love messages. Separated to avoid bloating the main entry chunk with static string data.
+
+## Performance Monitoring Infrastructure
+
+The project includes built-in performance monitoring utilities:
+
+### PerformanceMonitor Service (`src/services/performanceMonitor.ts`)
+
+A singleton service that tracks operation execution times using the Web Performance API:
+
+- `measureAsync(name, operation)` -- Measure execution time of async operations
+- `recordMetric(name, duration)` -- Record custom performance metrics
+- `getMetrics(name)` -- Get metrics for a specific operation (count, avg, min, max, total)
+- `getReport()` -- Generate a human-readable performance report sorted by total duration
+- In development mode, each measurement is logged to the console with `[PerfMonitor]` prefix
+
+### Scroll and Memory Monitoring (`src/utils/performanceMonitoring.ts`)
+
+Development-mode utilities for detecting performance issues:
+
+- `measureScrollPerformance()` -- Creates a PerformanceObserver that warns when frame drops occur (> 16.67ms per frame)
+- `measureMemoryUsage()` -- Returns current JavaScript heap size in MB (Chrome/Edge only via `performance.memory`)
+
+### Performance Constants (`src/config/performance.ts`)
+
+Centralized configuration for performance-related magic numbers:
+
+- **Pagination**: Default page size (20), max page size (100)
+- **Storage Quotas**: Warning threshold (80%), error threshold (95%), default quota (50MB), monitoring interval (5 minutes)
+- **Validation Limits**: Message text max (1000), caption max (500), mood note max (1000), partner name max (50)
+
+## How to Regenerate Bundle Report
+
+```bash
+npm run perf:bundle-report
+```
+
+This runs a clean build and generates the bundle report at `docs/performance/bundle-report.md` using `scripts/perf-bundle-report.mjs`. The raw build output is also captured in `docs/performance/perf-build.log`.
