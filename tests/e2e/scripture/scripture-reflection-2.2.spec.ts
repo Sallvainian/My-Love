@@ -348,3 +348,47 @@ test.describe('End-of-Session Reflection Summary', () => {
 });
 
 // ============================================================
+// Error Injection Tests
+// ============================================================
+
+test.describe(
+  'Session completion 500 shows completion error screen',
+  { annotation: [{ type: 'skipNetworkMonitoring' }] },
+  () => {
+    test('should show completion error screen when session PATCH fails with 500', async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      // GIVEN: User has completed all steps and submitted the reflection summary
+      await completeAllStepsToReflectionSummary(page, new Set([0]));
+      await expect(page.getByTestId('scripture-reflection-summary-screen')).toBeVisible();
+
+      // Submit reflection summary normally
+      await page.getByTestId('scripture-standout-verse-0').click();
+      await page.getByTestId('scripture-session-rating-4').click();
+
+      const summaryResponse = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_submit_reflection',
+      });
+      await page.getByTestId('scripture-reflection-summary-continue').click();
+      await summaryResponse;
+
+      // WHEN: Compose screen appears, inject 500 on session PATCH (markSessionComplete)
+      await expect(page.getByTestId('scripture-message-compose-screen')).toBeVisible();
+
+      interceptNetworkCall({
+        method: 'PATCH',
+        url: '**/rest/v1/scripture_sessions*',
+        fulfillResponse: { status: 500, body: 'Internal Server Error' },
+      });
+
+      // Click Skip to trigger markSessionComplete → PATCH → 500
+      await page.getByTestId('scripture-message-skip-btn').click();
+
+      // THEN: Completion error screen is shown with retry button
+      await expect(page.getByTestId('scripture-completion-error-screen')).toBeVisible();
+      await expect(page.getByTestId('scripture-completion-retry-btn')).toBeVisible();
+    });
+  }
+);
