@@ -2,177 +2,245 @@
 
 ## Store Creation
 
-The store is created in `src/stores/useAppStore.ts` using Zustand's `create` function with the `persist` middleware:
+**File**: `src/stores/useAppStore.ts` (287 lines)
+**Zustand Version**: 5.0.11
+
+The store is created using Zustand's `create` function with the `persist` middleware:
 
 ```typescript
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import type { AppState } from './types';
 
 export const useAppStore = create<AppState>()(
   persist(
-    (...args) => ({
-      ...createAppSlice(...args),
-      ...createSettingsSlice(...args),
-      ...createNavigationSlice(...args),
-      ...createMessagesSlice(...args),
-      ...createMoodSlice(...args),
-      ...createInteractionsSlice(...args),
-      ...createPartnerSlice(...args),
-      ...createNotesSlice(...args),
-      ...createPhotosSlice(...args),
-      ...createScriptureReadingSlice(...args),
+    (set, get, api) => ({
+      ...createAppSlice(set, get, api),
+      ...createMessagesSlice(set, get, api),
+      ...createPhotosSlice(set, get, api),
+      ...createSettingsSlice(set, get, api),
+      ...createNavigationSlice(set, get, api),
+      ...createMoodSlice(set, get, api),
+      ...createInteractionsSlice(set, get, api),
+      ...createPartnerSlice(set, get, api),
+      ...createNotesSlice(set, get, api),
+      ...createScriptureReadingSlice(set, get, api),
     }),
     persistConfig
   )
 );
 ```
 
-The spread pattern composes all 10 slices into a single flat state object. Each slice's properties and actions are merged at the top level of `AppState`.
+The spread pattern composes all 10 slices into a single flat state object. Each slice's properties and actions are merged at the top level of `AppState`. `createAppSlice` is spread first because it owns core state (`isLoading`, `error`, `__isHydrated`).
 
 ## AppState Type
 
-Defined in `src/stores/types.ts` as an intersection type:
+**File**: `src/stores/types.ts` (66 lines)
+
+Defined as an interface extending all slice interfaces:
 
 ```typescript
-export type AppState = AppSlice &
-  SettingsSlice &
-  NavigationSlice &
-  MessagesSlice &
-  MoodSlice &
-  InteractionsSlice &
-  PartnerSlice &
-  NotesSlice &
-  PhotosSlice &
-  ScriptureReadingSlice;
+export interface AppState
+  extends
+    AppSlice,
+    MessagesSlice,
+    PhotosSlice,
+    SettingsSlice,
+    NavigationSlice,
+    MoodSlice,
+    InteractionsSlice,
+    PartnerSlice,
+    NotesSlice,
+    ScriptureSlice {}
 ```
+
+`AppSlice` is defined in `types.ts` (not `appSlice.ts`) to avoid circular imports. See [Cross-Slice Dependencies](./03-cross-slice-dependencies.md) for details.
+
+## Middleware Type
+
+```typescript
+export type AppMiddleware = [['zustand/persist', unknown]];
+```
+
+Single middleware: `persist` only. No devtools or immer. If middleware is added later, update this tuple in one place.
 
 ## Slice Creator Type
 
-Each slice uses the `AppStateCreator<T>` type which includes the persist middleware signature:
-
 ```typescript
-export type AppStateCreator<T> = StateCreator<
-  AppState,
-  [['zustand/persist', Partial<AppState>]],
-  [],
-  T
->;
+export type AppStateCreator<Slice> = StateCreator<AppState, AppMiddleware, [], Slice>;
 ```
 
-This type gives each slice creator three arguments:
+Each slice creator receives three arguments from this type:
 
-- `set` -- Update function (supports partial state or updater function)
-- `get` -- Returns full `AppState` (cross-slice reads)
-- `_api` -- Store API (rarely used)
+- `set` -- Partial state updater (`(partial: Partial<AppState>) => void` or `(updater: (state: AppState) => Partial<AppState>) => void`)
+- `get` -- Returns full `AppState` snapshot (enables cross-slice reads)
+- `api` -- Store API object (rarely used directly)
 
 ## Persist Configuration
 
+### Storage Key
+
 ```typescript
-const persistConfig = {
-  name: 'my-love-storage',
-
-  storage: createJSONStorage(() => ({
-    getItem: (name: string) => {
-      const item = localStorage.getItem(name);
-      if (!item) return null;
-      try {
-        const parsed = JSON.parse(item);
-        // Pre-hydration validation
-        if (parsed?.state) {
-          // Deserialize Map from array entries
-          if (Array.isArray(parsed.state.messageHistory?.shownMessages)) {
-            parsed.state.messageHistory.shownMessages = new Map(
-              parsed.state.messageHistory.shownMessages
-            );
-          }
-        }
-        return JSON.stringify(parsed);
-      } catch {
-        console.error('[Store] Failed to parse persisted state');
-        localStorage.removeItem(name);
-        return null;
-      }
-    },
-    setItem: (name: string, value: string) => {
-      try {
-        const parsed = JSON.parse(value);
-        // Serialize Map to array entries
-        if (parsed?.state?.messageHistory?.shownMessages instanceof Map) {
-          parsed.state.messageHistory.shownMessages = Array.from(
-            parsed.state.messageHistory.shownMessages.entries()
-          );
-        }
-        localStorage.setItem(name, JSON.stringify(parsed));
-      } catch {
-        console.error('[Store] Failed to serialize state');
-      }
-    },
-    removeItem: (name: string) => localStorage.removeItem(name),
-  })),
-
-  partialize: (state: AppState) => ({
-    settings: state.settings,
-    isOnboarded: state.isOnboarded,
-    messageHistory: state.messageHistory,
-    moods: state.moods,
-  }),
-
-  onRehydrateStorage: () => {
-    return (_state: AppState | undefined, error: Error | undefined) => {
-      if (error) {
-        console.error('[Store] Hydration error:', error);
-      }
-      useAppStore.setState({ __isHydrated: !error });
-    };
-  },
-};
+name: 'my-love-storage'
 ```
+
+### Schema Version
+
+```typescript
+version: 0
+```
+
+Matches test fixtures. Increment when making breaking schema changes to trigger migration.
 
 ### Custom Storage Adapter
 
-The custom `createJSONStorage` adapter handles:
+```typescript
+storage: createJSONStorage(() => ({
+  getItem: (name) => {
+    const str = localStorage.getItem(name);
+    if (!str) return null;
+    try {
+      const data = JSON.parse(str);
+      const validation = validateHydratedState(data.state);
+      if (!validation.isValid) {
+        console.error('[Storage] Pre-hydration validation failed:', validation.errors);
+        localStorage.removeItem(name);
+        return null;
+      }
+      return str;
+    } catch (parseError) {
+      console.error('[Storage] Failed to parse localStorage data:', parseError);
+      localStorage.removeItem(name);
+      return null;
+    }
+  },
+  setItem: (name, value) => localStorage.setItem(name, value),
+  removeItem: (name) => localStorage.removeItem(name),
+})),
+```
 
-1. **Map serialization**: `messageHistory.shownMessages` is a `Map<string, number>` which JSON cannot serialize natively. The adapter converts it to/from an array of `[key, value]` entries.
-2. **Corruption recovery**: If parsing fails, the corrupted entry is removed from localStorage and `null` is returned, triggering default state.
-3. **Pre-hydration validation**: Validates structure before hydration to catch corruption early.
+The custom adapter handles:
+
+1. **Pre-hydration validation**: Runs `validateHydratedState()` before returning data to Zustand. Checks `shownMessages` is an array or Map, `currentIndex` is a number.
+2. **Corruption recovery**: If parsing or validation fails, removes the corrupted entry and returns `null`, triggering default state.
+3. **Critical vs non-critical errors**: Only fails on critical errors (`shownMessages` wrong type, `currentIndex` wrong type). Missing fields are acceptable -- defaults will be used.
 
 ### Partialize Function
 
+```typescript
+partialize: (state) => ({
+  settings: state.settings,
+  isOnboarded: state.isOnboarded,
+  messageHistory: {
+    ...state.messageHistory,
+    shownMessages:
+      state.messageHistory?.shownMessages instanceof Map
+        ? Array.from(state.messageHistory.shownMessages.entries())
+        : [],
+  },
+  moods: state.moods,
+}),
+```
+
 Only 4 state keys are persisted to localStorage:
 
-| Key              | Type             | Size Impact                       |
-| ---------------- | ---------------- | --------------------------------- |
-| `settings`       | `Settings`       | ~500 bytes                        |
-| `isOnboarded`    | `boolean`        | ~10 bytes                         |
-| `messageHistory` | `MessageHistory` | ~2-5 KB (depends on history size) |
-| `moods`          | `MoodEntry[]`    | ~10-50 KB (depends on entries)    |
+| Key              | Type                | Serialization                     | Size Impact                       |
+| ---------------- | ------------------- | --------------------------------- | --------------------------------- |
+| `settings`       | `Settings \| null`  | Direct JSON                       | ~500 bytes                        |
+| `isOnboarded`    | `boolean`           | Direct JSON                       | ~10 bytes                         |
+| `messageHistory` | `MessageHistory`    | Map -> Array for `shownMessages`  | ~2-5 KB (depends on history size) |
+| `moods`          | `MoodEntry[]`       | Direct JSON                       | ~10-50 KB (depends on entries)    |
 
-This keeps localStorage under 100KB typically, well within the 5MB browser limit.
+**Map serialization**: `messageHistory.shownMessages` is a `Map<string, number>` (date string -> message ID). The `partialize` function converts it to an array of `[key, value]` tuples for JSON storage. The `onRehydrateStorage` callback converts it back.
 
 ### Hydration Callback
 
-`onRehydrateStorage` sets the `__isHydrated` flag on `AppSlice` after hydration completes. The `initializeApp()` function in `SettingsSlice` checks this flag before proceeding:
-
 ```typescript
-const isHydrated = get().__isHydrated;
-if (!isHydrated) {
-  // Critical: clear corrupted localStorage
-  localStorage.removeItem('my-love-storage');
-  return;
+onRehydrateStorage: () => (state, error) => {
+  if (error) {
+    // Clear corrupted state, app will use defaults
+    localStorage.removeItem('my-love-storage');
+    return;
+  }
+
+  // Deserialize shownMessages: Array -> Map
+  if (state?.messageHistory) {
+    const raw = state.messageHistory.shownMessages as unknown;
+    if (!raw) {
+      state.messageHistory.shownMessages = new Map();
+    } else if (raw instanceof Map) {
+      // Already a Map, OK
+    } else if (Array.isArray(raw)) {
+      // Validate array structure, then convert
+      const isValidArray = raw.every(
+        (item): item is [string, unknown] =>
+          Array.isArray(item) && item.length === 2 && typeof item[0] === 'string'
+      );
+      state.messageHistory.shownMessages = isValidArray ? new Map(raw) : new Map();
+    } else {
+      state.messageHistory.shownMessages = new Map();
+    }
+  } else if (state) {
+    // Create default messageHistory structure
+    state.messageHistory = {
+      currentIndex: 0, shownMessages: new Map(), maxHistoryDays: 30,
+      favoriteIds: [], lastShownDate: '', lastMessageId: 0, viewedIds: [],
+    };
+  }
+
+  // Handle null settings gracefully (let initial state defaults apply)
+
+  // Run post-hydration validation
+  const validation = validateHydratedState(state);
+  if (!validation.isValid) {
+    localStorage.removeItem('my-love-storage');
+  }
+
+  // Set hydration flag
+  if (state) state.__isHydrated = true;
 }
 ```
+
+The callback performs four tasks:
+
+1. **Error recovery**: Clears corrupted state on hydration error
+2. **Map deserialization**: Converts `shownMessages` from serialized array back to `Map<string, number>`
+3. **Structural validation**: Re-validates after deserialization, clears on failure
+4. **Hydration flag**: Sets `__isHydrated = true` directly on the state object (actions not yet available during hydration)
+
+### Pre-Hydration Validation (`validateHydratedState`)
+
+```typescript
+function validateHydratedState(state: Partial<AppState> | undefined): {
+  isValid: boolean;
+  errors: string[];
+}
+```
+
+Validates:
+- `state` is not undefined
+- `settings.themeName` exists (if settings present)
+- `settings.relationship` exists (if settings present)
+- `messageHistory.shownMessages` is Array or Map (if present)
+- `messageHistory.currentIndex` is a number (if present)
+
+Only critical errors (`shownMessages` wrong type, `currentIndex` wrong type) cause validation failure. Missing fields are OK -- they use defaults.
 
 ## E2E Testing Support
 
-The store is exposed to `window.__STORE__` in development and test environments:
-
 ```typescript
-if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-  (window as Record<string, unknown>).__STORE__ = useAppStore;
+declare global {
+  interface Window {
+    __APP_STORE__?: typeof useAppStore;
+  }
+}
+
+if (typeof window !== 'undefined' && import.meta.env.MODE !== 'production') {
+  window.__APP_STORE__ = useAppStore;
 }
 ```
 
-This enables E2E tests to directly inspect and manipulate store state.
+In non-production environments, the store is exposed on `window.__APP_STORE__`. E2E tests can inspect and manipulate state via `page.evaluate()`.
 
 ## Related Documentation
 

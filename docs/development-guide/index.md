@@ -6,11 +6,12 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
 
 - [Prerequisites](./prerequisites.md) -- Required tools and versions
 - [Installation](./installation.md) -- Clone, install, and verify
-- [Environment Setup](./environment-setup.md) -- dotenvx secrets management, Supabase keys
+- [Environment Setup](./environment-setup.md) -- fnox secrets management with age encryption
+  - [How Secrets Are Managed](./environment-setup.md#how-secrets-are-managed)
   - [Environment Files](./environment-setup.md#environment-files)
   - [Getting Started with Environment Variables](./environment-setup.md#getting-started-with-environment-variables)
   - [Required Variables](./environment-setup.md#required-variables)
-  - [Modifying Encrypted Variables](./environment-setup.md#modifying-encrypted-variables)
+  - [Modifying Secrets](./environment-setup.md#modifying-secrets)
   - [E2E Test Environment](./environment-setup.md#e2e-test-environment)
   - [CI Environment](./environment-setup.md#ci-environment)
 - [Configuration Customization](./configuration-customization.md) -- Partner name, start date, feature flags

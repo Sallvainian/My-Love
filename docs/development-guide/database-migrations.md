@@ -48,18 +48,15 @@ supabase/migrations/20260209143045_create_reflections_table.sql
 
 ### Migration File Naming Convention
 
-Files must follow the format `YYYYMMDDHHmmss_short_description.sql` in UTC time:
+Files must follow the format `YYYYMMDDHHmmss_short_description.sql` in UTC time.
 
-- `YYYY` -- Four-digit year
-- `MM` -- Two-digit month (01-12)
-- `DD` -- Two-digit day (01-31)
-- `HH` -- Two-digit hour in 24-hour format (00-23)
-- `mm` -- Two-digit minute (00-59)
-- `ss` -- Two-digit second (00-59)
+### Current Migration Count
+
+The project has 21 migration files spanning from `20251203000001` (initial base schema) through `20260301000200` (latest scripture session improvements).
 
 ### Writing Migration SQL
 
-Follow the project's SQL style guide (`.claude/rules/postgres-sql-style-guide.md`):
+Follow the project's SQL style guide:
 
 - Use lowercase for SQL reserved words
 - Use snake_case for table and column names
@@ -107,7 +104,7 @@ create index idx_reflections_user_id on public.reflections using btree (user_id)
 ### Locally
 
 ```bash
-supabase db reset    # Drop all data, re-run all migrations, re-seed
+supabase db reset    # Drop all data, re-run all 21 migrations, re-seed
 ```
 
 This is the recommended approach during development. It ensures a clean slate with all migrations applied in order, followed by `seed.sql`.
@@ -127,13 +124,13 @@ After any schema change, regenerate the TypeScript types:
 ### From Local Database
 
 ```bash
-supabase gen types typescript --local > src/types/database.types.ts
+supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts
 ```
 
 ### From Remote Database
 
 ```bash
-supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts
+supabase gen types typescript --project-id xojempkrugifnaveqtqc | grep -v '^Connecting to' > src/types/database.types.ts
 ```
 
 This requires the `SUPABASE_ACCESS_TOKEN` environment variable to be set.
@@ -151,6 +148,7 @@ In the deploy workflow (`deploy.yml`), types are generated from the remote schem
   run: |
     npx supabase gen types typescript \
       --project-id xojempkrugifnaveqtqc \
+      | grep -v '^Connecting to' \
       > src/types/database.types.ts
 ```
 
@@ -197,13 +195,30 @@ Key configuration settings in `supabase/config.toml`:
 
 | Section           | Setting                     | Value   |
 | ----------------- | --------------------------- | ------- |
+| `[api]`           | `port`                      | 54321   |
+| `[api]`           | `max_rows`                  | 1000    |
 | `[db]`            | `major_version`             | 17      |
+| `[db]`            | `port`                      | 54322   |
+| `[db]`            | `shadow_port`               | 54320   |
+| `[db.pooler]`     | `enabled`                   | false   |
 | `[db.migrations]` | `enabled`                   | true    |
 | `[auth]`          | `enable_signup`             | true    |
 | `[auth]`          | `enable_anonymous_sign_ins` | false   |
+| `[auth]`          | `jwt_expiry`                | 3600    |
 | `[auth.email]`    | `enable_signup`             | true    |
 | `[auth.email]`    | `enable_confirmations`      | false   |
+| `[auth.email]`    | `max_frequency`             | "1s"    |
+| `[auth.external.google]` | `enabled`             | true (mock for local dev) |
 | `[realtime]`      | `enabled`                   | true    |
 | `[storage]`       | `file_size_limit`           | "50MiB" |
+| `[studio]`        | `port`                      | 54323   |
 | `[edge_runtime]`  | `enabled`                   | true    |
 | `[edge_runtime]`  | `deno_version`              | 2       |
+
+## Database Inspector
+
+The `scripts/inspect-db.sh` script queries the remote Supabase database to show current schema details including tables, row counts, RLS policies, and column definitions:
+
+```bash
+./scripts/inspect-db.sh
+```

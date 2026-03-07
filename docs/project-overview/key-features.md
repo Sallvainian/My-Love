@@ -24,36 +24,47 @@ A validation script (`scripts/validate-messages.cjs`) verifies:
 
 ## Mood Tracking
 
-- 12 emoji mood options with optional text notes
+- 12 emoji mood options (loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired) with multi-mood selection support
+- Optional text notes per mood entry
 - Daily mood logging stored in IndexedDB with cloud sync to Supabase
 - Mood history timeline view for pattern analysis over time
+- Calendar view with mood detail modal
 - Background Sync via service worker ensures mood entries are persisted even when the app is closed or the network is unavailable
 
 ## Partner Mood View
 
-- Real-time partner mood display using Supabase Realtime subscriptions
+- Real-time partner mood display using Supabase Realtime subscriptions (`postgres_changes` on moods table)
 - Shows partner's current mood and timestamp
 - Automatic updates when partner logs a new mood
+- Connection status indicator (connecting, connected, disconnected)
+- Poke/kiss interaction interface integrated into partner view
 
 ## Love Notes Chat
 
 - Real-time messaging between partners via Supabase Realtime
 - Message persistence in Supabase Postgres
-- Image support via Supabase Storage (`love_note_images` table)
+- Image support via Supabase Storage (`love_note_images` table) with compression
 - DOMPurify sanitization for message content to prevent XSS
+- Pagination support with fetch-older-notes
+- Full-screen image viewer for attached images
 
 ## Photo Gallery
 
 - Photo upload with captions stored in Supabase Storage
+- Image compression service for optimized storage
 - Grid display with lazy loading via `react-window` and `react-window-infinite-loader`
 - Photo carousel view for browsing
-- Offline-first: photos are accessible from local cache
+- Photo edit modal for caption updates
+- Photo delete with confirmation dialog
+- Shows both user and partner photos sorted newest first
 
 ## Partner Interactions
 
-- Three interaction types: poke, kiss, fart
+- Two interaction types: poke, kiss
 - Fun animations and visual feedback via Framer Motion
 - Real-time delivery to partner via Supabase Realtime
+- Interaction history view
+- Haptic feedback via `useVibration` hook
 - Stored in the `interactions` table with RLS policies ensuring privacy
 
 ## Scripture Reading
@@ -72,15 +83,23 @@ A guided prayer session with 17 scripture steps (all NKJV) organized into 6 sect
 Each step presents a Bible verse and a couple-focused response prayer. The reading flow supports:
 
 - **Solo mode** -- Individual reading at your own pace
-- **Together mode** -- Synchronized reading with partner (planned, Epic 4)
+- **Together mode** -- Synchronized reading with partner via Supabase Broadcast channels
+  - Lobby with Reader/Responder role selection
+  - Ready-up system with synchronized 3-second countdown
+  - Lock-in mechanism for mutual step advancement
+  - Partner position indicators (verse vs response screen, step index)
+  - No-shame "Continue solo" fallback from lobby
+  - Reconnection handling with graceful degradation to solo mode
+  - Disconnection overlay with status feedback
 - Per-step reflections with 1-5 rating scale
-- Verse bookmarking during sessions
+- Verse bookmarking during sessions with share-with-partner option
 - End-of-session reflection summary with standout verse selection and session rating
-- Daily prayer report generation and partner delivery
+- Daily prayer report generation and partner delivery via scripture messages
 - Save and resume support with optimistic UI
+- Couple-aggregate stats dashboard (total sessions, total steps, average rating, bookmark count)
 - Accessibility: keyboard navigation, screen reader support, reduced motion compliance
 
-Data is stored across `scripture_sessions`, `scripture_step_states`, `scripture_reflections`, `scripture_bookmarks`, and `scripture_messages` tables. Static verse data lives in `src/data/scriptureSteps.ts`.
+Data is stored across `scripture_sessions`, `scripture_reflections`, `scripture_bookmarks`, and `scripture_messages` tables, plus IndexedDB for offline caching. Static verse data lives in `src/data/scriptureSteps.ts`.
 
 ### Scripture Architecture Notes
 
@@ -91,6 +110,11 @@ The scripture feature uses an **online-first** pattern (the inverse of the rest 
 - **Optimistic UI.** The Zustand slice updates state before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
 
 ESLint enforces that scripture container components (`src/components/scripture-reading/containers/**`) must not import `@supabase/supabase-js`, `src/api/supabaseClient`, or service modules directly. They must go through Zustand slice actions. The sole legacy exception is `scriptureReadingService`.
+
+### Scripture Realtime Channels
+
+- **Broadcast channel** (`scripture-session:{sessionId}`): Private channel for partner_joined, state_updated, session_converted, and lock_in_status_changed events. Managed by `useScriptureBroadcast` hook.
+- **Presence channel** (`scripture-presence:{sessionId}`): Ephemeral channel for partner view position tracking. 10-second heartbeat, 20-second stale TTL. Managed by `useScripturePresence` hook.
 
 ## Settings and Configuration
 
@@ -153,18 +177,28 @@ A welcome screen displayed on first visit and after every 60 minutes of inactivi
 - Installable on iOS (Safari "Add to Home Screen") and Android (Chrome "Install App")
 - Offline functionality via custom service worker with InjectManifest strategy
 - Precaching for static assets (images and fonts only)
-- Runtime caching: NetworkFirst for navigation/API, CacheFirst for images/fonts
+- Runtime caching: NetworkOnly for JS/CSS, NetworkFirst for navigation, CacheFirst for images/fonts/Google Fonts
 - PWA manifest: theme color `#FF6B9D`, background color `#FFE5EC`, standalone display, portrait orientation
 - Auto-update registration via `workbox-window`
 
 ## Admin Panel
 
-Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provides administrative controls for the application. The admin route is detected on initial load in `App.tsx` and renders outside the normal navigation flow.
+Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provides administrative controls including message management (create, edit, delete with confirmation). The admin route is detected on initial load in `App.tsx` and renders outside the normal navigation flow.
+
+## Error Tracking
+
+Sentry (`@sentry/react` 10.39.0) provides production error tracking:
+
+- Initialized in `src/config/sentry.ts` with 20% trace sample rate
+- PII stripping: only UUIDs reach Sentry (email and IP address removed)
+- Filtered errors: chunk load failures, network errors, ResizeObserver noise
+- Source maps uploaded during CI build via `@sentry/vite-plugin`, then deleted from dist/
 
 ## Privacy and Security
 
 - Row Level Security (RLS) enabled on all Supabase tables
 - Policies ensure only the two linked partner users can access their shared data
 - DOMPurify sanitization for user-generated HTML content
-- Encrypted environment variables (dotenvx) -- secrets never committed in plaintext
+- Encrypted secrets via fnox with age encryption provider -- ciphertext committed in `fnox.toml`, private keys never in repo
+- Zod runtime validation at service boundaries for all data entering or leaving the app
 - CodeQL security analysis configured with `security-extended` and `security-and-quality` query suites

@@ -5,8 +5,8 @@
 | Branch Pattern                    | Purpose                                       |
 | --------------------------------- | --------------------------------------------- |
 | `main`                            | Production branch, deployed to GitHub Pages   |
-| `feature/epic-N-description`      | Feature branches for epic work                |
-| `codex/finish-epic-N-development` | Development branches for completing epic work |
+| `epic-N/description`             | Feature branches for epic work                |
+| `feature/epic-N-description`      | Feature branches for epic work (legacy)       |
 
 All epic work stays on its feature branch until PR review. PRs target `main`.
 
@@ -17,16 +17,22 @@ All epic work stays on its feature branch until PR review. PRs target `main`.
 ```bash
 git checkout main
 git pull origin main
-git checkout -b feature/epic-3-dashboard
+git checkout -b epic-4/scripture-together
 ```
 
 ### 2. Start the Dev Server
 
 ```bash
-npm run dev
+fnox exec -- npm run dev
 ```
 
-This starts Vite with signal-trapped cleanup. Environment variables are loaded by direnv via dotenvx. The app is available at `http://localhost:5173/`.
+This decrypts secrets via age and starts Vite with signal-trapped cleanup. The app is available at `http://localhost:5173/`.
+
+If you do not need production secrets (e.g., working on UI-only changes with local Supabase):
+
+```bash
+npm run dev:raw
+```
 
 ### 3. Make Changes
 
@@ -44,7 +50,7 @@ npm run test:e2e       # Run Playwright E2E tests (requires supabase start)
 Or run the full CI pipeline locally:
 
 ```bash
-npm run test:ci-local  # lint + unit + E2E + burn-in
+npm run test:ci-local  # lint + unit + E2E + burn-in (3 iterations)
 ```
 
 ### 5. Commit with Standard Format
@@ -58,8 +64,8 @@ git commit -m "feat(epic-2): add per-step reflection rating UI"
 ### 6. Push and Create a PR
 
 ```bash
-git push -u origin feature/epic-3-dashboard
-gh pr create --title "feat(epic-3): add dashboard overview" --body "Implements Story 3.1 ..."
+git push -u origin epic-4/scripture-together
+gh pr create --title "feat(epic-4): add scripture together mode" --body "Implements Story 4.1 ..."
 ```
 
 PRs trigger the full test pipeline (lint, unit, E2E sharded, burn-in for PRs to main) and automated Claude code review.
@@ -80,6 +86,7 @@ type(scope): brief description
 | `docs(epic-N)`   | Documentation updates                      |
 | `chore(sprint)`  | Sprint tracking and status updates         |
 | `refactor`       | Code restructuring without behavior change |
+| `revert`         | Reverting a previous change                |
 
 ### Examples
 
@@ -90,6 +97,8 @@ test(epic-2): add E2E tests for end-of-session summary flow
 docs(epic-2): update story 2.1 acceptance criteria status
 chore(sprint): push all pending workspace changes
 refactor: extract scripture step navigation into shared hook
+refactor(e2e): replace timeout constants with store-poll and RPC helpers
+revert(e2e): restore load-bearing waitForScriptureStore calls
 ```
 
 ## Commit Rules
@@ -129,7 +138,7 @@ When uncommitted changes span multiple stories:
 
 When a PR is opened or synchronized:
 
-1. **`test.yml`** runs the full test pipeline (lint, unit, E2E P0 gate, E2E sharded, burn-in for PRs to main)
+1. **`test.yml`** runs the full test pipeline (lint, unit, DB tests, integration tests, API tests, E2E P0 gate, E2E sharded, burn-in for PRs to main)
 2. **`claude-code-review.yml`** runs automated code review with Claude
 3. **`supabase-migrations.yml`** runs if any files under `supabase/` are modified
 4. Human reviewers are assigned for final approval

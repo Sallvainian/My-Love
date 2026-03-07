@@ -2,15 +2,17 @@
 
 ## Overview
 
-The project uses three testing layers:
+The project uses multiple testing layers:
 
-| Layer          | Framework         | Location                                | Environment                            |
-| -------------- | ----------------- | --------------------------------------- | -------------------------------------- |
-| Unit tests     | Vitest 4.0.17     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
-| E2E tests      | Playwright 1.58.2 | `tests/e2e/`                            | Real Chromium browser + local Supabase |
-| Database tests | pgTAP             | `supabase/tests/database/`              | Local Supabase Postgres 17             |
+| Layer             | Framework         | Location                                | Environment                            |
+| ----------------- | ----------------- | --------------------------------------- | -------------------------------------- |
+| Unit tests        | Vitest 4.0.17     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
+| E2E tests         | Playwright 1.58.2 | `tests/e2e/`                            | Real Chromium browser + local Supabase |
+| API tests         | Playwright 1.58.2 | `tests/api/`                            | Supabase API endpoints                 |
+| Integration tests | Playwright 1.58.2 | `tests/integration/`                    | Playwright integration project         |
+| Database tests    | pgTAP             | `supabase/tests/database/`              | Local Supabase Postgres 17             |
 
-Additional test types: smoke tests (pre-deploy validation), burn-in (flaky detection), and API tests (Playwright against Supabase endpoints).
+Additional test types: smoke tests (pre-deploy validation), burn-in (flaky detection), and failure analysis (AI-friendly Markdown summaries).
 
 ## Unit Tests (Vitest)
 
@@ -54,14 +56,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: [
-        'src/**/*.d.ts',
-        'src/main.tsx',
-        'src/vite-env.d.ts',
-        'src/**/*.test.ts',
-        'src/**/*.test.tsx',
-      ],
-      thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
+      exclude: ['src/**/*.d.ts', 'src/main.tsx', 'src/vite-env.d.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+      thresholds: { lines: 25, functions: 25, branches: 25, statements: 25 },
     },
   },
 });
@@ -70,7 +66,7 @@ export default defineConfig({
 Key details:
 
 - **Path alias**: `@/` maps to `src/` for imports like `import { moodService } from '@/services/moodService'`
-- **Coverage thresholds**: 80% on lines, functions, branches, and statements. Build fails if any threshold is not met.
+- **Coverage thresholds**: 25% minimum on lines, functions, branches, and statements.
 - **TDD enforcement**: The `tdd-guard-vitest` reporter is configured to enforce test-first development practices.
 - **JUnit output**: `test-results/vitest-junit.xml` for CI integration.
 - **Supabase env vars**: Hardcoded test values so unit tests can import modules that reference `import.meta.env.VITE_SUPABASE_URL`.
@@ -128,11 +124,11 @@ npx playwright test --grep "mood tracker"
 
 ### Projects
 
-| Project    | Test Directory                              | Dependencies | Purpose                                                 |
-| ---------- | ------------------------------------------- | ------------ | ------------------------------------------------------- |
-| `setup`    | `./tests/support` (matches `auth-setup.ts`) | None         | Creates test users, authenticates, saves `storageState` |
-| `chromium` | `./tests/e2e`                               | `setup`      | E2E tests in Desktop Chrome                             |
-| `api`      | `./tests/api`                               | `setup`      | API-level tests against Supabase endpoints              |
+| Project       | Test Directory       | Purpose                                     |
+| ------------- | -------------------- | ------------------------------------------- |
+| `chromium`    | `./tests/e2e`        | E2E tests in Desktop Chrome                 |
+| `api`         | `./tests/api`        | API-level tests against Supabase endpoints  |
+| `integration` | `./tests/integration` | Integration tests                           |
 
 ### Web Server
 
@@ -149,12 +145,15 @@ webServer: {
 
 `--mode test` makes Vite load `.env.test` (plain-text local Supabase values), overriding encrypted production credentials.
 
+### ES256 JWT Re-signing
+
+The Playwright config includes JWT re-signing logic for Supabase CLI v2.71.1+ which defaults GoTrue to ES256 signing. The config extracts the ES256 private key from the GoTrue Docker container and re-signs the service role and anon tokens, ensuring test authentication works with the local Supabase instance.
+
 ### Reporters
 
 - **HTML report**: `playwright-report/` (visual test results with traces and screenshots)
 - **JUnit**: `test-results/junit.xml` (CI integration)
 - **List**: Console output during test runs
-- **Currents**: Cloud reporting via `currentsReporter()` (project ID: `uvT2TP`)
 
 ## Test Infrastructure
 
@@ -173,40 +172,26 @@ All E2E test files import `{ test, expect }` from this file, not from `@playwrig
 | Scripture navigation fixtures                               | Scripture-specific page navigation helpers    |
 | Worker auth fixtures                                        | Worker-isolated auth for parallel test safety |
 
-### Network Error Monitor Exclusions
+### Shared Helpers (`tests/support/helpers.ts`)
 
-The network error monitor is configured to exclude common non-critical endpoints:
+Reusable functions for E2E tests that only receive `page: Page` (no fixture access):
 
-- `sentry.io` and `analytics`
-- Supabase logging RPC (`/rest/v1/rpc/log`)
-- Partner queries that fail without partner data in test env
-- Background auth token refresh (400 expected with stale refresh tokens)
-- Transient auth user probe failures
-- Reflection write failures (intentionally tested for retry UI)
+- `ensureScriptureOverview(page)` -- navigate to /scripture, handle stale sessions
+- `startSoloSession(page)` -- full solo session startup with auth readiness check
+- `advanceOneStep(page)` -- click Next Verse with hybrid sync
+- `completeAllStepsToReflectionSummary(page)` -- run through all 17 verses
+- `submitReflectionSummary(page)` -- fill + submit reflection form
+- `skipMessageAndCompleteSession(page)` -- skip message compose, complete session
+- `waitForScriptureRpc(page, rpcName)` -- wait for a successful RPC response
+- `waitForScriptureStore(page, label, predicate)` -- poll Zustand store via `expect.poll()`
 
-Maximum 3 tests per error to prevent domino failures.
+### Hybrid Sync Pattern (3-layer wait)
 
-### Worker-Isolated Auth (`tests/support/auth-setup.ts`)
+After any mutation that changes server + client state, use all three layers:
 
-The auth setup runs once as the `setup` project before all E2E tests:
-
-1. **Resolves Supabase connection** from environment variables or `supabase status -o env`
-2. **Creates test users** via Supabase Admin API:
-   - 2 legacy test users (`testuser1@test.example.com`, `testuser2@test.example.com`)
-   - N worker user pairs (`testworker{N}@test.example.com` + `testworker{N}-partner@test.example.com`)
-   - Pool size defaults to `max(8, CPU count)`, configurable via `PLAYWRIGHT_AUTH_POOL_SIZE`
-3. **Links user pairs** as partners in the `users` table
-4. **Signs in each user** via `signInWithPassword`, injects session into browser `localStorage`, and saves `storageState` to `tests/.auth/worker-{N}.json`
-
-Each parallel Playwright worker gets its own authenticated user pair, preventing test interference.
-
-### Test Data Factories (`tests/support/factories/`)
-
-Provides helper functions for test data management:
-
-- `createTestSession()` -- Create a scripture reading session with test data
-- `cleanupTestSession()` -- Remove test session data after tests
-- `linkTestPartners()` -- Link two test users as partners
+1. **NETWORK**: `waitForScriptureRpc` / `interceptNetworkCall` -- confirms server processed the request
+2. **STORE**: `waitForScriptureStore` -- confirms Zustand ingested the response
+3. **UI**: `expect(locator).toBeVisible()` -- confirms React re-rendered
 
 ## Database Tests (pgTAP)
 
@@ -239,13 +224,30 @@ Exit code 0 means all checks passed; exit code 1 blocks deployment.
 npm run test:burn-in   # Default: 10 iterations
 ```
 
-The burn-in script (`scripts/burn-in.sh`) runs Playwright tests in a loop to detect intermittent failures. Configurable via environment variable or script argument.
+The burn-in script (`scripts/burn-in.sh`) runs Playwright tests in a loop to detect intermittent failures. Usage:
+
+```bash
+./scripts/burn-in.sh              # Run all E2E tests 10x
+./scripts/burn-in.sh 5            # Run all E2E tests 5x
+./scripts/burn-in.sh 10 auth      # Run auth tests 10x
+```
+
+Failure artifacts are saved to `burn-in-failures/iteration-N/` for each failed iteration.
 
 In CI (`test.yml`), burn-in runs only on PRs to `main` with 5 iterations. It detects changed test files via `git diff` and only re-runs those specs.
 
+## Failure Analysis
+
+```bash
+npm run test:failures    # Run tests and generate AI-friendly failure summary
+npm run test:failures > failures-ai.md   # Save to file
+```
+
+The `pw-failures.mjs` script parses Playwright JSON output, groups failures by root cause pattern, extracts TEA test IDs and priority tags, and creates a dated artifacts folder in `_bmad-output/pw-test-results/` with per-test subfolders containing traces, error context, and screenshots.
+
 ## CI Test Pipeline
 
-The `test.yml` workflow runs a 5-stage pipeline:
+The `test.yml` workflow runs an 8-stage pipeline:
 
 ### Stage 1: Lint and Type Check (5-minute timeout)
 
@@ -258,33 +260,52 @@ The `test.yml` workflow runs a 5-stage pipeline:
 - Vitest with coverage
 - Coverage report uploaded as artifact (7-day retention)
 
-### Stage 3a: E2E P0 Gate (15-minute timeout)
+### Stage 3: Database Tests (10-minute timeout)
+
+- Sets up local Supabase via composite action
+- Runs pgTAP tests via `npx supabase test db`
+
+### Stage 4: Integration Tests (15-minute timeout)
+
+- Sets up local Supabase
+- Runs Playwright integration project tests
+
+### Stage 5: API Tests (15-minute timeout)
+
+- Sets up local Supabase
+- Runs Playwright API project tests
+
+### Stage 6a: E2E P0 Gate (15-minute timeout)
 
 - Requires lint to pass
 - Sets up local Supabase via composite action (`.github/actions/setup-supabase/`)
 - Runs only P0-tagged tests (`--grep "\[P0\]"`)
 - Caches Playwright browsers keyed by `package-lock.json` hash
 
-### Stage 3b: E2E Sharded (30-minute timeout)
+### Stage 6b: E2E Sharded (30-minute timeout)
 
 - Requires P0 gate to pass
 - Runs full E2E suite sharded across 2 workers (`--shard=1/2`, `--shard=2/2`)
 - `fail-fast: false` -- all shards run even if one fails
 - Results uploaded with 30-day retention
 
-### Stage 4: Burn-In (20-minute timeout)
+### Stage 7: Burn-In (30-minute timeout)
 
 - Only runs on PRs to `main`
 - Requires E2E to pass
 - Detects changed test files via `git diff`
 - Runs 5 iterations on changed specs only
 
-### Stage 5: Merge Reports
+### Stage 8: Merge Reports
 
 - Runs after E2E regardless of success/failure
 - Downloads all shard artifacts
 - Merges HTML reports via `npx playwright merge-reports`
 - Uploads merged report with 30-day retention
+
+### Test Summary
+
+A final `test-summary` job evaluates results from all stages and serves as the branch protection target. It requires lint, unit tests, DB tests, integration tests, API tests, and E2E tests to succeed. Burn-in is allowed to be skipped (non-PR events) but not failed.
 
 ### Concurrency
 
@@ -295,6 +316,13 @@ concurrency:
 ```
 
 New pushes to the same branch cancel in-progress test runs.
+
+### Triggers
+
+- Push to `main`
+- Pull requests
+- Weekly schedule: Sundays at 2 AM UTC (burn-in)
+- Manual dispatch
 
 ## Priority Tags
 

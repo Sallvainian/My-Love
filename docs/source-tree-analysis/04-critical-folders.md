@@ -98,11 +98,13 @@ validation/
 
 ```
 hooks/
-  useAuth.ts                # Auth state for app shell
-  useRealtimeMessages.ts    # Broadcast channel lifecycle
-  useNetworkStatus.ts       # Offline detection
-  useLoveNotes.ts           # Love notes composition hook
-  useMoodHistory.ts         # Paginated data fetching
+  useAuth.ts                  # Auth state for app shell
+  useRealtimeMessages.ts      # Broadcast channel lifecycle
+  useNetworkStatus.ts         # Offline detection
+  useLoveNotes.ts             # Love notes composition hook
+  useMoodHistory.ts           # Paginated data fetching
+  useScriptureBroadcast.ts    # Private broadcast channel with retry
+  useScripturePresence.ts     # Ephemeral presence for partner position
 ```
 
 **Why critical:**
@@ -110,6 +112,8 @@ hooks/
 - `useAuth.ts` gates the entire application behind authentication. A bug here locks users out.
 - `useRealtimeMessages.ts` manages the realtime channel lifecycle with retry logic. Connection leaks or missed cleanup cause resource exhaustion.
 - `useNetworkStatus.ts` drives the offline/online UI and sync decisions across the app.
+- `useScriptureBroadcast.ts` manages private broadcast channels for together-mode coordination with exponential backoff retry.
+- `useScripturePresence.ts` tracks partner reading position via ephemeral presence. Cleanup failures leak Supabase Realtime connections.
 
 ---
 
@@ -121,8 +125,8 @@ hooks/
 
 | Directory            | Why                                                                    |
 | -------------------- | ---------------------------------------------------------------------- |
-| `love-notes/`        | 7 files, most complex feature (chat, images, realtime, virtualization) |
-| `scripture-reading/` | 9 files, online-first pattern, session state management                |
+| `love-notes/`        | 7 files, most complex feature (chat, images, realtime, virtualization)                       |
+| `scripture-reading/` | 18 files across 6 subdirs, together-mode (lobby, lock-in, broadcast, presence), solo reading |
 | `MoodTracker/`       | 6 files, offline-first CRUD with partner mood display                  |
 | `Navigation/`        | `BottomNavigation.tsx` -- primary navigation mechanism                 |
 | `shared/`            | `NetworkStatusIndicator`, `SyncToast` -- global UI overlays            |
@@ -137,6 +141,7 @@ config/
   performance.ts          # Pagination limits, storage quotas
   images.ts               # Compression settings, file size limits
   relationshipDates.ts    # Birthday/anniversary dates
+  sentry.ts               # initSentry, setSentryUser, clearSentryUser
 ```
 
 **Why critical:**
@@ -144,6 +149,7 @@ config/
 - `constants.ts` contains the default partner name and relationship start date.
 - `performance.ts` defines `VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH` used by Zod schemas.
 - `images.ts` defines compression quality and max dimensions.
+- `sentry.ts` initializes Sentry error tracking with PII stripping. Called from `main.tsx` at boot.
 
 ---
 

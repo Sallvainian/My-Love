@@ -17,13 +17,30 @@
 | `verbatimModuleSyntax`       | true      | Enforce explicit `type` imports                    |
 | `noEmit`                     | true      | Vite handles bundling; TypeScript only type-checks |
 
+### TypeScript Configuration Files
+
+The project uses three TypeScript configs composed via project references in `tsconfig.json`:
+
+| File                | Purpose                                                    | Includes                           |
+| ------------------- | ---------------------------------------------------------- | ---------------------------------- |
+| `tsconfig.json`     | Root project references file (no files of its own)         | References app, node, test configs |
+| `tsconfig.app.json` | Application code (`src/`), excludes test files             | `src/` (minus `*.test.*`)          |
+| `tsconfig.node.json`| Vite and Vitest config files                               | `vite.config.ts`, `vitest.config.ts` |
+| `tsconfig.test.json`| Test code, extends `tsconfig.app.json`                     | `src/`, `tests/`                   |
+
+The test config (`tsconfig.test.json`) extends `tsconfig.app.json` with:
+
+- `composite: true`
+- Relaxed `noUnusedLocals` and `noUnusedParameters` (both false)
+- Additional types: `vitest/globals`, `node`, `@testing-library/jest-dom/vitest`
+
 ### Type Safety Rules
 
 - **No `any` types** -- `@typescript-eslint/no-explicit-any` is set to `error`. Use `unknown` or specific types instead.
 - **Unused variables** prefixed with `_` are allowed (e.g., `_event`, `_unused`).
 - **Generated types** -- `src/types/database.types.ts` is auto-generated from the Supabase schema. Do not edit manually. Regenerate with:
   ```bash
-  supabase gen types typescript --local > src/types/database.types.ts
+  supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts
   ```
 
 ## ESLint
@@ -65,10 +82,6 @@ Files in `src/components/scripture-reading/containers/**` must not import:
 
 Container components must go through Zustand slice actions for all data operations. This is enforced via `no-restricted-imports`.
 
-**4. Catch Block Rule (Retrospective Guardrail)**
-
-In scripture code, catch blocks must call `handleScriptureError()` or re-throw. Outside scripture code, catch blocks must re-throw or map to the feature's error handler. Empty catch blocks are never allowed.
-
 ### Special Configurations
 
 **CommonJS files (`*.cjs`)**:
@@ -77,7 +90,7 @@ In scripture code, catch blocks must call `handleScriptureError()` or re-throw. 
 - `sourceType: 'commonjs'`
 - `no-require-imports` disabled
 
-**Test files (`tests/**`, `_.test._`, `_.spec._`)\*\*:
+**Test files (`tests/**`, `*.test.*`, `*.spec.*`)**:
 
 - Both browser and Node globals enabled
 - `rules-of-hooks` disabled (test fixtures may use hooks unconventionally)
@@ -202,7 +215,7 @@ Zustand with one slice per domain area (10 slices). The main store is composed i
 
 ### Validation
 
-Zod 4.3.6 schemas for all runtime data validation. Schemas are defined in `src/validation/schemas.ts` with user-facing error messages in `src/validation/errorMessages.ts`.
+Zod 4.3.6 schemas for all runtime data validation. Schemas are defined in `src/validation/` with user-facing error messages in `src/validation/errorMessages.ts`.
 
 ### Component Organization
 

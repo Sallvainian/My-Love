@@ -2,29 +2,20 @@
 
 ## Overview
 
-The app uses two persistence layers: **localStorage** (via Zustand persist middleware) for lightweight state, and **IndexedDB** (via `idb` library) for structured data.
+Two persistence layers: **localStorage** (via Zustand persist middleware) for lightweight state, and **IndexedDB** (via `idb` library) for structured data.
 
 ## localStorage Persistence
 
 ### What Is Persisted
 
-The `partialize` function in the store configuration selects four state keys:
+The `partialize` function selects four state keys:
 
-```typescript
-partialize: (state: AppState) => ({
-  settings: state.settings,
-  isOnboarded: state.isOnboarded,
-  messageHistory: state.messageHistory,
-  moods: state.moods,
-}),
-```
-
-| Key              | Type             | Why Persisted                                                       |
-| ---------------- | ---------------- | ------------------------------------------------------------------- |
-| `settings`       | `Settings`       | Theme, relationship config, notifications must survive page refresh |
-| `isOnboarded`    | `boolean`        | Prevents re-showing onboarding after refresh                        |
-| `messageHistory` | `MessageHistory` | Preserves which messages were shown on which dates (Map data)       |
-| `moods`          | `MoodEntry[]`    | Enables offline mood display without waiting for IndexedDB load     |
+| Key              | Type                | Why Persisted                                                       |
+| ---------------- | ------------------- | ------------------------------------------------------------------- |
+| `settings`       | `Settings \| null`  | Theme, relationship config, notifications must survive page refresh |
+| `isOnboarded`    | `boolean`           | Prevents re-showing onboarding after refresh                        |
+| `messageHistory` | `MessageHistory`    | Preserves which messages were shown on which dates (Map data)       |
+| `moods`          | `MoodEntry[]`       | Enables offline mood display without waiting for IndexedDB load     |
 
 ### What Is NOT Persisted
 
@@ -34,74 +25,29 @@ partialize: (state: AppState) => ({
 | `currentView`                      | Determined from URL path on page load                     |
 | `messages`                         | Loaded from IndexedDB during initialization               |
 | `currentMessage`                   | Recalculated from messages + date on each load            |
+| `customMessages`                   | Loaded from IndexedDB via `loadCustomMessages()`          |
 | `partnerMoods`                     | Fetched from Supabase on demand                           |
 | `syncStatus`                       | Recalculated from IndexedDB on load                       |
-| `interactions`                     | Fetched from Supabase, ephemeral                          |
-| `partnerInfo`, `partnerRequests`   | Fetched from Supabase                                     |
+| `interactions`, `unviewedCount`    | Fetched from Supabase, ephemeral                          |
+| `partner`, `sentRequests`, etc.    | Fetched from Supabase                                     |
 | `notes`                            | Fetched from Supabase, no local cache                     |
 | `photos`                           | Metadata fetched from Supabase; blobs in Supabase Storage |
-| `currentSession`, `sessionHistory` | Cached in IndexedDB, fetched on demand                    |
+| `session`, `activeSession`, etc.   | Cached in IndexedDB, fetched on demand                    |
 
 ### Custom Map Serialization
 
-`messageHistory.shownMessages` is a `Map<string, number>` (date string -> message ID). JSON.stringify cannot handle Maps, so the custom storage adapter converts:
+`messageHistory.shownMessages` is `Map<string, number>` (date -> message ID). JSON cannot serialize Maps natively.
 
-**Serialization (write):**
+**Write (partialize)**: `Array.from(state.messageHistory.shownMessages.entries())` -> stored as `[["2025-11-15", 42], ...]`
 
-```typescript
-// Map -> Array of [key, value] entries
-parsed.state.messageHistory.shownMessages = Array.from(
-  state.messageHistory.shownMessages.entries()
-);
-// Stored as: [["2025-11-15", 42], ["2025-11-16", 17], ...]
-```
-
-**Deserialization (read):**
-
-```typescript
-// Array of [key, value] entries -> Map
-parsed.messageHistory.shownMessages = new Map(parsed.messageHistory.shownMessages);
-```
+**Read (onRehydrateStorage)**: Validates array structure (`[string, unknown][]`), then `new Map(raw)`. Falls back to empty Map on any structural error.
 
 ### Corruption Recovery
 
-The custom storage adapter wraps `getItem` in a try/catch:
-
-```typescript
-getItem: (name: string) => {
-  const item = localStorage.getItem(name);
-  if (!item) return null;
-  try {
-    const parsed = JSON.parse(item);
-    // ... deserialization
-    return JSON.stringify(parsed);
-  } catch {
-    console.error('[Store] Failed to parse persisted state');
-    localStorage.removeItem(name);
-    return null;  // Triggers default state
-  }
-},
-```
-
-If corrupted data is detected, it is removed and the store falls back to defaults.
-
-### Hydration Verification
-
-The `onRehydrateStorage` callback sets `__isHydrated` after hydration completes:
-
-```typescript
-onRehydrateStorage: () => {
-  return (_state, error) => {
-    useAppStore.setState({ __isHydrated: !error });
-  };
-},
-```
-
-`initializeApp()` checks this flag. If hydration failed:
-
-1. Error message is set
-2. Corrupted localStorage is cleared
-3. User is prompted to refresh
+1. **Pre-hydration**: `validateHydratedState()` in custom `getItem` -- removes key and returns null on critical errors
+2. **Hydration error**: `onRehydrateStorage` error callback -- removes key, sets `__isHydrated = false`
+3. **Post-hydration**: Second `validateHydratedState()` call after Map deserialization
+4. **Init guard**: `initializeApp()` checks `__isHydrated` -- if false, sets error message and clears localStorage
 
 ## IndexedDB Persistence
 
@@ -135,32 +81,16 @@ All IndexedDB access goes through service classes extending `BaseIndexedDBServic
 ### Migration Strategy (`src/services/migrationService.ts`)
 
 One-time migration from localStorage to IndexedDB for custom messages:
-
-```typescript
-export async function migrateCustomMessagesToIndexedDB(): Promise<void> {
-  const legacyData = localStorage.getItem('custom-messages');
-  if (!legacyData) return;
-
-  const messages = JSON.parse(legacyData);
-  for (const msg of messages) {
-    const validated = CreateMessageInputSchema.parse(msg);
-    await customMessageService.add(validated);
-  }
-  localStorage.removeItem('custom-messages');
-}
-```
-
-Features:
-
-- Duplicate detection (skips messages with matching text)
-- Zod validation during migration
-- Removes legacy localStorage key after successful migration
+- Reads `localStorage.getItem('custom-messages')`
+- Validates each via `CreateMessageInputSchema.parse()`
+- Writes to IndexedDB with duplicate detection
+- Removes legacy localStorage key
 
 ## Quota Monitoring
 
 ### localStorage
 
-`src/utils/storageMonitor.ts` estimates usage and warns at configurable thresholds:
+`src/utils/storageMonitor.ts` estimates usage against 5MB browser minimum:
 
 | Threshold | Level      | Action                                        |
 | --------- | ---------- | --------------------------------------------- |
@@ -168,11 +98,9 @@ Features:
 | 70-85%    | `warning`  | Console warning with optimization suggestions |
 | > 85%     | `critical` | Console error with action items               |
 
-Conservative estimate of 5MB total (typical browser minimum).
-
 ### IndexedDB
 
-`PhotoStorageService.estimateQuotaRemaining()` uses `navigator.storage.estimate()` to check browser-allocated quota. Falls back to `STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES` (50MB) when the Storage API is unavailable (e.g., Safari < 15.2).
+`PhotoStorageService.estimateQuotaRemaining()` uses `navigator.storage.estimate()`. Falls back to `STORAGE_QUOTAS.DEFAULT_QUOTA_BYTES` (50MB) when API unavailable.
 
 | Threshold | Level         | Action           |
 | --------- | ------------- | ---------------- |
@@ -182,7 +110,7 @@ Conservative estimate of 5MB total (typical browser minimum).
 
 ### Supabase Storage
 
-`photoService.ts` monitors bucket quota by summing `file_size` from the `photos` table against a 1GB free tier limit:
+`photoService.ts` sums `file_size` from `photos` table against 1GB free tier limit:
 
 | Threshold | Level         | Action           |
 | --------- | ------------- | ---------------- |
@@ -193,6 +121,5 @@ Conservative estimate of 5MB total (typical browser minimum).
 
 ## Related Documentation
 
-- [Zustand Store Configuration](./01-zustand-store-configuration.md)
-- [Data Architecture](../architecture/04-data-architecture.md)
+- [Store Configuration](./01-zustand-store-configuration.md)
 - [Data Flow](./04-data-flow.md)
