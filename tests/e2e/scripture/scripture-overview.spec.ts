@@ -17,29 +17,11 @@
  *   The "Together" card is the second ModeCard in mode-selection.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { ensureScriptureOverview, waitForScriptureSessionRequest } from '../../support/helpers';
 import {
-  ensureScriptureOverview,
-  startSoloSession,
-  advanceOneStep,
-  waitForScriptureSessionRequest,
-} from '../../support/helpers';
-import { clearClientScriptureCache } from '../../support/helpers/scripture-cache';
-import type { Page } from '@playwright/test';
-
-async function saveSoloSessionAtStep(page: Page, step: number): Promise<string> {
-  const sessionId = await startSoloSession(page);
-
-  for (let i = 1; i < step; i++) {
-    await advanceOneStep(page);
-  }
-
-  await page.getByTestId('exit-button').click();
-  await expect(page.getByTestId('exit-confirm-dialog')).toBeVisible();
-  await page.getByTestId('save-and-exit-button').click();
-  await expect(page.getByTestId('scripture-overview')).toBeVisible();
-
-  return sessionId;
-}
+  saveSoloSessionAtStep,
+  isolateSessionForResume,
+} from '../../support/helpers/scripture-overview';
 
 test.describe('Scripture Navigation & Overview', () => {
   test.describe('Navigation', () => {
@@ -100,6 +82,7 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: A solo flow is already active
+      const { startSoloSession } = await import('../../support/helpers');
       await startSoloSession(page);
       await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
 
@@ -122,7 +105,6 @@ test.describe('Scripture Navigation & Overview', () => {
       interceptNetworkCall,
     }) => {
       // GIVEN: User has no linked partner (partner_id is null)
-      // Intercept partner lookup query to simulate no-partner state.
       interceptNetworkCall({
         url: '**/rest/v1/users*',
         handler: async (route, request) => {
@@ -219,33 +201,7 @@ test.describe('Scripture Navigation & Overview', () => {
     test('should show resume prompt with correct step number', async ({ page, supabaseAdmin }) => {
       // GIVEN: User has an incomplete Solo session at step 7
       const sessionId = await saveSoloSessionAtStep(page, 7);
-      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(targetSessionError).toBeNull();
-
-      // Isolate this test's resume candidate for the worker user.
-      const { error: isolateSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'abandoned' })
-        .eq('user1_id', targetSession!.user1_id)
-        .eq('mode', 'solo')
-        .eq('status', 'in_progress')
-        .neq('id', sessionId);
-      expect(isolateSessionError).toBeNull();
-
-      // Stabilize active-session selection under parallel workers by making
-      // this test's saved session the newest candidate for resume lookup.
-      const { error: prioritizeSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ started_at: '2099-01-01T00:00:00.000Z' })
-        .eq('id', sessionId);
-      expect(prioritizeSessionError).toBeNull();
-
-      // Clear client-side cache so active-session lookup re-reads from server.
-      await clearClientScriptureCache(page);
+      await isolateSessionForResume({ supabaseAdmin, sessionId, page });
 
       // Network-first: intercept the session check API before navigating.
       const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
@@ -280,33 +236,7 @@ test.describe('Scripture Navigation & Overview', () => {
     }) => {
       // GIVEN: User has an incomplete session and sees the resume prompt
       const sessionId = await saveSoloSessionAtStep(page, 5);
-      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(targetSessionError).toBeNull();
-
-      // Isolate this test's resume candidate for the worker user.
-      const { error: isolateSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'abandoned' })
-        .eq('user1_id', targetSession!.user1_id)
-        .eq('mode', 'solo')
-        .eq('status', 'in_progress')
-        .neq('id', sessionId);
-      expect(isolateSessionError).toBeNull();
-
-      // Stabilize active-session selection under parallel workers by making
-      // this test's saved session the newest candidate for resume lookup.
-      const { error: prioritizeSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ started_at: '2099-01-01T00:00:00.000Z' })
-        .eq('id', sessionId);
-      expect(prioritizeSessionError).toBeNull();
-
-      // Clear client-side cache so active-session lookup re-reads from server.
-      await clearClientScriptureCache(page);
+      await isolateSessionForResume({ supabaseAdmin, sessionId, page });
 
       // Network-first: intercept the session check API before navigating.
       const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
@@ -328,17 +258,15 @@ test.describe('Scripture Navigation & Overview', () => {
 
       // THEN: The target session is abandoned server-side
       await expect
-        .poll(
-          async () => {
-            const { data: abandonedSession, error: abandonedSessionError } = await supabaseAdmin
-              .from('scripture_sessions')
-              .select('status')
-              .eq('id', sessionId)
-              .single();
-            expect(abandonedSessionError).toBeNull();
-            return abandonedSession?.status ?? null;
-          },
-        )
+        .poll(async () => {
+          const { data: abandonedSession, error: abandonedSessionError } = await supabaseAdmin
+            .from('scripture_sessions')
+            .select('status')
+            .eq('id', sessionId)
+            .single();
+          expect(abandonedSessionError).toBeNull();
+          return abandonedSession?.status ?? null;
+        })
         .toBe('abandoned');
 
       // AND: Fresh overview path is available (avoids cross-worker session collisions)

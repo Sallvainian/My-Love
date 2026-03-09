@@ -327,6 +327,7 @@ export type Database = {
       scripture_sessions: {
         Row: {
           completed_at: string | null;
+          countdown_started_at: string | null;
           current_phase: Database['public']['Enums']['scripture_session_phase'];
           current_step_index: number;
           id: string;
@@ -335,11 +336,16 @@ export type Database = {
           started_at: string;
           status: Database['public']['Enums']['scripture_session_status'];
           user1_id: string;
+          user1_ready: boolean;
+          user1_role: Database['public']['Enums']['scripture_session_role'] | null;
           user2_id: string | null;
+          user2_ready: boolean;
+          user2_role: Database['public']['Enums']['scripture_session_role'] | null;
           version: number;
         };
         Insert: {
           completed_at?: string | null;
+          countdown_started_at?: string | null;
           current_phase?: Database['public']['Enums']['scripture_session_phase'];
           current_step_index?: number;
           id?: string;
@@ -348,11 +354,16 @@ export type Database = {
           started_at?: string;
           status?: Database['public']['Enums']['scripture_session_status'];
           user1_id: string;
+          user1_ready?: boolean;
+          user1_role?: Database['public']['Enums']['scripture_session_role'] | null;
           user2_id?: string | null;
+          user2_ready?: boolean;
+          user2_role?: Database['public']['Enums']['scripture_session_role'] | null;
           version?: number;
         };
         Update: {
           completed_at?: string | null;
+          countdown_started_at?: string | null;
           current_phase?: Database['public']['Enums']['scripture_session_phase'];
           current_step_index?: number;
           id?: string;
@@ -361,7 +372,11 @@ export type Database = {
           started_at?: string;
           status?: Database['public']['Enums']['scripture_session_status'];
           user1_id?: string;
+          user1_ready?: boolean;
+          user1_role?: Database['public']['Enums']['scripture_session_role'] | null;
           user2_id?: string | null;
+          user2_ready?: boolean;
+          user2_role?: Database['public']['Enums']['scripture_session_role'] | null;
           version?: number;
         };
         Relationships: [];
@@ -460,18 +475,36 @@ export type Database = {
         Args: { p_session_id: string };
         Returns: boolean;
       };
+      scripture_convert_to_solo: {
+        Args: { p_session_id: string };
+        Returns: Json;
+      };
       scripture_create_session: {
         Args: { p_mode: string; p_partner_id?: string };
         Returns: Json;
       };
+      scripture_end_session: { Args: { p_session_id: string }; Returns: Json };
       scripture_get_couple_stats: { Args: never; Returns: Json };
+      scripture_lock_in: {
+        Args: {
+          p_expected_version: number;
+          p_session_id: string;
+          p_step_index: number;
+        };
+        Returns: Json;
+      };
       scripture_seed_test_data: {
         Args: {
+          p_bookmark_steps?: number[];
           p_include_messages?: boolean;
           p_include_reflections?: boolean;
           p_preset?: string;
           p_session_count?: number;
         };
+        Returns: Json;
+      };
+      scripture_select_role: {
+        Args: { p_role: string; p_session_id: string };
         Returns: Json;
       };
       scripture_submit_reflection: {
@@ -484,6 +517,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      scripture_toggle_ready: {
+        Args: { p_is_ready: boolean; p_session_id: string };
+        Returns: Json;
+      };
+      scripture_undo_lock_in: {
+        Args: { p_session_id: string; p_step_index: number };
+        Returns: Json;
+      };
     };
     Enums: {
       scripture_session_mode: 'solo' | 'together';
@@ -494,7 +535,13 @@ export type Database = {
         | 'reflection'
         | 'report'
         | 'complete';
-      scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned';
+      scripture_session_role: 'reader' | 'responder';
+      scripture_session_status:
+        | 'pending'
+        | 'in_progress'
+        | 'complete'
+        | 'abandoned'
+        | 'ended_early';
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -632,7 +679,8 @@ export const Constants = {
         'report',
         'complete',
       ],
-      scripture_session_status: ['pending', 'in_progress', 'complete', 'abandoned'],
+      scripture_session_role: ['reader', 'responder'],
+      scripture_session_status: ['pending', 'in_progress', 'complete', 'abandoned', 'ended_early'],
     },
   },
 } as const;

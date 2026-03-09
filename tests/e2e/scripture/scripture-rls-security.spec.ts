@@ -10,48 +10,10 @@
  * Epic 1, Stories 1.1
  */
 import { test, expect } from '../../support/merged-fixtures';
-import type { SeedResult } from '../../support/factories';
 import { createTestSession, cleanupTestSession } from '../../support/factories';
+import { createUserClient, createOutsiderClient } from '../../support/helpers/rls-security';
 
 test.describe('Scripture RLS Security', () => {
-  /**
-   * Helper: Create a Supabase client authenticated as a specific user.
-   * Uses service role to generate a user token, then creates a client.
-   */
-  async function createUserClient(
-    supabaseAdmin: Parameters<typeof createTestSession>[0],
-    userId: string
-  ) {
-    // Generate a session token for the specified user via admin API
-    const { data: sessionData, error: sessionError } =
-      await supabaseAdmin.auth.admin.getUserById(userId);
-
-    if (sessionError || !sessionData?.user) {
-      throw new Error(`Failed to get user ${userId}: ${sessionError?.message}`);
-    }
-
-    // Use admin to generate a link/token for this user
-    // This will be used to create an authenticated client
-    const { createClient } = await import('@supabase/supabase-js');
-    const url = process.env.SUPABASE_URL!;
-    const anonKey = process.env.SUPABASE_ANON_KEY!;
-
-    const userClient = createClient(url, anonKey);
-
-    // Sign in as this user (test users have known passwords from seed)
-    // The seeding RPC creates users with predictable credentials
-    const { error: signInError } = await userClient.auth.signInWithPassword({
-      email: sessionData.user.email!,
-      password: 'testpassword123',
-    });
-
-    if (signInError) {
-      throw new Error(`Failed to sign in as ${userId}: ${signInError.message}`);
-    }
-
-    return userClient;
-  }
-
   test.describe('P0-001: SELECT scripture_sessions - members only', () => {
     test('should return session data for session member', async ({
       supabaseAdmin,
@@ -83,15 +45,10 @@ test.describe('Scripture RLS Security', () => {
       const sessionId = testSession.session_ids[0];
 
       // Create a third user who is NOT a session member
-      const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
-        email: `outsider-${Date.now()}@test.example.com`,
-        password: 'testpassword123',
-        email_confirm: true,
-      });
+      const outsider = await createOutsiderClient(supabaseAdmin);
 
       // WHEN: A non-member queries the session
-      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
-      const { data, error } = await outsiderClient
+      const { data, error } = await outsider.client
         .from('scripture_sessions')
         .select('*')
         .eq('id', sessionId);
@@ -101,7 +58,7 @@ test.describe('Scripture RLS Security', () => {
       expect(data).toEqual([]);
 
       // Cleanup outsider user
-      await supabaseAdmin.auth.admin.deleteUser(newUser!.user!.id);
+      await outsider.cleanup();
     });
   });
 
@@ -138,15 +95,10 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // Create outsider
-      const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
-        email: `outsider-refl-${Date.now()}@test.example.com`,
-        password: 'testpassword123',
-        email_confirm: true,
-      });
+      const outsider = await createOutsiderClient(supabaseAdmin, 'outsider-refl');
 
       // WHEN: Non-member queries reflections
-      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
-      const { data, error } = await outsiderClient
+      const { data, error } = await outsider.client
         .from('scripture_reflections')
         .select('*')
         .eq('session_id', seedResult.session_ids[0]);
@@ -157,7 +109,7 @@ test.describe('Scripture RLS Security', () => {
 
       // Cleanup
       await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
-      await supabaseAdmin.auth.admin.deleteUser(newUser!.user!.id);
+      await outsider.cleanup();
     });
   });
 
@@ -168,18 +120,13 @@ test.describe('Scripture RLS Security', () => {
     }) => {
       // GIVEN: A session exists and a non-member user
       const sessionId = testSession.session_ids[0];
-      const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
-        email: `outsider-ins-${Date.now()}@test.example.com`,
-        password: 'testpassword123',
-        email_confirm: true,
-      });
+      const outsider = await createOutsiderClient(supabaseAdmin, 'outsider-ins');
 
       // WHEN: Non-member tries to INSERT a reflection
-      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
-      const { error } = await outsiderClient.from('scripture_reflections').insert({
+      const { error } = await outsider.client.from('scripture_reflections').insert({
         session_id: sessionId,
         step_index: 0,
-        user_id: newUser!.user!.id,
+        user_id: outsider.userId,
         rating: 5,
         notes: 'Unauthorized reflection',
         is_shared: false,
@@ -189,7 +136,7 @@ test.describe('Scripture RLS Security', () => {
       expect(error).toBeTruthy();
 
       // Cleanup
-      await supabaseAdmin.auth.admin.deleteUser(newUser!.user!.id);
+      await outsider.cleanup();
     });
 
     test('should reject non-member INSERT into scripture_bookmarks', async ({
@@ -198,18 +145,13 @@ test.describe('Scripture RLS Security', () => {
     }) => {
       // GIVEN: A session exists and a non-member user
       const sessionId = testSession.session_ids[0];
-      const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
-        email: `outsider-bm-${Date.now()}@test.example.com`,
-        password: 'testpassword123',
-        email_confirm: true,
-      });
+      const outsider = await createOutsiderClient(supabaseAdmin, 'outsider-bm');
 
       // WHEN: Non-member tries to INSERT a bookmark
-      const outsiderClient = await createUserClient(supabaseAdmin, newUser!.user!.id);
-      const { error } = await outsiderClient.from('scripture_bookmarks').insert({
+      const { error } = await outsider.client.from('scripture_bookmarks').insert({
         session_id: sessionId,
         step_index: 0,
-        user_id: newUser!.user!.id,
+        user_id: outsider.userId,
         share_with_partner: false,
       });
 
@@ -217,7 +159,7 @@ test.describe('Scripture RLS Security', () => {
       expect(error).toBeTruthy();
 
       // Cleanup
-      await supabaseAdmin.auth.admin.deleteUser(newUser!.user!.id);
+      await outsider.cleanup();
     });
   });
 
@@ -267,7 +209,6 @@ test.describe('Scripture RLS Security', () => {
       });
 
       // WHEN: Partner (user2) queries reflections
-      // Note: test_user2_id may be null for solo sessions
       if (seedResult.test_user2_id) {
         const user2Client = await createUserClient(supabaseAdmin, seedResult.test_user2_id);
         const { data } = await user2Client

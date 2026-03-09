@@ -35,7 +35,12 @@ export interface SeedResult {
  * - with_help_flags: Session with help flags set
  * - unlinked: Solo session at step 7 with NO partner (user2_id = NULL)
  */
-export type SeedPreset = 'mid_session' | 'completed' | 'with_help_flags' | 'unlinked';
+export type SeedPreset =
+  | 'mid_session'
+  | 'completed'
+  | 'with_help_flags'
+  | 'unlinked'
+  | 'at_reflection';
 
 /**
  * Options for creating test sessions
@@ -45,6 +50,7 @@ export interface CreateTestSessionOptions {
   includeReflections?: boolean;
   includeMessages?: boolean;
   preset?: SeedPreset;
+  bookmarkSteps?: number[];
 }
 
 /**
@@ -74,6 +80,7 @@ export async function createTestSession(
     p_include_reflections: options?.includeReflections ?? false,
     p_include_messages: options?.includeMessages ?? false,
     p_preset: options?.preset,
+    p_bookmark_steps: options?.bookmarkSteps,
   });
 
   if (error) {
