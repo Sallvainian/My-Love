@@ -16,53 +16,53 @@
 
 ## Supporting Libraries
 
-| Library                      | Version  | Purpose                               |
-| ---------------------------- | -------- | ------------------------------------- |
-| @sentry/react                | 10.39.0  | Error tracking and performance monitoring |
-| lucide-react                 | 0.575.0  | Tree-shakeable SVG icons              |
-| react-window                 | 2.2.7    | Virtualized list rendering            |
-| react-window-infinite-loader | 2.0.1    | Infinite scroll for virtualized lists |
-| dompurify                    | 3.3.1    | XSS sanitization for user content     |
-| workbox-window               | 7.4.0    | Service worker lifecycle management   |
-| eventsource                  | 4.1.0    | SSE polyfill for Supabase Realtime    |
+| Library                      | Version | Purpose                                   |
+| ---------------------------- | ------- | ----------------------------------------- |
+| @sentry/react                | 10.39.0 | Error tracking and performance monitoring |
+| lucide-react                 | 0.575.0 | Tree-shakeable SVG icons                  |
+| react-window                 | 2.2.7   | Virtualized list rendering                |
+| react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists     |
+| dompurify                    | 3.3.1   | XSS sanitization for user content         |
+| workbox-window               | 7.4.0   | Service worker lifecycle management       |
+| eventsource                  | 4.1.0   | SSE polyfill for Supabase Realtime        |
 
 ## Build and Development
 
-| Tool                     | Version | Purpose                         |
-| ------------------------ | ------- | ------------------------------- |
-| Vite                     | 7.3.1   | Build tool with React plugin    |
-| @vitejs/plugin-react     | 5.1.4   | React Fast Refresh              |
-| vite-plugin-pwa          | 1.2.0   | PWA support (InjectManifest)    |
-| vite-plugin-checker      | 0.12.0  | In-editor type checking         |
-| @sentry/vite-plugin      | 5.0.0   | Sentry source map upload        |
-| rollup-plugin-visualizer | 6.0.5   | Bundle analysis                 |
-| gh-pages                 | 6.3.0   | GitHub Pages deployment         |
-| tsx                      | 4.21.0  | TypeScript script execution     |
+| Tool                     | Version | Purpose                      |
+| ------------------------ | ------- | ---------------------------- |
+| Vite                     | 7.3.1   | Build tool with React plugin |
+| @vitejs/plugin-react     | 5.1.4   | React Fast Refresh           |
+| vite-plugin-pwa          | 1.2.0   | PWA support (InjectManifest) |
+| vite-plugin-checker      | 0.12.0  | In-editor type checking      |
+| @sentry/vite-plugin      | 5.0.0   | Sentry source map upload     |
+| rollup-plugin-visualizer | 6.0.5   | Bundle analysis              |
+| gh-pages                 | 6.3.0   | GitHub Pages deployment      |
+| tsx                      | 4.21.0  | TypeScript script execution  |
 
 ## Secrets and Environment
 
-| Tool            | Purpose                                              |
-| --------------- | ---------------------------------------------------- |
-| fnox (age)      | Encrypted secrets in `fnox.toml` (committed to git)  |
-| mise            | Tool version management (Node.js via `.mise.toml`)   |
+| Tool       | Purpose                                             |
+| ---------- | --------------------------------------------------- |
+| fnox (age) | Encrypted secrets in `fnox.toml` (committed to git) |
+| mise       | Tool version management (Node.js via `.mise.toml`)  |
 
 ## Testing Stack
 
-| Tool                             | Version | Purpose                     |
-| -------------------------------- | ------- | --------------------------- |
-| Vitest                           | 4.0.17  | Unit test runner            |
-| @vitest/coverage-v8              | 4.0.18  | Code coverage               |
-| @vitest/ui                       | 4.0.17  | Vitest browser UI           |
-| @testing-library/react           | 16.3.2  | Component testing           |
-| @testing-library/jest-dom        | 6.9.1   | DOM matchers                |
-| @testing-library/user-event      | 14.6.1  | User interaction simulation |
-| happy-dom                        | 20.7.0  | Lightweight DOM for tests   |
-| fake-indexeddb                   | 6.2.5   | IndexedDB mock              |
-| @playwright/test                 | 1.58.2  | E2E testing                 |
-| @seontechnologies/playwright-utils | 3.14.0 | Playwright fixture utilities |
-| @axe-core/playwright             | 4.11.1  | Accessibility testing       |
-| @faker-js/faker                  | 10.3.0  | Test data generation        |
-| tdd-guard-vitest                 | 0.1.6   | TDD enforcement             |
+| Tool                               | Version | Purpose                      |
+| ---------------------------------- | ------- | ---------------------------- |
+| Vitest                             | 4.0.17  | Unit test runner             |
+| @vitest/coverage-v8                | 4.0.18  | Code coverage                |
+| @vitest/ui                         | 4.0.17  | Vitest browser UI            |
+| @testing-library/react             | 16.3.2  | Component testing            |
+| @testing-library/jest-dom          | 6.9.1   | DOM matchers                 |
+| @testing-library/user-event        | 14.6.1  | User interaction simulation  |
+| happy-dom                          | 20.7.0  | Lightweight DOM for tests    |
+| fake-indexeddb                     | 6.2.5   | IndexedDB mock               |
+| @playwright/test                   | 1.58.2  | E2E testing                  |
+| @seontechnologies/playwright-utils | 3.14.0  | Playwright fixture utilities |
+| @axe-core/playwright               | 4.11.1  | Accessibility testing        |
+| @faker-js/faker                    | 10.3.0  | Test data generation         |
+| tdd-guard-vitest                   | 0.1.6   | TDD enforcement              |
 
 ## Code Quality
 

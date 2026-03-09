@@ -8,21 +8,21 @@ The application serves exactly two users (a couple) and is scoped for personal u
 
 ## Technical Stack at a Glance
 
-| Layer            | Technology          | Version  | Role                                                             |
-| ---------------- | ------------------- | -------- | ---------------------------------------------------------------- |
-| UI Framework     | React               | 19.2.4   | Concurrent rendering, lazy loading, Suspense                     |
-| Language         | TypeScript          | 5.9.3    | Strict mode, ES2022 target, bundler module resolution            |
-| Build Tool       | Vite                | 7.3.1    | Dev server, HMR, manual chunk splitting, PWA plugin              |
-| Styling          | Tailwind CSS        | 4.1.17   | v4 with PostCSS, Prettier class sorting                          |
-| Animation        | Framer Motion       | 12.34.3  | Page transitions, micro-interactions, reduced-motion support     |
-| State Management | Zustand             | 5.0.11   | Single store, 10 slices, persist middleware                      |
-| Backend / Auth   | Supabase            | 2.97.0   | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
-| Validation       | Zod                 | 4.3.6    | Runtime schema validation at all service boundaries              |
-| Local Storage    | IndexedDB via `idb` | 8.0.3    | 8 object stores, versioned migrations (v1-v5)                    |
-| Icons            | Lucide React        | 0.575.0  | Tree-shakeable SVG icons                                         |
-| Virtualization   | react-window        | 2.2.7    | Windowed rendering for large lists                               |
-| Sanitization     | DOMPurify           | 3.3.1    | XSS protection for user-generated content                        |
-| Error Tracking   | Sentry              | 10.39.0  | Error reporting with PII stripping                               |
+| Layer            | Technology          | Version | Role                                                             |
+| ---------------- | ------------------- | ------- | ---------------------------------------------------------------- |
+| UI Framework     | React               | 19.2.4  | Concurrent rendering, lazy loading, Suspense                     |
+| Language         | TypeScript          | 5.9.3   | Strict mode, ES2022 target, bundler module resolution            |
+| Build Tool       | Vite                | 7.3.1   | Dev server, HMR, manual chunk splitting, PWA plugin              |
+| Styling          | Tailwind CSS        | 4.1.17  | v4 with PostCSS, Prettier class sorting                          |
+| Animation        | Framer Motion       | 12.34.3 | Page transitions, micro-interactions, reduced-motion support     |
+| State Management | Zustand             | 5.0.11  | Single store, 10 slices, persist middleware                      |
+| Backend / Auth   | Supabase            | 2.97.0  | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
+| Validation       | Zod                 | 4.3.6   | Runtime schema validation at all service boundaries              |
+| Local Storage    | IndexedDB via `idb` | 8.0.3   | 8 object stores, versioned migrations (v1-v5)                    |
+| Icons            | Lucide React        | 0.575.0 | Tree-shakeable SVG icons                                         |
+| Virtualization   | react-window        | 2.2.7   | Windowed rendering for large lists                               |
+| Sanitization     | DOMPurify           | 3.3.1   | XSS protection for user-generated content                        |
+| Error Tracking   | Sentry              | 10.39.0 | Error reporting with PII stripping                               |
 
 ## Architecture Philosophy
 

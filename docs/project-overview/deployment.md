@@ -35,16 +35,16 @@ Runs after deployment:
 
 ## Required GitHub Secrets
 
-| Secret                                   | Description                                                           |
-| ---------------------------------------- | --------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`                      | Supabase project URL (injected at build time)                         |
-| `VITE_SUPABASE_ANON_KEY`                 | Supabase anon/public key (mapped to VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY) |
-| `SUPABASE_ACCESS_TOKEN`                  | Supabase CLI auth token for TypeScript type generation                |
-| `VITE_SENTRY_DSN`                        | Sentry DSN for error tracking                                        |
-| `SENTRY_AUTH_TOKEN`                      | Sentry auth token for source map upload                              |
-| `SENTRY_ORG`                             | Sentry organization slug                                             |
-| `SENTRY_PROJECT`                         | Sentry project slug                                                  |
-| `CLAUDE_CODE_OAUTH_TOKEN`                | Claude Code OAuth token for AI-powered workflows                     |
+| Secret                    | Description                                                                |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`       | Supabase project URL (injected at build time)                              |
+| `VITE_SUPABASE_ANON_KEY`  | Supabase anon/public key (mapped to VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY) |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation                     |
+| `VITE_SENTRY_DSN`         | Sentry DSN for error tracking                                              |
+| `SENTRY_AUTH_TOKEN`       | Sentry auth token for source map upload                                    |
+| `SENTRY_ORG`              | Sentry organization slug                                                   |
+| `SENTRY_PROJECT`          | Sentry project slug                                                        |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                           |
 
 ## GitHub Pages Configuration
 
@@ -116,13 +116,13 @@ Source maps are generated as `hidden` when `SENTRY_AUTH_TOKEN` is present (uploa
 
 ### Vite Plugins
 
-| Plugin                  | Purpose                                          |
-| ----------------------- | ------------------------------------------------ |
-| `@vitejs/plugin-react`  | React JSX transform and HMR                      |
-| `vite-plugin-checker`   | In-browser TypeScript error overlay               |
-| `vite-plugin-pwa`       | PWA service worker (InjectManifest)               |
-| `rollup-plugin-visualizer` | Bundle analysis (`dist/stats.html`)           |
-| `@sentry/vite-plugin`   | Source map upload to Sentry (conditional)         |
+| Plugin                     | Purpose                                   |
+| -------------------------- | ----------------------------------------- |
+| `@vitejs/plugin-react`     | React JSX transform and HMR               |
+| `vite-plugin-checker`      | In-browser TypeScript error overlay       |
+| `vite-plugin-pwa`          | PWA service worker (InjectManifest)       |
+| `rollup-plugin-visualizer` | Bundle analysis (`dist/stats.html`)       |
+| `@sentry/vite-plugin`      | Source map upload to Sentry (conditional) |
 
 ### Bundle Analysis
 

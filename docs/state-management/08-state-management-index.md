@@ -58,5 +58,5 @@ src/hooks/
 | Layer           | Storage      | Keys                                                 |
 | --------------- | ------------ | ---------------------------------------------------- |
 | Zustand persist | localStorage | `settings`, `isOnboarded`, `messageHistory`, `moods` |
-| Services        | IndexedDB    | messages, photos, moods, sw-auth, scripture-*        |
+| Services        | IndexedDB    | messages, photos, moods, sw-auth, scripture-\*       |
 | API             | Supabase     | All cloud-synced data                                |

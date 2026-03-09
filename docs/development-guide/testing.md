@@ -56,7 +56,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/**/*.d.ts', 'src/main.tsx', 'src/vite-env.d.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+      ],
       thresholds: { lines: 25, functions: 25, branches: 25, statements: 25 },
     },
   },
@@ -124,11 +130,11 @@ npx playwright test --grep "mood tracker"
 
 ### Projects
 
-| Project       | Test Directory       | Purpose                                     |
-| ------------- | -------------------- | ------------------------------------------- |
-| `chromium`    | `./tests/e2e`        | E2E tests in Desktop Chrome                 |
-| `api`         | `./tests/api`        | API-level tests against Supabase endpoints  |
-| `integration` | `./tests/integration` | Integration tests                           |
+| Project       | Test Directory        | Purpose                                    |
+| ------------- | --------------------- | ------------------------------------------ |
+| `chromium`    | `./tests/e2e`         | E2E tests in Desktop Chrome                |
+| `api`         | `./tests/api`         | API-level tests against Supabase endpoints |
+| `integration` | `./tests/integration` | Integration tests                          |
 
 ### Web Server
 

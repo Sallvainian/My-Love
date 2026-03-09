@@ -37,11 +37,11 @@ When uncommitted changes span multiple stories:
 
 ## Branch Strategy
 
-| Branch Pattern                          | Purpose                                     |
-| --------------------------------------- | ------------------------------------------- |
-| `main`                                  | Production branch, deployed to GitHub Pages |
-| `epic-N/description`                    | Feature branches for epic work              |
-| `epic-N/working-reset`                  | Working branches for cleanup/reset tasks    |
+| Branch Pattern         | Purpose                                     |
+| ---------------------- | ------------------------------------------- |
+| `main`                 | Production branch, deployed to GitHub Pages |
+| `epic-N/description`   | Feature branches for epic work              |
+| `epic-N/working-reset` | Working branches for cleanup/reset tasks    |
 
 All epic work stays on its feature branch until PR review. PRs target `main`.
 

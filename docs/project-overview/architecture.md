@@ -99,6 +99,7 @@ Auth flow in `App.tsx`:
 6. Sentry user context is set with user ID and partner ID (UUIDs only, no PII)
 
 Auth services are split into two modules:
+
 - `src/api/auth/actionService.ts` -- signIn, signUp, signOut, resetPassword, signInWithGoogle
 - `src/api/auth/sessionService.ts` -- getSession, getUser, getCurrentUserId, onAuthStateChange
 

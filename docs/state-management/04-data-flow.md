@@ -130,16 +130,19 @@ App renders main content
 ## State Update Semantics
 
 **Updater function** (for state-dependent updates):
+
 ```typescript
 set((state) => ({ moods: [...state.moods, created] }));
 ```
 
 **Direct object** (for simple updates):
+
 ```typescript
 set({ currentView: view });
 ```
 
 **Nested spread** (for deeply nested updates like settings):
+
 ```typescript
 set({
   settings: {

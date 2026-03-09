@@ -12,26 +12,26 @@
 
 ## Quick Reference: File Counts by Directory
 
-| Directory            | TypeScript Files | Purpose                                           |
-| -------------------- | ---------------- | ------------------------------------------------- |
-| `src/stores/`        | 12               | State management (1 store + 1 types + 10 slices)  |
-| `src/services/`      | 14               | Data services (1 base + 13 concrete)              |
-| `src/hooks/`         | 14               | React hooks (1 barrel + 13 hooks)                 |
-| `src/api/`           | 10               | Supabase API layer (auth, mood, interaction, etc.) |
-| `src/components/`    | ~80              | React components across 26 directories            |
-| `src/utils/`         | 17               | Utility functions                                 |
-| `src/validation/`    | 3                | Zod schemas and error handling                    |
-| `src/config/`        | 5                | Configuration constants + Sentry                  |
-| `src/types/`         | 3                | Type definitions (index, models, database.types)  |
-| `src/data/`          | 3                | Static data (messages, scripture steps)           |
-| `src/constants/`     | 1                | Animation constants                               |
-| `src/` (root)        | 5                | App.tsx, main.tsx, sw.ts, sw-db.ts, sw-types.d.ts |
-| `supabase/migrations/` | 21             | SQL migration files (4,289 lines total)           |
-| `supabase/tests/`    | 14               | pgTAP database test files                         |
-| `tests/e2e/`         | 25+              | E2E browser tests (Playwright)                    |
-| `tests/unit/`        | 25+              | Unit tests (Vitest + happy-dom)                   |
-| `tests/api/`         | 4                | API-level tests                                   |
-| `tests/integration/` | 1                | Integration tests                                 |
+| Directory              | TypeScript Files | Purpose                                            |
+| ---------------------- | ---------------- | -------------------------------------------------- |
+| `src/stores/`          | 12               | State management (1 store + 1 types + 10 slices)   |
+| `src/services/`        | 14               | Data services (1 base + 13 concrete)               |
+| `src/hooks/`           | 14               | React hooks (1 barrel + 13 hooks)                  |
+| `src/api/`             | 10               | Supabase API layer (auth, mood, interaction, etc.) |
+| `src/components/`      | ~80              | React components across 26 directories             |
+| `src/utils/`           | 17               | Utility functions                                  |
+| `src/validation/`      | 3                | Zod schemas and error handling                     |
+| `src/config/`          | 5                | Configuration constants + Sentry                   |
+| `src/types/`           | 3                | Type definitions (index, models, database.types)   |
+| `src/data/`            | 3                | Static data (messages, scripture steps)            |
+| `src/constants/`       | 1                | Animation constants                                |
+| `src/` (root)          | 5                | App.tsx, main.tsx, sw.ts, sw-db.ts, sw-types.d.ts  |
+| `supabase/migrations/` | 21               | SQL migration files (4,289 lines total)            |
+| `supabase/tests/`      | 14               | pgTAP database test files                          |
+| `tests/e2e/`           | 25+              | E2E browser tests (Playwright)                     |
+| `tests/unit/`          | 25+              | Unit tests (Vitest + happy-dom)                    |
+| `tests/api/`           | 4                | API-level tests                                    |
+| `tests/integration/`   | 1                | Integration tests                                  |
 
 ## Cross-Reference to Architecture Docs
 

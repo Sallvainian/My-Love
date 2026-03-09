@@ -24,13 +24,13 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 ### Development
 
-| Command             | Description                                                                 |
-| ------------------- | --------------------------------------------------------------------------- |
-| `npm run dev`       | Start dev server with process cleanup (wraps `dev-with-cleanup.sh`)         |
-| `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                         |
-| `npm run preview`   | Preview production build locally                                            |
-| `npm run build`     | Production build: `tsc -p tsconfig.app.json && vite build`                  |
-| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                                       |
+| Command             | Description                                                         |
+| ------------------- | ------------------------------------------------------------------- |
+| `npm run dev`       | Start dev server with process cleanup (wraps `dev-with-cleanup.sh`) |
+| `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                 |
+| `npm run preview`   | Preview production build locally                                    |
+| `npm run build`     | Production build: `tsc -p tsconfig.app.json && vite build`          |
+| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                               |
 
 ### Code Quality
 
@@ -43,24 +43,24 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 ### Testing
 
-| Command                      | Description                                                        |
-| ---------------------------- | ------------------------------------------------------------------ |
-| `npm run test:unit`          | Run all unit tests (Vitest)                                        |
-| `npm run test:unit:watch`    | Vitest watch mode                                                  |
-| `npm run test:unit:ui`       | Vitest interactive UI                                              |
-| `npm run test:unit:coverage` | Unit tests with V8 coverage (25% threshold)                        |
-| `npm run test:e2e`           | All E2E tests with process cleanup                                 |
-| `npm run test:e2e:raw`       | Playwright directly                                                |
-| `npm run test:e2e:ui`        | Playwright interactive UI mode                                     |
-| `npm run test:e2e:debug`     | Playwright debug mode                                              |
-| `npm run test:integration`   | Integration tests (Playwright integration project)                 |
-| `npm run test:p0`            | Priority 0 (critical) tests only                                   |
-| `npm run test:p1`            | Priority 0 + Priority 1 tests                                      |
-| `npm run test:db`            | Database tests (pgTAP via `supabase test db`)                      |
-| `npm run test:smoke`         | Post-build smoke tests against `dist/`                             |
-| `npm run test:burn-in`       | Flaky test detection (10 iterations by default)                    |
-| `npm run test:ci-local`      | Mirror CI pipeline locally (lint, unit, E2E, burn-in)              |
-| `npm run test:failures`      | Playwright failure analysis (AI-friendly Markdown summary)         |
+| Command                      | Description                                                |
+| ---------------------------- | ---------------------------------------------------------- |
+| `npm run test:unit`          | Run all unit tests (Vitest)                                |
+| `npm run test:unit:watch`    | Vitest watch mode                                          |
+| `npm run test:unit:ui`       | Vitest interactive UI                                      |
+| `npm run test:unit:coverage` | Unit tests with V8 coverage (25% threshold)                |
+| `npm run test:e2e`           | All E2E tests with process cleanup                         |
+| `npm run test:e2e:raw`       | Playwright directly                                        |
+| `npm run test:e2e:ui`        | Playwright interactive UI mode                             |
+| `npm run test:e2e:debug`     | Playwright debug mode                                      |
+| `npm run test:integration`   | Integration tests (Playwright integration project)         |
+| `npm run test:p0`            | Priority 0 (critical) tests only                           |
+| `npm run test:p1`            | Priority 0 + Priority 1 tests                              |
+| `npm run test:db`            | Database tests (pgTAP via `supabase test db`)              |
+| `npm run test:smoke`         | Post-build smoke tests against `dist/`                     |
+| `npm run test:burn-in`       | Flaky test detection (10 iterations by default)            |
+| `npm run test:ci-local`      | Mirror CI pipeline locally (lint, unit, E2E, burn-in)      |
+| `npm run test:failures`      | Playwright failure analysis (AI-friendly Markdown summary) |
 
 ### Single Test File Execution
 
@@ -77,14 +77,14 @@ npx playwright test --grep "mood tracker"
 
 ### Supabase
 
-| Command                                                                                                      | Description                                   |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `supabase start`                                                                                             | Start local Supabase (required for E2E tests) |
-| `supabase stop`                                                                                              | Stop local Supabase                           |
-| `supabase status`                                                                                            | Show connection URLs and keys                 |
-| `supabase db reset`                                                                                          | Reset DB and re-run all migrations            |
-| `supabase migration new <name>`                                                                              | Create new migration file                     |
-| `supabase gen types typescript --local \| grep -v '^Connecting to' > src/types/database.types.ts`            | Regenerate TypeScript types from local schema |
+| Command                                                                                           | Description                                   |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `supabase start`                                                                                  | Start local Supabase (required for E2E tests) |
+| `supabase stop`                                                                                   | Stop local Supabase                           |
+| `supabase status`                                                                                 | Show connection URLs and keys                 |
+| `supabase db reset`                                                                               | Reset DB and re-run all migrations            |
+| `supabase migration new <name>`                                                                   | Create new migration file                     |
+| `supabase gen types typescript --local \| grep -v '^Connecting to' > src/types/database.types.ts` | Regenerate TypeScript types from local schema |
 
 ### Performance and Analysis
 
