@@ -205,19 +205,8 @@ test.describe('Daily Prayer Report — Send & View', () => {
       expect(partnerUserId).toBeTruthy();
       await submitReflectionSummary(page);
 
-      // AND: Partner contributes data (may still be hidden by session visibility constraints)
-      const { error: partnerReflectionError } = await supabaseAdmin
-        .from('scripture_reflections')
-        .insert({
-          session_id: sessionId,
-          user_id: partnerUserId!,
-          step_index: 17,
-          rating: 5,
-          notes: JSON.stringify({ standoutVerses: [0, 1], userNote: 'Partner reflection' }),
-          is_shared: true,
-        });
-      expect(partnerReflectionError).toBeNull();
-
+      // AND: Partner contributes a message but has NOT completed their session
+      // (no session-level reflection at step_index 17, so isPartnerComplete = false)
       const { error: partnerMessageError } = await supabaseAdmin.from('scripture_messages').insert({
         session_id: sessionId,
         sender_id: partnerUserId!,
@@ -250,7 +239,8 @@ test.describe('Daily Prayer Report — Send & View', () => {
       expect(partnerUserId).toBeTruthy();
       await submitReflectionSummary(page);
 
-      // AND: Partner contributes ratings to the same session
+      // AND: Partner contributes some step-level ratings but has NOT completed their session
+      // (no session-level reflection at step_index 17, so isPartnerComplete = false)
       const { error: partnerRatingsError } = await supabaseAdmin
         .from('scripture_reflections')
         .insert([
@@ -268,14 +258,6 @@ test.describe('Daily Prayer Report — Send & View', () => {
             step_index: 1,
             rating: 4,
             notes: 'Partner step 2',
-            is_shared: true,
-          },
-          {
-            session_id: sessionId,
-            user_id: partnerUserId!,
-            step_index: 17,
-            rating: 5,
-            notes: JSON.stringify({ standoutVerses: [0, 1], userNote: 'Partner summary' }),
             is_shared: true,
           },
         ]);

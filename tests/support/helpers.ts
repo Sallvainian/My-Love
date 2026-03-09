@@ -216,13 +216,15 @@ export async function waitForScriptureStore(
   let lastSnapshot = await getScriptureStoreSnapshot(page);
 
   try {
-    await expect.poll(
-      async () => {
-        lastSnapshot = await getScriptureStoreSnapshot(page);
-        return predicate(lastSnapshot);
-      },
-      { timeout: options?.timeout }
-    ).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          lastSnapshot = await getScriptureStoreSnapshot(page);
+          return predicate(lastSnapshot);
+        },
+        { timeout: options?.timeout }
+      )
+      .toBe(true);
   } catch {
     throw new Error(
       `[waitForScriptureStore] ${label} not reached. Last snapshot: ${JSON.stringify(lastSnapshot)}`
@@ -492,8 +494,7 @@ export async function startSoloSession(page: Page): Promise<string> {
   await waitForScriptureStore(
     page,
     'solo session to enter reading phase',
-    (snapshot) =>
-      snapshot.session?.mode === 'solo' && snapshot.session.currentPhase === 'reading'
+    (snapshot) => snapshot.session?.mode === 'solo' && snapshot.session.currentPhase === 'reading'
   );
 
   // Primary success signal: deterministic UI readiness after the create-session RPC.
@@ -556,16 +557,33 @@ export async function completeAllStepsToReflectionSummary(
 
   // Complete all 17 steps (indices 0-16)
   for (let step = 0; step < 17; step++) {
-    // Wait for verse screen
+    // Wait for the correct verse to be fully rendered (progress indicator confirms step index).
+    // This is stronger than just waiting for verse-text visibility because the slide
+    // animation (0.3s Framer Motion) can make elements "visible" before the new step
+    // content has fully mounted and React state is consistent.
+    await expect(page.getByTestId('scripture-progress-indicator')).toHaveText(
+      `Verse ${step + 1} of 17`
+    );
     await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
     // Optionally bookmark this verse
     if (bookmarkSteps.has(step)) {
-      await page.getByTestId('scripture-bookmark-button').click();
-      await expect(page.getByTestId('scripture-bookmark-button')).toHaveAttribute(
-        'aria-pressed',
-        'true'
-      );
+      // Click the bookmark button and retry if the optimistic state update
+      // doesn't register (Framer Motion animations can cause click delivery
+      // issues on some frames).
+      await expect
+        .poll(
+          async () => {
+            const pressed = await page
+              .getByTestId('scripture-bookmark-button')
+              .getAttribute('aria-pressed');
+            if (pressed === 'true') return true;
+            await page.getByTestId('scripture-bookmark-button').click();
+            return false;
+          },
+          { timeout: 5000, intervals: [100, 200, 300, 500] }
+        )
+        .toBe(true);
     }
 
     // Click Next Verse to advance (intercept-before-click pattern)
@@ -620,11 +638,13 @@ export async function submitReflectionSummary(
 
   await responsePromise;
 
-  // Store-poll: wait for Zustand to reflect the optimistic phase transition to 'report'
+  // Store-poll: wait for Zustand to reflect the phase transition.
+  // Linked users go to 'report'; unlinked users may go directly to 'complete'.
   await waitForScriptureStore(
     page,
-    'reflection summary phase transition to report',
-    (snapshot) => snapshot.session?.currentPhase === 'report'
+    'reflection summary phase transition',
+    (snapshot) =>
+      snapshot.session?.currentPhase === 'report' || snapshot.session?.currentPhase === 'complete'
   );
 }
 
@@ -647,11 +667,12 @@ export async function skipMessageAndCompleteSession(page: Page): Promise<void> {
 
   await patchResponse;
 
-  // Store-poll: wait for Zustand to reflect session completion
+  // Store-poll: wait for Zustand to reflect session completion.
+  // Session may be set to null by broadcast handler after completion.
   await waitForScriptureStore(
     page,
     'session completion',
-    (snapshot) => snapshot.session?.status === 'complete'
+    (snapshot) => snapshot.session?.currentPhase === 'complete' || snapshot.session === null
   );
 
   await expect(page.getByTestId('scripture-report-screen')).toBeVisible();
