@@ -74,7 +74,9 @@ describe('createSettingsSlice initializeApp', () => {
     ];
 
     mockStorageService.init.mockResolvedValue(undefined);
-    mockStorageService.getAllMessages.mockResolvedValueOnce([]).mockResolvedValueOnce(seededMessages);
+    mockStorageService.getAllMessages
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(seededMessages);
     mockStorageService.addMessages.mockResolvedValue(undefined);
     mockLoadDefaultMessages.mockResolvedValue([{ text: 'Seeded', category: 'memory' }]);
 

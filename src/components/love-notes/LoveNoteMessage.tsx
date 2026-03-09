@@ -116,7 +116,7 @@ function LoveNoteMessageComponent({
     // Use preview URL for optimistic display
     if (message.imagePreviewUrl) {
       scheduleStateUpdate(() => {
-        setImageUrl(message.imagePreviewUrl);
+        setImageUrl(message.imagePreviewUrl ?? null);
         setImageLoading(false);
         setImageError(false);
       });
@@ -215,42 +215,37 @@ function LoveNoteMessageComponent({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
-        className={`flex flex-col mb-3 px-4 ${isOwnMessage ? 'items-end' : 'items-start'}`}
+        className={`mb-3 flex flex-col px-4 ${isOwnMessage ? 'items-end' : 'items-start'}`}
         role="listitem"
         aria-label={`Message from ${senderName} at ${fullTimestamp}`}
         data-testid="love-note-message"
       >
         {/* Sender name and timestamp caption */}
         <span
-          className={`text-xs text-gray-500 mb-1 px-1 ${isOwnMessage ? 'text-right' : 'text-left'}`}
+          className={`mb-1 px-1 text-xs text-gray-500 ${isOwnMessage ? 'text-right' : 'text-left'}`}
         >
           {senderName} · {formattedTime}
         </span>
 
         {/* Message bubble */}
         <div
-          className={`
-            max-w-[80%] rounded-2xl overflow-hidden
-            ${
-              isOwnMessage
-                ? 'bg-[#FF6B6B] text-white rounded-br-md'
-                : 'bg-[#E9ECEF] text-gray-800 rounded-bl-md'
-            }
-            ${isSending ? 'opacity-70' : ''}
-            ${hasError ? 'border-2 border-red-500' : ''}
-          `}
+          className={`max-w-[80%] overflow-hidden rounded-2xl ${
+            isOwnMessage
+              ? 'rounded-br-md bg-[#FF6B6B] text-white'
+              : 'rounded-bl-md bg-[#E9ECEF] text-gray-800'
+          } ${isSending ? 'opacity-70' : ''} ${hasError ? 'border-2 border-red-500' : ''} `}
         >
           {/* Image (displayed above text if both present) */}
           {hasImage && (
             <div className="relative">
               {imageLoading && (
-                <div className="w-full h-48 flex items-center justify-center bg-gray-200">
+                <div className="flex h-48 w-full items-center justify-center bg-gray-200">
                   <Loader2 className="animate-spin text-gray-400" size={24} />
                 </div>
               )}
 
               {imageError && (
-                <div className="w-full h-32 flex items-center justify-center bg-gray-200 text-gray-500 text-sm">
+                <div className="flex h-32 w-full items-center justify-center bg-gray-200 text-sm text-gray-500">
                   Failed to load image
                 </div>
               )}
@@ -259,13 +254,13 @@ function LoveNoteMessageComponent({
                 <button
                   type="button"
                   onClick={handleImageClick}
-                  className="block w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-coral-500 focus:ring-inset"
+                  className="focus:ring-coral-500 block w-full cursor-pointer focus:ring-2 focus:outline-none focus:ring-inset"
                   aria-label={`View full size: ${imageAltText}`}
                 >
                   <img
                     src={imageUrl}
                     alt={imageAltText}
-                    className="w-full max-h-64 object-cover"
+                    className="max-h-64 w-full object-cover"
                     onError={handleImageError}
                     loading="lazy"
                   />
@@ -274,8 +269,8 @@ function LoveNoteMessageComponent({
 
               {/* Image uploading overlay */}
               {isImageUploading && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <div className="flex items-center gap-2 text-white text-sm">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <div className="flex items-center gap-2 text-sm text-white">
                     <Loader2 className="animate-spin" size={16} />
                     <span>Uploading...</span>
                   </div>
@@ -294,14 +289,14 @@ function LoveNoteMessageComponent({
 
         {/* Status indicators */}
         {isSending && !isImageUploading && (
-          <span className="text-xs text-gray-400 mt-1 px-1" aria-live="polite">
+          <span className="mt-1 px-1 text-xs text-gray-400" aria-live="polite">
             Sending...
           </span>
         )}
         {hasError && (
           <button
             onClick={() => onRetry?.(message.tempId || message.id)}
-            className="text-xs text-red-500 mt-1 px-1 hover:text-red-700 hover:underline cursor-pointer flex items-center gap-1"
+            className="mt-1 flex cursor-pointer items-center gap-1 px-1 text-xs text-red-500 hover:text-red-700 hover:underline"
             aria-live="assertive"
             aria-label="Retry sending message"
           >

@@ -17,18 +17,18 @@ interface NetworkStatusIndicatorProps {
 
 Full-width bar with icon, colored dot, label text, and description. Three states:
 
-| State | Dot Color | Icon | Label | Description |
-|-------|-----------|------|-------|-------------|
-| Online | `#51CF66` (green) | `Wifi` | "Online" | (hidden unless `showOnlyWhenOffline=false`) |
-| Connecting | `#FCC419` (yellow, pulsing) | `Loader2` (spinning) | "Connecting..." | "Reconnecting to the network..." |
-| Offline | `#FF6B6B` (red) | `WifiOff` | "Offline" | "You're offline. Changes will sync when reconnected." |
+| State      | Dot Color                   | Icon                 | Label           | Description                                           |
+| ---------- | --------------------------- | -------------------- | --------------- | ----------------------------------------------------- |
+| Online     | `#51CF66` (green)           | `Wifi`               | "Online"        | (hidden unless `showOnlyWhenOffline=false`)           |
+| Connecting | `#FCC419` (yellow, pulsing) | `Loader2` (spinning) | "Connecting..." | "Reconnecting to the network..."                      |
+| Offline    | `#FF6B6B` (red)             | `WifiOff`            | "Offline"       | "You're offline. Changes will sync when reconnected." |
 
 Uses `useNetworkStatus()` hook. ARIA: `role="status"`, `aria-live="polite"`, descriptive `aria-label`. `data-testid="network-status-indicator"` with `data-status` attribute.
 
 ### Dot Variant (`NetworkStatusDot`)
 
 ```typescript
-function NetworkStatusDot({ className = '' }: { className?: string })
+function NetworkStatusDot({ className = '' }: { className?: string });
 ```
 
 Compact 10px (`w-2.5 h-2.5`) circle for inline/header integration. Same three-state color coding. Pulse animation when connecting. `role="status"`, `aria-label` with status text.
@@ -52,12 +52,12 @@ interface SyncToastProps {
 
 Fixed-position toast notification (top-center, `z-[100]`, min-width 280px). Spring animation entrance (`stiffness: 500`, `damping: 30`). Four display variants:
 
-| Condition | Background | Icon | Message Pattern |
-|-----------|------------|------|-----------------|
-| All success | `bg-green-50` | `CheckCircle` (green) | "Synced N pending item(s)" |
+| Condition       | Background     | Icon                   | Message Pattern                  |
+| --------------- | -------------- | ---------------------- | -------------------------------- |
+| All success     | `bg-green-50`  | `CheckCircle` (green)  | "Synced N pending item(s)"       |
 | Partial success | `bg-yellow-50` | `AlertCircle` (yellow) | "Synced X of Y items (Z failed)" |
-| All failed | `bg-red-50` | `AlertCircle` (red) | "Failed to sync N item(s)" |
-| No items | `bg-gray-50` | `Cloud` (gray) | "No pending items to sync" |
+| All failed      | `bg-red-50`    | `AlertCircle` (red)    | "Failed to sync N item(s)"       |
+| No items        | `bg-gray-50`   | `Cloud` (gray)         | "No pending items to sync"       |
 
 Auto-dismisses after `autoDismissMs` (default 5000ms). Manual dismiss via X button. Uses `AnimatePresence` for exit animation with 300ms delay before `onDismiss` callback.
 
@@ -95,8 +95,8 @@ Inline component defined within `App.tsx` used as the `<Suspense fallback>` for 
 ```tsx
 function LoadingSpinner() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin" />
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-pink-500 border-t-transparent" />
     </div>
   );
 }

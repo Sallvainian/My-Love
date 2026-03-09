@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -10,6 +11,7 @@ export default defineConfig(({ mode }) => ({
   // Use base path only in production, root path in development
   base: mode === 'production' ? '/My-Love/' : '/',
   build: {
+    sourcemap: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -44,9 +46,7 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
         globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
         // Force SW update on every build with timestamp revision
-        additionalManifestEntries: [
-          { url: 'index.html', revision: Date.now().toString() },
-        ],
+        additionalManifestEntries: [{ url: 'index.html', revision: Date.now().toString() }],
       },
       devOptions: {
         enabled: false,
@@ -87,5 +87,17 @@ export default defineConfig(({ mode }) => ({
       gzipSize: true,
       brotliSize: true,
     }),
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [
+          sentryVitePlugin({
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            release: { name: process.env.SENTRY_RELEASE },
+            sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+            telemetry: false,
+          }),
+        ]
+      : []),
   ],
 }));

@@ -226,9 +226,7 @@ describe('SupabaseBookmarkSchema', () => {
   });
 
   it('should accept share_with_partner as false', () => {
-    const result = SupabaseBookmarkSchema.safeParse(
-      validBookmark({ share_with_partner: false })
-    );
+    const result = SupabaseBookmarkSchema.safeParse(validBookmark({ share_with_partner: false }));
     expect(result.success).toBe(true);
   });
 

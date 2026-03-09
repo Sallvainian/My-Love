@@ -14,6 +14,8 @@ import { logStorageQuota } from './utils/storageMonitor';
 import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
 import { signOut } from './api/auth/actionService';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
+import { getPartnerId } from './api/supabaseClient';
+import { setSentryUser, clearSentryUser } from './config/sentry';
 import type { Session } from '@supabase/supabase-js';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
@@ -197,6 +199,11 @@ function App() {
           setSession(currentSession);
           setAuthLoading(false);
 
+          if (currentSession?.user) {
+            const partnerId = await getPartnerId();
+            setSentryUser(currentSession.user.id, partnerId);
+          }
+
           if (import.meta.env.DEV) {
             console.log(
               '[App] Auth check:',
@@ -224,6 +231,10 @@ function App() {
           const hasDisplayName = newSession.user.user_metadata?.display_name;
           setNeedsDisplayName(!hasDisplayName);
 
+          getPartnerId().then((partnerId) => {
+            setSentryUser(newSession.user.id, partnerId);
+          });
+
           if (import.meta.env.DEV) {
             console.log('[App] Auth state changed:', {
               authenticated: true,
@@ -233,6 +244,7 @@ function App() {
           }
         } else {
           setNeedsDisplayName(false);
+          clearSentryUser();
           if (import.meta.env.DEV) {
             console.log('[App] Auth state changed: signed out');
           }

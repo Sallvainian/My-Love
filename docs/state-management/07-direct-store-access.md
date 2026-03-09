@@ -1,61 +1,47 @@
 # Direct Store Access Patterns
 
-## Overview
-
-Zustand stores can be accessed both inside React components (via hooks) and outside React components (via direct store API). This document covers both patterns.
-
 ## Inside React Components
 
 ### useAppStore Hook
 
-The primary way to access state in React components:
+Primary access method:
 
 ```typescript
 import { useAppStore } from '../stores/useAppStore';
 
-function MoodTracker() {
-  // Select specific state (re-renders only when selected state changes)
-  const moods = useAppStore((state) => state.moods);
-  const addMoodEntry = useAppStore((state) => state.addMoodEntry);
-
-  // Multiple selections (object selector)
-  const { syncStatus, updateSyncStatus } = useAppStore((state) => ({
-    syncStatus: state.syncStatus,
-    updateSyncStatus: state.updateSyncStatus,
-  }));
-}
-```
-
-**Performance note:** Zustand uses reference equality by default. Selecting a new object on every render (`{ a: state.a, b: state.b }`) creates a new reference each time. For multiple selectors, either use `useShallow` from `zustand/react/shallow` or extract selectors individually.
-
-### Selector Best Practices
-
-**Granular selectors** minimize re-renders:
-
-```typescript
-// Good: Only re-renders when currentView changes
+// Single selector (re-renders only when this value changes)
 const currentView = useAppStore((state) => state.currentView);
 
-// Avoid: Re-renders whenever any state changes
-const state = useAppStore();
+// Action extraction (stable reference)
+const setView = useAppStore((state) => state.setView);
+
+// Multiple selectors with useShallow (prevents object-identity re-renders)
+import { useShallow } from 'zustand/react/shallow';
+const { session, scriptureLoading } = useAppStore(
+  useShallow((state) => ({
+    session: state.session,
+    scriptureLoading: state.scriptureLoading,
+  }))
+);
 ```
+
+**Performance**: Zustand uses reference equality by default. Selecting a new object on every render creates a new reference. Use `useShallow` for multi-field selectors (used by ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer).
 
 ## Outside React Components
 
 ### getState() for Reads
 
 ```typescript
-import { useAppStore } from '../stores/useAppStore';
-
-// Read current state snapshot
 const currentMoods = useAppStore.getState().moods;
 const isOnline = useAppStore.getState().syncStatus.isOnline;
 ```
 
+Used in service workers, utility functions, and initialization code.
+
 ### setState() for Writes
 
 ```typescript
-// Direct state update
+// Direct partial update
 useAppStore.setState({ isLoading: false });
 
 // Updater function for state-dependent updates
@@ -67,7 +53,6 @@ useAppStore.setState((state) => ({
 ### subscribe() for Side Effects
 
 ```typescript
-// Listen for state changes outside React
 const unsubscribe = useAppStore.subscribe(
   (state) => state.syncStatus.pendingMoods,
   (pendingMoods) => {
@@ -76,36 +61,42 @@ const unsubscribe = useAppStore.subscribe(
     }
   }
 );
-
-// Cleanup
-unsubscribe();
 ```
 
 ## E2E Testing Access
 
-In development and test environments, the store is exposed globally:
+In non-production environments, the store is exposed on `window.__APP_STORE__`:
 
 ```typescript
 // src/stores/useAppStore.ts
-if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-  (window as Record<string, unknown>).__STORE__ = useAppStore;
+if (typeof window !== 'undefined' && import.meta.env.MODE !== 'production') {
+  window.__APP_STORE__ = useAppStore;
 }
 ```
 
-E2E tests can then:
+E2E tests access via:
 
 ```typescript
-// In Playwright test
+// Playwright test
 await page.evaluate(() => {
-  const store = (window as any).__STORE__;
-  const state = store.getState();
-  return state.moods.length;
+  const store = window.__APP_STORE__;
+  return store?.getState().moods.length;
 });
+```
+
+The global type declaration:
+
+```typescript
+declare global {
+  interface Window {
+    __APP_STORE__?: typeof useAppStore;
+  }
+}
 ```
 
 ## Cross-Slice Access Within Slices
 
-Inside slice creators, `get()` provides the full `AppState`:
+Inside slice creators, `get()` provides full `AppState`:
 
 ```typescript
 export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => ({
@@ -124,9 +115,9 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
 });
 ```
 
-## Service Layer Store Access
+## Service Layer Boundary
 
-Services (IndexedDB, Supabase) do **not** access the store directly. Instead, data flows through slices:
+Services (IndexedDB, Supabase) do NOT access the store directly. Data flows unidirectionally:
 
 ```
 Component -> useAppStore (hook) -> Slice Action -> Service -> IndexedDB/Supabase
@@ -137,5 +128,5 @@ This keeps services stateless and testable.
 ## Related Documentation
 
 - [React Hooks](./06-react-hooks.md)
-- [Zustand Store Configuration](./01-zustand-store-configuration.md)
+- [Store Configuration](./01-zustand-store-configuration.md)
 - [Slice Details](./02-slice-details.md)

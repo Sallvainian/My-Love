@@ -8,58 +8,95 @@ Annotated layout of the full repository.
 src/
   api/                              # Supabase API integration layer
     supabaseClient.ts               # Supabase client singleton (createClient with VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
+    authService.ts                  # Authentication service
     auth/                           # Authentication service modules
       sessionService.ts             # getSession(), onAuthStateChange() -- session management
       actionService.ts              # signOut() and other auth actions
+      types.ts                      # Auth-related TypeScript types
+      __tests__/                    # Auth service unit tests
+    moodApi.ts                      # Mood API calls
     moodSyncService.ts              # Mood data sync between IndexedDB and Supabase
     interactionService.ts           # Poke/kiss/fart partner interaction API calls
+    partnerService.ts               # Partner data API calls
     errorHandlers.ts                # Centralized error handling utilities for API responses
+    validation/
+      supabaseSchemas.ts            # Zod schemas for Supabase response validation
 
-  assets/                           # Static assets (SVGs, images, fonts)
+  assets/                           # Static assets (SVGs, images)
 
   components/                       # React components organized by feature domain
-    AdminPanel/                     # Admin interface (lazy-loaded, accessed via /admin route)
+    AdminPanel/                     # Admin interface (lazy-loaded)
+      AdminPanel.tsx                # Main admin component
+      CreateMessageForm.tsx         # Custom message creation
+      EditMessageForm.tsx           # Custom message editing
+      DeleteConfirmDialog.tsx       # Delete confirmation dialog
+      MessageList.tsx               # Message list view
+      MessageRow.tsx                # Individual message row
+    CountdownTimer/                 # Countdown timer component
     DailyMessage/                   # Main message card with daily rotation logic
     DisplayNameSetup/               # Display name setup modal for new OAuth signups
-    ErrorBoundary/                  # Top-level error boundary (wraps LoginScreen, WelcomeSplash, AdminPanel)
+    ErrorBoundary/                  # Top-level error boundary
+    InteractionHistory/             # Partner interaction history
     LoginScreen/                    # Email/password authentication UI
     love-notes/                     # Real-time chat messaging between partners
-    MoodTracker/                    # Mood logging with emoji selection (12 emoji options)
-    Navigation/                     # Bottom navigation bar (BottomNavigation component)
-    PartnerMoodView/                # Partner mood real-time display via Supabase Realtime + poke/kiss/fart
+      __tests__/                    # Component unit tests
+    MoodHistory/                    # Mood history timeline
+    MoodTracker/                    # Mood logging with emoji selection
+    Navigation/
+      BottomNavigation.tsx          # Bottom navigation bar
+      __tests__/                    # Navigation unit tests
+    PartnerMoodView/                # Partner mood real-time display via Supabase Realtime
     PhotoCarousel/                  # Photo carousel viewer (lazy-loaded modal)
-    PhotoGallery/                   # Photo grid with lazy loading (react-window) and Supabase Storage
+    PhotoGallery/                   # Photo grid with lazy loading (react-window)
     PhotoUpload/                    # Photo upload dialog (lazy-loaded modal)
     PokeKissInterface/              # Playful partner interactions (poke, kiss, fart)
-    RelationshipTimers/             # TimeTogether, BirthdayCountdown, EventCountdown components
+    RelationshipTimers/             # TimeTogether, BirthdayCountdown, EventCountdown
     scripture-reading/              # Scripture reading flow (solo/together modes, reflection)
       containers/                   # Container components (ESLint enforces no direct Supabase imports)
+      overview/
+        StatsSection.tsx            # Scripture statistics display
+      motionFeatures.ts             # Framer Motion feature bundle
+      __tests__/                    # Scripture component unit tests
+    Settings/                       # User settings component
     shared/                         # Shared UI components
       NetworkStatusIndicator.tsx    # Offline/connecting banner
       SyncToast.tsx                 # Background sync completion feedback toast
-    ViewErrorBoundary/              # Per-view error boundary (preserves BottomNavigation on errors)
-    WelcomeSplash/                  # Welcome splash screen (lazy-loaded, 60-minute display interval)
+    ViewErrorBoundary/              # Per-view error boundary (preserves BottomNavigation)
+    WelcomeSplash/                  # Welcome splash screen (lazy-loaded)
 
   config/
     constants.ts                    # APP_CONFIG (partner name, start date), USER_ID, PARTNER_NAME
-    relationshipDates.ts            # RELATIONSHIP_DATES (birthdays, wedding, visits)
+    images.ts                       # Image asset configuration
+    performance.ts                  # Pagination, storage quotas, validation limits
 
-  constants/                        # Additional constant values
+  constants/
+    animations.ts                   # Animation constant values
 
   data/
     defaultMessages.ts              # 365 pre-written love messages (5 categories x 73 each)
     defaultMessagesLoader.ts        # Lazy loader for default messages (code splitting)
-    scriptureSteps.ts               # 17 scripture steps with NKJV verses and response prayers
 
   hooks/                            # Custom React hooks
-    useScriptureBroadcast.ts        # Supabase Realtime hook for scripture together mode
+    useAuth.ts                      # Authentication hook
+    useImageCompression.ts          # Image compression hook
+    useMoodHistory.ts               # Mood history data hook
+    useNetworkStatus.ts             # Online/offline detection hook
+    usePhotos.ts                    # Photo management hook
+    useRealtimeMessages.ts          # Realtime message subscription hook
+    useScriptureBroadcast.ts        # Supabase Realtime for scripture together mode
+    useVibration.ts                 # Haptic feedback hook
+    __tests__/                      # Hook unit tests
 
   services/
-    BaseIndexedDBService.ts         # Base CRUD class for IndexedDB operations
-    dbSchema.ts                     # IndexedDB schema definition (version 5)
-    migrationService.ts             # LocalStorage to IndexedDB migration (custom messages)
-    scriptureReadingService.ts      # Scripture reading API adapter (legacy Supabase exception)
+    customMessageService.ts         # Custom message CRUD
+    imageCompressionService.ts      # Image compression utility
+    migrationService.ts             # LocalStorage to IndexedDB migration
+    moodService.ts                  # Mood tracking service
+    performanceMonitor.ts           # Operation timing and metrics (singleton)
+    photoStorageService.ts          # Photo storage management
+    realtimeService.ts              # Supabase Realtime subscription management
     storage.ts                      # IndexedDB and localStorage utilities
+    syncService.ts                  # Data synchronization service
 
   stores/
     useAppStore.ts                  # Zustand store composed from 10 slices
@@ -76,26 +113,36 @@ src/
       scriptureReadingSlice.ts      # Scripture reading sessions, progress, reflection
 
   sw.ts                             # Custom service worker (InjectManifest strategy)
-  sw-db.ts                          # Service worker IndexedDB operations (isolated from app code)
   sw-types.d.ts                     # TypeScript declarations for service worker context
 
   types/
     index.ts                        # Application TypeScript type definitions
+    models.ts                       # Domain model types
     database.types.ts               # Auto-generated from Supabase schema (DO NOT EDIT MANUALLY)
 
   utils/
-    backgroundSync.ts               # Background sync utilities (isServiceWorkerSupported check)
+    calendarHelpers.ts              # Calendar date utilities
+    countdownService.ts             # Countdown timer calculation
+    dateFormatters.ts               # Date display formatting
+    dateHelpers.ts                  # Date calculation utilities
+    deterministicRandom.ts          # Deterministic random number generation
+    haptics.ts                      # Haptic feedback utilities
+    interactionValidation.ts        # Interaction input validation
     messageRotation.ts              # Daily message selection algorithm
-    storageMonitor.ts               # Storage quota monitoring (logStorageQuota, development mode)
-    themes.ts                       # Theme configurations (Sunset, Ocean, Lavender, Rose) + applyTheme()
-    dateHelpers.ts                  # Date formatting and calculation utilities
+    moodEmojis.ts                   # Mood emoji definitions
+    moodGrouping.ts                 # Mood data grouping for history
+    offlineErrorHandler.ts          # Offline-aware error handling
+    performanceMonitoring.ts        # Scroll performance and memory monitoring
+    storageMonitor.ts               # Storage quota monitoring
+    themes.ts                       # Theme configurations + applyTheme()
+    __tests__/                      # Utility unit tests
 
   validation/
-    schemas.ts                      # Zod validation schemas for runtime data validation
     errorMessages.ts                # User-facing validation error messages
+    index.ts                        # Validation module exports
 
-  main.tsx                          # App entry point: StrictMode, LazyMotion (domAnimation), SW registration
-  App.tsx                           # Root component: auth gate, routing, lazy loading, sync orchestration
+  main.tsx                          # App entry point: StrictMode, LazyMotion, SW registration
+  App.tsx                           # Root component: auth gate, routing, lazy loading, sync
 ```
 
 ## Tests (`tests/`)
@@ -110,30 +157,32 @@ tests/
     validation/                     # Zod schema validation tests
 
   e2e/                              # Playwright E2E browser tests
-    auth/                           # Login, logout, OAuth, display name setup
-    home/                           # Home view, welcome splash, error boundary
-    mood/                           # Mood tracker and mood history
-    navigation/                     # Bottom nav tabs, routing between views
-    notes/                          # Love notes messaging between partners
-    offline/                        # Network status indicator, data sync on reconnect
-    partner/                        # Partner mood view, poke/kiss interactions
-    photos/                         # Photo gallery display and upload flow
-    scripture/                      # Scripture overview, session flow, reflection, test data seeding
+    auth/                           # Login, logout
+    home/                           # Home view
+    mood/                           # Mood tracking
+    navigation/                     # View routing
+    notes/                          # Love notes chat
+    offline/                        # Offline handling
+    partner/                        # Partner interactions
+    photos/                         # Photo gallery
+    scripture/                      # Scripture reading (solo + together mode)
 
   api/                              # API-level tests (Playwright-based, against Supabase endpoints)
 
+  integration/                      # Integration tests (Playwright integration project)
+
   support/                          # Test infrastructure
     merged-fixtures.ts              # Main test entry point: import { test, expect } from here
-    auth-setup.ts                   # Worker-isolated auth setup (creates user pairs per parallel worker)
+    auth/
+      global-setup.ts               # Global auth setup (creates user pairs per parallel worker)
     fixtures/
       index.ts                      # Custom Playwright fixtures (supabaseAdmin, testSession)
-      scripture-navigation.ts       # Scripture-specific navigation fixtures
-      worker-auth.ts                # Worker-isolated auth fixtures for parallel test safety
     factories/
-      index.ts                      # Test data factories (createTestSession, cleanupTestSession, linkTestPartners)
+      index.ts                      # Test data factories
+    helpers.ts                      # Shared E2E helper functions
     helpers/
-      index.ts                      # Utility exports
-      supabase.ts                   # Supabase admin client for test setup
+      scripture-lobby.ts            # Scripture lobby helpers
+      scripture-together.ts         # Scripture together mode helpers
 ```
 
 ## Supabase (`supabase/`)
@@ -142,29 +191,28 @@ tests/
 supabase/
   config.toml                       # Local Supabase configuration (ports, auth, storage, realtime)
   seed.sql                          # Database seed data for local development
-  migrations/                       # SQL migration files (YYYYMMDDHHmmss_description.sql format)
+  migrations/                       # 21 SQL migration files (YYYYMMDDHHmmss_description.sql format)
   tests/
     database/                       # pgTAP database tests
 ```
 
 Key `config.toml` settings:
 
-| Setting | Value |
-|---|---|
-| Project ID | `My-Love` |
-| API port | `54321` |
-| DB port | `54322` |
-| Shadow DB port | `54320` |
-| Postgres version | `17` |
-| Studio port | `54323` |
-| Inbucket (email) port | `54324` |
-| Analytics port | `54327` |
-| Storage file size limit | `50MiB` |
-| Auth: email/password | Enabled |
-| Auth: anonymous sign-ins | Disabled |
+| Setting                   | Value                  |
+| ------------------------- | ---------------------- |
+| Project ID                | `My-Love`              |
+| API port                  | `54321`                |
+| DB port                   | `54322`                |
+| Shadow DB port            | `54320`                |
+| Postgres version          | `17`                   |
+| Studio port               | `54323`                |
+| Inbucket (email) port     | `54324`                |
+| Storage file size limit   | `50MiB`                |
+| Auth: email/password      | Enabled                |
+| Auth: anonymous sign-ins  | Disabled               |
 | Auth: email confirmations | Disabled (development) |
-| Realtime | Enabled |
-| Edge Runtime | Deno 2 |
+| Realtime                  | Enabled                |
+| Edge Runtime              | Deno 2                 |
 
 ## Scripts (`scripts/`)
 
@@ -173,13 +221,15 @@ scripts/
   dev-with-cleanup.sh               # Dev server with signal trapping (SIGINT/SIGTERM/EXIT) and process cleanup
   test-with-cleanup.sh              # E2E test runner with signal trapping and process cleanup
   burn-in.sh                        # Flaky test detection (configurable iterations, default 10)
-  ci-local.sh                       # Mirror CI pipeline locally (lint, unit, E2E, burn-in)
+  ci-local.sh                       # Mirror CI pipeline locally (lint, unit, E2E, burn-in x3)
   smoke-tests.cjs                   # Pre-deploy build validation (dist/ structure, manifests, bundles)
   post-deploy-check.cjs             # Live site health check (HTTP, manifest, service worker guidance)
+  pw-failures.mjs                   # Playwright failure summarizer (AI-friendly Markdown, dated artifact folders)
   clear-caches.js                   # Browser console script to clear all caches (IndexedDB, localStorage, SW)
-  validate-messages.cjs             # 365-message library validation (count, categories, duplicates)
+  validate-messages.cjs             # 365-message library validation (count, categories, duplicates, length distribution)
   perf-bundle-report.mjs            # Bundle size analysis (raw + gzip, generates Markdown report)
-  inspect-db.sh                     # Database inspection utility for local Supabase
+  inspect-db.sh                     # Remote database inspection (tables, row counts, RLS policies, columns)
+  fetch_comments.py                 # Fetch PR conversation comments, reviews, and review threads via GitHub GraphQL API
 ```
 
 ## CI/CD (`.github/`)
@@ -192,12 +242,18 @@ scripts/
 
   workflows/
     deploy.yml                      # Build + smoke test + deploy to GitHub Pages + health check
-    test.yml                        # Full test pipeline: lint, unit, E2E P0 gate, E2E sharded, burn-in, merge reports
+    test.yml                        # Full test pipeline: lint, unit, DB, integration, API, E2E P0 gate, E2E sharded, burn-in
     supabase-migrations.yml         # Migration validation on PRs touching supabase/ paths
-    claude.yml                      # Claude Code for @claude mentions in issues/PRs
+    claude.yml                      # Claude Code for @claude mentions in issues/PRs (claude-opus-4-6)
     claude-code-review.yml          # Automated PR code review with Claude
     manual-code-analysis.yml        # On-demand commit summarization or security review
     ci-failure-auto-fix.yml         # Auto-fix CI failures with Claude Code on non-main branches
+    bundle-size.yml                 # Bundle size tracking and regression detection
+    lighthouse.yml                  # Lighthouse performance audit
+    codeql.yml                      # CodeQL security analysis
+    dependency-review.yml           # Dependency vulnerability scanning
+    bmad-story-sync.yml             # BMAD workflow story synchronization
+    gemini-*.yml                    # Gemini AI integration workflows
 
   dependabot.yml                    # Weekly npm + GitHub Actions dependency updates (Monday)
   codeql/
@@ -207,24 +263,25 @@ scripts/
 ## Configuration Files (Root)
 
 ```
-.env                                # Encrypted environment variables (safe to commit)
+fnox.toml                           # Age-encrypted secrets (Supabase, Sentry) -- safe to commit
+.mise.toml                          # Tool versions (Node 24.13.0) + env vars
 .env.example                        # Template showing required variables
 .env.test                           # Plain-text local Supabase values for E2E testing
-.nvmrc                              # Node version: v24.13.0
 .prettierrc                         # Prettier config (100 char width, single quotes, tailwind plugin)
 .prettierignore                     # Prettier ignore rules
-.gitignore                          # Git ignore (node_modules, dist, .env.keys, test artifacts)
+.gitignore                          # Git ignore (node_modules, dist, .env, test artifacts)
 CLAUDE.md                           # Claude Code guidance (architecture, commands, conventions)
-currents.config.ts                  # Currents.dev Playwright reporting (projectId: "uvT2TP")
+AGENTS.md                           # AI coding agent guidance (architecture, E2E patterns, conventions)
 eslint.config.js                    # ESLint flat config (typescript-eslint, react-hooks, react-refresh)
 index.html                          # HTML entry point with SPA redirect handler for GitHub Pages
 package.json                        # npm scripts, dependencies, browserslist
-playwright.config.ts                # Playwright: projects (setup, chromium, api), sharding, auto dev server
+playwright.config.ts                # Playwright: projects (chromium, api, integration), sharding, auto dev server
 postcss.config.js                   # PostCSS plugins (@tailwindcss/postcss, autoprefixer)
 tailwind.config.js                  # Tailwind: custom colors, fonts, animations, keyframes
 tsconfig.json                       # TypeScript project references root
-tsconfig.app.json                   # App TypeScript config (ES2022, strict, react-jsx)
+tsconfig.app.json                   # App TypeScript config (ES2022, strict, react-jsx, path aliases)
 tsconfig.node.json                  # Node TypeScript config (vite.config.ts, vitest.config.ts)
-vite.config.ts                      # Vite: base path, manual chunks, PWA, visualizer, checker
-vitest.config.ts                    # Vitest: happy-dom, @/ alias, coverage 80%, JUnit, tdd-guard
+tsconfig.test.json                  # Test TypeScript config (extends app, adds vitest/jest-dom types)
+vite.config.ts                      # Vite: base path, manual chunks, PWA, visualizer, checker, Sentry
+vitest.config.ts                    # Vitest: happy-dom, @/ alias, coverage thresholds, JUnit, tdd-guard
 ```

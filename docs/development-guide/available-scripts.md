@@ -4,46 +4,48 @@ Every npm script defined in `package.json`, organized by category.
 
 ## Development
 
-| Script | Command | Description |
-|---|---|---|
-| `npm run dev` | `./scripts/dev-with-cleanup.sh` | Start Vite dev server with dotenvx decryption and signal-trapped process cleanup. Runs `dotenvx run --overload -- npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
-| `npm run dev:raw` | `vite` | Start Vite dev server directly without dotenvx or cleanup. Useful when you already have decrypted env vars in your shell. |
-| `npm run preview` | `dotenvx run --overload -- npx vite preview` | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/`. |
+| Script            | Command                         | Description                                                                                                                                                                                 |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`     | `./scripts/dev-with-cleanup.sh` | Start Vite dev server with signal-trapped process cleanup. Use `fnox exec -- npm run dev` to inject secrets. Runs `npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
+| `npm run dev:raw` | `vite`                          | Start Vite dev server directly without cleanup wrapper. Useful for quick restarts or when running inside an existing fnox context.                                                          |
+| `npm run preview` | `npx vite preview`              | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/My-Love/`.                                                                   |
 
 ## Build
 
-| Script | Command | Description |
-|---|---|---|
-| `npm run build` | `dotenvx run --overload -- bash -c 'tsc -b && vite build'` | Full production build: decrypt env vars via dotenvx, TypeScript compile (`tsc -b`), then Vite build with code splitting and PWA generation. Output goes to `dist/`. |
-| `npm run typecheck` | `tsc --noEmit` | TypeScript type check only (no output files). Use to validate types without building. |
+| Script              | Command                                  | Description                                                                                                                                                                            |
+| ------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build`     | `tsc -p tsconfig.app.json && vite build` | Full production build: TypeScript type-check against `tsconfig.app.json`, then Vite build with code splitting, PWA generation, and optional Sentry source map upload. Output: `dist/`. |
+| `npm run typecheck` | `tsc --noEmit`                           | TypeScript type check only (no output files). Use to validate types without building.                                                                                                  |
 
 ## Code Quality
 
-| Script | Command | Description |
-|---|---|---|
-| `npm run lint` | `eslint src tests scripts ...` | Run ESLint on `src/`, `tests/`, and `scripts/` directories. Ignores Playwright report directories and build artifacts. |
-| `npm run lint:fix` | `eslint ... --fix && prettier --write .` | Auto-fix ESLint issues, then format all files with Prettier. |
-| `npm run format` | `prettier --write .` | Format all files with Prettier (writes changes). |
-| `npm run format:check` | `prettier --check .` | Check formatting without modifying files. Returns non-zero exit code if any file needs formatting. |
+| Script                 | Command                                  | Description                                                                                                            |
+| ---------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`         | `eslint src tests scripts ...`           | Run ESLint on `src/`, `tests/`, and `scripts/` directories. Ignores Playwright report directories and build artifacts. |
+| `npm run lint:fix`     | `eslint ... --fix && prettier --write .` | Auto-fix ESLint issues, then format all files with Prettier.                                                           |
+| `npm run format`       | `prettier --write .`                     | Format all files with Prettier (writes changes).                                                                       |
+| `npm run format:check` | `prettier --check .`                     | Check formatting without modifying files. Returns non-zero exit code if any file needs formatting.                     |
 
 ## Testing
 
-| Script | Command | Description |
-|---|---|---|
-| `npm run test:unit` | `vitest run` | Run all Vitest unit tests (single run, no watch). |
-| `npm run test:unit:watch` | `vitest` | Run Vitest in watch mode. Re-runs tests on file changes. |
-| `npm run test:unit:ui` | `vitest --ui` | Open Vitest interactive browser UI for exploring and running tests. |
-| `npm run test:unit:coverage` | `vitest run --coverage` | Run unit tests with V8 coverage report. Enforces 80% thresholds on lines, functions, branches, and statements. |
-| `npm run test:e2e` | `./scripts/test-with-cleanup.sh` | Run all Playwright E2E tests with signal-trapped process cleanup. Ensures Vite dev server and child processes are killed on exit. |
-| `npm run test:e2e:raw` | `playwright test` | Run Playwright directly without cleanup wrapper. |
-| `npm run test:e2e:ui` | `playwright test --ui` | Open Playwright interactive UI mode for running and debugging tests visually. |
-| `npm run test:e2e:debug` | `playwright test --debug` | Run Playwright in step-through debug mode with the Playwright Inspector. |
-| `npm run test:p0` | `playwright test --grep '\\[P0\\]'` | Run only Priority 0 (critical path) E2E tests. |
-| `npm run test:p1` | `playwright test --grep '\\[P0\\]\\|\\[P1\\]'` | Run Priority 0 and Priority 1 E2E tests. |
-| `npm run test:db` | `supabase test db` | Run pgTAP database tests via the Supabase CLI. Requires `supabase start`. |
-| `npm run test:smoke` | `node scripts/smoke-tests.cjs` | Run pre-deploy smoke tests against the `dist/` directory. Validates index.html structure, PWA manifest, icons, JS bundles, and service worker. |
-| `npm run test:burn-in` | `bash scripts/burn-in.sh` | Run flaky test detection. Executes Playwright tests in a configurable loop (default 10 iterations). Detects intermittent failures. |
-| `npm run test:ci-local` | `bash scripts/ci-local.sh` | Mirror the CI pipeline locally: lint, unit tests, E2E tests, burn-in. Useful for pre-push validation. |
+| Script                       | Command                                                                                  | Description                                                                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `npm run test:unit`          | `vitest run`                                                                             | Run all Vitest unit tests (single run, no watch).                                                                                              |
+| `npm run test:unit:watch`    | `vitest`                                                                                 | Run Vitest in watch mode. Re-runs tests on file changes.                                                                                       |
+| `npm run test:unit:ui`       | `vitest --ui`                                                                            | Open Vitest interactive browser UI for exploring and running tests.                                                                            |
+| `npm run test:unit:coverage` | `vitest run --coverage`                                                                  | Run unit tests with V8 coverage report. Enforces thresholds on lines, functions, branches, and statements.                                     |
+| `npm run test:e2e`           | `./scripts/test-with-cleanup.sh`                                                         | Run all Playwright E2E tests with signal-trapped process cleanup. Ensures Vite dev server and child processes are killed on exit.              |
+| `npm run test:e2e:raw`       | `playwright test`                                                                        | Run Playwright directly without cleanup wrapper.                                                                                               |
+| `npm run test:e2e:ui`        | `playwright test --ui`                                                                   | Open Playwright interactive UI mode for running and debugging tests visually.                                                                  |
+| `npm run test:e2e:debug`     | `playwright test --debug`                                                                | Run Playwright in step-through debug mode with the Playwright Inspector.                                                                       |
+| `npm run test:integration`   | `playwright test --project=integration`                                                  | Run integration tests (Playwright integration project).                                                                                        |
+| `npm run test:p0`            | `playwright test --grep '\\[P0\\]'`                                                      | Run only Priority 0 (critical path) E2E tests.                                                                                                 |
+| `npm run test:p1`            | `playwright test --grep '\\[P0\\]                                                        | \\[P1\\]'`                                                                                                                                     | Run Priority 0 and Priority 1 E2E tests. |
+| `npm run test:db`            | `supabase test db`                                                                       | Run pgTAP database tests via the Supabase CLI. Requires `supabase start`.                                                                      |
+| `npm run test:smoke`         | `node scripts/smoke-tests.cjs`                                                           | Run pre-deploy smoke tests against the `dist/` directory. Validates index.html structure, PWA manifest, icons, JS bundles, and service worker. |
+| `npm run test:burn-in`       | `bash scripts/burn-in.sh`                                                                | Run flaky test detection. Executes Playwright tests in a configurable loop (default 10 iterations). Detects intermittent failures.             |
+| `npm run test:ci-local`      | `bash scripts/ci-local.sh`                                                               | Mirror the CI pipeline locally: lint, unit tests, E2E tests, burn-in (3 iterations). Useful for pre-push validation.                           |
+| `npm run test:failures`      | `playwright test --reporter=json 2>/dev/null \| node scripts/pw-failures.mjs /dev/stdin` | Run E2E tests and generate an AI-friendly Markdown summary of failures grouped by root cause. Output written to `failures-ai.md`.              |
 
 ### Single Test File Execution
 
@@ -63,34 +65,34 @@ npx playwright test tests/e2e/scripture --grep "\[P0\]"
 
 ## Performance and Analysis
 
-| Script | Command | Description |
-|---|---|---|
-| `npm run perf:build` | `mkdir -p docs/performance && npm run typecheck && vite build 2>&1 \| tee docs/performance/perf-build.log` | TypeScript check + production build with build output captured to a log file. |
-| `npm run perf:bundle-report` | `npm run perf:build && node scripts/perf-bundle-report.mjs` | Generate a bundle size analysis report at `docs/performance/bundle-report.md`. Includes raw and gzip sizes for each chunk and CSS file. |
+| Script                       | Command                                                                                                    | Description                                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run perf:build`         | `mkdir -p docs/performance && npm run typecheck && vite build 2>&1 \| tee docs/performance/perf-build.log` | TypeScript check + production build with build output captured to a log file.                                                           |
+| `npm run perf:bundle-report` | `npm run perf:build && node scripts/perf-bundle-report.mjs`                                                | Generate a bundle size analysis report at `docs/performance/bundle-report.md`. Includes raw and gzip sizes for each chunk and CSS file. |
 
 ## Supabase
 
 These commands use the Supabase CLI directly (not defined as npm scripts):
 
-| Command | Description |
-|---|---|
-| `supabase start` | Start local Supabase stack (Postgres 17, Auth, Storage, Realtime, Studio). Requires Docker. |
-| `supabase stop` | Stop local Supabase. |
-| `supabase stop --no-backup` | Stop local Supabase without creating a database backup (faster, used in CI). |
-| `supabase status` | Show local Supabase connection URLs, keys, and service status. |
-| `supabase db reset` | Reset local database: drop all data, re-run all migrations, re-seed from `seed.sql`. |
-| `supabase migration new <name>` | Create a new empty migration file in `supabase/migrations/` with the current timestamp. |
-| `supabase gen types typescript --local > src/types/database.types.ts` | Regenerate TypeScript types from the local database schema. |
-| `supabase gen types typescript --project-id xojempkrugifnaveqtqc > src/types/database.types.ts` | Regenerate TypeScript types from the remote Supabase project. Requires `SUPABASE_ACCESS_TOKEN`. |
-| `supabase test db` | Run pgTAP database tests in `supabase/tests/database/`. |
+| Command                                                                                                                     | Description                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `supabase start`                                                                                                            | Start local Supabase stack (Postgres 17, Auth, Storage, Realtime, Studio). Requires Docker.     |
+| `supabase stop`                                                                                                             | Stop local Supabase.                                                                            |
+| `supabase stop --no-backup`                                                                                                 | Stop local Supabase without creating a database backup (faster, used in CI).                    |
+| `supabase status`                                                                                                           | Show local Supabase connection URLs, keys, and service status.                                  |
+| `supabase db reset`                                                                                                         | Reset local database: drop all data, re-run all 21 migrations, re-seed from `seed.sql`.         |
+| `supabase migration new <name>`                                                                                             | Create a new empty migration file in `supabase/migrations/` with the current timestamp.         |
+| `supabase gen types typescript --local \| grep -v '^Connecting to' > src/types/database.types.ts`                           | Regenerate TypeScript types from the local database schema.                                     |
+| `supabase gen types typescript --project-id xojempkrugifnaveqtqc \| grep -v '^Connecting to' > src/types/database.types.ts` | Regenerate TypeScript types from the remote Supabase project. Requires `SUPABASE_ACCESS_TOKEN`. |
+| `supabase test db`                                                                                                          | Run pgTAP database tests in `supabase/tests/database/`.                                         |
 
 ## Deployment
 
-| Script | Command | Description |
-|---|---|---|
-| `npm run predeploy` | `npm run build && npm run test:smoke` | Automatically runs before `deploy`. Builds the app and validates the output with smoke tests. |
-| `npm run deploy` | `gh-pages -d dist` | Deploy `dist/` to GitHub Pages via the `gh-pages` package. Runs `predeploy` automatically first. |
-| `npm run postdeploy` | `echo 'Deployment complete! ...'` | Prints post-deployment instructions including the health check command. |
+| Script               | Command                               | Description                                                                                      |
+| -------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `npm run predeploy`  | `npm run build && npm run test:smoke` | Automatically runs before `deploy`. Builds the app and validates the output with smoke tests.    |
+| `npm run deploy`     | `gh-pages -d dist`                    | Deploy `dist/` to GitHub Pages via the `gh-pages` package. Runs `predeploy` automatically first. |
+| `npm run postdeploy` | `echo 'Deployment complete! ...'`     | Prints post-deployment instructions including the health check command.                          |
 
 ### Post-Deploy Health Check
 

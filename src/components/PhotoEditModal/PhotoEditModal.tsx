@@ -10,7 +10,10 @@ type PhotoLike = Photo | PhotoWithUrls;
 interface PhotoEditModalProps {
   photo: PhotoLike;
   onClose: () => void;
-  onSave: (photoId: string | number, updates: { caption?: string; tags: string[] }) => Promise<void>;
+  onSave: (
+    photoId: string | number,
+    updates: { caption?: string; tags: string[] }
+  ) => Promise<void>;
 }
 
 /**
@@ -100,7 +103,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       scheduleUrlUpdate(objectUrl);
       return () => {
         cancelled = true;
-        URL.revokeObjectURL(objectUrl);
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
       };
     }
 
@@ -203,37 +206,37 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
       aria-modal="true"
       aria-labelledby="photo-edit-modal-title"
     >
-      <div className="bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="mx-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-gray-800 shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+        <div className="flex items-center justify-between border-b border-gray-700 px-6 py-4">
           <h2 id="photo-edit-modal-title" className="text-xl font-semibold text-white">
             Edit Photo
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-gray-700"
             aria-label="Close modal"
             data-testid="photo-edit-modal-close-button"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="h-5 w-5 text-gray-400" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-6">
+        <div className="space-y-6 px-6 py-4">
           {/* Photo Preview */}
           <div className="flex justify-center">
             <img
               src={imageUrl}
               alt={photo.caption || `Photo ${photo.id}`}
-              className="max-h-[200px] max-w-full object-contain rounded-lg"
+              className="max-h-[200px] max-w-full rounded-lg object-contain"
               data-testid="photo-edit-modal-preview"
             />
           </div>
 
           {/* Caption Field */}
           <div>
-            <label htmlFor="photo-caption" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="photo-caption" className="mb-2 block text-sm font-medium text-gray-300">
               Caption
             </label>
             <textarea
@@ -241,15 +244,15 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Add a caption..."
-              className={`w-full px-4 py-3 bg-gray-700 text-white rounded-lg border ${
+              className={`w-full rounded-lg border bg-gray-700 px-4 py-3 text-white ${
                 captionError ? 'border-red-500' : 'border-gray-600'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+              } resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none`}
               rows={4}
               maxLength={500}
               aria-label="Photo caption"
               data-testid="photo-edit-modal-caption-input"
             />
-            <div className="flex justify-between items-center mt-2">
+            <div className="mt-2 flex items-center justify-between">
               <span className={`text-sm ${captionError ? 'text-red-400' : 'text-gray-400'}`}>
                 {captionError || `${caption.length} / 500 characters`}
               </span>
@@ -258,7 +261,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
 
           {/* Tags Field */}
           <div>
-            <label htmlFor="photo-tags" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="photo-tags" className="mb-2 block text-sm font-medium text-gray-300">
               Tags
             </label>
             <input
@@ -267,13 +270,13 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               placeholder="beach, sunset, memories"
-              className={`w-full px-4 py-3 bg-gray-700 text-white rounded-lg border ${
+              className={`w-full rounded-lg border bg-gray-700 px-4 py-3 text-white ${
                 tagsError ? 'border-red-500' : 'border-gray-600'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
               aria-label="Photo tags (comma-separated)"
               data-testid="photo-edit-modal-tags-input"
             />
-            <div className="flex justify-between items-center mt-2">
+            <div className="mt-2 flex items-center justify-between">
               <span className={`text-sm ${tagsError ? 'text-red-400' : 'text-gray-400'}`}>
                 {tagsError || 'Separate tags with commas (max 10 tags)'}
               </span>
@@ -283,7 +286,7 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
           {/* Error Message */}
           {error && (
             <div
-              className="px-4 py-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200"
+              className="rounded-lg border border-red-700 bg-red-900/50 px-4 py-3 text-red-200"
               data-testid="photo-edit-modal-error"
             >
               {error}
@@ -292,10 +295,10 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-700">
+        <div className="flex items-center justify-end gap-3 border-t border-gray-700 px-6 py-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
+            className="rounded-lg px-4 py-2 text-gray-300 transition-colors hover:bg-gray-700"
             aria-label="Cancel without saving"
             data-testid="photo-edit-modal-cancel-button"
           >
@@ -304,10 +307,10 @@ export function PhotoEditModal({ photo, onClose, onSave }: PhotoEditModalProps) 
           <button
             onClick={handleSave}
             disabled={!isValid() || isSaving}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+            className={`rounded-lg px-6 py-2 font-medium transition-colors ${
               isValid() && !isSaving
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'cursor-not-allowed bg-gray-700 text-gray-500'
             }`}
             aria-label="Save changes"
             data-testid="photo-edit-modal-save-button"

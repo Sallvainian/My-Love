@@ -104,7 +104,9 @@ function testDistDirectory() {
   logTest('dist/ directory exists', distExists);
 
   if (!distExists) {
-    console.log(`${colors.red}CRITICAL: Build output not found. Run 'npm run build' first.${colors.reset}`);
+    console.log(
+      `${colors.red}CRITICAL: Build output not found. Run 'npm run build' first.${colors.reset}`
+    );
     return false;
   }
 
@@ -217,7 +219,9 @@ function testCriticalAssets() {
   const fontsDir = fileExists('dist/fonts');
   if (fontsDir) {
     const fontFiles = getFilesMatching('dist/fonts', /\.woff2$/);
-    console.log(`${colors.cyan}ℹ️  Fonts directory exists: ${fontFiles.length} font file(s)${colors.reset}`);
+    console.log(
+      `${colors.cyan}ℹ️  Fonts directory exists: ${fontFiles.length} font file(s)${colors.reset}`
+    );
   } else {
     console.log(`${colors.cyan}ℹ️  Fonts directory not found (optional)${colors.reset}`);
   }
@@ -242,8 +246,8 @@ function testJavascriptBundles() {
   logTest('JavaScript bundles generated', hasJsBundle, `${jsFiles.length} file(s)`);
 
   // Check for vendor chunks (code splitting working) - look for common patterns
-  const vendorChunks = jsFiles.filter((file) =>
-    file.includes('vendor-') || file.match(/vendor\./i) || file.includes('chunk')
+  const vendorChunks = jsFiles.filter(
+    (file) => file.includes('vendor-') || file.match(/vendor\./i) || file.includes('chunk')
   );
   const hasVendorSplit = vendorChunks.length > 0 || jsFiles.length >= 2;
   logTest('Code splitting working', hasVendorSplit, `${jsFiles.length} bundle(s)`);
@@ -271,7 +275,8 @@ function testServiceWorker() {
       logTest('Service worker has content', hasContent, `${swContent.length} bytes`);
 
       // Check for precache manifest or workbox patterns (optional validation)
-      const hasPrecache = swContent.includes('self.__WB_MANIFEST') || swContent.includes('precache');
+      const hasPrecache =
+        swContent.includes('self.__WB_MANIFEST') || swContent.includes('precache');
       if (hasPrecache) {
         console.log(`${colors.cyan}ℹ️  Precache manifest detected${colors.reset}`);
       }
@@ -303,7 +308,9 @@ function displaySummary() {
     return 0;
   } else {
     console.log(`${colors.red}❌ ${testsFailed} test(s) failed${colors.reset}`);
-    console.log(`${colors.red}Build output has critical issues. Deployment blocked.${colors.reset}\n`);
+    console.log(
+      `${colors.red}Build output has critical issues. Deployment blocked.${colors.reset}\n`
+    );
     return 1;
   }
 }

@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 
@@ -48,9 +48,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
 
 // Create a test store with just the scripture slice
 function createTestStore() {
-  return create<ScriptureSlice>()((...args) => ({
-    ...createScriptureReadingSlice(...args),
-  }));
+  return create<ScriptureSlice>()(
+    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
+  );
 }
 
 describe('scriptureReadingSlice — coupleStats', () => {
@@ -76,12 +76,12 @@ describe('scriptureReadingSlice — coupleStats', () => {
   // ============================================
   describe('loadCoupleStats', () => {
     it('should set isStatsLoading=true while loading', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       // Make getCoupleStats hang so we can check loading state
-      let resolveStats!: (value: unknown) => void;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let resolveStats!: (value: any) => void;
       vi.mocked(scriptureReadingService.getCoupleStats).mockReturnValue(
         new Promise((resolve) => {
           resolveStats = resolve;
@@ -112,9 +112,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should update coupleStats with service response on success', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const expectedStats = {
         totalSessions: 5,
@@ -134,9 +133,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should keep existing coupleStats when service returns null (silent failure)', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       // First, load some stats
       const initialStats = {
@@ -163,9 +161,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should call scriptureReadingService.getCoupleStats exactly once', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.getCoupleStats).mockResolvedValue(null);
 
@@ -176,9 +173,8 @@ describe('scriptureReadingSlice — coupleStats', () => {
     });
 
     it('should set isStatsLoading=false even when service throws', async () => {
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       vi.mocked(scriptureReadingService.getCoupleStats).mockRejectedValue(
         new Error('Unexpected error')

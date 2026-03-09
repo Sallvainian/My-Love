@@ -63,12 +63,7 @@ function detectMimeType(buffer: Uint8Array): string | null {
     return 'image/webp';
   }
   // GIF: 47 49 46 38
-  if (
-    buffer[0] === 0x47 &&
-    buffer[1] === 0x49 &&
-    buffer[2] === 0x46 &&
-    buffer[3] === 0x38
-  ) {
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
     return 'image/gif';
   }
   return null;
@@ -83,9 +78,7 @@ function checkRateLimit(userId: string): { allowed: boolean; remaining: number }
   const timestamps = rateLimitStore.get(userId) || [];
 
   // Filter to only timestamps within the window
-  const recentTimestamps = timestamps.filter(
-    (ts) => now - ts < CONFIG.RATE_LIMIT_WINDOW_MS
-  );
+  const recentTimestamps = timestamps.filter((ts) => now - ts < CONFIG.RATE_LIMIT_WINDOW_MS);
 
   if (recentTimestamps.length >= CONFIG.RATE_LIMIT_MAX_UPLOADS) {
     return { allowed: false, remaining: 0 };
@@ -114,8 +107,7 @@ Deno.serve(async (req) => {
   // CORS headers
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers':
-      'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   };
 
   // Handle CORS preflight
@@ -126,19 +118,19 @@ Deno.serve(async (req) => {
   try {
     // Only allow POST
     if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Create Supabase client with user's JWT
@@ -155,10 +147,10 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Check rate limit
@@ -188,10 +180,10 @@ Deno.serve(async (req) => {
       const formData = await req.formData();
       const file = formData.get('file') as File | null;
       if (!file) {
-        return new Response(
-          JSON.stringify({ error: 'No file provided' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: 'No file provided' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
       fileBuffer = new Uint8Array(await file.arrayBuffer());
     } else {

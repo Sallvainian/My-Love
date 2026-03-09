@@ -1,5 +1,13 @@
 import { createGzip } from 'node:zlib';
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Writable } from 'node:stream';

@@ -1,11 +1,13 @@
 # 8. IndexedDB Services
 
 **Sources:**
+
 - `src/services/BaseIndexedDBService.ts` (abstract base class)
 - `src/services/dbSchema.ts` (shared schema and upgrade logic)
 - `src/services/moodService.ts` (mood tracking)
 - `src/services/customMessageService.ts` (love messages)
 - `src/services/photoStorageService.ts` (photo gallery)
+- `src/services/scriptureReadingService.ts` (scripture reading -- see [Doc 13](./13-scripture-reading-service.md))
 
 ## Overview
 
@@ -23,23 +25,23 @@ abstract class BaseIndexedDBService<
 
 ### Abstract Methods (services must implement)
 
-| Method | Returns | Purpose |
-|--------|---------|---------|
-| `getStoreName()` | `StoreName` | Returns the object store name |
-| `_doInit()` | `Promise<void>` | Opens the DB connection with `openDB()` |
+| Method           | Returns         | Purpose                                 |
+| ---------------- | --------------- | --------------------------------------- |
+| `getStoreName()` | `StoreName`     | Returns the object store name           |
+| `_doInit()`      | `Promise<void>` | Opens the DB connection with `openDB()` |
 
 ### Shared Methods (inherited)
 
-| Method | Signature | Error Strategy |
-|--------|-----------|----------------|
-| `init()` | `(): Promise<void>` | Guard prevents concurrent init |
-| `add(item)` | `(Omit<T,'id'>): Promise<T>` | **Throws** on failure |
-| `get(id)` | `(number\|string): Promise<T\|null>` | Returns `null` on failure |
-| `getAll()` | `(): Promise<T[]>` | Returns `[]` on failure |
-| `update(id, updates)` | `(number\|string, Partial<T>): Promise<void>` | **Throws** on failure |
-| `delete(id)` | `(number\|string): Promise<void>` | **Throws** on failure |
-| `clear()` | `(): Promise<void>` | **Throws** on failure |
-| `getPage(offset, limit)` | `(number, number): Promise<T[]>` | Returns `[]` on failure |
+| Method                   | Signature                                     | Error Strategy                 |
+| ------------------------ | --------------------------------------------- | ------------------------------ |
+| `init()`                 | `(): Promise<void>`                           | Guard prevents concurrent init |
+| `add(item)`              | `(Omit<T,'id'>): Promise<T>`                  | **Throws** on failure          |
+| `get(id)`                | `(number\|string): Promise<T\|null>`          | Returns `null` on failure      |
+| `getAll()`               | `(): Promise<T[]>`                            | Returns `[]` on failure        |
+| `update(id, updates)`    | `(number\|string, Partial<T>): Promise<void>` | **Throws** on failure          |
+| `delete(id)`             | `(number\|string): Promise<void>`             | **Throws** on failure          |
+| `clear()`                | `(): Promise<void>`                           | **Throws** on failure          |
+| `getPage(offset, limit)` | `(number, number): Promise<T[]>`              | Returns `[]` on failure        |
 
 ### Error Handling Strategy
 
@@ -72,21 +74,25 @@ const DB_VERSION = 5;
 
 ### Object Stores
 
-| Store Name | Key | Auto-Increment | Indexes | Version Added |
-|------------|-----|----------------|---------|---------------|
-| `messages` | `id: number` | Yes | `by-category` (category), `by-date` (createdAt) | v1 |
-| `photos` | `id: number` | Yes | `by-date` (uploadDate) | v2 |
-| `moods` | `id: number` | Yes | `by-date` (date, **unique**) | v3 |
-| `sw-auth` | `id: 'current'` | No | None | v4 |
-| `scripture-sessions` | `id: string` | No | `by-user` (userId) | v5 |
-| `scripture-reflections` | `id: string` | No | `by-session` (sessionId) | v5 |
-| `scripture-bookmarks` | `id: string` | No | `by-session` (sessionId) | v5 |
-| `scripture-messages` | `id: string` | No | `by-session` (sessionId) | v5 |
+| Store Name              | Key             | Auto-Increment | Indexes                                         | Version Added |
+| ----------------------- | --------------- | -------------- | ----------------------------------------------- | ------------- |
+| `messages`              | `id: number`    | Yes            | `by-category` (category), `by-date` (createdAt) | v1            |
+| `photos`                | `id: number`    | Yes            | `by-date` (uploadDate)                          | v2            |
+| `moods`                 | `id: number`    | Yes            | `by-date` (date, **unique**)                    | v3            |
+| `sw-auth`               | `id: 'current'` | No             | None                                            | v4            |
+| `scripture-sessions`    | `id: string`    | No             | `by-user` (userId)                              | v5            |
+| `scripture-reflections` | `id: string`    | No             | `by-session` (sessionId)                        | v5            |
+| `scripture-bookmarks`   | `id: string`    | No             | `by-session` (sessionId)                        | v5            |
+| `scripture-messages`    | `id: string`    | No             | `by-session` (sessionId)                        | v5            |
 
 ### Centralized Upgrade Function
 
 ```typescript
-function upgradeDb(db: IDBPDatabase<MyLoveDBSchema>, oldVersion: number, _newVersion: number | null): void
+function upgradeDb(
+  db: IDBPDatabase<MyLoveDBSchema>,
+  oldVersion: number,
+  _newVersion: number | null
+): void;
 ```
 
 All three services delegate to this single function in their `_doInit()` callback. It uses `if (oldVersion < N)` guards to create stores incrementally. The v1-to-v2 photos migration is a special case handled in `photoStorageService._doInit()` because it requires transaction access for data preservation (renaming `blob` to `imageBlob`).
@@ -119,11 +125,11 @@ Store name constants are exported via `STORE_NAMES` for type-safe access.
 
 Creates a new mood entry with Zod validation.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Authenticated user's UUID |
-| `moods` | `MoodEntry['mood'][]` | Array of mood types (first is primary) |
-| `note` | `string?` | Optional note (max 200 chars) |
+| Parameter | Type                  | Description                            |
+| --------- | --------------------- | -------------------------------------- |
+| `userId`  | `string`              | Authenticated user's UUID              |
+| `moods`   | `MoodEntry['mood'][]` | Array of mood types (first is primary) |
+| `note`    | `string?`             | Optional note (max 200 chars)          |
 
 Sets `date` to today's ISO date, `synced: false`, `supabaseId: undefined`. Validates via `MoodEntrySchema.parse()` before calling `super.add()`.
 
@@ -165,13 +171,13 @@ Validates via `UpdateMessageInputSchema.parse()`, merges only provided fields, a
 
 Overrides base `getAll()` to support filtering.
 
-| Filter Field | Type | Description |
-|-------------|------|-------------|
-| `category` | `MessageCategory` | Uses `by-category` index when not `'all'` |
-| `isCustom` | `boolean?` | Filter by custom vs. built-in |
-| `active` | `boolean?` | Filter by active status |
-| `searchTerm` | `string?` | Case-insensitive text search |
-| `tags` | `string[]?` | Match any tag |
+| Filter Field | Type              | Description                               |
+| ------------ | ----------------- | ----------------------------------------- |
+| `category`   | `MessageCategory` | Uses `by-category` index when not `'all'` |
+| `isCustom`   | `boolean?`        | Filter by custom vs. built-in             |
+| `active`     | `boolean?`        | Filter by active status                   |
+| `searchTerm` | `string?`         | Case-insensitive text search              |
+| `tags`       | `string[]?`       | Match any tag                             |
 
 ### `getActiveCustomMessages(): Promise<Message[]>`
 

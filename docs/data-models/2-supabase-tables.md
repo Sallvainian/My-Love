@@ -6,16 +6,16 @@ All tables are in the `public` schema with RLS enabled. Primary keys use `UUID` 
 
 User profiles linked 1:1 with `auth.users` via the `sync_user_profile` trigger.
 
-| Column | Type | Nullable | Default | Description |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | -- | PK, references `auth.users(id)` |
-| `partner_name` | `text` | Yes | `NULL` | Legacy partner name field |
-| `device_id` | `uuid` | Yes | `gen_random_uuid()` | Device identifier |
-| `email` | `text` | Yes | `NULL` | Synced from `auth.users` |
-| `display_name` | `text` | Yes | `NULL` | Synced from `auth.users.raw_user_meta_data` |
-| `partner_id` | `uuid` | Yes | `NULL` | Self-referential FK to `users(id)` |
-| `created_at` | `timestamptz` | Yes | `now()` | |
-| `updated_at` | `timestamptz` | Yes | `now()` | |
+| Column         | Type          | Nullable | Default             | Description                                 |
+| -------------- | ------------- | -------- | ------------------- | ------------------------------------------- |
+| `id`           | `uuid`        | No       | --                  | PK, references `auth.users(id)`             |
+| `partner_name` | `text`        | Yes      | `NULL`              | Legacy partner name field                   |
+| `device_id`    | `uuid`        | Yes      | `gen_random_uuid()` | Device identifier                           |
+| `email`        | `text`        | Yes      | `NULL`              | Synced from `auth.users`                    |
+| `display_name` | `text`        | Yes      | `NULL`              | Synced from `auth.users.raw_user_meta_data` |
+| `partner_id`   | `uuid`        | Yes      | `NULL`              | Self-referential FK to `users(id)`          |
+| `created_at`   | `timestamptz` | Yes      | `now()`             |                                             |
+| `updated_at`   | `timestamptz` | Yes      | `now()`             |                                             |
 
 **Indexes:** `idx_users_partner` (partner_id), `idx_users_email_search` (lower(email)), `idx_users_display_name_search` (lower(display_name))
 
@@ -23,15 +23,15 @@ User profiles linked 1:1 with `auth.users` via the `sync_user_profile` trigger.
 
 Mood tracking with 12 mood types and multi-mood support.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `user_id` | `uuid` | No | -- | FK to `users(id)` ON DELETE CASCADE |
-| `mood_type` | `text` | No | -- | CHECK: one of 12 mood types |
-| `mood_types` | `text[]` | Yes | `NULL` | CHECK: all elements in 12 mood types, or NULL |
-| `note` | `text` | Yes | `NULL` | CHECK: `char_length(note) <= 500` |
-| `created_at` | `timestamptz` | Yes | `now()` | |
-| `updated_at` | `timestamptz` | Yes | `now()` | |
+| Column       | Type          | Nullable | Default             | Constraints                                   |
+| ------------ | ------------- | -------- | ------------------- | --------------------------------------------- |
+| `id`         | `uuid`        | No       | `gen_random_uuid()` | PK                                            |
+| `user_id`    | `uuid`        | No       | --                  | FK to `users(id)` ON DELETE CASCADE           |
+| `mood_type`  | `text`        | No       | --                  | CHECK: one of 12 mood types                   |
+| `mood_types` | `text[]`      | Yes      | `NULL`              | CHECK: all elements in 12 mood types, or NULL |
+| `note`       | `text`        | Yes      | `NULL`              | CHECK: `char_length(note) <= 500`             |
+| `created_at` | `timestamptz` | Yes      | `now()`             |                                               |
+| `updated_at` | `timestamptz` | Yes      | `now()`             |                                               |
 
 **Mood type values:** `loved`, `happy`, `content`, `excited`, `thoughtful`, `grateful`, `sad`, `anxious`, `frustrated`, `angry`, `lonely`, `tired`
 
@@ -41,14 +41,14 @@ Mood tracking with 12 mood types and multi-mood support.
 
 Messages between partners with optional image attachments.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `from_user_id` | `uuid` | No | -- | FK to `auth.users(id)` |
-| `to_user_id` | `uuid` | No | -- | FK to `auth.users(id)` |
-| `content` | `text` | No | -- | CHECK: 1-1000 chars |
-| `image_url` | `text` | Yes | `NULL` | Storage path for attached image |
-| `created_at` | `timestamptz` | No | `now()` | |
+| Column         | Type          | Nullable | Default             | Constraints                     |
+| -------------- | ------------- | -------- | ------------------- | ------------------------------- |
+| `id`           | `uuid`        | No       | `gen_random_uuid()` | PK                              |
+| `from_user_id` | `uuid`        | No       | --                  | FK to `auth.users(id)`          |
+| `to_user_id`   | `uuid`        | No       | --                  | FK to `auth.users(id)`          |
+| `content`      | `text`        | No       | --                  | CHECK: 1-1000 chars             |
+| `image_url`    | `text`        | Yes      | `NULL`              | Storage path for attached image |
+| `created_at`   | `timestamptz` | No       | `now()`             |                                 |
 
 **Check constraints:** `different_users` ensures `from_user_id <> to_user_id`.
 
@@ -58,14 +58,14 @@ Messages between partners with optional image attachments.
 
 Poke and kiss interactions between partners with read tracking.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `type` | `text` | No | -- | CHECK: `poke` or `kiss` |
-| `from_user_id` | `uuid` | No | -- | FK to `users(id)` |
-| `to_user_id` | `uuid` | No | -- | FK to `users(id)` |
-| `viewed` | `boolean` | Yes | `false` | Whether recipient has seen it |
-| `created_at` | `timestamptz` | Yes | `now()` | |
+| Column         | Type          | Nullable | Default             | Constraints                   |
+| -------------- | ------------- | -------- | ------------------- | ----------------------------- |
+| `id`           | `uuid`        | No       | `gen_random_uuid()` | PK                            |
+| `type`         | `text`        | No       | --                  | CHECK: `poke` or `kiss`       |
+| `from_user_id` | `uuid`        | No       | --                  | FK to `users(id)`             |
+| `to_user_id`   | `uuid`        | No       | --                  | FK to `users(id)`             |
+| `viewed`       | `boolean`     | Yes      | `false`             | Whether recipient has seen it |
+| `created_at`   | `timestamptz` | Yes      | `now()`             |                               |
 
 **Indexes:** `idx_interactions_from_user` (from_user_id), `idx_interactions_to_user_viewed` (to_user_id, viewed)
 
@@ -73,14 +73,14 @@ Poke and kiss interactions between partners with read tracking.
 
 Partnership invitation workflow with pending/accepted/declined states.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `from_user_id` | `uuid` | No | -- | FK to `users(id)` |
-| `to_user_id` | `uuid` | No | -- | FK to `users(id)` |
-| `status` | `text` | No | `'pending'` | CHECK: `pending`, `accepted`, or `declined` |
-| `created_at` | `timestamptz` | No | `now()` | |
-| `updated_at` | `timestamptz` | No | `now()` | |
+| Column         | Type          | Nullable | Default             | Constraints                                 |
+| -------------- | ------------- | -------- | ------------------- | ------------------------------------------- |
+| `id`           | `uuid`        | No       | `gen_random_uuid()` | PK                                          |
+| `from_user_id` | `uuid`        | No       | --                  | FK to `users(id)`                           |
+| `to_user_id`   | `uuid`        | No       | --                  | FK to `users(id)`                           |
+| `status`       | `text`        | No       | `'pending'`         | CHECK: `pending`, `accepted`, or `declined` |
+| `created_at`   | `timestamptz` | No       | `now()`             |                                             |
+| `updated_at`   | `timestamptz` | No       | `now()`             |                                             |
 
 **Check constraints:** `no_self_requests` ensures `from_user_id <> to_user_id`.
 
@@ -90,51 +90,60 @@ Partnership invitation workflow with pending/accepted/declined states.
 
 Photo gallery metadata. Actual image files are stored in the `photos` Supabase Storage bucket.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `user_id` | `uuid` | No | -- | FK to `auth.users(id)` |
-| `storage_path` | `text` | No | -- | UNIQUE, path in Storage bucket |
-| `filename` | `text` | No | -- | Original filename |
-| `caption` | `text` | Yes | `NULL` | Photo caption |
-| `mime_type` | `text` | No | -- | CHECK: `image/jpeg`, `image/png`, or `image/webp` |
-| `file_size` | `integer` | No | -- | File size in bytes |
-| `width` | `integer` | No | -- | Image width in pixels |
-| `height` | `integer` | No | -- | Image height in pixels |
-| `created_at` | `timestamptz` | No | `now()` | |
+| Column         | Type          | Nullable | Default             | Constraints                                       |
+| -------------- | ------------- | -------- | ------------------- | ------------------------------------------------- |
+| `id`           | `uuid`        | No       | `gen_random_uuid()` | PK                                                |
+| `user_id`      | `uuid`        | No       | --                  | FK to `auth.users(id)`                            |
+| `storage_path` | `text`        | No       | --                  | UNIQUE, path in Storage bucket                    |
+| `filename`     | `text`        | No       | --                  | Original filename                                 |
+| `caption`      | `text`        | Yes      | `NULL`              | Photo caption                                     |
+| `mime_type`    | `text`        | No       | --                  | CHECK: `image/jpeg`, `image/png`, or `image/webp` |
+| `file_size`    | `integer`     | No       | --                  | File size in bytes                                |
+| `width`        | `integer`     | No       | --                  | Image width in pixels                             |
+| `height`       | `integer`     | No       | --                  | Image height in pixels                            |
+| `created_at`   | `timestamptz` | No       | `now()`             |                                                   |
 
 ## 2.7 `scripture_sessions`
 
 Scripture reading session state and progress tracking. Supports solo and together (partner) modes.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `mode` | `scripture_session_mode` | No | -- | `solo` or `together` |
-| `user1_id` | `uuid` | No | -- | FK to `auth.users(id)` ON DELETE CASCADE |
-| `user2_id` | `uuid` | Yes | `NULL` | FK to `auth.users(id)` ON DELETE CASCADE |
-| `current_phase` | `scripture_session_phase` | No | `'lobby'` | Session lifecycle phase |
-| `current_step_index` | `integer` | No | `0` | Current reading step position |
-| `status` | `scripture_session_status` | No | `'pending'` | Overall session status |
-| `version` | `integer` | No | `1` | Optimistic concurrency control |
-| `snapshot_json` | `jsonb` | Yes | `NULL` | Arbitrary session state snapshot |
-| `started_at` | `timestamptz` | No | `now()` | |
-| `completed_at` | `timestamptz` | Yes | `NULL` | |
+| Column                 | Type                       | Nullable | Default             | Constraints                                                                       |
+| ---------------------- | -------------------------- | -------- | ------------------- | --------------------------------------------------------------------------------- |
+| `id`                   | `uuid`                     | No       | `gen_random_uuid()` | PK                                                                                |
+| `mode`                 | `scripture_session_mode`   | No       | --                  | `solo` or `together`                                                              |
+| `user1_id`             | `uuid`                     | No       | --                  | FK to `auth.users(id)` ON DELETE CASCADE                                          |
+| `user2_id`             | `uuid`                     | Yes      | `NULL`              | FK to `auth.users(id)` ON DELETE CASCADE                                          |
+| `current_phase`        | `scripture_session_phase`  | No       | `'lobby'`           | Session lifecycle phase                                                           |
+| `current_step_index`   | `integer`                  | No       | `0`                 | Current reading step position                                                     |
+| `status`               | `scripture_session_status` | No       | `'pending'`         | Overall session status                                                            |
+| `version`              | `integer`                  | No       | `1`                 | Optimistic concurrency control                                                    |
+| `snapshot_json`        | `jsonb`                    | Yes      | `NULL`              | Arbitrary session state snapshot                                                  |
+| `started_at`           | `timestamptz`              | No       | `now()`             |                                                                                   |
+| `completed_at`         | `timestamptz`              | Yes      | `NULL`              |                                                                                   |
+| `user1_role`           | `scripture_session_role`   | Yes      | `NULL`              | Role selected by user1 (reader/responder); null until selected                    |
+| `user2_role`           | `scripture_session_role`   | Yes      | `NULL`              | Role selected by user2 (reader/responder); null until selected                    |
+| `user1_ready`          | `boolean`                  | No       | `false`             | Whether user1 has toggled Ready in the lobby                                      |
+| `user2_ready`          | `boolean`                  | No       | `false`             | Whether user2 has toggled Ready in the lobby                                      |
+| `countdown_started_at` | `timestamptz`              | Yes      | `NULL`              | Server UTC timestamp set when both users are ready; drives synchronized countdown |
 
-**Indexes:** `idx_scripture_sessions_user1` (user1_id, started_at DESC), `idx_scripture_sessions_user2` (user2_id, started_at DESC)
+**Indexes:** `idx_scripture_sessions_user1` (user1_id, started_at DESC), `idx_scripture_sessions_user2` (user2_id, started_at DESC), `idx_scripture_sessions_user2_status` (user2_id, status) WHERE user2_id IS NOT NULL
+
+**Lobby columns note:** The `user1_role`, `user2_role`, `user1_ready`, `user2_ready`, and `countdown_started_at` columns were added in migration 15 (`20260220000001`). They support the together-mode lobby flow where users select roles and signal readiness before the reading session begins.
+
+**Status values:** `pending`, `in_progress`, `complete`, `abandoned`, `ended_early`. The `ended_early` value was added in migration 19 (`20260228000001`).
 
 ## 2.8 `scripture_step_states`
 
 Per-step lock and advance timestamps for session synchronization in together mode.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `session_id` | `uuid` | No | -- | FK to `scripture_sessions(id)` ON DELETE CASCADE |
-| `step_index` | `integer` | No | -- | |
-| `user1_locked_at` | `timestamptz` | Yes | `NULL` | When user1 locked this step |
-| `user2_locked_at` | `timestamptz` | Yes | `NULL` | When user2 locked this step |
-| `advanced_at` | `timestamptz` | Yes | `NULL` | When step was advanced |
+| Column            | Type          | Nullable | Default             | Constraints                                      |
+| ----------------- | ------------- | -------- | ------------------- | ------------------------------------------------ |
+| `id`              | `uuid`        | No       | `gen_random_uuid()` | PK                                               |
+| `session_id`      | `uuid`        | No       | --                  | FK to `scripture_sessions(id)` ON DELETE CASCADE |
+| `step_index`      | `integer`     | No       | --                  |                                                  |
+| `user1_locked_at` | `timestamptz` | Yes      | `NULL`              | When user1 locked this step                      |
+| `user2_locked_at` | `timestamptz` | Yes      | `NULL`              | When user2 locked this step                      |
+| `advanced_at`     | `timestamptz` | Yes      | `NULL`              | When step was advanced                           |
 
 **Unique constraint:** `(session_id, step_index)`
 
@@ -144,16 +153,16 @@ Per-step lock and advance timestamps for session synchronization in together mod
 
 Per-step user reflections with 1-5 rating scale.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `session_id` | `uuid` | No | -- | FK to `scripture_sessions(id)` ON DELETE CASCADE |
-| `step_index` | `integer` | No | -- | |
-| `user_id` | `uuid` | No | -- | FK to `auth.users(id)` ON DELETE CASCADE |
-| `rating` | `integer` | Yes | `NULL` | CHECK: 1-5 |
-| `notes` | `text` | Yes | `NULL` | |
-| `is_shared` | `boolean` | No | `false` | Whether partner can see this reflection |
-| `created_at` | `timestamptz` | No | `now()` | |
+| Column       | Type          | Nullable | Default             | Constraints                                      |
+| ------------ | ------------- | -------- | ------------------- | ------------------------------------------------ |
+| `id`         | `uuid`        | No       | `gen_random_uuid()` | PK                                               |
+| `session_id` | `uuid`        | No       | --                  | FK to `scripture_sessions(id)` ON DELETE CASCADE |
+| `step_index` | `integer`     | No       | --                  |                                                  |
+| `user_id`    | `uuid`        | No       | --                  | FK to `auth.users(id)` ON DELETE CASCADE         |
+| `rating`     | `integer`     | Yes      | `NULL`              | CHECK: 1-5                                       |
+| `notes`      | `text`        | Yes      | `NULL`              |                                                  |
+| `is_shared`  | `boolean`     | No       | `false`             | Whether partner can see this reflection          |
+| `created_at` | `timestamptz` | No       | `now()`             |                                                  |
 
 **Unique constraint:** `(session_id, step_index, user_id)`
 
@@ -163,14 +172,14 @@ Per-step user reflections with 1-5 rating scale.
 
 Bookmarked reading steps with optional partner sharing.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `session_id` | `uuid` | No | -- | FK to `scripture_sessions(id)` ON DELETE CASCADE |
-| `step_index` | `integer` | No | -- | |
-| `user_id` | `uuid` | No | -- | FK to `auth.users(id)` ON DELETE CASCADE |
-| `share_with_partner` | `boolean` | No | `false` | |
-| `created_at` | `timestamptz` | No | `now()` | |
+| Column               | Type          | Nullable | Default             | Constraints                                      |
+| -------------------- | ------------- | -------- | ------------------- | ------------------------------------------------ |
+| `id`                 | `uuid`        | No       | `gen_random_uuid()` | PK                                               |
+| `session_id`         | `uuid`        | No       | --                  | FK to `scripture_sessions(id)` ON DELETE CASCADE |
+| `step_index`         | `integer`     | No       | --                  |                                                  |
+| `user_id`            | `uuid`        | No       | --                  | FK to `auth.users(id)` ON DELETE CASCADE         |
+| `share_with_partner` | `boolean`     | No       | `false`             |                                                  |
+| `created_at`         | `timestamptz` | No       | `now()`             |                                                  |
 
 **Unique constraint:** `(session_id, step_index, user_id)`
 
@@ -180,12 +189,12 @@ Bookmarked reading steps with optional partner sharing.
 
 Prayer report messages within a scripture reading session.
 
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | `uuid` | No | `gen_random_uuid()` | PK |
-| `session_id` | `uuid` | No | -- | FK to `scripture_sessions(id)` ON DELETE CASCADE |
-| `sender_id` | `uuid` | No | -- | FK to `auth.users(id)` ON DELETE CASCADE |
-| `message` | `text` | No | -- | |
-| `created_at` | `timestamptz` | No | `now()` | |
+| Column       | Type          | Nullable | Default             | Constraints                                      |
+| ------------ | ------------- | -------- | ------------------- | ------------------------------------------------ |
+| `id`         | `uuid`        | No       | `gen_random_uuid()` | PK                                               |
+| `session_id` | `uuid`        | No       | --                  | FK to `scripture_sessions(id)` ON DELETE CASCADE |
+| `sender_id`  | `uuid`        | No       | --                  | FK to `auth.users(id)` ON DELETE CASCADE         |
+| `message`    | `text`        | No       | --                  |                                                  |
+| `created_at` | `timestamptz` | No       | `now()`             |                                                  |
 
 **Indexes:** `idx_scripture_messages_session` (session_id)

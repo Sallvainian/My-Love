@@ -1,6 +1,7 @@
 # 4. TypeScript Type Definitions
 
 **Sources:**
+
 - `src/types/database.types.ts` (auto-generated from Supabase schema)
 - `src/types/index.ts` (application types)
 - `src/types/models.ts` (Supabase model types and re-exports)
@@ -46,6 +47,7 @@ type Database = {
 ```
 
 Each table provides three type variants:
+
 - **Row**: All columns, all non-nullable (matches SELECT results)
 - **Insert**: Required columns non-optional, generated columns optional
 - **Update**: All columns optional (for partial updates)
@@ -67,30 +69,41 @@ Hand-written types for the client-side application.
 ```typescript
 type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
 type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
-type MoodType = 'loved' | 'happy' | 'content' | 'excited' | 'thoughtful' | 'grateful'
-              | 'sad' | 'anxious' | 'frustrated' | 'angry' | 'lonely' | 'tired';
+type MoodType =
+  | 'loved'
+  | 'happy'
+  | 'content'
+  | 'excited'
+  | 'thoughtful'
+  | 'grateful'
+  | 'sad'
+  | 'anxious'
+  | 'frustrated'
+  | 'angry'
+  | 'lonely'
+  | 'tired';
 type RouteType = 'home' | 'memories' | 'moods' | 'countdown' | 'settings' | 'onboarding';
 ```
 
 ### Core Interfaces
 
-| Interface | Key Fields | Used By |
-|-----------|-----------|---------|
-| `Message` | `id: number`, `text`, `category`, `isCustom`, `active`, `createdAt`, `tags` | `customMessageService`, messagesSlice |
-| `Photo` | `id: number`, `imageBlob: Blob`, `caption`, `tags`, `uploadDate`, `originalSize`, `compressedSize`, `width`, `height`, `mimeType` | `photoStorageService`, photosSlice |
-| `MoodEntry` | `id?: number`, `userId`, `mood`, `moods?`, `note`, `date`, `timestamp`, `synced: boolean`, `supabaseId?` | `moodService`, moodSlice |
-| `Settings` | `themeName`, `notificationTime`, `relationship` (nested), `customization` (nested), `notifications` (nested) | settingsSlice |
-| `Anniversary` | `id: number`, `date`, `label`, `description?` | Settings.relationship |
-| `MessageHistory` | `currentIndex`, `shownMessages: Map<string, number>`, `maxHistoryDays`, `favoriteIds` | messagesSlice |
-| `AppState` | `settings`, `messageHistory`, `messages`, `photos`, `moods`, `isOnboarded` | useAppStore |
+| Interface        | Key Fields                                                                                                                        | Used By                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `Message`        | `id: number`, `text`, `category`, `isCustom`, `active`, `createdAt`, `tags`                                                       | `customMessageService`, messagesSlice |
+| `Photo`          | `id: number`, `imageBlob: Blob`, `caption`, `tags`, `uploadDate`, `originalSize`, `compressedSize`, `width`, `height`, `mimeType` | `photoStorageService`, photosSlice    |
+| `MoodEntry`      | `id?: number`, `userId`, `mood`, `moods?`, `note`, `date`, `timestamp`, `synced: boolean`, `supabaseId?`                          | `moodService`, moodSlice              |
+| `Settings`       | `themeName`, `notificationTime`, `relationship` (nested), `customization` (nested), `notifications` (nested)                      | settingsSlice                         |
+| `Anniversary`    | `id: number`, `date`, `label`, `description?`                                                                                     | Settings.relationship                 |
+| `MessageHistory` | `currentIndex`, `shownMessages: Map<string, number>`, `maxHistoryDays`, `favoriteIds`                                             | messagesSlice                         |
+| `AppState`       | `settings`, `messageHistory`, `messages`, `photos`, `moods`, `isOnboarded`                                                        | useAppStore                           |
 
 ### Compression Types
 
 ```typescript
 interface CompressionOptions {
-  maxWidth: number;   // Default: 2048
-  maxHeight: number;  // Default: 2048
-  quality: number;    // Default: 0.8
+  maxWidth: number; // Default: 2048
+  maxHeight: number; // Default: 2048
+  quality: number; // Default: 0.8
 }
 
 interface CompressionResult {
@@ -105,16 +118,17 @@ interface CompressionResult {
 
 ### Message Management Types
 
-| Interface | Purpose |
-|-----------|---------|
-| `CreateMessageInput` | `text`, `category`, `active?`, `tags?` |
-| `UpdateMessageInput` | `id` (required), `text?`, `category?`, `active?`, `tags?` |
-| `MessageFilter` | `category?`, `isCustom?`, `active?`, `searchTerm?`, `tags?` |
+| Interface              | Purpose                                                      |
+| ---------------------- | ------------------------------------------------------------ |
+| `CreateMessageInput`   | `text`, `category`, `active?`, `tags?`                       |
+| `UpdateMessageInput`   | `id` (required), `text?`, `category?`, `active?`, `tags?`    |
+| `MessageFilter`        | `category?`, `isCustom?`, `active?`, `searchTerm?`, `tags?`  |
 | `CustomMessagesExport` | `version: '1.0'`, `exportDate`, `messageCount`, `messages[]` |
 
 ### Re-exports
 
 `types/index.ts` re-exports from `interactionService`:
+
 - `Interaction`, `SupabaseInteractionRecord`, `InteractionType`
 
 ### Legacy Types (Deprecated)
@@ -130,6 +144,8 @@ Re-exports and additional interfaces for Supabase data models.
 From `photoService`: `SupabasePhoto`, `PhotoWithUrls`, `StorageQuota`, `PhotoUploadInput`
 
 From `dbSchema`: `ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, `ScriptureSessionMode`, `ScriptureSessionPhase`, `ScriptureSessionStatus`
+
+From `api/validation/supabaseSchemas`: `CoupleStats` (inferred from `CoupleStatsSchema`)
 
 ### LoveNote Interface
 

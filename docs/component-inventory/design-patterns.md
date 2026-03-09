@@ -2,39 +2,39 @@
 
 ## Barrel Exports
 
-9 component directories use `index.ts` barrel exports for clean imports:
+13 component directories use `index.ts` barrel exports for clean imports:
 
-| Folder | Exports |
-|--------|---------|
-| `CountdownTimer/` | `CountdownTimer` |
-| `DisplayNameSetup/` | `DisplayNameSetup` |
-| `InteractionHistory/` | `InteractionHistory` |
-| `LoginScreen/` | `LoginScreen` |
-| `MoodHistory/` | `MoodHistoryCalendar` |
-| `PartnerMoodView/` | `PartnerMoodView` |
-| `PokeKissInterface/` | `PokeKissInterface` |
-| `RelationshipTimers/` | `TimeTogether`, `BirthdayCountdown`, `EventCountdown`, `RelationshipTimers` |
-| `Settings/` | `Settings`, `AnniversarySettings` |
-| `shared/` | `NetworkStatusIndicator`, `NetworkStatusDot`, `SyncToast`, `SyncResult` (type) |
-| `love-notes/` | `LoveNotes`, `LoveNoteMessage` (+ type), `MessageList` (+ type) |
-| `ViewErrorBoundary/` | `ViewErrorBoundary` (named + default) |
-| `scripture-reading/` | `ScriptureOverview`, `SoloReadingFlow`, `BookmarkFlag`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport` |
+| Folder                | Exports                                                                                                                                                                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CountdownTimer/`     | `CountdownTimer`                                                                                                                                                                                                                                               |
+| `DisplayNameSetup/`   | `DisplayNameSetup`                                                                                                                                                                                                                                             |
+| `InteractionHistory/` | `InteractionHistory`                                                                                                                                                                                                                                           |
+| `LoginScreen/`        | `LoginScreen`                                                                                                                                                                                                                                                  |
+| `MoodHistory/`        | `MoodHistoryCalendar`                                                                                                                                                                                                                                          |
+| `PartnerMoodView/`    | `PartnerMoodView`                                                                                                                                                                                                                                              |
+| `PokeKissInterface/`  | `PokeKissInterface`                                                                                                                                                                                                                                            |
+| `RelationshipTimers/` | `TimeTogether`, `BirthdayCountdown`, `EventCountdown`, `RelationshipTimers`                                                                                                                                                                                    |
+| `Settings/`           | `Settings`, `AnniversarySettings`                                                                                                                                                                                                                              |
+| `shared/`             | `NetworkStatusIndicator`, `NetworkStatusDot`, `SyncToast`, `SyncResult` (type)                                                                                                                                                                                 |
+| `love-notes/`         | `LoveNotes`, `LoveNoteMessage` (+ type), `MessageList` (+ type)                                                                                                                                                                                                |
+| `ViewErrorBoundary/`  | `ViewErrorBoundary` (named + default)                                                                                                                                                                                                                          |
+| `scripture-reading/`  | `ScriptureOverview`, `SoloReadingFlow`, `LobbyContainer`, `ReadingContainer`, `Countdown`, `LockInButton`, `BookmarkFlag`, `RoleIndicator`, `PartnerPosition`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport`, `StatsSection` |
 
 ## Lazy Loading (Code Splitting)
 
 9 components are lazy-loaded via `React.lazy()` with dynamic imports in `App.tsx`:
 
-| Component | Import Path | Trigger |
-|-----------|-------------|---------|
-| `PhotoGallery` | `./components/PhotoGallery/PhotoGallery` | `currentView === 'photos'` |
-| `MoodTracker` | `./components/MoodTracker/MoodTracker` | `currentView === 'mood'` |
-| `PartnerMoodView` | `./components/PartnerMoodView/PartnerMoodView` | `currentView === 'partner'` |
-| `AdminPanel` | `./components/AdminPanel/AdminPanel` | URL path `/admin` |
-| `LoveNotes` | `./components/love-notes` | `currentView === 'notes'` |
-| `ScriptureOverview` | `./components/scripture-reading` | `currentView === 'scripture'` |
-| `WelcomeSplash` | `./components/WelcomeSplash/WelcomeSplash` | First visit or 60-min timer |
-| `PhotoUpload` | `./components/PhotoUpload/PhotoUpload` | Upload button click |
-| `PhotoCarousel` | `./components/PhotoCarousel/PhotoCarousel` | Photo selection |
+| Component           | Import Path                                    | Trigger                       |
+| ------------------- | ---------------------------------------------- | ----------------------------- |
+| `PhotoGallery`      | `./components/PhotoGallery/PhotoGallery`       | `currentView === 'photos'`    |
+| `MoodTracker`       | `./components/MoodTracker/MoodTracker`         | `currentView === 'mood'`      |
+| `PartnerMoodView`   | `./components/PartnerMoodView/PartnerMoodView` | `currentView === 'partner'`   |
+| `AdminPanel`        | `./components/AdminPanel/AdminPanel`           | URL path `/admin`             |
+| `LoveNotes`         | `./components/love-notes`                      | `currentView === 'notes'`     |
+| `ScriptureOverview` | `./components/scripture-reading`               | `currentView === 'scripture'` |
+| `WelcomeSplash`     | `./components/WelcomeSplash/WelcomeSplash`     | First visit or 60-min timer   |
+| `PhotoUpload`       | `./components/PhotoUpload/PhotoUpload`         | Upload button click           |
+| `PhotoCarousel`     | `./components/PhotoCarousel/PhotoCarousel`     | Photo selection               |
 
 All lazy views are wrapped in `<Suspense fallback={<LoadingSpinner />}>`. Additionally, `SoloReadingFlow` uses `LazyMotion` with a dynamic import of `motionFeatures.ts` for Framer Motion tree-shaking.
 
@@ -52,33 +52,44 @@ All lazy views are wrapped in `<Suspense fallback={<LoadingSpinner />}>`. Additi
 The `scripture-reading/` feature uses explicit container/presentational separation:
 
 **Containers** (connect to store, manage state, handle side effects):
-- `ScriptureOverview` - connects to PartnerSlice + ScriptureReadingSlice via `useShallow`, manages mode selection and session lifecycle
+
+- `ScriptureOverview` - connects to PartnerSlice + ScriptureReadingSlice via `useShallow`, manages mode selection and session lifecycle, mounts `useScriptureBroadcast` for together-mode
 - `SoloReadingFlow` - connects to ScriptureReadingSlice + PartnerSlice via `useShallow`, manages step navigation, save/exit, reflection, and report phases
+- `LobbyContainer` - connects to ScriptureReadingSlice + PartnerSlice via `useShallow`, manages role selection, lobby waiting, and countdown phases (Story 4.1)
+- `ReadingContainer` - connects to ScriptureReadingSlice + PartnerSlice via `useShallow`, manages together-mode reading with role alternation, lock-in, and disconnection handling (Story 4.2/4.3)
 
 **Presentational** (pure UI, accept props, no store access):
-- `BookmarkFlag` - toggle icon with ARIA
+
+- `BookmarkFlag` - toggle icon with ARIA (shared between solo and together flows)
 - `PerStepReflection` - rating scale + note input
 - `ReflectionSummary` - verse chips + rating + note
 - `MessageCompose` - textarea + send/skip
 - `DailyPrayerReport` - read-only report display
+- `StatsSection` - couple-aggregate statistics display (Story 3.1)
+- `Countdown` - synchronized 3-second countdown with server-derived timing (Story 4.1)
+- `LockInButton` - multi-state ready/waiting/undo button (Story 4.2)
+- `DisconnectionOverlay` - two-phase partner disconnection UI (Story 4.3)
+- `RoleIndicator` - reader/responder pill badge (Story 4.2)
+- `PartnerPosition` - ephemeral partner view indicator (Story 4.2)
 
 ## Memoization (React.memo)
 
 5 components use `React.memo` for render optimization:
 
-| Component | Location | Reason |
-|-----------|----------|--------|
-| `CalendarDay` | `MoodHistory/CalendarDay.tsx` | 30+ cells per month grid, only re-render on mood/date change |
-| `MoodCard` | `PartnerMoodView/PartnerMoodView.tsx` | List items in partner mood feed |
-| `LoveNoteMessage` | `love-notes/LoveNoteMessage.tsx` | Chat bubbles in virtualized list, prevent re-render on scroll |
-| `FullScreenImageViewer` | `love-notes/FullScreenImageViewer.tsx` | Prevent re-render when parent state changes |
-| `ImagePreview` | `love-notes/ImagePreview.tsx` | Prevent re-render during typing in MessageInput |
+| Component               | Location                               | Reason                                                        |
+| ----------------------- | -------------------------------------- | ------------------------------------------------------------- |
+| `CalendarDay`           | `MoodHistory/CalendarDay.tsx`          | 30+ cells per month grid, only re-render on mood/date change  |
+| `MoodCard`              | `PartnerMoodView/PartnerMoodView.tsx`  | List items in partner mood feed                               |
+| `LoveNoteMessage`       | `love-notes/LoveNoteMessage.tsx`       | Chat bubbles in virtualized list, prevent re-render on scroll |
+| `FullScreenImageViewer` | `love-notes/FullScreenImageViewer.tsx` | Prevent re-render when parent state changes                   |
+| `ImagePreview`          | `love-notes/ImagePreview.tsx`          | Prevent re-render during typing in MessageInput               |
 
 ## Virtualization (react-window v2)
 
 Two components use react-window for large list performance:
 
 ### MessageList (love-notes)
+
 - `List` component from react-window v2 with `useListRef(null)` for ref access
 - `useInfiniteLoader` from react-window-infinite-loader (threshold: 10, minimumBatchSize: 50)
 - Variable row heights via `calculateRowHeight()` based on content length and image presence
@@ -86,6 +97,7 @@ Two components use react-window for large list performance:
 - `onRowsRendered` callback for infinite loader integration and scroll position tracking
 
 ### MoodHistoryTimeline (MoodTracker)
+
 - `List` component with `useInfiniteLoader`
 - Date-grouped sections with `DateHeader` separators
 - Variable row heights
@@ -95,12 +107,15 @@ Two components use react-window for large list performance:
 All animations use Framer Motion with several import patterns:
 
 ### Standard Import
+
 ```typescript
 import { m as motion, AnimatePresence } from 'framer-motion';
 ```
+
 The `m as motion` alias enables Framer Motion's tree-shakeable `m` API while maintaining the familiar `motion.div` syntax.
 
 ### LazyMotion (Scripture Reading)
+
 ```typescript
 import { LazyMotion, m } from 'framer-motion';
 const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
@@ -112,7 +127,8 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 ```
 
 ### Animation Patterns Used
-- `AnimatePresence` for mount/unmount transitions (used in CountdownTimer, MoodDetailModal, PhotoCarousel, WelcomeSplash, PokeKissInterface, SoloReadingFlow, MessageList, MessageInput)
+
+- `AnimatePresence` for mount/unmount transitions (used in CountdownTimer, MoodDetailModal, PhotoCarousel, WelcomeSplash, PokeKissInterface, SoloReadingFlow, MessageList, MessageInput, ReadingContainer, LobbyContainer, Countdown, AnniversarySettings)
 - `AnimatePresence mode="wait"` for sequential transitions (CountdownTimer cards)
 - `whileHover={{ scale: 1.02 }}` for hover effects (RelationshipTimers, CountdownCard)
 - `whileTap={{ scale: 0.95 }}` for press feedback (WelcomeButton)
@@ -124,13 +140,19 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 ## Accessibility Patterns
 
 ### ARIA Live Regions
+
 - `NetworkStatusIndicator`: `role="status"`, `aria-live="polite"` for connectivity changes
 - `SyncToast`: `role="alert"`, `aria-live="polite"` for sync completion
 - `ScriptureOverview` / `SoloReadingFlow`: Dedicated screen reader announcer `<div className="sr-only" aria-live="polite" aria-atomic="true">` for step changes, view transitions, and session events
+- `Countdown`: `aria-live="assertive"` announces countdown start ("Session starting in 3 seconds") and completion ("Session started")
+- `DisconnectionOverlay`: `role="status"` + `aria-live="polite"` hidden announcement for partner disconnection
+- `LobbyContainer`: `aria-live="polite"` on partner join/ready status region
+- `PartnerPosition`: `aria-live="polite"` for partner view changes
 - `MessageInput`: `aria-live="polite"` on character counter
 - `PerStepReflection` / `ReflectionSummary`: `aria-live="polite"` on character counters
 
 ### Focus Management
+
 - `ViewErrorBoundary`: "Go Home" and "Try Again" buttons visible when error occurs
 - `PhotoViewer`: Focus trap (WCAG 2.4.3)
 - `FullScreenImageViewer`: Stores `previousFocusRef`, auto-focuses close button, restores on close
@@ -138,6 +160,7 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 - `ReflectionSummary`: Focus heading on mount via `requestAnimationFrame`
 
 ### Keyboard Navigation
+
 - `DailyMessage`: ArrowLeft/ArrowRight for message navigation
 - `PhotoCarousel`: ArrowLeft/ArrowRight for photo navigation, Escape to close
 - `PhotoViewer`: Same keyboard navigation
@@ -146,16 +169,23 @@ const loadMotionFeatures = () => import('../motionFeatures').then((module) => mo
 - `SoloReadingFlow`: Escape to close exit dialog
 
 ### Touch Targets
+
 - `BookmarkFlag`: `min-h-[48px] min-w-[48px]` (WCAG 2.5.8)
 - `SoloReadingFlow` buttons: `min-h-[48px]` for secondary, `min-h-[56px]` for primary
+- `LobbyContainer` role cards: `min-h-[140px]`, ready button: `min-h-[56px]`
+- `LockInButton`: `min-h-[48px]` on all button states
+- `DisconnectionOverlay` buttons: `min-h-[48px]`
+- `ReadingContainer` tabs: `min-h-[48px]`
 - Scripture partner link: `min-h-[44px]`
 - `MessageInput` buttons: `min-h-[44px] min-w-[44px]`
 
 ### Focus Visibility
+
 - `FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2'` used throughout scripture-reading feature
 - Standard Tailwind `focus:ring-2` used in other features
 
 ### Role Attributes
+
 - `role="status"`: NetworkStatusIndicator, NetworkStatusDot, offline indicators
 - `role="alert"`: SyncToast, error displays, validation messages
 - `role="dialog"` + `aria-modal="true"`: PhotoEditModal, FullScreenImageViewer, exit confirmation
@@ -174,6 +204,7 @@ Several components implement optimistic updates:
 - **SoloReadingFlow phase updates**: `updatePhase('report')` optimistically, persist to server in background
 - **LoveNoteMessage**: Optimistic send with `sending` flag, error state with retry
 - **PartnerMoodView**: Optimistic request actions
+- **Scripture lobby**: `selectRole` and `toggleReady` set state before RPC, rollback on error
 
 ## XSS Sanitization
 
@@ -196,14 +227,21 @@ Multiple components create Object URLs for image previews and clean them up:
 - `PhotoEditModal`: `URL.revokeObjectURL()` in cleanup function
 - `ImagePreview`: `URL.revokeObjectURL()` in effect cleanup
 - `LoveNoteMessage`: `URL.revokeObjectURL()` in effect cleanup (for preview URLs)
+- `NotesSlice`: `revokePreviewUrlsFromNotes()` helper cleans up all blob URLs on fetch/unmount
 
 Pattern uses `queueMicrotask` for state updates to avoid React warnings:
+
 ```typescript
 useEffect(() => {
   let cancelled = false;
   const url = URL.createObjectURL(file);
-  queueMicrotask(() => { if (!cancelled) setPreviewUrl(url); });
-  return () => { cancelled = true; URL.revokeObjectURL(url); };
+  queueMicrotask(() => {
+    if (!cancelled) setPreviewUrl(url);
+  });
+  return () => {
+    cancelled = true;
+    URL.revokeObjectURL(url);
+  };
 }, [file]);
 ```
 

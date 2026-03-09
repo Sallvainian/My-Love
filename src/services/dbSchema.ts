@@ -23,8 +23,17 @@ export type StoredMoodEntry = MoodEntry;
 // ============================================
 
 export type ScriptureSessionMode = 'solo' | 'together';
-export type ScriptureSessionPhase = 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete';
+export type ScriptureSessionPhase =
+  | 'lobby'
+  | 'countdown'
+  | 'reading'
+  | 'reflection'
+  | 'report'
+  | 'complete';
 export type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
+
+/** Story 4.1: Role a participant takes in a together-mode lobby */
+export type ScriptureSessionRole = 'reader' | 'responder';
 
 /**
  * Scripture session stored in IndexedDB for offline support
@@ -41,6 +50,12 @@ export interface ScriptureSession {
   snapshotJson?: Record<string, unknown>;
   startedAt: Date;
   completedAt?: Date;
+  // Story 4.1: Role and ready state (populated from server snapshot)
+  myRole?: ScriptureSessionRole;
+  partnerRole?: ScriptureSessionRole;
+  user1Ready?: boolean;
+  user2Ready?: boolean;
+  countdownStartedAt?: Date;
 }
 
 /**

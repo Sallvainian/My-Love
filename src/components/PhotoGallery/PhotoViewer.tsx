@@ -282,11 +282,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         navigatePhoto('prev');
       }
       // AC 6.4.7: Swipe down to close
-      else if (
-        Math.abs(info.offset.y) > 100 &&
-        info.velocity.y > 0 &&
-        scale === MIN_ZOOM
-      ) {
+      else if (Math.abs(info.offset.y) > 100 && info.velocity.y > 0 && scale === MIN_ZOOM) {
         onClose();
       }
 
@@ -382,7 +378,8 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
       <motion.div
         ref={containerRef}
         // AC 6.4.1: Full-screen modal overlay with black background
-        className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black"
+        data-testid="photo-viewer-overlay"
         role="dialog"
         aria-modal="true"
         aria-label="Photo viewer"
@@ -397,20 +394,20 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
           {currentPhoto.isOwn && (
             <button
               onClick={() => setShowDeleteDialog(true)}
-              className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"
+              className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
               aria-label="Delete photo"
             >
-              <Trash2 className="w-6 h-6 text-white" />
+              <Trash2 className="h-6 w-6 text-white" />
             </button>
           )}
 
           {/* AC 6.4.1: Close button */}
           <button
             onClick={onClose}
-            className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"
+            className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
             aria-label="Close viewer"
           >
-            <X className="w-6 h-6 text-white" />
+            <X className="h-6 w-6 text-white" />
           </button>
         </div>
 
@@ -418,25 +415,25 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         <button
           onClick={() => navigatePhoto('prev')}
           disabled={!canNavigatePrev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 rounded-full hover:bg-white/20 transition disabled:opacity-30 disabled:cursor-not-allowed z-10"
+          className="absolute top-1/2 left-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
           aria-disabled={!canNavigatePrev}
         >
-          <ChevronLeft className="w-8 h-8 text-white" />
+          <ChevronLeft className="h-8 w-8 text-white" />
         </button>
 
         <button
           onClick={() => navigatePhoto('next')}
           disabled={!canNavigateNext}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 rounded-full hover:bg-white/20 transition disabled:opacity-30 disabled:cursor-not-allowed z-10"
+          className="absolute top-1/2 right-4 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
           aria-disabled={!canNavigateNext}
         >
-          <ChevronRight className="w-8 h-8 text-white" />
+          <ChevronRight className="h-8 w-8 text-white" />
         </button>
 
         {/* AC 6.4.2, 6.4.4, 6.4.5, 6.4.7: Photo with gesture support */}
-        <div className="relative w-full h-full flex items-center justify-center p-4">
+        <div className="relative flex h-full w-full items-center justify-center p-4">
           <motion.div
             drag={scale === MIN_ZOOM ? true : scale > MIN_ZOOM}
             dragConstraints={calculateDragConstraints()}
@@ -457,7 +454,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
             {/* AC 6.4.15: Loading spinner */}
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-white animate-spin" />
+                <Loader2 className="h-12 w-12 animate-spin text-white" />
               </div>
             )}
 
@@ -467,7 +464,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 <p className="mb-4">Failed to load photo</p>
                 <button
                   onClick={handleRetryLoad}
-                  className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition"
+                  className="rounded-lg bg-white/10 px-4 py-2 transition hover:bg-white/20"
                 >
                   Retry
                 </button>
@@ -481,7 +478,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
                 key={currentPhoto.id} // Force remount on photo change
                 src={currentPhoto.signedUrl || ''}
                 alt={currentPhoto.caption || 'Photo'}
-                className="max-w-full max-h-[calc(100vh-8rem)] object-contain"
+                className="max-h-[calc(100vh-8rem)] max-w-full object-contain"
                 style={{ opacity: isLoading ? 0 : 1 }}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
@@ -496,21 +493,21 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
         {/* AC 6.4.8, 6.4.9: Photo caption and metadata */}
         <motion.div
-          className="absolute bottom-0 left-0 right-0 bg-black/80 text-white p-4"
+          className="absolute right-0 bottom-0 left-0 bg-black/80 p-4 text-white"
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="text-sm text-gray-300 mb-1">
+          <div className="mb-1 text-sm text-gray-300">
             Photo {currentIndex + 1} of {photos.length} •{' '}
             {currentPhoto.isOwn ? 'Your photo' : 'Partner photo'}
           </div>
           {currentPhoto.caption && (
-            <p id="photo-caption" className="text-base line-clamp-2">
+            <p id="photo-caption" className="line-clamp-2 text-base">
               {currentPhoto.caption}
             </p>
           )}
-          <div className="text-sm text-gray-400 mt-1">
+          <div className="mt-1 text-sm text-gray-400">
             {new Date(currentPhoto.created_at).toLocaleDateString('en-US', {
               month: 'long',
               day: 'numeric',
@@ -523,31 +520,31 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         {showDeleteDialog && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
             <motion.div
-              className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4"
+              className="mx-4 max-w-sm rounded-lg bg-white p-6 dark:bg-gray-800"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
             >
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Delete Photo?
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+              <p className="mb-4 text-gray-600 dark:text-gray-400">
                 This photo will be permanently deleted. This action cannot be undone.
               </p>
               {currentPhoto.caption && (
-                <p className="text-sm text-gray-500 dark:text-gray-500 italic mb-4 line-clamp-2">
+                <p className="mb-4 line-clamp-2 text-sm text-gray-500 italic dark:text-gray-500">
                   "{currentPhoto.caption}"
                 </p>
               )}
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowDeleteDialog(false)}
-                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                  className="flex-1 rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                  className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-white transition hover:bg-red-600"
                 >
                   Delete
                 </button>

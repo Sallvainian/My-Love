@@ -78,7 +78,7 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={handleCancel}
-        className="fixed inset-0 bg-black/50 z-50"
+        className="fixed inset-0 z-50 bg-black/50"
         data-testid="admin-create-form-backdrop"
       />
 
@@ -91,35 +91,35 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
           data-testid="admin-create-form"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between border-b border-gray-200 p-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Create New Message</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-500">
                 Add a personalized message to your library
               </p>
             </div>
             <button
               onClick={handleCancel}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
               aria-label="Close"
               data-testid="admin-create-form-close"
             >
-              <X className="w-6 h-6 text-gray-500" />
+              <X className="h-6 w-6 text-gray-500" />
             </button>
           </div>
 
           {/* Form */}
-          <div className="p-6 space-y-6">
+          <div className="space-y-6 p-6">
             {/* Message text */}
             <div>
               <label
                 htmlFor="message-text"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="mb-2 block text-sm font-medium text-gray-700"
               >
                 Message Text *
               </label>
@@ -130,12 +130,12 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 placeholder="Enter your message here..."
                 maxLength={maxLength}
                 rows={6}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none ${
+                className={`w-full resize-none rounded-lg border px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-pink-500 ${
                   textError ? 'border-red-500' : 'border-gray-300'
                 }`}
                 data-testid="admin-create-form-text"
               />
-              <div className="flex items-center justify-between mt-2">
+              <div className="mt-2 flex items-center justify-between">
                 {textError ? (
                   <p className="text-sm text-red-600">{textError}</p>
                 ) : (
@@ -155,14 +155,14 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
 
             {/* Category */}
             <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="category" className="mb-2 block text-sm font-medium text-gray-700">
                 Category *
               </label>
               <select
                 id="category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MessageCategory)}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+                className={`w-full rounded-lg border px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-pink-500 ${
                   categoryError ? 'border-red-500' : 'border-gray-300'
                 }`}
                 data-testid="admin-create-form-category"
@@ -174,9 +174,9 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
                 <option value="custom">💕 Custom</option>
               </select>
               {categoryError ? (
-                <p className="text-sm text-red-600 mt-2">{categoryError}</p>
+                <p className="mt-2 text-sm text-red-600">{categoryError}</p>
               ) : (
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="mt-2 text-sm text-gray-500">
                   Choose a category that best describes your message
                 </p>
               )}
@@ -184,18 +184,18 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
 
             {/* Active toggle (Story 3.5 AC-3.5.4) */}
             <div>
-              <label htmlFor="create-active" className="flex items-center gap-3 cursor-pointer">
+              <label htmlFor="create-active" className="flex cursor-pointer items-center gap-3">
                 <input
                   type="checkbox"
                   id="create-active"
                   checked={active}
                   onChange={(e) => setActive(e.target.checked)}
-                  className="w-5 h-5 text-pink-500 border-gray-300 rounded focus:ring-2 focus:ring-pink-500"
+                  className="h-5 w-5 rounded border-gray-300 text-pink-500 focus:ring-2 focus:ring-pink-500"
                   data-testid="create-message-active-toggle"
                 />
                 <div>
                   <span className="text-sm font-medium text-gray-700">Active in rotation</span>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="mt-0.5 text-xs text-gray-500">
                     {active
                       ? 'This message can appear in daily rotation'
                       : "Save as draft - won't appear in rotation until activated"}
@@ -207,7 +207,7 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
             {/* General Error Message */}
             {error && (
               <div
-                className="px-4 py-3 bg-red-50 border border-red-300 rounded-lg text-red-700"
+                className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-700"
                 data-testid="admin-create-form-error"
               >
                 {error}
@@ -216,10 +216,10 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 p-6">
             <button
               onClick={handleCancel}
-              className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              className="rounded-lg border border-gray-300 px-6 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-100"
               data-testid="admin-create-form-cancel"
             >
               Cancel
@@ -227,7 +227,7 @@ export function CreateMessageForm({ isOpen, onClose }: CreateMessageFormProps) {
             <button
               onClick={handleSave}
               disabled={!isValid}
-              className="px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg hover:shadow-lg transition-shadow font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+              className="rounded-lg bg-gradient-to-r from-pink-500 to-rose-500 px-6 py-2.5 font-medium text-white transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
               data-testid="admin-create-form-save"
             >
               Save Message

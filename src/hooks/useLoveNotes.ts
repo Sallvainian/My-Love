@@ -101,17 +101,26 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     clearNotesError();
   }, [clearNotesError]);
 
-  const sendNote = useCallback(async (content: string, imageFile?: File) => {
-    await sendNoteAction(content, imageFile);
-  }, [sendNoteAction]);
+  const sendNote = useCallback(
+    async (content: string, imageFile?: File) => {
+      await sendNoteAction(content, imageFile);
+    },
+    [sendNoteAction]
+  );
 
-  const retryFailedMessage = useCallback(async (tempId: string) => {
-    await retryFailedMessageAction(tempId);
-  }, [retryFailedMessageAction]);
+  const retryFailedMessage = useCallback(
+    async (tempId: string) => {
+      await retryFailedMessageAction(tempId);
+    },
+    [retryFailedMessageAction]
+  );
 
-  const removeFailedMessage = useCallback((tempId: string) => {
-    removeFailedMessageAction(tempId);
-  }, [removeFailedMessageAction]);
+  const removeFailedMessage = useCallback(
+    (tempId: string) => {
+      removeFailedMessageAction(tempId);
+    },
+    [removeFailedMessageAction]
+  );
 
   // Auto-fetch notes on mount
   useEffect(() => {

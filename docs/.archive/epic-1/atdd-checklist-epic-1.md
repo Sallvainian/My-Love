@@ -20,6 +20,7 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 ## Acceptance Criteria
 
 ### Story 1.1: Database Schema & Backend Infrastructure
+
 1. Supabase tables exist with correct schemas (scripture_sessions, scripture_step_states, scripture_reflections, scripture_bookmarks, scripture_messages)
 2. RLS policies enforce session-based access (only session participants can read/write)
 3. RPCs exist: scripture_create_session, scripture_submit_reflection, scripture_lock_in, scripture_advance_phase
@@ -30,6 +31,7 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 8. Static scripture data: 17 steps with verse text, response text, section themes, verse references
 
 ### Story 1.2: Navigation & Overview Page
+
 9. Scripture tab appears in bottom navigation
 10. Overview page displays with Lavender Dreams theme
 11. "Start" button begins new session with mode selection
@@ -37,6 +39,7 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 13. Resume prompt for incomplete sessions: "Continue where you left off? (Step X of 17)"
 
 ### Story 1.3: Solo Reading Flow
+
 14. New session created with mode='solo', status='in_progress', current_step_index=0
 15. Verse screen displays reference, text, "View Response" button, "Next Verse" button, progress indicator
 16. Response screen shows response text with "Back to Verse" and "Next Verse" buttons
@@ -45,6 +48,7 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 19. Exit button shows confirmation with "Save & Exit"
 
 ### Story 1.4: Save, Resume & Optimistic UI
+
 20. Exit mid-session persists step index to server and caches in IndexedDB
 21. Resume loads from cache immediately, then fetches fresh from server
 22. Step advancement appears instant (optimistic UI) with background server update
@@ -53,6 +57,7 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 25. Server write failure shows retry UI, local state preserved
 
 ### Story 1.5: Accessibility Foundations
+
 26. All interactive elements reachable via Tab in logical order
 27. Buttons have descriptive aria-labels
 28. Progress indicator has aria-label "Currently on verse X of 17"
@@ -67,92 +72,92 @@ Users can access Scripture Reading from bottom navigation, start a Solo session,
 
 ### 1. API Tests: RLS Security (`tests/e2e/scripture/scripture-rls-security.spec.ts`)
 
-| # | Test Name | Priority | AC | Status | Failure Reason |
-|---|-----------|----------|-----|--------|----------------|
-| 1 | P0-001: SELECT scripture_sessions - member access | P0 | 2 | RED | RLS policies not yet created |
-| 2 | P0-001: SELECT scripture_sessions - non-member blocked | P0 | 2 | RED | RLS policies not yet created |
-| 3 | P0-002: SELECT scripture_reflections - member access | P0 | 2 | RED | Table/RLS not yet created |
-| 4 | P0-002: SELECT scripture_reflections - non-member blocked | P0 | 2 | RED | Table/RLS not yet created |
-| 5 | P0-003: INSERT scripture_reflections - non-member rejected | P0 | 2 | RED | RLS INSERT policy not yet created |
-| 6 | P0-003: INSERT scripture_bookmarks - non-member rejected | P0 | 2 | RED | RLS INSERT policy not yet created |
-| 7 | P0-004: user_id = auth.uid() enforced on INSERT | P0 | 2 | RED | CHECK constraint not yet created |
-| 8 | P0-005: is_shared visibility - unshared hidden from partner | P0 | 2 | RED | RLS visibility policy not yet created |
-| 9 | P0-008: Solo session creation via RPC | P0 | 3,14 | RED | RPC scripture_create_session not yet created |
-| 10 | P0-012: Idempotent reflection write (upsert) | P0 | 4 | RED | RPC scripture_submit_reflection not yet created |
+| #   | Test Name                                                   | Priority | AC   | Status | Failure Reason                                  |
+| --- | ----------------------------------------------------------- | -------- | ---- | ------ | ----------------------------------------------- |
+| 1   | P0-001: SELECT scripture_sessions - member access           | P0       | 2    | RED    | RLS policies not yet created                    |
+| 2   | P0-001: SELECT scripture_sessions - non-member blocked      | P0       | 2    | RED    | RLS policies not yet created                    |
+| 3   | P0-002: SELECT scripture_reflections - member access        | P0       | 2    | RED    | Table/RLS not yet created                       |
+| 4   | P0-002: SELECT scripture_reflections - non-member blocked   | P0       | 2    | RED    | Table/RLS not yet created                       |
+| 5   | P0-003: INSERT scripture_reflections - non-member rejected  | P0       | 2    | RED    | RLS INSERT policy not yet created               |
+| 6   | P0-003: INSERT scripture_bookmarks - non-member rejected    | P0       | 2    | RED    | RLS INSERT policy not yet created               |
+| 7   | P0-004: user_id = auth.uid() enforced on INSERT             | P0       | 2    | RED    | CHECK constraint not yet created                |
+| 8   | P0-005: is_shared visibility - unshared hidden from partner | P0       | 2    | RED    | RLS visibility policy not yet created           |
+| 9   | P0-008: Solo session creation via RPC                       | P0       | 3,14 | RED    | RPC scripture_create_session not yet created    |
+| 10  | P0-012: Idempotent reflection write (upsert)                | P0       | 4    | RED    | RPC scripture_submit_reflection not yet created |
 
 **Risk Coverage:** R-001 (RLS policy bypass, Score: 6) - fully covered
 
 ### 2. E2E Tests: Solo Reading Flow (`tests/e2e/scripture/scripture-solo-reading.spec.ts`)
 
-| # | Test Name | Priority | AC | Status | Failure Reason |
-|---|-----------|----------|-----|--------|----------------|
-| 1 | P0-009: Complete full 17-step solo reading flow | P0 | 14-18 | RED | UI components not yet built |
-| 2 | Verse screen displays correct elements | P1 | 15 | RED | UI components not yet built |
-| 3 | Navigate to response screen and back | P1 | 16 | RED | Response screen not yet built |
-| 4 | Advance from response screen via Next Verse | P1 | 16,17 | RED | Navigation logic not yet implemented |
-| 5 | P1-001: Optimistic step advance | P1 | 22 | RED | Optimistic UI not yet implemented |
-| 6 | P1-012: Progress indicator updates | P1 | 15 | RED | Progress component not yet built |
-| 7 | P2-012: Session completion boundary (step 17 → reflection) | P2 | 18 | RED | Completion logic not yet implemented |
+| #   | Test Name                                                  | Priority | AC    | Status | Failure Reason                       |
+| --- | ---------------------------------------------------------- | -------- | ----- | ------ | ------------------------------------ |
+| 1   | P0-009: Complete full 17-step solo reading flow            | P0       | 14-18 | RED    | UI components not yet built          |
+| 2   | Verse screen displays correct elements                     | P1       | 15    | RED    | UI components not yet built          |
+| 3   | Navigate to response screen and back                       | P1       | 16    | RED    | Response screen not yet built        |
+| 4   | Advance from response screen via Next Verse                | P1       | 16,17 | RED    | Navigation logic not yet implemented |
+| 5   | P1-001: Optimistic step advance                            | P1       | 22    | RED    | Optimistic UI not yet implemented    |
+| 6   | P1-012: Progress indicator updates                         | P1       | 15    | RED    | Progress component not yet built     |
+| 7   | P2-012: Session completion boundary (step 17 → reflection) | P2       | 18    | RED    | Completion logic not yet implemented |
 
 ### 3. E2E Tests: Navigation & Overview (`tests/e2e/scripture/scripture-overview.spec.ts`)
 
-| # | Test Name | Priority | AC | Status | Failure Reason |
-|---|-----------|----------|-----|--------|----------------|
-| 1 | Scripture tab in bottom navigation | P1 | 9 | RED | Nav tab not yet added |
-| 2 | Navigate to scripture overview | P1 | 9,10 | RED | Route/page not yet created |
-| 3 | Display overview with Start button | P1 | 11 | RED | Overview page not yet built |
-| 4 | Show mode selection after tapping Start | P1 | 11 | RED | Mode selection not yet built |
-| 5 | P1-006: No partner disables Together mode | P1 | 12 | RED | Partner check logic not yet implemented |
-| 6 | P1-007: Partner enables both modes | P1 | 12 | RED | Partner integration not yet built |
-| 7 | P1-008: Resume prompt with correct step number | P1 | 13 | RED | Resume prompt not yet built |
-| 8 | P1-009: Start fresh clears saved state | P1 | 13 | RED | Fresh start logic not yet implemented |
+| #   | Test Name                                      | Priority | AC   | Status | Failure Reason                          |
+| --- | ---------------------------------------------- | -------- | ---- | ------ | --------------------------------------- |
+| 1   | Scripture tab in bottom navigation             | P1       | 9    | RED    | Nav tab not yet added                   |
+| 2   | Navigate to scripture overview                 | P1       | 9,10 | RED    | Route/page not yet created              |
+| 3   | Display overview with Start button             | P1       | 11   | RED    | Overview page not yet built             |
+| 4   | Show mode selection after tapping Start        | P1       | 11   | RED    | Mode selection not yet built            |
+| 5   | P1-006: No partner disables Together mode      | P1       | 12   | RED    | Partner check logic not yet implemented |
+| 6   | P1-007: Partner enables both modes             | P1       | 12   | RED    | Partner integration not yet built       |
+| 7   | P1-008: Resume prompt with correct step number | P1       | 13   | RED    | Resume prompt not yet built             |
+| 8   | P1-009: Start fresh clears saved state         | P1       | 13   | RED    | Fresh start logic not yet implemented   |
 
 ### 4. E2E Tests: Save, Resume & Exit (`tests/e2e/scripture/scripture-session.spec.ts`)
 
-| # | Test Name | Priority | AC | Status | Failure Reason |
-|---|-----------|----------|-----|--------|----------------|
-| 1 | P0-010: Session save on exit | P0 | 19,20 | RED | Exit flow not yet built |
-| 2 | P0-011: Session resume at correct step | P0 | 21 | RED | Resume logic not yet implemented |
-| 3 | P2-011: Exit confirmation dialog with save option | P2 | 19 | RED | Dialog component not yet built |
-| 4 | Dismiss exit dialog on cancel | P2 | 19 | RED | Dialog component not yet built |
-| 5 | P1-005: Server write failure shows retry UI | P1 | 25 | RED | Retry UI not yet implemented |
-| 6 | P2-009: Offline indicator when offline | P2 | 23 | RED | Offline detection not yet built |
-| 7 | P2-010: Step advancement blocked when offline | P2 | 23 | RED | Offline guard not yet implemented |
+| #   | Test Name                                         | Priority | AC    | Status | Failure Reason                    |
+| --- | ------------------------------------------------- | -------- | ----- | ------ | --------------------------------- |
+| 1   | P0-010: Session save on exit                      | P0       | 19,20 | RED    | Exit flow not yet built           |
+| 2   | P0-011: Session resume at correct step            | P0       | 21    | RED    | Resume logic not yet implemented  |
+| 3   | P2-011: Exit confirmation dialog with save option | P2       | 19    | RED    | Dialog component not yet built    |
+| 4   | Dismiss exit dialog on cancel                     | P2       | 19    | RED    | Dialog component not yet built    |
+| 5   | P1-005: Server write failure shows retry UI       | P1       | 25    | RED    | Retry UI not yet implemented      |
+| 6   | P2-009: Offline indicator when offline            | P2       | 23    | RED    | Offline detection not yet built   |
+| 7   | P2-010: Step advancement blocked when offline     | P2       | 23    | RED    | Offline guard not yet implemented |
 
 ### 5. E2E Tests: Accessibility (`tests/e2e/scripture/scripture-accessibility.spec.ts`)
 
-| # | Test Name | Priority | AC | Status | Failure Reason |
-|---|-----------|----------|-----|--------|----------------|
-| 1 | P2-001: Tab reaches all interactive elements | P2 | 26 | RED | UI components not yet built |
-| 2 | Buttons activate with Enter and Space | P2 | 26 | RED | UI components not yet built |
-| 3 | No keyboard traps | P2 | 26 | RED | UI components not yet built |
-| 4 | P2-002: Descriptive aria-labels on buttons | P2 | 27 | RED | aria-labels not yet added |
-| 5 | P2-002: aria-label on progress indicator | P2 | 28 | RED | Progress component not yet built |
-| 6 | P2-003: aria-live region for verse transitions | P2 | 29 | RED | Live region not yet implemented |
-| 7 | P2-004: Announcements only on semantic state changes | P2 | 29 | RED | Announcement logic not yet built |
-| 8 | P2-005: Focus verse heading after step navigation | P2 | 30 | RED | Focus management not yet implemented |
-| 9 | P2-006: Focus nav button after response transition | P2 | 30 | RED | Focus management not yet implemented |
-| 10 | P2-008: Buttons have 48x48px touch targets | P2 | 32 | RED | Button sizing not yet implemented |
-| 11 | P2-008: 8px spacing between touch targets | P2 | 32 | RED | Button spacing not yet implemented |
-| 12 | P2-014: WCAG AA automated audit via axe-core | P2 | 32 | RED | UI components not yet built |
+| #   | Test Name                                            | Priority | AC  | Status | Failure Reason                       |
+| --- | ---------------------------------------------------- | -------- | --- | ------ | ------------------------------------ |
+| 1   | P2-001: Tab reaches all interactive elements         | P2       | 26  | RED    | UI components not yet built          |
+| 2   | Buttons activate with Enter and Space                | P2       | 26  | RED    | UI components not yet built          |
+| 3   | No keyboard traps                                    | P2       | 26  | RED    | UI components not yet built          |
+| 4   | P2-002: Descriptive aria-labels on buttons           | P2       | 27  | RED    | aria-labels not yet added            |
+| 5   | P2-002: aria-label on progress indicator             | P2       | 28  | RED    | Progress component not yet built     |
+| 6   | P2-003: aria-live region for verse transitions       | P2       | 29  | RED    | Live region not yet implemented      |
+| 7   | P2-004: Announcements only on semantic state changes | P2       | 29  | RED    | Announcement logic not yet built     |
+| 8   | P2-005: Focus verse heading after step navigation    | P2       | 30  | RED    | Focus management not yet implemented |
+| 9   | P2-006: Focus nav button after response transition   | P2       | 30  | RED    | Focus management not yet implemented |
+| 10  | P2-008: Buttons have 48x48px touch targets           | P2       | 32  | RED    | Button sizing not yet implemented    |
+| 11  | P2-008: 8px spacing between touch targets            | P2       | 32  | RED    | Button spacing not yet implemented   |
+| 12  | P2-014: WCAG AA automated audit via axe-core         | P2       | 32  | RED    | UI components not yet built          |
 
 ### 6. Unit Tests: useMotionConfig Hook (`tests/unit/hooks/useMotionConfig.test.ts`)
 
-| # | Test Name | Priority | AC | Status | Failure Reason |
-|---|-----------|----------|-----|--------|----------------|
-| 1 | P2-007: Full durations when reduced motion NOT preferred | P2 | 31 | RED | Hook not yet implemented |
-| 2 | P2-007: Zero durations when reduced motion IS preferred | P2 | 31 | RED | Hook not yet implemented |
-| 3 | Export getMotionConfig for non-hook usage | P2 | 31 | RED | Module not yet created |
+| #   | Test Name                                                | Priority | AC  | Status | Failure Reason           |
+| --- | -------------------------------------------------------- | -------- | --- | ------ | ------------------------ |
+| 1   | P2-007: Full durations when reduced motion NOT preferred | P2       | 31  | RED    | Hook not yet implemented |
+| 2   | P2-007: Zero durations when reduced motion IS preferred  | P2       | 31  | RED    | Hook not yet implemented |
+| 3   | Export getMotionConfig for non-hook usage                | P2       | 31  | RED    | Module not yet created   |
 
 ### 7. Pre-Existing Unit Tests (GREEN - Story 1.1)
 
 These tests were already passing before this ATDD cycle:
 
-| File | Tests | Status |
-|------|-------|--------|
-| `tests/unit/services/scriptureReadingService.test.ts` | 11 tests (IndexedDB CRUD, corruption recovery) | GREEN |
-| `tests/unit/stores/scriptureReadingSlice.test.ts` | 13 tests (Zustand state transitions) | GREEN |
-| `tests/unit/data/scriptureSteps.test.ts` | 7 tests (17 steps, sections, refs) | GREEN |
+| File                                                  | Tests                                          | Status |
+| ----------------------------------------------------- | ---------------------------------------------- | ------ |
+| `tests/unit/services/scriptureReadingService.test.ts` | 11 tests (IndexedDB CRUD, corruption recovery) | GREEN  |
+| `tests/unit/stores/scriptureReadingSlice.test.ts`     | 13 tests (Zustand state transitions)           | GREEN  |
+| `tests/unit/data/scriptureSteps.test.ts`              | 7 tests (17 steps, sections, refs)             | GREEN  |
 
 ---
 
@@ -160,10 +165,10 @@ These tests were already passing before this ATDD cycle:
 
 ### Existing: `tests/support/factories/index.ts`
 
-| Factory | Description | Used By |
-|---------|-------------|---------|
-| `createTestSession(supabaseAdmin, options?)` | Seeds test data via `scripture_seed_test_data` RPC. Options: `preset` ('default', 'mid_session'), `includeReflections`. Returns `SeedResult` with `session_ids`, `test_user1_id`, `test_user2_id` | RLS security tests, session tests |
-| `cleanupTestSession(supabaseAdmin, sessionIds)` | Deletes in FK order: messages → reflections → bookmarks → step_states → sessions | All API tests |
+| Factory                                         | Description                                                                                                                                                                                       | Used By                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `createTestSession(supabaseAdmin, options?)`    | Seeds test data via `scripture_seed_test_data` RPC. Options: `preset` ('default', 'mid_session'), `includeReflections`. Returns `SeedResult` with `session_ids`, `test_user1_id`, `test_user2_id` | RLS security tests, session tests |
+| `cleanupTestSession(supabaseAdmin, sessionIds)` | Deletes in FK order: messages → reflections → bookmarks → step_states → sessions                                                                                                                  | All API tests                     |
 
 ### Factory Types
 
@@ -180,7 +185,7 @@ export interface SeedResult {
 
 ```typescript
 // Located in scripture-rls-security.spec.ts
-async function createUserClient(supabaseAdmin, userId: string)
+async function createUserClient(supabaseAdmin, userId: string);
 // Creates Supabase client authenticated as specific user via signInWithPassword
 // Uses test-password-123 (known from seed data)
 ```
@@ -193,31 +198,31 @@ async function createUserClient(supabaseAdmin, userId: string)
 
 ### Existing: `tests/support/fixtures/index.ts`
 
-| Fixture | Scope | Description |
-|---------|-------|-------------|
-| `supabaseAdmin` | test | Supabase client with service role key for admin operations (seeding, cleanup, RLS bypass) |
-| `testSession` | test | Pre-seeded session via `createTestSession()` with automatic cleanup in `afterEach` |
+| Fixture         | Scope | Description                                                                               |
+| --------------- | ----- | ----------------------------------------------------------------------------------------- |
+| `supabaseAdmin` | test  | Supabase client with service role key for admin operations (seeding, cleanup, RLS bypass) |
+| `testSession`   | test  | Pre-seeded session via `createTestSession()` with automatic cleanup in `afterEach`        |
 
 ### Existing: `tests/support/merged-fixtures.ts`
 
 ```typescript
 export const test = mergeTests(
-  apiRequestFixture,    // Playwright API request context
-  recurseFixture,       // Retry/recurse helper
-  logFixture,           // Test logging
+  apiRequestFixture, // Playwright API request context
+  recurseFixture, // Retry/recurse helper
+  logFixture, // Test logging
   networkMonitorFixture, // Network request monitoring
-  customFixtures,       // supabaseAdmin + testSession
+  customFixtures // supabaseAdmin + testSession
 );
 export { expect } from '@playwright/test';
 ```
 
 ### Existing: `tests/support/helpers/index.ts`
 
-| Helper | Description |
-|--------|-------------|
+| Helper                         | Description                                           |
+| ------------------------------ | ----------------------------------------------------- |
 | `waitFor(condition, options?)` | Poll-based waiting with configurable timeout/interval |
-| `generateTestEmail()` | Generates unique test email addresses |
-| `formatTestDate(date)` | Formats dates for test assertions |
+| `generateTestEmail()`          | Generates unique test email addresses                 |
+| `formatTestDate(date)`         | Formats dates for test assertions                     |
 
 **No new fixtures needed.** Existing infrastructure supports all test scenarios.
 
@@ -227,18 +232,18 @@ export { expect } from '@playwright/test';
 
 ### E2E Network Mocks (Playwright Route Interception)
 
-| Mock | Used In | Purpose |
-|------|---------|---------|
-| `**/rest/v1/rpc/scripture_advance_phase` → 500 | P1-005 (scripture-session.spec.ts) | Simulate server write failure on step advancement |
-| `**/rest/v1/scripture_sessions*` PATCH → 500 | P1-005 (scripture-session.spec.ts) | Simulate server write failure on session update |
-| `page.context().setOffline(true)` | P2-009, P2-010 (scripture-session.spec.ts) | Simulate offline state |
+| Mock                                           | Used In                                    | Purpose                                           |
+| ---------------------------------------------- | ------------------------------------------ | ------------------------------------------------- |
+| `**/rest/v1/rpc/scripture_advance_phase` → 500 | P1-005 (scripture-session.spec.ts)         | Simulate server write failure on step advancement |
+| `**/rest/v1/scripture_sessions*` PATCH → 500   | P1-005 (scripture-session.spec.ts)         | Simulate server write failure on session update   |
+| `page.context().setOffline(true)`              | P2-009, P2-010 (scripture-session.spec.ts) | Simulate offline state                            |
 
 ### Unit Test Mocks (Vitest)
 
-| Mock | Used In | Purpose |
-|------|---------|---------|
+| Mock                | Used In                          | Purpose                                   |
+| ------------------- | -------------------------------- | ----------------------------------------- |
 | `window.matchMedia` | P2-007 (useMotionConfig.test.ts) | Mock `prefers-reduced-motion` media query |
-| `fake-indexeddb` | Existing unit tests | Mock IndexedDB for service tests |
+| `fake-indexeddb`    | Existing unit tests              | Mock IndexedDB for service tests          |
 
 **Pattern Applied:** Network-first route interception (from `timing-debugging.md` knowledge base) — routes are set up before triggering the action that causes the network call.
 
@@ -249,60 +254,67 @@ export { expect } from '@playwright/test';
 All `data-testid` attributes referenced by generated tests, organized by component area:
 
 ### Navigation (1)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
+
+| data-testid     | Component        | Tests        |
+| --------------- | ---------------- | ------------ |
 | `nav-scripture` | BottomNavigation | overview:1,2 |
 
 ### Overview & Mode Selection (7)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
-| `scripture-overview` | ScriptureOverviewPage | overview:2,3; session:1,2 |
-| `scripture-start-button` | ScriptureOverviewPage | overview:3,4,5,6,7,8; solo:all; session:all; accessibility:all |
-| `scripture-mode-select` | ModeSelectionModal | overview:4,8 |
-| `scripture-mode-solo` | ModeSelectionModal | overview:4,5,6,8; solo:all; session:all; accessibility:all |
-| `scripture-mode-together` | ModeSelectionModal | overview:4,5,6 |
-| `scripture-together-disabled-message` | ModeSelectionModal | overview:5 |
-| `scripture-partner-link` | ModeSelectionModal | overview:5 |
+
+| data-testid                           | Component             | Tests                                                          |
+| ------------------------------------- | --------------------- | -------------------------------------------------------------- |
+| `scripture-overview`                  | ScriptureOverviewPage | overview:2,3; session:1,2                                      |
+| `scripture-start-button`              | ScriptureOverviewPage | overview:3,4,5,6,7,8; solo:all; session:all; accessibility:all |
+| `scripture-mode-select`               | ModeSelectionModal    | overview:4,8                                                   |
+| `scripture-mode-solo`                 | ModeSelectionModal    | overview:4,5,6,8; solo:all; session:all; accessibility:all     |
+| `scripture-mode-together`             | ModeSelectionModal    | overview:4,5,6                                                 |
+| `scripture-together-disabled-message` | ModeSelectionModal    | overview:5                                                     |
+| `scripture-partner-link`              | ModeSelectionModal    | overview:5                                                     |
 
 ### Resume Prompt (4)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
-| `scripture-resume-prompt` | ResumePrompt | overview:7; session:2 |
-| `scripture-resume-step` | ResumePrompt | overview:7 |
+
+| data-testid                 | Component    | Tests                 |
+| --------------------------- | ------------ | --------------------- |
+| `scripture-resume-prompt`   | ResumePrompt | overview:7; session:2 |
+| `scripture-resume-step`     | ResumePrompt | overview:7            |
 | `scripture-resume-continue` | ResumePrompt | overview:7; session:2 |
-| `scripture-start-fresh` | ResumePrompt | overview:8 |
+| `scripture-start-fresh`     | ResumePrompt | overview:8            |
 
 ### Reading Flow (6)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
-| `scripture-reading-container` | ScriptureReadingScreen | accessibility:12 |
-| `scripture-verse-reference` | VerseDisplay | solo:1,2; accessibility:8 |
-| `scripture-verse-text` | VerseDisplay | solo:1,2,3,4; session:4 |
-| `scripture-response-text` | ResponseDisplay | solo:3,4; accessibility:2 |
-| `scripture-progress-indicator` | ProgressIndicator | solo:1,2,5,6,7; session:1,2,5,7; accessibility:5 |
-| `scripture-completion-screen` | CompletionScreen | solo:1,7 |
+
+| data-testid                    | Component              | Tests                                            |
+| ------------------------------ | ---------------------- | ------------------------------------------------ |
+| `scripture-reading-container`  | ScriptureReadingScreen | accessibility:12                                 |
+| `scripture-verse-reference`    | VerseDisplay           | solo:1,2; accessibility:8                        |
+| `scripture-verse-text`         | VerseDisplay           | solo:1,2,3,4; session:4                          |
+| `scripture-response-text`      | ResponseDisplay        | solo:3,4; accessibility:2                        |
+| `scripture-progress-indicator` | ProgressIndicator      | solo:1,2,5,6,7; session:1,2,5,7; accessibility:5 |
+| `scripture-completion-screen`  | CompletionScreen       | solo:1,7                                         |
 
 ### Action Buttons (4)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
-| `scripture-next-verse-button` | ReadingControls | solo:all; session:5,7; accessibility:1,2,3,6,7,8,10,11 |
-| `scripture-view-response-button` | ReadingControls | solo:2,3,4; accessibility:1,2,4,7,9 |
-| `scripture-back-to-verse-button` | ReadingControls | solo:3; accessibility:2,9 |
-| `scripture-exit-button` | ReadingControls | session:1,2,3,4; accessibility:1,4,10 |
+
+| data-testid                      | Component       | Tests                                                  |
+| -------------------------------- | --------------- | ------------------------------------------------------ |
+| `scripture-next-verse-button`    | ReadingControls | solo:all; session:5,7; accessibility:1,2,3,6,7,8,10,11 |
+| `scripture-view-response-button` | ReadingControls | solo:2,3,4; accessibility:1,2,4,7,9                    |
+| `scripture-back-to-verse-button` | ReadingControls | solo:3; accessibility:2,9                              |
+| `scripture-exit-button`          | ReadingControls | session:1,2,3,4; accessibility:1,4,10                  |
 
 ### Exit Dialog (3)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
-| `scripture-exit-dialog` | ExitConfirmationDialog | session:1,3,4 |
-| `scripture-save-exit-button` | ExitConfirmationDialog | session:1,2,3 |
-| `scripture-cancel-exit-button` | ExitConfirmationDialog | session:3,4 |
+
+| data-testid                    | Component              | Tests         |
+| ------------------------------ | ---------------------- | ------------- |
+| `scripture-exit-dialog`        | ExitConfirmationDialog | session:1,3,4 |
+| `scripture-save-exit-button`   | ExitConfirmationDialog | session:1,2,3 |
+| `scripture-cancel-exit-button` | ExitConfirmationDialog | session:3,4   |
 
 ### Status Indicators (3)
-| data-testid | Component | Tests |
-|-------------|-----------|-------|
-| `scripture-retry-indicator` | RetryIndicator | session:5 |
-| `scripture-offline-indicator` | OfflineIndicator | session:6 |
-| `scripture-live-region` | LiveAnnouncer | accessibility:6,7 |
+
+| data-testid                   | Component        | Tests             |
+| ----------------------------- | ---------------- | ----------------- |
+| `scripture-retry-indicator`   | RetryIndicator   | session:5         |
+| `scripture-offline-indicator` | OfflineIndicator | session:6         |
+| `scripture-live-region`       | LiveAnnouncer    | accessibility:6,7 |
 
 **Total: 28 unique data-testid attributes**
 
@@ -430,6 +442,7 @@ npx playwright test tests/e2e/scripture/ && npx vitest run tests/unit/
 ### RED Phase (Complete)
 
 **TEA Agent Deliverables:**
+
 - [x] 10 API tests generated (RLS security)
 - [x] 27 E2E tests generated (solo reading, overview, session, accessibility)
 - [x] 3 unit tests generated (useMotionConfig hook)
