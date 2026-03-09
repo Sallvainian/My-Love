@@ -101,6 +101,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
+    ['./tests/support/reporters/failure-summary-reporter.ts'],
   ],
 
   outputDir: 'test-results',
