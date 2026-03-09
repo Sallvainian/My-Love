@@ -6,33 +6,35 @@ The project uses [fnox](https://fnox.jdx.dev) with the `age` encryption provider
 
 Tool versions (Node.js) are managed by [mise](https://mise.jdx.dev) via `.mise.toml`.
 
-| Context   | Mechanism                                                                              |
-| --------- | -------------------------------------------------------------------------------------- |
-| Local dev | `fnox exec -- npm run dev` decrypts secrets via age, injects as env vars               |
-| Local build | `fnox exec -- npm run build` decrypts secrets for production build                   |
-| CI build  | GitHub Secrets are set directly as environment variables (no fnox in CI)                |
-| CI tests  | Tests use local Supabase -- no production secrets needed                               |
-| E2E tests | Playwright config parses `supabase status -o env` for local Supabase connection values |
+| Context     | Mechanism                                                                              |
+| ----------- | -------------------------------------------------------------------------------------- |
+| Local dev   | `fnox exec -- npm run dev` decrypts secrets via age, injects as env vars               |
+| Local build | `fnox exec -- npm run build` decrypts secrets for production build                     |
+| CI build    | GitHub Secrets are set directly as environment variables (no fnox in CI)               |
+| CI tests    | Tests use local Supabase -- no production secrets needed                               |
+| E2E tests   | Playwright config parses `supabase status -o env` for local Supabase connection values |
 
 ## Environment Files
 
-| File           | Purpose                                                                          | In Git? |
-| -------------- | -------------------------------------------------------------------------------- | ------- |
-| `fnox.toml`    | Age-encrypted secret ciphertext + recipient public keys                          | Yes     |
-| `.mise.toml`   | Tool versions (Node 24.13.0) + env vars (CODEX_HOME)                            | Yes     |
-| `.env.test`    | Plain-text local Supabase values for E2E testing                                 | Yes     |
-| `.env.example` | Template showing required variable names and descriptions                        | Yes     |
-| `.env`         | Not used (gitignored) -- all secrets live in fnox.toml                           | No      |
-| `.envrc`       | direnv config (gitignored)                                                       | No      |
+| File           | Purpose                                                   | In Git? |
+| -------------- | --------------------------------------------------------- | ------- |
+| `fnox.toml`    | Age-encrypted secret ciphertext + recipient public keys   | Yes     |
+| `.mise.toml`   | Tool versions (Node 24.13.0) + env vars (CODEX_HOME)      | Yes     |
+| `.env.test`    | Plain-text local Supabase values for E2E testing          | Yes     |
+| `.env.example` | Template showing required variable names and descriptions | Yes     |
+| `.env`         | Not used (gitignored) -- all secrets live in fnox.toml    | No      |
+| `.envrc`       | direnv config (gitignored)                                | No      |
 
 ## Getting Started with Environment Variables
 
 1. Clone the repo and install dependencies:
+
    ```bash
    npm install
    ```
 
 2. Set up your age key for fnox:
+
    ```bash
    # Generate a new age key pair (if you don't have one)
    mkdir -p ~/.age
@@ -43,6 +45,7 @@ Tool versions (Node.js) are managed by [mise](https://mise.jdx.dev) via `.mise.t
    ```
 
 3. Have an existing team member add your age public key to `fnox.toml` recipients and re-encrypt all secrets:
+
    ```bash
    # Get your public key
    cat ~/.age/key.txt | grep "public key"
@@ -50,6 +53,7 @@ Tool versions (Node.js) are managed by [mise](https://mise.jdx.dev) via `.mise.t
    ```
 
 4. Verify secrets resolve:
+
    ```bash
    fnox check
    ```
@@ -124,15 +128,15 @@ Additionally, `playwright.config.ts` parses `supabase status -o env` to automati
 
 In CI (GitHub Actions), secrets are provided directly as GitHub Secrets -- fnox is not used in CI:
 
-| GitHub Secret                            | Purpose                                                                   |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`                      | Supabase project URL for production builds                                |
-| `VITE_SUPABASE_ANON_KEY`                 | Supabase anon key for production builds (mapped to `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) |
-| `VITE_SENTRY_DSN`                        | Sentry DSN for error tracking in production                               |
-| `SENTRY_AUTH_TOKEN`                      | Sentry auth token for source map uploads during build                     |
-| `SENTRY_ORG`                             | Sentry organization slug                                                  |
-| `SENTRY_PROJECT`                         | Sentry project slug                                                       |
-| `SUPABASE_ACCESS_TOKEN`                  | Supabase CLI auth token for TypeScript type generation from remote schema |
-| `CLAUDE_CODE_OAUTH_TOKEN`                | Claude Code OAuth token for AI-powered workflows                          |
+| GitHub Secret             | Purpose                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`       | Supabase project URL for production builds                                                  |
+| `VITE_SUPABASE_ANON_KEY`  | Supabase anon key for production builds (mapped to `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) |
+| `VITE_SENTRY_DSN`         | Sentry DSN for error tracking in production                                                 |
+| `SENTRY_AUTH_TOKEN`       | Sentry auth token for source map uploads during build                                       |
+| `SENTRY_ORG`              | Sentry organization slug                                                                    |
+| `SENTRY_PROJECT`          | Sentry project slug                                                                         |
+| `SUPABASE_ACCESS_TOKEN`   | Supabase CLI auth token for TypeScript type generation from remote schema                   |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token for AI-powered workflows                                            |
 
 The build step in `deploy.yml` passes these secrets as environment variables directly to `npm run build` without any encryption layer.

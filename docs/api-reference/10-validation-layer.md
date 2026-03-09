@@ -111,13 +111,13 @@ Used by `moodApi.fetchByUser()` and similar methods that return arrays.
 
 Validates the JSONB response from the `scripture_get_couple_stats` RPC:
 
-| Field            | Validation                       | Description                    |
-| ---------------- | -------------------------------- | ------------------------------ |
-| `totalSessions`  | `z.number().int().min(0)`        | All sessions for the pair      |
-| `totalSteps`     | `z.number().int().min(0)`        | Total reading steps completed  |
-| `lastCompleted`  | `TimestampSchema.nullable()`     | Last completed session time    |
-| `avgRating`      | `z.number().min(0).max(5)`       | Average reflection rating      |
-| `bookmarkCount`  | `z.number().int().min(0)`        | Total bookmarks across pair    |
+| Field           | Validation                   | Description                   |
+| --------------- | ---------------------------- | ----------------------------- |
+| `totalSessions` | `z.number().int().min(0)`    | All sessions for the pair     |
+| `totalSteps`    | `z.number().int().min(0)`    | Total reading steps completed |
+| `lastCompleted` | `TimestampSchema.nullable()` | Last completed session time   |
+| `avgRating`     | `z.number().min(0).max(5)`   | Average reflection rating     |
+| `bookmarkCount` | `z.number().int().min(0)`    | Total bookmarks across pair   |
 
 ### Exported Types
 

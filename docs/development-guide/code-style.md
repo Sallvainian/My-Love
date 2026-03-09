@@ -21,12 +21,12 @@
 
 The project uses three TypeScript configs composed via project references in `tsconfig.json`:
 
-| File                | Purpose                                                    | Includes                           |
-| ------------------- | ---------------------------------------------------------- | ---------------------------------- |
-| `tsconfig.json`     | Root project references file (no files of its own)         | References app, node, test configs |
-| `tsconfig.app.json` | Application code (`src/`), excludes test files             | `src/` (minus `*.test.*`)          |
-| `tsconfig.node.json`| Vite and Vitest config files                               | `vite.config.ts`, `vitest.config.ts` |
-| `tsconfig.test.json`| Test code, extends `tsconfig.app.json`                     | `src/`, `tests/`                   |
+| File                 | Purpose                                            | Includes                             |
+| -------------------- | -------------------------------------------------- | ------------------------------------ |
+| `tsconfig.json`      | Root project references file (no files of its own) | References app, node, test configs   |
+| `tsconfig.app.json`  | Application code (`src/`), excludes test files     | `src/` (minus `*.test.*`)            |
+| `tsconfig.node.json` | Vite and Vitest config files                       | `vite.config.ts`, `vitest.config.ts` |
+| `tsconfig.test.json` | Test code, extends `tsconfig.app.json`             | `src/`, `tests/`                     |
 
 The test config (`tsconfig.test.json`) extends `tsconfig.app.json` with:
 
@@ -90,7 +90,7 @@ Container components must go through Zustand slice actions for all data operatio
 - `sourceType: 'commonjs'`
 - `no-require-imports` disabled
 
-**Test files (`tests/**`, `*.test.*`, `*.spec.*`)**:
+**Test files (`tests/**`, `_.test._`, `_.spec._`)\*\*:
 
 - Both browser and Node globals enabled
 - `rules-of-hooks` disabled (test fixtures may use hooks unconventionally)

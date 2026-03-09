@@ -15,15 +15,15 @@ Zustand 5.0.11-based state management architecture for the **My-Love** PWA with 
 
 ## Quick Reference
 
-| Slice        | Key State                                                                                          | Persisted                               | Cross-Slice Deps       |
-| ------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------- |
-| App          | `isLoading`, `error`, `__isHydrated`                                                               | No                                      | None                   |
-| Settings     | `settings`, `isOnboarded`                                                                          | Yes (localStorage)                      | Reads AppSlice, writes MessagesSlice |
-| Navigation   | `currentView`                                                                                      | No                                      | None                   |
-| Messages     | `messages`, `messageHistory`, `currentMessage`, `currentDayOffset`, `customMessages`               | Partial (messageHistory only)           | Reads Settings (via `get()`) |
-| Mood         | `moods`, `partnerMoods`, `syncStatus`                                                              | Yes (moods in localStorage + IndexedDB) | None                   |
-| Interactions | `interactions`, `unviewedCount`, `isSubscribed`                                                    | No                                      | None                   |
-| Partner      | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `searchResults`                  | No                                      | None                   |
-| Notes        | `notes`, `notesIsLoading`, `notesError`, `notesHasMore`, `sentMessageTimestamps`                   | No                                      | None                   |
-| Photos       | `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress`, `error`, `storageWarning`            | No                                      | None                   |
-| Scripture    | `session`, `scriptureLoading`, `activeSession`, `pendingRetry`, `myRole`, `partnerLocked`, + 15 more | No                                      | None                   |
+| Slice        | Key State                                                                                            | Persisted                               | Cross-Slice Deps                     |
+| ------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------ |
+| App          | `isLoading`, `error`, `__isHydrated`                                                                 | No                                      | None                                 |
+| Settings     | `settings`, `isOnboarded`                                                                            | Yes (localStorage)                      | Reads AppSlice, writes MessagesSlice |
+| Navigation   | `currentView`                                                                                        | No                                      | None                                 |
+| Messages     | `messages`, `messageHistory`, `currentMessage`, `currentDayOffset`, `customMessages`                 | Partial (messageHistory only)           | Reads Settings (via `get()`)         |
+| Mood         | `moods`, `partnerMoods`, `syncStatus`                                                                | Yes (moods in localStorage + IndexedDB) | None                                 |
+| Interactions | `interactions`, `unviewedCount`, `isSubscribed`                                                      | No                                      | None                                 |
+| Partner      | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `searchResults`                   | No                                      | None                                 |
+| Notes        | `notes`, `notesIsLoading`, `notesError`, `notesHasMore`, `sentMessageTimestamps`                     | No                                      | None                                 |
+| Photos       | `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress`, `error`, `storageWarning`              | No                                      | None                                 |
+| Scripture    | `session`, `scriptureLoading`, `activeSession`, `pendingRetry`, `myRole`, `partnerLocked`, + 15 more | No                                      | None                                 |

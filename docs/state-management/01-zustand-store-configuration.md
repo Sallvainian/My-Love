@@ -81,13 +81,13 @@ Each slice creator receives three arguments from this type:
 ### Storage Key
 
 ```typescript
-name: 'my-love-storage'
+name: 'my-love-storage';
 ```
 
 ### Schema Version
 
 ```typescript
-version: 0
+version: 0;
 ```
 
 Matches test fixtures. Increment when making breaking schema changes to trigger migration.
@@ -144,12 +144,12 @@ partialize: (state) => ({
 
 Only 4 state keys are persisted to localStorage:
 
-| Key              | Type                | Serialization                     | Size Impact                       |
-| ---------------- | ------------------- | --------------------------------- | --------------------------------- |
-| `settings`       | `Settings \| null`  | Direct JSON                       | ~500 bytes                        |
-| `isOnboarded`    | `boolean`           | Direct JSON                       | ~10 bytes                         |
-| `messageHistory` | `MessageHistory`    | Map -> Array for `shownMessages`  | ~2-5 KB (depends on history size) |
-| `moods`          | `MoodEntry[]`       | Direct JSON                       | ~10-50 KB (depends on entries)    |
+| Key              | Type               | Serialization                    | Size Impact                       |
+| ---------------- | ------------------ | -------------------------------- | --------------------------------- |
+| `settings`       | `Settings \| null` | Direct JSON                      | ~500 bytes                        |
+| `isOnboarded`    | `boolean`          | Direct JSON                      | ~10 bytes                         |
+| `messageHistory` | `MessageHistory`   | Map -> Array for `shownMessages` | ~2-5 KB (depends on history size) |
+| `moods`          | `MoodEntry[]`      | Direct JSON                      | ~10-50 KB (depends on entries)    |
 
 **Map serialization**: `messageHistory.shownMessages` is a `Map<string, number>` (date string -> message ID). The `partialize` function converts it to an array of `[key, value]` tuples for JSON storage. The `onRehydrateStorage` callback converts it back.
 
@@ -183,8 +183,13 @@ onRehydrateStorage: () => (state, error) => {
   } else if (state) {
     // Create default messageHistory structure
     state.messageHistory = {
-      currentIndex: 0, shownMessages: new Map(), maxHistoryDays: 30,
-      favoriteIds: [], lastShownDate: '', lastMessageId: 0, viewedIds: [],
+      currentIndex: 0,
+      shownMessages: new Map(),
+      maxHistoryDays: 30,
+      favoriteIds: [],
+      lastShownDate: '',
+      lastMessageId: 0,
+      viewedIds: [],
     };
   }
 
@@ -198,7 +203,7 @@ onRehydrateStorage: () => (state, error) => {
 
   // Set hydration flag
   if (state) state.__isHydrated = true;
-}
+};
 ```
 
 The callback performs four tasks:
@@ -214,10 +219,11 @@ The callback performs four tasks:
 function validateHydratedState(state: Partial<AppState> | undefined): {
   isValid: boolean;
   errors: string[];
-}
+};
 ```
 
 Validates:
+
 - `state` is not undefined
 - `settings.themeName` exists (if settings present)
 - `settings.relationship` exists (if settings present)

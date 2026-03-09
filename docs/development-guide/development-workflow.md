@@ -2,11 +2,11 @@
 
 ## Branch Strategy
 
-| Branch Pattern                    | Purpose                                       |
-| --------------------------------- | --------------------------------------------- |
-| `main`                            | Production branch, deployed to GitHub Pages   |
-| `epic-N/description`             | Feature branches for epic work                |
-| `feature/epic-N-description`      | Feature branches for epic work (legacy)       |
+| Branch Pattern               | Purpose                                     |
+| ---------------------------- | ------------------------------------------- |
+| `main`                       | Production branch, deployed to GitHub Pages |
+| `epic-N/description`         | Feature branches for epic work              |
+| `feature/epic-N-description` | Feature branches for epic work (legacy)     |
 
 All epic work stays on its feature branch until PR review. PRs target `main`.
 

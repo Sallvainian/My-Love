@@ -200,14 +200,14 @@ export default {
 
 `src/config/performance.ts` centralizes magic numbers for pagination, storage quotas, and validation limits:
 
-| Category          | Constant                   | Value  | Purpose                                      |
-| ----------------- | -------------------------- | ------ | -------------------------------------------- |
-| Pagination        | `DEFAULT_PAGE_SIZE`        | 20     | Default items per page (photos, messages)    |
-| Pagination        | `MAX_PAGE_SIZE`            | 100    | Maximum page size                            |
-| Storage Quotas    | `WARNING_THRESHOLD_PERCENT`| 80     | Display warning banner at this quota %       |
-| Storage Quotas    | `ERROR_THRESHOLD_PERCENT`  | 95     | Block uploads at this quota %                |
-| Storage Quotas    | `DEFAULT_QUOTA_MB`         | 50     | Fallback quota when Storage API unavailable  |
-| Validation Limits | `MESSAGE_TEXT_MAX_LENGTH`   | 1000   | Maximum message text length                  |
-| Validation Limits | `CAPTION_MAX_LENGTH`       | 500    | Maximum photo caption length                 |
-| Validation Limits | `NOTE_MAX_LENGTH`          | 1000   | Maximum mood note length                     |
-| Validation Limits | `PARTNER_NAME_MAX_LENGTH`  | 50     | Maximum partner name length                  |
+| Category          | Constant                    | Value | Purpose                                     |
+| ----------------- | --------------------------- | ----- | ------------------------------------------- |
+| Pagination        | `DEFAULT_PAGE_SIZE`         | 20    | Default items per page (photos, messages)   |
+| Pagination        | `MAX_PAGE_SIZE`             | 100   | Maximum page size                           |
+| Storage Quotas    | `WARNING_THRESHOLD_PERCENT` | 80    | Display warning banner at this quota %      |
+| Storage Quotas    | `ERROR_THRESHOLD_PERCENT`   | 95    | Block uploads at this quota %               |
+| Storage Quotas    | `DEFAULT_QUOTA_MB`          | 50    | Fallback quota when Storage API unavailable |
+| Validation Limits | `MESSAGE_TEXT_MAX_LENGTH`   | 1000  | Maximum message text length                 |
+| Validation Limits | `CAPTION_MAX_LENGTH`        | 500   | Maximum photo caption length                |
+| Validation Limits | `NOTE_MAX_LENGTH`           | 1000  | Maximum mood note length                    |
+| Validation Limits | `PARTNER_NAME_MAX_LENGTH`   | 50    | Maximum partner name length                 |

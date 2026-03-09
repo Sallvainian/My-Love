@@ -53,9 +53,9 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 ## Error Tracking
 
-| Technology    | Version | Purpose                                                          |
-| ------------- | ------- | ---------------------------------------------------------------- |
-| @sentry/react | 10.39.0 | Error tracking and performance monitoring (20% sample rate)      |
+| Technology    | Version | Purpose                                                     |
+| ------------- | ------- | ----------------------------------------------------------- |
+| @sentry/react | 10.39.0 | Error tracking and performance monitoring (20% sample rate) |
 
 Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs reach Sentry). Source maps are uploaded during CI builds via `@sentry/vite-plugin` and deleted from the `dist/` directory after upload.
 
@@ -80,22 +80,22 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 
 ## Developer Tooling
 
-| Technology                  | Version  | Purpose                                                                               |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------- |
-| ESLint                      | 9.39.2   | Linting (flat config format, `eslint.config.js`)                                      |
-| typescript-eslint           | 8.56.1   | TypeScript ESLint rules                                                               |
-| eslint-plugin-react-hooks   | 7.0.1    | React hooks linting (including React 19 rules for `set-state-in-effect` and `purity`) |
-| eslint-plugin-react-refresh | 0.5.2    | React Refresh HMR validation                                                          |
-| Prettier                    | 3.8.1    | Code formatting                                                                       |
-| prettier-plugin-tailwindcss | 0.7.2    | Tailwind class sorting                                                                |
-| fnox (age provider)         | --       | Encrypted secrets management (age encryption, committed in `fnox.toml`)               |
-| vite-plugin-checker         | 0.12.0   | Vite-integrated TypeScript type checking overlay                                      |
-| rollup-plugin-visualizer    | 6.0.5    | Bundle analysis (generates `dist/stats.html` with gzip and brotli sizes)              |
-| gh-pages                    | 6.3.0    | GitHub Pages deployment                                                               |
-| tsx                         | 4.21.0   | TypeScript script execution                                                           |
-| Supabase CLI                | 2.76.15  | Local Supabase development, migrations, type generation                               |
-| @sentry/vite-plugin         | 5.0.0    | Sentry source map upload during builds                                                |
-| mise                        | --       | Tool version management (Node.js version pinned in `.mise.toml`)                      |
+| Technology                  | Version | Purpose                                                                               |
+| --------------------------- | ------- | ------------------------------------------------------------------------------------- |
+| ESLint                      | 9.39.2  | Linting (flat config format, `eslint.config.js`)                                      |
+| typescript-eslint           | 8.56.1  | TypeScript ESLint rules                                                               |
+| eslint-plugin-react-hooks   | 7.0.1   | React hooks linting (including React 19 rules for `set-state-in-effect` and `purity`) |
+| eslint-plugin-react-refresh | 0.5.2   | React Refresh HMR validation                                                          |
+| Prettier                    | 3.8.1   | Code formatting                                                                       |
+| prettier-plugin-tailwindcss | 0.7.2   | Tailwind class sorting                                                                |
+| fnox (age provider)         | --      | Encrypted secrets management (age encryption, committed in `fnox.toml`)               |
+| vite-plugin-checker         | 0.12.0  | Vite-integrated TypeScript type checking overlay                                      |
+| rollup-plugin-visualizer    | 6.0.5   | Bundle analysis (generates `dist/stats.html` with gzip and brotli sizes)              |
+| gh-pages                    | 6.3.0   | GitHub Pages deployment                                                               |
+| tsx                         | 4.21.0  | TypeScript script execution                                                           |
+| Supabase CLI                | 2.76.15 | Local Supabase development, migrations, type generation                               |
+| @sentry/vite-plugin         | 5.0.0   | Sentry source map upload during builds                                                |
+| mise                        | --      | Tool version management (Node.js version pinned in `.mise.toml`)                      |
 
 ## Build Targets
 

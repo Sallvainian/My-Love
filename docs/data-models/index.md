@@ -12,7 +12,7 @@ This section documents the entire data layer of the My-Love application, coverin
 | Supabase Storage  | S3-compatible object storage | Photo files (`photos` bucket), love note images (`love-notes-images` bucket)                                            |
 | IndexedDB         | `idb` library                | Offline-first client cache (messages, photos, moods, auth tokens, scripture sessions/reflections/bookmarks/messages)    |
 | TypeScript Types  | Auto-generated + manual      | Type safety across API boundaries                                                                                       |
-| Supabase Client   | `@supabase/supabase-js`       | v2.97.0                                                                                                                 |
+| Supabase Client   | `@supabase/supabase-js`      | v2.97.0                                                                                                                 |
 | Zod Schemas       | Zod v4 (4.3.6)               | Runtime validation at IndexedDB write and Supabase API response boundaries                                              |
 
 ### Documents in This Section

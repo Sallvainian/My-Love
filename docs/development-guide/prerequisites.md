@@ -2,21 +2,21 @@
 
 ## Required Tools
 
-| Tool         | Version                          | Purpose                                         | Installation                                                              |
-| ------------ | -------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
-| Node.js      | v24.13.0 (pinned in `.mise.toml`) | JavaScript runtime                              | [mise](https://mise.jdx.dev) recommended                                 |
-| npm          | Bundled with Node.js             | Package manager (lock file: `package-lock.json`) | Included with Node.js                                                    |
-| Git          | Latest stable                    | Version control                                 | [git-scm.com](https://git-scm.com/)                                      |
-| Supabase CLI | Latest (`npm install -g supabase`) | Local database, E2E tests, migrations           | `npm install -g supabase`                                                |
-| Docker       | Latest stable                    | Required by Supabase CLI for local development  | [docker.com](https://www.docker.com/)                                    |
-| fnox         | Latest                           | Secrets management (age encryption provider)    | [fnox.jdx.dev](https://fnox.jdx.dev)                                     |
+| Tool         | Version                            | Purpose                                          | Installation                             |
+| ------------ | ---------------------------------- | ------------------------------------------------ | ---------------------------------------- |
+| Node.js      | v24.13.0 (pinned in `.mise.toml`)  | JavaScript runtime                               | [mise](https://mise.jdx.dev) recommended |
+| npm          | Bundled with Node.js               | Package manager (lock file: `package-lock.json`) | Included with Node.js                    |
+| Git          | Latest stable                      | Version control                                  | [git-scm.com](https://git-scm.com/)      |
+| Supabase CLI | Latest (`npm install -g supabase`) | Local database, E2E tests, migrations            | `npm install -g supabase`                |
+| Docker       | Latest stable                      | Required by Supabase CLI for local development   | [docker.com](https://www.docker.com/)    |
+| fnox         | Latest                             | Secrets management (age encryption provider)     | [fnox.jdx.dev](https://fnox.jdx.dev)     |
 
 ## Optional Tools
 
-| Tool                | Purpose                    | Installation                                       |
-| ------------------- | -------------------------- | -------------------------------------------------- |
-| Playwright browsers | E2E test execution         | `npx playwright install` (run after `npm install`) |
-| mise                | Tool version management    | [mise.jdx.dev](https://mise.jdx.dev)               |
+| Tool                | Purpose                 | Installation                                       |
+| ------------------- | ----------------------- | -------------------------------------------------- |
+| Playwright browsers | E2E test execution      | `npx playwright install` (run after `npm install`) |
+| mise                | Tool version management | [mise.jdx.dev](https://mise.jdx.dev)               |
 
 ## Node Version Management
 

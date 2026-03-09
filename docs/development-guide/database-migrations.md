@@ -193,27 +193,27 @@ sql_paths = ["./seed.sql"]
 
 Key configuration settings in `supabase/config.toml`:
 
-| Section           | Setting                     | Value   |
-| ----------------- | --------------------------- | ------- |
-| `[api]`           | `port`                      | 54321   |
-| `[api]`           | `max_rows`                  | 1000    |
-| `[db]`            | `major_version`             | 17      |
-| `[db]`            | `port`                      | 54322   |
-| `[db]`            | `shadow_port`               | 54320   |
-| `[db.pooler]`     | `enabled`                   | false   |
-| `[db.migrations]` | `enabled`                   | true    |
-| `[auth]`          | `enable_signup`             | true    |
-| `[auth]`          | `enable_anonymous_sign_ins` | false   |
-| `[auth]`          | `jwt_expiry`                | 3600    |
-| `[auth.email]`    | `enable_signup`             | true    |
-| `[auth.email]`    | `enable_confirmations`      | false   |
-| `[auth.email]`    | `max_frequency`             | "1s"    |
-| `[auth.external.google]` | `enabled`             | true (mock for local dev) |
-| `[realtime]`      | `enabled`                   | true    |
-| `[storage]`       | `file_size_limit`           | "50MiB" |
-| `[studio]`        | `port`                      | 54323   |
-| `[edge_runtime]`  | `enabled`                   | true    |
-| `[edge_runtime]`  | `deno_version`              | 2       |
+| Section                  | Setting                     | Value                     |
+| ------------------------ | --------------------------- | ------------------------- |
+| `[api]`                  | `port`                      | 54321                     |
+| `[api]`                  | `max_rows`                  | 1000                      |
+| `[db]`                   | `major_version`             | 17                        |
+| `[db]`                   | `port`                      | 54322                     |
+| `[db]`                   | `shadow_port`               | 54320                     |
+| `[db.pooler]`            | `enabled`                   | false                     |
+| `[db.migrations]`        | `enabled`                   | true                      |
+| `[auth]`                 | `enable_signup`             | true                      |
+| `[auth]`                 | `enable_anonymous_sign_ins` | false                     |
+| `[auth]`                 | `jwt_expiry`                | 3600                      |
+| `[auth.email]`           | `enable_signup`             | true                      |
+| `[auth.email]`           | `enable_confirmations`      | false                     |
+| `[auth.email]`           | `max_frequency`             | "1s"                      |
+| `[auth.external.google]` | `enabled`                   | true (mock for local dev) |
+| `[realtime]`             | `enabled`                   | true                      |
+| `[storage]`              | `file_size_limit`           | "50MiB"                   |
+| `[studio]`               | `port`                      | 54323                     |
+| `[edge_runtime]`         | `enabled`                   | true                      |
+| `[edge_runtime]`         | `deno_version`              | 2                         |
 
 ## Database Inspector
 
