@@ -123,3 +123,23 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 - Prettier with `tailwindcss` plugin for class sorting
 - CI workflows in `.github/workflows/`: deploy, test, migrations, code review
 
+## General Rules
+
+- Always read relevant documentation/docs files BEFORE making changes. Never rush into implementation without understanding the full context first.
+- Prefer comprehensive fixes over minimal fixes. When fixing issues, fix them thoroughly rather than suggesting the smallest possible change.
+
+## Communication
+
+- When the user asks a question, answer the question asked — don't reinterpret it. If the user asks 'should I do X?', that's a question, not a request to do X.
+
+## Workflow Rules
+
+- For migration tasks: 1) Create a complete plan covering ALL environments/platforms mentioned 2) Get approval 3) Execute step by step. Never delete source files before confirming the target is working.
+
+## CI/CD
+
+- When asked to fix CI, always check ALL failure modes (formatting, lint, coverage thresholds, tests) before pushing — never fix one issue and leave others broken.
+
+## Git & Commits
+
+- Always run Prettier/formatting on all new or modified files before committing. Run `npm run format` on changed files as a pre-commit step.
