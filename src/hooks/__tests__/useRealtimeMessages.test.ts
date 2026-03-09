@@ -137,9 +137,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as unknown as RealtimeChannel
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -175,9 +173,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as unknown as RealtimeChannel
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -211,9 +207,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as unknown as RealtimeChannel
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -252,9 +246,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as unknown as RealtimeChannel
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
       await act(async () => {
         renderHook(() => useRealtimeMessages());
@@ -303,9 +295,7 @@ describe('useRealtimeMessages', () => {
         subscribe: mockSubscribe,
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as unknown as RealtimeChannel
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
       let unmountFn: () => void;
       await act(async () => {
@@ -351,9 +341,7 @@ describe('useRealtimeMessages', () => {
         }),
       };
 
-      vi.mocked(supabase.channel).mockReturnValue(
-        mockChannel as unknown as RealtimeChannel
-      );
+      vi.mocked(supabase.channel).mockReturnValue(mockChannel as unknown as RealtimeChannel);
 
       renderHook(() => useRealtimeMessages({ onNewMessage }));
 

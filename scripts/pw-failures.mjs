@@ -207,7 +207,9 @@ function formatRetryHistory(allResults) {
     const r = allResults[i];
     const status = r.status ?? 'unknown';
     const dur = r.duration ?? 0;
-    const errMsg = stripAnsi(normalizeNewlines(r.errors?.[0]?.message ?? '')).split('\n')[0]?.trim();
+    const errMsg = stripAnsi(normalizeNewlines(r.errors?.[0]?.message ?? ''))
+      .split('\n')[0]
+      ?.trim();
     block += `- Attempt ${i + 1}: **${status}** (${dur}ms)`;
     if (errMsg && status !== 'passed') block += ` — ${errMsg.slice(0, 120)}`;
     block += '\n';
@@ -345,8 +347,14 @@ function formatContext(attachments) {
 /** Format stdout/stderr if present */
 function formatStdio(stdout, stderr) {
   let block = '';
-  const outLines = (stdout ?? []).map((s) => (typeof s === 'string' ? s : '')).join('').trim();
-  const errLines = (stderr ?? []).map((s) => (typeof s === 'string' ? s : '')).join('').trim();
+  const outLines = (stdout ?? [])
+    .map((s) => (typeof s === 'string' ? s : ''))
+    .join('')
+    .trim();
+  const errLines = (stderr ?? [])
+    .map((s) => (typeof s === 'string' ? s : ''))
+    .join('')
+    .trim();
 
   if (outLines) {
     block += '**stdout**\n\n```\n' + escapeCodeBlock(stripAnsi(outLines)) + '\n```\n\n';
@@ -507,9 +515,9 @@ function main() {
   out += `|---|---------------|-------|----------|-------|\n`;
   groups.forEach(([sig, tests], idx) => {
     const projects = [...new Set(tests.map((t) => t.project))].join(', ');
-    const files = [
-      ...new Set(tests.map((t) => t.file ?? '?').map((f) => f.split('/').pop())),
-    ].join(', ');
+    const files = [...new Set(tests.map((t) => t.file ?? '?').map((f) => f.split('/').pop()))].join(
+      ', '
+    );
     out += `| ${idx + 1} | ${mdEscape(sig)} | ${tests.length} | ${projects} | ${files} |\n`;
   });
   out += `\n`;

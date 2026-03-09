@@ -329,7 +329,9 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
             Prefer: 'return=representation',
           },
           body: { share_with_partner: true },
-        }).validateSchema<z.infer<typeof SupabaseBookmarkSchema>[]>(z.array(SupabaseBookmarkSchema));
+        }).validateSchema<z.infer<typeof SupabaseBookmarkSchema>[]>(
+          z.array(SupabaseBookmarkSchema)
+        );
 
         expect(shareOnResponse.status).toBe(200);
         expect(shareOnResponse.body).toHaveLength(2);
@@ -344,7 +346,9 @@ test.describe('Scripture Reflection API - Story 2.3', () => {
             Prefer: 'return=representation',
           },
           body: { share_with_partner: false },
-        }).validateSchema<z.infer<typeof SupabaseBookmarkSchema>[]>(z.array(SupabaseBookmarkSchema));
+        }).validateSchema<z.infer<typeof SupabaseBookmarkSchema>[]>(
+          z.array(SupabaseBookmarkSchema)
+        );
 
         expect(shareOffResponse.status).toBe(200);
         expect(shareOffResponse.body).toHaveLength(2);

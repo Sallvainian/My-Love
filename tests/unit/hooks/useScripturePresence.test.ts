@@ -285,7 +285,8 @@ describe('useScripturePresence', () => {
   });
 
   test('[P1] heartbeat uses latest step/view after props change', async () => {
-    let rerender: ((props: { stepIndex: number; view: 'verse' | 'response' }) => void) | null = null;
+    let rerender: ((props: { stepIndex: number; view: 'verse' | 'response' }) => void) | null =
+      null;
 
     await act(async () => {
       const hook = renderHook(

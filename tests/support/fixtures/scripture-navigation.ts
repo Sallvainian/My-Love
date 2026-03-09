@@ -14,7 +14,6 @@ import {
   skipMessageAndCompleteSession,
 } from '../helpers';
 
-
 /**
  * Scripture navigation fixture providing high-level methods for scripture tests.
  */
@@ -64,7 +63,9 @@ type ScriptureNavFixtures = {
 export const test = base.extend<ScriptureNavFixtures>({
   scriptureNav: async ({ page }, use) => {
     const fixture: ScriptureNavFixture = {
-      ensureOverview: async () => { await ensureScriptureOverview(page); },
+      ensureOverview: async () => {
+        await ensureScriptureOverview(page);
+      },
       startSoloSession: async () => startSoloSession(page),
       advanceOneStep: async () => advanceOneStep(page),
       completeAllSteps: async (bookmarkSteps = new Set([0, 5, 12])) =>
