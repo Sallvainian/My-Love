@@ -4,17 +4,17 @@
 
 The app uses a **hybrid offline strategy** where different features have different network requirements:
 
-| Feature | Pattern | Offline Behavior |
-|---------|---------|-----------------|
-| Daily Messages | Offline-first | Fully functional offline (messages in IndexedDB) |
-| Mood Tracking | Offline-first | Create/update works offline; sync when connected |
-| Custom Messages | Offline-first | Full CRUD offline via IndexedDB |
-| Settings/Theme | Local-only | Always works (localStorage) |
-| Love Notes | Online-required | Read cached messages; send fails with retry prompt |
-| Photo Gallery | Online-required | Cached photos viewable; upload requires connection |
-| Scripture Reading | Online-first | Cached sessions viewable; new sessions require connection |
-| Poke/Kiss | Online-required | Fails with offline error |
-| Partner Data | Online-required | Shows cached partner info; refresh requires connection |
+| Feature           | Pattern         | Offline Behavior                                          |
+| ----------------- | --------------- | --------------------------------------------------------- |
+| Daily Messages    | Offline-first   | Fully functional offline (messages in IndexedDB)          |
+| Mood Tracking     | Offline-first   | Create/update works offline; sync when connected          |
+| Custom Messages   | Offline-first   | Full CRUD offline via IndexedDB                           |
+| Settings/Theme    | Local-only      | Always works (localStorage)                               |
+| Love Notes        | Online-required | Read cached messages; send fails with retry prompt        |
+| Photo Gallery     | Online-required | Cached photos viewable; upload requires connection        |
+| Scripture Reading | Online-first    | Cached sessions viewable; new sessions require connection |
+| Poke/Kiss         | Online-required | Fails with offline error                                  |
+| Partner Data      | Online-required | Shows cached partner info; refresh requires connection    |
 
 ## Three-Tier Sync Architecture
 
@@ -41,11 +41,14 @@ Failures are non-blocking -- the entry is saved locally and will sync via other 
 
 ```typescript
 useEffect(() => {
-  const intervalId = setInterval(async () => {
-    if (navigator.onLine) {
-      await syncPendingMoods();
-    }
-  }, 5 * 60 * 1000); // 5 minutes
+  const intervalId = setInterval(
+    async () => {
+      if (navigator.onLine) {
+        await syncPendingMoods();
+      }
+    },
+    5 * 60 * 1000
+  ); // 5 minutes
   return () => clearInterval(intervalId);
 }, []);
 ```
@@ -135,16 +138,44 @@ if (result.offline) {
 }
 ```
 
+## Sync Service (`src/services/syncService.ts`)
+
+The `SyncService` class transforms local `MoodEntry` objects (IndexedDB format) into the Supabase `moods` table insert format:
+
+```typescript
+class SyncService {
+  async syncPendingMoods(): Promise<{ synced: number; failed: number }>;
+  async hasPendingSync(): Promise<boolean>;
+  async getPendingCount(): Promise<number>;
+}
+```
+
+**Field mapping (local to remote):**
+
+| Local Field (`MoodEntry`) | Remote Column (`moods`)                   |
+| ------------------------- | ----------------------------------------- |
+| `mood`                    | `mood_type`                               |
+| `moods`                   | `mood_types`                              |
+| `note`                    | `note`                                    |
+| `date`                    | `created_at` (converted to ISO timestamp) |
+| `userId`                  | `user_id`                                 |
+
+**Partial failure handling:** If an individual mood entry fails to sync (e.g., network error, RLS violation), the service continues with the remaining entries. Failed entries retain `synced: false` and are retried on the next sync pass.
+
 ## Offline-Safe Authentication
 
 `getCurrentUserIdOfflineSafe()` retrieves the user ID from the cached Supabase session without making a network request. This enables mood tracking to work offline:
 
 ```typescript
 export async function getCurrentUserIdOfflineSafe(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session?.user?.id ?? null;
 }
 ```
+
+Note: `getSession()` reads from the in-memory cache (populated during initial auth), unlike `getUser()` which makes a network request to verify the token with the server.
 
 ## Related Documentation
 

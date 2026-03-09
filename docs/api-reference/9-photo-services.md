@@ -1,6 +1,7 @@
 # 9. Photo Services
 
 **Sources:**
+
 - `src/services/photoService.ts` (Supabase Storage operations)
 - `src/services/imageCompressionService.ts` (client-side compression)
 - `src/services/loveNoteImageService.ts` (Edge Function upload + signed URL cache)
@@ -10,12 +11,12 @@
 
 Photo handling is split across four modules by responsibility:
 
-| Module | Responsibility | Storage Target |
-|--------|---------------|----------------|
-| `photoService` | Gallery photo CRUD via Supabase Storage | `photos` bucket |
-| `imageCompressionService` | Client-side Canvas API compression | In-memory (returns Blob) |
-| `loveNoteImageService` | Love note image upload via Edge Function | `love-note-images` bucket |
-| Edge Function | Server-side MIME validation and rate limiting | `love-note-images` bucket |
+| Module                    | Responsibility                                | Storage Target            |
+| ------------------------- | --------------------------------------------- | ------------------------- |
+| `photoService`            | Gallery photo CRUD via Supabase Storage       | `photos` bucket           |
+| `imageCompressionService` | Client-side Canvas API compression            | In-memory (returns Blob)  |
+| `loveNoteImageService`    | Love note image upload via Edge Function      | `love-note-images` bucket |
+| Edge Function             | Server-side MIME validation and rate limiting | `love-note-images` bucket |
 
 ## PhotoService (src/services/photoService.ts)
 
@@ -29,10 +30,10 @@ Manages the photo gallery stored in the `photos` Supabase Storage bucket. All op
 interface SupabasePhoto {
   id: string;
   user_id: string;
-  storage_path: string;  // "{user_id}/{uuid}.{ext}"
+  storage_path: string; // "{user_id}/{uuid}.{ext}"
   filename: string;
   caption: string | null;
-  mime_type: string;      // DB constraint: 'image/jpeg' | 'image/png' | 'image/webp'
+  mime_type: string; // DB constraint: 'image/jpeg' | 'image/png' | 'image/webp'
   file_size: number;
   width: number;
   height: number;
@@ -46,7 +47,7 @@ interface PhotoWithUrls extends SupabasePhoto {
 
 interface StorageQuota {
   used: number;
-  quota: number;        // 1GB free tier
+  quota: number; // 1GB free tier
   percent: number;
   warning: 'none' | 'approaching' | 'critical' | 'exceeded';
 }
@@ -75,12 +76,12 @@ Batch generates signed URLs using `Promise.allSettled` for parallel execution. R
 
 Calculates storage usage by summing `file_size` from the `photos` table for the current user.
 
-| Threshold | Warning Level |
-|-----------|--------------|
-| < 80% | `'none'` |
-| >= 80% | `'approaching'` |
-| >= 95% | `'critical'` |
-| >= 100% | `'exceeded'` |
+| Threshold | Warning Level   |
+| --------- | --------------- |
+| < 80%     | `'none'`        |
+| >= 80%    | `'approaching'` |
+| >= 95%    | `'critical'`    |
+| >= 100%   | `'exceeded'`    |
 
 Returns a safe default (`used: 0`, `warning: 'none'`) on any error.
 
@@ -91,6 +92,7 @@ Fetches photos (own + partner's via RLS) sorted newest first, with signed URLs. 
 #### `uploadPhoto(input, onProgress?): Promise<SupabasePhoto | null>`
 
 **Flow:**
+
 1. Check storage quota -- reject if `'exceeded'` or `'critical'`
 2. Generate storage path: `{userId}/{uuid}.{ext}`
 3. Upload to Supabase Storage
@@ -120,12 +122,12 @@ Client-side image compression using the Canvas API. No external dependencies.
 
 ### Configuration
 
-| Setting | Value | Source |
-|---------|-------|--------|
-| Max width | 2048px | `IMAGE_COMPRESSION.MAX_WIDTH` |
-| Max height | 2048px | `IMAGE_COMPRESSION.MAX_HEIGHT` |
-| JPEG quality | 80% | `IMAGE_COMPRESSION.QUALITY` |
-| Performance target | < 3 seconds for 10MB input | |
+| Setting            | Value                      | Source                         |
+| ------------------ | -------------------------- | ------------------------------ |
+| Max width          | 2048px                     | `IMAGE_COMPRESSION.MAX_WIDTH`  |
+| Max height         | 2048px                     | `IMAGE_COMPRESSION.MAX_HEIGHT` |
+| JPEG quality       | 80%                        | `IMAGE_COMPRESSION.QUALITY`    |
+| Performance target | < 3 seconds for 10MB input |                                |
 
 ### Methods
 
@@ -143,6 +145,7 @@ interface CompressionResult {
 ```
 
 **Flow:**
+
 1. Load image via `URL.createObjectURL()` + `Image` element
 2. Calculate new dimensions maintaining aspect ratio (cap at max width/height)
 3. Draw onto a `<canvas>` element (strips EXIF metadata automatically)
@@ -153,12 +156,12 @@ interface CompressionResult {
 
 #### `validateImageFile(file): { valid: boolean; error?: string; warning?: string }`
 
-| Check | Result |
-|-------|--------|
-| MIME not in `[image/jpeg, image/png, image/webp]` | `{ valid: false, error: '...' }` |
-| Size > 25MB | `{ valid: false, error: '...' }` |
-| Size > large file threshold | `{ valid: true, warning: '...' }` |
-| Otherwise | `{ valid: true }` |
+| Check                                             | Result                            |
+| ------------------------------------------------- | --------------------------------- |
+| MIME not in `[image/jpeg, image/png, image/webp]` | `{ valid: false, error: '...' }`  |
+| Size > 25MB                                       | `{ valid: false, error: '...' }`  |
+| Size > large file threshold                       | `{ valid: true, warning: '...' }` |
+| Otherwise                                         | `{ valid: true }`                 |
 
 #### `estimateCompressedSize(file): number`
 
@@ -176,7 +179,7 @@ In-memory cache with LRU eviction and request deduplication.
 interface CachedUrl {
   url: string;
   expiresAt: number;
-  lastAccessed: number;  // LRU tracking
+  lastAccessed: number; // LRU tracking
 }
 ```
 
@@ -196,6 +199,7 @@ interface UploadResult {
 ```
 
 **Flow:**
+
 1. Client-side validation via `imageCompressionService.validateImageFile()`
 2. Client-side compression via `imageCompressionService.compressImage()`
 3. Get JWT from current session
@@ -249,12 +253,12 @@ Server-side image validation and upload. Runs on every love note image upload.
 
 ### Magic Byte MIME Detection
 
-| Format | Magic Bytes |
-|--------|-------------|
-| JPEG | `0xFF 0xD8 0xFF` |
-| PNG | `0x89 0x50 0x4E 0x47` |
-| GIF | `0x47 0x49 0x46 0x38` |
-| WebP | Bytes 8-11: `0x57 0x45 0x42 0x50` |
+| Format | Magic Bytes                       |
+| ------ | --------------------------------- |
+| JPEG   | `0xFF 0xD8 0xFF`                  |
+| PNG    | `0x89 0x50 0x4E 0x47`             |
+| GIF    | `0x47 0x49 0x46 0x38`             |
+| WebP   | Bytes 8-11: `0x57 0x45 0x42 0x50` |
 
 ### Upload Path
 

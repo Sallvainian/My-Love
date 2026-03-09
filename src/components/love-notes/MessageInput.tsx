@@ -202,7 +202,7 @@ export function MessageInput() {
   const isDisabled = !canSend;
 
   return (
-    <div className="flex flex-col gap-2 p-4 bg-white border-t border-gray-200 relative z-10 shrink-0">
+    <div className="relative z-10 flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white p-4">
       {/* Image preview (when image selected) */}
       <AnimatePresence>
         {selectedImage && (
@@ -216,23 +216,20 @@ export function MessageInput() {
 
       {/* Character counter (visible at 900+ chars) */}
       {showCounter && (
-        <div
-          className={`text-sm text-right ${counterColor}`}
-          aria-live="polite"
-        >
+        <div className={`text-right text-sm ${counterColor}`} aria-live="polite">
           {characterCount}/{MAX_CHARACTERS}
         </div>
       )}
 
       {/* Input row with image button, textarea, and send button */}
-      <div className="flex gap-2 items-end">
+      <div className="flex items-end gap-2">
         {/* Image picker button */}
         <button
           type="button"
           onClick={handleImageButtonClick}
           disabled={isSending}
           aria-label="Attach image"
-          className="p-2 text-gray-500 hover:text-coral-500 hover:bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-coral-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="hover:text-coral-500 focus:ring-coral-500 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ImageIcon size={24} />
         </button>
@@ -253,10 +250,10 @@ export function MessageInput() {
           value={content}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={selectedImage ? "Add a caption..." : "Send a love note..."}
+          placeholder={selectedImage ? 'Add a caption...' : 'Send a love note...'}
           aria-label="Love note message input"
           disabled={isSending}
-          className="flex-1 resize-none rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-coral-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] max-h-[200px] overflow-y-auto"
+          className="focus:ring-coral-500 max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           rows={1}
         />
 
@@ -266,7 +263,7 @@ export function MessageInput() {
           onClick={handleSend}
           disabled={isDisabled}
           aria-label="Send message"
-          className="px-6 py-2 bg-coral-500 text-white font-medium rounded-lg hover:bg-coral-600 focus:outline-none focus:ring-2 focus:ring-coral-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-coral-500 transition-colors min-h-[44px]"
+          className="bg-coral-500 hover:bg-coral-600 focus:ring-coral-500 disabled:hover:bg-coral-500 min-h-[44px] rounded-lg px-6 py-2 font-medium text-white transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSending ? 'Sending...' : 'Send'}
         </button>

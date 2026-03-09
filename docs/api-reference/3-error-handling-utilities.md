@@ -23,16 +23,16 @@ Custom error class thrown by all API services. The `isNetworkError` flag disting
 
 `handleSupabaseError()` maps PostgrestError codes to user-friendly messages:
 
-| Error Code | User Message |
-|-----------|-------------|
-| `23505` | This record already exists |
-| `23503` | Referenced record not found |
-| `23502` | Required field is missing |
-| `42501` | Permission denied - check Row Level Security policies |
-| `42P01` | Table not found - database schema may be out of sync |
-| `PGRST116` | No rows found |
-| `PGRST301` | Invalid request parameters |
-| *(other)* | Database error: `{original message}` |
+| Error Code | User Message                                          |
+| ---------- | ----------------------------------------------------- |
+| `23505`    | This record already exists                            |
+| `23503`    | Referenced record not found                           |
+| `23502`    | Required field is missing                             |
+| `42501`    | Permission denied - check Row Level Security policies |
+| `42P01`    | Table not found - database schema may be out of sync  |
+| `PGRST116` | No rows found                                         |
+| `PGRST301` | Invalid request parameters                            |
+| _(other)_  | Database error: `{original message}`                  |
 
 ## Functions
 
@@ -64,6 +64,7 @@ Type guard using `instanceof SupabaseServiceError`.
 ### `logSupabaseError(context: string, error: unknown): void`
 
 Structured console logging. Detection order:
+
 1. `SupabaseServiceError` -- logs message, code, isNetworkError
 2. `PostgrestError` -- logs code, message, details, hint
 3. `Error` -- logs message
@@ -74,6 +75,7 @@ Structured console logging. Detection order:
 Generic exponential backoff retry for any async operation.
 
 **Algorithm:**
+
 1. Execute `operation()`
 2. On failure, wait `delay` ms then retry
 3. Increase delay by `backoffMultiplier`, capped at `maxDelayMs`
@@ -83,9 +85,9 @@ Generic exponential backoff retry for any async operation.
 
 ```typescript
 interface RetryConfig {
-  maxAttempts: number;       // Default: 3
-  initialDelayMs: number;    // Default: 1000
-  maxDelayMs: number;        // Default: 30000
+  maxAttempts: number; // Default: 3
+  initialDelayMs: number; // Default: 1000
+  maxDelayMs: number; // Default: 30000
   backoffMultiplier: number; // Default: 2
 }
 ```

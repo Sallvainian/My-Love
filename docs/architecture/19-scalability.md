@@ -4,26 +4,26 @@
 
 The app is designed for a **two-user deployment** (a couple). This constraint simplifies many architectural decisions:
 
-| Concern | Current Design | Scaling Impact |
-|---------|---------------|----------------|
-| Users | 2 users, linked via `partner_id` | Partner detection assumes exactly 1 partner |
-| Auth | Email/password, Supabase Auth | No multi-tenant isolation |
-| Data volume | Low (daily moods, occasional photos) | IndexedDB and localStorage adequate |
-| Realtime | 1:1 channels between partners | No fan-out concerns |
-| Storage | Single Supabase project | No sharding needed |
+| Concern     | Current Design                       | Scaling Impact                              |
+| ----------- | ------------------------------------ | ------------------------------------------- |
+| Users       | 2 users, linked via `partner_id`     | Partner detection assumes exactly 1 partner |
+| Auth        | Email/password, Supabase Auth        | No multi-tenant isolation                   |
+| Data volume | Low (daily moods, occasional photos) | IndexedDB and localStorage adequate         |
+| Realtime    | 1:1 channels between partners        | No fan-out concerns                         |
+| Storage     | Single Supabase project              | No sharding needed                          |
 
 ## Data Volume Estimates
 
 For a 2-user deployment over 1 year:
 
-| Data Type | Estimated Volume | Storage Layer |
-|-----------|-----------------|---------------|
-| Mood entries | ~730 entries (2 users x 365 days) | IndexedDB + Supabase |
-| Messages (default) | ~200 default messages | IndexedDB |
-| Custom messages | ~50-100 user-created | IndexedDB |
-| Photos | ~200-500 photos | Supabase Storage |
-| Love notes | ~1000-5000 messages | Supabase |
-| Scripture sessions | ~50-100 sessions | Supabase (cache in IDB) |
+| Data Type          | Estimated Volume                  | Storage Layer           |
+| ------------------ | --------------------------------- | ----------------------- |
+| Mood entries       | ~730 entries (2 users x 365 days) | IndexedDB + Supabase    |
+| Messages (default) | ~200 default messages             | IndexedDB               |
+| Custom messages    | ~50-100 user-created              | IndexedDB               |
+| Photos             | ~200-500 photos                   | Supabase Storage        |
+| Love notes         | ~1000-5000 messages               | Supabase                |
+| Scripture sessions | ~50-100 sessions                  | Supabase (cache in IDB) |
 
 These volumes are well within the capacity of both IndexedDB (typically 50MB+ per origin) and localStorage (5MB per origin).
 
@@ -56,9 +56,11 @@ If love notes volume grows significantly:
 
 ### IndexedDB Indexes
 
-The `moods` store has indexes for efficient queries:
-- `by-date` -- Range queries for calendar view
-- `by-synced` -- Filter unsynced entries for sync operations
+The `moods` store has a `by-date` unique index for efficient queries:
+
+- `by-date` -- Unique index on the ISO date string field; enables O(1) lookups via `getMoodForDate()` and range scans via `getMoodsInRange()` using `IDBKeyRange.bound()`
+
+Note: Unsynced entries are identified by iterating all entries and filtering `synced === false` in JavaScript rather than via a dedicated index. At the expected data volume (~730 entries/year), this approach is adequate.
 
 ### Cursor-Based Pagination
 

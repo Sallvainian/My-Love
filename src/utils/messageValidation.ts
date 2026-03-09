@@ -24,9 +24,7 @@ export const MAX_MESSAGE_LENGTH = 1000;
  * @param content - The message content to validate
  * @returns Validation result with error message if invalid
  */
-export function validateMessageContent(
-  content: string
-): MessageValidationResult {
+export function validateMessageContent(content: string): MessageValidationResult {
   // Check for empty or whitespace-only messages
   if (!content || content.trim().length === 0) {
     return {

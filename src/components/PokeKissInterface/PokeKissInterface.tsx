@@ -270,7 +270,10 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       id: 'history',
       icon: History,
       label: 'History',
-      onClick: () => { setShowHistory(true); setIsExpanded(false); },
+      onClick: () => {
+        setShowHistory(true);
+        setIsExpanded(false);
+      },
       gradient: 'from-purple-400 to-purple-500',
       disabled: false,
       cooldown: 0,
@@ -288,8 +291,19 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
     {
       id: 'kiss',
       icon: () => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 fill-current">
-          <path d="M12 8c-2.5-2-5-2-7 0-1 1-1 3-1 5s1 4 2 5c2 2 4 2 6 0 2 2 4 2 6 0 1-1 2-3 2-5s0-4-1-5c-2-2-4.5-2-7 0Z"/>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 fill-current"
+        >
+          <path d="M12 8c-2.5-2-5-2-7 0-1 1-1 3-1 5s1 4 2 5c2 2 4 2 6 0 2 2 4 2 6 0 1-1 2-3 2-5s0-4-1-5c-2-2-4.5-2-7 0Z" />
         </svg>
       ),
       label: 'Kiss',
@@ -313,12 +327,16 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
 
   return (
     <>
-      <div ref={containerRef} className="relative inline-flex items-center" data-testid="poke-kiss-interface">
+      <div
+        ref={containerRef}
+        className="relative inline-flex items-center"
+        data-testid="poke-kiss-interface"
+      >
         {/* Action Buttons (expand up or down based on prop) */}
         <AnimatePresence>
           {isExpanded && (
             <motion.div
-              className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-2 z-50 ${
+              className={`absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 ${
                 expandDirection === 'down'
                   ? 'top-full mt-3 flex-col'
                   : 'bottom-full mb-3 flex-col-reverse'
@@ -341,27 +359,21 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
                       opacity: 1,
                       y: 0,
                       scale: 1,
-                      transition: { delay: index * 0.05 }
+                      transition: { delay: index * 0.05 },
                     }}
                     exit={{
                       opacity: 0,
                       y: yExit,
                       scale: 0.8,
-                      transition: { delay: (actionButtons.length - index) * 0.03 }
+                      transition: { delay: (actionButtons.length - index) * 0.03 },
                     }}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`
-                      relative flex items-center gap-2 px-4 py-2 rounded-full
-                      bg-linear-to-br ${button.gradient}
-                      text-white text-sm font-medium shadow-lg
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-shadow hover:shadow-xl
-                    `}
+                    className={`relative flex items-center gap-2 rounded-full bg-linear-to-br px-4 py-2 ${button.gradient} text-sm font-medium text-white shadow-lg transition-shadow hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50`}
                     data-testid={`${button.id}-button`}
                     aria-label={button.label}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="h-5 w-5" />
                     <span>{button.label}</span>
                     {button.cooldown > 0 && (
                       <span className="text-xs opacity-75">
@@ -380,25 +392,13 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
           onClick={() => setIsExpanded(!isExpanded)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className={`
-            relative flex items-center justify-center w-14 h-14 rounded-full
-            bg-linear-to-br from-pink-500 to-rose-500
-            text-white shadow-lg hover:shadow-xl
-            transition-all duration-300
-          `}
+          className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-pink-500 to-rose-500 text-white shadow-lg transition-all duration-300 hover:shadow-xl`}
           data-testid="fab-main-button"
           aria-label={isExpanded ? 'Close actions' : 'Open actions'}
           aria-expanded={isExpanded}
         >
-          <motion.div
-            animate={{ rotate: isExpanded ? 45 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {isExpanded ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Heart className="w-6 h-6 fill-current" />
-            )}
+          <motion.div animate={{ rotate: isExpanded ? 45 : 0 }} transition={{ duration: 0.2 }}>
+            {isExpanded ? <X className="h-6 w-6" /> : <Heart className="h-6 w-6 fill-current" />}
           </motion.div>
 
           {/* Notification Badge */}
@@ -406,7 +406,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shadow-md"
+              className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white shadow-md"
               onClick={(e) => {
                 e.stopPropagation();
                 handleBadgeClick();
@@ -439,7 +439,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full shadow-lg z-50"
+              className="fixed top-20 left-1/2 z-50 -translate-x-1/2 transform rounded-full bg-black/80 px-6 py-3 text-white shadow-lg"
               data-testid="toast-notification"
             >
               {showToast}
@@ -492,7 +492,7 @@ function KissAnimation({ onComplete }: { onComplete: () => void }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/30 backdrop-blur-sm"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -531,7 +531,7 @@ function FartAnimation({ onComplete }: { onComplete: () => void }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-yellow-50/40 backdrop-blur-sm overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-yellow-50/40 backdrop-blur-sm"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -572,7 +572,7 @@ function FartAnimation({ onComplete }: { onComplete: () => void }) {
       ))}
 
       <motion.div
-        className="absolute w-64 h-64 rounded-full bg-linear-to-r from-yellow-200/30 to-green-200/30"
+        className="absolute h-64 w-64 rounded-full bg-linear-to-r from-yellow-200/30 to-green-200/30"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: [0, 2, 3], opacity: [0.5, 0.3, 0] }}
         transition={{ duration: 1.2, ease: 'easeOut' }}

@@ -77,9 +77,7 @@ describe('scriptureReadingService — cache-first & write-through', () => {
   let scriptureReadingService: Awaited<
     typeof import('../../../src/services/scriptureReadingService')
   >['scriptureReadingService'];
-  let supabase: Awaited<
-    typeof import('../../../src/api/supabaseClient')
-  >['supabase'];
+  let supabase: Awaited<typeof import('../../../src/api/supabaseClient')>['supabase'];
 
   function makeSupabaseSession(overrides: Record<string, unknown> = {}) {
     return {
@@ -161,10 +159,18 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     } as unknown as ReturnType<typeof supabase.from>);
 
     return {
-      selectFn, eqFn, singleFn, orderFn, orFn,
-      updateFn, updateEqFn,
-      insertFn, insertSelectFn, insertSingleFn,
-      deleteFn, deleteEqFn,
+      selectFn,
+      eqFn,
+      singleFn,
+      orderFn,
+      orFn,
+      updateFn,
+      updateEqFn,
+      insertFn,
+      insertSelectFn,
+      insertSingleFn,
+      deleteFn,
+      deleteEqFn,
     };
   }
 
@@ -295,14 +301,25 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should return cached sessions on cache hit', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-sessions', {
-        id: SESSION_UUID, mode: 'solo', userId: USER_UUID,
-        currentPhase: 'reading', currentStepIndex: 0,
-        status: 'in_progress', version: 1, startedAt: new Date(),
+        id: SESSION_UUID,
+        mode: 'solo',
+        userId: USER_UUID,
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date(),
       });
       await db.put('scripture-sessions', {
-        id: SESSION_UUID_2, mode: 'together', userId: USER_UUID,
-        currentPhase: 'complete', currentStepIndex: 16,
-        status: 'complete', version: 1, startedAt: new Date(), completedAt: new Date(),
+        id: SESSION_UUID_2,
+        mode: 'together',
+        userId: USER_UUID,
+        currentPhase: 'complete',
+        currentStepIndex: 16,
+        status: 'complete',
+        version: 1,
+        startedAt: new Date(),
+        completedAt: new Date(),
       });
       db.close();
 
@@ -320,7 +337,10 @@ describe('scriptureReadingService — cache-first & write-through', () => {
 
       const chain = mockSupabaseFrom();
       chain.orderFn.mockResolvedValue({
-        data: [makeSupabaseSession(), makeSupabaseSession({ id: SESSION_UUID_2, mode: 'together' })],
+        data: [
+          makeSupabaseSession(),
+          makeSupabaseSession({ id: SESSION_UUID_2, mode: 'together' }),
+        ],
         error: null,
       });
 
@@ -338,9 +358,14 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should write to Supabase first then update cache', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-sessions', {
-        id: SESSION_UUID, mode: 'solo', userId: USER_UUID,
-        currentPhase: 'reading', currentStepIndex: 3,
-        status: 'in_progress', version: 1, startedAt: new Date('2026-01-30T10:00:00Z'),
+        id: SESSION_UUID,
+        mode: 'solo',
+        userId: USER_UUID,
+        currentPhase: 'reading',
+        currentStepIndex: 3,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date('2026-01-30T10:00:00Z'),
       });
       db.close();
 
@@ -374,9 +399,14 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should throw ScriptureError on server failure without updating cache', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-sessions', {
-        id: SESSION_UUID, mode: 'solo', userId: USER_UUID,
-        currentPhase: 'reading', currentStepIndex: 3,
-        status: 'in_progress', version: 1, startedAt: new Date('2026-01-30T10:00:00Z'),
+        id: SESSION_UUID,
+        mode: 'solo',
+        userId: USER_UUID,
+        currentPhase: 'reading',
+        currentStepIndex: 3,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date('2026-01-30T10:00:00Z'),
       });
       db.close();
 
@@ -448,8 +478,12 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should return cached bookmarks on cache hit', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-bookmarks', {
-        id: BOOKMARK_UUID, sessionId: SESSION_UUID, stepIndex: 5,
-        userId: USER_UUID, shareWithPartner: false, createdAt: new Date(),
+        id: BOOKMARK_UUID,
+        sessionId: SESSION_UUID,
+        stepIndex: 5,
+        userId: USER_UUID,
+        shareWithPartner: false,
+        createdAt: new Date(),
       });
       db.close();
 
@@ -579,15 +613,24 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should delete bookmark when one already exists', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-bookmarks', {
-        id: BOOKMARK_UUID, sessionId: SESSION_UUID, stepIndex: 5,
-        userId: USER_UUID, shareWithPartner: false, createdAt: new Date(),
+        id: BOOKMARK_UUID,
+        sessionId: SESSION_UUID,
+        stepIndex: 5,
+        userId: USER_UUID,
+        shareWithPartner: false,
+        createdAt: new Date(),
       });
       db.close();
 
       const chain = mockSupabaseFrom();
       chain.deleteEqFn.mockResolvedValue({ data: null, error: null });
 
-      const result = await scriptureReadingService.toggleBookmark(SESSION_UUID, 5, USER_UUID, false);
+      const result = await scriptureReadingService.toggleBookmark(
+        SESSION_UUID,
+        5,
+        USER_UUID,
+        false
+      );
 
       expect(result.added).toBe(false);
       expect(result.bookmark).toBeNull();
@@ -613,7 +656,11 @@ describe('scriptureReadingService — cache-first & write-through', () => {
         error: null,
       });
 
-      const message = await scriptureReadingService.addMessage(SESSION_UUID, USER_UUID, 'Lord, thank you.');
+      const message = await scriptureReadingService.addMessage(
+        SESSION_UUID,
+        USER_UUID,
+        'Lord, thank you.'
+      );
 
       expect(message.id).toBe(MESSAGE_UUID);
       expect(message.message).toBe('Lord, thank you.');
@@ -649,8 +696,11 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should return cached messages on cache hit', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-messages', {
-        id: MESSAGE_UUID, sessionId: SESSION_UUID, senderId: USER_UUID,
-        message: 'Cached message', createdAt: new Date(),
+        id: MESSAGE_UUID,
+        sessionId: SESSION_UUID,
+        senderId: USER_UUID,
+        message: 'Cached message',
+        createdAt: new Date(),
       });
       db.close();
 
@@ -687,9 +737,14 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should clear all sessions from IndexedDB cache', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-sessions', {
-        id: SESSION_UUID, mode: 'solo', userId: USER_UUID,
-        currentPhase: 'reading', currentStepIndex: 0,
-        status: 'in_progress', version: 1, startedAt: new Date(),
+        id: SESSION_UUID,
+        mode: 'solo',
+        userId: USER_UUID,
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date(),
       });
       expect(await db.count('scripture-sessions')).toBe(1);
       db.close();
@@ -706,21 +761,37 @@ describe('scriptureReadingService — cache-first & write-through', () => {
     it('should clear all scripture stores', async () => {
       const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
       await db.put('scripture-sessions', {
-        id: SESSION_UUID, mode: 'solo', userId: USER_UUID,
-        currentPhase: 'reading', currentStepIndex: 0,
-        status: 'in_progress', version: 1, startedAt: new Date(),
+        id: SESSION_UUID,
+        mode: 'solo',
+        userId: USER_UUID,
+        currentPhase: 'reading',
+        currentStepIndex: 0,
+        status: 'in_progress',
+        version: 1,
+        startedAt: new Date(),
       });
       await db.put('scripture-reflections', {
-        id: 'r1', sessionId: SESSION_UUID, stepIndex: 0,
-        userId: USER_UUID, isShared: false, createdAt: new Date(),
+        id: 'r1',
+        sessionId: SESSION_UUID,
+        stepIndex: 0,
+        userId: USER_UUID,
+        isShared: false,
+        createdAt: new Date(),
       });
       await db.put('scripture-bookmarks', {
-        id: BOOKMARK_UUID, sessionId: SESSION_UUID, stepIndex: 0,
-        userId: USER_UUID, shareWithPartner: false, createdAt: new Date(),
+        id: BOOKMARK_UUID,
+        sessionId: SESSION_UUID,
+        stepIndex: 0,
+        userId: USER_UUID,
+        shareWithPartner: false,
+        createdAt: new Date(),
       });
       await db.put('scripture-messages', {
-        id: MESSAGE_UUID, sessionId: SESSION_UUID, senderId: USER_UUID,
-        message: 'test', createdAt: new Date(),
+        id: MESSAGE_UUID,
+        sessionId: SESSION_UUID,
+        senderId: USER_UUID,
+        message: 'test',
+        createdAt: new Date(),
       });
       db.close();
 

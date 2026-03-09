@@ -90,7 +90,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -100,7 +100,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
 
           {/* Modal */}
           <motion.div
-            className="fixed inset-x-4 top-20 bottom-20 md:inset-x-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-2xl md:h-auto md:max-h-[80vh] bg-white rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden"
+            className="fixed inset-x-4 top-20 bottom-20 z-50 flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:inset-x-auto md:top-1/2 md:left-1/2 md:h-auto md:max-h-[80vh] md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -108,15 +108,15 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
             data-testid="interaction-history-modal"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-200 p-6">
               <h2 className="text-2xl font-bold text-gray-800">Interaction History</h2>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                className="rounded-full p-2 transition-colors hover:bg-gray-100"
                 data-testid="close-history-button"
                 aria-label="Close"
               >
-                <X className="w-6 h-6 text-gray-600" />
+                <X className="h-6 w-6 text-gray-600" />
               </button>
             </div>
 
@@ -125,16 +125,16 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <div className="text-6xl mb-4 animate-pulse">💕</div>
+                    <div className="mb-4 animate-pulse text-6xl">💕</div>
                     <p className="text-gray-600">Loading interactions...</p>
                   </div>
                 </div>
               ) : interactions.length === 0 ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <div className="text-6xl mb-4">💝</div>
-                    <p className="text-gray-600 text-lg mb-2">No interactions yet</p>
-                    <p className="text-gray-400 text-sm">
+                    <div className="mb-4 text-6xl">💝</div>
+                    <p className="mb-2 text-lg text-gray-600">No interactions yet</p>
+                    <p className="text-sm text-gray-400">
                       Send your first poke or kiss to get started!
                     </p>
                   </div>
@@ -148,32 +148,26 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
                         key={interaction.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`
-                          flex items-center gap-4 p-4 rounded-xl border-2 transition-all
-                          ${sent ? 'bg-pink-50 border-pink-200' : 'bg-purple-50 border-purple-200'}
-                        `}
+                        className={`flex items-center gap-4 rounded-xl border-2 p-4 transition-all ${sent ? 'border-pink-200 bg-pink-50' : 'border-purple-200 bg-purple-50'} `}
                         data-testid={`interaction-${interaction.id}`}
                       >
                         {/* Direction Indicator */}
                         <div
-                          className={`
-                          flex items-center justify-center w-10 h-10 rounded-full
-                          ${sent ? 'bg-pink-200' : 'bg-purple-200'}
-                        `}
+                          className={`flex h-10 w-10 items-center justify-center rounded-full ${sent ? 'bg-pink-200' : 'bg-purple-200'} `}
                         >
                           {sent ? (
-                            <ArrowRight className="w-5 h-5 text-pink-600" />
+                            <ArrowRight className="h-5 w-5 text-pink-600" />
                           ) : (
-                            <ArrowLeft className="w-5 h-5 text-purple-600" />
+                            <ArrowLeft className="h-5 w-5 text-purple-600" />
                           )}
                         </div>
 
                         {/* Interaction Icon */}
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-sm">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
                           {interaction.type === 'kiss' ? (
-                            <Heart className="w-7 h-7 text-red-500 fill-current" />
+                            <Heart className="h-7 w-7 fill-current text-red-500" />
                           ) : (
-                            <Hand className="w-7 h-7 text-pink-500" />
+                            <Hand className="h-7 w-7 text-pink-500" />
                           )}
                         </div>
 
@@ -188,14 +182,14 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
                               {sent ? 'Sent' : 'Received'}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="mt-1 text-xs text-gray-500">
                             {formatTimestamp(interaction.createdAt)}
                           </p>
                         </div>
 
                         {/* Viewed Badge */}
                         {!sent && !interaction.viewed && (
-                          <div className="px-3 py-1 rounded-full bg-purple-500 text-white text-xs font-medium">
+                          <div className="rounded-full bg-purple-500 px-3 py-1 text-xs font-medium text-white">
                             New
                           </div>
                         )}
@@ -207,8 +201,8 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
-              <p className="text-sm text-gray-500 text-center">
+            <div className="border-t border-gray-200 bg-gray-50 p-6">
+              <p className="text-center text-sm text-gray-500">
                 Showing interactions from the last 7 days ({interactions.length} total)
               </p>
             </div>

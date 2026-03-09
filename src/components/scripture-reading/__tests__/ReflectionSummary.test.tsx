@@ -38,9 +38,21 @@ let originalRAF: typeof requestAnimationFrame;
 
 describe('ReflectionSummary', () => {
   const sampleBookmarks: BookmarkedVerse[] = [
-    { stepIndex: 0, verseReference: 'Psalm 147:3', verseText: 'He heals the brokenhearted and binds up their wounds.' },
-    { stepIndex: 5, verseReference: '1 John 4:18', verseText: 'There is no fear in love. But perfect love drives out fear.' },
-    { stepIndex: 12, verseReference: 'Romans 8:28', verseText: 'And we know that in all things God works for the good.' },
+    {
+      stepIndex: 0,
+      verseReference: 'Psalm 147:3',
+      verseText: 'He heals the brokenhearted and binds up their wounds.',
+    },
+    {
+      stepIndex: 5,
+      verseReference: '1 John 4:18',
+      verseText: 'There is no fear in love. But perfect love drives out fear.',
+    },
+    {
+      stepIndex: 12,
+      verseReference: 'Romans 8:28',
+      verseText: 'And we know that in all things God works for the good.',
+    },
   ];
 
   const defaultProps = {
@@ -52,7 +64,10 @@ describe('ReflectionSummary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalRAF = globalThis.requestAnimationFrame;
-    globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    };
   });
 
   afterEach(() => {
@@ -148,7 +163,9 @@ describe('ReflectionSummary', () => {
       // Radiogroup exists
       const group = screen.getByTestId('scripture-session-rating-group');
       expect(group.getAttribute('role')).toBe('radiogroup');
-      expect(group.getAttribute('aria-label')).toBe('How meaningful was this session for you today?');
+      expect(group.getAttribute('aria-label')).toBe(
+        'How meaningful was this session for you today?'
+      );
 
       // 5 rating buttons with role="radio"
       for (let n = 1; n <= 5; n++) {
@@ -160,10 +177,14 @@ describe('ReflectionSummary', () => {
 
       // Select a rating and verify
       fireEvent.click(screen.getByTestId('scripture-session-rating-3'));
-      expect(screen.getByTestId('scripture-session-rating-3').getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByTestId('scripture-session-rating-3').getAttribute('aria-checked')).toBe(
+        'true'
+      );
       // Others remain unchecked
       for (const n of [1, 2, 4, 5]) {
-        expect(screen.getByTestId(`scripture-session-rating-${n}`).getAttribute('aria-checked')).toBe('false');
+        expect(
+          screen.getByTestId(`scripture-session-rating-${n}`).getAttribute('aria-checked')
+        ).toBe('false');
       }
     });
   });
@@ -358,24 +379,36 @@ describe('ReflectionSummary', () => {
 
       // Select rating 1
       fireEvent.click(screen.getByTestId('scripture-session-rating-1'));
-      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe(
+        'true'
+      );
 
       // ArrowRight moves to rating 2
       fireEvent.keyDown(group, { key: 'ArrowRight' });
-      expect(screen.getByTestId('scripture-session-rating-2').getAttribute('aria-checked')).toBe('true');
-      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe('false');
+      expect(screen.getByTestId('scripture-session-rating-2').getAttribute('aria-checked')).toBe(
+        'true'
+      );
+      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe(
+        'false'
+      );
 
       // ArrowLeft moves back to rating 1
       fireEvent.keyDown(group, { key: 'ArrowLeft' });
-      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe(
+        'true'
+      );
 
       // ArrowLeft from 1 wraps to 5
       fireEvent.keyDown(group, { key: 'ArrowLeft' });
-      expect(screen.getByTestId('scripture-session-rating-5').getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByTestId('scripture-session-rating-5').getAttribute('aria-checked')).toBe(
+        'true'
+      );
 
       // ArrowRight from 5 wraps to 1
       fireEvent.keyDown(group, { key: 'ArrowRight' });
-      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByTestId('scripture-session-rating-1').getAttribute('aria-checked')).toBe(
+        'true'
+      );
     });
   });
 
@@ -400,7 +433,9 @@ describe('ReflectionSummary', () => {
     it('disabled prop prevents submission even when form is complete', () => {
       const onSubmit = vi.fn();
       // Render as NOT disabled first to fill form, then re-render disabled
-      const { rerender } = render(<ReflectionSummary {...defaultProps} onSubmit={onSubmit} disabled={false} />);
+      const { rerender } = render(
+        <ReflectionSummary {...defaultProps} onSubmit={onSubmit} disabled={false} />
+      );
       // Select verse and rating
       fireEvent.click(screen.getByTestId('scripture-standout-verse-0'));
       fireEvent.click(screen.getByTestId('scripture-session-rating-4'));

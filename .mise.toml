@@ -1,0 +1,5 @@
+[tools]
+node = "24.13.0"
+
+[env]
+CODEX_HOME = "{{config_root}}/.codex"

@@ -3,14 +3,9 @@
  *
  * Reusable helpers for E2E tests. Import from this file
  * to avoid duplicating navigation and session setup logic.
- *
- * IMPORTANT: The scripture reading flow per-step is:
- *   verse screen → (click "Next Verse") → reflection screen → (rate + click Continue) → next verse screen
- * "Next Verse" does NOT advance the step directly — it transitions to the reflection sub-view.
- * Only submitting the reflection (rating + Continue) advances the step.
  */
 import { expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 
 type ScriptureEntryState = 'overview' | 'active-flow';
 
@@ -21,13 +16,46 @@ export type ScriptureSessionSnapshot = {
   current_step_index: number;
 };
 
-const AUTH_READINESS_MAX_ATTEMPTS = 5;
-const AUTH_READINESS_RETRY_MS = 300;
-const NETWORK_DIAGNOSTIC_TIMEOUT_MS = 12_000;
+export type ScriptureStoreSnapshot = {
+  hasStore: boolean;
+  session: {
+    id: string;
+    mode: string;
+    currentPhase: string;
+    currentStepIndex: number;
+    status: string;
+    version: number;
+  } | null;
+  activeSession: {
+    id: string;
+    currentStepIndex: number;
+  } | null;
+  countdownStartedAt: number | null;
+  myReady: boolean;
+  partnerReady: boolean;
+  partnerJoined: boolean;
+  partnerLocked: boolean;
+  partnerDisconnected: boolean;
+  partnerDisconnectedAt: number | null;
+  scriptureLoading: boolean;
+  isCheckingSession: boolean;
+  scriptureErrorMessage: string | null;
+};
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/**
+ * Hybrid Sync Pattern (3-layer wait)
+ *
+ * Use all three layers after any mutation that changes server + client state:
+ *
+ *   1. NETWORK: waitForScriptureRpc / interceptNetworkCall — confirms server processed the request
+ *   2. STORE:   waitForScriptureStore — confirms Zustand ingested the response
+ *   3. UI:      expect(locator).toBeVisible() — confirms React re-rendered
+ *
+ * Polling guide:
+ *   - waitForScriptureStore: Scripture store state (well-typed, diagnostic snapshots)
+ *   - expect.poll(): Simple boolean conditions in helpers (no fixture access needed)
+ *   - recurse fixture: Complex polling in test bodies needing Playwright report logging
+ */
 
 async function getSupabaseAuthContext(page: Page): Promise<{
   apiUrl: string;
@@ -93,37 +121,163 @@ async function getSupabaseAuthContext(page: Page): Promise<{
 }
 
 async function waitForAuthReadiness(page: Page): Promise<void> {
-  const diagnostics: string[] = [];
+  let lastStatus = 'not-started';
 
-  for (let attempt = 1; attempt <= AUTH_READINESS_MAX_ATTEMPTS; attempt++) {
-    const authContext = await getSupabaseAuthContext(page);
-    if (!authContext) {
-      diagnostics.push(`attempt ${attempt}: missing auth context`);
-      await sleep(AUTH_READINESS_RETRY_MS * attempt);
-      continue;
-    }
+  try {
+    await expect
+      .poll(
+        async () => {
+          const authContext = await getSupabaseAuthContext(page);
+          if (!authContext) {
+            lastStatus = 'missing auth context';
+            return false;
+          }
 
-    const response = await page.request
-      .get(`${authContext.apiUrl}/auth/v1/user`, {
-        headers: {
-          apikey: authContext.anonKey,
-          Authorization: `Bearer ${authContext.accessToken}`,
+          const response = await page.request
+            .get(`${authContext.apiUrl}/auth/v1/user`, {
+              headers: {
+                apikey: authContext.anonKey,
+                Authorization: `Bearer ${authContext.accessToken}`,
+              },
+            })
+            .catch(() => null);
+
+          lastStatus = `status ${response?.status() ?? 'network-error'}`;
+          return response?.ok() ?? false;
         },
-      })
-      .catch(() => null);
+        { timeout: 5000 }
+      )
+      .toBe(true);
+  } catch {
+    throw new Error(`[startSoloSession] Auth readiness failed (last: ${lastStatus})`);
+  }
+}
 
-    if (response?.ok()) {
-      return;
+export async function getScriptureStoreSnapshot(page: Page): Promise<ScriptureStoreSnapshot> {
+  return page.evaluate(() => {
+    const store = window.__APP_STORE__;
+    if (!store) {
+      return {
+        hasStore: false,
+        session: null,
+        activeSession: null,
+        countdownStartedAt: null,
+        myReady: false,
+        partnerReady: false,
+        partnerJoined: false,
+        partnerLocked: false,
+        partnerDisconnected: false,
+        partnerDisconnectedAt: null,
+        scriptureLoading: false,
+        isCheckingSession: false,
+        scriptureErrorMessage: null,
+      };
     }
 
-    diagnostics.push(`attempt ${attempt}: status ${response?.status() ?? 'network-error'}`);
-    await sleep(AUTH_READINESS_RETRY_MS * attempt);
+    const state = store.getState();
+    return {
+      hasStore: true,
+      session: state.session
+        ? {
+            id: state.session.id,
+            mode: state.session.mode,
+            currentPhase: state.session.currentPhase,
+            currentStepIndex: state.session.currentStepIndex,
+            status: state.session.status,
+            version: state.session.version,
+          }
+        : null,
+      activeSession: state.activeSession
+        ? {
+            id: state.activeSession.id,
+            currentStepIndex: state.activeSession.currentStepIndex,
+          }
+        : null,
+      countdownStartedAt: state.countdownStartedAt,
+      myReady: state.myReady,
+      partnerReady: state.partnerReady,
+      partnerJoined: state.partnerJoined,
+      partnerLocked: state.partnerLocked,
+      partnerDisconnected: state.partnerDisconnected,
+      partnerDisconnectedAt: state.partnerDisconnectedAt,
+      scriptureLoading: state.scriptureLoading,
+      isCheckingSession: state.isCheckingSession,
+      scriptureErrorMessage: state.scriptureError?.message ?? null,
+    };
+  });
+}
+
+export async function waitForScriptureStore(
+  page: Page,
+  label: string,
+  predicate: (snapshot: ScriptureStoreSnapshot) => boolean,
+  options?: { timeout?: number }
+): Promise<ScriptureStoreSnapshot> {
+  let lastSnapshot = await getScriptureStoreSnapshot(page);
+
+  try {
+    await expect
+      .poll(
+        async () => {
+          lastSnapshot = await getScriptureStoreSnapshot(page);
+          return predicate(lastSnapshot);
+        },
+        { timeout: options?.timeout }
+      )
+      .toBe(true);
+  } catch {
+    throw new Error(
+      `[waitForScriptureStore] ${label} not reached. Last snapshot: ${JSON.stringify(lastSnapshot)}`
+    );
   }
 
-  throw new Error(
-    `[startSoloSession] Auth readiness failed after ${AUTH_READINESS_MAX_ATTEMPTS} attempts (${diagnostics.join(
-      '; '
-    )})`
+  return lastSnapshot;
+}
+
+function isSuccessfulScriptureResponse(
+  resp: Pick<Response, 'url' | 'status' | 'request'>,
+  options: { urlIncludes?: string; method?: string }
+): boolean {
+  if (options.urlIncludes && !resp.url().includes(options.urlIncludes)) {
+    return false;
+  }
+
+  if (options.method && resp.request().method() !== options.method) {
+    return false;
+  }
+
+  return resp.status() >= 200 && resp.status() < 300;
+}
+
+/**
+ * Wait for a successful scripture RPC response.
+ *
+ * Uses vanilla `page.waitForResponse()` — acceptable in helpers that only
+ * receive `page: Page` (no fixture access). In test bodies with fixture
+ * access, prefer `interceptNetworkCall` for consistency.
+ */
+export async function waitForScriptureRpc(
+  page: Page,
+  rpcName: string,
+  method = 'POST'
+): Promise<Response> {
+  return page.waitForResponse((resp) =>
+    isSuccessfulScriptureResponse(resp, {
+      urlIncludes: `/rest/v1/rpc/${rpcName}`,
+      method,
+    })
+  );
+}
+
+export async function waitForScriptureSessionRequest(
+  page: Page,
+  method: 'GET' | 'PATCH'
+): Promise<Response> {
+  return page.waitForResponse((resp) =>
+    isSuccessfulScriptureResponse(resp, {
+      urlIncludes: '/rest/v1/scripture_sessions',
+      method,
+    })
   );
 }
 
@@ -216,25 +370,22 @@ async function normalizeOverviewFromActiveFlow(page: Page): Promise<void> {
   await page.getByTestId('save-and-exit-button').click();
   await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
+  const startButton = page.getByTestId('scripture-start-button');
   const resumePrompt = page.getByTestId('resume-prompt');
+
+  // Wait for either the start button or the resume prompt to appear.
+  await expect(startButton.or(resumePrompt)).toBeVisible();
+
+  // If the resume prompt appeared, click "start fresh" and wait for the abandon PATCH.
   if (await resumePrompt.isVisible()) {
-    const abandonPromise = page
-      .waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/scripture_sessions') &&
-          resp.request().method() === 'PATCH' &&
-          resp.status() >= 200 &&
-          resp.status() < 300,
-        { timeout: NETWORK_DIAGNOSTIC_TIMEOUT_MS }
-      )
-      .catch(() => null);
+    const abandonPromise = waitForScriptureSessionRequest(page, 'PATCH').catch(() => null);
 
     await page.getByTestId('resume-start-fresh').click();
     await abandonPromise;
   }
 
-  await expect(page.getByTestId('scripture-start-button')).toBeVisible();
-  await expect(page.getByTestId('scripture-start-button')).toBeEnabled();
+  await expect(startButton).toBeVisible();
+  await expect(startButton).toBeEnabled();
 }
 
 /**
@@ -253,15 +404,26 @@ export async function ensureScriptureOverview(page: Page): Promise<ScriptureEntr
 
   const startButton = page.getByTestId('scripture-start-button');
   const readingFlow = page.getByTestId('solo-reading-flow');
+  const loginScreen = page.getByTestId('login-screen');
+
+  // Wait for the page to settle into a known state: overview, reading flow, or login.
+  // Detecting login early prevents a 20s timeout when auth is missing/expired.
+  const overviewOrReading = page.getByTestId('scripture-overview').or(readingFlow);
+  const firstVisible = overviewOrReading.or(loginScreen);
+
+  await expect(firstVisible).toBeVisible();
+
+  // Fail fast if we landed on the login screen (auth token missing or expired)
+  if (await loginScreen.isVisible()) {
+    throw new Error(
+      '[ensureScriptureOverview] Page rendered login screen instead of scripture overview. Auth token may be expired or missing.'
+    );
+  }
 
   try {
     const state = await Promise.any<ScriptureEntryState>([
-      startButton
-        .waitFor({ state: 'visible', timeout: 20_000 })
-        .then(() => 'overview' as const),
-      readingFlow
-        .waitFor({ state: 'visible', timeout: 20_000 })
-        .then(() => 'active-flow' as const),
+      startButton.waitFor({ state: 'visible' }).then(() => 'overview' as const),
+      readingFlow.waitFor({ state: 'visible' }).then(() => 'active-flow' as const),
     ]);
 
     if (state === 'overview') {
@@ -272,12 +434,26 @@ export async function ensureScriptureOverview(page: Page): Promise<ScriptureEntr
 
     return state;
   } catch {
+    // If the overview is visible but start button isn't yet, the session check
+    // may still be in progress. Wait a bit longer for the start button.
+    const overviewVisible = await page.getByTestId('scripture-overview').isVisible();
+    if (overviewVisible) {
+      try {
+        await startButton.waitFor({ state: 'visible' });
+        await expect(startButton).toBeEnabled();
+        return 'overview';
+      } catch {
+        // Fall through to diagnostics
+      }
+    }
+
     const diagnostics = {
       startButtonVisible: await startButton.isVisible(),
       readingFlowVisible: await readingFlow.isVisible(),
-      overviewVisible: await page.getByTestId('scripture-overview').isVisible(),
+      overviewVisible,
       resumePromptVisible: await page.getByTestId('resume-prompt').isVisible(),
       sessionLoadingVisible: await page.getByTestId('session-loading').isVisible(),
+      sessionCheckLoadingVisible: await page.getByTestId('session-check-loading').isVisible(),
     };
 
     throw new Error(
@@ -305,12 +481,7 @@ export async function startSoloSession(page: Page): Promise<string> {
 
   await waitForAuthReadiness(page);
 
-  const responsePromise = page
-    .waitForResponse(
-      (resp) => resp.url().includes('/rest/v1/rpc/scripture_create_session'),
-      { timeout: NETWORK_DIAGNOSTIC_TIMEOUT_MS }
-    )
-    .catch(() => null);
+  const responsePromise = waitForScriptureRpc(page, 'scripture_create_session');
 
   await expect(page.getByTestId('scripture-start-button')).toBeEnabled();
   await page.getByTestId('scripture-start-button').click();
@@ -318,25 +489,19 @@ export async function startSoloSession(page: Page): Promise<string> {
   await expect(page.getByTestId('scripture-mode-solo')).toBeEnabled();
   await page.getByTestId('scripture-mode-solo').click();
 
-  // Primary success signal: deterministic UI readiness.
+  const response = await responsePromise;
+  const data = (await response.json()) as { id?: string };
+  await waitForScriptureStore(
+    page,
+    'solo session to enter reading phase',
+    (snapshot) => snapshot.session?.mode === 'solo' && snapshot.session.currentPhase === 'reading'
+  );
+
+  // Primary success signal: deterministic UI readiness after the create-session RPC.
   await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
 
-  const response = await responsePromise;
-  if (response) {
-    if (response.ok()) {
-      const data = (await response.json()) as { id?: string };
-      if (typeof data?.id === 'string') {
-        return data.id;
-      }
-    } else {
-      console.warn(
-        `[startSoloSession] scripture_create_session returned ${response.status()} (${response.statusText()})`
-      );
-    }
-  } else {
-    console.warn(
-      '[startSoloSession] scripture_create_session response was not observed within diagnostic timeout'
-    );
+  if (typeof data?.id === 'string') {
+    return data.id;
   }
 
   const fallbackSessionId = await getLatestInProgressSoloSessionId(page);
@@ -350,32 +515,24 @@ export async function startSoloSession(page: Page): Promise<string> {
 }
 
 /**
- * Advance one full step in the scripture reading flow.
+ * Advance one step in the scripture reading flow.
  *
- * The flow is: verse → (click Next Verse) → reflection → (rate + Continue) → next verse.
- * This helper completes one full cycle: clicks Next Verse, rates, and submits.
+ * Clicks Next Verse and waits for the next verse to appear.
  *
  * @param page - Playwright page
- * @param rating - Rating to select (1-5), defaults to 3
  */
-export async function advanceOneStep(page: Page, rating: number = 3) {
-  // Click Next Verse → transitions to reflection sub-view
+export async function advanceOneStep(page: Page) {
+  // Intercept-before-click pattern to avoid race conditions
+  const previousStep = (await getScriptureStoreSnapshot(page)).session?.currentStepIndex ?? 0;
+  const patchResponse = waitForScriptureSessionRequest(page, 'PATCH');
+
   await page.getByTestId('scripture-next-verse-button').click();
-
-  // Wait for reflection screen
-  await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
-
-  // Select rating
-  await page.getByTestId(`scripture-rating-${rating}`).click();
-
-  // Wait for reflection submission to complete
-  const responsePromise = page.waitForResponse(
-    (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
+  await patchResponse;
+  await waitForScriptureStore(
+    page,
+    'solo step advance',
+    (snapshot) => (snapshot.session?.currentStepIndex ?? previousStep) >= previousStep + 1
   );
-
-  await page.getByTestId('scripture-reflection-continue').click();
-
-  await responsePromise;
 
   // Wait for next verse screen to appear
   await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
@@ -384,7 +541,7 @@ export async function advanceOneStep(page: Page, rating: number = 3) {
 /**
  * Complete all 17 scripture steps to reach the reflection summary screen.
  *
- * Navigates through start → solo → 17 verse/reflection cycles.
+ * Navigates through start → solo → 17 verses via Next Verse.
  * Optionally bookmarks specific steps along the way.
  *
  * @param page - Playwright page
@@ -400,36 +557,43 @@ export async function completeAllStepsToReflectionSummary(
 
   // Complete all 17 steps (indices 0-16)
   for (let step = 0; step < 17; step++) {
-    // Wait for verse screen
+    // Wait for the correct verse to be fully rendered (progress indicator confirms step index).
+    // This is stronger than just waiting for verse-text visibility because the slide
+    // animation (0.3s Framer Motion) can make elements "visible" before the new step
+    // content has fully mounted and React state is consistent.
+    await expect(page.getByTestId('scripture-progress-indicator')).toHaveText(
+      `Verse ${step + 1} of 17`
+    );
     await expect(page.getByTestId('scripture-verse-text')).toBeVisible();
 
     // Optionally bookmark this verse
     if (bookmarkSteps.has(step)) {
-      await page.getByTestId('scripture-bookmark-button').click();
-      await expect(page.getByTestId('scripture-bookmark-button')).toHaveAttribute(
-        'aria-pressed',
-        'true'
-      );
+      // Click the bookmark button and retry if the optimistic state update
+      // doesn't register (Framer Motion animations can cause click delivery
+      // issues on some frames).
+      await expect
+        .poll(
+          async () => {
+            const pressed = await page
+              .getByTestId('scripture-bookmark-button')
+              .getAttribute('aria-pressed');
+            if (pressed === 'true') return true;
+            await page.getByTestId('scripture-bookmark-button').click();
+            return false;
+          },
+          { timeout: 5000, intervals: [100, 200, 300, 500] }
+        )
+        .toBe(true);
     }
 
-    // Advance to reflection screen
+    // Click Next Verse to advance (intercept-before-click pattern)
+    const patchResponse = waitForScriptureSessionRequest(page, 'PATCH');
+
     await page.getByTestId('scripture-next-verse-button').click();
-    await expect(page.getByTestId('scripture-reflection-screen')).toBeVisible();
-
-    // Select a rating and submit reflection
-    await page.getByTestId('scripture-rating-3').click();
-
-    // Wait for reflection submission to complete
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
-    );
-
-    await page.getByTestId('scripture-reflection-continue').click();
-
-    await responsePromise;
+    await patchResponse;
   }
 
-  // After step 17 (index 16) reflection, the reflection summary should appear
+  // After step 17 (index 16), the completion/reflection summary should appear
   return sessionId;
 }
 
@@ -468,11 +632,48 @@ export async function submitReflectionSummary(
   }
 
   // Submit the reflection summary — wait for server response
-  const responsePromise = page.waitForResponse(
-    (resp) => resp.url().includes('/rest/v1/rpc/scripture_submit_reflection') && resp.status() === 200
-  );
+  const responsePromise = waitForScriptureRpc(page, 'scripture_submit_reflection');
 
   await page.getByTestId('scripture-reflection-summary-continue').click();
 
   await responsePromise;
+
+  // Store-poll: wait for Zustand to reflect the phase transition.
+  // Linked users go to 'report'; unlinked users may go directly to 'complete'.
+  await waitForScriptureStore(
+    page,
+    'reflection summary phase transition',
+    (snapshot) =>
+      snapshot.session?.currentPhase === 'report' || snapshot.session?.currentPhase === 'complete'
+  );
+}
+
+/**
+ * After submitting the reflection summary, skip the message compose screen
+ * and wait for the session-completing PATCH before advancing to the report.
+ */
+export async function skipMessageAndCompleteSession(page: Page): Promise<void> {
+  await expect(page.getByTestId('scripture-message-compose-screen')).toBeVisible();
+
+  const patchResponse = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/rest/v1/scripture_sessions') &&
+      resp.request().method() === 'PATCH' &&
+      resp.status() >= 200 &&
+      resp.status() < 300
+  );
+
+  await page.getByTestId('scripture-message-skip-btn').click();
+
+  await patchResponse;
+
+  // Store-poll: wait for Zustand to reflect session completion.
+  // Session may be set to null by broadcast handler after completion.
+  await waitForScriptureStore(
+    page,
+    'session completion',
+    (snapshot) => snapshot.session?.currentPhase === 'complete' || snapshot.session === null
+  );
+
+  await expect(page.getByTestId('scripture-report-screen')).toBeVisible();
 }

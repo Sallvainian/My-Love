@@ -11,9 +11,8 @@ import {
   advanceOneStep,
   completeAllStepsToReflectionSummary,
   submitReflectionSummary,
+  skipMessageAndCompleteSession,
 } from '../helpers';
-import type { InterceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call/fixtures';
-import type { Page } from '@playwright/test';
 
 /**
  * Scripture navigation fixture providing high-level methods for scripture tests.
@@ -31,13 +30,12 @@ export type ScriptureNavFixture = {
   startSoloSession: () => Promise<string>;
 
   /**
-   * Advance one full step (verse → reflection → next verse).
-   * @param rating - Rating to select (1-5), defaults to 3
+   * Advance to the next verse by clicking Next Verse.
    */
-  advanceOneStep: (rating?: number) => Promise<void>;
+  advanceOneStep: () => Promise<void>;
 
   /**
-   * Complete all 17 steps to reach reflection summary.
+   * Complete all 17 steps (clicking Next Verse) to reach reflection summary.
    * @param bookmarkSteps - Set of step indices (0-16) to bookmark
    * @returns Session ID
    */
@@ -47,6 +45,11 @@ export type ScriptureNavFixture = {
    * Submit the reflection summary form.
    */
   submitSummary: () => Promise<void>;
+
+  /**
+   * Submit reflection summary, skip message compose, and wait for session completion.
+   */
+  completeSession: () => Promise<void>;
 };
 
 type ScriptureNavFixtures = {
@@ -60,12 +63,18 @@ type ScriptureNavFixtures = {
 export const test = base.extend<ScriptureNavFixtures>({
   scriptureNav: async ({ page }, use) => {
     const fixture: ScriptureNavFixture = {
-      ensureOverview: async () => ensureScriptureOverview(page),
+      ensureOverview: async () => {
+        await ensureScriptureOverview(page);
+      },
       startSoloSession: async () => startSoloSession(page),
-      advanceOneStep: async (rating = 3) => advanceOneStep(page, rating),
+      advanceOneStep: async () => advanceOneStep(page),
       completeAllSteps: async (bookmarkSteps = new Set([0, 5, 12])) =>
         completeAllStepsToReflectionSummary(page, bookmarkSteps),
       submitSummary: async () => submitReflectionSummary(page),
+      completeSession: async () => {
+        await submitReflectionSummary(page);
+        await skipMessageAndCompleteSession(page);
+      },
     };
 
     await use(fixture);

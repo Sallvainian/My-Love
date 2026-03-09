@@ -24,9 +24,12 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
   const hearts = useMemo(() => generateHearts(), []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-pink-50 via-rose-50 to-purple-50 relative overflow-hidden">
+    <div
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-pink-50 via-rose-50 to-purple-50 px-4"
+      data-testid="welcome-splash"
+    >
       {/* Raining hearts animation */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="pointer-events-none fixed inset-0 z-0">
         {hearts.map((heart) => (
           <motion.div
             key={heart.id}
@@ -58,11 +61,11 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="max-w-2xl w-full relative z-10"
+        className="relative z-10 w-full max-w-2xl"
       >
         <div className="card relative overflow-hidden">
           {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-pink-100/50 to-rose-100/50 pointer-events-none" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-pink-100/50 to-rose-100/50" />
 
           {/* Content */}
           <div className="relative z-10 text-center">
@@ -73,7 +76,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
               className="mb-8 flex justify-center"
             >
-              <Heart className="w-20 h-20 text-pink-500 fill-pink-500" />
+              <Heart className="h-20 w-20 fill-pink-500 text-pink-500" />
             </motion.div>
 
             {/* Main heading */}
@@ -81,7 +84,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-6"
+              className="mb-6 bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-4xl font-bold text-transparent md:text-5xl"
             >
               Welcome to Your App
             </motion.h1>
@@ -91,7 +94,7 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className="text-lg md:text-xl text-gray-700 leading-relaxed mb-8 font-serif"
+              className="mb-8 font-serif text-lg leading-relaxed text-gray-700 md:text-xl"
             >
               I will never stop finding ways to express my love for you, here's just one of many
               more to come. From the bottom of my heart, I love you Baby Cakes
@@ -103,10 +106,11 @@ export function WelcomeSplash({ onContinue }: WelcomeSplashProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
               onClick={onContinue}
-              className="group inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-xl transition-all duration-300 font-medium text-lg hover:scale-105"
+              data-testid="welcome-continue-button"
+              className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-8 py-4 text-lg font-medium text-white transition-all duration-300 hover:scale-105 hover:shadow-xl"
             >
               Continue
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </motion.button>
           </div>
         </div>

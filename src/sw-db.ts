@@ -25,7 +25,9 @@ async function openDatabase() {
   return openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, newVersion) {
       if (import.meta.env.DEV) {
-        console.log(`[SW-DB] Upgrading database from v${oldVersion} to v${newVersion ?? 'unknown'}`);
+        console.log(
+          `[SW-DB] Upgrading database from v${oldVersion} to v${newVersion ?? 'unknown'}`
+        );
       }
 
       // Migration: v0 → v1 - Add messages store
@@ -84,7 +86,9 @@ export async function getPendingMoods(): Promise<StoredMoodEntry[]> {
     const allMoods = await db.getAll(STORE_NAMES.MOODS);
     return allMoods.filter((mood) => !mood.synced);
   } catch (error) {
-    throw new Error(`Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to get pending moods: ${error instanceof Error ? error.message : String(error)}`
+    );
   } finally {
     db.close();
   }
@@ -108,7 +112,9 @@ export async function markMoodSynced(localId: number, supabaseId: string): Promi
     if (error instanceof Error && error.message.includes('not found')) {
       throw error; // Re-throw "not found" errors as-is
     }
-    throw new Error(`Failed to mark mood ${localId} as synced: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to mark mood ${localId} as synced: ${error instanceof Error ? error.message : String(error)}`
+    );
   } finally {
     db.close();
   }
@@ -123,7 +129,9 @@ export async function storeAuthToken(token: Omit<StoredAuthToken, 'id'>): Promis
   try {
     await db.put(STORE_NAMES.SW_AUTH, { id: 'current', ...token });
   } catch (error) {
-    throw new Error(`Failed to store auth token: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to store auth token: ${error instanceof Error ? error.message : String(error)}`
+    );
   } finally {
     db.close();
   }
@@ -139,7 +147,9 @@ export async function getAuthToken(): Promise<StoredAuthToken | null> {
     const token = await db.get(STORE_NAMES.SW_AUTH, 'current');
     return token ?? null;
   } catch (error) {
-    throw new Error(`Failed to get auth token: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to get auth token: ${error instanceof Error ? error.message : String(error)}`
+    );
   } finally {
     db.close();
   }
@@ -154,7 +164,9 @@ export async function clearAuthToken(): Promise<void> {
   try {
     await db.delete(STORE_NAMES.SW_AUTH, 'current');
   } catch (error) {
-    throw new Error(`Failed to clear auth token: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to clear auth token: ${error instanceof Error ? error.message : String(error)}`
+    );
   } finally {
     db.close();
   }

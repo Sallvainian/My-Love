@@ -38,6 +38,7 @@ Sends a kiss interaction. Delegates to the private `sendInteraction()` with `typ
 ### Private: `sendInteraction(type, toUserId)`
 
 **Flow:**
+
 1. Check `isOnline()` -- throw `SupabaseServiceError` with `isNetworkError: true` if offline
 2. Get `currentUserId` via `getCurrentUserId()` from sessionService
 3. Build `InteractionInsert` payload (`type`, `from_user_id`, `to_user_id`, `viewed: false`)
@@ -50,8 +51,8 @@ Sends a kiss interaction. Delegates to the private `sendInteraction()` with `typ
 
 Subscribes to real-time incoming interactions using `postgres_changes`.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter  | Type                                               | Description                              |
+| ---------- | -------------------------------------------------- | ---------------------------------------- |
 | `callback` | `(interaction: SupabaseInteractionRecord) => void` | Called when partner sends an interaction |
 
 **Channel:** `incoming-interactions`
@@ -66,10 +67,10 @@ Subscribes to real-time incoming interactions using `postgres_changes`.
 
 Fetches interactions where the current user is either sender or recipient.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | `number` | `50` | Max results |
-| `offset` | `number` | `0` | Starting position |
+| Parameter | Type     | Default | Description       |
+| --------- | -------- | ------- | ----------------- |
+| `limit`   | `number` | `50`    | Max results       |
+| `offset`  | `number` | `0`     | Starting position |
 
 **Query:** `.or(from_user_id.eq.{userId},to_user_id.eq.{userId})` with `.order('created_at', { ascending: false })` and `.range(offset, offset + limit - 1)`.
 

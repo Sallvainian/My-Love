@@ -42,14 +42,14 @@ Views are rendered conditionally based on `currentView` from `NavigationSlice`. 
 type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 ```
 
-| View | Component | Lazy | Contains |
-|------|-----------|------|----------|
-| `home` | Inline in App.tsx | No | DailyMessage, RelationshipTimers, CountdownTimer |
-| `photos` | `PhotoGallery` | Yes | PhotoGridItem, PhotoViewer, PhotoUpload, PhotoCarousel, PhotoEditModal, PhotoDeleteConfirmation |
-| `mood` | `MoodTracker` | Yes | MoodButton, MoodHistoryItem, MoodHistoryTimeline, MoodHistoryCalendar, PartnerMoodDisplay, NoMoodLoggedState |
-| `partner` | Inline partner view | Yes | PokeKissInterface, InteractionHistory, PartnerMoodView |
-| `notes` | `LoveNotes` | Yes | MessageList, MessageInput, LoveNoteMessage, ImagePreview, FullScreenImageViewer |
-| `scripture` | `ScriptureOverview` | Yes | SoloReadingFlow, PerStepReflection, BookmarkFlag, DailyPrayerReport, ReflectionSummary, MessageCompose |
+| View        | Component           | Lazy | Contains                                                                                                     |
+| ----------- | ------------------- | ---- | ------------------------------------------------------------------------------------------------------------ |
+| `home`      | Inline in App.tsx   | No   | DailyMessage, RelationshipTimers, CountdownTimer                                                             |
+| `photos`    | `PhotoGallery`      | Yes  | PhotoGridItem, PhotoViewer, PhotoUpload, PhotoCarousel, PhotoEditModal, PhotoDeleteConfirmation              |
+| `mood`      | `MoodTracker`       | Yes  | MoodButton, MoodHistoryItem, MoodHistoryTimeline, MoodHistoryCalendar, PartnerMoodDisplay, NoMoodLoggedState |
+| `partner`   | Inline partner view | Yes  | PokeKissInterface, InteractionHistory, PartnerMoodView                                                       |
+| `notes`     | `LoveNotes`         | Yes  | MessageList, MessageInput, LoveNoteMessage, ImagePreview, FullScreenImageViewer                              |
+| `scripture` | `ScriptureOverview` | Yes  | SoloReadingFlow, PerStepReflection, BookmarkFlag, DailyPrayerReport, ReflectionSummary, MessageCompose       |
 
 ## Component Directory Structure
 

@@ -1,3 +1,17 @@
+# gemini-cli settings
+.gemini/
+
+# GitHub App credentials
+gha-creds-*.json
+
+# Gemini GitHub Action workflows (auto-generated)
+.github/commands/
+
+# Test failure reports
+failures-ai.md
+playwright-results.json
+_bmad-output/pw-test-results/
+
 # Logs
 logs
 *.log
@@ -19,10 +33,11 @@ dev-dist
 coverage/
 .nyc_output/
 
-# dotenvx: Keep .env.keys secret (contains decryption key)
-# Encrypted .env files are now safe to commit
+# fnox — secrets stored in macOS Keychain, not files
+# fnox.toml is safe to commit (declarations only, no values)
+fnox.local.toml
+.env
 .env.keys
-.envrc
 
 # Playwright test artifacts
 /test-results/
@@ -31,6 +46,7 @@ coverage/
 tests/e2e/.auth/storageState.json
 tests/e2e/.auth/auth-failure.png
 tests/.auth/
+/.auth/
 
 # Editor directories and files
 .vscode/*
@@ -71,11 +87,9 @@ _bmad/
 .playwright-mcp/
 .serena/
 
-# Test environment - .env.test is encrypted with dotenvx and safe to commit
-# The decryption key (DOTENV_PRIVATE_KEY_TEST) is stored in .env.keys and GitHub Secrets
+# Test environment - .env.test contains local Supabase dev values (safe to commit)
 
 # Additional env files without dot prefix
-env.keys
 env.test
 .agentvibes/
 .vscode/
@@ -88,6 +102,7 @@ supabase/.temp/
 
 # BMAD method files (local tooling)
 _bmad/
+.agent/
 .agents/
 skills/
 
@@ -98,3 +113,20 @@ skills/
 
 # Auto Claude data directory
 .auto-claude/
+
+# Auto Claude generated files
+.auto-claude-security.json
+.auto-claude-status
+.claude_settings.json
+.worktrees/
+.security-key
+logs/security/
+CLAUDE.md
+AGENTS.md
+
+# Working directories (image generation, temp files)
+output/
+tmp/
+test-results.json
+
+gha-creds-*.json

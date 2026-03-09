@@ -8,14 +8,15 @@ type(scope): brief description
 
 ### Prefixes
 
-| Prefix | Use |
-|---|---|
-| `feat(epic-N)` | New story implementation |
-| `fix(story-N.N)` | Bug fixes for a specific story |
-| `test(epic-N)` | QA passes, test additions |
-| `docs(epic-N)` | Documentation updates |
-| `chore(sprint)` | Sprint tracking, status updates |
-| `refactor` | Code restructuring without behavior change |
+| Prefix           | Use                                        |
+| ---------------- | ------------------------------------------ |
+| `feat(epic-N)`   | New story implementation                   |
+| `fix(story-N.N)` | Bug fixes for a specific story             |
+| `test(epic-N)`   | QA passes, test additions                  |
+| `docs(epic-N)`   | Documentation updates                      |
+| `chore(sprint)`  | Sprint tracking, status updates            |
+| `refactor`       | Code restructuring without behavior change |
+| `revert`         | Reverting previous changes                 |
 
 ### Commit Rules
 
@@ -36,10 +37,11 @@ When uncommitted changes span multiple stories:
 
 ## Branch Strategy
 
-| Branch Pattern | Purpose |
-|---|---|
-| `main` | Production branch, deployed to GitHub Pages |
-| `feature/epic-N-description` | Feature branches for epic work |
+| Branch Pattern         | Purpose                                     |
+| ---------------------- | ------------------------------------------- |
+| `main`                 | Production branch, deployed to GitHub Pages |
+| `epic-N/description`   | Feature branches for epic work              |
+| `epic-N/working-reset` | Working branches for cleanup/reset tasks    |
 
 All epic work stays on its feature branch until PR review. PRs target `main`.
 
@@ -47,10 +49,10 @@ All epic work stays on its feature branch until PR review. PRs target `main`.
 
 Dependabot runs weekly on Mondays and creates grouped PRs:
 
-| Ecosystem | Groups |
-|---|---|
-| npm | `production-dependencies` (minor/patch), `dev-dependencies` (minor/patch) |
-| GitHub Actions | All action updates grouped together |
+| Ecosystem      | Groups                                                                    |
+| -------------- | ------------------------------------------------------------------------- |
+| npm            | `production-dependencies` (minor/patch), `dev-dependencies` (minor/patch) |
+| GitHub Actions | All action updates grouped together                                       |
 
 - **Commit prefix**: `deps` for npm packages, `ci` for GitHub Actions
 - **PR limit**: 10 open pull requests maximum
@@ -58,12 +60,25 @@ Dependabot runs weekly on Mondays and creates grouped PRs:
 
 ## CI Workflows
 
-| Workflow | Trigger | Purpose |
-|---|---|---|
-| `deploy.yml` | Push to `main`, manual | Build, smoke test, deploy to GitHub Pages, health check |
-| `test.yml` | Push to `main`/`develop`, PRs, daily at 2 AM UTC, manual | Lint, unit tests, sharded E2E, burn-in, merge reports |
-| `supabase-migrations.yml` | PRs touching `supabase/` paths, manual | Migration validation with local Supabase |
-| `claude.yml` | `@claude` mentions in issues/PRs | Claude Code AI assistance |
-| `claude-code-review.yml` | PR opened/synchronized/ready | Automated PR code review with Claude |
-| `manual-code-analysis.yml` | Manual dispatch | On-demand commit summarization or security review |
-| `ci-failure-auto-fix.yml` | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code |
+The project has 18 GitHub Actions workflows:
+
+| Workflow                      | Trigger                                                  | Purpose                                                 |
+| ----------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| `deploy.yml`                  | Push to `main`, manual                                   | Build, smoke test, deploy to GitHub Pages, health check |
+| `test.yml`                    | Push to `main`/`develop`, PRs, daily at 2 AM UTC, manual | Lint, unit tests, E2E, merge reports                    |
+| `supabase-migrations.yml`     | PRs touching `supabase/` paths, manual                   | Migration validation with local Supabase                |
+| `claude.yml`                  | `@claude` mentions in issues/PRs                         | Claude Code AI assistance                               |
+| `claude-code-review.yml`      | PR opened/synchronized/ready                             | Automated PR code review with Claude                    |
+| `ci-failure-auto-fix.yml`     | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code                   |
+| `manual-code-analysis.yml`    | Manual dispatch                                          | On-demand commit summarization or security review       |
+| `codeql.yml`                  | Scheduled/PR                                             | CodeQL security scanning                                |
+| `dependency-review.yml`       | PRs                                                      | Dependency vulnerability review                         |
+| `bundle-size.yml`             | PRs                                                      | Bundle size tracking                                    |
+| `lighthouse.yml`              | Scheduled/manual                                         | Lighthouse performance auditing                         |
+| `bmad-story-sync.yml`         | Manual                                                   | BMAD method story sync                                  |
+| `gemini-dispatch.yml`         | Manual                                                   | Gemini AI dispatch                                      |
+| `gemini-invoke.yml`           | Workflow call                                            | Gemini AI invocation                                    |
+| `gemini-plan-execute.yml`     | Manual                                                   | Gemini AI plan execution                                |
+| `gemini-review.yml`           | PRs                                                      | Gemini AI code review                                   |
+| `gemini-scheduled-triage.yml` | Scheduled                                                | Gemini AI scheduled triage                              |
+| `gemini-triage.yml`           | Issues                                                   | Gemini AI issue triage                                  |

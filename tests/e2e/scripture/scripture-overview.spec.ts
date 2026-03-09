@@ -17,57 +17,11 @@
  *   The "Together" card is the second ModeCard in mode-selection.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { ensureScriptureOverview, waitForScriptureSessionRequest } from '../../support/helpers';
 import {
-  ensureScriptureOverview,
-  startSoloSession,
-  advanceOneStep,
-} from '../../support/helpers';
-import type { Page } from '@playwright/test';
-
-async function saveSoloSessionAtStep(page: Page, step: number): Promise<string> {
-  const sessionId = await startSoloSession(page);
-
-  for (let i = 1; i < step; i++) {
-    await advanceOneStep(page);
-  }
-
-  await page.getByTestId('exit-button').click();
-  await expect(page.getByTestId('exit-confirm-dialog')).toBeVisible();
-  await page.getByTestId('save-and-exit-button').click();
-  await expect(page.getByTestId('scripture-overview')).toBeVisible();
-
-  return sessionId;
-}
-
-async function clearClientScriptureCache(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    localStorage.removeItem('my-love-storage');
-
-    const factory = indexedDB as IDBFactory & {
-      databases?: () => Promise<Array<{ name?: string }>>;
-    };
-
-    const dbNames = new Set<string>(['my-love-db']);
-    if (typeof factory.databases === 'function') {
-      const databases = await factory.databases();
-      for (const db of databases) {
-        if (db.name) dbNames.add(db.name);
-      }
-    }
-
-    await Promise.all(
-      [...dbNames].map(
-        (dbName) =>
-          new Promise<void>((resolve) => {
-            const request = indexedDB.deleteDatabase(dbName);
-            request.onsuccess = () => resolve();
-            request.onerror = () => resolve();
-            request.onblocked = () => resolve();
-          })
-      )
-    );
-  });
-}
+  saveSoloSessionAtStep,
+  isolateSessionForResume,
+} from '../../support/helpers/scripture-overview';
 
 test.describe('Scripture Navigation & Overview', () => {
   test.describe('Navigation', () => {
@@ -80,9 +34,7 @@ test.describe('Scripture Navigation & Overview', () => {
       await expect(page.getByTestId('nav-scripture')).toBeVisible();
     });
 
-    test('should navigate to scripture overview when tapping Scripture tab', async ({
-      page,
-    }) => {
+    test('should navigate to scripture overview when tapping Scripture tab', async ({ page }) => {
       // GIVEN: User is on the home page
       await page.goto('/');
 
@@ -130,6 +82,7 @@ test.describe('Scripture Navigation & Overview', () => {
       page,
     }) => {
       // GIVEN: A solo flow is already active
+      const { startSoloSession } = await import('../../support/helpers');
       await startSoloSession(page);
       await expect(page.getByTestId('solo-reading-flow')).toBeVisible();
 
@@ -149,22 +102,26 @@ test.describe('Scripture Navigation & Overview', () => {
   test.describe('P1-006: Mode selection - no partner disables Together', () => {
     test('should disable Together mode when user has no linked partner', async ({
       page,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User has no linked partner (partner_id is null)
-      // Intercept partner lookup query to simulate no-partner state.
-      await page.route('**/rest/v1/users*', (route) => {
-        const url = route.request().url();
-        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              partner_id: null,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-        }
-        return route.continue();
+      interceptNetworkCall({
+        url: '**/rest/v1/users*',
+        handler: async (route, request) => {
+          const url = request.url();
+          if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                partner_id: null,
+                updated_at: '2026-01-01T00:00:00.000Z',
+              }),
+            });
+          } else {
+            await route.continue();
+          }
+        },
       });
 
       await ensureScriptureOverview(page);
@@ -172,7 +129,9 @@ test.describe('Scripture Navigation & Overview', () => {
 
       // WHEN: Mode selection is shown
       // THEN: Together mode is grayed out
-      const togetherOption = page.getByTestId('mode-selection').getByRole('button', { name: /together/i });
+      const togetherOption = page
+        .getByTestId('mode-selection')
+        .getByRole('button', { name: /together/i });
       await expect(togetherOption).toBeVisible();
       await expect(togetherOption).toBeDisabled();
 
@@ -189,39 +148,41 @@ test.describe('Scripture Navigation & Overview', () => {
   test.describe('P1-007: Mode selection - partner enables both modes', () => {
     test('should enable both modes when user has linked partner', async ({
       page,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User has a linked partner (partner_id is not null)
       const partnerId = '11111111-1111-4111-8111-111111111111';
-      await page.route('**/rest/v1/users*', (route) => {
-        const url = route.request().url();
+      interceptNetworkCall({
+        url: '**/rest/v1/users*',
+        handler: async (route, request) => {
+          const url = request.url();
 
-        if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              partner_id: partnerId,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-        }
-
-        if (
-          url.includes('select=id,email,display_name') ||
-          url.includes('select=id%2Cemail%2Cdisplay_name')
-        ) {
-          return route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              id: partnerId,
-              email: 'linked.partner@example.com',
-              display_name: 'Linked Partner',
-            }),
-          });
-        }
-
-        return route.continue();
+          if (url.includes('select=partner_id') || url.includes('select=partner_id%2Cupdated_at')) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                partner_id: partnerId,
+                updated_at: '2026-01-01T00:00:00.000Z',
+              }),
+            });
+          } else if (
+            url.includes('select=id,email,display_name') ||
+            url.includes('select=id%2Cemail%2Cdisplay_name')
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                id: partnerId,
+                email: 'linked.partner@example.com',
+                display_name: 'Linked Partner',
+              }),
+            });
+          } else {
+            await route.continue();
+          }
+        },
       });
 
       await ensureScriptureOverview(page);
@@ -237,42 +198,17 @@ test.describe('Scripture Navigation & Overview', () => {
   });
 
   test.describe('P1-008: Resume prompt for incomplete session', () => {
-    test('should show resume prompt with correct step number', async ({
-      page,
-      supabaseAdmin,
-    }) => {
+    test('should show resume prompt with correct step number', async ({ page, supabaseAdmin }) => {
       // GIVEN: User has an incomplete Solo session at step 7
       const sessionId = await saveSoloSessionAtStep(page, 7);
-      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(targetSessionError).toBeNull();
+      await isolateSessionForResume({ supabaseAdmin, sessionId, page });
 
-      // Isolate this test's resume candidate for the worker user.
-      const { error: isolateSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'abandoned' })
-        .eq('user1_id', targetSession!.user1_id)
-        .eq('mode', 'solo')
-        .eq('status', 'in_progress')
-        .neq('id', sessionId);
-      expect(isolateSessionError).toBeNull();
-
-      // Stabilize active-session selection under parallel workers by making
-      // this test's saved session the newest candidate for resume lookup.
-      const { error: prioritizeSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
-        .eq('id', sessionId);
-      expect(prioritizeSessionError).toBeNull();
-
-      // Clear client-side cache so active-session lookup re-reads from server.
-      await clearClientScriptureCache(page);
+      // Network-first: intercept the session check API before navigating.
+      const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
 
       // Re-open once after prioritize update so session check reads the target row.
       await page.goto('/scripture');
+      await sessionCheck;
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
       // WHEN: The overview page loads
@@ -280,14 +216,12 @@ test.describe('Scripture Navigation & Overview', () => {
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
 
       // AND: Shows correct step info
-      await expect(
-        page.getByTestId('resume-prompt')
-      ).toContainText(/Continue where you left off\? \(Step 7 of 17\)/i);
+      await expect(page.getByTestId('resume-prompt')).toContainText(
+        /Continue where you left off\? \(Step 7 of 17\)/i
+      );
 
       // AND: Continue button is available
-      await expect(
-        page.getByTestId('resume-continue')
-      ).toBeVisible();
+      await expect(page.getByTestId('resume-continue')).toBeVisible();
 
       // AND: Start fresh option is available
       await expect(page.getByTestId('resume-start-fresh')).toBeVisible();
@@ -298,39 +232,18 @@ test.describe('Scripture Navigation & Overview', () => {
     test('should clear saved state and begin new session', async ({
       page,
       supabaseAdmin,
+      interceptNetworkCall,
     }) => {
       // GIVEN: User has an incomplete session and sees the resume prompt
       const sessionId = await saveSoloSessionAtStep(page, 5);
-      const { data: targetSession, error: targetSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .select('user1_id')
-        .eq('id', sessionId)
-        .single();
-      expect(targetSessionError).toBeNull();
+      await isolateSessionForResume({ supabaseAdmin, sessionId, page });
 
-      // Isolate this test's resume candidate for the worker user.
-      const { error: isolateSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ status: 'abandoned' })
-        .eq('user1_id', targetSession!.user1_id)
-        .eq('mode', 'solo')
-        .eq('status', 'in_progress')
-        .neq('id', sessionId);
-      expect(isolateSessionError).toBeNull();
-
-      // Stabilize active-session selection under parallel workers by making
-      // this test's saved session the newest candidate for resume lookup.
-      const { error: prioritizeSessionError } = await supabaseAdmin
-        .from('scripture_sessions')
-        .update({ started_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
-        .eq('id', sessionId);
-      expect(prioritizeSessionError).toBeNull();
-
-      // Clear client-side cache so active-session lookup re-reads from server.
-      await clearClientScriptureCache(page);
+      // Network-first: intercept the session check API before navigating.
+      const sessionCheck = waitForScriptureSessionRequest(page, 'GET');
 
       // Re-open once after prioritize update so session check reads the target row.
       await page.goto('/scripture');
+      await sessionCheck;
       await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
       await expect(page.getByTestId('resume-prompt')).toBeVisible();
@@ -345,18 +258,15 @@ test.describe('Scripture Navigation & Overview', () => {
 
       // THEN: The target session is abandoned server-side
       await expect
-        .poll(
-          async () => {
-            const { data: abandonedSession, error: abandonedSessionError } = await supabaseAdmin
-              .from('scripture_sessions')
-              .select('status')
-              .eq('id', sessionId)
-              .single();
-            expect(abandonedSessionError).toBeNull();
-            return abandonedSession?.status ?? null;
-          },
-          { timeout: 15_000 }
-        )
+        .poll(async () => {
+          const { data: abandonedSession, error: abandonedSessionError } = await supabaseAdmin
+            .from('scripture_sessions')
+            .select('status')
+            .eq('id', sessionId)
+            .single();
+          expect(abandonedSessionError).toBeNull();
+          return abandonedSession?.status ?? null;
+        })
         .toBe('abandoned');
 
       // AND: Fresh overview path is available (avoids cross-worker session collisions)
@@ -369,17 +279,14 @@ test.describe('Scripture Navigation & Overview', () => {
       await expect(page.getByTestId('mode-selection')).toBeVisible();
 
       // AND: After selecting Solo, session starts at step 1
-      const sessionCreated = page.waitForResponse(
-        (resp) =>
-          resp.url().includes('/rest/v1/rpc/scripture_create_session') &&
-          resp.status() === 200
-      );
+      const sessionCreated = interceptNetworkCall({
+        method: 'POST',
+        url: '**/rest/v1/rpc/scripture_create_session',
+      });
       await page.getByTestId('scripture-mode-solo').click();
       await sessionCreated;
 
-      await expect(
-        page.getByTestId('scripture-progress-indicator')
-      ).toHaveText('Verse 1 of 17');
+      await expect(page.getByTestId('scripture-progress-indicator')).toHaveText('Verse 1 of 17');
     });
   });
 });

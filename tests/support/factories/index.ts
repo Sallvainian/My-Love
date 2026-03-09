@@ -35,7 +35,12 @@ export interface SeedResult {
  * - with_help_flags: Session with help flags set
  * - unlinked: Solo session at step 7 with NO partner (user2_id = NULL)
  */
-export type SeedPreset = 'mid_session' | 'completed' | 'with_help_flags' | 'unlinked';
+export type SeedPreset =
+  | 'mid_session'
+  | 'completed'
+  | 'with_help_flags'
+  | 'unlinked'
+  | 'at_reflection';
 
 /**
  * Options for creating test sessions
@@ -45,6 +50,7 @@ export interface CreateTestSessionOptions {
   includeReflections?: boolean;
   includeMessages?: boolean;
   preset?: SeedPreset;
+  bookmarkSteps?: number[];
 }
 
 /**
@@ -73,14 +79,15 @@ export async function createTestSession(
     p_session_count: options?.sessionCount ?? 1,
     p_include_reflections: options?.includeReflections ?? false,
     p_include_messages: options?.includeMessages ?? false,
-    p_preset: options?.preset ?? null,
+    p_preset: options?.preset,
+    p_bookmark_steps: options?.bookmarkSteps,
   });
 
   if (error) {
     throw new Error(`Seeding failed: ${error.message}`);
   }
 
-  return data as SeedResult;
+  return data as unknown as SeedResult;
 }
 
 /**
@@ -102,8 +109,49 @@ export async function linkTestPartners(
   user1Id: string,
   user2Id: string
 ): Promise<void> {
-  await supabase.from('users').update({ partner_id: user2Id }).eq('id', user1Id);
-  await supabase.from('users').update({ partner_id: user1Id }).eq('id', user2Id);
+  const { error: error1 } = await supabase
+    .from('users')
+    .update({ partner_id: user2Id })
+    .eq('id', user1Id);
+  if (error1) throw new Error(`Failed to link user1 (${user1Id}) as partner: ${error1.message}`);
+
+  const { error: error2 } = await supabase
+    .from('users')
+    .update({ partner_id: user1Id })
+    .eq('id', user2Id);
+  if (error2) throw new Error(`Failed to link user2 (${user2Id}) as partner: ${error2.message}`);
+}
+
+/**
+ * Unlink two test users (remove bidirectional partner relationship).
+ *
+ * Reverses the effect of linkTestPartners by clearing partner_id for both
+ * users. Call in finally blocks to prevent partner state from leaking into
+ * subsequent tests within the same worker.
+ *
+ * @param supabase - Supabase client (must have service role for admin access)
+ * @param user1Id - First user's UUID
+ * @param user2Id - Second user's UUID
+ *
+ * @example
+ * await unlinkTestPartners(supabase, result.test_user1_id, result.test_user2_id);
+ */
+export async function unlinkTestPartners(
+  supabase: TypedSupabaseClient,
+  user1Id: string,
+  user2Id: string
+): Promise<void> {
+  const { error: error1 } = await supabase
+    .from('users')
+    .update({ partner_id: null })
+    .eq('id', user1Id);
+  if (error1) throw new Error(`Failed to unlink user1 (${user1Id}) partner: ${error1.message}`);
+
+  const { error: error2 } = await supabase
+    .from('users')
+    .update({ partner_id: null })
+    .eq('id', user2Id);
+  if (error2) throw new Error(`Failed to unlink user2 (${user2Id}) partner: ${error2.message}`);
 }
 
 /**

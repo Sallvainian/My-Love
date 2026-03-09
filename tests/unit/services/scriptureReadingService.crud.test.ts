@@ -89,7 +89,6 @@ describe('scriptureReadingService', () => {
         status: 'in_progress',
         version: 1,
         startedAt: new Date('2026-01-30T10:00:00Z'),
-
       };
 
       await db.put('scripture-sessions', session);
@@ -113,7 +112,6 @@ describe('scriptureReadingService', () => {
         status: 'in_progress',
         version: 1,
         startedAt: new Date(),
-
       };
 
       const session2: ScriptureSession = {
@@ -126,7 +124,6 @@ describe('scriptureReadingService', () => {
         version: 1,
         startedAt: new Date(),
         completedAt: new Date(),
-
       };
 
       const session3: ScriptureSession = {
@@ -138,18 +135,13 @@ describe('scriptureReadingService', () => {
         status: 'in_progress',
         version: 1,
         startedAt: new Date(),
-
       };
 
       await db.put('scripture-sessions', session1);
       await db.put('scripture-sessions', session2);
       await db.put('scripture-sessions', session3);
 
-      const userSessions = await db.getAllFromIndex(
-        'scripture-sessions',
-        'by-user',
-        'user-123'
-      );
+      const userSessions = await db.getAllFromIndex('scripture-sessions', 'by-user', 'user-123');
 
       expect(userSessions).toHaveLength(2);
       expect(userSessions.every((s) => s.userId === 'user-123')).toBe(true);
@@ -165,7 +157,6 @@ describe('scriptureReadingService', () => {
         status: 'in_progress',
         version: 1,
         startedAt: new Date(),
-
       };
 
       await db.put('scripture-sessions', session);
@@ -194,7 +185,6 @@ describe('scriptureReadingService', () => {
         notes: 'This verse spoke to me deeply.',
         isShared: false,
         createdAt: new Date(),
-
       };
 
       await db.put('scripture-reflections', reflection);
@@ -220,7 +210,6 @@ describe('scriptureReadingService', () => {
           rating: (i % 5) + 1,
           isShared: i % 2 === 0,
           createdAt: new Date(),
-  
         });
       }
 
@@ -243,16 +232,11 @@ describe('scriptureReadingService', () => {
         userId: 'user-123',
         shareWithPartner: true,
         createdAt: new Date(),
-
       };
 
       await db.put('scripture-bookmarks', bookmark);
 
-      const bookmarks = await db.getAllFromIndex(
-        'scripture-bookmarks',
-        'by-session',
-        'session-1'
-      );
+      const bookmarks = await db.getAllFromIndex('scripture-bookmarks', 'by-session', 'session-1');
 
       expect(bookmarks).toHaveLength(1);
       expect(bookmarks[0].stepIndex).toBe(5);
@@ -267,7 +251,6 @@ describe('scriptureReadingService', () => {
         userId: 'user-123',
         shareWithPartner: false,
         createdAt: new Date(),
-
       });
 
       await db.delete('scripture-bookmarks', 'bm-1');
@@ -285,16 +268,11 @@ describe('scriptureReadingService', () => {
         senderId: 'user-123',
         message: 'Thank you Lord for this time together.',
         createdAt: new Date(),
-
       };
 
       await db.put('scripture-messages', message);
 
-      const messages = await db.getAllFromIndex(
-        'scripture-messages',
-        'by-session',
-        'session-1'
-      );
+      const messages = await db.getAllFromIndex('scripture-messages', 'by-session', 'session-1');
 
       expect(messages).toHaveLength(1);
       expect(messages[0].message).toBe('Thank you Lord for this time together.');
@@ -313,7 +291,6 @@ describe('scriptureReadingService', () => {
         status: 'in_progress',
         version: 1,
         startedAt: new Date(),
-
       });
 
       expect(await db.count('scripture-sessions')).toBe(1);
@@ -333,7 +310,6 @@ describe('scriptureReadingService', () => {
         userId: 'user-123',
         isShared: false,
         createdAt: new Date(),
-
       });
 
       await db.put('scripture-reflections', {
@@ -343,7 +319,6 @@ describe('scriptureReadingService', () => {
         userId: 'user-123',
         isShared: false,
         createdAt: new Date(),
-
       });
 
       expect(await db.count('scripture-reflections')).toBe(2);
@@ -381,7 +356,6 @@ describe('scriptureReadingService', () => {
         status: 'in_progress',
         version: 1,
         startedAt: new Date(),
-
       });
       await db.put('scripture-reflections', {
         id: 'r1',
@@ -390,7 +364,6 @@ describe('scriptureReadingService', () => {
         userId: 'u1',
         isShared: false,
         createdAt: new Date(),
-
       });
       await db.put('scripture-bookmarks', {
         id: 'b1',
@@ -399,7 +372,6 @@ describe('scriptureReadingService', () => {
         userId: 'u1',
         shareWithPartner: false,
         createdAt: new Date(),
-
       });
       await db.put('scripture-messages', {
         id: 'm1',
@@ -407,7 +379,6 @@ describe('scriptureReadingService', () => {
         senderId: 'u1',
         message: 'test',
         createdAt: new Date(),
-
       });
 
       // Clear all
@@ -425,9 +396,7 @@ describe('scriptureReadingService', () => {
 
   describe('Error handling', () => {
     it('should export ScriptureErrorCode enum', async () => {
-      const { ScriptureErrorCode } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { ScriptureErrorCode } = await import('../../../src/services/scriptureReadingService');
 
       expect(ScriptureErrorCode.VERSION_MISMATCH).toBe('VERSION_MISMATCH');
       expect(ScriptureErrorCode.SESSION_NOT_FOUND).toBe('SESSION_NOT_FOUND');
@@ -439,9 +408,8 @@ describe('scriptureReadingService', () => {
     });
 
     it('should call handleScriptureError without throwing', async () => {
-      const { handleScriptureError, ScriptureErrorCode } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { handleScriptureError, ScriptureErrorCode } =
+        await import('../../../src/services/scriptureReadingService');
 
       // Should not throw
       expect(() =>
@@ -460,4 +428,3 @@ describe('scriptureReadingService', () => {
 // These tests exercise the actual scriptureReadingService singleton methods
 // with mocked Supabase, verifying write-through, cache-first, and error paths.
 // ============================================================================
-

@@ -1,0 +1,3 @@
+-- Local development seed file.
+-- Applied by `supabase db reset` ONLY — never pushed to remote via `supabase db push`.
+-- Use this file for local-only stubs and development fixtures.

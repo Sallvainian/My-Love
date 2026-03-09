@@ -117,10 +117,7 @@ export class MoodSyncService {
    * @param partnerId - Partner's user ID to broadcast to
    * @returns void - Fire-and-forget, errors are logged but not thrown
    */
-  private async broadcastMoodToPartner(
-    mood: SupabaseMoodRecord,
-    partnerId: string
-  ): Promise<void> {
+  private async broadcastMoodToPartner(mood: SupabaseMoodRecord, partnerId: string): Promise<void> {
     try {
       if (!isOnline()) {
         if (import.meta.env.DEV) {

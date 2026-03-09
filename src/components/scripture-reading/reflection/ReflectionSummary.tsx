@@ -6,7 +6,7 @@
  * Features:
  * - Displays bookmarked verses as selectable chips (multi-select)
  * - No-bookmark fallback message
- * - Session-level rating scale (1-5) matching PerStepReflection pattern
+ * - Session-level rating scale (1-5)
  * - Optional note textarea (max 200 chars, auto-grow)
  * - Continue button: aria-disabled until requirements met
  * - Quiet validation messages
@@ -122,7 +122,15 @@ export function ReflectionSummary({
       notes,
       shareBookmarkedVerses,
     });
-  }, [disabled, isComplete, selectedVerses, selectedRating, notes, onSubmit, shareBookmarkedVerses]);
+  }, [
+    disabled,
+    isComplete,
+    selectedVerses,
+    selectedRating,
+    notes,
+    onSubmit,
+    shareBookmarkedVerses,
+  ]);
 
   const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNotes(e.target.value);
@@ -166,9 +174,7 @@ export function ReflectionSummary({
       {/* Bookmarked Verses Section */}
       {hasBookmarks ? (
         <div className="flex flex-col space-y-3">
-          <h3 className="text-center text-sm font-medium text-purple-700">
-            Verses that stood out
-          </h3>
+          <h3 className="text-center text-sm font-medium text-purple-700">Verses that stood out</h3>
           <div className="flex flex-wrap justify-center gap-2">
             {bookmarkedVerses.map((verse) => {
               const isSelected = selectedVerses.has(verse.stepIndex);
@@ -234,7 +240,9 @@ export function ReflectionSummary({
             {[1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n}
-                ref={(el) => { ratingRefs.current[n - 1] = el; }}
+                ref={(el) => {
+                  ratingRefs.current[n - 1] = el;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={selectedRating === n}
@@ -272,7 +280,7 @@ export function ReflectionSummary({
         />
         {notes.length >= CHAR_COUNTER_THRESHOLD && (
           <span
-            className="absolute bottom-2 right-3 text-xs text-gray-400"
+            className="absolute right-3 bottom-2 text-xs text-gray-400"
             data-testid="scripture-session-note-char-count"
             aria-live="polite"
           >

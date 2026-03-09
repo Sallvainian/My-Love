@@ -90,7 +90,10 @@ class PhotoService {
    * AC 6.0.8: Users can read own photos
    * AC 6.0.9: Partners can read each other's photos
    */
-  async getSignedUrl(storagePath: string, expiresIn: number = SIGNED_URL_EXPIRY): Promise<string | null> {
+  async getSignedUrl(
+    storagePath: string,
+    expiresIn: number = SIGNED_URL_EXPIRY
+  ): Promise<string | null> {
     try {
       const { data, error } = await supabase.storage
         .from(BUCKET_NAME)
@@ -302,9 +305,7 @@ class PhotoService {
         throw new Error('Storage quota exceeded. Please delete some photos to free up space.');
       }
       if (quota.warning === 'critical') {
-        throw new Error(
-          `Storage nearly full (${quota.percent}%) - delete photos to continue`
-        );
+        throw new Error(`Storage nearly full (${quota.percent}%) - delete photos to continue`);
       }
 
       const userId = currentUser.user.id;
@@ -427,10 +428,7 @@ class PhotoService {
       }
 
       // Delete metadata record
-      const { error: deleteError } = await supabase
-        .from('photos')
-        .delete()
-        .eq('id', photoId);
+      const { error: deleteError } = await supabase.from('photos').delete().eq('id', photoId);
 
       if (deleteError) {
         console.error('[PhotoService] Database delete error:', deleteError);

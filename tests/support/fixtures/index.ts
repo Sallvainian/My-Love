@@ -8,13 +8,8 @@
  * @see _bmad/bmm/testarch/knowledge/fixture-architecture.md
  */
 import { test as base } from '@playwright/test';
-import {
-  createTestSession,
-  cleanupTestSession,
-  linkTestPartners,
-  SeedResult,
-  TypedSupabaseClient,
-} from '../factories';
+import { createTestSession, cleanupTestSession, linkTestPartners } from '../factories';
+import type { SeedResult, TypedSupabaseClient } from '../factories';
 import { createSupabaseAdminClient } from '../helpers/supabase';
 
 /**

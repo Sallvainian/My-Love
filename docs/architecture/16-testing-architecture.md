@@ -2,22 +2,22 @@
 
 ## Test Layers
 
-| Layer | Framework | Environment | Location |
-|-------|-----------|-------------|----------|
-| Unit Tests | Vitest + happy-dom | In-process DOM | `tests/unit/` |
-| E2E Tests | Playwright | Real browser | `tests/e2e/` |
-| API Tests | Playwright | HTTP | `tests/api/` |
-| Database Tests | pgTAP | PostgreSQL | `supabase/tests/database/` |
-| Smoke Tests | Node.js script | Build output | `scripts/smoke-tests.cjs` |
+| Layer          | Framework          | Environment    | Location                   |
+| -------------- | ------------------ | -------------- | -------------------------- |
+| Unit Tests     | Vitest + happy-dom | In-process DOM | `tests/unit/`              |
+| E2E Tests      | Playwright         | Real browser   | `tests/e2e/`               |
+| API Tests      | Playwright         | HTTP           | `tests/api/`               |
+| Database Tests | pgTAP              | PostgreSQL     | `supabase/tests/database/` |
+| Smoke Tests    | Node.js script     | Build output   | `scripts/smoke-tests.cjs`  |
 
 ## Unit Tests
 
 ### Configuration
 
 - **Runner**: Vitest 4.0.17 (`vitest.config.ts`)
-- **DOM**: happy-dom 20.5.0 (lightweight DOM implementation)
+- **DOM**: happy-dom 20.7.0 (lightweight DOM implementation)
 - **Setup**: `tests/setup.ts` (global test setup)
-- **Coverage**: V8 coverage with 80% threshold
+- **Coverage**: V8 coverage with 25% threshold
 - **Path alias**: `@/` maps to `src/`
 - **IndexedDB mock**: `fake-indexeddb` 6.2.5
 
@@ -30,6 +30,38 @@ npm run test:unit:ui           # Browser-based Vitest UI
 npm run test:unit:coverage     # With coverage report
 npx vitest run tests/unit/services/moodService.test.ts --silent  # Single file
 ```
+
+### Test Setup (`tests/setup.ts`)
+
+The global setup file configures:
+
+```typescript
+import '@testing-library/jest-dom'; // Custom DOM matchers
+import 'fake-indexeddb/auto'; // IndexedDB mock (auto-injected)
+
+// Browser API mocks:
+// - window.matchMedia  (responsive components)
+// - IntersectionObserver  (virtualized lists)
+// - ResizeObserver  (responsive components)
+```
+
+### Vitest Configuration (`vitest.config.ts`)
+
+```typescript
+{
+  globals: true,           // No import needed for describe/it/expect
+  environment: 'happy-dom', // Lightweight DOM (not jsdom)
+  setupFiles: ['./tests/setup.ts'],
+  include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx',
+            'src/**/*.test.ts', 'src/**/*.test.tsx'],
+  coverage: {
+    provider: 'v8',
+    thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
+  },
+}
+```
+
+The path alias `@/` maps to `src/` for clean imports in test files.
 
 ### Test Patterns
 
@@ -107,11 +139,11 @@ test('user can log mood', async ({ page, authenticatedPage }) => {
 
 Tests use priority tags for selective execution:
 
-| Tag | Description |
-|-----|-------------|
+| Tag    | Description                            |
+| ------ | -------------------------------------- |
 | `[P0]` | Critical path, must pass before deploy |
-| `[P1]` | Important features, run in CI |
-| `[P2]` | Nice-to-have, run in full suite |
+| `[P1]` | Important features, run in CI          |
+| `[P2]` | Nice-to-have, run in full suite        |
 
 ## Database Tests
 
@@ -123,6 +155,7 @@ npm run test:db
 ```
 
 Test files are in `supabase/tests/database/` and validate:
+
 - RLS policies
 - Database functions
 - Migration correctness

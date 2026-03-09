@@ -281,6 +281,6 @@ declare global {
 }
 
 // Expose store to window object for E2E testing
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.MODE !== 'production') {
   window.__APP_STORE__ = useAppStore;
 }

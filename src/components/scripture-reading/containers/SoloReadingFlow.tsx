@@ -34,7 +34,6 @@ import { useAutoSave } from '../../../hooks/useAutoSave';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
-import { PerStepReflection } from '../reflection/PerStepReflection';
 import { ReflectionSummary } from '../reflection/ReflectionSummary';
 import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
 import { MessageCompose } from '../reflection/MessageCompose';
@@ -52,8 +51,8 @@ const scriptureTheme = {
   surface: '#FAF5FF',
 };
 
-// Sub-view within a step: verse, response, or reflection
-type StepSubView = 'verse' | 'response' | 'reflection';
+// Sub-view within a step: verse or response
+type StepSubView = 'verse' | 'response';
 
 // Story 2.3: Sub-phase within report phase
 type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked' | 'completion-error';
@@ -130,6 +129,8 @@ export function SoloReadingFlow() {
   // Story 2.3: Report sub-phase state and data
   const [reportSubPhase, setReportSubPhase] = useState<ReportSubPhase>(() => {
     if (session?.currentPhase === 'complete' || session?.status === 'complete') return 'report';
+    if (session?.currentPhase === 'report' && !partner && !isLoadingPartner)
+      return 'complete-unlinked';
     return 'compose';
   });
   const [reportData, setReportData] = useState<{
@@ -164,12 +165,10 @@ export function SoloReadingFlow() {
 
   // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
   const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isMountedRef = useRef(true);
 
   // Cleanup bookmark debounce on unmount
   useEffect(() => {
     return () => {
-      isMountedRef.current = false;
       if (bookmarkDebounceRef.current) clearTimeout(bookmarkDebounceRef.current);
     };
   }, []);
@@ -238,7 +237,7 @@ export function SoloReadingFlow() {
             message: 'Failed to toggle bookmark',
             details: error,
           });
-          if (!isMountedRef.current) return;
+          // Revert optimistic toggle on server failure (no-op if unmounted)
           setBookmarkedSteps((prev) => {
             const next = new Set(prev);
             if (next.has(stepIndex)) {
@@ -287,9 +286,7 @@ export function SoloReadingFlow() {
             details: error,
           });
         } finally {
-          if (isMountedRef.current) {
-            setIsSubmittingSummary(false);
-          }
+          setIsSubmittingSummary(false);
         }
       })();
 
@@ -362,14 +359,12 @@ export function SoloReadingFlow() {
           if (completionSucceeded) {
             setReportLoadError(null);
             setReportSubPhase('report');
-          } else if (isMountedRef.current) {
+          } else {
             setCompletionError('Unable to complete this session. Retry to open your report.');
             setReportSubPhase('completion-error');
           }
         } finally {
-          if (isMountedRef.current) {
-            setIsSendingMessage(false);
-          }
+          setIsSendingMessage(false);
         }
       })();
     },
@@ -390,14 +385,12 @@ export function SoloReadingFlow() {
         if (completionSucceeded) {
           setReportLoadError(null);
           setReportSubPhase('report');
-        } else if (isMountedRef.current) {
+        } else {
           setCompletionError('Unable to complete this session. Retry to open your report.');
           setReportSubPhase('completion-error');
         }
       } finally {
-        if (isMountedRef.current) {
-          setIsSendingMessage(false);
-        }
+        setIsSendingMessage(false);
       }
     })();
   }, [session, isSendingMessage, markSessionComplete]);
@@ -411,13 +404,10 @@ export function SoloReadingFlow() {
       try {
         const completionSucceeded = await markSessionComplete();
         if (!completionSucceeded) {
-          if (isMountedRef.current) {
-            setCompletionError('Unable to complete this session. Please try again.');
-          }
+          setCompletionError('Unable to complete this session. Please try again.');
           return;
         }
 
-        if (!isMountedRef.current) return;
         if (completionRetryTargetRef.current === 'complete-unlinked') {
           setReportSubPhase('complete-unlinked');
         } else {
@@ -425,9 +415,7 @@ export function SoloReadingFlow() {
           setReportSubPhase('report');
         }
       } finally {
-        if (isMountedRef.current) {
-          setIsRetryingCompletion(false);
-        }
+        setIsRetryingCompletion(false);
       }
     })();
   }, [isRetryingCompletion, markSessionComplete, session]);
@@ -453,6 +441,8 @@ export function SoloReadingFlow() {
       return;
     }
 
+    let isActive = true;
+
     if (!hasPartner) {
       setReportSubPhase('complete-unlinked');
       if (session.currentPhase === 'complete' || session.status === 'complete') {
@@ -463,7 +453,7 @@ export function SoloReadingFlow() {
       completionRetryTargetRef.current = 'complete-unlinked';
       void (async () => {
         const completionSucceeded = await markSessionComplete();
-        if (!isMountedRef.current) return;
+        if (!isActive) return;
 
         if (completionSucceeded) {
           setCompletionError(null);
@@ -480,12 +470,18 @@ export function SoloReadingFlow() {
         setReportSubPhase('compose');
       }
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [isReportEntry, hasPartner, session, isLoadingPartner, markSessionComplete]);
 
   // Story 2.3: Load report data when report view is actually displayed
   useEffect(() => {
     if ((reportSubPhase !== 'report' && reportSubPhase !== 'complete-unlinked') || !session) return;
     setReportLoadError(null);
+
+    let isActive = true;
 
     void (async () => {
       try {
@@ -541,7 +537,9 @@ export function SoloReadingFlow() {
         let partnerStandoutVerses: number[] = [];
         if (partnerSessionReflection?.notes) {
           try {
-            const parsed = JSON.parse(partnerSessionReflection.notes) as { standoutVerses?: number[] };
+            const parsed = JSON.parse(partnerSessionReflection.notes) as {
+              standoutVerses?: number[];
+            };
             partnerStandoutVerses = parsed.standoutVerses ?? [];
           } catch (error) {
             handleScriptureError({
@@ -564,7 +562,7 @@ export function SoloReadingFlow() {
         const isPartnerComplete =
           Boolean(partnerSessionReflection) || partnerUniqueRatedSteps >= MAX_STEPS;
 
-        if (!isMountedRef.current) return;
+        if (!isActive) return;
         setReportData({
           userRatings,
           userBookmarks,
@@ -577,61 +575,22 @@ export function SoloReadingFlow() {
           isPartnerComplete,
         });
       } catch {
-        if (isMountedRef.current) {
+        if (isActive) {
           setReportLoadError('Unable to load your daily prayer report right now.');
         }
       }
     })();
+
+    return () => {
+      isActive = false;
+    };
   }, [reportSubPhase, session, reportReloadKey]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
-  // Story 2.1: Next Verse now transitions to reflection instead of advancing directly
-  const handleNextVerse = useCallback(() => {
-    setSubView('reflection');
-  }, []);
-
-  // Story 2.1: Handle reflection submission — save reflection then advance step
-  const handleReflectionSubmit = useCallback(
-    async (rating: number, notes: string) => {
-      if (!session) return;
-
-      // Advance step first (non-blocking UX)
-      setSlideDirection('left');
-      setSubView('verse');
-
-      // Save reflection in background (non-blocking per AC)
-      void (async () => {
-        const isShared = session.mode === 'together';
-        try {
-          await scriptureReadingService.addReflection(
-            session.id,
-            session.currentStepIndex,
-            rating,
-            notes,
-            isShared
-          );
-        } catch {
-          useAppStore.setState({
-            pendingRetry: {
-              type: 'reflection',
-              attempts: 1,
-              maxAttempts: 3,
-              reflectionData: {
-                sessionId: session.id,
-                stepIndex: session.currentStepIndex,
-                rating,
-                notes,
-                isShared,
-              },
-            },
-          });
-        }
-      })();
-
-      await advanceStep();
-    },
-    [session, advanceStep]
-  );
+  const handleNextVerse = useCallback(async () => {
+    setSlideDirection('left');
+    await advanceStep();
+  }, [advanceStep]);
 
   const handleViewResponse = useCallback(() => {
     setSubView('response');
@@ -693,8 +652,6 @@ export function SoloReadingFlow() {
   // Story 1.5: Screen reader announcements + focus management on step change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (
@@ -702,22 +659,16 @@ export function SoloReadingFlow() {
       prevStepIndexRef.current !== undefined &&
       prevStepIndexRef.current !== session.currentStepIndex
     ) {
-      // Use timeout to decouple announcement from render and fix sync setState lint
-      announcementTimer = setTimeout(() => {
-        setAnnouncement(`Now on verse ${session.currentStepIndex + 1}`);
-      }, 100);
+      setAnnouncement(`Now on verse ${session.currentStepIndex + 1}`);
       focusRaf = requestAnimationFrame(() => {
         verseHeadingRef.current?.focus();
       });
       prevStepIndexRef.current = session.currentStepIndex;
-      clearTimer = setTimeout(() => setAnnouncement(''), 1000);
     } else {
       prevStepIndexRef.current = session?.currentStepIndex;
     }
 
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [session?.currentStepIndex, session]);
@@ -725,51 +676,30 @@ export function SoloReadingFlow() {
   // Story 1.5 + 2.1: Screen reader announcements + focus management on sub-view change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (prevSubViewRef.current !== subView) {
       if (subView === 'response') {
-        const msg = `Viewing response for verse ${(session?.currentStepIndex ?? 0) + 1}`;
-        announcementTimer = setTimeout(() => setAnnouncement(msg), 100);
+        setAnnouncement(`Viewing response for verse ${(session?.currentStepIndex ?? 0) + 1}`);
         focusRaf = requestAnimationFrame(() => {
           backToVerseRef.current?.focus();
         });
-      } else if (subView === 'reflection') {
-        // Story 2.1: Focus reflection heading on transition
-        announcementTimer = setTimeout(() => setAnnouncement('Reflect on this verse'), 100);
-        focusRaf = requestAnimationFrame(() => {
-          // Focus the reflection prompt heading via data-testid
-          const reflectionPrompt = document.querySelector<HTMLElement>(
-            '[data-testid="scripture-reflection-prompt"]'
-          );
-          reflectionPrompt?.focus();
-        });
       } else if (prevSubViewRef.current === 'response') {
-        announcementTimer = setTimeout(
-          () => setAnnouncement(`Back to verse ${(session?.currentStepIndex ?? 0) + 1}`),
-          100
-        );
+        setAnnouncement(`Back to verse ${(session?.currentStepIndex ?? 0) + 1}`);
         focusRaf = requestAnimationFrame(() => {
           verseHeadingRef.current?.focus();
         });
       }
-      clearTimer = setTimeout(() => setAnnouncement(''), 1000);
       prevSubViewRef.current = subView;
     }
 
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [subView, session?.currentStepIndex]);
 
   // Story 2.3: Announcements + focus management for report transitions
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (!isReportEntry) {
@@ -793,7 +723,7 @@ export function SoloReadingFlow() {
     }
 
     if (announcementText) {
-      announcementTimer = setTimeout(() => setAnnouncement(announcementText!), 100);
+      setAnnouncement(announcementText);
       focusRaf = requestAnimationFrame(() => {
         const heading = headingSelector
           ? document.querySelector<HTMLElement>(headingSelector)
@@ -803,10 +733,7 @@ export function SoloReadingFlow() {
     }
 
     prevReportSubPhaseRef.current = reportSubPhase;
-    clearTimer = setTimeout(() => setAnnouncement(''), 1000);
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [isReportEntry, reportSubPhase]);
@@ -819,26 +746,20 @@ export function SoloReadingFlow() {
 
   // Story 1.5 + 2.2: Completion screen announcement + focus (AC #2, #3)
   useEffect(() => {
-    let announcementTimer: ReturnType<typeof setTimeout> | null = null;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     let focusRaf: number | null = null;
 
     if (isReflectionPhase && !prevIsCompletedRef.current) {
       prevIsCompletedRef.current = true;
-      const msg = 'Review your session reflections';
-      announcementTimer = setTimeout(() => setAnnouncement(msg), 100);
+      setAnnouncement('Review your session reflections');
       focusRaf = requestAnimationFrame(() => {
         completionHeadingRef.current?.focus();
       });
-      clearTimer = setTimeout(() => setAnnouncement(''), 1000);
     }
     if (!isReflectionPhase) {
       prevIsCompletedRef.current = false;
     }
 
     return () => {
-      if (announcementTimer !== null) clearTimeout(announcementTimer);
-      if (clearTimer !== null) clearTimeout(clearTimer);
       if (focusRaf !== null) cancelAnimationFrame(focusRaf);
     };
   }, [isReflectionPhase]);
@@ -983,7 +904,12 @@ export function SoloReadingFlow() {
             animate={{ opacity: 1 }}
             transition={crossfade}
           >
-            <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
+            <div
+              className="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="sr-announcer"
+            >
               {announcement}
             </div>
             <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center space-y-5 text-center">
@@ -1180,25 +1106,19 @@ export function SoloReadingFlow() {
               initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
               animate={subView === 'verse' ? 'center' : { opacity: 1 }}
               exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
-              transition={
-                subView === 'reflection'
-                  ? { duration: 0.4 }
-                  : subView === 'verse'
-                    ? slide
-                    : crossfade
-              }
+              transition={subView === 'verse' ? slide : crossfade}
               className="flex w-full flex-1 flex-col justify-center pb-32"
             >
               {subView === 'verse' ? (
                 /* Verse Screen */
                 <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
-                  {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-600, tabIndex for focus management */}
+                  {/* Verse reference — Story 1.5: contrast fix text-purple-500 → text-purple-700, tabIndex for focus management */}
                   <div className="flex items-center justify-between">
                     <div className="w-12" /> {/* Spacer for centering */}
                     <p
                       ref={verseHeadingRef}
                       tabIndex={-1}
-                      className="text-center text-xs font-medium tracking-wide text-purple-600"
+                      className="text-center text-xs font-medium tracking-wide text-purple-700"
                       data-testid="scripture-verse-reference"
                     >
                       {currentStep.verseReference}
@@ -1221,7 +1141,7 @@ export function SoloReadingFlow() {
                     </p>
                   </blockquote>
                 </div>
-              ) : subView === 'response' ? (
+              ) : (
                 /* Response Screen */
                 <div className="flex w-full flex-col space-y-6" data-testid="response-screen">
                   {/* Verse reference (context) — Story 1.5: contrast fix text-purple-400 → text-purple-600 */}
@@ -1241,11 +1161,6 @@ export function SoloReadingFlow() {
                       {currentStep.responseText}
                     </p>
                   </div>
-                </div>
-              ) : (
-                /* Story 2.1: Reflection Screen (AC #2, #3, #4) */
-                <div data-testid="reflection-subview">
-                  <PerStepReflection onSubmit={handleReflectionSubmit} disabled={isSyncing} />
                 </div>
               )}
             </m.div>
@@ -1336,72 +1251,70 @@ export function SoloReadingFlow() {
           )}
 
           {/* Action buttons - bottom anchored for thumb-friendly access */}
-          {subView !== 'reflection' && (
-            <div className="space-y-3 pt-4">
-              {subView === 'verse' ? (
-                <>
-                  {/* View Response - secondary button */}
-                  <button
-                    onClick={handleViewResponse}
-                    className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
-                    data-testid="scripture-view-response-button"
-                    type="button"
-                  >
-                    View Response
-                  </button>
+          <div className="space-y-3 pt-4">
+            {subView === 'verse' ? (
+              <>
+                {/* View Response - secondary button */}
+                <button
+                  onClick={handleViewResponse}
+                  className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
+                  data-testid="scripture-view-response-button"
+                  type="button"
+                >
+                  View Response
+                </button>
 
-                  {/* Next Verse - primary button */}
-                  <button
-                    onClick={handleNextVerse}
-                    disabled={isNextDisabled}
-                    className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
-                    data-testid="scripture-next-verse-button"
-                    type="button"
-                  >
-                    {isLastStep ? 'Complete Reading' : 'Next Verse'}
-                  </button>
+                {/* Next Verse - primary button */}
+                <button
+                  onClick={handleNextVerse}
+                  disabled={isNextDisabled}
+                  className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+                  data-testid="scripture-next-verse-button"
+                  type="button"
+                >
+                  {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                </button>
 
-                  {/* Story 1.5: Disabled reason text (AC #5) */}
-                  {!isOnline && (
-                    <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
-                      Connect to internet to continue
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Back to Verse - secondary button */}
-                  <button
-                    ref={backToVerseRef}
-                    onClick={handleBackToVerse}
-                    className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
-                    data-testid="scripture-back-to-verse-button"
-                    type="button"
-                  >
-                    Back to Verse
-                  </button>
+                {/* Story 1.5: Disabled reason text (AC #5) */}
+                {!isOnline && (
+                  <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
+                    Connect to internet to continue
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Back to Verse - secondary button */}
+                <button
+                  ref={backToVerseRef}
+                  onClick={handleBackToVerse}
+                  className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
+                  data-testid="scripture-back-to-verse-button"
+                  type="button"
+                >
+                  Back to Verse
+                </button>
 
-                  {/* Next Verse - primary button (also available on response screen) */}
-                  <button
-                    onClick={handleNextVerse}
-                    disabled={isNextDisabled}
-                    className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
-                    data-testid="scripture-next-verse-button"
-                    type="button"
-                  >
-                    {isLastStep ? 'Complete Reading' : 'Next Verse'}
-                  </button>
+                {/* Next Verse - primary button (also available on response screen) */}
+                <button
+                  onClick={handleNextVerse}
+                  disabled={isNextDisabled}
+                  className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
+                  data-testid="scripture-next-verse-button"
+                  type="button"
+                >
+                  {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                </button>
 
-                  {/* Story 1.5: Disabled reason text (AC #5) */}
-                  {!isOnline && (
-                    <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
-                      Connect to internet to continue
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                {/* Story 1.5: Disabled reason text (AC #5) */}
+                {!isOnline && (
+                  <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
+                    Connect to internet to continue
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Exit Confirmation Dialog */}

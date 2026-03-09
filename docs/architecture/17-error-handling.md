@@ -33,23 +33,46 @@ try {
 
 `BaseIndexedDBService` follows a split error strategy:
 
-| Operation Type | Error Behavior | Rationale |
-|---------------|----------------|-----------|
-| Read (`getById`, `getAll`, `getPage`) | Return `null` or `[]` | Graceful degradation; missing data is recoverable |
-| Write (`add`, `update`, `delete`) | Throw | Data integrity; silent write failures cause corruption |
+| Operation Type                        | Error Behavior        | Rationale                                              |
+| ------------------------------------- | --------------------- | ------------------------------------------------------ |
+| Read (`getById`, `getAll`, `getPage`) | Return `null` or `[]` | Graceful degradation; missing data is recoverable      |
+| Write (`add`, `update`, `delete`)     | Throw                 | Data integrity; silent write failures cause corruption |
 
 ### API Layer (Supabase)
 
 API calls use `errorHandlers.ts` for consistent error mapping:
 
 ```typescript
-// Supabase error codes -> user-friendly messages
-const errorMap = {
-  'PGRST116': 'Record not found',
-  '23505': 'Duplicate entry',
-  // ...
+// src/api/errorHandlers.ts
+export class SupabaseServiceError extends Error {
+  public readonly code: string | undefined;
+  public readonly details: string | undefined;
+  public readonly hint: string | undefined;
+  public readonly isNetworkError: boolean;
+}
+
+// Error code mapping
+const errorMessages: Record<string, string> = {
+  '23505': 'This record already exists',
+  '23503': 'Referenced record not found',
+  '23502': 'Required field is missing',
+  '42501': 'Permission denied - check Row Level Security policies',
+  '42P01': 'Table not found - database schema may be out of sync',
+  PGRST116: 'No rows found',
+  PGRST301: 'Invalid request parameters',
 };
 ```
+
+The `moodApi.ts` adds an additional error class:
+
+```typescript
+// src/api/moodApi.ts
+export class ApiValidationError extends Error {
+  public readonly validationErrors: ZodError | null;
+}
+```
+
+This is thrown when Supabase returns data that passes the database layer but fails Zod validation, indicating a schema mismatch between the application and the database.
 
 ### Offline Errors
 
@@ -123,6 +146,7 @@ if (state.pendingRetry) {
 ### Silent Retry (Background Sync)
 
 Mood sync failures are silently retried via three tiers:
+
 1. Immediate retry on creation
 2. Periodic retry every 5 minutes
 3. Background Sync API retry when connectivity returns

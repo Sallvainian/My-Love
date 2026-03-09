@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Dancing+Script:wght@400;500;600;700&display=swap');
 
 @import 'tailwindcss';
-@config "../tailwind.config.js";
+@config '../tailwind.config.js';
 
 @layer base {
   html {
@@ -12,7 +12,7 @@
   }
 
   body {
-    @apply bg-linear-to-br from-pink-50 via-rose-50 to-pink-100 min-h-screen font-sans;
+    @apply min-h-screen bg-linear-to-br from-pink-50 via-rose-50 to-pink-100 font-sans;
   }
 
   /* Custom scrollbar styling - webkit prefix for Safari/Chrome, standard for Firefox */
@@ -42,33 +42,33 @@
 @layer components {
   /* Card styles */
   .card {
-    @apply bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-6;
+    @apply rounded-3xl bg-white/80 p-6 shadow-xl backdrop-blur-sm;
   }
 
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98];
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl active:scale-[0.98];
   }
 
   /* Button styles */
   .btn-primary {
-    @apply bg-linear-to-r from-pink-500 to-rose-500 text-white font-medium px-6 py-3 rounded-full shadow-lg;
-    @apply transition-all duration-300 hover:shadow-xl hover:scale-105 active:scale-95;
+    @apply rounded-full bg-linear-to-r from-pink-500 to-rose-500 px-6 py-3 font-medium text-white shadow-lg;
+    @apply transition-all duration-300 hover:scale-105 hover:shadow-xl active:scale-95;
   }
 
   .btn-secondary {
-    @apply bg-white/80 backdrop-blur-sm text-pink-600 font-medium px-6 py-3 rounded-full shadow-md;
-    @apply transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95;
+    @apply rounded-full bg-white/80 px-6 py-3 font-medium text-pink-600 shadow-md backdrop-blur-sm;
+    @apply transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95;
   }
 
   .btn-icon {
-    @apply w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm shadow-md;
+    @apply h-12 w-12 rounded-full bg-white/80 shadow-md backdrop-blur-sm;
     @apply flex items-center justify-center transition-all duration-300;
-    @apply hover:shadow-lg hover:scale-110 active:scale-95;
+    @apply hover:scale-110 hover:shadow-lg active:scale-95;
   }
 
   /* Input styles */
   .input {
-    @apply w-full px-4 py-3 rounded-2xl bg-white/80 backdrop-blur-sm;
+    @apply w-full rounded-2xl bg-white/80 px-4 py-3 backdrop-blur-sm;
     @apply border-2 border-pink-200 focus:border-pink-400 focus:ring-4 focus:ring-pink-100;
     @apply transition-all duration-200 outline-none;
   }
@@ -98,7 +98,7 @@
   }
 
   .scrollbar-thumb-pink-300::-webkit-scrollbar-thumb {
-    @apply bg-pink-300 rounded-full;
+    @apply rounded-full bg-pink-300;
   }
 
   .scrollbar-track-pink-50::-webkit-scrollbar-track {

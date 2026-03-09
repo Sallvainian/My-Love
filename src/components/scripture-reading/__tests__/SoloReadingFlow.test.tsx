@@ -42,7 +42,7 @@ vi.mock('framer-motion', () => ({
         custom: _custom,
         ...htmlProps
       } = props;
-      return <div {...htmlProps}>{children}</div>;
+      return <div {...htmlProps}>{children as React.ReactNode}</div>;
     },
     section: ({ children, ...props }: Record<string, unknown>) => {
       const {
@@ -52,7 +52,7 @@ vi.mock('framer-motion', () => ({
         transition: _transition,
         ...htmlProps
       } = props;
-      return <section {...htmlProps}>{children}</section>;
+      return <section {...htmlProps}>{children as React.ReactNode}</section>;
     },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -93,15 +93,13 @@ const mockToggleBookmark = vi.fn().mockResolvedValue(undefined);
 const mockAddReflection = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSessionBookmarkSharing = vi.fn().mockResolvedValue(undefined);
 const mockUpdateSession = vi.fn().mockResolvedValue(undefined);
-const mockAddMessage = vi
-  .fn()
-  .mockResolvedValue({
-    id: 'msg-1',
-    sessionId: 'session-123',
-    senderId: 'user-456',
-    message: 'test',
-    createdAt: new Date(),
-  });
+const mockAddMessage = vi.fn().mockResolvedValue({
+  id: 'msg-1',
+  sessionId: 'session-123',
+  senderId: 'user-456',
+  message: 'test',
+  createdAt: new Date(),
+});
 const mockGetSessionReportData = vi.fn().mockResolvedValue({
   reflections: [],
   bookmarks: [],
@@ -112,8 +110,7 @@ vi.mock('../../../services/scriptureReadingService', () => ({
     getBookmarksBySession: (...args: unknown[]) => mockGetBookmarksBySession(...args),
     toggleBookmark: (...args: unknown[]) => mockToggleBookmark(...args),
     addReflection: (...args: unknown[]) => mockAddReflection(...args),
-    updateSessionBookmarkSharing: (...args: unknown[]) =>
-      mockUpdateSessionBookmarkSharing(...args),
+    updateSessionBookmarkSharing: (...args: unknown[]) => mockUpdateSessionBookmarkSharing(...args),
     updateSession: (...args: unknown[]) => mockUpdateSession(...args),
     addMessage: (...args: unknown[]) => mockAddMessage(...args),
     getSessionReportData: (...args: unknown[]) => mockGetSessionReportData(...args),
@@ -151,7 +148,7 @@ interface MockSession {
 }
 
 interface MockPendingRetry {
-  type: 'advanceStep' | 'saveSession' | 'reflection';
+  type: 'advanceStep' | 'saveSession';
   attempts: number;
   maxAttempts: number;
 }
@@ -378,29 +375,18 @@ describe('SoloReadingFlow', () => {
   // ============================================
 
   describe('Step Advancement', () => {
-    it('shows reflection screen when Next Verse is tapped on verse screen', () => {
+    it('calls advanceStep when Next Verse is tapped on verse screen', async () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      expect(screen.getByTestId('reflection-subview')).toBeDefined();
-      expect(screen.getByTestId('scripture-reflection-screen')).toBeDefined();
+      await vi.waitFor(() => {
+        expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
+      });
     });
 
-    it('shows reflection screen when Next Verse is tapped on response screen', () => {
+    it('calls advanceStep when Next Verse is tapped on response screen', async () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('scripture-view-response-button'));
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      expect(screen.getByTestId('reflection-subview')).toBeDefined();
-    });
-
-    it('calls advanceStep after reflection Continue is submitted', async () => {
-      render(<SoloReadingFlow />);
-      // Go to reflection
-      fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      // Select a rating
-      fireEvent.click(screen.getByTestId('scripture-rating-3'));
-      // Submit reflection
-      fireEvent.click(screen.getByTestId('scripture-reflection-continue'));
-      // advanceStep is called after reflection submit
       await vi.waitFor(() => {
         expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
       });
@@ -446,7 +432,7 @@ describe('SoloReadingFlow', () => {
       mockStoreState.partner = null;
       render(<SoloReadingFlow />);
       expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
-      expect(screen.getByText('Session complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-heading')).toBeDefined();
     });
 
     it('shows "Session complete" heading on report phase for unlinked user', () => {
@@ -456,7 +442,7 @@ describe('SoloReadingFlow', () => {
       });
       mockStoreState.partner = null;
       render(<SoloReadingFlow />);
-      expect(screen.getByText('Session complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-heading')).toBeDefined();
     });
 
     it('shows reflections saved message on report phase for unlinked user', () => {
@@ -980,17 +966,13 @@ describe('SoloReadingFlow', () => {
       expect(document.activeElement).toBe(verseRef);
     });
 
-    it('focuses verse heading after reflection submit advances step', async () => {
-      // Start at step 0, advance to step 1 after reflection
+    it('focuses verse heading after Next Verse advances step', async () => {
+      // Start at step 0, advance to step 1
       mockAdvanceStep.mockImplementation(async () => {
         mockStoreState.session = createMockSession({ currentStepIndex: 1 });
       });
       const { rerender } = render(<SoloReadingFlow />);
-      // Go to reflection
       fireEvent.click(screen.getByTestId('scripture-next-verse-button'));
-      // Select a rating and submit
-      fireEvent.click(screen.getByTestId('scripture-rating-3'));
-      fireEvent.click(screen.getByTestId('scripture-reflection-continue'));
       // Wait for advanceStep to complete
       await vi.waitFor(() => {
         expect(mockAdvanceStep).toHaveBeenCalledTimes(1);
@@ -1033,11 +1015,11 @@ describe('SoloReadingFlow', () => {
       expect(theme.className.includes('text-purple-400')).toBe(false);
     });
 
-    it('verse reference uses text-purple-600', () => {
+    it('verse reference uses text-purple-700', () => {
       render(<SoloReadingFlow />);
       const verseRef = screen.getByTestId('scripture-verse-reference');
-      expect(verseRef.className.includes('text-purple-600')).toBe(true);
-      expect(verseRef.className.includes('text-purple-500')).toBe(false);
+      expect(verseRef.className.includes('text-purple-700')).toBe(true);
+      expect(verseRef.className.includes('text-purple-600')).toBe(false);
     });
 
     it('syncing indicator uses text-purple-600', () => {
@@ -1166,7 +1148,7 @@ describe('SoloReadingFlow', () => {
       render(<SoloReadingFlow />);
       // Should show unlinked completion (placeholder replaced by Story 2.3)
       expect(screen.getByTestId('scripture-unlinked-complete-screen')).toBeDefined();
-      expect(screen.getByText('Session complete')).toBeDefined();
+      expect(screen.getByTestId('scripture-unlinked-complete-heading')).toBeDefined();
       // Should have Return to Overview button
       expect(screen.getByTestId('scripture-unlinked-return-btn')).toBeDefined();
       // Should NOT show the ReflectionSummary
@@ -1477,12 +1459,19 @@ describe('SoloReadingFlow', () => {
       await vi.waitFor(() => {
         expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
       });
-      expect(screen.getByTestId('scripture-report-partner-message')).toBeDefined();
-      expect(screen.getByTestId('scripture-report-partner-waiting')).toBeDefined();
+      await vi.waitFor(() => {
+        expect(mockGetSessionReportData).toHaveBeenCalledWith('session-123');
+      });
+
+      const partnerMessage = await screen.findByTestId('scripture-report-partner-message');
+      const waitingMessage = await screen.findByTestId('scripture-report-partner-waiting');
+
+      expect(partnerMessage).toHaveTextContent('Still working through this');
+      expect(waitingMessage).toHaveTextContent("Waiting for Sarah's reflections");
     });
 
     it('treats partner as complete when session-level reflection exists', async () => {
-      mockGetSessionReportData.mockResolvedValueOnce({
+      mockGetSessionReportData.mockResolvedValue({
         reflections: [
           {
             id: 'u-step',

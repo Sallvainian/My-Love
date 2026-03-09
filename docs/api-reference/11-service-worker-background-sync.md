@@ -1,12 +1,14 @@
 # 11. Service Worker and Background Sync
 
 **Sources:**
+
 - `src/sw.ts` (custom service worker with Workbox)
 - `src/sw-db.ts` (IndexedDB helpers for service worker context)
 
 ## Overview
 
 The service worker uses the Workbox InjectManifest strategy (not GenerateSW). It handles:
+
 1. Precaching of static assets
 2. Runtime caching with appropriate strategies per resource type
 3. Background Sync API for syncing pending moods when the app is closed
@@ -24,13 +26,13 @@ The `__WB_MANIFEST` array is injected by VitePWA at build time. It includes `ind
 
 ### Runtime Routes
 
-| Resource | Strategy | Cache Name | Notes |
-|----------|----------|------------|-------|
-| JS (`script`) | `NetworkOnly` | -- | Always fetch fresh to prevent stale code after deployments |
-| CSS (`style`) | `NetworkOnly` | -- | Same rationale as JS |
-| Navigation | `NetworkFirst` | `navigation-cache` | 3-second network timeout, falls back to precached `index.html` |
-| Images, Fonts | `CacheFirst` | `static-assets-v2` | Max 100 entries, 30-day expiry |
-| Google Fonts | `CacheFirst` | `google-fonts-v2` | Max 30 entries, 1-year expiry, accepts opaque responses (`status: 0`) |
+| Resource      | Strategy       | Cache Name         | Notes                                                                 |
+| ------------- | -------------- | ------------------ | --------------------------------------------------------------------- |
+| JS (`script`) | `NetworkOnly`  | --                 | Always fetch fresh to prevent stale code after deployments            |
+| CSS (`style`) | `NetworkOnly`  | --                 | Same rationale as JS                                                  |
+| Navigation    | `NetworkFirst` | `navigation-cache` | 3-second network timeout, falls back to precached `index.html`        |
+| Images, Fonts | `CacheFirst`   | `static-assets-v2` | Max 100 entries, 30-day expiry                                        |
+| Google Fonts  | `CacheFirst`   | `google-fonts-v2`  | Max 30 entries, 1-year expiry, accepts opaque responses (`status: 0`) |
 
 ### Why NetworkOnly for JS/CSS
 
@@ -41,6 +43,7 @@ After deployments, JS/CSS filenames change (Vite content hashing). Serving stale
 ### Trigger
 
 The service worker listens for `sync` events with the tag `sync-pending-moods`. This fires when:
+
 1. The browser regains connectivity after being offline
 2. The app explicitly calls `registration.sync.register('sync-pending-moods')`
 
@@ -61,10 +64,11 @@ The service worker listens for `sync` events with the tag `sync-pending-moods`. 
 ### Mood Transformation
 
 ```typescript
-function transformMoodForSupabase(mood: StoredMoodEntry, userId: string): Record<string, unknown>
+function transformMoodForSupabase(mood: StoredMoodEntry, userId: string): Record<string, unknown>;
 ```
 
 Maps local mood format to Supabase REST API format:
+
 - `mood_type`: The primary mood (`mood.mood`)
 - `mood_types`: Array of all selected moods (`mood.moods` or `[mood.mood]` for legacy)
 - `note`: The mood note (or `null`)
@@ -80,9 +84,9 @@ fetch(`${SUPABASE_URL}/rest/v1/moods`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${authToken.accessToken}`,
-    'Prefer': 'return=representation',
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${authToken.accessToken}`,
+    Prefer: 'return=representation',
   },
   body: JSON.stringify(supabaseMood),
 });
@@ -134,13 +138,13 @@ Stores (or overwrites) the auth token with key `'current'` in the `sw-auth` stor
 
 **Stored fields:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `'current'` | Fixed key for single-token storage |
-| `accessToken` | `string` | JWT for API authorization |
-| `refreshToken` | `string` | For token refresh |
-| `expiresAt` | `number` | Unix timestamp of token expiry |
-| `userId` | `string` | User UUID for REST API requests |
+| Field          | Type        | Description                        |
+| -------------- | ----------- | ---------------------------------- |
+| `id`           | `'current'` | Fixed key for single-token storage |
+| `accessToken`  | `string`    | JWT for API authorization          |
+| `refreshToken` | `string`    | For token refresh                  |
+| `expiresAt`    | `number`    | Unix timestamp of token expiry     |
+| `userId`       | `string`    | User UUID for REST API requests    |
 
 #### `getAuthToken(): Promise<StoredAuthToken | null>`
 
@@ -168,8 +172,8 @@ Calls `self.clients.claim()` to take control of all open clients immediately aft
 
 The app uses three complementary sync triggers:
 
-| Trigger | Location | When |
-|---------|----------|------|
-| Immediate sync | App (moodSyncService) | On mood creation |
-| Periodic sync | App (App.tsx) | While app is open |
+| Trigger         | Location               | When                                         |
+| --------------- | ---------------------- | -------------------------------------------- |
+| Immediate sync  | App (moodSyncService)  | On mood creation                             |
+| Periodic sync   | App (App.tsx)          | While app is open                            |
 | Background Sync | Service worker (sw.ts) | When app is closed, then device comes online |

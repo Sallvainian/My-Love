@@ -135,10 +135,14 @@ export abstract class BaseIndexedDBService<
 
       if (item) {
         if (import.meta.env.DEV) {
-          console.log(`[${this.constructor.name}] Retrieved item from ${String(storeName)}, id: ${id}`);
+          console.log(
+            `[${this.constructor.name}] Retrieved item from ${String(storeName)}, id: ${id}`
+          );
         }
       } else {
-        console.warn(`[${this.constructor.name}] Item not found in ${String(storeName)}, id: ${id}`);
+        console.warn(
+          `[${this.constructor.name}] Item not found in ${String(storeName)}, id: ${id}`
+        );
       }
 
       return (item as T) || null;
@@ -161,7 +165,9 @@ export abstract class BaseIndexedDBService<
       const items = await db.getAll(storeName);
 
       if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Retrieved ${items.length} items from ${String(storeName)}`);
+        console.log(
+          `[${this.constructor.name}] Retrieved ${items.length} items from ${String(storeName)}`
+        );
       }
       return items as T[];
     } catch (error) {

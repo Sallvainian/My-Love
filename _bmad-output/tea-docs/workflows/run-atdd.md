@@ -109,8 +109,7 @@ test.describe('Profile API', () => {
 #### API Tests with Playwright Utils
 
 ```typescript
-import { test } from '@seontechnologies/playwright-utils/api-request/fixtures';
-import { expect } from '@playwright/test';
+import { test, expect } from '../support/merged-fixtures';
 import { z } from 'zod';
 
 const ProfileSchema = z.object({

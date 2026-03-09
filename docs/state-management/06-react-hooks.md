@@ -1,192 +1,218 @@
 # React Hooks
 
-## Custom Hooks Inventory
+All custom hooks in `src/hooks/`. Barrel export (`src/hooks/index.ts`) exports: `useNetworkStatus`, `useAutoSave`, `useLoveNotes`, `useVibration`, `useMotionConfig`.
 
-All custom hooks are in `src/hooks/`. The barrel export (`src/hooks/index.ts`) exports: `useNetworkStatus`, `useAutoSave`, `useLoveNotes`, `useVibration`, `useMotionConfig`.
+---
 
-### useAuth (`src/hooks/useAuth.ts`)
-
-Provides authentication state to the application shell.
+## useAuth (`src/hooks/useAuth.ts`)
 
 ```typescript
-const { user, loading } = useAuth();
+function useAuth(): { user: User | null; loading: boolean };
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `user` | `User \| null` | Authenticated Supabase user or null |
-| `loading` | `boolean` | True during initial auth check |
-
-**Implementation:**
 - Calls `supabase.auth.getUser()` on mount
-- Subscribes to `supabase.auth.onAuthStateChange()` for real-time session changes
+- Subscribes to `supabase.auth.onAuthStateChange()` for session changes
 - Cleanup: unsubscribes on unmount
+- **Used by**: `App.tsx`
 
-### useLoveNotes (`src/hooks/useLoveNotes.ts`)
-
-Composes store access with realtime messaging for the Love Notes feature.
-
-```typescript
-const { notes, loading, error, sendNote, partnerId } = useLoveNotes();
-```
-
-**Behavior:**
-- Auto-fetches notes on mount via `loadNotes()`
-- Integrates `useRealtimeMessages(partnerId)` for live message delivery
-- Cleans up preview object URLs on unmount via `clearPreviewUrls()`
-
-### useRealtimeMessages (`src/hooks/useRealtimeMessages.ts`)
-
-Manages a Supabase Broadcast channel for live love note delivery.
+## useLoveNotes (`src/hooks/useLoveNotes.ts`)
 
 ```typescript
-useRealtimeMessages(partnerId);
+function useLoveNotes(): {
+  notes: LoveNote[];
+  isLoading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  fetchNotes: () => Promise<void>;
+  fetchOlderNotes: () => Promise<void>;
+  sendNote: (content: string, imageFile?: File) => Promise<void>;
+  clearError: () => void;
+  retryFailedMessage: (tempId: string) => Promise<void>;
+  removeFailedMessage: (tempId: string) => void;
+  cleanupPreviewUrls: () => void;
+  partnerId: string | null;
+};
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `partnerId` | `string` | Partner's user ID for channel scoping |
+- Wraps NotesSlice selectors with memoized callbacks
+- Integrates `useRealtimeMessages(partnerId)` for live broadcast delivery
+- Auto-fetches notes on mount
+- Cleans up preview URLs on unmount
+- **Used by**: `LoveNotes`, `MessageInput`
 
-**Features:**
+## useRealtimeMessages (`src/hooks/useRealtimeMessages.ts`)
+
+```typescript
+function useRealtimeMessages(partnerId: string | null): void;
+```
+
+- Manages Supabase Broadcast channel `love-notes:{userId}`
 - Exponential backoff retry: 1s, 2s, 4s, 8s, 16s (max 30s), up to 5 retries
-- Vibration feedback on incoming message (`navigator.vibrate`)
-- Connection state tracking: `connected`, `disconnected`, `connecting`
+- Vibration feedback on incoming message
+- Connection state tracking: connected/disconnected/connecting
 - Cleanup: unsubscribes and removes channel on unmount
+- **Used by**: `useLoveNotes` (internal)
 
-### useAutoSave (`src/hooks/useAutoSave.ts`)
-
-Auto-saves scripture session progress on visibility change and page unload.
-
-```typescript
-useAutoSave(session);
-```
-
-**Behavior:**
-- Listens to `document.addEventListener('visibilitychange')` -- saves when tab becomes hidden
-- Listens to `window.addEventListener('beforeunload')` -- saves on page close
-- Fire-and-forget: does not block the visibility/unload event
-
-### useMoodHistory (`src/hooks/useMoodHistory.ts`)
-
-Provides paginated mood history from the Supabase API.
+## useAutoSave (`src/hooks/useAutoSave.ts`)
 
 ```typescript
-const { moods, loading, hasMore, loadMore } = useMoodHistory(userId);
+function useAutoSave(session: ScriptureSession | null): void;
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `moods` | `SupabaseMood[]` | Loaded mood entries |
-| `loading` | `boolean` | True during fetch |
-| `hasMore` | `boolean` | True if more pages available |
-| `loadMore` | `() => void` | Load next page |
+- Listens to `visibilitychange` -- saves when tab becomes hidden
+- Listens to `beforeunload` -- saves on page close
+- Fire-and-forget: does not block visibility/unload events
+- **Used by**: `SoloReadingFlow`
 
-Page size: 50 entries. Uses cursor-based pagination via `moodApi.fetchByUser()`.
-
-### usePartnerMood (`src/hooks/usePartnerMood.ts`)
-
-Provides partner's mood data with Broadcast API realtime updates.
+## useMoodHistory (`src/hooks/useMoodHistory.ts`)
 
 ```typescript
-const { partnerMood, connectionStatus } = usePartnerMood(partnerId);
+function useMoodHistory(userId: string): {
+  moods: SupabaseMood[];
+  loading: boolean;
+  hasMore: boolean;
+  loadMore: () => void;
+};
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `partnerMood` | `MoodEntry \| null` | Partner's latest mood |
-| `connectionStatus` | `'connected' \| 'disconnected' \| 'connecting'` | Realtime channel state |
+- Page size: 50 entries, cursor-based pagination via `moodApi.fetchByUser()`
+- **Used by**: `MoodHistoryTimeline`
 
-### useNetworkStatus (`src/hooks/useNetworkStatus.ts`)
-
-Tracks device online/offline status with debounced reconnection.
+## usePartnerMood (`src/hooks/usePartnerMood.ts`)
 
 ```typescript
-const status = useNetworkStatus();
-// status: 'online' | 'offline' | 'connecting'
+function usePartnerMood(partnerId: string | null): {
+  partnerMood: MoodEntry | null;
+  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+};
 ```
 
-**Debounce:** 1.5 second delay on reconnection to prevent UI flicker during brief connectivity interruptions. Listens to `window.addEventListener('online')` and `window.addEventListener('offline')`.
+- Supabase Broadcast subscription for live partner mood updates
+- Falls back to last known mood when disconnected
+- **Used by**: `PartnerMoodDisplay`
 
-### useVibration (`src/hooks/useVibration.ts`)
-
-Wrapper for the Vibration API with feature detection.
+## useNetworkStatus (`src/hooks/useNetworkStatus.ts`)
 
 ```typescript
-const { vibrate, isSupported } = useVibration();
+function useNetworkStatus(): 'online' | 'offline' | 'connecting';
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `vibrate` | `(pattern: number \| number[]) => void` | Trigger vibration |
-| `isSupported` | `boolean` | True if Vibration API available |
+- Listens to `window.addEventListener('online')` and `offline`
+- 1.5s debounce on reconnection to prevent UI flicker
+- **Used by**: `NetworkStatusIndicator`, `NetworkStatusDot`, `SoloReadingFlow`, `ScriptureOverview`
 
-Gracefully degrades on unsupported devices (no-op).
-
-### useMotionConfig (`src/hooks/useMotionConfig.ts`)
-
-Provides Framer Motion configuration respecting user's reduced motion preferences.
+## useVibration (`src/hooks/useVibration.ts`)
 
 ```typescript
-const { shouldAnimate, motionPresets } = useMotionConfig();
+function useVibration(): {
+  vibrate: (pattern: number | number[]) => void;
+  isSupported: boolean;
+};
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `shouldAnimate` | `boolean` | False if `prefers-reduced-motion: reduce` |
-| `motionPresets` | `object` | Named animation presets (fadeIn, slideUp, etc.) |
+- Feature detection for Vibration API
+- No-op on unsupported devices
+- **Used by**: `MessageInput`
 
-Reads `window.matchMedia('(prefers-reduced-motion: reduce)')` on mount and listens for changes.
-
-### useImageCompression (`src/hooks/useImageCompression.ts`)
-
-React state wrapper for the image compression service.
+## useMotionConfig (`src/hooks/useMotionConfig.ts`)
 
 ```typescript
-const { compress, isCompressing, error } = useImageCompression();
+function useMotionConfig(): {
+  shouldAnimate: boolean;
+  motionPresets: object;
+};
 ```
 
-| Return | Type | Description |
-|--------|------|-------------|
-| `compress` | `(file: File) => Promise<CompressedImage>` | Compress image |
-| `isCompressing` | `boolean` | True during compression |
-| `error` | `string \| null` | Error message if failed |
+- Reads `window.matchMedia('(prefers-reduced-motion: reduce)')` on mount
+- Listens for preference changes
+- **Used by**: `SoloReadingFlow`, `ScriptureOverview`, `ReadingContainer`, `Countdown`
 
-### usePhotos (`src/hooks/usePhotos.ts`)
-
-Store consumer for photos with auto-load on mount.
+## useImageCompression (`src/hooks/useImageCompression.ts`)
 
 ```typescript
-const { photos, loading, uploadPhoto } = usePhotos();
+function useImageCompression(): {
+  compress: (file: File) => Promise<CompressedImage>;
+  isCompressing: boolean;
+  error: string | null;
+};
 ```
 
-Calls `loadPhotos()` on mount to fetch photos from Supabase.
+- React state wrapper for `imageCompressionService`
+- **Used by**: `PhotoUploader`
+
+## usePhotos (`src/hooks/usePhotos.ts`)
+
+```typescript
+function usePhotos(): {
+  photos: PhotoWithUrls[];
+  loading: boolean;
+  error: string | null;
+  storageWarning: string | null;
+  isUploading: boolean;
+  uploadProgress: number;
+  uploadPhoto: (input: PhotoUploadInput) => Promise<void>;
+  loadPhotos: () => Promise<void>;
+  deletePhoto: (photoId: string) => Promise<void>;
+  clearError: () => void;
+  clearStorageWarning: () => void;
+};
+```
+
+- Wraps PhotosSlice selectors with memoized callbacks
+- Auto-loads photos on mount
+- **Used by**: `PhotoGallery`, `PhotoUploader`
+
+## useScriptureBroadcast (`src/hooks/useScriptureBroadcast.ts`)
+
+```typescript
+function useScriptureBroadcast(sessionId: string | null, mode: SessionMode | null): void;
+```
+
+- Manages Supabase Realtime channel for together-mode scripture sessions
+- Dispatches to store actions: `onPartnerJoined`, `onPartnerReady`, `onCountdownStarted`, `onBroadcastReceived`, `onPartnerLockInChanged`, `setPartnerDisconnected`
+- Wires `setBroadcastFn` so store actions can send broadcasts
+- Mounted in `ScriptureOverview` to persist across lobby/reading transitions
+- **Used by**: `ScriptureOverview`
+
+## useScripturePresence (`src/hooks/useScripturePresence.ts`)
+
+```typescript
+function useScripturePresence(
+  sessionId: string | null,
+  myView: string
+): {
+  partnerPresence: PartnerPresenceInfo | null;
+};
+```
+
+- Tracks partner's current view (verse or response) via Supabase Presence
+- Sends own view state on change
+- Returns null when partner not present
+- **Used by**: `ReadingContainer`
 
 ## Store Access Patterns
 
-### Direct Selector
+**Single selector** (minimal re-renders):
 
 ```typescript
 const currentView = useAppStore((state) => state.currentView);
 ```
 
-### Action Extraction
+**Multiple selectors with useShallow** (scripture containers):
+
+```typescript
+const { session, scriptureLoading } = useAppStore(
+  useShallow((state) => ({ session: state.session, scriptureLoading: state.scriptureLoading }))
+);
+```
+
+**Action extraction** (stable reference, no re-render):
 
 ```typescript
 const setView = useAppStore((state) => state.setView);
-```
-
-### Multiple Selectors
-
-```typescript
-const { moods, addMoodEntry, syncStatus } = useAppStore((state) => ({
-  moods: state.moods,
-  addMoodEntry: state.addMoodEntry,
-  syncStatus: state.syncStatus,
-}));
 ```
 
 ## Related Documentation
 
 - [Slice Details](./02-slice-details.md)
 - [Direct Store Access](./07-direct-store-access.md)
-- [Component Hierarchy](../architecture/06-component-hierarchy.md)
