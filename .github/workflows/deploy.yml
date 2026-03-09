@@ -35,7 +35,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           npx supabase gen types typescript \
-            --project-id xojempkrugifnaveqtqc \
+            --project-id ${{ vars.SUPABASE_PROJECT_ID }} \
             | grep -v '^Connecting to' \
             > src/types/database.types.ts
 
