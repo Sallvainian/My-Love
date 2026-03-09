@@ -25,7 +25,9 @@ describe('haptics utility', () => {
         configurable: true,
       });
     } else {
-      vi.spyOn(navigator, 'vibrate').mockImplementation(vibrateMock);
+      vi.spyOn(navigator, 'vibrate').mockImplementation(
+        vibrateMock as unknown as (pattern: VibratePattern) => boolean
+      );
     }
   });
 

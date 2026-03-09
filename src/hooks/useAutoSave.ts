@@ -24,10 +24,7 @@ export interface UseAutoSaveOptions {
  */
 export function useAutoSave({ session, saveSession }: UseAutoSaveOptions): void {
   const handleVisibilityChange = useCallback(() => {
-    if (
-      document.visibilityState === 'hidden' &&
-      session?.status === 'in_progress'
-    ) {
+    if (document.visibilityState === 'hidden' && session?.status === 'in_progress') {
       void saveSession();
     }
   }, [session, saveSession]);

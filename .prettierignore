@@ -41,6 +41,10 @@ public/workbox-*.js
 .cache/
 *.tsbuildinfo
 
+# BMAD generated files
+_bmad-output/
+_bmad/
+
 # Package manager
 package-lock.json
 yarn.lock

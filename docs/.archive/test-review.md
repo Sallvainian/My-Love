@@ -52,21 +52,21 @@ Post-fix verification is stable: targeted execution for `[P1-012]` and `[P2-012]
 
 ## Quality Criteria Assessment
 
-| Criterion | Status | Violations | Notes |
-| --- | --- | --- | --- |
-| BDD Format (Given-When-Then) | ✅ PASS | 0 | Clear Given/When/Then flow in target tests |
-| Test IDs | ✅ PASS | 0 | IDs present and aligned (`P0-009`, `P1-012`, `P2-012`) |
-| Priority Markers (P0/P1/P2/P3) | ✅ PASS | 0 | Priority grouping is explicit |
-| Hard Waits (sleep, waitForTimeout) | ✅ PASS | 0 | No hard waits in reviewed spec path |
-| Determinism (no conditionals) | ✅ PASS | 0 | UI-first readiness and explicit state checks improve determinism |
-| Isolation (cleanup, no shared state) | ⚠️ WARN | 1 | Session/auth state relies on runtime auth context and backend health |
-| Fixture Patterns | ⚠️ WARN | 1 | Helper resilience improved; remaining shared helper methods are stricter |
-| Data Factories | ✅ PASS | 0 | No random data anti-patterns in reviewed flow |
-| Network-First Pattern | ✅ PASS | 0 | Network waits registered before trigger actions where used |
-| Explicit Assertions | ✅ PASS | 0 | Assertions are visible and tied to user-observable state |
-| Test Length (<=300 lines) | ✅ PASS | 283 lines | Within target limit |
-| Test Duration (<=1.5 min) | ⚠️ WARN | 1 | Long-path tests still use elevated timeout (expected for 17-step path) |
-| Flakiness Patterns | ⚠️ WARN | 1 | Target tests stabilized; monitor adjacent helpers for same pattern drift |
+| Criterion                            | Status  | Violations | Notes                                                                    |
+| ------------------------------------ | ------- | ---------- | ------------------------------------------------------------------------ |
+| BDD Format (Given-When-Then)         | ✅ PASS | 0          | Clear Given/When/Then flow in target tests                               |
+| Test IDs                             | ✅ PASS | 0          | IDs present and aligned (`P0-009`, `P1-012`, `P2-012`)                   |
+| Priority Markers (P0/P1/P2/P3)       | ✅ PASS | 0          | Priority grouping is explicit                                            |
+| Hard Waits (sleep, waitForTimeout)   | ✅ PASS | 0          | No hard waits in reviewed spec path                                      |
+| Determinism (no conditionals)        | ✅ PASS | 0          | UI-first readiness and explicit state checks improve determinism         |
+| Isolation (cleanup, no shared state) | ⚠️ WARN | 1          | Session/auth state relies on runtime auth context and backend health     |
+| Fixture Patterns                     | ⚠️ WARN | 1          | Helper resilience improved; remaining shared helper methods are stricter |
+| Data Factories                       | ✅ PASS | 0          | No random data anti-patterns in reviewed flow                            |
+| Network-First Pattern                | ✅ PASS | 0          | Network waits registered before trigger actions where used               |
+| Explicit Assertions                  | ✅ PASS | 0          | Assertions are visible and tied to user-observable state                 |
+| Test Length (<=300 lines)            | ✅ PASS | 283 lines  | Within target limit                                                      |
+| Test Duration (<=1.5 min)            | ⚠️ WARN | 1          | Long-path tests still use elevated timeout (expected for 17-step path)   |
+| Flakiness Patterns                   | ⚠️ WARN | 1          | Target tests stabilized; monitor adjacent helpers for same pattern drift |
 
 **Total Violations**: 0 Critical, 0 High, 2 Medium, 2 Low
 

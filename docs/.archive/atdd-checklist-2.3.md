@@ -175,6 +175,7 @@ Users can send a message to their partner and view the Daily Prayer Report showi
 No new data factories required for RED phase. Existing `createTestSession` RPC handles session seeding.
 
 **Fixture Gaps Identified (for GREEN phase):**
+
 - Unlinked user seed preset (`p_preset='unlinked'`) — needed for E2E-002
 - Pre-seeded partner message (`p_include_messages=true`) — needed for E2E-003
 
@@ -183,6 +184,7 @@ No new data factories required for RED phase. Existing `createTestSession` RPC h
 ## Fixtures Created
 
 No new fixture files created. Tests use existing infrastructure:
+
 - **E2E/API:** `tests/support/merged-fixtures.ts` (Playwright fixtures with `supabaseAdmin`, `testSession`)
 - **Component:** Vitest + `@testing-library/react` with manual mocks (Zustand store, services)
 
@@ -193,12 +195,14 @@ No new fixture files created. Tests use existing infrastructure:
 ### Scripture Reading Service (Vitest mocks)
 
 **Method:** `addMessage(sessionId, senderId, message)` — Persist message to `scripture_messages`
+
 - Mocked in SoloReadingFlow integration tests
 - Real implementation needed for GREEN phase
 
 ### Supabase RPC (E2E/API)
 
 **Endpoint:** `scripture_messages` table insert via Supabase client
+
 - Tests use `supabaseAdmin` to verify data persistence
 - RLS policy required: sender can insert for their own sessions
 
@@ -381,6 +385,7 @@ npx playwright test --grep "2.3-E2E-001" --debug
 6. **Move to next test** and repeat
 
 **Recommended order:**
+
 1. MessageCompose component tests (9 tests) — standalone presentational component
 2. DailyPrayerReport component tests (8 tests) — standalone presentational component
 3. SoloReadingFlow integration tests (7 tests) — wiring components into flow

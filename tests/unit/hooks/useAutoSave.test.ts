@@ -145,18 +145,13 @@ describe('useAutoSave hook', () => {
   it('should cleanup event listeners on unmount', () => {
     const session = createMockSession();
 
-    const { unmount } = renderHook(() =>
-      useAutoSave({ session, saveSession: mockSaveSession })
-    );
+    const { unmount } = renderHook(() => useAutoSave({ session, saveSession: mockSaveSession }));
 
     expect(document.addEventListener).toHaveBeenCalledWith(
       'visibilitychange',
       expect.any(Function)
     );
-    expect(window.addEventListener).toHaveBeenCalledWith(
-      'beforeunload',
-      expect.any(Function)
-    );
+    expect(window.addEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
 
     unmount();
 
@@ -164,9 +159,6 @@ describe('useAutoSave hook', () => {
       'visibilitychange',
       expect.any(Function)
     );
-    expect(window.removeEventListener).toHaveBeenCalledWith(
-      'beforeunload',
-      expect.any(Function)
-    );
+    expect(window.removeEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
   });
 });

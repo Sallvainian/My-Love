@@ -10,11 +10,11 @@
 export function NoMoodLoggedState() {
   return (
     <div
-      className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-8 text-center mb-6"
+      className="mb-6 rounded-2xl bg-gray-50 p-8 text-center dark:bg-gray-800/50"
       data-testid="no-mood-logged-state"
     >
-      <div className="text-6xl mb-3">💭</div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+      <div className="mb-3 text-6xl">💭</div>
+      <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-100">
         No mood logged yet
       </h3>
       <p className="text-gray-600 dark:text-gray-400">

@@ -127,8 +127,8 @@ export interface MessageListProps {
  */
 function BeginningOfConversation() {
   return (
-    <div className="text-center py-8 text-gray-400" data-testid="beginning-of-conversation">
-      <div className="text-4xl mb-2">💕</div>
+    <div className="py-8 text-center text-gray-400" data-testid="beginning-of-conversation">
+      <div className="mb-2 text-4xl">💕</div>
       <p className="text-sm">This is the beginning of your love story</p>
     </div>
   );
@@ -139,8 +139,12 @@ function BeginningOfConversation() {
  */
 function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
   return (
-    <div className="flex items-center justify-center py-4" style={style} data-testid="loading-spinner">
-      <Loader2 className="w-6 h-6 animate-spin text-[#FF6B6B]" />
+    <div
+      className="flex items-center justify-center py-4"
+      style={style}
+      data-testid="loading-spinner"
+    >
+      <Loader2 className="h-6 w-6 animate-spin text-[#FF6B6B]" />
     </div>
   );
 }
@@ -149,7 +153,11 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
  * Calculate row height based on message content length and image presence
  * Story 2.4 - Task 1.3: Variable row height calculation
  */
-function calculateRowHeight(note: LoveNote | null, includeBeginning: boolean, index: number): number {
+function calculateRowHeight(
+  note: LoveNote | null,
+  includeBeginning: boolean,
+  index: number
+): number {
   // Beginning of conversation indicator
   if (includeBeginning && index === 0) {
     return 120; // BeginningOfConversation component height
@@ -333,17 +341,17 @@ export function MessageList({
   // Empty state
   if (!isLoading && notes.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="bg-[#FFF5F5] rounded-full p-6 mb-4"
+          className="mb-4 rounded-full bg-[#FFF5F5] p-6"
         >
-          <Heart className="w-12 h-12 text-[#FF6B6B]" />
+          <Heart className="h-12 w-12 text-[#FF6B6B]" />
         </motion.div>
-        <h3 className="text-lg font-medium text-gray-700 mb-2">No love notes yet</h3>
-        <p className="text-gray-500 max-w-xs">
+        <h3 className="mb-2 text-lg font-medium text-gray-700">No love notes yet</h3>
+        <p className="max-w-xs text-gray-500">
           Send one to start the conversation with your partner! 💕
         </p>
       </div>
@@ -353,8 +361,8 @@ export function MessageList({
   // Initial loading state
   if (isLoading && notes.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#FF6B6B]" />
+      <div className="flex flex-1 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#FF6B6B]" />
       </div>
     );
   }
@@ -372,7 +380,7 @@ export function MessageList({
   };
 
   return (
-    <div className="flex-1 relative overflow-hidden" data-testid="virtualized-list">
+    <div className="relative flex-1 overflow-hidden" data-testid="virtualized-list">
       {/* Story 2.3: AC-2.3.4 - New message indicator */}
       <AnimatePresence>
         {showNewMessageIndicator && (
@@ -381,12 +389,12 @@ export function MessageList({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             onClick={scrollToBottom}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 bg-[#FF6B6B] text-white rounded-full px-4 py-2 shadow-lg flex items-center gap-2 hover:bg-[#FF5252] transition-colors"
+            className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#FF6B6B] px-4 py-2 text-white shadow-lg transition-colors hover:bg-[#FF5252]"
             aria-label="Scroll to new message"
             data-testid="new-message-indicator"
           >
             <span className="text-sm font-medium">New message</span>
-            <ArrowDown className="w-4 h-4" />
+            <ArrowDown className="h-4 w-4" />
           </motion.button>
         )}
       </AnimatePresence>

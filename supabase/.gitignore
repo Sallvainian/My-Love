@@ -2,7 +2,6 @@
 .branches
 .temp
 
-# dotenvx
-.env.keys
+# Local env overrides
 .env.local
 .env.*.local

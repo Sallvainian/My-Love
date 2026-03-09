@@ -59,10 +59,7 @@ export function DailyPrayerReport({
     : null;
 
   return (
-    <div
-      className="flex w-full flex-col space-y-6"
-      data-testid="scripture-report-screen"
-    >
+    <div className="flex w-full flex-col space-y-6" data-testid="scripture-report-screen">
       {/* Report heading */}
       <h2
         className="text-center font-serif text-2xl font-bold text-purple-900"
@@ -74,9 +71,7 @@ export function DailyPrayerReport({
 
       {/* Your Reflections section */}
       <div data-testid="scripture-report-user-ratings">
-        <h3 className="mb-3 text-center text-sm font-medium text-purple-700">
-          Your Reflections
-        </h3>
+        <h3 className="mb-3 text-center text-sm font-medium text-purple-700">Your Reflections</h3>
         <div className="space-y-1">
           {SCRIPTURE_STEPS.map((step) => {
             const rating = userRatingMap.get(step.stepIndex);
@@ -185,12 +180,8 @@ export function DailyPrayerReport({
           className="font-cursive rounded-2xl border border-purple-200 bg-purple-50 p-6"
           data-testid="scripture-report-partner-message"
         >
-          <p className="mb-2 font-sans text-sm text-purple-500">
-            A message from {partnerName}
-          </p>
-          <p className="text-lg font-normal leading-relaxed text-purple-900">
-            {partnerMessage}
-          </p>
+          <p className="mb-2 font-sans text-sm text-purple-500">A message from {partnerName}</p>
+          <p className="text-lg leading-relaxed font-normal text-purple-900">{partnerMessage}</p>
         </div>
       )}
 
@@ -209,7 +200,7 @@ export function DailyPrayerReport({
       {/* Waiting for partner */}
       {partnerName && !isPartnerComplete && (
         <p
-          className="motion-safe:animate-pulse motion-reduce:animate-none text-center text-sm italic text-purple-400"
+          className="text-center text-sm text-purple-400 italic motion-safe:animate-pulse motion-reduce:animate-none"
           data-testid="scripture-report-partner-waiting"
           aria-live="polite"
         >

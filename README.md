@@ -1,496 +1,232 @@
-# 💕 My Love - Daily Reminder App
+# My Love
 
-![Playwright Tests](https://github.com/Sallvainian/My-Love/actions/workflows/playwright.yml/badge.svg)
+![Tests](https://github.com/Sallvainian/My-Love/actions/workflows/test.yml/badge.svg)
+![Deploy](https://github.com/Sallvainian/My-Love/actions/workflows/deploy.yml/badge.svg)
 
-A beautiful Progressive Web App (PWA) that sends daily love messages and reminders to your girlfriend. Built with React, TypeScript, Tailwind CSS, and Framer Motion for smooth animations.
+A Progressive Web App for couples to exchange daily love messages, track moods, share photos, chat via love notes, read scripture together, and send playful interactions. Built with React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Zustand, and Supabase.
 
-## ✨ Features
+**Live**: https://sallvainian.github.io/My-Love/
 
-- **Daily Love Messages**: Rotating heartfelt messages (reasons, memories, affirmations, future dreams)
-- **100 Pre-written Messages**: Curated sweet messages ready to use or customize
-- **Love Notes Chat**: Real-time messaging with your partner - send love notes instantly
-- **Beautiful Animations**: Smooth, delightful animations with Framer Motion
-- **PWA Support**: Installable on mobile devices, works offline
-- **Photo Memories**: Store and view photos with captions in a beautiful gallery
-- **Anniversary Countdown Timers**: Real-time countdown to special dates with celebration animations
-- **Mood Tracker**: Daily mood logging with emoji moods and optional notes
-- **Partner Mood View**: See your partner's current mood in real-time
-- **Partner Interactions**: Send pokes, kisses, and farts with fun animations and real-time delivery
-- **Mood History**: View your mood timeline and patterns over time
-- **Multiple Themes**: Sunset, Ocean, Lavender, and Rose themes
-- **Privacy First**: Row Level Security for data protection
-- **Super Clean UI**: Modern, romantic design with glassmorphism
+## Features
 
-## 🚀 Quick Start
+- **Daily Love Messages** — Rotating heartfelt messages across categories (reasons, memories, affirmations, future dreams)
+- **Love Notes Chat** — Real-time messaging with your partner
+- **Mood Tracker** — Daily mood logging with emoji moods, optional notes, and mood history timeline
+- **Partner Mood View** — See your partner's current mood in real-time
+- **Partner Interactions** — Send pokes, kisses, and farts with animations and real-time delivery
+- **Photo Gallery** — Upload, view, edit, and share photos with captions and lazy loading
+- **Scripture Reading** — Solo and Together mode scripture sessions with lobby, role selection, countdown, and synchronized reading
+- **Anniversary Timers** — Real-time countdowns to special dates with celebration animations
+- **Themes** — Sunset, Ocean, Lavender, and Rose
+- **PWA** — Installable on mobile, works offline
+- **Privacy** — Row Level Security on all tables
+
+## Quick Start
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn
+- [mise](https://mise.jdx.dev) (manages Node.js v24 via `.mise.toml`)
+- [fnox](https://fnox.jdx.dev) with [age](https://age-encryption.org) provider (local secrets)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (local dev backend)
+- Docker (required by Supabase CLI)
 
-### Installation
-
-1. Clone the repository:
+### Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/My-Love.git
+git clone https://github.com/Sallvainian/My-Love.git
 cd My-Love
-```
-
-2. Install dependencies:
-
-```bash
 npm install
+supabase start          # Start local Supabase (Postgres, Auth, Realtime, etc.)
+fnox exec -- npm run dev  # Start dev server with decrypted secrets
 ```
 
-3. **Configure the app constants** by editing `src/config/constants.ts`:
+Open http://localhost:5173 in your browser.
 
-   ```typescript
-   export const APP_CONFIG = {
-     defaultPartnerName: 'Gracie', // Edit this with your partner's name
-     defaultStartDate: '2025-10-18', // Edit this with the relationship start date (YYYY-MM-DD)
-     isPreConfigured: true,
-   } as const;
-   ```
-
-4. Start the development server:
+## Development
 
 ```bash
-npm run dev
+npm run dev              # Start dev server (cleanup wrapper)
+npm run dev:raw          # Vite dev server directly
+npm run build            # Production build (tsc + vite)
+npm run typecheck        # tsc --noEmit
+npm run lint             # ESLint
+npm run format:check     # Prettier check
+npm run format           # Prettier write
 ```
 
-6. Open http://localhost:5173/My-Love/ in your browser
+## Testing
 
-## ⚙️ Configuration
+The project uses a fullstack test strategy with four tiers:
 
-### How to Customize the App
-
-The app uses pre-configured constants for relationship data. To customize for your relationship, edit `src/config/constants.ts`:
-
-```typescript
-// src/config/constants.ts
-export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie', // Change to your partner's name
-  defaultStartDate: '2025-10-18', // Change to relationship start date (YYYY-MM-DD)
-  isPreConfigured: true,
-} as const;
-```
-
-**That's it!** The app will automatically use these values when it starts. No environment files, no build configuration needed.
-
-### What Gets Pre-Configured
-
-When you set `defaultPartnerName` and `defaultStartDate` in `constants.ts`:
-
-- Partner name displays throughout the app
-- Relationship duration counter calculates automatically
-- No onboarding wizard shown (pre-configured mode is always active)
-- Settings are initialized on first app load
-- Users can still edit these values later if needed (via Settings panel, when available)
-
-## 📱 Deployment
-
-**Live URL**: https://sallvainian.github.io/My-Love/
-
-### Automatic Deployment (CI/CD)
-
-Every push to `main` triggers the GitHub Actions workflow (`.github/workflows/deploy.yml`):
-
-1. **Build** - `npm ci && npm run build`
-2. **Supabase Types** - Generates TypeScript types from database
-3. **Smoke Tests** - Runs `npm run test:smoke`
-4. **Deploy** - Uploads `dist/` to GitHub Pages
-5. **Health Check** - Verifies site is live and Supabase connects
-
-**Timeline**: ~2-3 minutes from push to live.
-
-### Required GitHub Secrets
-
-Configure in **Settings** → **Secrets and variables** → **Actions**:
-
-| Secret | Description |
-|--------|-------------|
-| `DOTENV_KEY` | Decryption key for `.env` file |
-| `SUPABASE_ACCESS_TOKEN` | For generating TypeScript types |
-
-### GitHub Pages Setup
-
-1. Go to **Settings** → **Pages**
-2. Under **Source**, select "GitHub Actions"
-3. Click **Save**
-
-### Manual Deploy
+| Tier        | Tool                     | Command                    | Scope                        |
+| ----------- | ------------------------ | -------------------------- | ---------------------------- |
+| Unit        | Vitest + happy-dom       | `npm run test:unit`        | Components, stores, services |
+| Integration | Playwright (browserless) | `npm run test:integration` | Supabase RPC, API contracts  |
+| E2E         | Playwright (Chromium)    | `npm run test:e2e`         | Full user flows with browser |
+| Database    | pgTAP via Supabase CLI   | `npm run test:db`          | SQL functions, RLS policies  |
 
 ```bash
-npm run deploy
+# Unit
+npm run test:unit              # Run all
+npm run test:unit:watch        # Watch mode
+npm run test:unit:coverage     # With coverage (80% threshold)
+npx vitest run tests/unit/services/moodService.test.ts --silent  # Single file
+
+# E2E (requires local Supabase running)
+npm run test:e2e               # All E2E tests
+npm run test:e2e:ui            # Playwright UI mode
+npm run test:p0                # Priority 0 only
+npm run test:p1                # Priority 0+1
+npx playwright test tests/e2e/mood/mood-tracker.spec.ts  # Single file
+
+# Integration
+npm run test:integration
+
+# Database
+npm run test:db
+
+# Smoke (post-build verification)
+npm run test:smoke
 ```
 
-### Post-Deploy Verification
+## Architecture
 
-- [ ] Site loads at https://sallvainian.github.io/My-Love/
-- [ ] No console errors
-- [ ] Service worker registered (DevTools → Application → Service Workers)
-- [ ] Offline mode works
-- [ ] Supabase connection works (login/data loads)
+### State Management
 
-## 📝 Customizing Messages
+Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices:
 
-All messages are stored in `/src/data/defaultMessages.ts`. You can:
+`appSlice` | `settingsSlice` | `navigationSlice` | `messagesSlice` | `moodSlice` | `interactionsSlice` | `partnerSlice` | `notesSlice` | `photosSlice` | `scriptureReadingSlice`
 
-1. **Edit existing messages**: Open the file and modify any message text
-2. **Add new messages**: Add new objects to the arrays
-3. **Categories**:
-   - `reason`: Why you love her
-   - `memory`: Special memories together
-   - `affirmation`: Daily affirmations and encouragement
-   - `future`: Dreams and plans for the future
-   - `custom`: Any custom messages
+### Secrets Management
 
-Example:
+Uses [fnox](https://fnox.jdx.dev) with the `age` provider. Secrets are encrypted inline in `fnox.toml` (safe to commit) and decrypted at runtime via age keys.
 
-```typescript
-{
-  text: "Your smile makes my day instantly better",
-  category: 'reason',
-  isFavorite: false
-}
-```
-
-## 🎨 Customizing Themes
-
-Themes are defined in `/src/utils/themes.ts`. Each theme has:
-
-- Primary and secondary colors
-- Background gradients
-- Text colors
-- Accent colors
-
-You can add new themes or modify existing ones.
-
-## 🔧 Backend Setup (Supabase)
-
-The app uses Supabase for real-time mood tracking and partner interactions. Follow these steps to set up your backend:
-
-### 1. Create Supabase Project
-
-1. Go to [https://supabase.com](https://supabase.com) and create a free account
-2. Click **New Project** and fill in:
-   - **Project Name**: `my-love-backend` (or your preferred name)
-   - **Database Password**: Generate a strong password (save this!)
-   - **Region**: Choose the closest region to you
-3. Click **Create New Project** (takes ~2 minutes)
-
-### 2. Get Your API Credentials
-
-1. Go to **Settings** → **API** in your Supabase dashboard
-2. Copy the following values:
-   - **Project URL**: `https://your-project-id.supabase.co`
-   - **Anon/Public Key**: Long string starting with `eyJ...`
-
-### 3. Environment Variables (dotenvx Encrypted)
-
-This project uses [dotenvx](https://dotenvx.com) for encrypted environment variables. The `.env` file is encrypted and safely committed to the repository.
-
-**For local development**, you need the decryption key:
-
-1. Get the `DOTENV_KEY` from a team member or your password manager
-2. Create a `.env.keys` file in the project root:
+| File           | Committed | Purpose                          |
+| -------------- | --------- | -------------------------------- |
+| `.mise.toml`   | Yes       | Tool versions (Node) + env vars  |
+| `fnox.toml`    | Yes       | Age-encrypted secrets            |
+| `.env.example` | Yes       | Template with placeholder values |
+| `.env.test`    | Yes       | Local Supabase test values       |
 
 ```bash
-echo "DOTENV_KEY='your-decryption-key-here'" > .env.keys
+fnox exec -- <command>    # Run with decrypted secrets
+fnox set KEY "value"      # Encrypt and store a secret
+fnox get KEY              # Decrypt and retrieve
+fnox check                # Verify all secrets resolve
 ```
 
-3. Run commands with dotenvx (automatically decrypts):
+### Supabase
+
+21 migrations managing tables, RLS policies, RPC functions, and realtime subscriptions. Key tables: `users`, `moods`, `interactions`, `love_notes`, `photos`, `scripture_sessions`, `scripture_session_participants`, and more.
 
 ```bash
-dotenvx run -- npm run dev
+supabase start                    # Start local instance
+supabase db reset                 # Reset and re-run all migrations
+supabase migration new <name>     # Create new migration
+supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts
 ```
 
-**Note**: The `.env.keys` file is gitignored for security. Never share or commit this file.
+### Base Path
 
-### 4. Database Schema (✅ Already Executed)
+Production uses `/My-Love/` for GitHub Pages. Development uses `/`. Configured in `vite.config.ts`.
 
-**Status**: ✅ **Schema execution complete** (as of 2025-11-15)
-
-The database schema has been created with:
-
-- ✅ 3 tables: `users`, `moods`, `interactions`
-- ✅ Row Level Security (RLS) enabled on all tables
-- ✅ 10 RLS policies enforcing access control
-- ✅ Indexes for efficient queries
-- ✅ Realtime enabled for `moods` and `interactions` tables
-
-You can verify this in your Supabase dashboard:
-
-- **Database** → **Tables**: Should show `users`, `moods`, `interactions`
-- **Authentication** → **Policies**: Should show RLS policies for all tables
-- **Database** → **Replication**: `moods` and `interactions` should be in `supabase_realtime` publication
-
-**Schema source**: See `docs/migrations/001_initial_schema.sql` for the complete SQL migration.
-
-### 5. Create User Accounts
-
-The app uses email/password authentication. Create accounts for you and your partner:
-
-**Option 1: Using Supabase Dashboard** (Recommended)
-
-1. Go to **Authentication** → **Users** in Supabase dashboard
-2. Click **Add User** → **Create New User**
-3. Create two users:
-   - **User 1** (You): Enter your email and password
-   - **User 2** (Partner): Enter partner's email and password
-4. ✅ Auto-confirm both users (no email verification needed)
-5. Share the login credentials with your partner
-
-**Option 2: Using the App** (If sign-up is enabled in Supabase)
-
-1. Start the app and click "Sign Up" on login screen
-2. Enter your email and password
-3. Have your partner do the same
-
-**Important**: The app expects exactly 2 users in the system. The "partner" is automatically detected as the other user in the database.
-
-### 6. Add Test Users for E2E Tests (Optional)
-
-Test user credentials are already included in the encrypted `.env` file. If you need to add or change them:
-
-1. Decrypt and edit the `.env` file
-2. Re-encrypt with `dotenvx encrypt`
-
-**Note**: Create this test user in Supabase Auth with the same credentials.
-
-### 7. Verify Connection
-
-Start the dev server and check the browser console:
-
-```bash
-npm run dev
-```
-
-You should see:
-
-- ✅ `[Supabase] Client initialized`
-- ✅ No errors about missing environment variables
-
-### Backend Features
-
-Once set up, your app supports:
-
-- **Love Notes**: Real-time chat with your partner - messages delivered instantly
-- **Mood Tracking**: Log your daily mood with 12 emoji options and optional notes
-- **Partner Mood View**: See your partner's current mood in real-time
-- **Poke, Kiss & Fart**: Send playful interactions with fun animations
-- **Photo Sharing**: Upload and share photos with captions
-- **Offline-first**: All features work offline, sync when online
-- **Privacy**: Row Level Security ensures only you and your partner can see your data
-
-### Troubleshooting Backend
-
-#### "Missing environment variables" error
-
-- Verify `.env` file exists in project root
-- Check both variables are set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
-- Restart dev server after changing `.env`
-
-#### "Table not found" error
-
-- Run the SQL migration script in Supabase Dashboard → SQL Editor
-- Verify tables exist in Database → Tables
-
-#### "RLS policy violation" error
-
-- Ensure you're signed in with a valid Google OAuth account
-- Verify Row Level Security policies are enabled (they're created by the migration script)
-- Check that your user account exists in Supabase Auth → Users
-
-#### Realtime not working
-
-- Enable Realtime for `moods` and `interactions` tables in Database → Replication
-- Check browser console for WebSocket connection errors
-- Verify Supabase project is not paused (free tier pauses after 1 week of inactivity)
-
-For more details, see [Supabase Documentation](https://supabase.com/docs).
-
----
-
-## 📱 Installing on Mobile
-
-### iOS (iPhone/iPad)
-
-1. Open the app in Safari
-2. Tap the Share button (square with arrow)
-3. Scroll down and tap "Add to Home Screen"
-4. Give it a name (e.g., "My Love")
-5. Tap "Add"
-
-### Android
-
-1. Open the app in Chrome
-2. Tap the three dots menu
-3. Tap "Add to Home screen" or "Install app"
-4. Follow the prompts
-
-The app will now appear on your home screen like a native app!
-
-## 🔧 Project Structure
+## Project Structure
 
 ```
 My-Love/
-├── .env.example             # Template for environment variables
-├── .env                     # Encrypted env vars (safe to commit)
-├── .env.keys                # Decryption key (gitignored - keep secret!)
-├── docs/
-│   └── migrations/          # SQL migration scripts for Supabase
-├── public/
-│   └── icons/               # App icons for PWA
 ├── src/
-│   ├── api/                 # Supabase API integration (Epic 6)
-│   │   ├── supabaseClient.ts      # Supabase client singleton
-│   │   ├── moodSyncService.ts     # Mood sync service
-│   │   ├── interactionService.ts  # Poke/kiss interactions
-│   │   └── errorHandlers.ts       # Error handling utilities
 │   ├── components/
-│   │   ├── DailyMessage/    # Main message card component
-│   │   ├── love-notes/      # Real-time chat messaging
-│   │   ├── MoodTracker/     # Mood logging with emoji selection
-│   │   ├── PartnerMoodView/ # View partner's mood in real-time
-│   │   ├── PokeKissInterface/ # Playful interactions (poke/kiss/fart)
-│   │   ├── PhotoGallery/    # Photo grid with lazy loading
+│   │   ├── scripture-reading/    # Together/Solo mode scripture sessions
+│   │   ├── love-notes/           # Real-time chat
+│   │   ├── DailyMessage/         # Main message card
+│   │   ├── MoodTracker/          # Mood logging
+│   │   ├── PartnerMoodView/      # Partner mood display
+│   │   ├── PokeKissInterface/    # Playful interactions
+│   │   ├── PhotoGallery/         # Photo grid
+│   │   ├── PhotoEditModal/       # Photo editing
 │   │   └── ...
-│   ├── config/
-│   │   └── constants.ts     # Environment configuration constants
 │   ├── stores/
-│   │   └── useAppStore.ts   # Zustand state management
-│   ├── services/
-│   │   ├── storage.ts              # IndexedDB & localStorage
-│   │   ├── BaseIndexedDBService.ts # Base service class
-│   │   └── ...
-│   ├── utils/
-│   │   ├── messageRotation.ts  # Daily message logic
-│   │   ├── themes.ts           # Theme configurations
-│   │   └── dateHelpers.ts      # Date utilities
-│   ├── data/
-│   │   └── defaultMessages.ts  # 100 pre-written messages
-│   └── types/
-│       └── index.ts         # TypeScript types
+│   │   ├── useAppStore.ts        # Root Zustand store
+│   │   └── slices/               # 10 state slices
+│   ├── services/                 # Supabase, IndexedDB, sync, realtime
+│   ├── config/                   # App constants
+│   ├── data/                     # Default messages
+│   ├── types/                    # TypeScript types (database.types.ts auto-generated)
+│   └── utils/                    # Themes, date helpers, message rotation
+├── tests/
+│   ├── e2e/                      # Playwright E2E specs
+│   ├── integration/              # Playwright integration specs
+│   ├── unit/                     # Vitest unit tests
+│   ├── api/                      # API contract tests
+│   └── support/                  # Fixtures, factories, helpers
+├── supabase/
+│   ├── migrations/               # 21 SQL migrations
+│   └── tests/                    # pgTAP database tests
+└── .github/workflows/            # CI/CD pipelines
 ```
 
-## 🛠️ Built With
+## CI/CD
 
-- [React 19](https://react.dev/) - UI framework
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Vite](https://vite.dev/) - Build tool
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
-- [Framer Motion](https://www.framer.com/motion/) - Animations
-- [Zustand](https://zustand.docs.pmnd.rs/) - State management
-- [Supabase](https://supabase.com/) - Backend and real-time sync
-- [IDB](https://github.com/jakearchibald/idb) - IndexedDB wrapper
-- [Lucide React](https://lucide.dev/) - Icons
-- [Vite PWA](https://vite-pwa-org.netlify.app/) - PWA support
+### Test Pipeline (`.github/workflows/test.yml`)
 
-## 🎯 Roadmap
+Runs on every PR targeting `main`:
 
-- [x] Daily message rotation
-- [x] Onboarding flow
-- [x] Beautiful animations
-- [x] PWA support
-- [x] Theme system
-- [x] Photo gallery with upload, carousel, and lazy loading
-- [x] Anniversary countdown timers with celebration animations
-- [x] Mood tracker with emoji moods and notes
-- [x] Partner mood view with real-time sync
-- [x] Partner poke/kiss/fart interactions with animations
-- [x] Supabase backend integration with Row Level Security
-- [x] Mood history timeline view
-- [x] Love Notes real-time chat
-- [ ] Push notifications
-- [ ] Export/import data
-- [ ] More themes
+- Lint & Type Check (Prettier + ESLint + tsc)
+- Unit Tests (Vitest with coverage)
+- Database Tests (pgTAP)
+- Integration Tests (Playwright)
+- API Tests (Playwright)
+- E2E Tests (Playwright, sharded across 4 runners)
+- Burn-in (flaky test detection)
+- Test Summary (required status check for merge)
 
-## 💡 Tips for the Best Experience
+### Deploy Pipeline (`.github/workflows/deploy.yml`)
 
-1. **Personalize the messages**: Edit the default messages to make them truly yours
-2. **Set up notifications**: Enable daily reminders during onboarding
-3. **Install on home screen**: Makes it feel like a real app
-4. **Add photos**: Once the photo feature is complete, add memories together
-5. **Mark favorites**: Favorite messages will appear more frequently
+On push to `main`: build → smoke test → deploy to GitHub Pages → health check.
 
-## 📄 License
+### Other Workflows
 
-This project is open source and available for personal use. Feel free to customize it for your own relationship!
+- `bundle-size.yml` — PR bundle size comparison
+- `codeql.yml` — Security analysis
+- `supabase-migrations.yml` — Migration validation
+- `claude-code-review.yml` — AI-assisted code review
+- `lighthouse.yml` — Performance audits
 
-## 💖 Made with Love
+## Deployment
 
-Created with care to help you express your love every single day.
+### GitHub Secrets
 
----
+| Secret                                  | Purpose                           |
+| --------------------------------------- | --------------------------------- |
+| `VITE_SUPABASE_URL`                     | Supabase project URL (build-time) |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key (build-time)    |
+| `SUPABASE_ACCESS_TOKEN`                 | CLI auth for type generation      |
 
-## 🐛 Troubleshooting
+### GitHub Pages
 
-### App shows "Loading your daily message..." forever
+1. **Settings** > **Pages** > **Source**: "GitHub Actions"
+2. Pushes to `main` auto-deploy via the deploy workflow
 
-**Cause**: Missing or invalid configuration in `src/config/constants.ts`
+## Installing on Mobile
 
-**Solution**:
+**iOS**: Safari > Share > "Add to Home Screen"
+**Android**: Chrome > Menu > "Install app"
 
-1. Edit `src/config/constants.ts` and verify your values are set
-2. Clear browser IndexedDB:
-   - Open DevTools → Application → IndexedDB
-   - Delete the `my-love-db` database
-3. Refresh the page
+## Built With
 
-### Console errors about configuration
+- [React 19](https://react.dev/) — UI framework
+- [TypeScript](https://www.typescriptlang.org/) — Type safety
+- [Vite](https://vite.dev/) — Build tool
+- [Tailwind CSS v4](https://tailwindcss.com/) — Styling
+- [Framer Motion](https://www.framer.com/motion/) — Animations
+- [Zustand](https://zustand.docs.pmnd.rs/) — State management
+- [Supabase](https://supabase.com/) — Backend, auth, realtime
+- [Playwright](https://playwright.dev/) — E2E and integration testing
+- [Vitest](https://vitest.dev/) — Unit testing
+- [Sentry](https://sentry.io/) — Error monitoring
+- [mise](https://mise.jdx.dev/) — Tool version management
+- [fnox](https://fnox.jdx.dev/) — Secrets management
 
-**Symptom**: `Configuration not set` warnings in console
+## License
 
-**Solution**:
-
-- Edit `src/config/constants.ts` with your partner name and relationship start date
-- Ensure `defaultPartnerName` and `defaultStartDate` are not empty strings
-
-### ConstraintError: Key already exists
-
-**Cause**: IndexedDB schema mismatch or duplicate initialization
-
-**Solution**:
-
-1. Clear browser IndexedDB (DevTools → Application → IndexedDB)
-2. Delete `my-love-db` database
-3. Refresh the page
-4. If persists, clear all browser data for localhost
-
-### Development server won't start
-
-- Make sure Node.js v18+ is installed
-- Delete `node_modules` and run `npm install` again
-
-### Build fails
-
-- Run `npm run lint` to check for errors
-- Make sure all dependencies are installed
-- Verify `.env.production` exists before building
-
-### PWA not installing
-
-- Must be served over HTTPS (GitHub Pages does this automatically)
-- Check browser console for errors
-- Try clearing browser cache
-
-### Messages not updating
-
-- Check browser console for IndexedDB errors
-- Try clearing application data in browser dev tools
-- Ensure JavaScript is enabled
-
-## 📞 Support
-
-If you run into issues:
-
-1. Check the browser console for errors
-2. Ensure all dependencies are installed
-3. Try clearing browser data
-4. Rebuild the project: `npm run build`
-
----
-
-**Remember**: This app uses Supabase for real-time sync between you and your partner. Row Level Security ensures only you two can see your data - complete privacy with real-time connection. Perfect for keeping your love notes personal and special! 💕
+Open source, available for personal use. Customize it for your own relationship.

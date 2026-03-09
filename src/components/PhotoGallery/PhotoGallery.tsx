@@ -188,13 +188,13 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   if (error && photos.length === 0) {
     return (
       <div
-        className="min-h-screen flex flex-col items-center justify-center px-4"
+        className="flex min-h-screen flex-col items-center justify-center px-4"
         data-testid="photo-gallery-error-state"
       >
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="max-w-md text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
             <svg
-              className="w-8 h-8 text-red-600 dark:text-red-400"
+              className="h-8 w-8 text-red-600 dark:text-red-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -207,13 +207,13 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
               />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
             Failed to load photos
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">{error}</p>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">{error}</p>
           <button
             onClick={handleRetry}
-            className="bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
+            className="rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
             data-testid="photo-gallery-error-retry-button"
           >
             Try Again
@@ -239,15 +239,15 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   if (!isLoading && hasLoadedOnce && photos.length === 0) {
     return (
       <div
-        className="min-h-screen flex flex-col items-center justify-center px-4"
+        className="flex min-h-screen flex-col items-center justify-center px-4"
         data-testid="photo-gallery-empty-state"
       >
-        <div className="text-center max-w-md">
-          <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg mb-6">No photos yet. Start building your memories!</p>
+        <div className="max-w-md text-center">
+          <Camera className="mx-auto mb-4 h-16 w-16 text-gray-400" />
+          <p className="mb-6 text-lg text-gray-500">No photos yet. Start building your memories!</p>
           <button
             onClick={onUploadClick}
-            className="bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
+            className="rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
             data-testid="photo-gallery-empty-upload-button"
           >
             Upload Photo
@@ -262,7 +262,7 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
   return (
     <div className="min-h-screen p-4" data-testid="photo-gallery">
       <div
-        className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-3 w-full"
+        className="grid w-full grid-cols-3 gap-2 md:grid-cols-4 md:gap-3"
         data-testid="photo-gallery-grid"
       >
         {photos.map((photo) => (
@@ -278,13 +278,13 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       {hasMore && (
         <div
           ref={observerTarget}
-          className="w-full py-8 flex items-center justify-center"
+          className="flex w-full items-center justify-center py-8"
           data-testid="photo-gallery-load-trigger"
         >
           {isLoadingMore && (
             <div className="flex flex-col items-center">
-              <Loader2 className="w-8 h-8 text-pink-500 animate-spin mb-2" />
-              <p className="text-gray-500 text-sm">Loading more photos...</p>
+              <Loader2 className="mb-2 h-8 w-8 animate-spin text-pink-500" />
+              <p className="text-sm text-gray-500">Loading more photos...</p>
             </div>
           )}
         </div>
@@ -293,21 +293,21 @@ export function PhotoGallery({ onUploadClick }: PhotoGalleryProps) {
       {/* Story 5.2 AC-3, Subtask 4.3: "No more photos" indicator when pagination ends */}
       {!hasMore && photos.length > 0 && (
         <div
-          className="w-full py-8 flex items-center justify-center"
+          className="flex w-full items-center justify-center py-8"
           data-testid="photo-gallery-end-message"
         >
-          <p className="text-gray-400 text-sm">You've reached the end of your memories</p>
+          <p className="text-sm text-gray-400">You've reached the end of your memories</p>
         </div>
       )}
 
       {/* Floating action button (FAB) for uploading more photos */}
       <button
         onClick={onUploadClick}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-10"
+        className="fixed right-4 bottom-20 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg transition-shadow hover:shadow-xl"
         aria-label="Upload photo"
         data-testid="photo-gallery-upload-fab"
       >
-        <Camera className="w-6 h-6" />
+        <Camera className="h-6 w-6" />
       </button>
 
       {/* Story 6.4: PhotoViewer modal */}

@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.mise.toml'
           cache: 'npm'
 
       - name: Install dependencies
@@ -35,13 +35,21 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           npx supabase gen types typescript \
-            --project-id xojempkrugifnaveqtqc \
+            --project-id ${{ vars.SUPABASE_PROJECT_ID }} \
+            | grep -v '^Connecting to' \
             > src/types/database.types.ts
 
       - name: Build application
         run: npm run build
         env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_RELEASE: my-love@${{ github.sha }}
+          VITE_SENTRY_RELEASE: my-love@${{ github.sha }}
 
       - name: Run smoke tests
         run: npm run test:smoke
@@ -72,10 +80,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.mise.toml'
 
       - name: Install dependencies for health check
-        run: npm install --no-save @supabase/supabase-js @dotenvx/dotenvx
+        run: npm install --no-save @supabase/supabase-js
 
       - name: Wait for GitHub Pages propagation
         run: |
@@ -152,19 +160,15 @@ jobs:
 
       - name: Health Check - Supabase Connection
         env:
-          DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           echo "🔍 Checking Supabase connection..."
 
-          # Create health check script (dotenvx decrypts env vars at runtime)
+          # Create health check script
           cat > health-check-supabase.mjs << 'EOF'
           import { createClient } from '@supabase/supabase-js';
-          import { config } from '@dotenvx/dotenvx';
 
-          // Load decrypted environment variables
-          config();
-
-          // Validate environment variables
           const supabaseUrl = process.env.VITE_SUPABASE_URL;
           const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
@@ -206,7 +210,6 @@ jobs:
           }
           EOF
 
-          # Run health check script
           node health-check-supabase.mjs
 
       - name: Health Check Summary

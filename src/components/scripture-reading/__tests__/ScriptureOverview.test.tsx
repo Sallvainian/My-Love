@@ -26,9 +26,11 @@ import type { ScriptureError } from '../../../services/scriptureReadingService';
 // Mock framer-motion (project pattern)
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: Record<string, unknown>) => (
+      <div {...props}>{children as React.ReactNode}</div>
+    ),
     section: ({ children, ...props }: Record<string, unknown>) => (
-      <section {...props}>{children}</section>
+      <section {...props}>{children as React.ReactNode}</section>
     ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -369,7 +371,9 @@ describe('ScriptureOverview', () => {
 
       const togetherButton = screen.getByText('Together').closest('button');
       expect(togetherButton).not.toBeDisabled();
-      expect(screen.getByText('Read and reflect with your partner in real-time')).toBeInTheDocument();
+      expect(
+        screen.getByText('Read and reflect with your partner in real-time')
+      ).toBeInTheDocument();
     });
 
     it('should NOT show partner link message when partner is linked', () => {
@@ -389,9 +393,7 @@ describe('ScriptureOverview', () => {
       render(<ScriptureOverview />);
 
       expect(screen.getByTestId('link-partner-message')).toBeInTheDocument();
-      expect(
-        screen.getByText('🔗 Link your partner to do this together')
-      ).toBeInTheDocument();
+      expect(screen.getByText('🔗 Link your partner to do this together')).toBeInTheDocument();
     });
 
     it('should disable Together mode when partner is not linked', () => {
@@ -621,7 +623,6 @@ describe('ScriptureOverview', () => {
 
       expect(screen.queryByTestId('offline-indicator')).not.toBeInTheDocument();
     });
-
 
     it('should disable mode cards when offline', () => {
       // Start online, click Start to show modes, then go offline

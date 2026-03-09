@@ -105,9 +105,8 @@ describe('scriptureReadingService — service methods', () => {
         error: null,
       } as ReturnType<typeof supabase.auth.getUser> extends Promise<infer R> ? R : never);
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const session = await scriptureReadingService.createSession('solo');
 
@@ -118,7 +117,6 @@ describe('scriptureReadingService — service methods', () => {
       expect(session.mode).toBe('solo');
       expect(session.currentPhase).toBe('reading');
       expect(session.currentStepIndex).toBe(0);
-
     });
 
     it('should throw ScriptureError on RPC failure', async () => {
@@ -132,13 +130,10 @@ describe('scriptureReadingService — service methods', () => {
         statusText: 'Internal Server Error',
       });
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
-      await expect(
-        scriptureReadingService.createSession('solo')
-      ).rejects.toMatchObject({
+      await expect(scriptureReadingService.createSession('solo')).rejects.toMatchObject({
         code: 'SYNC_FAILED',
       });
     });
@@ -155,13 +150,10 @@ describe('scriptureReadingService — service methods', () => {
         statusText: 'OK',
       });
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
-      await expect(
-        scriptureReadingService.createSession('solo')
-      ).rejects.toThrow();
+      await expect(scriptureReadingService.createSession('solo')).rejects.toThrow();
     });
   });
 
@@ -188,9 +180,8 @@ describe('scriptureReadingService — service methods', () => {
         statusText: 'OK',
       });
 
-      const { scriptureReadingService } = await import(
-        '../../../src/services/scriptureReadingService'
-      );
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
 
       const reflection = await scriptureReadingService.addReflection(
         TEST_SESSION_UUID,
@@ -210,7 +201,6 @@ describe('scriptureReadingService — service methods', () => {
       });
       expect(reflection.id).toBe(TEST_REFLECTION_UUID);
       expect(reflection.rating).toBe(4);
-
     });
   });
 });
@@ -222,4 +212,3 @@ describe('scriptureReadingService — service methods', () => {
 // message CRUD, and corruption recovery via service methods.
 // Uses vi.resetModules() for clean singleton state between tests.
 // ============================================================================
-

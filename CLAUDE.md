@@ -1,45 +1,5 @@
 # CLAUDE.md
 
-## 🚨 MANDATORY RULE: DISPLAY AT START OF EVERY RESPONSE 🚨
-
-## MANDATORY: Use td for Task Management
-
-Run td usage --new-session at conversation start (or after /clear). This tells you what to work on next.
-
-Sessions are automatic (based on terminal/agent context). Optional:
-- td session "name" to label the current session
-- td session --new to force a new session in the same context
-
-Use td usage -q after first read.
-
-## Issue Tracking with Beads (`bd`)
-
-Use `bd` (beads) for project-level issue tracking (bugs, features, tasks with dependencies). Issues persist in git across sessions.
-
-**Session start:** `bd prime` is auto-injected via hooks. Check `bd ready` for available work.
-
-**Workflow:**
-1. `bd ready` — find unblocked issues
-2. `bd show <id>` — review issue details
-3. `bd update <id> --status=in_progress` — claim it before coding
-4. Write code, commit
-5. `bd close <id>` — mark complete
-6. `bd sync` — sync beads changes with git
-
-**Creating issues:** When you discover bugs, new features, or follow-up work during development:
-```bash
-bd create --title="Short description" --description="Context and what needs to be done" --type=task|bug|feature --priority=2
-```
-Priority: 0-4 (0=critical, 4=backlog). Do NOT use "high"/"medium"/"low".
-
-**Dependencies:** `bd dep add <child> <parent>` — child depends on parent (parent blocks child).
-
-**Session close:** Before saying "done", run: `bd sync` then push.
-
-**WARNING:** Never use `bd edit` — it opens $EDITOR which blocks agents.
-
-**td vs bd:** Use `td` for session-level task management (what to work on right now). Use `bd` for persistent issue tracking (bugs, features, tasks that span sessions).
-
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -55,8 +15,8 @@ Live URL: https://sallvainian.github.io/My-Love/
 ```bash
 npm run dev              # Start dev server (runs cleanup script wrapper)
 npm run dev:raw          # Start Vite dev server directly
-npm run preview          # Preview production build (dotenvx decrypts .env)
-npm run build            # Production build (dotenvx + tsc + vite)
+npm run preview          # Preview production build
+npm run build            # Production build (tsc + vite)
 npm run typecheck        # tsc --noEmit
 npm run lint             # ESLint (src, tests, scripts)
 npm run lint:fix         # ESLint fix + Prettier
@@ -93,6 +53,10 @@ npx playwright test --grep "mood tracker"
 # Database tests (pgTAP via Supabase CLI)
 npm run test:db                # supabase test db
 
+# Failure analysis (AI-friendly Markdown summary of failed tests)
+npm run test:failures          # Groups by root cause, extracts test IDs/priority/API paths
+npm run test:failures > failures-ai.md  # Save to file
+
 # Smoke tests (post-build verification)
 npm run test:smoke
 ```
@@ -105,7 +69,7 @@ supabase stop            # Stop local Supabase
 supabase status          # Show connection URLs and keys
 supabase db reset        # Reset DB and re-run all migrations
 supabase migration new <name>  # Create new migration file
-supabase gen types typescript --local > src/types/database.types.ts  # Regenerate types
+supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts  # Regenerate types
 ```
 
 ## Architecture
@@ -125,62 +89,25 @@ Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices via t
 - `photosSlice` - photo gallery
 - `scriptureReadingSlice` - scripture reading sessions
 
-State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`.
+### Environment Variables & Secrets
 
-### Data Layer: Offline-First with Cloud Sync
+Uses [fnox](https://fnox.jdx.dev) with the `age` provider for local secrets (encrypted inline in `fnox.toml`) and GitHub Secrets for CI. Tool versions managed by [mise](https://mise.jdx.dev) via `.mise.toml`.
 
-**Offline-first architecture** — UI reads/writes IndexedDB as the primary data store. Supabase is the sync and sharing layer, not the source of truth for local user data.
+**Local development:**
+- `fnox exec -- npm run dev` — decrypts secrets via age, starts dev server
+- `fnox exec -- npm run build` — local production build with secrets
+- `fnox check` — verify all secrets resolve
+- `fnox set KEY value` — encrypt and store a secret
 
-- **IndexedDB** (via `idb` library): Primary local storage. Schema defined in `src/services/dbSchema.ts` (versioned, currently v5). Services extend `BaseIndexedDBService` for CRUD operations. Entries are created with `synced: false` and `supabaseId: null`.
-- **Supabase**: Cloud backend for cross-device sync, partner features (realtime mood, love notes, interactions), and data persistence. Client singleton in `src/api/supabaseClient.ts`.
-- **Sync strategy** (moods/photos/interactions): Three triggers — (1) immediate on creation, (2) periodic while app is open, (3) Background Sync API via service worker when app is closed. Partial failure handling: failed entries are retried on next sync pass.
-- **Scripture feature uses the opposite pattern**: Online-first with optimistic UI. Supabase is the source of truth; IndexedDB is a read cache. Writes go to Supabase RPC first and throw on failure (no offline queue). Reads use cache-first with fire-and-forget background refresh. The Zustand slice updates state optimistically before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
+**Files:**
+| File | Committed | Contents |
+|------|-----------|----------|
+| `.mise.toml` | Yes | Tool versions (Node) + env vars (CODEX_HOME) |
+| `fnox.toml` | Yes | Age-encrypted secret ciphertext + recipient public keys |
+| `.env.example` | Yes | Template with placeholder values |
+| `.env.test` | Yes | Local Supabase test values |
 
-### Service Worker (`src/sw.ts`)
-
-Custom InjectManifest strategy (not GenerateSW). Handles:
-- Precaching static assets (images/fonts only - JS/CSS use NetworkFirst)
-- Background Sync for mood entries via direct IndexedDB + Supabase REST API calls
-- Cache strategies: NetworkFirst for navigation/API, CacheFirst for images/fonts
-- Database operations in `src/sw-db.ts` (separate from app IndexedDB code)
-
-### Environment Variables
-
-Uses [dotenvx](https://dotenvx.com) for encrypted `.env` files committed to git. The `.env.keys` file (gitignored) contains the decryption key.
-
-Key env vars:
-- `VITE_SUPABASE_URL` - Supabase project URL
-- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anon/public key
-
-For E2E tests, `.env.test` provides plain-text local Supabase values. Playwright config auto-detects local Supabase via `supabase status -o env`.
-
-### Authentication
-
-Email/password auth via Supabase Auth. The app expects exactly 2 users linked via `partner_id` in the `users` table. Partner detection is automatic.
-
-### Testing Architecture
-
-**Unit tests** (`tests/unit/`): Vitest + happy-dom + React Testing Library. Setup in `tests/setup.ts`. Uses `fake-indexeddb` for IndexedDB mocking.
-
-**E2E tests** (`tests/e2e/`): Playwright with merged fixtures from `@seontechnologies/playwright-utils` and custom fixtures (`tests/support/merged-fixtures.ts`). Always import `{ test, expect }` from `tests/support/merged-fixtures` in E2E tests.
-
-**Auth setup** (`tests/support/auth-setup.ts`): Creates worker-isolated test users via Supabase Admin API before tests run. Each parallel worker gets its own user pair (user + partner) to prevent cross-contamination. Auth state stored in `tests/.auth/worker-{n}.json`.
-
-**API tests** (`tests/api/`): Playwright-based API tests against Supabase endpoints.
-
-**Database tests** (`supabase/tests/database/`): pgTAP tests run via `supabase test db`.
-
-### Supabase Migrations
-
-Located in `supabase/migrations/`. Named as `YYYYMMDDHHmmss_description.sql`. Tables: `users`, `moods`, `interactions`, `photos`, `love_note_images`, `scripture_*` tables. All tables have RLS enabled.
-
-### Validation
-
-Zod schemas in `src/validation/schemas.ts` with user-facing error messages in `src/validation/errorMessages.ts`.
-
-### Routing
-
-No router library - navigation is managed via `navigationSlice` in Zustand store. `App.tsx` renders views conditionally based on `currentView` state.
+**Project secrets (in `fnox.toml`):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_SERVICE_KEY`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VITE_SENTRY_DSN`, `SUPABASE_PAT`
 
 ### Base Path
 
@@ -189,18 +116,30 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 ## Key Conventions
 
 - Package manager: **npm** (see `package-lock.json`)
-- Node version: **v24.13.0** (see `.nvmrc`)
+- Node version: **v24.13.0** (see `.mise.toml`)
 - Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
 - Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
 - ESLint enforces `no-explicit-any` as error
 - Prettier with `tailwindcss` plugin for class sorting
 - CI workflows in `.github/workflows/`: deploy, test, migrations, code review
 
-## Retrospective Guardrails (Epic Carry-Over)
+## General Rules
 
-- Catch blocks must never be empty. In scripture code, catch blocks must call `handleScriptureError()` or re-throw; outside scripture code, re-throw or map to the feature's error handler.
-- For scripture-reading container code and new architecture-conforming work, do not import `supabase` or service modules directly; go through Zustand slice actions (legacy exception: `scriptureReadingService` adapter until refactor).
-- New scope discovered during development must be captured as a follow-up story. Do not reopen a story in review unless there is a critical regression or security fix approved by the owner.
-- After a retrospective, all action items (CLAUDE.md rules, documentation updates, process changes) must be executed in the same session — not deferred to "before next epic." Track each action item in `sprint-status.yaml` under `retro_action_items` with status tracking.
-- pgTAP tests for multi-table scenarios (e.g., couple aggregate queries) must explicitly set all FK relationships (e.g., `partner_id` in `public.users`) before asserting security or aggregation properties. The test scenario name must match the test data topology — a "couple isolation" test with no couple relationship in the data is a false green. Always add a test case verifying the partner direction (user B sees user A's data via partner_id).
-- `project-structure-boundaries.md` is a dev-story exit criterion, not a planning-only artifact. Any story that creates files in a new directory must update the boundaries doc as part of the implementation — not deferred to retrospective cleanup. Include the boundaries doc in the story's File List.
+- Always read relevant documentation/docs files BEFORE making changes. Never rush into implementation without understanding the full context first.
+- Prefer comprehensive fixes over minimal fixes. When fixing issues, fix them thoroughly rather than suggesting the smallest possible change.
+
+## Communication
+
+- When the user asks a question, answer the question asked — don't reinterpret it. If the user asks 'should I do X?', that's a question, not a request to do X.
+
+## Workflow Rules
+
+- For migration tasks: 1) Create a complete plan covering ALL environments/platforms mentioned 2) Get approval 3) Execute step by step. Never delete source files before confirming the target is working.
+
+## CI/CD
+
+- When asked to fix CI, always check ALL failure modes (formatting, lint, coverage thresholds, tests) before pushing — never fix one issue and leave others broken.
+
+## Git & Commits
+
+- Always run Prettier/formatting on all new or modified files before committing. Run `npm run format` on changed files as a pre-commit step.

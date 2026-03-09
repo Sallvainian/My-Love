@@ -157,7 +157,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 z-50 bg-black/50"
             data-testid="photo-upload-backdrop"
           />
 
@@ -170,15 +170,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
               data-testid="photo-upload-modal"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between border-b border-gray-200 p-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Upload Photo</h2>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="mt-1 text-sm text-gray-500">
                     {step === 'select' && 'Select a photo to upload'}
                     {step === 'preview' && 'Add details and upload'}
                     {step === 'uploading' && 'Compressing and saving...'}
@@ -188,25 +188,25 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                 </div>
                 <button
                   onClick={handleClose}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="rounded-lg p-2 transition-colors hover:bg-gray-100"
                   aria-label="Close"
                   data-testid="photo-upload-close"
                   disabled={step === 'uploading'}
                 >
-                  <X className="w-6 h-6 text-gray-500" />
+                  <X className="h-6 w-6 text-gray-500" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-6 space-y-6">
+              <div className="space-y-6 p-6">
                 {/* Storage Warning (AC-4.1.9) */}
                 {storageWarning && (
                   <div
-                    className="p-4 bg-orange-50 border border-orange-300 rounded-lg flex items-start gap-3"
+                    className="flex items-start gap-3 rounded-lg border border-orange-300 bg-orange-50 p-4"
                     data-testid="storage-warning-banner"
                   >
                     <svg
-                      className="w-5 h-5 text-orange-600 shrink-0 mt-0.5"
+                      className="mt-0.5 h-5 w-5 shrink-0 text-orange-600"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
@@ -216,18 +216,18 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         clipRule="evenodd"
                       />
                     </svg>
-                    <p className="text-sm text-orange-800 font-medium">{storageWarning}</p>
+                    <p className="text-sm font-medium text-orange-800">{storageWarning}</p>
                   </div>
                 )}
 
                 {/* Step: Select */}
                 {step === 'select' && (
                   <div className="flex flex-col items-center justify-center py-12">
-                    <div className="bg-pink-50 rounded-full p-6 mb-6">
-                      <Camera className="w-12 h-12 text-pink-500" />
+                    <div className="mb-6 rounded-full bg-pink-50 p-6">
+                      <Camera className="h-12 w-12 text-pink-500" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Choose a Photo</h3>
-                    <p className="text-sm text-gray-500 mb-6 text-center max-w-md">
+                    <h3 className="mb-2 text-lg font-semibold text-gray-900">Choose a Photo</h3>
+                    <p className="mb-6 max-w-md text-center text-sm text-gray-500">
                       Select a JPEG, PNG, or WebP image to upload. We'll compress it to save space.
                     </p>
                     <input
@@ -240,10 +240,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium"
+                      className="flex items-center gap-2 rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
                       data-testid="photo-upload-select-button"
                     >
-                      <Upload className="w-5 h-5" />
+                      <Upload className="h-5 w-5" />
                       Select Photo
                     </button>
                   </div>
@@ -254,18 +254,18 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                   <>
                     {/* Photo Preview */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
                         Preview
                       </label>
-                      <div className="relative w-full bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="relative w-full overflow-hidden rounded-lg bg-gray-100">
                         <img
                           src={previewUrl}
                           alt="Preview"
-                          className="w-full h-auto max-h-[300px] object-contain"
+                          className="h-auto max-h-[300px] w-full object-contain"
                           data-testid="photo-upload-preview-image"
                         />
                       </div>
-                      <div className="flex items-center justify-between mt-2 text-sm text-gray-500">
+                      <div className="mt-2 flex items-center justify-between text-sm text-gray-500">
                         <span>
                           Original size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                         </span>
@@ -279,7 +279,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     <div>
                       <label
                         htmlFor="photo-caption"
-                        className="block text-sm font-medium text-gray-700 mb-2"
+                        className="mb-2 block text-sm font-medium text-gray-700"
                       >
                         Caption (optional)
                       </label>
@@ -290,10 +290,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         placeholder="Add a caption to your photo..."
                         maxLength={maxCaptionLength}
                         rows={3}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                        className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-pink-500"
                         data-testid="photo-upload-caption-input"
                       />
-                      <div className="flex items-center justify-between mt-2">
+                      <div className="mt-2 flex items-center justify-between">
                         <p className="text-sm text-gray-500">Supports emoji and multiple lines</p>
                         <p
                           className={`text-sm ${remainingCaptionChars < 50 ? 'text-orange-500' : 'text-gray-500'}`}
@@ -307,7 +307,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     <div>
                       <label
                         htmlFor="photo-tags"
-                        className="block text-sm font-medium text-gray-700 mb-2"
+                        className="mb-2 block text-sm font-medium text-gray-700"
                       >
                         Tags (optional)
                       </label>
@@ -317,7 +317,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="beach, sunset, memories"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-pink-500"
                         data-testid="photo-upload-tags-input"
                       />
                       <div className="mt-2 space-y-1">
@@ -329,7 +329,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                             {parsedTags.slice(0, 10).map((tag, index) => (
                               <span
                                 key={index}
-                                className={`px-2 py-1 text-xs rounded-full ${
+                                className={`rounded-full px-2 py-1 text-xs ${
                                   tag.length > 50
                                     ? 'bg-red-100 text-red-700'
                                     : 'bg-pink-100 text-pink-700'
@@ -340,7 +340,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                               </span>
                             ))}
                             {parsedTags.length > 10 && (
-                              <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-700">
+                              <span className="rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-700">
                                 +{parsedTags.length - 10} more (max 10)
                               </span>
                             )}
@@ -365,17 +365,17 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     {/* Error Display */}
                     {error && (
                       <div
-                        className="p-4 bg-red-50 border border-red-200 rounded-lg"
+                        className="rounded-lg border border-red-200 bg-red-50 p-4"
                         data-testid="photo-upload-error"
                       >
-                        <p className="text-sm text-red-700 font-medium">{error}</p>
+                        <p className="text-sm font-medium text-red-700">{error}</p>
                       </div>
                     )}
 
                     {/* Warning Display */}
                     {warning && (
                       <div
-                        className="p-4 bg-orange-50 border border-orange-200 rounded-lg"
+                        className="rounded-lg border border-orange-200 bg-orange-50 p-4"
                         data-testid="photo-upload-warning"
                       >
                         <p className="text-sm text-orange-700">{warning}</p>
@@ -383,10 +383,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
                       <button
                         onClick={handleClose}
-                        className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="rounded-lg px-6 py-2 text-gray-700 transition-colors hover:bg-gray-100"
                         data-testid="photo-upload-cancel"
                       >
                         Cancel
@@ -394,7 +394,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                       {step === 'error' && (
                         <button
                           onClick={handleRetry}
-                          className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium"
+                          className="rounded-lg bg-pink-500 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-600"
                           data-testid="photo-upload-retry"
                         >
                           Retry
@@ -404,10 +404,10 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         <button
                           onClick={handleUpload}
                           disabled={!isFormValid}
-                          className="flex items-center gap-2 px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 rounded-lg bg-pink-500 px-6 py-2 font-medium text-white transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
                           data-testid="photo-upload-submit-button"
                         >
-                          <Upload className="w-5 h-5" />
+                          <Upload className="h-5 w-5" />
                           Upload
                         </button>
                       )}
@@ -418,8 +418,8 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                 {/* Step: Uploading */}
                 {step === 'uploading' && (
                   <div className="flex flex-col items-center justify-center py-12">
-                    <Loader className="w-12 h-12 text-pink-500 animate-spin mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <Loader className="mb-4 h-12 w-12 animate-spin text-pink-500" />
+                    <h3 className="mb-2 text-lg font-semibold text-gray-900">
                       Compressing & Saving...
                     </h3>
                     <p className="text-sm text-gray-500">This may take a moment</p>
@@ -429,9 +429,9 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                 {/* Step: Success */}
                 {step === 'success' && (
                   <div className="flex flex-col items-center justify-center py-12">
-                    <div className="bg-green-50 rounded-full p-6 mb-6">
+                    <div className="mb-6 rounded-full bg-green-50 p-6">
                       <svg
-                        className="w-12 h-12 text-green-500"
+                        className="h-12 w-12 text-green-500"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -444,7 +444,7 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
                         />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Photo uploaded! ✨</h3>
+                    <h3 className="mb-2 text-lg font-semibold text-gray-900">Photo uploaded! ✨</h3>
                     <p className="text-sm text-gray-500">Your photo has been saved</p>
                   </div>
                 )}

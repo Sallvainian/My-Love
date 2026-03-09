@@ -31,9 +31,7 @@ export function BookmarkFlag({ isBookmarked, onToggle, disabled = false }: Bookm
       aria-pressed={isBookmarked}
       data-testid="scripture-bookmark-button"
       className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 transition-colors ${
-        isBookmarked
-          ? 'text-amber-400'
-          : 'text-purple-400 hover:text-purple-600'
+        isBookmarked ? 'text-amber-400' : 'text-purple-400 hover:text-purple-600'
       } ${FOCUS_RING}`}
     >
       <Bookmark

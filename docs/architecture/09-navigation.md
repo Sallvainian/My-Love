@@ -27,7 +27,7 @@ setView: (view) => {
   const base = import.meta.env.MODE === 'production' ? '/My-Love/' : '/';
   const url = view === 'home' ? base : `${base}${view}`;
   window.history.pushState({ view }, '', url);
-}
+};
 ```
 
 Production builds use `/My-Love/` as the base path for GitHub Pages compatibility. Development uses `/`.
@@ -52,6 +52,7 @@ On initial load, `detectViewFromURL()` parses `window.location.pathname` to dete
 ### Navigation State
 
 The `currentView` state is **not persisted** to localStorage. On page refresh, the view is determined from the URL path. This means:
+
 - Bookmarking works (URL reflects current view)
 - Refresh works (URL is parsed on load)
 - But there is no "last visited view" memory beyond the URL
@@ -60,14 +61,14 @@ The `currentView` state is **not persisted** to localStorage. On page refresh, t
 
 The `BottomNavigation` component (`src/components/Navigation/BottomNavigation.tsx`) renders a tab bar with 6 tabs:
 
-| Tab | View | Icon |
-|-----|------|------|
-| Home | `home` | Heart |
-| Photos | `photos` | Camera |
-| Mood | `mood` | Smile |
-| Partner | `partner` | Users |
-| Notes | `notes` | MessageSquare |
-| Scripture | `scripture` | Book |
+| Tab       | View        | Icon          |
+| --------- | ----------- | ------------- |
+| Home      | `home`      | Heart         |
+| Photos    | `photos`    | Camera        |
+| Mood      | `mood`      | Smile         |
+| Partner   | `partner`   | Users         |
+| Notes     | `notes`     | MessageSquare |
+| Scripture | `scripture` | Book          |
 
 Each tab calls `setView(viewType)` on tap, which updates both the Zustand state and the browser URL.
 

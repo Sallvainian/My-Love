@@ -38,11 +38,11 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
   const displayNote =
     shouldTruncate && !isExpanded
       ? (mood.note?.slice(0, NOTE_TRUNCATE_LENGTH) ?? '') + '...'
-      : mood.note ?? '';
+      : (mood.note ?? '');
 
   return (
     <div
-      className="flex items-start gap-3 py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors relative"
+      className="relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
       data-testid="mood-history-item"
       data-timestamp={mood.created_at}
     >
@@ -52,18 +52,15 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <h4
-            className="font-medium text-gray-900 dark:text-gray-100 capitalize"
+            className="font-medium text-gray-900 capitalize dark:text-gray-100"
             data-testid="mood-label"
           >
             {mood.mood_type}
           </h4>
-          <span
-            className="text-sm text-gray-500 dark:text-gray-400"
-            data-testid="mood-timestamp"
-          >
+          <span className="text-sm text-gray-500 dark:text-gray-400" data-testid="mood-timestamp">
             {getRelativeTime(mood.created_at || '')}
           </span>
         </div>
@@ -71,14 +68,14 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
         {/* Note with expand/collapse */}
         {mood.note && (
           <div className="mt-1">
-            <p className="text-gray-700 dark:text-gray-300 text-sm" data-testid="mood-note">
+            <p className="text-sm text-gray-700 dark:text-gray-300" data-testid="mood-note">
               {displayNote}
             </p>
 
             {shouldTruncate && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="text-xs text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300 mt-1 font-medium"
+                className="mt-1 text-xs font-medium text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300"
                 data-testid="mood-note-toggle"
               >
                 {isExpanded ? 'Show less' : 'Show more'}
@@ -89,7 +86,7 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
       </div>
 
       {/* Divider line */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gray-200 dark:bg-gray-700" />
+      <div className="absolute right-0 bottom-0 left-0 h-px bg-gray-200 dark:bg-gray-700" />
     </div>
   );
 }

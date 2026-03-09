@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       analysis_type:
-        description: "Type of analysis to perform"
+        description: 'Type of analysis to perform'
         required: true
         type: choice
         options:

@@ -32,9 +32,9 @@ All user-generated love note content is sanitized via DOMPurify before display:
 // src/utils/messageValidation.ts
 export function sanitizeMessageContent(content: string): string {
   return DOMPurify.sanitize(content, {
-    ALLOWED_TAGS: [],    // No HTML tags allowed
-    ALLOWED_ATTR: [],    // No attributes allowed
-    KEEP_CONTENT: true,  // Preserve text content
+    ALLOWED_TAGS: [], // No HTML tags allowed
+    ALLOWED_ATTR: [], // No attributes allowed
+    KEEP_CONTENT: true, // Preserve text content
   });
 }
 ```
@@ -68,24 +68,36 @@ Zod v4 schemas validate data at every service boundary, preventing data corrupti
 
 ## Environment Variable Security
 
-- Environment variables are encrypted with **dotenvx** and committed to git
-- The `.env.keys` file (decryption key) is gitignored
+- Secrets are encrypted with **fnox** using the age encryption provider and committed to git in `fnox.toml`
+- Age private keys (`~/.age/key.txt`) are never committed to the repository
 - E2E tests use plain-text `.env.test` with local Supabase credentials only
 - Environment variables are validated at module load time in `supabaseClient.ts`
+- In CI, GitHub Secrets are injected directly as environment variables
 
 ## Service Worker Auth Token Management
 
-Auth tokens for background sync are stored in IndexedDB (not localStorage, which is inaccessible to service workers):
+Auth tokens for background sync are stored in IndexedDB (not localStorage, which is inaccessible to service workers). The `sw-auth` object store uses a string key path `id` with no auto-increment:
 
 ```typescript
 // src/sw-db.ts
 export async function storeAuthToken(token: string): Promise<void> {
   const db = await openMyLoveDB();
-  await db.put('sw-auth', { key: 'auth-token', value: token });
+  await db.put('sw-auth', { id: 'current', token, timestamp: Date.now() });
+}
+
+export async function getAuthToken(): Promise<string | null> {
+  const db = await openMyLoveDB();
+  const record = await db.get('sw-auth', 'current');
+  return record?.token ?? null;
+}
+
+export async function clearAuthToken(): Promise<void> {
+  const db = await openMyLoveDB();
+  await db.delete('sw-auth', 'current');
 }
 ```
 
-The token is refreshed whenever the main app's auth state changes.
+The token is refreshed whenever the main app's auth state changes via the `onAuthStateChange` listener. The `sw-db.ts` file duplicates the `upgradeDb()` migration logic from `dbSchema.ts` since the service worker runs in a separate execution context and cannot import the app's service layer.
 
 ## Rate Limiting
 

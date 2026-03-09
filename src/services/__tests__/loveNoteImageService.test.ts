@@ -30,7 +30,7 @@ function createSessionResponse(accessToken: string | null): SessionResponse {
         : null,
     },
     error: null,
-  };
+  } as unknown as SessionResponse;
 }
 
 function createStorageBucket(overrides: Partial<StorageBucket> = {}): StorageBucket {
@@ -184,9 +184,7 @@ describe('loveNoteImageService', () => {
 
       const mockFile = new File(['test-image'], 'photo.jpg', { type: 'image/jpeg' });
 
-      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow(
-        'Not authenticated'
-      );
+      await expect(uploadLoveNoteImage(mockFile, 'user-123')).rejects.toThrow('Not authenticated');
     });
 
     it('should throw error on rate limit exceeded (429)', async () => {
@@ -315,9 +313,7 @@ describe('loveNoteImageService', () => {
 
       const mockBlob = new Blob(['data'], { type: 'image/jpeg' });
 
-      await expect(uploadCompressedBlob(mockBlob, 'user-123')).rejects.toThrow(
-        'Network error'
-      );
+      await expect(uploadCompressedBlob(mockBlob, 'user-123')).rejects.toThrow('Network error');
     });
   });
 
@@ -325,7 +321,8 @@ describe('loveNoteImageService', () => {
     it('should return signed URL with expiry timestamp', async () => {
       const { supabase } = await import('../../api/supabaseClient');
 
-      const mockSignedUrl = 'https://storage.supabase.co/signed/love-notes-images/user-123/image.jpg?token=abc';
+      const mockSignedUrl =
+        'https://storage.supabase.co/signed/love-notes-images/user-123/image.jpg?token=abc';
       const mockCreateSignedUrl = vi.fn().mockResolvedValue({
         data: { signedUrl: mockSignedUrl },
         error: null,

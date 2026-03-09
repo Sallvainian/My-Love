@@ -19,7 +19,8 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
 import { test as scriptureNavFixture } from './fixtures/scripture-navigation';
-import { test as workerAuthFixture } from './fixtures/worker-auth';
+import { test as authFixture } from './fixtures/auth';
+import { test as togetherModeFixture } from './fixtures/together-mode';
 
 /**
  * Create network error monitor with project-specific exclusions.
@@ -34,10 +35,9 @@ const networkMonitorFixture = base.extend(
       /\/rest\/v1\/users\?select=partner/, // Partner queries fail without partner data in test env
       /\/auth\/v1\/token/, // Background auth token refresh — 400 expected when refresh token is stale
       /\/auth\/v1\/user(?:\?|$)/, // Transient auth user probe failures (e.g. local 504) can be non-functional noise in E2E
-      /\/rest\/v1\/rpc\/scripture_submit_reflection/, // Reflection write failures intentionally tested for retry UI
     ],
     maxTestsPerError: 3, // Prevent domino failures
-  }),
+  })
 );
 
 /**
@@ -48,10 +48,8 @@ const networkMonitorFixture = base.extend(
  * - networkErrorMonitor: Automatic HTTP 4xx/5xx detection
  * - Plus any custom fixtures from ./fixtures
  *
- * NOTE: Auth fixtures (authToken/authOptions) require a custom auth provider.
- * To add auth support, see:
- *   - @seontechnologies/playwright-utils/auth-session documentation
- *   - Create auth-provider.ts with setAuthProvider() call
+ * Auth: Uses SupabaseAuthProvider via @seontechnologies/playwright-utils auth-session.
+ * Each worker gets a unique user identity via authOptions (worker-scoped).
  */
 export const test = mergeTests(
   apiRequestFixture,
@@ -61,7 +59,8 @@ export const test = mergeTests(
   networkMonitorFixture,
   customFixtures,
   scriptureNavFixture,
-  workerAuthFixture,
+  authFixture,
+  togetherModeFixture
 );
 
 export { expect } from '@playwright/test';

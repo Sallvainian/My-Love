@@ -152,7 +152,7 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 z-40 bg-black/50"
             onClick={onClose}
             aria-hidden="true"
             data-testid="modal-backdrop"
@@ -160,7 +160,7 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
 
           {/* Modal - AC-4: Slide up from bottom */}
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none"
+            className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center"
             role="dialog"
             aria-modal="true"
             aria-labelledby="mood-modal-title"
@@ -172,7 +172,7 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 pointer-events-auto relative"
+              className="pointer-events-auto relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close button - AC-4: X icon in top-right */}
@@ -180,17 +180,17 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
               <button
                 ref={closeButtonRef}
                 onClick={onClose}
-                className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500"
+                className="absolute top-4 right-4 rounded-full p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:outline-none"
                 aria-label="Close mood details modal"
                 data-testid="modal-close-button"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="h-5 w-5 text-gray-500" />
               </button>
 
               {/* Mood icon and type - AC-4: Icon with color */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className={`p-4 rounded-full ${moodConfig.bgColor}`} aria-hidden="true">
-                  <Icon className={`w-8 h-8 ${moodConfig.color}`} />
+              <div className="mb-6 flex items-center gap-4">
+                <div className={`rounded-full p-4 ${moodConfig.bgColor}`} aria-hidden="true">
+                  <Icon className={`h-8 w-8 ${moodConfig.color}`} />
                 </div>
                 <div>
                   <h2
@@ -200,12 +200,12 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
                   >
                     {moodConfig.label}
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">How you were feeling</p>
+                  <p className="mt-1 text-sm text-gray-500">How you were feeling</p>
                 </div>
               </div>
 
               {/* Date and timestamp - AC-4: Formatted display */}
-              <div className="space-y-2 mb-6">
+              <div className="mb-6 space-y-2">
                 <div className="flex items-center gap-2 text-gray-700">
                   <span className="font-medium">Date:</span>
                   <span data-testid="modal-date">{formattedDate}</span>
@@ -219,8 +219,8 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
               {/* Note text - AC-4: Display if present */}
               {mood.note && (
                 <div className="border-t border-gray-200 pt-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Note:</h3>
-                  <p className="text-gray-600 whitespace-pre-wrap" data-testid="modal-note">
+                  <h3 className="mb-2 text-sm font-medium text-gray-700">Note:</h3>
+                  <p className="whitespace-pre-wrap text-gray-600" data-testid="modal-note">
                     {mood.note}
                   </p>
                 </div>

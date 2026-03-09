@@ -96,7 +96,7 @@ function FullScreenImageViewerComponent({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+            className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 focus:ring-2 focus:ring-white focus:outline-none"
             aria-label="Close image viewer"
           >
             <X size={24} aria-hidden="true" />
@@ -108,13 +108,13 @@ function FullScreenImageViewerComponent({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative z-10 max-w-[90vw] max-h-[90vh]"
+            className="relative z-10 max-h-[90vh] max-w-[90vw]"
             onClick={(e) => e.stopPropagation()}
           >
             <img
               src={imageUrl}
               alt={alt}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              className="max-h-[90vh] max-w-full rounded-lg object-contain"
               loading="eager"
             />
           </motion.div>

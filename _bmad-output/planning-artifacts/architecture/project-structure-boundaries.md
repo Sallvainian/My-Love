@@ -10,6 +10,7 @@ src/
 │   └── scripture-reading/              # NEW DIRECTORY
 │       ├── session/
 │       │   ├── Countdown.tsx
+│       │   ├── DisconnectionOverlay.tsx    # Story 4.3 (AC#1, #2, #3)
 │       │   ├── LockInButton.tsx
 │       │   └── SessionProgress.tsx
 │       ├── reading/
@@ -39,6 +40,7 @@ src/
 ├── hooks/
 │   ├── useMotionConfig.ts              # NEW FILE (global reduced-motion)
 │   ├── useScriptureBroadcast.ts        # NEW FILE (real-time channel)
+│   ├── useScripturePresence.ts         # NEW FILE Story 4.2 (ephemeral presence channel)
 │   └── index.ts                        # MODIFIED (export new hooks)
 │
 └── types/
@@ -95,7 +97,7 @@ tests/
 | `src/sw-db.ts` | **⚠️ Manual sync:** Update DB_VERSION to 5, add scripture stores if Background Sync needed |
 | `src/types/database.types.ts` | Add scripture table type definitions |
 | `src/types/models.ts` | Add scripture app model interfaces |
-| `src/hooks/index.ts` | Export `useMotionConfig`, `useScriptureBroadcast` |
+| `src/hooks/index.ts` | Export `useMotionConfig`, `useScriptureBroadcast`, `useScripturePresence` |
 
 ## Architectural Boundaries
 
@@ -136,7 +138,7 @@ tests/
 |-------------|---------------|
 | **Session Management (FR1-7)** | `scriptureReadingSlice.ts`, `scriptureReadingService.ts`, `ScriptureReadingView.tsx` |
 | **Solo Mode Flow (FR8-13)** | `ReadingContainer.tsx`, `scriptureReadingService.ts`, `dbSchema.ts` |
-| **Together Mode Flow (FR14-29)** | `useScriptureBroadcast.ts`, `LobbyContainer.tsx`, `LockInButton.tsx`, `Countdown.tsx` |
+| **Together Mode Flow (FR14-29)** | `useScriptureBroadcast.ts`, `useScripturePresence.ts`, `LobbyContainer.tsx`, `ReadingContainer.tsx`, `LockInButton.tsx`, `RoleIndicator.tsx`, `PartnerPosition.tsx`, `Countdown.tsx` |
 | **Reflection System (FR30-33)** | `ReflectionSummary.tsx`, `BookmarkFlag.tsx`, `ReflectionContainer.tsx` |
 | **Daily Prayer Report (FR34-41)** | `DailyPrayerReport.tsx`, `ReflectionContainer.tsx` |
 | **Stats & Progress (FR42-46)** | `scriptureReadingService.ts`, `scriptureReadingSlice.ts`, `overview/StatsSection.tsx`, `scripture_get_couple_stats` RPC |
@@ -146,7 +148,7 @@ tests/
 
 | Concern | Files |
 |---------|-------|
-| **Real-time sync** | `useScriptureBroadcast.ts`, `scriptureReadingSlice.ts` |
+| **Real-time sync** | `useScriptureBroadcast.ts`, `useScripturePresence.ts`, `scriptureReadingSlice.ts` |
 | **Caching layer** | `dbSchema.ts`, `scriptureReadingService.ts` |
 | **Reduced motion** | `useMotionConfig.ts` (global, used by all animated components) |
 | **RLS policies** | `20260125_scripture_reading.sql` |
