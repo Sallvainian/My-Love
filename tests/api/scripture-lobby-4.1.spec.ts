@@ -50,7 +50,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
 
-
       try {
         // WHEN: User1 calls scripture_select_role with role='reader'
         const response = await apiRequest({
@@ -103,7 +102,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
 
-
       try {
         // WHEN: User1 selects role 'responder'
         const response = await apiRequest({
@@ -151,7 +149,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
 
       // Use user2's token — exercises the user2_id code path in the RPC
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
-
 
       try {
         // WHEN: User2 calls scripture_select_role with role='responder'
@@ -211,7 +208,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
-
 
       try {
         // WHEN: User1 toggles ready = true
@@ -298,7 +294,6 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       const user1Id = seedResult.test_user1_id;
 
       const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
-
 
       try {
         // WHEN: User1 calls scripture_convert_to_solo

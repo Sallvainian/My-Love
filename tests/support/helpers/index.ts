@@ -125,4 +125,3 @@ export async function expectToast(
 export function randomString(length = 8): string {
   return faker.string.alphanumeric(length);
 }
-

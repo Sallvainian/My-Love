@@ -26,7 +26,9 @@ import type { ScriptureError } from '../../../services/scriptureReadingService';
 // Mock framer-motion (project pattern)
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: Record<string, unknown>) => <div {...props}>{children as React.ReactNode}</div>,
+    div: ({ children, ...props }: Record<string, unknown>) => (
+      <div {...props}>{children as React.ReactNode}</div>
+    ),
     section: ({ children, ...props }: Record<string, unknown>) => (
       <section {...props}>{children as React.ReactNode}</section>
     ),

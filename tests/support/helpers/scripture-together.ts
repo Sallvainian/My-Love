@@ -112,7 +112,11 @@ export async function reconnectPartnerAndLoadSession(page: Page, sessionId: stri
   await page.goto('/scripture');
   await expect(page.getByTestId('scripture-overview')).toBeVisible();
 
-  await waitForScriptureStore(page, 'scripture store availability', (snapshot) => snapshot.hasStore);
+  await waitForScriptureStore(
+    page,
+    'scripture store availability',
+    (snapshot) => snapshot.hasStore
+  );
 
   await page.evaluate(async (sid) => {
     const store = window.__APP_STORE__;
@@ -123,7 +127,8 @@ export async function reconnectPartnerAndLoadSession(page: Page, sessionId: stri
   await waitForScriptureStore(
     page,
     'reconnected partner reading session',
-    (snapshot) => snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'reading'
+    (snapshot) =>
+      snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'reading'
   );
   await expect(page.getByTestId('reading-container')).toBeVisible();
 }

@@ -101,7 +101,11 @@ describe('moodSlice', () => {
       mockedGetCurrentUserId.mockResolvedValue('user-123');
       mockedMoodService.create.mockResolvedValue(entry);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([entry]);
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({ synced: 1, failed: 0, errors: [] });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+        synced: 1,
+        failed: 0,
+        errors: [],
+      });
       mockedMoodService.getAll.mockResolvedValue([entry]);
 
       const { get } = createTestStore();
@@ -129,7 +133,11 @@ describe('moodSlice', () => {
       const updated = makeMoodEntry({ id: 5, mood: 'sad', moods: ['sad'] });
       mockedMoodService.updateMood.mockResolvedValue(updated);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({ synced: 0, failed: 0, errors: [] });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+        synced: 0,
+        failed: 0,
+        errors: [],
+      });
       mockedMoodService.getAll.mockResolvedValue([updated]);
 
       await get().addMoodEntry(['sad']);
@@ -204,7 +212,11 @@ describe('moodSlice', () => {
 
   describe('syncPendingMoods', () => {
     it('sets isSyncing during sync and clears after', async () => {
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({ synced: 1, failed: 0, errors: [] });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+        synced: 1,
+        failed: 0,
+        errors: [],
+      });
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
@@ -217,7 +229,11 @@ describe('moodSlice', () => {
     });
 
     it('returns synced/failed counts', async () => {
-      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({ synced: 3, failed: 1, errors: [] });
+      mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
+        synced: 3,
+        failed: 1,
+        errors: [],
+      });
       mockedMoodService.getAll.mockResolvedValue([]);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([]);
       mockedGetPartnerId.mockResolvedValue(null);
