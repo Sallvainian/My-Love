@@ -55,7 +55,11 @@ async function waitForScriptureResponse(
 }
 
 export async function waitForPartnerJoined(page: Page): Promise<void> {
-  await waitForScriptureStore(page, 'partner to join the lobby', (snapshot) => snapshot.partnerJoined);
+  await waitForScriptureStore(
+    page,
+    'partner to join the lobby',
+    (snapshot) => snapshot.partnerJoined
+  );
   await expect(page.getByTestId('lobby-partner-status')).toContainText(/has joined/i);
 }
 
@@ -97,6 +101,10 @@ export async function waitForPartnerPosition(
   page: Page,
   expectedText?: string | RegExp
 ): Promise<void> {
+  // Wait for presence channel to be fully subscribed — generous timeout
+  // because the second Realtime channel has spin-up latency under load.
+  await expect(page.locator('[data-presence-connected="true"]')).toBeAttached({ timeout: 30_000 });
+
   const partnerPosition = page.getByTestId('partner-position');
   await expect(partnerPosition).toBeVisible();
 
@@ -157,7 +165,11 @@ export async function waitForPartnerReconnected(page: Page): Promise<void> {
  * Enriches the error with the given `label` on failure.
  */
 export async function lockInAndWait(page: Page, label: string): Promise<void> {
-  const lockInResponse = waitForScriptureResponse(page, `scripture_lock_in RPC (${label})`, isLockInResponse);
+  const lockInResponse = waitForScriptureResponse(
+    page,
+    `scripture_lock_in RPC (${label})`,
+    isLockInResponse
+  );
 
   await page.getByTestId('lock-in-button').click();
   await lockInResponse;
@@ -175,7 +187,11 @@ export async function navigateBothToReadingPhase(
     userB: 'responder',
   }
 ): Promise<void> {
-  const userASelectRole = waitForScriptureResponse(page, 'scripture_select_role RPC (User A)', isSelectRoleResponse);
+  const userASelectRole = waitForScriptureResponse(
+    page,
+    'scripture_select_role RPC (User A)',
+    isSelectRoleResponse
+  );
   await page.getByTestId(`lobby-role-${roles.userA}`).click();
   await userASelectRole;
   await expect(page.getByTestId('lobby-waiting')).toBeVisible();
@@ -191,7 +207,11 @@ export async function navigateBothToReadingPhase(
 
   await waitForPartnerJoined(page);
 
-  const userAReady = waitForScriptureResponse(page, 'scripture_toggle_ready RPC (User A)', isToggleReadyResponse);
+  const userAReady = waitForScriptureResponse(
+    page,
+    'scripture_toggle_ready RPC (User A)',
+    isToggleReadyResponse
+  );
   await page.getByTestId('lobby-ready-button').click();
   await userAReady;
   await waitForScriptureStore(page, 'current user ready state', (snapshot) => snapshot.myReady);
@@ -229,8 +249,7 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
   // causes a re-render that can detach the start button mid-click.
   // We must wait for the LAST response (couple stats) to guarantee stability.
   const partnerLoaded = page.waitForResponse(
-    (resp) =>
-      resp.url().includes('/rest/v1/users') && resp.status() >= 200 && resp.status() < 300,
+    (resp) => resp.url().includes('/rest/v1/users') && resp.status() >= 200 && resp.status() < 300,
     { timeout: 20_000 }
   );
   const statsLoaded = page.waitForResponse(
@@ -275,10 +294,7 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
   // Best-effort: swallow rejections — these APIs may not fire if partner is
   // unlinked (no couple stats) or if the user has no partner row yet. This is
   // NOT flow control; we just need to give the render chain time to settle.
-  await Promise.all([
-    partnerLoaded.catch(() => {}),
-    statsLoaded.catch(() => {}),
-  ]);
+  await Promise.all([partnerLoaded.catch(() => {}), statsLoaded.catch(() => {})]);
 
   const sessionResponse = waitForScriptureRpc(page, 'scripture_create_session');
   await togetherButton.click();
@@ -289,8 +305,7 @@ export async function navigateToTogetherRoleSelection(page: Page): Promise<strin
   await waitForScriptureStore(
     page,
     'together-mode lobby role selection',
-    (snapshot) =>
-      snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'lobby'
+    (snapshot) => snapshot.session?.mode === 'together' && snapshot.session.currentPhase === 'lobby'
   );
   await expect(lobbyRoleSelection).toBeVisible();
 
