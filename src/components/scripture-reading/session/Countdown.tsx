@@ -27,7 +27,7 @@ interface CountdownProps {
 /** Derives countdown digit (3→2→1→0) from elapsed time. */
 function getDigit(startedAt: number): number {
   const elapsed = Date.now() - startedAt;
-  return Math.max(0, Math.ceil(3 - elapsed / 1000));
+  return Math.max(0, Math.ceil((3000 - elapsed) / 1000));
 }
 
 export function Countdown({ startedAt, onComplete }: CountdownProps): ReactElement {

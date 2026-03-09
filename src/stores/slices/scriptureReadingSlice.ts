@@ -43,23 +43,6 @@ export interface StateUpdatePayload {
 // Helpers
 // ============================================
 
-/**
- * Type-safe wrapper for new lobby RPCs not yet registered in database.types.ts.
- * Remove once `supabase gen types typescript --local` is run after migration.
- */
-async function callLobbyRpc(
-  fn: string,
-  args: Record<string, unknown>
-): Promise<{ data: unknown; error: { message: string } | null }> {
-  // Cast required because these RPCs postdate the last types regeneration.
-  // This is safe — the RPC exists in the migration; types are stale, not wrong.
-  type UntypedRpc = (
-    fn: string,
-    args: Record<string, unknown>
-  ) => Promise<{ data: unknown; error: { message: string } | null }>;
-  return (supabase.rpc as unknown as UntypedRpc)(fn, args);
-}
-
 function isScriptureError(value: unknown): value is ScriptureError {
   return (
     typeof value === 'object' &&
@@ -630,7 +613,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // Optimistic update: set myRole now that auth is confirmed
       set({ myRole: role });
 
-      const { data, error } = await callLobbyRpc('scripture_select_role', {
+      const { data, error } = await supabase.rpc('scripture_select_role', {
         p_session_id: session.id,
         p_role: role,
       });
@@ -680,7 +663,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ myReady: isReady });
 
     try {
-      const { data, error } = await callLobbyRpc('scripture_toggle_ready', {
+      const { data, error } = await supabase.rpc('scripture_toggle_ready', {
         p_session_id: session.id,
         p_is_ready: isReady,
       });
@@ -728,7 +711,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      const { error } = await callLobbyRpc('scripture_convert_to_solo', {
+      const { error } = await supabase.rpc('scripture_convert_to_solo', {
         p_session_id: session.id,
       });
 
@@ -874,7 +857,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isPendingLockIn: true, scriptureError: null });
 
     try {
-      const { data, error } = await callLobbyRpc('scripture_lock_in', {
+      const { data, error } = await supabase.rpc('scripture_lock_in', {
         p_session_id: session.id,
         p_step_index: session.currentStepIndex,
         p_expected_version: session.version,
@@ -971,7 +954,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isPendingLockIn: false });
 
     try {
-      const { data, error } = await callLobbyRpc('scripture_undo_lock_in', {
+      const { data, error } = await supabase.rpc('scripture_undo_lock_in', {
         p_session_id: session.id,
         p_step_index: session.currentStepIndex,
       });
@@ -1020,7 +1003,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isSyncing: true, scriptureError: null });
 
     try {
-      const { data, error } = await callLobbyRpc('scripture_end_session', {
+      const { data, error } = await supabase.rpc('scripture_end_session', {
         p_session_id: session.id,
       });
 
