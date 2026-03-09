@@ -165,12 +165,10 @@ export function SoloReadingFlow() {
 
   // Story 2.1: Debounce ref for bookmark server write (300ms, last-write-wins)
   const bookmarkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isMountedRef = useRef(true);
 
   // Cleanup bookmark debounce on unmount
   useEffect(() => {
     return () => {
-      isMountedRef.current = false;
       if (bookmarkDebounceRef.current) clearTimeout(bookmarkDebounceRef.current);
     };
   }, []);
@@ -239,7 +237,7 @@ export function SoloReadingFlow() {
             message: 'Failed to toggle bookmark',
             details: error,
           });
-          if (!isMountedRef.current) return;
+          // Revert optimistic toggle on server failure (no-op if unmounted)
           setBookmarkedSteps((prev) => {
             const next = new Set(prev);
             if (next.has(stepIndex)) {
@@ -288,9 +286,7 @@ export function SoloReadingFlow() {
             details: error,
           });
         } finally {
-          if (isMountedRef.current) {
-            setIsSubmittingSummary(false);
-          }
+          setIsSubmittingSummary(false);
         }
       })();
 
@@ -363,14 +359,12 @@ export function SoloReadingFlow() {
           if (completionSucceeded) {
             setReportLoadError(null);
             setReportSubPhase('report');
-          } else if (isMountedRef.current) {
+          } else {
             setCompletionError('Unable to complete this session. Retry to open your report.');
             setReportSubPhase('completion-error');
           }
         } finally {
-          if (isMountedRef.current) {
-            setIsSendingMessage(false);
-          }
+          setIsSendingMessage(false);
         }
       })();
     },
@@ -391,14 +385,12 @@ export function SoloReadingFlow() {
         if (completionSucceeded) {
           setReportLoadError(null);
           setReportSubPhase('report');
-        } else if (isMountedRef.current) {
+        } else {
           setCompletionError('Unable to complete this session. Retry to open your report.');
           setReportSubPhase('completion-error');
         }
       } finally {
-        if (isMountedRef.current) {
-          setIsSendingMessage(false);
-        }
+        setIsSendingMessage(false);
       }
     })();
   }, [session, isSendingMessage, markSessionComplete]);
@@ -412,13 +404,10 @@ export function SoloReadingFlow() {
       try {
         const completionSucceeded = await markSessionComplete();
         if (!completionSucceeded) {
-          if (isMountedRef.current) {
-            setCompletionError('Unable to complete this session. Please try again.');
-          }
+          setCompletionError('Unable to complete this session. Please try again.');
           return;
         }
 
-        if (!isMountedRef.current) return;
         if (completionRetryTargetRef.current === 'complete-unlinked') {
           setReportSubPhase('complete-unlinked');
         } else {
@@ -426,9 +415,7 @@ export function SoloReadingFlow() {
           setReportSubPhase('report');
         }
       } finally {
-        if (isMountedRef.current) {
-          setIsRetryingCompletion(false);
-        }
+        setIsRetryingCompletion(false);
       }
     })();
   }, [isRetryingCompletion, markSessionComplete, session]);
@@ -454,6 +441,8 @@ export function SoloReadingFlow() {
       return;
     }
 
+    let isActive = true;
+
     if (!hasPartner) {
       setReportSubPhase('complete-unlinked');
       if (session.currentPhase === 'complete' || session.status === 'complete') {
@@ -464,7 +453,7 @@ export function SoloReadingFlow() {
       completionRetryTargetRef.current = 'complete-unlinked';
       void (async () => {
         const completionSucceeded = await markSessionComplete();
-        if (!isMountedRef.current) return;
+        if (!isActive) return;
 
         if (completionSucceeded) {
           setCompletionError(null);
@@ -481,12 +470,18 @@ export function SoloReadingFlow() {
         setReportSubPhase('compose');
       }
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [isReportEntry, hasPartner, session, isLoadingPartner, markSessionComplete]);
 
   // Story 2.3: Load report data when report view is actually displayed
   useEffect(() => {
     if ((reportSubPhase !== 'report' && reportSubPhase !== 'complete-unlinked') || !session) return;
     setReportLoadError(null);
+
+    let isActive = true;
 
     void (async () => {
       try {
@@ -567,7 +562,7 @@ export function SoloReadingFlow() {
         const isPartnerComplete =
           Boolean(partnerSessionReflection) || partnerUniqueRatedSteps >= MAX_STEPS;
 
-        if (!isMountedRef.current) return;
+        if (!isActive) return;
         setReportData({
           userRatings,
           userBookmarks,
@@ -580,11 +575,15 @@ export function SoloReadingFlow() {
           isPartnerComplete,
         });
       } catch {
-        if (isMountedRef.current) {
+        if (isActive) {
           setReportLoadError('Unable to load your daily prayer report right now.');
         }
       }
     })();
+
+    return () => {
+      isActive = false;
+    };
   }, [reportSubPhase, session, reportReloadKey]);
 
   // H1 Fix: ALL useCallback hooks BEFORE the session guard
