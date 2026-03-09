@@ -18,7 +18,16 @@ import { PartnerPosition } from '../reading/PartnerPosition';
 describe('PartnerPosition', () => {
   test('[P1] renders nothing when presence.view is null', () => {
     const { container } = render(
-      <PartnerPosition partnerName="Jordan" presence={{ view: null, stepIndex: null, ts: null, isPartnerConnected: false }} />
+      <PartnerPosition
+        partnerName="Jordan"
+        presence={{
+          view: null,
+          stepIndex: null,
+          ts: null,
+          isPartnerConnected: false,
+          isChannelSubscribed: false,
+        }}
+      />
     );
 
     // Should render nothing (empty or hidden)
@@ -29,7 +38,13 @@ describe('PartnerPosition', () => {
     render(
       <PartnerPosition
         partnerName="Jordan"
-        presence={{ view: 'verse', stepIndex: 0, ts: Date.now(), isPartnerConnected: true }}
+        presence={{
+          view: 'verse',
+          stepIndex: 0,
+          ts: Date.now(),
+          isPartnerConnected: true,
+          isChannelSubscribed: true,
+        }}
       />
     );
 
@@ -42,7 +57,13 @@ describe('PartnerPosition', () => {
     render(
       <PartnerPosition
         partnerName="Jordan"
-        presence={{ view: 'response', stepIndex: 0, ts: Date.now(), isPartnerConnected: true }}
+        presence={{
+          view: 'response',
+          stepIndex: 0,
+          ts: Date.now(),
+          isPartnerConnected: true,
+          isChannelSubscribed: true,
+        }}
       />
     );
 
@@ -55,7 +76,13 @@ describe('PartnerPosition', () => {
     render(
       <PartnerPosition
         partnerName="Jordan"
-        presence={{ view: 'verse', stepIndex: 0, ts: Date.now(), isPartnerConnected: true }}
+        presence={{
+          view: 'verse',
+          stepIndex: 0,
+          ts: Date.now(),
+          isPartnerConnected: true,
+          isChannelSubscribed: true,
+        }}
       />
     );
 
