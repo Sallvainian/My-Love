@@ -22,9 +22,7 @@ import {
 /**
  * Helper: Click Next Verse and wait for the step to advance.
  */
-async function advanceStep(
-  page: import('@playwright/test').Page
-) {
+async function advanceStep(page: import('@playwright/test').Page) {
   const progressIndicator = page.getByTestId('scripture-progress-indicator');
   const previousProgressText = await progressIndicator.textContent();
 

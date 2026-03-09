@@ -27,10 +27,7 @@ test.describe('Photo Gallery', () => {
     await expect(page.getByTestId('photo-gallery-empty-state')).toBeVisible();
   });
 
-  test('[P0] 4.3-E2E-002 should display upload button', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
+  test('[P0] 4.3-E2E-002 should display upload button', async ({ page, interceptNetworkCall }) => {
     // GIVEN: User is on photo gallery (empty state)
     const photosCall = interceptNetworkCall({
       url: '**/rest/v1/photos?**',

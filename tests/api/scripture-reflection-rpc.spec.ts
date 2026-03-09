@@ -230,7 +230,9 @@ test.describe('Scripture Reflection API - RPC Validation', () => {
             user_id: userId,
             share_with_partner: false,
           },
-        }).validateSchema<z.infer<typeof SupabaseBookmarkSchema>[]>(z.array(SupabaseBookmarkSchema));
+        }).validateSchema<z.infer<typeof SupabaseBookmarkSchema>[]>(
+          z.array(SupabaseBookmarkSchema)
+        );
 
         // THEN: Bookmark is created successfully
         expect(insertResponse.status).toBe(201);
