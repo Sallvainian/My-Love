@@ -85,6 +85,7 @@ await page.evaluate(() => {
 ```
 
 The global type declaration:
+
 ```typescript
 declare global {
   interface Window {

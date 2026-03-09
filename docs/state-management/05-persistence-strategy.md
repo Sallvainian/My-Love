@@ -10,29 +10,29 @@ Two persistence layers: **localStorage** (via Zustand persist middleware) for li
 
 The `partialize` function selects four state keys:
 
-| Key              | Type                | Why Persisted                                                       |
-| ---------------- | ------------------- | ------------------------------------------------------------------- |
-| `settings`       | `Settings \| null`  | Theme, relationship config, notifications must survive page refresh |
-| `isOnboarded`    | `boolean`           | Prevents re-showing onboarding after refresh                        |
-| `messageHistory` | `MessageHistory`    | Preserves which messages were shown on which dates (Map data)       |
-| `moods`          | `MoodEntry[]`       | Enables offline mood display without waiting for IndexedDB load     |
+| Key              | Type               | Why Persisted                                                       |
+| ---------------- | ------------------ | ------------------------------------------------------------------- |
+| `settings`       | `Settings \| null` | Theme, relationship config, notifications must survive page refresh |
+| `isOnboarded`    | `boolean`          | Prevents re-showing onboarding after refresh                        |
+| `messageHistory` | `MessageHistory`   | Preserves which messages were shown on which dates (Map data)       |
+| `moods`          | `MoodEntry[]`      | Enables offline mood display without waiting for IndexedDB load     |
 
 ### What Is NOT Persisted
 
-| Key                                | Why Excluded                                              |
-| ---------------------------------- | --------------------------------------------------------- |
-| `isLoading`, `error`               | Transient UI state, recalculated on each load             |
-| `currentView`                      | Determined from URL path on page load                     |
-| `messages`                         | Loaded from IndexedDB during initialization               |
-| `currentMessage`                   | Recalculated from messages + date on each load            |
-| `customMessages`                   | Loaded from IndexedDB via `loadCustomMessages()`          |
-| `partnerMoods`                     | Fetched from Supabase on demand                           |
-| `syncStatus`                       | Recalculated from IndexedDB on load                       |
-| `interactions`, `unviewedCount`    | Fetched from Supabase, ephemeral                          |
-| `partner`, `sentRequests`, etc.    | Fetched from Supabase                                     |
-| `notes`                            | Fetched from Supabase, no local cache                     |
-| `photos`                           | Metadata fetched from Supabase; blobs in Supabase Storage |
-| `session`, `activeSession`, etc.   | Cached in IndexedDB, fetched on demand                    |
+| Key                              | Why Excluded                                              |
+| -------------------------------- | --------------------------------------------------------- |
+| `isLoading`, `error`             | Transient UI state, recalculated on each load             |
+| `currentView`                    | Determined from URL path on page load                     |
+| `messages`                       | Loaded from IndexedDB during initialization               |
+| `currentMessage`                 | Recalculated from messages + date on each load            |
+| `customMessages`                 | Loaded from IndexedDB via `loadCustomMessages()`          |
+| `partnerMoods`                   | Fetched from Supabase on demand                           |
+| `syncStatus`                     | Recalculated from IndexedDB on load                       |
+| `interactions`, `unviewedCount`  | Fetched from Supabase, ephemeral                          |
+| `partner`, `sentRequests`, etc.  | Fetched from Supabase                                     |
+| `notes`                          | Fetched from Supabase, no local cache                     |
+| `photos`                         | Metadata fetched from Supabase; blobs in Supabase Storage |
+| `session`, `activeSession`, etc. | Cached in IndexedDB, fetched on demand                    |
 
 ### Custom Map Serialization
 
@@ -81,6 +81,7 @@ All IndexedDB access goes through service classes extending `BaseIndexedDBServic
 ### Migration Strategy (`src/services/migrationService.ts`)
 
 One-time migration from localStorage to IndexedDB for custom messages:
+
 - Reads `localStorage.getItem('custom-messages')`
 - Validates each via `CreateMessageInputSchema.parse()`
 - Writes to IndexedDB with duplicate detection

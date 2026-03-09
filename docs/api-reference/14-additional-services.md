@@ -116,33 +116,33 @@ Opens `my-love-db` at the current `DB_VERSION`. Has its own upgrade logic with `
 
 ### Photo Operations
 
-| Method                        | Returns                | Error Strategy    |
-| ----------------------------- | ---------------------- | ----------------- |
-| `addPhoto(photo)`             | `Promise<number>`      | Throws            |
-| `getPhoto(id)`                | `Promise<Photo?>`      | Returns undefined |
-| `getAllPhotos()`               | `Promise<Photo[]>`     | Returns []        |
-| `deletePhoto(id)`             | `Promise<void>`        | Throws            |
-| `updatePhoto(id, updates)`    | `Promise<void>`        | Throws            |
+| Method                     | Returns            | Error Strategy    |
+| -------------------------- | ------------------ | ----------------- |
+| `addPhoto(photo)`          | `Promise<number>`  | Throws            |
+| `getPhoto(id)`             | `Promise<Photo?>`  | Returns undefined |
+| `getAllPhotos()`           | `Promise<Photo[]>` | Returns []        |
+| `deletePhoto(id)`          | `Promise<void>`    | Throws            |
+| `updatePhoto(id, updates)` | `Promise<void>`    | Throws            |
 
 ### Message Operations
 
-| Method                              | Returns              | Error Strategy    |
-| ----------------------------------- | -------------------- | ----------------- |
-| `addMessage(message)`               | `Promise<number>`    | Throws            |
-| `getMessage(id)`                    | `Promise<Message?>`  | Returns undefined |
-| `getAllMessages()`                   | `Promise<Message[]>` | Returns []        |
-| `getMessagesByCategory(category)`   | `Promise<Message[]>` | Returns []        |
-| `updateMessage(id, updates)`        | `Promise<void>`      | Throws            |
-| `deleteMessage(id)`                 | `Promise<void>`      | Throws            |
-| `toggleFavorite(messageId)`         | `Promise<void>`      | Throws            |
+| Method                            | Returns              | Error Strategy    |
+| --------------------------------- | -------------------- | ----------------- |
+| `addMessage(message)`             | `Promise<number>`    | Throws            |
+| `getMessage(id)`                  | `Promise<Message?>`  | Returns undefined |
+| `getAllMessages()`                | `Promise<Message[]>` | Returns []        |
+| `getMessagesByCategory(category)` | `Promise<Message[]>` | Returns []        |
+| `updateMessage(id, updates)`      | `Promise<void>`      | Throws            |
+| `deleteMessage(id)`               | `Promise<void>`      | Throws            |
+| `toggleFavorite(messageId)`       | `Promise<void>`      | Throws            |
 
 ### Bulk Operations
 
-| Method                      | Returns                                     | Description                    |
-| --------------------------- | ------------------------------------------- | ------------------------------ |
-| `addMessages(messages[])`   | `Promise<void>`                             | Transaction-based bulk insert  |
-| `clearAllData()`            | `Promise<void>`                             | Clears photos + messages       |
-| `exportData()`              | `Promise<{ photos: Photo[], messages: Message[] }>` | Exports all data for backup |
+| Method                    | Returns                                             | Description                   |
+| ------------------------- | --------------------------------------------------- | ----------------------------- |
+| `addMessages(messages[])` | `Promise<void>`                                     | Transaction-based bulk insert |
+| `clearAllData()`          | `Promise<void>`                                     | Clears photos + messages      |
+| `exportData()`            | `Promise<{ photos: Photo[], messages: Message[] }>` | Exports all data for backup   |
 
 ### localStorageHelper
 

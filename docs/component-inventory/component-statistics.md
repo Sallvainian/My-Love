@@ -86,18 +86,18 @@
 
 ## Design Pattern Adoption
 
-| Pattern                              | Count     | Details                                                                                       |
-| ------------------------------------ | --------- | --------------------------------------------------------------------------------------------- |
-| Barrel exports (index.ts)            | 13        | All major feature folders                                                                     |
-| Container/Presentational split       | 1 feature | Scripture Reading (4 containers, 11 presentational)                                           |
-| Virtualized lists (react-window v2)  | 2         | `MessageList`, `MoodHistoryTimeline`                                                          |
-| Infinite loading (useInfiniteLoader) | 2         | `MessageList`, `MoodHistoryTimeline`                                                          |
-| Optimistic UI                        | 7         | Mood logging, bookmarks, reflections, phase updates, message sending, role selection, ready toggle |
-| XSS sanitization (DOMPurify)         | 2         | `LoveNoteMessage`, `MessageInput`                                                             |
-| Object URL cleanup                   | 5         | `PhotoUploader`, `PhotoEditModal`, `ImagePreview`, `LoveNoteMessage`, `NotesSlice`            |
-| Focus management (store/restore)     | 3         | `FullScreenImageViewer`, `SoloReadingFlow`, `ReflectionSummary`                               |
+| Pattern                              | Count     | Details                                                                                                                                                                 |
+| ------------------------------------ | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barrel exports (index.ts)            | 13        | All major feature folders                                                                                                                                               |
+| Container/Presentational split       | 1 feature | Scripture Reading (4 containers, 11 presentational)                                                                                                                     |
+| Virtualized lists (react-window v2)  | 2         | `MessageList`, `MoodHistoryTimeline`                                                                                                                                    |
+| Infinite loading (useInfiniteLoader) | 2         | `MessageList`, `MoodHistoryTimeline`                                                                                                                                    |
+| Optimistic UI                        | 7         | Mood logging, bookmarks, reflections, phase updates, message sending, role selection, ready toggle                                                                      |
+| XSS sanitization (DOMPurify)         | 2         | `LoveNoteMessage`, `MessageInput`                                                                                                                                       |
+| Object URL cleanup                   | 5         | `PhotoUploader`, `PhotoEditModal`, `ImagePreview`, `LoveNoteMessage`, `NotesSlice`                                                                                      |
+| Focus management (store/restore)     | 3         | `FullScreenImageViewer`, `SoloReadingFlow`, `ReflectionSummary`                                                                                                         |
 | ARIA live regions                    | 9         | `NetworkStatusIndicator`, `SyncToast`, `ScriptureOverview`, `SoloReadingFlow`, `MessageInput`, `Countdown`, `DisconnectionOverlay`, `LobbyContainer`, `PartnerPosition` |
-| Keyboard navigation                  | 5         | `DailyMessage`, `PhotoCarousel`, `PhotoViewer`, `PerStepReflection`, `MessageInput`           |
+| Keyboard navigation                  | 5         | `DailyMessage`, `PhotoCarousel`, `PhotoViewer`, `PerStepReflection`, `MessageInput`                                                                                     |
 
 ## Animation Usage (Framer Motion)
 

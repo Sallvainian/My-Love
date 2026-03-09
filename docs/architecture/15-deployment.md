@@ -97,16 +97,16 @@ GitHub Secrets are used directly in workflow environment variables:
 
 Located in `.github/workflows/` (18 total):
 
-| Workflow                  | Trigger           | Purpose                                  |
-| ------------------------- | ----------------- | ---------------------------------------- |
-| `deploy.yml`              | Push to main      | Build, smoke test, deploy, health check  |
-| `test.yml`                | PR / Push         | Lint, unit tests, E2E                    |
-| `supabase-migrations.yml` | Migration changes | Validate Supabase migration files        |
-| `claude-code-review.yml`  | PR                | Automated code review with Claude        |
-| `codeql.yml`              | Scheduled/PR      | CodeQL security scanning                 |
-| `dependency-review.yml`   | PR                | Dependency vulnerability review          |
-| `bundle-size.yml`         | PR                | Bundle size tracking                     |
-| `lighthouse.yml`          | Scheduled/manual  | Lighthouse performance auditing          |
+| Workflow                  | Trigger           | Purpose                                 |
+| ------------------------- | ----------------- | --------------------------------------- |
+| `deploy.yml`              | Push to main      | Build, smoke test, deploy, health check |
+| `test.yml`                | PR / Push         | Lint, unit tests, E2E                   |
+| `supabase-migrations.yml` | Migration changes | Validate Supabase migration files       |
+| `claude-code-review.yml`  | PR                | Automated code review with Claude       |
+| `codeql.yml`              | Scheduled/PR      | CodeQL security scanning                |
+| `dependency-review.yml`   | PR                | Dependency vulnerability review         |
+| `bundle-size.yml`         | PR                | Bundle size tracking                    |
+| `lighthouse.yml`          | Scheduled/manual  | Lighthouse performance auditing         |
 
 ### Source Maps and Sentry
 

@@ -123,13 +123,13 @@ hooks/
 
 **Most critical subdirectories:**
 
-| Directory            | Why                                                                    |
-| -------------------- | ---------------------------------------------------------------------- |
+| Directory            | Why                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------- |
 | `love-notes/`        | 7 files, most complex feature (chat, images, realtime, virtualization)                       |
 | `scripture-reading/` | 18 files across 6 subdirs, together-mode (lobby, lock-in, broadcast, presence), solo reading |
-| `MoodTracker/`       | 6 files, offline-first CRUD with partner mood display                  |
-| `Navigation/`        | `BottomNavigation.tsx` -- primary navigation mechanism                 |
-| `shared/`            | `NetworkStatusIndicator`, `SyncToast` -- global UI overlays            |
+| `MoodTracker/`       | 6 files, offline-first CRUD with partner mood display                                        |
+| `Navigation/`        | `BottomNavigation.tsx` -- primary navigation mechanism                                       |
+| `shared/`            | `NetworkStatusIndicator`, `SyncToast` -- global UI overlays                                  |
 
 ---
 

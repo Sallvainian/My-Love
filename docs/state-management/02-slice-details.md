@@ -55,6 +55,7 @@ export interface SettingsSlice {
 | `isOnboarded` | `boolean`          | `true`                     | Yes       |
 
 **Default settings**:
+
 ```typescript
 {
   themeName: 'sunset',
@@ -71,14 +72,14 @@ export interface SettingsSlice {
 
 **Actions**:
 
-| Action              | Validation                         | Side Effects                                                          |
-| ------------------- | ---------------------------------- | --------------------------------------------------------------------- |
-| `initializeApp`     | Checks `__isHydrated`              | Opens IndexedDB, loads/seeds messages, calls `updateCurrentMessage()` |
-| `setSettings`       | `SettingsSchema.parse()` (Zod)     | Throws `ValidationError` on failure                                   |
+| Action              | Validation                           | Side Effects                                                          |
+| ------------------- | ------------------------------------ | --------------------------------------------------------------------- |
+| `initializeApp`     | Checks `__isHydrated`                | Opens IndexedDB, loads/seeds messages, calls `updateCurrentMessage()` |
+| `setSettings`       | `SettingsSchema.parse()` (Zod)       | Throws `ValidationError` on failure                                   |
 | `updateSettings`    | Merges then `SettingsSchema.parse()` | Throws `ValidationError` on failure                                   |
-| `addAnniversary`    | Auto-generates ID from max+1       | Nested spread update on `settings.relationship.anniversaries`         |
-| `removeAnniversary` | None                               | Filters by ID                                                         |
-| `setTheme`          | None                               | Updates `settings.themeName`                                          |
+| `addAnniversary`    | Auto-generates ID from max+1         | Nested spread update on `settings.relationship.anniversaries`         |
+| `removeAnniversary` | None                                 | Filters by ID                                                         |
+| `setTheme`          | None                                 | Updates `settings.themeName`                                          |
 
 **StrictMode Protection**: Module-level `isInitializing` and `isInitialized` flags prevent duplicate `initializeApp()` calls.
 
@@ -143,14 +144,14 @@ export interface MessagesSlice {
 }
 ```
 
-| Field                 | Type              | Default           | Persisted        |
-| --------------------- | ----------------- | ----------------- | ---------------- |
-| `messages`            | `Message[]`       | `[]`              | No (IndexedDB)   |
-| `messageHistory`      | `MessageHistory`  | See below         | Yes (localStorage) |
-| `currentMessage`      | `Message \| null` | `null`            | No               |
-| `currentDayOffset`    | `number`          | `0`               | No (deprecated)  |
-| `customMessages`      | `CustomMessage[]` | `[]`              | No (IndexedDB)   |
-| `customMessagesLoaded`| `boolean`         | `false`           | No               |
+| Field                  | Type              | Default   | Persisted          |
+| ---------------------- | ----------------- | --------- | ------------------ |
+| `messages`             | `Message[]`       | `[]`      | No (IndexedDB)     |
+| `messageHistory`       | `MessageHistory`  | See below | Yes (localStorage) |
+| `currentMessage`       | `Message \| null` | `null`    | No                 |
+| `currentDayOffset`     | `number`          | `0`       | No (deprecated)    |
+| `customMessages`       | `CustomMessage[]` | `[]`      | No (IndexedDB)     |
+| `customMessagesLoaded` | `boolean`         | `false`   | No                 |
 
 **MessageHistory default**: `{ currentIndex: 0, shownMessages: new Map(), maxHistoryDays: 30, favoriteIds: [], lastShownDate: '', lastMessageId: 0, viewedIds: [] }`
 
@@ -185,11 +186,11 @@ export interface MoodSlice {
 }
 ```
 
-| Field          | Type          | Default                                          | Persisted |
-| -------------- | ------------- | ------------------------------------------------ | --------- |
-| `moods`        | `MoodEntry[]` | `[]`                                             | Yes       |
-| `partnerMoods` | `MoodEntry[]` | `[]`                                             | No        |
-| `syncStatus`   | object        | `{ pendingMoods: 0, isOnline: navigator.onLine, isSyncing: false }` | No |
+| Field          | Type          | Default                                                             | Persisted |
+| -------------- | ------------- | ------------------------------------------------------------------- | --------- |
+| `moods`        | `MoodEntry[]` | `[]`                                                                | Yes       |
+| `partnerMoods` | `MoodEntry[]` | `[]`                                                                | No        |
+| `syncStatus`   | object        | `{ pendingMoods: 0, isOnline: navigator.onLine, isSyncing: false }` | No        |
 
 **Offline-first flow**: `addMoodEntry` -> `getCurrentUserIdOfflineSafe()` -> `moodService.create()` (IndexedDB with `synced: false`) -> optimistic state update -> `syncPendingMoods()` if online.
 
@@ -251,15 +252,15 @@ export interface PartnerSlice {
 }
 ```
 
-| Field              | Type                   | Default | Persisted |
-| ------------------ | ---------------------- | ------- | --------- |
-| `partner`          | `PartnerInfo \| null`  | `null`  | No        |
-| `isLoadingPartner` | `boolean`              | `false` | No        |
-| `sentRequests`     | `PartnerRequest[]`     | `[]`    | No        |
-| `receivedRequests` | `PartnerRequest[]`     | `[]`    | No        |
-| `isLoadingRequests`| `boolean`              | `false` | No        |
-| `searchResults`    | `UserSearchResult[]`   | `[]`    | No        |
-| `isSearching`      | `boolean`              | `false` | No        |
+| Field               | Type                  | Default | Persisted |
+| ------------------- | --------------------- | ------- | --------- |
+| `partner`           | `PartnerInfo \| null` | `null`  | No        |
+| `isLoadingPartner`  | `boolean`             | `false` | No        |
+| `sentRequests`      | `PartnerRequest[]`    | `[]`    | No        |
+| `receivedRequests`  | `PartnerRequest[]`    | `[]`    | No        |
+| `isLoadingRequests` | `boolean`             | `false` | No        |
+| `searchResults`     | `UserSearchResult[]`  | `[]`    | No        |
+| `isSearching`       | `boolean`             | `false` | No        |
 
 All actions use `partnerService`. `searchUsers` requires `query.trim().length >= 2`. `sendPartnerRequest` reloads pending requests and clears search. `acceptPartnerRequest` reloads both partner and requests via `Promise.all`.
 
@@ -331,14 +332,14 @@ export interface PhotosSlice {
 }
 ```
 
-| Field            | Type               | Default | Persisted |
-| ---------------- | ------------------ | ------- | --------- |
-| `photos`         | `PhotoWithUrls[]`  | `[]`    | No        |
-| `selectedPhotoId`| `string \| null`   | `null`  | No        |
-| `isUploading`    | `boolean`          | `false` | No        |
-| `uploadProgress` | `number`           | `0`     | No        |
-| `error`          | `string \| null`   | `null`  | No        |
-| `storageWarning` | `string \| null`   | `null`  | No        |
+| Field             | Type              | Default | Persisted |
+| ----------------- | ----------------- | ------- | --------- |
+| `photos`          | `PhotoWithUrls[]` | `[]`    | No        |
+| `selectedPhotoId` | `string \| null`  | `null`  | No        |
+| `isUploading`     | `boolean`         | `false` | No        |
+| `uploadProgress`  | `number`          | `0`     | No        |
+| `error`           | `string \| null`  | `null`  | No        |
+| `storageWarning`  | `string \| null`  | `null`  | No        |
 
 **Quota checks**: `uploadPhoto` checks quota before upload -- rejects at >=95%, warns at >=80%. Re-checks after upload. Progress callback updates `uploadProgress` 0-100.
 
@@ -362,11 +363,11 @@ export interface ScriptureReadingState {
   pendingRetry: PendingRetry | null;
   coupleStats: CoupleStats | null;
   isStatsLoading: boolean;
-  myRole: SessionRole | null;          // 'reader' | 'responder'
+  myRole: SessionRole | null; // 'reader' | 'responder'
   partnerJoined: boolean;
   myReady: boolean;
   partnerReady: boolean;
-  countdownStartedAt: number | null;   // Server UTC ms
+  countdownStartedAt: number | null; // Server UTC ms
   currentUserId: string | null;
   partnerLocked: boolean;
   partnerDisconnected: boolean;
@@ -413,6 +414,7 @@ export interface ScriptureSlice extends ScriptureReadingState {
 ```
 
 **Key types**:
+
 - `SessionRole`: `'reader' | 'responder'`
 - `PendingRetry`: `{ type: 'advanceStep' | 'saveSession'; attempts: number; maxAttempts: number; sessionData?: {...} }`
 - `StateUpdatePayload`: Broadcast payload shape from server RPCs

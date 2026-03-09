@@ -7,7 +7,7 @@ All custom hooks in `src/hooks/`. Barrel export (`src/hooks/index.ts`) exports: 
 ## useAuth (`src/hooks/useAuth.ts`)
 
 ```typescript
-function useAuth(): { user: User | null; loading: boolean }
+function useAuth(): { user: User | null; loading: boolean };
 ```
 
 - Calls `supabase.auth.getUser()` on mount
@@ -31,7 +31,7 @@ function useLoveNotes(): {
   removeFailedMessage: (tempId: string) => void;
   cleanupPreviewUrls: () => void;
   partnerId: string | null;
-}
+};
 ```
 
 - Wraps NotesSlice selectors with memoized callbacks
@@ -43,7 +43,7 @@ function useLoveNotes(): {
 ## useRealtimeMessages (`src/hooks/useRealtimeMessages.ts`)
 
 ```typescript
-function useRealtimeMessages(partnerId: string | null): void
+function useRealtimeMessages(partnerId: string | null): void;
 ```
 
 - Manages Supabase Broadcast channel `love-notes:{userId}`
@@ -56,7 +56,7 @@ function useRealtimeMessages(partnerId: string | null): void
 ## useAutoSave (`src/hooks/useAutoSave.ts`)
 
 ```typescript
-function useAutoSave(session: ScriptureSession | null): void
+function useAutoSave(session: ScriptureSession | null): void;
 ```
 
 - Listens to `visibilitychange` -- saves when tab becomes hidden
@@ -72,7 +72,7 @@ function useMoodHistory(userId: string): {
   loading: boolean;
   hasMore: boolean;
   loadMore: () => void;
-}
+};
 ```
 
 - Page size: 50 entries, cursor-based pagination via `moodApi.fetchByUser()`
@@ -84,7 +84,7 @@ function useMoodHistory(userId: string): {
 function usePartnerMood(partnerId: string | null): {
   partnerMood: MoodEntry | null;
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
-}
+};
 ```
 
 - Supabase Broadcast subscription for live partner mood updates
@@ -94,7 +94,7 @@ function usePartnerMood(partnerId: string | null): {
 ## useNetworkStatus (`src/hooks/useNetworkStatus.ts`)
 
 ```typescript
-function useNetworkStatus(): 'online' | 'offline' | 'connecting'
+function useNetworkStatus(): 'online' | 'offline' | 'connecting';
 ```
 
 - Listens to `window.addEventListener('online')` and `offline`
@@ -107,7 +107,7 @@ function useNetworkStatus(): 'online' | 'offline' | 'connecting'
 function useVibration(): {
   vibrate: (pattern: number | number[]) => void;
   isSupported: boolean;
-}
+};
 ```
 
 - Feature detection for Vibration API
@@ -120,7 +120,7 @@ function useVibration(): {
 function useMotionConfig(): {
   shouldAnimate: boolean;
   motionPresets: object;
-}
+};
 ```
 
 - Reads `window.matchMedia('(prefers-reduced-motion: reduce)')` on mount
@@ -134,7 +134,7 @@ function useImageCompression(): {
   compress: (file: File) => Promise<CompressedImage>;
   isCompressing: boolean;
   error: string | null;
-}
+};
 ```
 
 - React state wrapper for `imageCompressionService`
@@ -155,7 +155,7 @@ function usePhotos(): {
   deletePhoto: (photoId: string) => Promise<void>;
   clearError: () => void;
   clearStorageWarning: () => void;
-}
+};
 ```
 
 - Wraps PhotosSlice selectors with memoized callbacks
@@ -165,7 +165,7 @@ function usePhotos(): {
 ## useScriptureBroadcast (`src/hooks/useScriptureBroadcast.ts`)
 
 ```typescript
-function useScriptureBroadcast(sessionId: string | null, mode: SessionMode | null): void
+function useScriptureBroadcast(sessionId: string | null, mode: SessionMode | null): void;
 ```
 
 - Manages Supabase Realtime channel for together-mode scripture sessions
@@ -177,9 +177,12 @@ function useScriptureBroadcast(sessionId: string | null, mode: SessionMode | nul
 ## useScripturePresence (`src/hooks/useScripturePresence.ts`)
 
 ```typescript
-function useScripturePresence(sessionId: string | null, myView: string): {
+function useScripturePresence(
+  sessionId: string | null,
+  myView: string
+): {
   partnerPresence: PartnerPresenceInfo | null;
-}
+};
 ```
 
 - Tracks partner's current view (verse or response) via Supabase Presence
@@ -190,11 +193,13 @@ function useScripturePresence(sessionId: string | null, myView: string): {
 ## Store Access Patterns
 
 **Single selector** (minimal re-renders):
+
 ```typescript
 const currentView = useAppStore((state) => state.currentView);
 ```
 
 **Multiple selectors with useShallow** (scripture containers):
+
 ```typescript
 const { session, scriptureLoading } = useAppStore(
   useShallow((state) => ({ session: state.session, scriptureLoading: state.scriptureLoading }))
@@ -202,6 +207,7 @@ const { session, scriptureLoading } = useAppStore(
 ```
 
 **Action extraction** (stable reference, no re-render):
+
 ```typescript
 const setView = useAppStore((state) => state.setView);
 ```
