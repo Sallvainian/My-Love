@@ -27,6 +27,7 @@ export interface PartnerPresenceInfo {
   stepIndex: number | null;
   ts: number | null;
   isPartnerConnected: boolean;
+  isChannelSubscribed: boolean;
 }
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -51,6 +52,7 @@ export function useScripturePresence(
     stepIndex: null,
     ts: null,
     isPartnerConnected: true,
+    isChannelSubscribed: false,
   });
 
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -117,12 +119,13 @@ export function useScripturePresence(
         }));
       }, STALE_TTL_MS);
 
-      setPartnerPresence({
+      setPartnerPresence((prev) => ({
+        ...prev,
         view: payload.view,
         stepIndex: payload.step_index,
         ts: payload.ts,
         isPartnerConnected: true,
-      });
+      }));
     });
 
     channelRef.current = channel;
@@ -137,6 +140,9 @@ export function useScripturePresence(
 
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
+            // Mark channel as subscribed so UI can expose testability attribute
+            setPartnerPresence((prev) => ({ ...prev, isChannelSubscribed: true }));
+
             // Send own presence immediately
             sendPresence();
 
@@ -169,6 +175,7 @@ export function useScripturePresence(
               setPartnerPresence((prev) => ({
                 ...prev,
                 isPartnerConnected: false,
+                isChannelSubscribed: false,
                 view: null,
               }));
               void supabase.removeChannel(channel);

@@ -15,7 +15,10 @@ interface PartnerPositionProps {
 }
 
 export function PartnerPosition({ partnerName, presence }: PartnerPositionProps) {
-  if (presence.view === null) return null;
+  if (presence.view === null) {
+    // Render a hidden sentinel so tests can wait for channel subscription
+    return <div data-presence-connected={String(presence.isChannelSubscribed)} />;
+  }
 
   const viewLabel = presence.view === 'verse' ? 'the verse' : 'the response';
 
@@ -23,6 +26,7 @@ export function PartnerPosition({ partnerName, presence }: PartnerPositionProps)
     <div
       className="flex items-center gap-1.5 text-sm text-purple-400"
       data-testid="partner-position"
+      data-presence-connected={String(presence.isChannelSubscribed)}
       aria-live="polite"
     >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
