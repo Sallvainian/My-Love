@@ -11,7 +11,7 @@
  * - endSession() on error calls handleScriptureError
  * - endSession() is a no-op when session is null
  * - onBroadcastReceived with triggeredBy='end_session' calls exitSession()
- * - onBroadcastReceived with currentPhase='complete' calls exitSession()
+ * - onBroadcastReceived with currentPhase='complete' does NOT reset session (no end_session trigger)
  * - partnerDisconnected and partnerDisconnectedAt in initial state
  */
 
@@ -211,7 +211,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
     expect(store.getState().session).toBeNull();
   });
 
-  test('[P0] onBroadcastReceived with currentPhase=complete calls exitSession()', async () => {
+  test('[P0] onBroadcastReceived with currentPhase=complete does NOT reset session (no triggered_by=end_session)', async () => {
     const store = await createStoreWithReadingSession();
     store.setState({ currentUserId: 'user-1' });
 
@@ -221,8 +221,9 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
       version: 10,
     });
 
-    // Session should be cleared
-    expect(store.getState().session).toBeNull();
+    // Session should NOT be cleared — only triggered_by='end_session' resets
+    expect(store.getState().session).not.toBeNull();
+    expect(store.getState().session?.currentPhase).toBe('complete');
   });
 
   // ===========================================================================

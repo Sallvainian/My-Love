@@ -1125,8 +1125,10 @@ describe('SoloReadingFlow', () => {
       fireEvent.click(screen.getByTestId('scripture-session-rating-4'));
       // Submit the reflection summary
       fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
-      // Verify updatePhase was called with 'report'
-      expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+      // Verify updatePhase was called with 'report' (now async — awaits addReflection first)
+      await vi.waitFor(() => {
+        expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+      });
       await vi.waitFor(() => {
         expect(mockUpdateSessionBookmarkSharing).toHaveBeenCalledWith(
           'session-123',

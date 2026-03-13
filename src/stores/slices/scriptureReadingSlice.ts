@@ -778,8 +778,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     // Version check FIRST — drop stale broadcasts entirely
     if (session && payload.version <= session.version) return;
 
-    // Story 4.3: End session or complete phase → exit
-    if (payload.triggered_by === 'end_session' || payload.currentPhase === 'complete') {
+    // Only reset on explicit end_session — markSessionComplete uses direct DB update, not broadcast
+    if (payload.triggered_by === 'end_session') {
       set(resetSessionState(get));
       return;
     }

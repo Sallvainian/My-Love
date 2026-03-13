@@ -256,7 +256,6 @@ export function SoloReadingFlow() {
   const handleReflectionSummarySubmit = useCallback(
     (data: ReflectionSummarySubmission) => {
       if (!session || isSubmittingSummary) return;
-
       setIsSubmittingSummary(true);
 
       void (async () => {
@@ -268,17 +267,24 @@ export function SoloReadingFlow() {
           });
           await scriptureReadingService.addReflection(
             session.id,
-            MAX_STEPS, // sentinel value for session-level reflection
+            MAX_STEPS,
             data.rating,
             jsonNotes,
             isShared
           );
-
-          await scriptureReadingService.updateSessionBookmarkSharing(
-            session.id,
-            session.userId,
-            data.shareBookmarkedVerses
-          );
+          try {
+            await scriptureReadingService.updateSessionBookmarkSharing(
+              session.id,
+              session.userId,
+              data.shareBookmarkedVerses
+            );
+          } catch (e) {
+            console.error('Bookmark sharing preference failed to save', e);
+          }
+          await scriptureReadingService.updateSession(session.id, {
+            currentPhase: 'report',
+          });
+          updatePhase('report');
         } catch (error) {
           handleScriptureError({
             code: ScriptureErrorCode.SYNC_FAILED,
@@ -287,24 +293,6 @@ export function SoloReadingFlow() {
           });
         } finally {
           setIsSubmittingSummary(false);
-        }
-      })();
-
-      // Advance phase to 'report' optimistically via store
-      updatePhase('report');
-
-      // Persist phase change to server in background
-      void (async () => {
-        try {
-          await scriptureReadingService.updateSession(session.id, {
-            currentPhase: 'report',
-          });
-        } catch (error) {
-          handleScriptureError({
-            code: ScriptureErrorCode.SYNC_FAILED,
-            message: 'Failed to persist phase change',
-            details: error,
-          });
         }
       })();
     },
@@ -337,6 +325,10 @@ export function SoloReadingFlow() {
 
     return false;
   }, [session, updatePhase]);
+
+  // Ref to avoid re-triggering the isReportEntry effect when session changes recreate markSessionComplete
+  const markSessionCompleteRef = useRef(markSessionComplete);
+  markSessionCompleteRef.current = markSessionComplete;
 
   // Story 2.3: Handle message send
   const handleMessageSend = useCallback(
@@ -452,7 +444,7 @@ export function SoloReadingFlow() {
 
       completionRetryTargetRef.current = 'complete-unlinked';
       void (async () => {
-        const completionSucceeded = await markSessionComplete();
+        const completionSucceeded = await markSessionCompleteRef.current();
         if (!isActive) return;
 
         if (completionSucceeded) {
@@ -474,7 +466,7 @@ export function SoloReadingFlow() {
     return () => {
       isActive = false;
     };
-  }, [isReportEntry, hasPartner, session, isLoadingPartner, markSessionComplete]);
+  }, [isReportEntry, hasPartner, session, isLoadingPartner]);
 
   // Story 2.3: Load report data when report view is actually displayed
   useEffect(() => {
@@ -880,7 +872,6 @@ export function SoloReadingFlow() {
               )}
               <button
                 onClick={() => exitSession()}
-                disabled={Boolean(completionError)}
                 className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 ${FOCUS_RING}`}
                 data-testid="scripture-unlinked-return-btn"
                 type="button"
@@ -934,6 +925,14 @@ export function SoloReadingFlow() {
                 className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
               >
                 {isRetryingCompletion ? 'Retrying...' : 'Retry'}
+              </button>
+              <button
+                type="button"
+                onClick={() => exitSession()}
+                data-testid="scripture-completion-error-return-btn"
+                className={`min-h-[48px] text-sm font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
+              >
+                Return to Overview
               </button>
             </div>
           </m.div>

@@ -305,6 +305,19 @@ export function ScriptureOverview() {
     return <SoloReadingFlow />;
   }
 
+  // Route to SoloReadingFlow for together-mode post-reading phases.
+  // After the RPC fix, together-mode sessions stay status='in_progress' through reflection/report,
+  // so the status='complete' check above no longer catches them.
+  if (
+    session &&
+    session.mode === 'together' &&
+    (session.currentPhase === 'reflection' ||
+      session.currentPhase === 'report' ||
+      session.currentPhase === 'complete')
+  ) {
+    return <SoloReadingFlow />;
+  }
+
   // Story 4.2: Route to ReadingContainer for together-mode reading phase
   if (session && session.mode === 'together' && session.currentPhase === 'reading') {
     return <ReadingContainer />;

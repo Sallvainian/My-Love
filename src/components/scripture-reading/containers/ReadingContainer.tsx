@@ -80,6 +80,40 @@ export function ReadingContainer(): ReactElement | null {
   const [localView, setLocalView] = useState<'verse' | 'response'>('verse');
   const [bookmarkedSteps, setBookmarkedSteps] = useState<Set<number>>(new Set());
   const [isLockActionPending, setIsLockActionPending] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const exitDialogRef = useRef<HTMLDivElement>(null);
+
+  // Escape key and focus trap for exit confirmation dialog
+  useEffect(() => {
+    if (!showExitConfirm) return;
+    const dialog = exitDialogRef.current;
+    if (!dialog) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowExitConfirm(false);
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusable = dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showExitConfirm]);
 
   // Story 4.3: Reconnected toast (green tint, 2s auto-dismiss)
   const [showReconnectedToast, setShowReconnectedToast] = useState(false);
@@ -266,8 +300,24 @@ export function ReadingContainer(): ReactElement | null {
       )}
 
       <div className="mx-auto w-full max-w-md flex-1 p-4">
-        {/* Step progress */}
-        <header className="mb-4 text-center">
+        {/* Step progress with exit button */}
+        <header className="relative mb-4 text-center">
+          <button
+            onClick={() => setShowExitConfirm(true)}
+            className={`absolute top-0 left-0 flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
+            aria-label="Exit reading"
+            data-testid="reading-exit-button"
+            type="button"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
           <p className="text-sm font-medium text-purple-600" data-testid="reading-step-progress">
             Verse {currentStepIndex + 1} of {MAX_STEPS}
           </p>
@@ -368,6 +418,63 @@ export function ReadingContainer(): ReactElement | null {
           />
         </div>
       </div>
+
+      {/* Exit confirmation dialog */}
+      <AnimatePresence>
+        {showExitConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            data-testid="reading-exit-confirm-overlay"
+            onClick={() => setShowExitConfirm(false)}
+          >
+            <motion.div
+              ref={exitDialogRef}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl"
+              data-testid="reading-exit-confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reading-exit-dialog-title"
+              aria-describedby="reading-exit-dialog-desc"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="reading-exit-dialog-title" className="text-lg font-semibold text-purple-900">
+                End this session?
+              </h2>
+              <p id="reading-exit-dialog-desc" className="text-sm text-purple-700">
+                This will end the session for both of you.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleEndSession}
+                  disabled={isSyncing}
+                  className={`min-h-[48px] flex-1 rounded-xl bg-linear-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 ${FOCUS_RING}`}
+                  data-testid="reading-exit-confirm-button"
+                  type="button"
+                  autoFocus
+                >
+                  {isSyncing ? 'Ending...' : 'End Session'}
+                </button>
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className={`min-h-[48px] rounded-lg px-4 py-3 font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
+                  data-testid="reading-exit-cancel-button"
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
