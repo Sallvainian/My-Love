@@ -93,10 +93,15 @@ function fetchUrl(targetUrl) {
  * @param {string} [details] - Optional details to display
  */
 function logTest(testName, passed, details = '') {
+  const safeDetails = String(details).replace(/[\n\r]/g, '');
   if (passed) {
-    console.log(`${colors.green}✅ ${testName}${colors.reset}${details ? `: ${details}` : ''}`);
+    console.log(
+      `${colors.green}✅ ${testName}${colors.reset}${safeDetails ? `: ${safeDetails}` : ''}`
+    );
   } else {
-    console.log(`${colors.yellow}⚠️  ${testName}${colors.reset}${details ? `: ${details}` : ''}`);
+    console.log(
+      `${colors.yellow}⚠️  ${testName}${colors.reset}${safeDetails ? `: ${safeDetails}` : ''}`
+    );
   }
 }
 

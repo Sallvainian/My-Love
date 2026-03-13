@@ -14,7 +14,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // Use vi.hoisted() for mock values
-const { mockChannel, mockSubscribe, mockSend, mockRemoveChannel } = vi.hoisted(() => {
+const { mockChannel, mockSubscribe, mockRemoveChannel } = vi.hoisted(() => {
   const mockSend = vi.fn();
   // Auto-call the subscribe callback with 'SUBSCRIBED' status
   const mockSubscribe = vi.fn((cb: (status: string) => void) => {

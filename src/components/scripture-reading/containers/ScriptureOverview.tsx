@@ -53,7 +53,7 @@ type PartnerStatus = 'loading' | 'linked' | 'unlinked';
 // Helper: extract message from error (handles both string and ScriptureError)
 function getErrorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
-  if (error && typeof error === 'object' && 'message' in error) {
+  if (typeof error === 'object' && error !== null && 'message' in error) {
     return String((error as { message: unknown }).message);
   }
   return 'An unexpected error occurred';

@@ -113,9 +113,8 @@ describe('getMessageForDate', () => {
 
 describe('getAvailableHistoryDays', () => {
   it('returns days since start when less than 30', () => {
-    const today = new Date();
-    const tenDaysAgo = new Date(today);
-    tenDaysAgo.setDate(today.getDate() - 10);
+    // Subtract exact ms to avoid DST off-by-one from setDate()
+    const tenDaysAgo = new Date(Date.now() - 10 * 86400000);
 
     const history: MessageHistory = { maxHistoryDays: 30 } as MessageHistory;
     const settings: Settings = {
@@ -185,9 +184,9 @@ describe('getDaysSinceStart', () => {
   });
 
   it('returns correct number of days', () => {
-    const tenDaysAgo = new Date();
-    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
-    expect(getDaysSinceStart(tenDaysAgo)).toBe(10);
+    const start = new Date(2025, 0, 1);
+    const target = new Date(2025, 0, 11);
+    expect(getDaysSinceStart(start, target)).toBe(10);
   });
 
   it('accepts optional target date', () => {
@@ -199,27 +198,27 @@ describe('getDaysSinceStart', () => {
 
 describe('formatRelationshipDuration', () => {
   it('formats days when less than 30', () => {
-    const start = new Date();
-    start.setDate(start.getDate() - 5);
-    expect(formatRelationshipDuration(start)).toBe('5 days');
+    const start = new Date(2025, 0, 1);
+    const target = new Date(2025, 0, 6);
+    expect(formatRelationshipDuration(start, target)).toBe('5 days');
   });
 
   it('uses singular for 1 day', () => {
-    const start = new Date();
-    start.setDate(start.getDate() - 1);
-    expect(formatRelationshipDuration(start)).toBe('1 day');
+    const start = new Date(2025, 0, 1);
+    const target = new Date(2025, 0, 2);
+    expect(formatRelationshipDuration(start, target)).toBe('1 day');
   });
 
   it('formats months when 30-364 days', () => {
-    const start = new Date();
-    start.setDate(start.getDate() - 60);
-    expect(formatRelationshipDuration(start)).toBe('2 months');
+    const start = new Date(2025, 0, 1);
+    const target = new Date(2025, 2, 2); // 60 days later
+    expect(formatRelationshipDuration(start, target)).toBe('2 months');
   });
 
   it('uses singular for 1 month', () => {
-    const start = new Date();
-    start.setDate(start.getDate() - 30);
-    expect(formatRelationshipDuration(start)).toBe('1 month');
+    const start = new Date(2025, 0, 1);
+    const target = new Date(2025, 0, 31); // 30 days later
+    expect(formatRelationshipDuration(start, target)).toBe('1 month');
   });
 
   it('formats years with remaining months', () => {
