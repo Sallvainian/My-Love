@@ -14,7 +14,6 @@ files_to_modify:
   - src/components/love-notes/MessageList.tsx
   - src/components/PhotoUpload/PhotoUpload.tsx
   - src/components/MoodHistory/MoodDetailModal.tsx
-  - tests/support/merged-fixtures.ts
   - tests/unit/utils/offlineErrorHandler.test.ts
   - tests/unit/services/moodService.test.ts
   - tests/unit/services/scriptureReadingService.cache.test.ts
@@ -100,7 +99,7 @@ Remove the committed generated report from git tracking (fixing the gitignore pa
   1. *Redundant early return before AnimatePresence* (PhotoUpload, MoodDetailModal): The `if (!x) return null` early return unmounts the entire component tree including `<AnimatePresence>`, which prevents exit animations from firing. The inner `{x && (...)}` conditional is the correct AnimatePresence pattern — it lets AnimatePresence stay mounted and observe its children appearing/disappearing. **Fix: Remove the early return, keep the inner conditional.**
   2. *Dead code* (MessageList `includeBeginning`): Remove the parameter entirely. The `getRowHeight` useCallback wrapper at line 278-289 already handles the beginning-of-conversation case via `showBeginning` and passes `adjustedIndex` to `calculateRowHeight`. The function just needs `(note, index)`.
   3. *Redundant null guard clarity* (ScriptureOverview `error`): `error &&` on line 56 is actually a necessary null guard (`typeof null === 'object'` is `true`), NOT a redundant check. CodeQL's "always evaluates to true" assessment appears incorrect. However, replacing `error && typeof error === 'object'` with `typeof error === 'object' && error !== null` is semantically equivalent and makes the null guard explicit, satisfying CodeQL. This is a clarity improvement, not a bug fix.
-- **Regex anchoring:** The `excludePatterns` array in merged-fixtures has 6 patterns, 5 of which are unanchored. CodeQL only flagged `/sentry\.io/` because it looks like a hostname. The broad match is intentional — it filters Sentry network traffic from E2E error monitoring. Use minimal anchoring `/[\w.]sentry\.io/` to indicate hostname context without being so restrictive it misses Sentry URL formats. Overly restrictive anchoring (full `^https?://...`) risks breaking E2E test filtering.
+- **Regex anchoring:** The `excludePatterns` array in merged-fixtures has 6 patterns, 5 of which are unanchored. CodeQL only flagged `/sentry\.io/` because it looks like a hostname. The broad match is intentional — it filters Sentry network traffic from E2E error monitoring. Dismiss the alert as "won't fix" rather than changing the regex — any anchoring risks breaking E2E test filtering for no security benefit (test-only patterns matching network URLs, not user input).
 - **False positive dismissal:** Use `gh api -X PATCH` to dismiss alert #91 with `-f dismissed_reason="false positive"` (with a space — the API rejects `false_positive`; valid values are `"false positive"`, `"won't fix"`, `"used in tests"`).
 - **Unused imports in tests:** Remove exact unused imports per CodeQL analysis: `beforeEach` in offlineErrorHandler.test.ts, `vi` in moodService.test.ts, `afterEach` in cache.test.ts, `beforeAll` in crud.test.ts, `DB_VERSION`+`upgradeDb`+`openDB`+`afterEach`+`beforeAll` in service.test.ts, `mockSend` (prefix with `_`) in reconnect.test.ts, `startFocus` (prefix with `_`) and `initialText` (prefix with `_`) in scripture-accessibility.spec.ts, `expect` (remove) in display-name-setup.spec.ts.
 
@@ -200,62 +199,23 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
   - Notes: The early return unmounts the entire tree including `<AnimatePresence>`, which prevents exit animations on the `motion.div` children (opacity fade, scale). `AnimatePresence` needs to stay mounted and observe its children appearing/disappearing via the `{isOpen && (...)}` conditional. Parent is `App.tsx:613`: `<PhotoUpload isOpen={isPhotoUploadOpen} onClose={...} />`. Verify that the component body above line 148 has no side effects that should be guarded (hooks must not be called conditionally, so removing the early return is safe — hooks are already above it).
 
 - [ ] Task 7: Remove redundant early return in MoodDetailModal
-  - File: `src/components/MoodHistory/MoodDetailModal.tsx:137`
-  - Action: Remove the `if (!mood) return null;` early return on line 137. Keep the `{mood && (...)}` conditional inside `<AnimatePresence>`.
-  - Before:
-    ```tsx
-    if (!mood) return null;
-
-    const moodConfig = MOOD_CONFIG[mood.mood as MoodType];
-    // ... more code using mood ...
-
-    return (
-      <AnimatePresence>
-        {mood && (
-          <>...</>
-        )}
-      </AnimatePresence>
-    );
-    ```
-  - After: Move the code that uses `mood` (lines 139-143: `moodConfig`, `Icon`, `moodDate`, `formattedDate`, `formattedTime`) inside the `{mood && (...)}` conditional, since `mood` can now be null when the component renders:
+  - File: `src/components/MoodHistory/MoodDetailModal.tsx`
+  - Action: Extract the AnimatePresence children into a new `MoodDetailContent` component, then remove the early return. This avoids the problem of derived values (`moodConfig`, `Icon`, `moodDate`, etc.) needing null guards.
+  - Step 1: Create a `MoodDetailContent` component in the same file that receives `mood: MoodEntry` (non-null) and `onClose: () => void`. Move the derived values (lines 139-143) and the JSX children of the `{mood && (...)}` block into it.
+  - Step 2: In the main `MoodDetailModal` component, remove `if (!mood) return null;` (line 137) and the derived values. Replace with:
     ```tsx
     return (
       <AnimatePresence>
-        {mood && (() => {
-          const moodConfig = MOOD_CONFIG[mood.mood as MoodType];
-          const Icon = moodConfig.icon;
-          const moodDate = new Date(mood.timestamp);
-          const formattedDate = formatModalDate(moodDate);
-          const formattedTime = formatModalTime(moodDate);
-          return (
-            <>...</>
-          );
-        })()}
+        {mood && <MoodDetailContent mood={mood} onClose={onClose} />}
       </AnimatePresence>
     );
     ```
-    **Alternatively** (simpler): Keep the early return but wrap it so AnimatePresence still renders:
-    ```tsx
-    const moodConfig = mood ? MOOD_CONFIG[mood.mood as MoodType] : null;
-    const Icon = moodConfig?.icon;
-    const moodDate = mood ? new Date(mood.timestamp) : null;
-    const formattedDate = moodDate ? formatModalDate(moodDate) : '';
-    const formattedTime = moodDate ? formatModalTime(moodDate) : '';
+  - Notes: This is the standard React pattern for conditional AnimatePresence children that need derived state. The child component receives a guaranteed non-null `mood` prop so all derivations work without null checks. The `useEffect` for keyboard handling (lines 95-135) should move into `MoodDetailContent` as well since it depends on `mood` and manages focus trapping for the modal content. Parent is `MoodHistoryCalendar.tsx:330`.
 
-    return (
-      <AnimatePresence>
-        {mood && (
-          <>...</>
-        )}
-      </AnimatePresence>
-    );
-    ```
-  - Notes: Unlike PhotoUpload (where the early return is the only code before the JSX), MoodDetailModal has a `useEffect` for keyboard handling (lines 95-135) and derived values (lines 139-143) between hooks and the return. The `useEffect` depends on `mood` in its dependency array, so it's safe with `mood: null`. But the derived values (`moodConfig`, `Icon`, etc.) would throw on null access without the guard. The dev agent must handle this — either move the derivations inside the conditional or make them null-safe. Parent is `MoodHistoryCalendar.tsx:330`: `<MoodDetailModal mood={selectedMood} onClose={handleCloseModal} />`.
-
-- [ ] Task 8: Anchor regex pattern in merged-fixtures
-  - File: `tests/support/merged-fixtures.ts:32`
-  - Action: Change `/sentry\.io/` to `/[\w.]sentry\.io/`
-  - Notes: CodeQL flags unanchored regexes that look like hostnames because they could match unexpected URL substrings. The `excludePatterns` array (lines 31-37) has 6 patterns — 5 are unanchored (`/analytics/`, `/\/auth\/v1\/token/`, etc.). CodeQL only flagged `sentry.io` because it resembles a hostname. The broad match is intentional — it filters all Sentry network traffic from E2E error monitoring. Using `/[\w.]sentry\.io/` adds minimal anchoring to indicate hostname context (requires a word char or dot before `sentry`) without being so restrictive it misses Sentry URL formats like `https://o123.ingest.sentry.io/...`. Do NOT use `^https?://` anchoring — that's overly restrictive and inconsistent with the other 5 patterns in the array. After this change, run E2E tests (at minimum `npm run test:p0`) to verify Sentry traffic is still filtered.
+- [ ] Task 8: Dismiss regex anchor alert in merged-fixtures
+  - File: `tests/support/merged-fixtures.ts:32` — NO CODE CHANGE
+  - Action: Dismiss alert #16 via API: `gh api -X PATCH /repos/sallvainian/My-Love/code-scanning/alerts/16 -f state=dismissed -f 'dismissed_reason=won'"'"'t fix' -f dismissed_comment="Broad match is intentional — excludePatterns filters all Sentry network traffic from E2E error monitoring. The other 5 patterns in the same array are also unanchored. Anchoring would risk breaking E2E test filtering for no security benefit (these are test-only patterns matching network request URLs, not user input)."`
+  - Notes: CodeQL flags `/sentry\.io/` because it resembles a hostname without anchoring. But the `excludePatterns` array (lines 31-37) has 6 patterns, 5 of which are identically unanchored (`/analytics/`, `/\/auth\/v1\/token/`, etc.). The broad match is intentional — it ensures all Sentry traffic is filtered from E2E error monitoring. Any anchoring (minimal or restrictive) risks breaking this filtering and may not satisfy CodeQL anyway since the regex still wouldn't have `^`/`$` anchors. Dismissing is the correct action for an intentionally broad pattern.
 
 - [ ] Task 9: Clean up unused imports in unit test files
   - Action: Remove the exact unused imports identified by CodeQL:
@@ -282,8 +242,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     2. `npm run format` — ensure Prettier formatting
     3. `npm run lint` — verify no ESLint errors
     4. `npm run test:unit` — verify no unit test regressions
-    5. `npm run test:p0` — verify P0 E2E tests pass (requires `supabase start`). This validates that the regex change in Task 8 (`merged-fixtures.ts`) doesn't break network error monitoring.
-  - Notes: Steps 1-4 must pass before committing. Step 5 should run if local Supabase is available — if not, note it as a manual verification step post-merge.
+  - Notes: All 4 steps must pass before committing.
 
 ### Acceptance Criteria
 
@@ -298,7 +257,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
 - [ ] AC 9: Given all fixes are applied, when `npm run typecheck` is run, then it exits with code 0
 - [ ] AC 10: Given all fixes are applied, when `npm run lint` is run, then it exits with code 0
 - [ ] AC 11: Given all fixes are applied, when `npm run test:unit` is run, then all tests pass with no regressions
-- [ ] AC 12: Given the regex change in `merged-fixtures.ts`, when `npm run test:p0` is run with local Supabase, then P0 E2E tests pass and Sentry network requests are still filtered from error monitoring
+- [ ] AC 12: Given alert #16 is dismissed via API, when the alerts list is queried, then alert #16 shows `state: dismissed` with `dismissed_reason: "won't fix"`
 
 ## Additional Context
 
@@ -309,8 +268,7 @@ None - this is a cleanup/security task with no new dependencies.
 ### Testing Strategy
 
 - **Automated verification:** `npm run typecheck`, `npm run format`, `npm run lint`, `npm run test:unit` must all pass
-- **E2E verification:** `npm run test:p0` should pass (requires `supabase start`) to validate Task 8 regex change doesn't break network error monitoring in `merged-fixtures.ts`
-- **Manual verification:** After push, check GitHub Security tab to confirm alert count drops from 80 to ~3 (only `tests/e2e-archive/` alerts remain)
+- **Manual verification:** After push, check GitHub Security tab to confirm alert count drops from 80 to ~5 (only `tests/e2e-archive/` alerts remain, plus 2 dismissed)
 - **No new tests needed:** These are code quality fixes, not feature changes. Existing tests verify no regressions.
 
 ### Notes
