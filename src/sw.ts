@@ -18,6 +18,7 @@
 
 /// <reference lib="webworker" />
 
+import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst, NetworkOnly } from 'workbox-strategies';
@@ -41,6 +42,12 @@ interface PrecacheEntry {
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<PrecacheEntry | string>;
 };
+
+// Auto-update: activate new SW immediately and claim all clients.
+// Required by vite-plugin-pwa injectManifest + registerType: 'autoUpdate'.
+// See: https://vite-pwa-org.netlify.app/guide/inject-manifest
+self.skipWaiting();
+clientsClaim();
 
 // Supabase configuration from environment variables
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -255,22 +262,7 @@ async function syncPendingMoods(): Promise<void> {
   }
 }
 
-/**
- * Message Handler
- *
- * Receives messages from the main app
- */
-self.addEventListener('message', ((event: ExtendableMessageEvent) => {
-  // Validate origin — same-origin postMessage has empty origin
-  if (event.origin && event.origin !== self.location.origin) return;
-
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-}) as EventListener);
-
-// Log when service worker is activated
-self.addEventListener('activate', ((event: ExtendableEvent) => {
+// Log activation (skipWaiting + clientsClaim are handled at top level)
+self.addEventListener('activate', (() => {
   console.log('[ServiceWorker] Activated - Background Sync ready');
-  event.waitUntil(self.clients.claim());
 }) as EventListener);
