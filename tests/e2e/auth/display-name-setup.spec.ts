@@ -11,7 +11,7 @@
  * auth state internally. These tests are skipped until a test user without
  * display_name is provisioned in the auth pool.
  */
-import { test, expect } from '../../support/merged-fixtures';
+import { test } from '../../support/merged-fixtures';
 
 test.describe('Display Name Setup', () => {
   test('[P0] should show display name setup for new OAuth users', async ({ page }) => {
