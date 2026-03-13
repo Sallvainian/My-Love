@@ -204,7 +204,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     const validated = SupabaseSessionSchema.parse(data);
     const local = toLocalSession(validated, validated.user1_id);
 
-    await this.cacheSession(local);
+    void this.cacheSession(local);
     return local;
   }
 
@@ -339,7 +339,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     const validated = SupabaseReflectionSchema.parse(data);
     const local = toLocalReflection(validated);
 
-    await this.cacheReflection(local);
+    void this.cacheReflection(local);
     return local;
   }
 
@@ -400,7 +400,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     const validated = SupabaseBookmarkSchema.parse(data);
     const local = toLocalBookmark(validated);
 
-    await this.cacheBookmark(local);
+    void this.cacheBookmark(local);
     return local;
   }
 
@@ -595,11 +595,25 @@ class ScriptureReadingService extends BaseIndexedDBService<
   // Cache helpers (Subtask 2.6 — cache-first read)
   // ============================================
 
+  private static readonly CACHE_TIMEOUT_MS = 5_000;
+
+  private async withCacheTimeout<T>(operation: () => Promise<T>): Promise<T> {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('IndexedDB cache timeout')),
+        ScriptureReadingService.CACHE_TIMEOUT_MS
+      )
+    );
+    return Promise.race([operation(), timeout]);
+  }
+
   private async cacheSession(session: ScriptureSession): Promise<void> {
     try {
-      await this.init();
-      const db = this.getTypedDB();
-      await db.put('scripture-sessions', session);
+      await this.withCacheTimeout(async () => {
+        await this.init();
+        const db = this.getTypedDB();
+        await db.put('scripture-sessions', session);
+      });
     } catch (error) {
       console.error('[ScriptureService] Failed to cache session:', error);
     }
@@ -607,9 +621,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
 
   private async cacheReflection(reflection: ScriptureReflection): Promise<void> {
     try {
-      await this.init();
-      const db = this.getTypedDB();
-      await db.put('scripture-reflections', reflection);
+      await this.withCacheTimeout(async () => {
+        await this.init();
+        const db = this.getTypedDB();
+        await db.put('scripture-reflections', reflection);
+      });
     } catch (error) {
       console.error('[ScriptureService] Failed to cache reflection:', error);
     }
@@ -617,9 +633,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
 
   private async cacheBookmark(bookmark: ScriptureBookmark): Promise<void> {
     try {
-      await this.init();
-      const db = this.getTypedDB();
-      await db.put('scripture-bookmarks', bookmark);
+      await this.withCacheTimeout(async () => {
+        await this.init();
+        const db = this.getTypedDB();
+        await db.put('scripture-bookmarks', bookmark);
+      });
     } catch (error) {
       console.error('[ScriptureService] Failed to cache bookmark:', error);
     }
@@ -627,9 +645,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
 
   private async removeBookmarkFromCache(bookmarkId: string): Promise<void> {
     try {
-      await this.init();
-      const db = this.getTypedDB();
-      await db.delete('scripture-bookmarks', bookmarkId);
+      await this.withCacheTimeout(async () => {
+        await this.init();
+        const db = this.getTypedDB();
+        await db.delete('scripture-bookmarks', bookmarkId);
+      });
     } catch (error) {
       console.error('[ScriptureService] Failed to remove bookmark from cache:', error);
     }
@@ -637,9 +657,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
 
   private async cacheMessage(message: ScriptureMessage): Promise<void> {
     try {
-      await this.init();
-      const db = this.getTypedDB();
-      await db.put('scripture-messages', message);
+      await this.withCacheTimeout(async () => {
+        await this.init();
+        const db = this.getTypedDB();
+        await db.put('scripture-messages', message);
+      });
     } catch (error) {
       console.error('[ScriptureService] Failed to cache message:', error);
     }
