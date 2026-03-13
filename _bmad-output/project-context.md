@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-03-07'
+date: '2026-03-13'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 108
+rule_count: 112
 optimized_for_llm: true
 ---
 
@@ -21,21 +21,21 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **UI Framework:** React ^19.2.4 (react-jsx transform)
 - **Build:** Vite ^7.3.1 (bundler module resolution, manual chunk splitting, vite-plugin-checker for dev overlay)
 - **State:** Zustand ^5.0.11 (slice-based, persist middleware -> localStorage)
-- **Backend:** Supabase ^2.97.0 (PostgreSQL 17 + RLS + Realtime subscriptions + Storage + Broadcast channels)
+- **Backend:** Supabase ^2.99.0 (PostgreSQL 17 + RLS + Realtime subscriptions + Storage + Broadcast channels)
 - **Local DB:** idb ^8.0.3 (IndexedDB for offline-first persistence)
 - **Validation:** Zod ^4.3.6 (schema validation at data boundaries)
 - **Styling:** Tailwind CSS ^4.1.17 (utility-first, PostCSS, class sorting via Prettier plugin)
-- **Animation:** Framer Motion ^12.34.3 (lazy-loaded via `LazyMotion` with `domAnimation`)
-- **Icons:** Lucide React ^0.575.0 (tree-shakeable)
+- **Animation:** Framer Motion ^12.35.2 (lazy-loaded via `LazyMotion` with `domAnimation`)
+- **Icons:** Lucide React ^0.577.0 (tree-shakeable)
 - **PWA:** vite-plugin-pwa ^1.2.0 (injectManifest strategy, custom sw.ts) + workbox-window ^7.4.0
-- **Sanitization:** DOMPurify ^3.3.1 (XSS prevention for user content)
+- **Sanitization:** DOMPurify ^3.3.2 (XSS prevention for user content)
 - **Virtualization:** react-window ^2.2.7 + react-window-infinite-loader ^2.0.1
 - **SSE:** eventsource ^4.1.0
-- **Error Tracking:** @sentry/react ^10.39.0 (prod-only, PII-stripped, ignores chunk/network/ResizeObserver errors)
-- **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 25% thresholds)
+- **Error Tracking:** @sentry/react ^10.42.0 (prod-only, PII-stripped, ignores chunk/network/ResizeObserver errors)
+- **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 25% thresholds) + @vitest/coverage-v8 ^4.0.18
 - **E2E Tests:** Playwright ^1.58.2 (Chromium) + @seontechnologies/playwright-utils ^3.14.0 + @axe-core/playwright ^4.11.1
 - **Test Data:** @faker-js/faker ^10.3.0
-- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.56.1 (flat config)
+- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.57.0 (flat config)
 - **Formatting:** Prettier ^3.8.1 (100 char width, single quotes, trailing commas ES5)
 - **Package Manager:** npm (package-lock.json)
 - **Secrets Management:** fnox with age encryption provider (encrypted ciphertext in `fnox.toml`, committed to git; age keys at `~/.age/key.txt`)
@@ -48,7 +48,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **No `any`:** ESLint enforces `@typescript-eslint/no-explicit-any: 'error'` -- use `unknown`, specific types, or generics instead
 - **Explicit return types:** All exported functions must declare return types (components return `ReactElement`)
 - **Unused vars prefix:** Unused parameters/variables must be prefixed with `_` (e.g., `_event`, `_unused`)
-- **Path alias:** Use `@/` for imports from `src/` (e.g., `import { X } from '@/services/myService'`) -- configured in vitest.config.ts only, NOT in vite.config.ts
+- **Path alias:** Use `@/` for imports from `src/` (e.g., `import { X } from '@/services/myService'`) -- configured in vitest.config.ts and tsconfig.app.json, NOT in vite.config.ts
 - **Named exports only:** No default exports for components or services -- use named exports + barrel files
 - **Import order:** Node built-ins -> External packages -> `@/` internal modules -> Relative imports
 - **Error handling split:** Read operations return `null`/`[]` on failure; write operations throw `SupabaseServiceError`
@@ -167,6 +167,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Sentry PII rules:** Only UUIDs reach Sentry -- `beforeSend` strips `event.user.email` and `event.user.ip_address`. Use `setSentryUser(userId, partnerId)` after auth (sets user ID + partner tag). Never pass PII to Sentry tags or breadcrumbs.
 - **ES256 JWT re-signing:** Supabase CLI v2.71.1+ defaults GoTrue to ES256 but `supabase status -o env` still outputs stale HS256-signed keys. `playwright.config.ts` re-signs tokens using the GoTrue ES256 private key extracted from the Docker container. If E2E auth fails with 401s, check that the re-signing logic in `playwright.config.ts` is running.
 - **TypeScript config composition:** Three tsconfig files composed via project references: `tsconfig.app.json` (src/), `tsconfig.node.json` (vite/vitest configs), `tsconfig.test.json` (tests, relaxed strictness). Build uses `tsc -p tsconfig.app.json`, not `tsc -b`.
+- **Vite manual chunk splitting:** Production builds split vendor code into named chunks (`vendor-react`, `vendor-supabase`, `vendor-state`, `vendor-animation`, `vendor-icons`) for optimal caching. New heavy dependencies should be added to an appropriate chunk in `vite.config.ts` `rollupOptions.output.manualChunks`.
+- **`no-useless-catch` disabled:** ESLint's `no-useless-catch` is turned off project-wide -- catch-and-rethrow is allowed for debugging breakpoints and error boundary patterns.
+- **Tailwind v4 import syntax:** Uses `@import 'tailwindcss'` (not `@tailwind` directives) with `@config` reference and `@layer components` for custom utility classes.
+- **Test JUnit output:** Vitest outputs JUnit XML to `test-results/vitest-junit.xml` for CI consumption.
 
 ---
 
@@ -186,4 +190,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-07
+Last Updated: 2026-03-13
