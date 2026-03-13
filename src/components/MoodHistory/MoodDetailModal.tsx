@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { useEffect, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import {
@@ -74,16 +75,26 @@ interface MoodDetailModalProps {
  * - Focus trap: tab cycles within modal
  * - Focus returns to trigger on close (accessibility)
  */
-export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
+function MoodDetailContent({
+  mood,
+  onClose,
+}: {
+  mood: MoodEntry;
+  onClose: () => void;
+}): ReactElement {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const moodConfig = MOOD_CONFIG[mood.mood as MoodType];
+  const Icon = moodConfig.icon;
+  const moodDate = new Date(mood.timestamp);
+  const formattedDate = formatModalDate(moodDate);
+  const formattedTime = formatModalTime(moodDate);
 
   /**
    * ESC key handler - AC-4: Close modal on ESC
    */
   useEffect(() => {
-    if (!mood) return;
-
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -92,13 +103,13 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [mood, onClose]);
+  }, [onClose]);
 
   /**
    * Focus trap - AC-4: Tab cycles within modal
    */
   useEffect(() => {
-    if (!mood || !modalRef.current) return;
+    if (!modalRef.current) return;
 
     // Focus close button when modal opens
     closeButtonRef.current?.focus();
@@ -132,110 +143,104 @@ export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps) {
 
     window.addEventListener('keydown', handleTab);
     return () => window.removeEventListener('keydown', handleTab);
-  }, [mood]);
-
-  if (!mood) return null;
-
-  const moodConfig = MOOD_CONFIG[mood.mood as MoodType];
-  const Icon = moodConfig.icon;
-  const moodDate = new Date(mood.timestamp);
-  const formattedDate = formatModalDate(moodDate);
-  const formattedTime = formatModalTime(moodDate);
+  }, []);
 
   return (
-    <AnimatePresence>
-      {mood && (
-        <>
-          {/* Backdrop - AC-4: Fade in/out */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/50"
+    <>
+      {/* Backdrop - AC-4: Fade in/out */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-40 bg-black/50"
+        onClick={onClose}
+        aria-hidden="true"
+        data-testid="modal-backdrop"
+      />
+
+      {/* Modal - AC-4: Slide up from bottom */}
+      <div
+        className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mood-modal-title"
+        data-testid="mood-detail-modal"
+      >
+        <motion.div
+          ref={modalRef}
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          className="pointer-events-auto relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close button - AC-4: X icon in top-right */}
+          {/* Task 10: Enhanced focus indicator for keyboard users */}
+          <button
+            ref={closeButtonRef}
             onClick={onClose}
-            aria-hidden="true"
-            data-testid="modal-backdrop"
-          />
-
-          {/* Modal - AC-4: Slide up from bottom */}
-          <div
-            className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mood-modal-title"
-            data-testid="mood-detail-modal"
+            className="absolute top-4 right-4 rounded-full p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:outline-none"
+            aria-label="Close mood details modal"
+            data-testid="modal-close-button"
           >
-            <motion.div
-              ref={modalRef}
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="pointer-events-auto relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Close button - AC-4: X icon in top-right */}
-              {/* Task 10: Enhanced focus indicator for keyboard users */}
-              <button
-                ref={closeButtonRef}
-                onClick={onClose}
-                className="absolute top-4 right-4 rounded-full p-2 transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-pink-500 focus:outline-none"
-                aria-label="Close mood details modal"
-                data-testid="modal-close-button"
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+
+          {/* Mood icon and type - AC-4: Icon with color */}
+          <div className="mb-6 flex items-center gap-4">
+            <div className={`rounded-full p-4 ${moodConfig.bgColor}`} aria-hidden="true">
+              <Icon className={`h-8 w-8 ${moodConfig.color}`} />
+            </div>
+            <div>
+              <h2
+                id="mood-modal-title"
+                className={`text-2xl font-semibold ${moodConfig.color}`}
+                data-testid="modal-mood-type"
               >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
-
-              {/* Mood icon and type - AC-4: Icon with color */}
-              <div className="mb-6 flex items-center gap-4">
-                <div className={`rounded-full p-4 ${moodConfig.bgColor}`} aria-hidden="true">
-                  <Icon className={`h-8 w-8 ${moodConfig.color}`} />
-                </div>
-                <div>
-                  <h2
-                    id="mood-modal-title"
-                    className={`text-2xl font-semibold ${moodConfig.color}`}
-                    data-testid="modal-mood-type"
-                  >
-                    {moodConfig.label}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">How you were feeling</p>
-                </div>
-              </div>
-
-              {/* Date and timestamp - AC-4: Formatted display */}
-              <div className="mb-6 space-y-2">
-                <div className="flex items-center gap-2 text-gray-700">
-                  <span className="font-medium">Date:</span>
-                  <span data-testid="modal-date">{formattedDate}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-700">
-                  <span className="font-medium">Time:</span>
-                  <span data-testid="modal-time">{formattedTime}</span>
-                </div>
-              </div>
-
-              {/* Note text - AC-4: Display if present */}
-              {mood.note && (
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="mb-2 text-sm font-medium text-gray-700">Note:</h3>
-                  <p className="whitespace-pre-wrap text-gray-600" data-testid="modal-note">
-                    {mood.note}
-                  </p>
-                </div>
-              )}
-
-              {/* No note message */}
-              {!mood.note && (
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm text-gray-400 italic">No note for this mood</p>
-                </div>
-              )}
-            </motion.div>
+                {moodConfig.label}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">How you were feeling</p>
+            </div>
           </div>
-        </>
-      )}
-    </AnimatePresence>
+
+          {/* Date and timestamp - AC-4: Formatted display */}
+          <div className="mb-6 space-y-2">
+            <div className="flex items-center gap-2 text-gray-700">
+              <span className="font-medium">Date:</span>
+              <span data-testid="modal-date">{formattedDate}</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-700">
+              <span className="font-medium">Time:</span>
+              <span data-testid="modal-time">{formattedTime}</span>
+            </div>
+          </div>
+
+          {/* Note text - AC-4: Display if present */}
+          {mood.note && (
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="mb-2 text-sm font-medium text-gray-700">Note:</h3>
+              <p className="whitespace-pre-wrap text-gray-600" data-testid="modal-note">
+                {mood.note}
+              </p>
+            </div>
+          )}
+
+          {/* No note message */}
+          {!mood.note && (
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-sm text-gray-400 italic">No note for this mood</p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </>
+  );
+}
+
+export function MoodDetailModal({ mood, onClose }: MoodDetailModalProps): ReactElement {
+  return (
+    <AnimatePresence>{mood && <MoodDetailContent mood={mood} onClose={onClose} />}</AnimatePresence>
   );
 }

@@ -11,13 +11,10 @@
  * Story 1.1: Task 6.1
  */
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { openDB } from 'idb';
 import {
   DB_NAME,
-  DB_VERSION,
-  upgradeDb,
   type MyLoveDBSchema,
   type ScriptureSession,
   type ScriptureReflection,

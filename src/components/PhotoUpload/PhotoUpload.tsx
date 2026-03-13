@@ -145,8 +145,6 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
 
   const isFormValid = selectedFile && tagErrors.length === 0;
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
       {isOpen && (
