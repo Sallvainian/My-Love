@@ -15,7 +15,7 @@
 
 import { useCallback } from 'react';
 import type { ReactElement } from 'react';
-import { BookOpen, MessageCircle } from 'lucide-react';
+import { ArrowLeft, BookOpen, MessageCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
@@ -43,6 +43,7 @@ export function LobbyContainer(): ReactElement {
     toggleReady,
     convertToSolo,
     updatePhase,
+    exitSession,
     partner,
   } = useAppStore(
     useShallow((state) => ({
@@ -57,6 +58,7 @@ export function LobbyContainer(): ReactElement {
       toggleReady: state.toggleReady,
       convertToSolo: state.convertToSolo,
       updatePhase: state.updatePhase,
+      exitSession: state.exitSession,
       partner: state.partner,
     }))
   );
@@ -79,6 +81,10 @@ export function LobbyContainer(): ReactElement {
   const handleContinueSolo = useCallback(async () => {
     await convertToSolo();
   }, [convertToSolo]);
+
+  const handleBack = useCallback(() => {
+    exitSession();
+  }, [exitSession]);
 
   const handleCountdownComplete = useCallback(() => {
     if (session) {
@@ -108,6 +114,16 @@ export function LobbyContainer(): ReactElement {
         data-testid="lobby-role-selection"
       >
         <div className="mx-auto max-w-md space-y-6 pt-8">
+          <button
+            type="button"
+            data-testid="lobby-back-button"
+            onClick={handleBack}
+            aria-label="Back to overview"
+            className={`-ml-2 rounded-full p-2 transition-colors hover:bg-purple-200/50 ${FOCUS_RING}`}
+          >
+            <ArrowLeft className="h-5 w-5 text-purple-700" />
+          </button>
+
           <header className="text-center">
             <h1 className="font-serif text-2xl font-bold text-purple-900">
               How would you like to participate?
@@ -171,6 +187,16 @@ export function LobbyContainer(): ReactElement {
       data-testid="lobby-waiting"
     >
       <div className="mx-auto max-w-md space-y-6 pt-8">
+        <button
+          type="button"
+          data-testid="lobby-back-button"
+          onClick={handleBack}
+          aria-label="Back to overview"
+          className={`-ml-2 rounded-full p-2 transition-colors hover:bg-purple-200/50 ${FOCUS_RING}`}
+        >
+          <ArrowLeft className="h-5 w-5 text-purple-700" />
+        </button>
+
         <header className="text-center">
           <h1 className="font-serif text-2xl font-bold text-purple-900">Reading Together</h1>
         </header>

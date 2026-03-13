@@ -54,6 +54,7 @@ vi.mock('../session/Countdown', () => ({
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
+  ArrowLeft: () => <span data-testid="icon-arrowleft" />,
   BookOpen: () => <span data-testid="icon-bookopen" />,
   MessageCircle: () => <span data-testid="icon-messagecircle" />,
 }));
@@ -65,6 +66,7 @@ const mockSelectRole = vi.fn().mockResolvedValue(undefined);
 const mockToggleReady = vi.fn().mockResolvedValue(undefined);
 const mockConvertToSolo = vi.fn().mockResolvedValue(undefined);
 const mockUpdatePhase = vi.fn();
+const mockExitSession = vi.fn();
 
 const mockStoreState = {
   session: {
@@ -88,6 +90,7 @@ const mockStoreState = {
   toggleReady: mockToggleReady,
   convertToSolo: mockConvertToSolo,
   updatePhase: mockUpdatePhase,
+  exitSession: mockExitSession,
   partner: { id: 'user-2', displayName: 'Alex' } as { id: string; displayName: string } | null,
 };
 
@@ -159,6 +162,19 @@ describe('LobbyContainer', () => {
       fireEvent.click(screen.getByTestId('lobby-continue-solo'));
       expect(mockConvertToSolo).toHaveBeenCalledTimes(1);
     });
+
+    test('[P1] back button renders with correct aria-label', () => {
+      render(<LobbyContainer />);
+      const backButton = screen.getByTestId('lobby-back-button');
+      expect(backButton).toBeInTheDocument();
+      expect(backButton).toHaveAttribute('aria-label', 'Back to overview');
+    });
+
+    test('[P1] clicking back button calls exitSession', () => {
+      render(<LobbyContainer />);
+      fireEvent.click(screen.getByTestId('lobby-back-button'));
+      expect(mockExitSession).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Phase B: Lobby Waiting (myRole set, countdownStartedAt=null)', () => {
@@ -224,6 +240,19 @@ describe('LobbyContainer', () => {
       fireEvent.click(screen.getByTestId('lobby-continue-solo'));
       expect(mockConvertToSolo).toHaveBeenCalledTimes(1);
     });
+
+    test('[P1] back button renders with correct aria-label', () => {
+      render(<LobbyContainer />);
+      const backButton = screen.getByTestId('lobby-back-button');
+      expect(backButton).toBeInTheDocument();
+      expect(backButton).toHaveAttribute('aria-label', 'Back to overview');
+    });
+
+    test('[P1] clicking back button calls exitSession', () => {
+      render(<LobbyContainer />);
+      fireEvent.click(screen.getByTestId('lobby-back-button'));
+      expect(mockExitSession).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Phase C: Countdown', () => {
@@ -240,6 +269,13 @@ describe('LobbyContainer', () => {
       render(<LobbyContainer />);
       fireEvent.click(screen.getByTestId('countdown-complete'));
       expect(mockUpdatePhase).toHaveBeenCalledWith('reading');
+    });
+
+    test('[P1] no back button during countdown', () => {
+      mockStoreState.myRole = 'reader';
+      mockStoreState.countdownStartedAt = Date.now() - 500;
+      render(<LobbyContainer />);
+      expect(screen.queryByTestId('lobby-back-button')).not.toBeInTheDocument();
     });
   });
 });
