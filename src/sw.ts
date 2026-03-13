@@ -261,6 +261,9 @@ async function syncPendingMoods(): Promise<void> {
  * Receives messages from the main app
  */
 self.addEventListener('message', ((event: ExtendableMessageEvent) => {
+  // Validate origin — same-origin postMessage has empty origin
+  if (event.origin && event.origin !== self.location.origin) return;
+
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }

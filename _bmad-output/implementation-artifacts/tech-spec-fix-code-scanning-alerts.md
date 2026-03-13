@@ -2,7 +2,7 @@
 title: 'Fix GitHub Code Scanning Alerts'
 slug: 'fix-code-scanning-alerts'
 created: '2026-03-12'
-status: 'ready-for-dev'
+status: 'completed'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack: [TypeScript, React 19, Zustand 5, Vite 7, Playwright, Vitest]
 files_to_modify:
@@ -109,14 +109,14 @@ Remove the committed generated report from git tracking (fixing the gitignore pa
 
 Tasks are ordered by dependency (infrastructure first, then security, then code quality, then test cleanup).
 
-- [ ] Task 1: Remove committed Playwright report and fix gitignore
+- [x] Task 1: Remove committed Playwright report and fix gitignore
   - File: `.gitignore`
   - Action: Change `/playwright-report/` to `**/playwright-report/` so it matches at any depth (not just repo root)
   - File: `tests/playwright-report/index.html`
   - Action: `git rm --cached tests/playwright-report/index.html` to untrack without deleting locally
   - Notes: This single change resolves 50 of 80 alerts. The file was tracked because the gitignore pattern was root-anchored.
 
-- [ ] Task 2: Fix log-injection vulnerabilities in post-deploy script (ERROR severity)
+- [x] Task 2: Fix log-injection vulnerabilities in post-deploy script (ERROR severity)
   - File: `scripts/post-deploy-check.cjs:95-101`
   - Action: In `logTest()`, sanitize `details` by stripping newlines before interpolation. `testName` is always a hardcoded string literal at every call site so it's safe, but sanitize `details` which comes from HTTP responses (`error.message`, `response.statusCode`, `manifest.theme_color`):
     ```javascript
@@ -131,7 +131,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     ```
   - Notes: CodeQL's `js/log-injection` rule recommends `String.prototype.replace` to strip newlines. `%s` substitution does NOT sanitize (verified: newlines and ANSI codes pass through). In practice, risk is low (CI script fetching own deploy URL), but the sanitization is correct and cheap.
 
-- [ ] Task 3: Add origin check to service worker message handler (SECURITY)
+- [x] Task 3: Add origin check to service worker message handler (SECURITY)
   - File: `src/sw.ts:263-267`
   - Action: Add origin validation at the top of the message handler callback:
     ```typescript
@@ -146,7 +146,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     ```
   - Notes: SW message events from `navigator.serviceWorker.controller.postMessage()` have empty string origin when same-origin. We allow empty (trusted) and block mismatched (cross-origin).
 
-- [ ] Task 4: Fix trivial conditional in ScriptureOverview
+- [x] Task 4: Fix trivial conditional in ScriptureOverview
   - File: `src/components/scripture-reading/containers/ScriptureOverview.tsx:54-59`
   - Action: In `getErrorMessage()`, replace `error && typeof error === 'object'` with `typeof error === 'object' && error !== null`:
     ```typescript
@@ -160,7 +160,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     ```
   - Notes: The `error &&` is actually a necessary null guard (`typeof null === 'object'` returns `true`), NOT a redundant check — CodeQL's "always evaluates to true" analysis appears incorrect. However, the replacement `typeof error === 'object' && error !== null` is semantically identical and makes the null guard explicit, satisfying CodeQL. This is a clarity improvement, not a bug fix.
 
-- [ ] Task 5: Remove dead `includeBeginning` parameter from MessageList
+- [x] Task 5: Remove dead `includeBeginning` parameter from MessageList
   - File: `src/components/love-notes/MessageList.tsx`
   - Context: `calculateRowHeight` (lines 156-171) accepts `(note, includeBeginning, index)` but is only called once at line 286: `calculateRowHeight(note, false, adjustedIndex)`. The `getRowHeight` useCallback wrapper (lines 278-289) already handles the beginning-of-conversation case via its own `showBeginning` check and passes `adjustedIndex` to `calculateRowHeight`.
   - Action:
@@ -171,7 +171,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     5. Update the call site at line 286 from `calculateRowHeight(note, false, adjustedIndex)` to `calculateRowHeight(note, adjustedIndex)`
   - Notes: The `adjustedIndex` variable at the call site (line 284) is computed by the `getRowHeight` callback, not by `calculateRowHeight` — it stays. Only the `false` argument is removed. The callback's `showBeginning` logic (lines 280-284) continues to handle the beginning-of-conversation case independently.
 
-- [ ] Task 6: Remove redundant early return in PhotoUpload
+- [x] Task 6: Remove redundant early return in PhotoUpload
   - File: `src/components/PhotoUpload/PhotoUpload.tsx:148`
   - Action: Remove the `if (!isOpen) return null;` early return on line 148. Keep the `{isOpen && (...)}` conditional inside `<AnimatePresence>` — that's the correct pattern.
   - Before:
@@ -198,7 +198,7 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     ```
   - Notes: The early return unmounts the entire tree including `<AnimatePresence>`, which prevents exit animations on the `motion.div` children (opacity fade, scale). `AnimatePresence` needs to stay mounted and observe its children appearing/disappearing via the `{isOpen && (...)}` conditional. Parent is `App.tsx:613`: `<PhotoUpload isOpen={isPhotoUploadOpen} onClose={...} />`. Verify that the component body above line 148 has no side effects that should be guarded (hooks must not be called conditionally, so removing the early return is safe — hooks are already above it).
 
-- [ ] Task 7: Remove redundant early return in MoodDetailModal
+- [x] Task 7: Remove redundant early return in MoodDetailModal
   - File: `src/components/MoodHistory/MoodDetailModal.tsx`
   - Action: Extract the AnimatePresence children into a new `MoodDetailContent` component, then remove the early return. This avoids the problem of derived values (`moodConfig`, `Icon`, `moodDate`, etc.) needing null guards.
   - Step 1: Create a `MoodDetailContent` component in the same file that receives `mood: MoodEntry` (non-null) and `onClose: () => void`. Move the derived values (lines 139-143) and the JSX children of the `{mood && (...)}` block into it.
@@ -212,12 +212,12 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     ```
   - Notes: This is the standard React pattern for conditional AnimatePresence children that need derived state. The child component receives a guaranteed non-null `mood` prop so all derivations work without null checks. The `useEffect` for keyboard handling (lines 95-135) should move into `MoodDetailContent` as well since it depends on `mood` and manages focus trapping for the modal content. Parent is `MoodHistoryCalendar.tsx:330`.
 
-- [ ] Task 8: Dismiss regex anchor alert in merged-fixtures
+- [x] Task 8: Dismiss regex anchor alert in merged-fixtures
   - File: `tests/support/merged-fixtures.ts:32` — NO CODE CHANGE
   - Action: Dismiss alert #16 via API: `gh api -X PATCH /repos/sallvainian/My-Love/code-scanning/alerts/16 -f state=dismissed -f 'dismissed_reason=won'"'"'t fix' -f dismissed_comment="Broad match is intentional — excludePatterns filters all Sentry network traffic from E2E error monitoring. The other 5 patterns in the same array are also unanchored. Anchoring would risk breaking E2E test filtering for no security benefit (these are test-only patterns matching network request URLs, not user input)."`
   - Notes: CodeQL flags `/sentry\.io/` because it resembles a hostname without anchoring. But the `excludePatterns` array (lines 31-37) has 6 patterns, 5 of which are identically unanchored (`/analytics/`, `/\/auth\/v1\/token/`, etc.). The broad match is intentional — it ensures all Sentry traffic is filtered from E2E error monitoring. Any anchoring (minimal or restrictive) risks breaking this filtering and may not satisfy CodeQL anyway since the regex still wouldn't have `^`/`$` anchors. Dismissing is the correct action for an intentionally broad pattern.
 
-- [ ] Task 9: Clean up unused imports in unit test files
+- [x] Task 9: Clean up unused imports in unit test files
   - Action: Remove the exact unused imports identified by CodeQL:
     - `tests/unit/utils/offlineErrorHandler.test.ts:1` — remove `beforeEach` from vitest import (alert #111)
     - `tests/unit/services/moodService.test.ts:1` — remove `vi` from vitest import (alert #110)
@@ -226,17 +226,17 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
     - `tests/unit/services/scriptureReadingService.service.test.ts:14-17` — remove `beforeAll` and `afterEach` from vitest import (alert #53), remove `openDB` from idb import (alert #54), remove `DB_VERSION` and `upgradeDb` from service import (alert #55)
     - `tests/unit/hooks/useScripturePresence.reconnect.test.ts:17` — prefix `mockSend` with `_` in the `vi.hoisted()` destructure (alert #52). It's part of the mock setup block that must stay together — renaming to `_mockSend` satisfies CodeQL without breaking the mock factory.
 
-- [ ] Task 10: Clean up unused variables in E2E test files
+- [x] Task 10: Clean up unused variables in E2E test files
   - Action:
     - `tests/e2e/scripture/scripture-accessibility.spec.ts:86` — rename `const startFocus` to `const _startFocus` (alert #41). This is assigned from `await page.evaluate(() => document.activeElement?.tagName)` — the assignment has no needed side effect (it's a pure read), but it documents the test's intent to capture initial focus state. The test asserts on `afterShiftTab` instead, making `startFocus` an incomplete assertion. Prefix with `_` to preserve the intent while satisfying CodeQL.
     - `tests/e2e/scripture/scripture-accessibility.spec.ts:168` — rename `const initialText` to `const _initialText` (alert #43). Assigned from `await liveRegion.textContent()`. The test later asserts `afterViewResponse` against `/verse 2/i` (line 181) rather than comparing to `initialText`. The variable documents that the test intended to compare before/after text but the assertion was written differently. Prefix with `_`.
     - `tests/e2e/auth/display-name-setup.spec.ts:14` — remove `expect` from the import: change `import { test, expect }` to `import { test }` (alert #29). Both tests in this file are `test.skip()` stubs that never use `expect`.
 
-- [ ] Task 11: Dismiss false-positive alert #91
+- [x] Task 11: Dismiss false-positive alert #91
   - Action: Run `gh api -X PATCH /repos/sallvainian/My-Love/code-scanning/alerts/91 -f state=dismissed -f 'dismissed_reason=false positive' -f dismissed_comment="Standard Zustand slice pattern: createXxxSlice(set, get, api) — the api parameter is the standard StateCreator third argument, not a superfluous trailing argument."`
   - Notes: This is the `js/superfluous-trailing-arguments` alert on `useAppStore.ts:79`. The Zustand slice pattern always passes `(set, get, api)` to slice creators. IMPORTANT: The API requires `"false positive"` with a space — `false_positive` returns HTTP 422. Valid values are: `"false positive"`, `"won't fix"`, `"used in tests"`.
 
-- [ ] Task 12: Run verification checks
+- [x] Task 12: Run verification checks
   - Action:
     1. `npm run typecheck` — verify no TypeScript errors
     2. `npm run format` — ensure Prettier formatting
@@ -246,18 +246,18 @@ Tasks are ordered by dependency (infrastructure first, then security, then code 
 
 ### Acceptance Criteria
 
-- [ ] AC 1: Given `tests/playwright-report/index.html` is currently tracked in git, when `git ls-files tests/playwright-report/` is run after the fix, then no files are listed (untracked)
-- [ ] AC 2: Given the `.gitignore` has been updated, when a file is created at `tests/playwright-report/foo.html`, then `git status` does not show it as untracked
-- [ ] AC 3: Given `scripts/post-deploy-check.cjs` uses `console.log` with `%s` substitution, when CodeQL rescans, then alerts #18 and #19 (`js/log-injection`) are resolved
-- [ ] AC 4: Given `src/sw.ts` message handler checks `event.origin`, when a cross-origin message is received, then the handler returns early without processing
-- [ ] AC 5: Given `src/sw.ts` message handler checks `event.origin`, when a same-origin `postMessage('SKIP_WAITING')` is sent, then `self.skipWaiting()` is still called (empty origin is allowed)
-- [ ] AC 6: Given the 4 trivial-conditional fixes are applied, when CodeQL rescans, then alerts #75, #76, #77, #78 are resolved
-- [ ] AC 7: Given unused imports are removed from test files, when CodeQL rescans, then alerts #29, #41, #43, #51-57, #110, #111 are resolved
-- [ ] AC 8: Given alert #91 is dismissed via API, when the alerts list is queried, then alert #91 shows `state: dismissed` with `dismissed_reason: "false positive"` (with space)
-- [ ] AC 9: Given all fixes are applied, when `npm run typecheck` is run, then it exits with code 0
-- [ ] AC 10: Given all fixes are applied, when `npm run lint` is run, then it exits with code 0
-- [ ] AC 11: Given all fixes are applied, when `npm run test:unit` is run, then all tests pass with no regressions
-- [ ] AC 12: Given alert #16 is dismissed via API, when the alerts list is queried, then alert #16 shows `state: dismissed` with `dismissed_reason: "won't fix"`
+- [x] AC 1: Given `tests/playwright-report/index.html` is currently tracked in git, when `git ls-files tests/playwright-report/` is run after the fix, then no files are listed (untracked)
+- [x] AC 2: Given the `.gitignore` has been updated, when a file is created at `tests/playwright-report/foo.html`, then `git status` does not show it as untracked
+- [x] AC 3: Given `scripts/post-deploy-check.cjs` uses `console.log` with `%s` substitution, when CodeQL rescans, then alerts #18 and #19 (`js/log-injection`) are resolved
+- [x] AC 4: Given `src/sw.ts` message handler checks `event.origin`, when a cross-origin message is received, then the handler returns early without processing
+- [x] AC 5: Given `src/sw.ts` message handler checks `event.origin`, when a same-origin `postMessage('SKIP_WAITING')` is sent, then `self.skipWaiting()` is still called (empty origin is allowed)
+- [x] AC 6: Given the 4 trivial-conditional fixes are applied, when CodeQL rescans, then alerts #75, #76, #77, #78 are resolved
+- [x] AC 7: Given unused imports are removed from test files, when CodeQL rescans, then alerts #29, #41, #43, #51-57, #110, #111 are resolved
+- [x] AC 8: Given alert #91 is dismissed via API, when the alerts list is queried, then alert #91 shows `state: dismissed` with `dismissed_reason: "false positive"` (with space)
+- [x] AC 9: Given all fixes are applied, when `npm run typecheck` is run, then it exits with code 0
+- [x] AC 10: Given all fixes are applied, when `npm run lint` is run, then it exits with code 0
+- [x] AC 11: Given all fixes are applied, when `npm run test:unit` is run, then all tests pass with no regressions
+- [x] AC 12: Given alert #16 is dismissed via API, when the alerts list is queried, then alert #16 shows `state: dismissed` with `dismissed_reason: "won't fix"`
 
 ## Additional Context
 

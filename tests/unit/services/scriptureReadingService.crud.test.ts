@@ -11,7 +11,7 @@
  * Story 1.1: Task 6.1
  */
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
 import {
