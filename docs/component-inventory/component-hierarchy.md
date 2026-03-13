@@ -1,122 +1,129 @@
 # Component Hierarchy
 
+## App Root Tree
+
 ```
-App (root) -- src/App.tsx (624 lines)
-|-- ErrorBoundary (global class component, Sentry integration)
-|   |-- LoginScreen (unauthenticated)
-|   |-- DisplayNameSetup (post-OAuth onboarding modal)
-|   +-- WelcomeSplash (first visit / 60-min interval, lazy)
+App (root) -- src/App.tsx
 |
-|-- NetworkStatusIndicator (always visible when offline)
-|-- SyncToast (sync completion feedback)
-|
-|-- <main> (authenticated, initialized)
+|-- ErrorBoundary (class component, global, Sentry integration)
 |   |
-|   |-- [home] -- Inline (not lazy-loaded, always works offline)
-|   |   |-- TimeTogether (count-up, 1s updates)
-|   |   |-- BirthdayCountdown (x2: user + partner)
-|   |   |-- EventCountdown (wedding + next visit)
-|   |   |-- DailyMessage (swipeable card)
-|   |   |   +-- CountdownTimer
-|   |   |       +-- CountdownCard (internal)
-|   |   |           +-- CelebrationAnimation (internal)
-|   |   +-- WelcomeButton (FAB, bottom-right)
+|   |-- [Auth Gate: not authenticated]
+|   |   |-- LoginScreen (email/password + Google OAuth)
 |   |
-|   +-- ViewErrorBoundary (wraps all lazy views, resets on navigation)
+|   |-- [Auth Gate: authenticated, no display name]
+|   |   |-- DisplayNameSetup (post-OAuth display name modal)
+|   |
+|   |-- [Auth Gate: authenticated, has display name, first visit]
+|   |   |-- WelcomeSplash (lazy) (animated welcome with raining hearts)
+|   |
+|   |-- [Auth Gate: authenticated, ready]
 |       |
-|       |-- [photos] -- Lazy
-|       |   +-- PhotoGallery
-|       |       |-- PhotoGridSkeleton / PhotoGridSkeletonGrid
-|       |       |-- PhotoGridItem (per photo, lazy-loaded images)
-|       |       +-- PhotoViewer (full-screen modal, focus trap, pinch-zoom)
+|       |-- NetworkStatusIndicator (showOnlyWhenOffline)
+|       |-- SyncToast (sync completion feedback)
+|       |-- BottomNavigation (7 tabs: Home, Mood, Notes, Partner, Photos, Scripture, Logout)
 |       |
-|       |-- [mood] -- Lazy
-|       |   +-- MoodTracker (3 tabs: Log/Timeline/Calendar)
-|       |       |-- MoodButton (x12 in 3x4 grid)
-|       |       |-- PartnerMoodDisplay (real-time Supabase Broadcast)
-|       |       |   +-- NoMoodLoggedState
-|       |       |-- MoodHistoryTimeline (react-window virtualized)
-|       |       |   |-- DateHeader (internal)
-|       |       |   |-- MoodHistoryItem (expandable)
-|       |       |   |-- LoadingSpinner (internal)
-|       |       |   +-- EmptyMoodHistoryState (internal)
-|       |       +-- MoodHistoryCalendar (month grid)
-|       |           |-- CalendarDay (memoized, per cell)
-|       |           +-- MoodDetailModal (detail overlay)
-|       |
-|       |-- [partner] -- Lazy
-|       |   +-- PartnerMoodView (dual-mode: connection / mood feed)
-|       |       |-- MoodCard (memoized, per entry)
-|       |       +-- PokeKissInterface (expandable FAB)
-|       |           |-- PokeAnimation (internal, full-screen)
-|       |           |-- KissAnimation (internal, full-screen)
-|       |           |-- FartAnimation (internal, full-screen)
-|       |           +-- InteractionHistory (modal, last 7 days)
-|       |
-|       |-- [notes] -- Lazy
-|       |   +-- LoveNotes (full chat page)
-|       |       |-- MessageList (react-window v2 virtualized)
-|       |       |   |-- MessageRow (internal, per row)
-|       |       |   |-- BeginningOfConversation (internal)
-|       |       |   |-- LoadingSpinner (internal)
-|       |       |   +-- LoveNoteMessage (memoized, per bubble)
-|       |       |       +-- FullScreenImageViewer (memoized, modal)
-|       |       +-- MessageInput (auto-resize textarea + image picker)
-|       |           +-- ImagePreview (memoized, thumbnail + size)
-|       |
-|       +-- [scripture] -- Lazy
-|           +-- ScriptureOverview (Lavender Dreams theme)
-|               |-- StatsSection (couple-aggregate stats: sessions, steps, rating, bookmarks)
-|               |-- ModeCard (internal: Solo / Together)
-|               |-- PartnerStatusSkeleton (internal)
-|               |-- PartnerLinkMessage (internal)
-|               |-- SoloIcon / TogetherIcon (internal SVGs)
-|               |-- SoloReadingFlow (LazyMotion wrapper)
-|               |   |-- BookmarkFlag (presentational)
-|               |   |-- ReflectionSummary (presentational, multi-select chips)
-|               |   |-- MessageCompose (presentational, 300 char textarea)
-|               |   +-- DailyPrayerReport (presentational, ratings + messages)
-|               |-- LobbyContainer (together-mode lobby orchestration)
-|               |   +-- Countdown (3-second synchronized countdown)
-|               +-- ReadingContainer (together-mode reading orchestration)
-|                   |-- RoleIndicator (reader/responder pill badge)
-|                   |-- BookmarkFlag (shared with SoloReadingFlow)
-|                   |-- PartnerPosition (ephemeral partner view indicator)
-|                   |-- LockInButton (ready/waiting/undo states)
-|                   +-- DisconnectionOverlay (two-phase reconnection UI)
-|
-|-- BottomNavigation (fixed bottom, 7 tabs + logout)
-|
-|-- PhotoUpload (modal, lazy)
-|-- PhotoCarousel (modal, lazy)
-|   |-- PhotoCarouselControls
-|   |-- PhotoEditModal (z-index: 60)
-|   +-- PhotoDeleteConfirmation (z-index: 70)
-|
-|-- PhotoUploader (alternative upload, uses usePhotos hook)
-|
-|-- Settings (account + anniversaries)
-|   +-- AnniversarySettings
-|       +-- AnniversaryForm (internal)
-|
-+-- AdminPanel (route: /admin, lazy)
-    |-- MessageList (admin, with search + category filter)
-    |   +-- MessageRow (per message)
-    |-- CreateMessageForm (modal)
-    |-- EditMessageForm (modal)
-    +-- DeleteConfirmDialog (modal)
+|       |-- ViewErrorBoundary (class component, per-view, keeps nav visible)
+|       |   |
+|       |   |-- [currentView === 'home']
+|       |   |   |-- DailyMessage (swipe navigation, favorites, share)
+|       |   |   |-- CountdownTimer (celebration animations)
+|       |   |   |-- RelationshipTimers
+|       |   |   |   |-- TimeTogether (real-time count-up)
+|       |   |   |   |-- BirthdayCountdown (x2: Frank, Gracie)
+|       |   |   |   |-- EventCountdown (wedding, visits)
+|       |   |   |-- Settings
+|       |   |   |   |-- AnniversarySettings (CRUD with animations)
+|       |   |   |-- WelcomeButton (FAB to re-show splash)
+|       |   |
+|       |   |-- [currentView === 'photos']
+|       |   |   |-- PhotoGallery (lazy) (responsive grid, infinite scroll)
+|       |   |   |   |-- PhotoGridItem (lazy-loaded thumbnails)
+|       |   |   |   |-- PhotoGridSkeleton (loading skeleton)
+|       |   |   |-- PhotoUpload (lazy) (multi-step upload modal)
+|       |   |   |-- PhotoCarousel (lazy) (lightbox with swipe/keyboard)
+|       |   |   |   |-- PhotoCarouselControls (top bar controls)
+|       |   |   |-- PhotoViewer (full-screen with gestures, zoom)
+|       |   |   |-- PhotoEditModal (caption/tags editing)
+|       |   |   |-- PhotoDeleteConfirmation (delete dialog)
+|       |   |
+|       |   |-- [currentView === 'mood']
+|       |   |   |-- MoodTracker (lazy) (12 mood types, tabs: tracker/timeline/calendar)
+|       |   |   |   |-- MoodButton (animated mood selection)
+|       |   |   |   |-- MoodHistoryTimeline (react-window virtualized)
+|       |   |   |   |   |-- MoodHistoryItem (expand/collapse)
+|       |   |   |   |-- MoodHistoryCalendar (month navigation)
+|       |   |   |       |-- CalendarDay (memo)
+|       |   |   |       |-- MoodDetailModal (focus trap, ESC dismiss)
+|       |   |   |-- PartnerMoodDisplay (realtime partner mood)
+|       |   |   |-- NoMoodLoggedState (empty state)
+|       |   |
+|       |   |-- [currentView === 'partner']
+|       |   |   |-- PartnerMoodView (lazy) (partner connection + mood + interactions)
+|       |   |   |   |-- PokeKissInterface (expandable FAB)
+|       |   |   |       |-- InteractionHistory (7-day modal)
+|       |   |   |       |-- PokeAnimation / KissAnimation / FartAnimation
+|       |   |
+|       |   |-- [currentView === 'notes']
+|       |   |   |-- LoveNotes (lazy) (full chat page)
+|       |   |       |-- MessageList (react-window virtualized, infinite scroll)
+|       |   |       |   |-- LoveNoteMessage (memo) (chat bubble + image)
+|       |   |       |   |   |-- FullScreenImageViewer (memo) (modal image viewer)
+|       |   |       |-- MessageInput (auto-resize textarea, image picker)
+|       |   |           |-- ImagePreview (memo) (thumbnail + compression estimate)
+|       |   |
+|       |   |-- [currentView === 'scripture']
+|       |       |-- ScriptureOverview (lazy) (entry point, mode selection, session routing)
+|       |       |   |-- StatsSection (couple aggregate stats)
+|       |       |   |
+|       |       |   |-- [session.mode === 'solo' || post-reading phases]
+|       |       |   |   |-- SoloReadingFlow (step-by-step reading, reflection, report)
+|       |       |   |       |-- BookmarkFlag (verse bookmark toggle)
+|       |       |   |       |-- ReflectionSummary (standout verses, rating, notes)
+|       |       |   |       |-- MessageCompose (partner message textarea)
+|       |       |   |       |-- DailyPrayerReport (ratings, bookmarks, partner message)
+|       |       |   |
+|       |       |   |-- [session.mode === 'together', phase === 'lobby'/'countdown']
+|       |       |   |   |-- LobbyContainer (role selection, ready up, countdown)
+|       |       |   |       |-- Countdown (3-second synchronized countdown)
+|       |       |   |
+|       |       |   |-- [session.mode === 'together', phase === 'reading']
+|       |       |       |-- ReadingContainer (verse/response tabs, lock-in, presence)
+|       |       |           |-- RoleIndicator (reader/responder pill badge)
+|       |       |           |-- BookmarkFlag (verse bookmark toggle)
+|       |       |           |-- PartnerPosition (ephemeral view position)
+|       |       |           |-- LockInButton (ready/waiting/undo states)
+|       |       |           |-- DisconnectionOverlay (two-phase: reconnecting/timeout)
+|       |       |
+|       |       |-- [admin panel - toggled from Settings]
+|       |           |-- AdminPanel (lazy) (message management)
+|       |               |-- MessageList (filtered/searchable table)
+|       |               |   |-- MessageRow (single table row)
+|       |               |-- CreateMessageForm (modal)
+|       |               |-- EditMessageForm (modal)
+|       |               |-- DeleteConfirmDialog (modal)
 ```
 
-## Key Architectural Notes
+## Lazy-Loaded Components (9 total)
 
-1. **Auth gating**: The `App` component renders `LoginScreen` when `!session`, `DisplayNameSetup` when `needsDisplayName`, the splash/admin/main when authenticated.
+All lazy-loaded via `React.lazy()` with `<Suspense>` fallback:
 
-2. **Home view is inline** (not lazy-loaded) to guarantee offline availability. All other views are wrapped in `Suspense` with `LoadingSpinner` fallback.
+| Component         | Import Path                                                   | Trigger                       |
+| ----------------- | ------------------------------------------------------------- | ----------------------------- |
+| PhotoGallery      | `./components/PhotoGallery/PhotoGallery`                      | `currentView === 'photos'`    |
+| MoodTracker       | `./components/MoodTracker/MoodTracker`                        | `currentView === 'mood'`      |
+| PartnerMoodView   | `./components/PartnerMoodView/PartnerMoodView`                | `currentView === 'partner'`   |
+| AdminPanel        | `./components/AdminPanel/AdminPanel`                          | Admin toggle in Settings      |
+| LoveNotes         | `./components/love-notes/LoveNotes`                           | `currentView === 'notes'`     |
+| ScriptureOverview | `./components/scripture-reading/containers/ScriptureOverview` | `currentView === 'scripture'` |
+| WelcomeSplash     | `./components/WelcomeSplash/WelcomeSplash`                    | First visit after auth        |
+| PhotoUpload       | `./components/PhotoUpload/PhotoUpload`                        | Upload button in PhotoGallery |
+| PhotoCarousel     | `./components/PhotoCarousel/PhotoCarousel`                    | Photo selection in gallery    |
 
-3. **Two-tier error boundaries**: `ErrorBoundary` wraps the entire app; `ViewErrorBoundary` wraps only lazy-loaded views and auto-resets on navigation.
+## Auth Flow Gates
 
-4. **Scripture reading** uses `useScriptureBroadcast` hook for realtime channel management. The hook is called in `ScriptureOverview` so it persists across lobby-to-reading phase transitions.
+App.tsx implements a sequential auth gate pattern:
 
-5. **BottomNavigation** has 7 tabs (Home, Mood, Notes, Partner, Photos, Scripture, Logout) and stays visible even when a view-level error boundary triggers.
-
----
+1. **Not authenticated** -> Render `LoginScreen`
+2. **Authenticated but no display name** -> Render `DisplayNameSetup`
+3. **Authenticated, has display name, first visit** -> Render `WelcomeSplash` (lazy)
+4. **Authenticated, ready** -> Render main app with navigation

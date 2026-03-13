@@ -85,11 +85,11 @@ settingsSlice.initializeApp()
 
 ### E2E Testing Support
 
-The store exposes itself to `window.__STORE__` in development and test environments for E2E test access:
+The store exposes itself to `window.__APP_STORE__` in non-production environments for E2E test access:
 
 ```typescript
-if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-  (window as Record<string, unknown>).__STORE__ = useAppStore;
+if (import.meta.env.MODE !== 'production') {
+  (window as Record<string, unknown>).__APP_STORE__ = useAppStore;
 }
 ```
 

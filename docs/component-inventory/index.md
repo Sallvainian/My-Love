@@ -2,34 +2,31 @@
 
 > Exhaustive component inventory for the My-Love React 19 Progressive Web Application.
 > Generated from complete source code analysis of all component files.
-> Last updated: 2026-03-07
+> Last updated: 2026-03-13
 
 ## Summary Statistics
 
-| Metric                           | Value                                                                                                                             |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Total Component .tsx Files       | 65 (excluding tests)                                                                                                              |
-| Total Test Files                 | 19                                                                                                                                |
-| Component Directories            | 26                                                                                                                                |
-| Total Component LOC              | ~14,700                                                                                                                           |
-| Feature Groups                   | 8 (auth, home, photos, mood, partner, notes, scripture, admin)                                                                    |
-| Shared/Utility Components        | 3 (NetworkStatusIndicator, NetworkStatusDot, SyncToast)                                                                           |
-| Barrel Export Files (index.ts)   | 13                                                                                                                                |
-| Class Components                 | 2 (ErrorBoundary, ViewErrorBoundary)                                                                                              |
-| Memoized Components (React.memo) | 5 (CalendarDay, MoodCard, LoveNoteMessage, FullScreenImageViewer, ImagePreview)                                                   |
-| Lazy-Loaded Components           | 9                                                                                                                                 |
-| Virtualized Lists (react-window) | 2 (MessageList, MoodHistoryTimeline)                                                                                              |
-| Together Mode Components         | 8 (LobbyContainer, ReadingContainer, Countdown, DisconnectionOverlay, LockInButton, RoleIndicator, PartnerPosition, StatsSection) |
+| Metric                           | Value                                                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Total Component .tsx Files       | ~67 (excluding tests)                                                                                                               |
+| Component Directories            | 26                                                                                                                                  |
+| Feature Groups                   | 8 (auth, home, photos, mood, partner, notes, scripture, admin)                                                                      |
+| Shared/Utility Components        | 3 (NetworkStatusIndicator, NetworkStatusDot, SyncToast)                                                                             |
+| Class Components                 | 2 (ErrorBoundary, ViewErrorBoundary)                                                                                                |
+| Memoized Components (React.memo) | 5 (CalendarDay, MoodHistoryItem, LoveNoteMessage, FullScreenImageViewer, ImagePreview)                                              |
+| Lazy-Loaded Components           | 9 (PhotoGallery, MoodTracker, PartnerMoodView, AdminPanel, LoveNotes, ScriptureOverview, WelcomeSplash, PhotoUpload, PhotoCarousel) |
+| Virtualized Lists (react-window) | 2 (MessageList, MoodHistoryTimeline)                                                                                                |
+| Together Mode Components         | 8 (LobbyContainer, ReadingContainer, Countdown, DisconnectionOverlay, LockInButton, RoleIndicator, PartnerPosition, StatsSection)   |
 
 ## Tech Stack
 
-- **React** 19 with TypeScript
+- **React** 19.2.4 with TypeScript
 - **State Management**: Zustand 5.0.11 (`useAppStore`) with `useShallow` selector
-- **Animations**: Framer Motion (imported as `m as motion` for tree-shaking; `LazyMotion` in scripture)
+- **Animations**: Framer Motion 12.35.2 (imported as `m as motion` for tree-shaking; `LazyMotion` in scripture)
 - **Icons**: Lucide React (Heart, Camera, Upload, X, Sparkles, Calendar, Bookmark, etc.)
 - **Virtualization**: react-window v2 (`List`, `useListRef`) + react-window-infinite-loader (`useInfiniteLoader`)
 - **Backend**: Supabase (Auth with email/password + Google OAuth, Database, Realtime Broadcast)
-- **Styling**: Tailwind CSS v4 (utility-first, dark mode via class)
+- **Styling**: Tailwind CSS 4.2.1 (utility-first, dark mode via class)
 - **Sanitization**: DOMPurify (XSS prevention in LoveNoteMessage)
 - **Image Processing**: imageCompressionService (client-side compression before upload)
 - **Error Tracking**: Sentry (`@sentry/react`)

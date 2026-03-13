@@ -48,7 +48,7 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 | `npm run test:unit`          | Run all unit tests (Vitest)                                |
 | `npm run test:unit:watch`    | Vitest watch mode                                          |
 | `npm run test:unit:ui`       | Vitest interactive UI                                      |
-| `npm run test:unit:coverage` | Unit tests with V8 coverage (25% threshold)                |
+| `npm run test:unit:coverage` | Unit tests with V8 coverage (80% threshold)                |
 | `npm run test:e2e`           | All E2E tests with process cleanup                         |
 | `npm run test:e2e:raw`       | Playwright directly                                        |
 | `npm run test:e2e:ui`        | Playwright interactive UI mode                             |
@@ -95,7 +95,7 @@ npx playwright test --grep "mood tracker"
 
 ## Key Conventions
 
-- **Package manager**: npm
+- **Package manager**: npm (lock file: `package-lock.json`)
 - **Node version**: v24.13.0 (see `.mise.toml`)
 - **Path alias**: `@/` maps to `src/` (configured in `vitest.config.ts`, not in `vite.config.ts`)
 - **Generated types**: `src/types/database.types.ts` is auto-generated from Supabase schema -- do not edit manually
@@ -103,3 +103,6 @@ npx playwright test --grep "mood tracker"
 - **Prettier**: Uses `prettier-plugin-tailwindcss` for Tailwind class sorting
 - **Secrets**: Managed via [fnox](https://fnox.jdx.dev) with age encryption provider; encrypted ciphertext committed in `fnox.toml`
 - **CI workflows**: Located in `.github/workflows/` -- 18 workflows covering deploy, test, migrations, code review, security, and AI assistance
+- **Base path**: Production uses `/My-Love/`, development uses `/`
+- **Module system**: ESM (`"type": "module"` in `package.json`)
+- **Browser target**: `defaults and supports es6-module`

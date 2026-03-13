@@ -4,35 +4,34 @@
 
 ## Overview
 
-The `ScriptureReadingService` extends `BaseIndexedDBService<ScriptureSession>` to provide cache-first CRUD operations for scripture reading sessions, reflections, bookmarks, and messages. It manages four IndexedDB stores (scripture-sessions, scripture-reflections, scripture-bookmarks, scripture-messages) while using Supabase as the source of truth.
+Manages scripture reading sessions with a cache-first pattern backed by Supabase. Extends `BaseIndexedDBService` for the `scripture-sessions` store and directly accesses additional stores (`scripture-reflections`, `scripture-bookmarks`, `scripture-messages`) via the shared database handle.
 
-## Architecture: Cache-First Pattern
+**Singleton:** `export const scriptureReadingService = new ScriptureReadingService()`
 
-```
-READ:   IndexedDB cache -> return cached -> fire-and-forget background refresh from Supabase -> update cache
-WRITE:  POST to Supabase RPC -> on success -> update IndexedDB cache -> on failure -> throw
-CORRUPTION: On IndexedDB error -> clear cache -> refetch from server
-```
+**Extends:** `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>`
 
-The service extends `BaseIndexedDBService` for the `scripture-sessions` store only. Additional stores (reflections, bookmarks, messages) are accessed directly via the shared `db` handle.
+## Cache Pattern
+
+- **READ:** Check IndexedDB cache first. If found, return cached data and fire-and-forget a background refresh from Supabase. If miss, fetch from Supabase, cache, then return.
+- **WRITE:** POST to Supabase RPC/table first. On success, update IndexedDB cache. On failure, throw.
+- **CORRUPTION:** On IndexedDB error, clear the corrupted cache and re-fetch from server.
+- **Timeout:** All cache operations wrapped with 5-second timeout (`CACHE_TIMEOUT_MS`).
 
 ## Error Handling
 
-### ScriptureErrorCode Enum
+### `ScriptureErrorCode` Enum
 
-```typescript
-enum ScriptureErrorCode {
-  VERSION_MISMATCH = 'VERSION_MISMATCH',
-  SESSION_NOT_FOUND = 'SESSION_NOT_FOUND',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  SYNC_FAILED = 'SYNC_FAILED',
-  OFFLINE = 'OFFLINE',
-  CACHE_CORRUPTED = 'CACHE_CORRUPTED',
-  VALIDATION_FAILED = 'VALIDATION_FAILED',
-}
-```
+| Code                | Meaning                         |
+| ------------------- | ------------------------------- |
+| `VERSION_MISMATCH`  | Optimistic concurrency conflict |
+| `SESSION_NOT_FOUND` | Session does not exist          |
+| `UNAUTHORIZED`      | User lacks access               |
+| `SYNC_FAILED`       | Server write failed             |
+| `OFFLINE`           | Device is offline               |
+| `CACHE_CORRUPTED`   | IndexedDB data invalid          |
+| `VALIDATION_FAILED` | Zod validation failed           |
 
-### ScriptureError Interface
+### `ScriptureError` Interface
 
 ```typescript
 interface ScriptureError {
@@ -42,152 +41,132 @@ interface ScriptureError {
 }
 ```
 
-### `handleScriptureError(error: ScriptureError): void`
+All write failures throw `ScriptureError` objects. Read failures return `null` or `[]` (graceful degradation).
 
-Logs errors to console with severity based on error code:
-
-- `VERSION_MISMATCH`, `SYNC_FAILED`, `OFFLINE`: `console.warn`
-- `CACHE_CORRUPTED`, `SESSION_NOT_FOUND`, `UNAUTHORIZED`, `VALIDATION_FAILED`: `console.error`
-
-## Transform Helpers
-
-Four private functions convert Supabase snake_case rows to camelCase IndexedDB records:
-
-| Helper              | Input                | Output                |
-| ------------------- | -------------------- | --------------------- |
-| `toLocalSession`    | `SupabaseSession`    | `ScriptureSession`    |
-| `toLocalReflection` | `SupabaseReflection` | `ScriptureReflection` |
-| `toLocalBookmark`   | `SupabaseBookmark`   | `ScriptureBookmark`   |
-| `toLocalMessage`    | `SupabaseMessage`    | `ScriptureMessage`    |
-
-All transform helpers convert ISO string timestamps to `Date` objects and map `null` to `undefined` for optional fields.
-
-## Session CRUD
+## Session Methods
 
 ### `createSession(mode, partnerId?): Promise<ScriptureSession>`
 
-Creates a new scripture session via the `scripture_create_session` RPC.
+Creates a session via the `scripture_create_session` RPC.
 
-| Parameter   | Type                   | Required          | Description    |
-| ----------- | ---------------------- | ----------------- | -------------- |
-| `mode`      | `'solo' \| 'together'` | Yes               | Session mode   |
-| `partnerId` | `string`               | For together mode | Partner's UUID |
+**RPC:** `supabase.rpc('scripture_create_session', { p_mode, p_partner_id? })`
 
-**Flow:**
+**Validation:** Response validated via `SupabaseSessionSchema.parse()`
 
-1. Call `supabase.rpc('scripture_create_session', { p_mode, p_partner_id })`
-2. Validate response with `SupabaseSessionSchema.parse()`
-3. Transform to local format via `toLocalSession()`
-4. Cache in IndexedDB
-5. Return the local session
+**Cache:** Writes to IndexedDB after successful creation (fire-and-forget).
 
-**Throws:** `ScriptureError` with `SYNC_FAILED` code on RPC failure.
+---
 
 ### `getSession(sessionId, onRefresh?): Promise<ScriptureSession | null>`
 
 Cache-first read with optional background refresh callback.
 
-| Parameter   | Type                                  | Description                              |
-| ----------- | ------------------------------------- | ---------------------------------------- |
-| `sessionId` | `string`                              | Session UUID                             |
-| `onRefresh` | `(session: ScriptureSession) => void` | Called when background refresh completes |
+**Parameters:**
+
+- `sessionId: string` -- Session UUID
+- `onRefresh?: (session: ScriptureSession) => void` -- Called when background refresh completes with fresh data (allows Zustand state sync)
 
 **Flow:**
 
 1. Check IndexedDB cache via `this.get(sessionId)`
-2. If cached: return immediately, fire-and-forget `refreshSessionFromServer()` which calls `onRefresh` with fresh data
-3. If cache miss: fetch from Supabase, cache, return
+2. If cached: return cached, fire-and-forget `refreshSessionFromServer()`
+3. If miss: call `fetchAndCacheSession()` from Supabase
+
+---
 
 ### `getUserSessions(userId): Promise<ScriptureSession[]>`
 
-Cache-first read for all sessions where the user is `user1_id` or `user2_id`.
+Gets all sessions for a user. Uses `by-user` index on `scripture-sessions` store.
 
-**Flow:**
+**Cache corruption recovery:** On IndexedDB error, calls `recoverSessionCache()` then fetches from server.
 
-1. Query IndexedDB `by-user` index
-2. If cached entries found: return immediately, fire-and-forget background refresh
-3. If cache miss or cache error: fetch from Supabase via `.or()` filter, cache all, return
-4. On cache corruption: call `recoverSessionCache()` then fetch from server
+---
 
 ### `updateSession(sessionId, updates): Promise<void>`
 
-Write-through pattern: server first, then update cache.
+Write-through update to Supabase then cache.
 
-**Updatable fields:** `currentPhase`, `currentStepIndex`, `status`, `version`, `completedAt`, `mode`
+**Accepted fields:** `currentPhase`, `currentStepIndex`, `status`, `version`, `completedAt`, `mode`
 
-**Flow:**
+**Field mapping:** camelCase to snake_case for Supabase (e.g., `currentPhase` to `current_phase`)
 
-1. Build snake_case payload from camelCase updates
-2. Call `supabase.from('scripture_sessions').update().eq('id', sessionId)`
-3. On success: update IndexedDB cache
-4. On failure: throw `ScriptureError` with `SYNC_FAILED`
+**Query:** `supabase.from('scripture_sessions').update(supabaseUpdates).eq('id', sessionId)`
 
-## Reflection CRUD
+## Reflection Methods
 
 ### `addReflection(sessionId, stepIndex, rating, notes, isShared): Promise<ScriptureReflection>`
 
-Submits a reflection via the `scripture_submit_reflection` RPC (idempotent upsert).
+Submits a reflection via the `scripture_submit_reflection` RPC.
 
-| Parameter   | Type      | Description         |
-| ----------- | --------- | ------------------- |
-| `sessionId` | `string`  | Session UUID        |
-| `stepIndex` | `number`  | Reading step (0-16) |
-| `rating`    | `number`  | 1-5 rating          |
-| `notes`     | `string`  | Reflection text     |
-| `isShared`  | `boolean` | Share with partner  |
+**RPC:** `supabase.rpc('scripture_submit_reflection', { p_session_id, p_step_index, p_rating, p_notes, p_is_shared })`
 
-**Validation:** Response parsed with `SupabaseReflectionSchema`.
+**Validation:** `SupabaseReflectionSchema.parse(data)`
+
+---
 
 ### `getReflectionsBySession(sessionId): Promise<ScriptureReflection[]>`
 
-Cache-first read from `scripture-reflections` store's `by-session` index. Fires background refresh on cache hit. Calls `recoverReflectionCache()` on cache errors.
+Cache-first read using `by-session` index on `scripture-reflections` store.
 
-## Bookmark CRUD
+## Bookmark Methods
 
 ### `addBookmark(sessionId, stepIndex, userId, shareWithPartner): Promise<ScriptureBookmark>`
 
-Write-through insert to `scripture_bookmarks` table with `SupabaseBookmarkSchema` validation.
+Direct table insert (not RPC).
 
-### `toggleBookmark(sessionId, stepIndex, userId, shareWithPartner): Promise<{ added: boolean; bookmark: ScriptureBookmark | null }>`
+**Query:** `supabase.from('scripture_bookmarks').insert({ session_id, step_index, user_id, share_with_partner }).select().single()`
 
-Toggles a bookmark for a specific step:
+**Validation:** `SupabaseBookmarkSchema.parse(data)`
 
-1. Check if bookmark exists via `getBookmarkByStep()` (searches cached bookmarks)
-2. If exists: delete from server, remove from cache, return `{ added: false, bookmark: null }`
-3. If not exists: create via `addBookmark()`, return `{ added: true, bookmark }`
+---
+
+### `toggleBookmark(sessionId, stepIndex, userId, shareWithPartner): Promise<{ added: boolean, bookmark: ScriptureBookmark | null }>`
+
+Checks if bookmark exists for the step. If yes, deletes it from server and cache. If no, creates it. Returns `{ added: true/false, bookmark }`.
+
+---
 
 ### `getBookmarksBySession(sessionId): Promise<ScriptureBookmark[]>`
 
-Cache-first read from `scripture-bookmarks` store. Same pattern as reflections.
+Cache-first read using `by-session` index on `scripture-bookmarks` store.
+
+---
 
 ### `updateSessionBookmarkSharing(sessionId, userId, shareWithPartner): Promise<void>`
 
-Batch updates the `share_with_partner` flag for all bookmarks belonging to the current user in a session.
+Batch updates `share_with_partner` flag for all of a user's bookmarks in a session.
 
-**Flow:**
+**Server:** `supabase.from('scripture_bookmarks').update({ share_with_partner }).eq('session_id', sessionId).eq('user_id', userId)`
 
-1. Server: `supabase.from('scripture_bookmarks').update({ share_with_partner }).eq('session_id').eq('user_id')`
-2. Cache: Open transaction on `scripture-bookmarks`, iterate all bookmarks for session, update matching userId entries
+**Cache:** Updates matching bookmarks in a single IndexedDB transaction.
 
-## Message CRUD
+## Message Methods
 
 ### `addMessage(sessionId, senderId, message): Promise<ScriptureMessage>`
 
-Write-through insert to `scripture_messages` table with `SupabaseMessageSchema` validation.
+Direct table insert.
+
+**Query:** `supabase.from('scripture_messages').insert({ session_id, sender_id, message }).select().single()`
+
+**Validation:** `SupabaseMessageSchema.parse(data)`
+
+---
 
 ### `getMessagesBySession(sessionId): Promise<ScriptureMessage[]>`
 
-Cache-first read from `scripture-messages` store. Same pattern as reflections and bookmarks.
+Cache-first read using `by-session` index on `scripture-messages` store.
 
-## Statistics
+## Stats
 
 ### `getCoupleStats(): Promise<CoupleStats | null>`
 
-Fetches couple-aggregate stats via `scripture_get_couple_stats` RPC. Read operation -- returns `null` on failure (per project convention for read operations).
+Fetches aggregate statistics via RPC.
 
-**Validation:** Response parsed with `CoupleStatsSchema` from `src/api/validation/supabaseSchemas.ts`.
+**RPC:** `supabase.rpc('scripture_get_couple_stats')`
 
-**Return type:**
+**Validation:** `CoupleStatsSchema.parse(data)`
+
+**Returns:**
 
 ```typescript
 interface CoupleStats {
@@ -199,38 +178,29 @@ interface CoupleStats {
 }
 ```
 
-## Report Data
+**Error handling:** Returns `null` on any failure (read operation convention).
 
-### `getSessionReportData(sessionId): Promise<{ reflections, bookmarks, messages }>`
+## Cache Recovery
 
-Fetches all session data **directly from server** (bypasses cache) using `Promise.all` for parallel execution. Used by the Daily Prayer Report to ensure partner data is included.
+### `recoverSessionCache(): Promise<void>`
 
-## Corruption Recovery
+Clears the `scripture-sessions` store on corruption detection.
 
-All recovery methods clear the relevant IndexedDB store(s) and log errors without throwing.
+### `recoverAllCaches(): Promise<void>`
 
-| Method                     | Scope                  | Description                               |
-| -------------------------- | ---------------------- | ----------------------------------------- |
-| `recoverSessionCache()`    | All sessions           | Clears `scripture-sessions` store         |
-| `recoverReflectionCache()` | Session-scoped or all  | Deletes by session or clears entire store |
-| `recoverBookmarkCache()`   | Session-scoped or all  | Deletes by session or clears entire store |
-| `recoverMessageCache()`    | Session-scoped or all  | Deletes by session or clears entire store |
-| `recoverAllCaches()`       | All 4 scripture stores | Calls all 4 recovery methods sequentially |
+Clears all four scripture stores: sessions, reflections, bookmarks, messages.
 
-Session-scoped recovery uses a transaction to delete only entries matching the given `sessionId` from the `by-session` index.
+## Session Report
 
-## Background Refresh Helpers
+### `getSessionReportData(sessionId): Promise<{ session, reflections, bookmarks, messages }>`
 
-Five private methods silently refresh cached data from the server. All catch errors without rethrowing (the cache serves stale data as fallback):
+Aggregates all data for a session report view by fetching sessions, reflections, bookmarks, and messages.
 
-- `refreshSessionFromServer(sessionId, onRefresh?)` -- calls `onRefresh` callback with fresh data
-- `refreshUserSessionsFromServer(userId)`
-- `refreshReflectionsFromServer(sessionId)`
-- `refreshBookmarksFromServer(sessionId)`
-- `refreshMessagesFromServer(sessionId)`
+## Transform Helpers (Private)
 
-## Singleton
-
-```typescript
-export const scriptureReadingService = new ScriptureReadingService();
-```
+| Function                      | Direction             | Description                                                                         |
+| ----------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `toLocalSession(row, userId)` | Supabase to IndexedDB | Maps `user1_id` to `userId`, `user2_id` to `partnerId`, converts timestamps to Date |
+| `toLocalReflection(row)`      | Supabase to IndexedDB | Maps `session_id` to `sessionId`, snake_case to camelCase                           |
+| `toLocalBookmark(row)`        | Supabase to IndexedDB | Maps `share_with_partner` to `shareWithPartner`                                     |
+| `toLocalMessage(row)`         | Supabase to IndexedDB | Maps `sender_id` to `senderId`                                                      |

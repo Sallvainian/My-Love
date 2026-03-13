@@ -2,178 +2,121 @@
 
 **Sources:**
 
-- `src/sw.ts` (custom service worker with Workbox)
-- `src/sw-db.ts` (IndexedDB helpers for service worker context)
+- `src/sw.ts` -- Service worker with Workbox caching + Background Sync
+- `src/sw-db.ts` -- IndexedDB helpers for service worker context
 
 ## Overview
 
-The service worker uses the Workbox InjectManifest strategy (not GenerateSW). It handles:
+The service worker extends Workbox-generated precaching with custom Background Sync support for offline mood syncing. It operates independently of the app window, syncing pending moods even when the app is closed.
 
-1. Precaching of static assets
-2. Runtime caching with appropriate strategies per resource type
-3. Background Sync API for syncing pending moods when the app is closed
+## Caching Strategies
 
-## Cache Strategies (src/sw.ts)
+| Content           | Strategy       | Cache Name         | Details                                                           |
+| ----------------- | -------------- | ------------------ | ----------------------------------------------------------------- |
+| JS/CSS            | `NetworkOnly`  | None               | Always fresh from network (prevents stale code after deployments) |
+| Navigation (HTML) | `NetworkFirst` | `navigation-cache` | 3s network timeout, falls back to precached version offline       |
+| Images/Fonts      | `CacheFirst`   | `static-assets-v2` | 30-day expiry, max 100 entries                                    |
+| Google Fonts      | `CacheFirst`   | `google-fonts-v2`  | 1-year expiry, max 30 entries, cacheable status 0/200             |
 
-### Precaching
+## Auto-Update Configuration
+
+```typescript
+self.skipWaiting();
+clientsClaim();
+```
+
+New service worker versions activate immediately and claim all clients. Required by `vite-plugin-pwa` with `injectManifest` + `registerType: 'autoUpdate'`.
+
+## Precaching
 
 ```typescript
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 ```
 
-The `__WB_MANIFEST` array is injected by VitePWA at build time. It includes `index.html` for version detection (triggers SW updates when JS hashes change).
+`self.__WB_MANIFEST` is injected by VitePWA at build time with hashed static assets. `index.html` is included for version detection (triggers SW updates when JS hashes change).
 
-### Runtime Routes
+## Background Sync
 
-| Resource      | Strategy       | Cache Name         | Notes                                                                 |
-| ------------- | -------------- | ------------------ | --------------------------------------------------------------------- |
-| JS (`script`) | `NetworkOnly`  | --                 | Always fetch fresh to prevent stale code after deployments            |
-| CSS (`style`) | `NetworkOnly`  | --                 | Same rationale as JS                                                  |
-| Navigation    | `NetworkFirst` | `navigation-cache` | 3-second network timeout, falls back to precached `index.html`        |
-| Images, Fonts | `CacheFirst`   | `static-assets-v2` | Max 100 entries, 30-day expiry                                        |
-| Google Fonts  | `CacheFirst`   | `google-fonts-v2`  | Max 30 entries, 1-year expiry, accepts opaque responses (`status: 0`) |
+### Sync Event Handler
 
-### Why NetworkOnly for JS/CSS
+Listens for the `sync` event with tag `sync-pending-moods`.
 
-After deployments, JS/CSS filenames change (Vite content hashing). Serving stale bundles from cache would cause import errors or runtime crashes. The precache manifest handles offline support for these assets.
+**Trigger conditions:**
 
-## Background Sync (src/sw.ts)
+1. Browser regains connectivity after being offline
+2. Manually triggered via `registration.sync.register('sync-pending-moods')` from the app
 
-### Trigger
+### `syncPendingMoods()` Flow
 
-The service worker listens for `sync` events with the tag `sync-pending-moods`. This fires when:
+1. **Get pending moods:** Calls `getPendingMoods()` from `sw-db.ts` to read unsynced entries from IndexedDB
+2. **Get auth token:** Calls `getAuthToken()` from `sw-db.ts` to read the stored JWT
+3. **Token validation:** Checks if token is expired (with 5-minute buffer). If expired, returns silently (app will refresh token on next open)
+4. **Sync each mood:** For each pending mood:
+   - Transforms to Supabase REST format via `transformMoodForSupabase()`
+   - Calls `POST {SUPABASE_URL}/rest/v1/moods` with headers:
+     - `Content-Type: application/json`
+     - `apikey: {SUPABASE_ANON_KEY}`
+     - `Authorization: Bearer {accessToken}`
+     - `Prefer: return=representation`
+   - On success: calls `markMoodSynced(localId, supabaseId)`
+   - On failure: logs error, continues to next mood
+5. **Notify clients:** Posts `BACKGROUND_SYNC_COMPLETED` message to all open windows with `successCount` and `failCount`
+6. **Retry trigger:** If all moods failed, throws to trigger Background Sync API retry
 
-1. The browser regains connectivity after being offline
-2. The app explicitly calls `registration.sync.register('sync-pending-moods')`
-
-### syncPendingMoods() Flow
-
-```
-1. getPendingMoods()         -- Read unsynced moods from IndexedDB
-2. getAuthToken()            -- Read stored JWT from IndexedDB sw-auth store
-3. Check token expiry        -- Skip if expired (5-minute buffer)
-4. For each pending mood:
-   a. transformMoodForSupabase()  -- Convert local format to REST API format
-   b. fetch(SUPABASE_URL/rest/v1/moods, { method: 'POST', ... })
-   c. markMoodSynced(localId, supabaseId)
-5. Notify open clients       -- postMessage({ type: 'BACKGROUND_SYNC_COMPLETED', ... })
-6. If all failed, throw       -- Triggers automatic retry via Background Sync API
-```
-
-### Mood Transformation
-
-```typescript
-function transformMoodForSupabase(mood: StoredMoodEntry, userId: string): Record<string, unknown>;
-```
+### `transformMoodForSupabase(mood, userId)`
 
 Maps local mood format to Supabase REST API format:
 
-- `mood_type`: The primary mood (`mood.mood`)
-- `mood_types`: Array of all selected moods (`mood.moods` or `[mood.mood]` for legacy)
-- `note`: The mood note (or `null`)
-- `created_at`: ISO timestamp from `mood.timestamp`
-- `user_id`: From the stored auth token
+| Local Field                      | Supabase Field |
+| -------------------------------- | -------------- |
+| `mood.mood`                      | `mood_type`    |
+| `mood.moods` or `[mood.mood]`    | `mood_types`   |
+| `mood.note` or `null`            | `note`         |
+| `mood.timestamp` (as ISO string) | `created_at`   |
+| `userId` (from auth token)       | `user_id`      |
 
-### REST API Authentication
+## Service Worker Database Helpers (`src/sw-db.ts`)
 
-The service worker calls the Supabase REST API directly with `fetch()` (not the JS client):
+These functions operate directly on IndexedDB without the app's service layer, enabling Background Sync when the app is closed.
 
-```typescript
-fetch(`${SUPABASE_URL}/rest/v1/moods`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${authToken.accessToken}`,
-    Prefer: 'return=representation',
-  },
-  body: JSON.stringify(supabaseMood),
-});
-```
+### `openDatabase(): Promise<IDBPDatabase>`
 
-Environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`) are baked in at build time via `import.meta.env`.
+Opens `my-love-db` with full v1-v4 migration support. The SW must handle upgrades independently since it may open the database before the app does.
 
-### Error Handling
+### `getPendingMoods(): Promise<StoredMoodEntry[]>`
 
-- **No auth token:** Returns early without throwing (will retry on next sync)
-- **Expired token:** Returns early (app will refresh token on next open)
-- **Individual mood failure:** Logs error, increments `failCount`, continues with next mood
-- **All moods failed:** Throws error to trigger automatic retry via Background Sync API
-- **Partial success:** Does not throw (successful moods stay synced, failed ones retry next time)
+Reads all moods from the `moods` store and filters to `synced === false`. Closes the database connection after reading.
 
-### Client Notification
+### `markMoodSynced(localId: number, supabaseId: string): Promise<void>`
 
-After sync completes, the service worker notifies all open windows:
+Sets `synced = true` and `supabaseId` on the mood entry. Closes the database connection after writing.
+
+### `storeAuthToken(token): Promise<void>`
+
+Stores auth credentials in the `sw-auth` store with key `'current'`. Called from `actionService.signIn()` and `sessionService.onAuthStateChange()`.
 
 ```typescript
-client.postMessage({
-  type: 'BACKGROUND_SYNC_COMPLETED',
-  successCount,
-  failCount,
-});
+interface StoredAuthToken {
+  id: 'current';
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number; // Unix timestamp
+  userId: string;
+}
 ```
 
-## Service Worker Database Helpers (src/sw-db.ts)
+### `getAuthToken(): Promise<StoredAuthToken | null>`
 
-IndexedDB operations for use in the service worker context. The service worker cannot share the app's IndexedDB connection, so it opens its own connection using the same `DB_NAME` and `DB_VERSION`.
+Reads the stored auth token. Called from the sync handler to authenticate REST API calls.
 
-### openDatabase()
+### `clearAuthToken(): Promise<void>`
 
-Opens `my-love-db` at `DB_VERSION` (currently 5). Includes its own migration logic for v1-v4 (matching the app's migrations but with `objectStoreNames.contains()` guards to handle stores that may already exist). Note: v5 scripture stores are not created here since the service worker only needs moods and auth.
+Deletes the auth token from IndexedDB. Called on sign-out.
 
-### Functions
+## Environment Variables (Build-time)
 
-#### `getPendingMoods(): Promise<StoredMoodEntry[]>`
+The service worker accesses these via `import.meta.env` (injected at build time by Vite):
 
-Reads all moods from the `moods` store, filters to `synced === false`. Opens and closes the database connection per call.
-
-#### `markMoodSynced(localId: number, supabaseId: string): Promise<void>`
-
-Gets the mood by `localId`, sets `synced: true` and `supabaseId`, then puts it back. Throws if the mood is not found.
-
-#### `storeAuthToken(token: Omit<StoredAuthToken, 'id'>): Promise<void>`
-
-Stores (or overwrites) the auth token with key `'current'` in the `sw-auth` store.
-
-**Stored fields:**
-
-| Field          | Type        | Description                        |
-| -------------- | ----------- | ---------------------------------- |
-| `id`           | `'current'` | Fixed key for single-token storage |
-| `accessToken`  | `string`    | JWT for API authorization          |
-| `refreshToken` | `string`    | For token refresh                  |
-| `expiresAt`    | `number`    | Unix timestamp of token expiry     |
-| `userId`       | `string`    | User UUID for REST API requests    |
-
-#### `getAuthToken(): Promise<StoredAuthToken | null>`
-
-Reads the token with key `'current'`. Returns `null` if not found.
-
-#### `clearAuthToken(): Promise<void>`
-
-Deletes the token with key `'current'`. Called on sign-out.
-
-### Connection Lifecycle
-
-Each function opens a connection, performs the operation, and closes the connection in a `finally` block. This is necessary because service workers have short lifetimes and cannot maintain persistent connections.
-
-## Other Service Worker Events
-
-### `message` Event
-
-Handles `SKIP_WAITING` messages to activate a new service worker immediately.
-
-### `activate` Event
-
-Calls `self.clients.claim()` to take control of all open clients immediately after activation.
-
-## Hybrid Sync Strategy Summary
-
-The app uses three complementary sync triggers:
-
-| Trigger         | Location               | When                                         |
-| --------------- | ---------------------- | -------------------------------------------- |
-| Immediate sync  | App (moodSyncService)  | On mood creation                             |
-| Periodic sync   | App (App.tsx)          | While app is open                            |
-| Background Sync | Service worker (sw.ts) | When app is closed, then device comes online |
+- `VITE_SUPABASE_URL` -- Used for REST API calls
+- `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` -- Used as `apikey` header

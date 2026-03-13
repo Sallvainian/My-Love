@@ -47,8 +47,6 @@ The scripture feature inverts the offline-first pattern:
 2. **IndexedDB is a read cache.** Reads use cache-first with fire-and-forget background refresh.
 3. **Optimistic UI.** The Zustand slice updates state before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
 
-**Architectural guardrail:** ESLint enforces that scripture container components (`src/components/scripture-reading/containers/**`) must not import `@supabase/supabase-js`, `src/api/supabaseClient`, or service modules directly. They must go through Zustand slice actions. The sole legacy exception is `scriptureReadingService`.
-
 ## State Management: Zustand Sliced Store
 
 A single Zustand store (`src/stores/useAppStore.ts`) is composed from 10 slices using the slice pattern:
@@ -68,8 +66,6 @@ A single Zustand store (`src/stores/useAppStore.ts`) is composed from 10 slices 
 
 State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`. The `partialize` option restricts what is persisted: settings, onboarding state, messageHistory, and moods. Large data (messages, photos, custom messages) is stored in IndexedDB.
 
-**Architectural guardrail:** ESLint rules enforce that React components and hooks (`src/components/**`, `src/hooks/**`) must not call `useAppStore.getState()` directly. They must use `useAppStore` with a `useShallow` selector.
-
 ## Routing
 
 No router library is used. Navigation is managed by the `navigationSlice` in the Zustand store. `App.tsx` renders views conditionally based on the `currentView` state value.
@@ -83,7 +79,7 @@ Supported views and their URL paths:
 - `notes` -- `/notes`
 - `scripture` -- `/scripture`
 
-`setView(view, skipHistory?)` updates both the Zustand state and the browser URL via `history.pushState`. A `popstate` event listener supports browser back/forward navigation. The `getRoutePath()` helper strips the production base path (`/My-Love/`) to normalize route detection.
+`setView(view)` updates both the Zustand state and the browser URL via `history.pushState`. A `popstate` event listener supports browser back/forward navigation. Production builds use `/My-Love/` as the base path.
 
 ## Authentication
 
@@ -101,7 +97,7 @@ Auth flow in `App.tsx`:
 Auth services are split into two modules:
 
 - `src/api/auth/actionService.ts` -- signIn, signUp, signOut, resetPassword, signInWithGoogle
-- `src/api/auth/sessionService.ts` -- getSession, getUser, getCurrentUserId, onAuthStateChange
+- `src/api/auth/sessionService.ts` -- getSession, getUser, getCurrentUserId, getCurrentUserIdOfflineSafe, onAuthStateChange
 
 ## Code Splitting
 
@@ -128,24 +124,31 @@ Uses the InjectManifest strategy (not GenerateSW). The custom service worker han
 
 - **Precaching**: Static assets only (images, fonts via `**/*.{png,jpg,jpeg,svg,woff2,ico}`) -- JS and CSS are excluded from precache and handled by runtime caching
 - **Background Sync**: Mood entries via direct IndexedDB reads and Supabase REST API calls
-- **Cache strategies**: NetworkOnly for JS/CSS, NetworkFirst for navigation, CacheFirst for images/fonts/Google Fonts
+- **Cache strategies**: NetworkOnly for JS/CSS, NetworkFirst for navigation (3s timeout), CacheFirst for images/fonts/Google Fonts
 - **Database operations**: Isolated in `src/sw-db.ts` (separate from app IndexedDB code)
 - **Sync notification**: Posts `BACKGROUND_SYNC_COMPLETED` message to the main thread with `successCount` and `failCount` for toast notification
-
-The `src/sw-types.d.ts` file provides TypeScript declarations for the service worker context.
+- **Auto-update**: `skipWaiting()` + `clientsClaim()` for immediate activation
 
 Service worker registration in `src/main.tsx`:
 
-- **Production**: `registerSW` with `immediate: true` and auto-reload on `onNeedRefresh`
+- **Production**: Auto-update registration with immediate reload on `onNeedRefresh`
 - **Development**: Unregisters all existing service workers to prevent stale code issues
 
 ## Realtime Features
 
-Supabase Realtime is used for three distinct purposes:
+Supabase Realtime is used for four distinct channel patterns:
 
-1. **Mood changes** (`RealtimeService` in `src/services/realtimeService.ts`) -- Subscribes to `postgres_changes` on the `moods` table filtered by partner user ID. Singleton pattern.
-2. **Scripture broadcast** (`useScriptureBroadcast` hook) -- Private broadcast channel `scripture-session:{sessionId}` for partner_joined, state_updated, session_converted, and lock_in_status_changed events. Includes retry logic for CHANNEL_ERROR/CLOSED with exponential re-subscribe.
-3. **Scripture presence** (`useScripturePresence` hook) -- Ephemeral broadcast channel `scripture-presence:{sessionId}` for partner position tracking (verse/response view, step index). 10-second heartbeat, 20-second stale TTL.
+| Channel Pattern            | Feature       | Protocol                  | Direction     |
+| -------------------------- | ------------- | ------------------------- | ------------- |
+| `love-notes:{partnerId}`   | Love Notes    | Broadcast                 | Bidirectional |
+| `partner-mood:{partnerId}` | Partner Mood  | Broadcast                 | Bidirectional |
+| `incoming-interactions`    | Poke/Kiss     | postgres_changes (INSERT) | Receive only  |
+| `moods:user_id=eq.{id}`    | Mood Realtime | postgres_changes (INSERT) | Receive only  |
+
+Scripture adds two additional channel types:
+
+- **Broadcast** (`scripture-session:{sessionId}`): Partner coordination events with exponential backoff retry
+- **Presence** (`scripture-presence:{sessionId}`): Partner position tracking with 10-second heartbeat
 
 ## Validation
 
@@ -154,7 +157,7 @@ Zod schemas provide runtime validation at two layers:
 1. **Client-side** (`src/validation/schemas.ts`) -- Validates form inputs, IndexedDB data, and scripture session/reflection/bookmark/message structures
 2. **API response** (`src/api/validation/supabaseSchemas.ts`) -- Validates Supabase query responses for users, moods, interactions, photos, and couple stats
 
-User-facing error messages are in `src/validation/errorMessages.ts`.
+User-facing error messages are in `src/validation/errorMessages.ts` with a `ValidationError` class that provides per-field error mapping.
 
 ## Environment Variables and Secrets
 
@@ -167,21 +170,11 @@ Key variables:
 - `VITE_SENTRY_DSN` -- Sentry error tracking DSN
 - `SENTRY_AUTH_TOKEN` -- Sentry source map upload token
 
-For E2E tests, `.env.test` provides plain-text local Supabase values (`http://127.0.0.1:54321`). The Playwright config auto-detects local Supabase credentials via `supabase status -o env` and re-signs JWT tokens for ES256 compatibility.
-
-## Base Path
-
-Production builds use `/My-Love/` as the base path for GitHub Pages deployment. Development uses `/`. This is configured in `vite.config.ts`:
-
-```typescript
-base: mode === 'production' ? '/My-Love/' : '/',
-```
-
-The `index.html` file includes a SPA redirect handler that converts GitHub Pages 404 responses into proper client-side routes.
+For E2E tests, `.env.test` provides plain-text local Supabase values. The Playwright config auto-detects local Supabase credentials via `supabase status -o env` and re-signs JWT tokens for ES256 compatibility.
 
 ## Database Schema
 
-Supabase Postgres with 21 migration files (4,289 total lines of SQL) in `supabase/migrations/`. Postgres major version: 17. Tables include:
+Supabase Postgres with 23 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
 
 - `users` -- App users with `partner_id` for partner linking
 - `moods` -- Mood tracking entries with emoji, multi-mood support, and optional notes
@@ -197,14 +190,6 @@ All tables have Row Level Security (RLS) enabled. TypeScript types are auto-gene
 
 14 pgTAP database test files in `supabase/tests/database/` covering schema, RLS policies, RPCs, reflections, bookmarks, sessions, messages, couple stats, lobby, lock-in, and session end.
 
-Local Supabase configuration is in `supabase/config.toml` with:
-
-- API port: 54321
-- DB port: 54322
-- Postgres major version: 17
-- Realtime enabled
-- Auth: email/password with signup enabled
-
 ## Key Architectural Decisions
 
 1. **No router library.** Navigation is simple enough (6 views + admin) that a Zustand slice with `history.pushState` suffices. This avoids a dependency and keeps the bundle small.
@@ -219,10 +204,6 @@ Local Supabase configuration is in `supabase/config.toml` with:
 
 6. **fnox/age for secrets.** Secrets are encrypted with age and stored inline in `fnox.toml` (committed to git). This works across Mac, WSL, SSH, and CI without macOS Keychain dependency.
 
-7. **Base path handling.** Production uses `/My-Love/` base path for GitHub Pages. Development uses `/`. This is configured in `vite.config.ts` and handled in `App.tsx` route detection.
+7. **Manual chunk splitting.** Vendor libraries are split into stable chunks (`vendor-react`, `vendor-supabase`, `vendor-state`, `vendor-animation`, `vendor-icons`) so app code changes do not invalidate cached vendor bundles.
 
-8. **ESLint as architectural guardrail.** ESLint rules enforce domain boundaries: scripture containers cannot import Supabase directly, React code cannot call `getState()`, and submission controls must include `disabled` props.
-
-9. **Catch blocks must never be empty.** In scripture code, catch blocks must call `handleScriptureError()` or re-throw. Outside scripture code, catch blocks must re-throw or map to the feature's error handler.
-
-10. **Sentry for error tracking.** Sentry is initialized in production only with PII stripping. Chunk load failures, network errors, and ResizeObserver noise are filtered out.
+8. **Zod at every boundary.** Runtime validation prevents data corruption from IndexedDB schema drift, Supabase schema changes, or malformed API responses.

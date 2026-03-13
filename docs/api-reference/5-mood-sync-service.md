@@ -2,127 +2,113 @@
 
 **Sources:**
 
-- `src/api/moodSyncService.ts` (Supabase sync with broadcast)
-- `src/services/syncService.ts` (batch sync orchestration)
+- `src/api/moodSyncService.ts` -- Supabase sync + broadcast
+- `src/services/moodService.ts` -- IndexedDB mood operations (for pending mood retrieval)
 
 ## Overview
 
-The mood sync layer implements the **offline-first** sync pattern: mood entries are created in IndexedDB first (via `moodService`), then synced to Supabase. There are two sync services with different responsibilities.
+Handles synchronization of mood entries between IndexedDB (offline) and Supabase (online). Provides real-time partner mood updates via the Supabase Broadcast API.
 
-## MoodSyncService (src/api/moodSyncService.ts)
+**Singleton:** `export const moodSyncService = new MoodSyncService()`
 
-Handles individual mood sync, partner broadcasts, realtime subscriptions, and remote queries.
-
-### Types
+## Types
 
 ```typescript
+type SupabaseMoodRecord = SupabaseMood; // Re-export alias
+type MoodEntryInsert = MoodInsert; // Re-export alias
+
 interface SyncResult {
-  synced: number;
-  failed: number;
-  errors: string[];
+  synced: number; // Successfully synced count
+  failed: number; // Failed count
+  errors: string[]; // Error messages for failed entries
 }
 ```
 
-### Methods
+## Methods
 
-#### `syncMood(mood: MoodEntry): Promise<SupabaseMoodRecord>`
+### `syncMood(mood: MoodEntry): Promise<SupabaseMoodRecord>`
 
-Uploads a single mood to Supabase with partner notification.
-
-**Flow:**
-
-1. Check `isOnline()` -- throw if offline
-2. Transform local `MoodEntry` to `MoodInsert` format (snake_case, ISO timestamps)
-3. Call `moodApi.create()` for validated insert
-4. Fire-and-forget: broadcast to partner via `broadcastMoodToPartner()`
-5. Return the validated Supabase record
-
-**Mood transformation:** Maps `mood.moods` array (or fallback to `[mood.mood]`) into `mood_types` for multi-mood support.
-
-#### `syncPendingMoods(): Promise<SyncResult>`
-
-Batch syncs all unsynced moods from IndexedDB.
+Uploads a single mood entry to Supabase.
 
 **Flow:**
 
-1. Check `isOnline()` -- return early with error if offline
-2. Call `moodService.getUnsyncedMoods()` from IndexedDB
-3. For each mood, call `syncMoodWithRetry()` (exponential backoff)
-4. On success: call `moodService.markAsSynced(localId, supabaseId)`
-5. On failure: log error and continue (partial failure handling)
-6. Return detailed `SyncResult`
+1. Checks `isOnline()` -- throws `SupabaseServiceError` if offline
+2. Transforms local `MoodEntry` to `MoodInsert` format (maps `mood` to `mood_type`, `moods` array to `mood_types`)
+3. Calls `moodApi.create(moodInsert)` for validated insert
+4. On success, fires a background broadcast to partner via `broadcastMoodToPartner()` (fire-and-forget)
+5. Returns the validated Supabase record
 
-**Retry logic (private `syncMoodWithRetry()`):**
+**Partner broadcast:** Uses `getPartnerId()` to find partner, then broadcasts on the partner's channel. Errors are logged but never thrown.
 
-- Max 3 retries (4 total attempts)
-- Delays: 1000ms, 2000ms, 4000ms
+---
+
+### `syncPendingMoods(): Promise<SyncResult>`
+
+Batch syncs all unsynced moods from IndexedDB to Supabase.
+
+**Flow:**
+
+1. Checks `isOnline()` -- returns early with error message if offline
+2. Calls `moodService.getUnsyncedMoods()` to get pending entries
+3. For each mood, calls `syncMoodWithRetry()` with exponential backoff
+4. On success: calls `moodService.markAsSynced(mood.id, syncedMood.id)`
+5. On failure: logs error, continues to next mood (partial failure handling)
+6. Returns `SyncResult` summary
+
+**Retry strategy (per mood):**
+
+- 4 total attempts (1 initial + 3 retries)
+- Delays: 1s, 2s, 4s (exponential backoff)
 - Checks `isOnline()` before each attempt
 - Throws after all attempts fail
 
-#### `subscribeMoodUpdates(callback, onStatusChange?): Promise<() => void>`
+---
 
-Subscribes to partner mood updates via **Broadcast API** (not `postgres_changes`).
+### `subscribeMoodUpdates(callback, onStatusChange?): Promise<() => void>`
 
-**Why Broadcast instead of postgres_changes:** RLS policies on the moods table use complex subqueries for partner lookup that Supabase Realtime cannot evaluate.
+```typescript
+async subscribeMoodUpdates(
+  callback: (mood: SupabaseMoodRecord) => void,
+  onStatusChange?: (status: string) => void
+): Promise<() => void>
+```
 
-**Channel:** `mood-updates:{currentUserId}` with `broadcast: { self: false }`
+Subscribes to real-time partner mood updates via the Supabase Broadcast API.
 
-**Event:** `new_mood` -- partner broadcasts to this channel when they log a mood.
+**Why Broadcast instead of postgres_changes:** RLS policies on the `moods` table use a subquery for partner lookup that Supabase Realtime cannot evaluate. Broadcast API bypasses this limitation.
+
+**Channel:** `mood-updates:{currentUserId}` -- each user subscribes to their OWN channel. The partner broadcasts TO this channel when they log a mood.
+
+**Config:** `broadcast: { self: false }` -- prevents receiving own broadcasts.
+
+**Event:** `new_mood` -- contains `{ id, user_id, mood_type, mood_types, note, created_at }`
 
 **Returns:** Unsubscribe function that removes the channel.
 
-#### `fetchMoods(userId: string, limit?: number): Promise<SupabaseMoodRecord[]>`
+---
 
-Delegates to `moodApi.fetchByUser()` for validated remote queries.
+### `fetchMoods(userId: string, limit?: number): Promise<SupabaseMoodRecord[]>`
 
-#### `getLatestPartnerMood(userId: string): Promise<SupabaseMoodRecord | null>`
+Delegates to `moodApi.fetchByUser(userId, limit)`. Convenience wrapper.
 
-Fetches the single most recent mood for a user. Returns `null` on error (graceful degradation).
+---
 
-### Private: broadcastMoodToPartner()
+### `getLatestPartnerMood(userId: string): Promise<SupabaseMoodRecord | null>`
 
-Creates an ephemeral Broadcast channel (`mood-updates:{partnerId}`), sends the mood data, then immediately removes the channel. Fire-and-forget -- errors are logged but not thrown.
+Fetches the most recent mood for a user (typically the partner).
 
-## SyncService (src/services/syncService.ts)
+**Implementation:** Calls `fetchMoods(userId, 1)` and returns the first element or `null`.
 
-Simpler batch sync using parallel `Promise.all` with partial failure handling.
+**Error handling:** Returns `null` on any failure (graceful degradation for read operations).
 
-### Types
+## Private Methods
 
-```typescript
-interface MoodSyncResult {
-  localId: number;
-  success: boolean;
-  supabaseId?: string;
-  error?: string;
-}
+### `broadcastMoodToPartner(mood, partnerId): Promise<void>`
 
-interface SyncSummary {
-  total: number;
-  successful: number;
-  failed: number;
-  results: MoodSyncResult[];
-}
-```
+Creates an ephemeral Supabase channel to the partner's `mood-updates:{partnerId}` channel, sends a `new_mood` broadcast event, then immediately unsubscribes and removes the channel.
 
-### Methods
+**Fire-and-forget:** Errors are logged but never thrown to the caller.
 
-#### `syncPendingMoods(): Promise<SyncSummary>`
+### `syncMoodWithRetry(mood: MoodEntry): Promise<SupabaseMoodRecord>`
 
-Syncs all unsynced moods using `Promise.all()` for parallel execution. Each mood is synced independently -- failures do not block other moods.
-
-#### `hasPendingSync(): Promise<boolean>`
-
-Returns `true` if there are any unsynced moods in IndexedDB.
-
-#### `getPendingCount(): Promise<number>`
-
-Returns the count of unsynced moods.
-
-## Hybrid Sync Strategy
-
-The app uses three complementary sync triggers:
-
-1. **Immediate sync** -- on mood creation (in-app)
-2. **Periodic sync** -- while app is open (in-app)
-3. **Background Sync** -- when app is closed (service worker, see Doc 11)
+Wraps `syncMood()` with exponential backoff retry logic (1s, 2s, 4s delays, 3 retries max).

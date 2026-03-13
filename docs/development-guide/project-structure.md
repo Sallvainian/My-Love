@@ -68,6 +68,8 @@ src/
     constants.ts                    # APP_CONFIG (partner name, start date), USER_ID, PARTNER_NAME
     images.ts                       # Image asset configuration
     performance.ts                  # Pagination, storage quotas, validation limits
+    relationshipDates.ts            # Relationship date configuration for timers
+    sentry.ts                       # Sentry error tracking initialization
 
   constants/
     animations.ts                   # Animation constant values
@@ -95,6 +97,7 @@ src/
     performanceMonitor.ts           # Operation timing and metrics (singleton)
     photoStorageService.ts          # Photo storage management
     realtimeService.ts              # Supabase Realtime subscription management
+    scriptureReadingService.ts      # Scripture reading session service
     storage.ts                      # IndexedDB and localStorage utilities
     syncService.ts                  # Data synchronization service
 
@@ -113,6 +116,7 @@ src/
       scriptureReadingSlice.ts      # Scripture reading sessions, progress, reflection
 
   sw.ts                             # Custom service worker (InjectManifest strategy)
+  sw-db.ts                          # Service worker IndexedDB utilities
   sw-types.d.ts                     # TypeScript declarations for service worker context
 
   types/
@@ -121,6 +125,7 @@ src/
     database.types.ts               # Auto-generated from Supabase schema (DO NOT EDIT MANUALLY)
 
   utils/
+    backgroundSync.ts               # Background sync and service worker utilities
     calendarHelpers.ts              # Calendar date utilities
     countdownService.ts             # Countdown timer calculation
     dateFormatters.ts               # Date display formatting
@@ -143,6 +148,8 @@ src/
 
   main.tsx                          # App entry point: StrictMode, LazyMotion, SW registration
   App.tsx                           # Root component: auth gate, routing, lazy loading, sync
+  index.css                         # Global CSS entry point (Tailwind directives)
+  vite-env.d.ts                     # Vite environment type declarations
 ```
 
 ## Tests (`tests/`)
@@ -183,6 +190,8 @@ tests/
     helpers/
       scripture-lobby.ts            # Scripture lobby helpers
       scripture-together.ts         # Scripture together mode helpers
+    reporters/
+      failure-summary-reporter.ts   # Custom Playwright reporter for failure summaries
 ```
 
 ## Supabase (`supabase/`)
@@ -191,9 +200,9 @@ tests/
 supabase/
   config.toml                       # Local Supabase configuration (ports, auth, storage, realtime)
   seed.sql                          # Database seed data for local development
-  migrations/                       # 21 SQL migration files (YYYYMMDDHHmmss_description.sql format)
+  migrations/                       # 23 SQL migration files (YYYYMMDDHHmmss_description.sql format)
   tests/
-    database/                       # pgTAP database tests
+    database/                       # 14 pgTAP database test files
 ```
 
 Key `config.toml` settings:
@@ -238,26 +247,41 @@ scripts/
 .github/
   actions/
     setup-supabase/
-      action.yml                    # Composite action: install CLI, start local, apply migrations, export credentials
+      action.yml                    # Composite action: install CLI v2.72.7, start local, apply migrations, export credentials
 
   workflows/
+    # Core pipelines
     deploy.yml                      # Build + smoke test + deploy to GitHub Pages + health check
     test.yml                        # Full test pipeline: lint, unit, DB, integration, API, E2E P0 gate, E2E sharded, burn-in
+
+    # Database
     supabase-migrations.yml         # Migration validation on PRs touching supabase/ paths
+
+    # AI: Claude
     claude.yml                      # Claude Code for @claude mentions in issues/PRs (claude-opus-4-6)
-    claude-code-review.yml          # Automated PR code review with Claude
+    claude-code-review.yml          # Automated PR code review with Claude /review skill
     manual-code-analysis.yml        # On-demand commit summarization or security review
     ci-failure-auto-fix.yml         # Auto-fix CI failures with Claude Code on non-main branches
-    bundle-size.yml                 # Bundle size tracking and regression detection
-    lighthouse.yml                  # Lighthouse performance audit
-    codeql.yml                      # CodeQL security analysis
-    dependency-review.yml           # Dependency vulnerability scanning
-    bmad-story-sync.yml             # BMAD workflow story synchronization
-    gemini-*.yml                    # Gemini AI integration workflows
 
-  dependabot.yml                    # Weekly npm + GitHub Actions dependency updates (Monday)
+    # AI: Gemini
+    gemini-dispatch.yml             # Central dispatcher: routes to triage/review/invoke/plan-execute
+    gemini-review.yml               # PR code review with Gemini CLI + GitHub MCP server
+    gemini-triage.yml               # AI-powered issue labeling
+    gemini-scheduled-triage.yml     # Hourly batch triage of unlabeled issues
+    gemini-invoke.yml               # General-purpose Gemini CLI invocation
+    gemini-plan-execute.yml         # Plan execution with write access
+
+    # Quality and security
+    bundle-size.yml                 # Bundle size tracking and regression detection (brotli)
+    lighthouse.yml                  # Lighthouse PWA performance audit
+    codeql.yml                      # CodeQL security analysis (javascript-typescript)
+    dependency-review.yml           # Dependency vulnerability scanning (fails on moderate+)
+
+    # Project management
+    bmad-story-sync.yml             # BMAD workflow story synchronization on issue close
+
   codeql/
-    codeql-config.yml               # CodeQL security analysis (security-extended + security-and-quality)
+    codeql-config.yml               # CodeQL security analysis configuration
 ```
 
 ## Configuration Files (Root)
@@ -265,6 +289,7 @@ scripts/
 ```
 fnox.toml                           # Age-encrypted secrets (Supabase, Sentry) -- safe to commit
 .mise.toml                          # Tool versions (Node 24.13.0) + env vars
+.node-version                       # Node version file for CI (24.13.0)
 .env.example                        # Template showing required variables
 .env.test                           # Plain-text local Supabase values for E2E testing
 .prettierrc                         # Prettier config (100 char width, single quotes, tailwind plugin)

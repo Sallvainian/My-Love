@@ -1,125 +1,44 @@
 # API Reference
 
-Complete reference documentation for the My Love application API layer.
+Complete API documentation for the My Love PWA backend services.
 
-## Technology Stack
+## Sections
 
-| Layer           | Technology                                                   | Version                      |
-| --------------- | ------------------------------------------------------------ | ---------------------------- |
-| Frontend        | React                                                        | 19.2.4                       |
-| Language        | TypeScript                                                   | 5.9.3                        |
-| Build           | Vite                                                         | 7.3.1                        |
-| Backend         | Supabase (Auth, Postgres, Storage, Realtime, Edge Functions) | supabase-js 2.97.0           |
-| Validation      | Zod                                                          | 4.3.6 (imported as `zod/v4`) |
-| Offline Storage | IndexedDB via `idb`                                          | 8.0.3                        |
-| Service Worker  | Workbox (InjectManifest)                                     | --                           |
+1. [Supabase Client Configuration](./1-supabase-client-configuration.md)
+2. [Authentication Service](./2-authentication-service.md)
+3. [Error Handling Utilities](./3-error-handling-utilities.md)
+4. [Mood API Service](./4-mood-api-service.md)
+5. [Mood Sync Service](./5-mood-sync-service.md)
+6. [Interaction Service](./6-interaction-service.md)
+7. [Partner Service](./7-partner-service.md)
+8. [IndexedDB Services](./8-indexeddb-services.md)
+9. [Photo Services](./9-photo-services.md)
+10. [Validation Layer](./10-validation-layer.md)
+11. [Service Worker & Background Sync](./11-service-worker-background-sync.md)
+12. [Real-Time Subscriptions](./12-real-time-subscriptions.md)
+13. [Scripture Reading Service](./13-scripture-reading-service.md)
+14. [Additional Services](./14-additional-services.md)
 
 ## Architecture Overview
 
 ```
-UI Components (React 19 + Zustand Sliced Store)
+UI Components (React 19)
     |
-    v
-API Services (src/api/)              Service Layer (src/services/)
-  - authService (facade)               - BaseIndexedDBService (abstract)
-  - moodApi (validated CRUD)            - moodService (IndexedDB)
-  - moodSyncService (sync + broadcast)  - customMessageService (IndexedDB)
-  - interactionService (poke/kiss)       - photoStorageService (IndexedDB)
-  - partnerService (connections)         - scriptureReadingService (cache-first)
-  - errorHandlers (retry, mapping)       - realtimeService (channel mgmt)
-  - validation/supabaseSchemas           - syncService (batch sync)
-    |                                    - imageCompressionService
-    v                                    - loveNoteImageService
-Supabase Client (singleton, typed)       - photoService (Supabase Storage)
-    |                                    - performanceMonitor (timing)
-    v                                    - migrationService (LS -> IDB)
-Supabase Backend                     Edge Functions (Deno)
-  - Postgres with RLS                  - upload-love-note-image
-  - Auth (email, Google OAuth)
-  - Storage (photos, love-note-images)
-  - Realtime (Broadcast + postgres_changes)
+Zustand Store (10 slices via AppState)
+    |
+Services Layer (IndexedDB CRUD, business logic, caching)
+    |
+API Layer (Supabase client, Zod validation, error handling)
+    |
+Supabase Backend (PostgreSQL + RLS, Storage, Realtime, Auth, Edge Functions)
 ```
 
-## Singleton Exports
+### Key Patterns
 
-All services use the singleton pattern. Import the instance, not the class:
-
-| Singleton                 | Import Path                            |
-| ------------------------- | -------------------------------------- |
-| `supabase`                | `src/api/supabaseClient`               |
-| `authService`             | `src/api/authService`                  |
-| `moodApi`                 | `src/api/moodApi`                      |
-| `moodSyncService`         | `src/api/moodSyncService`              |
-| `interactionService`      | `src/api/interactionService`           |
-| `partnerService`          | `src/api/partnerService`               |
-| `moodService`             | `src/services/moodService`             |
-| `customMessageService`    | `src/services/customMessageService`    |
-| `photoStorageService`     | `src/services/photoStorageService`     |
-| `scriptureReadingService` | `src/services/scriptureReadingService` |
-| `imageCompressionService` | `src/services/imageCompressionService` |
-| `photoService`            | `src/services/photoService`            |
-| `realtimeService`         | `src/services/realtimeService`         |
-| `syncService`             | `src/services/syncService`             |
-| `performanceMonitor`      | `src/services/performanceMonitor`      |
-| `storageService`          | `src/services/storage` (legacy)        |
-
-## Documents
-
-| #   | Document                                                                   | Description                                                     |
-| --- | -------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1   | [Supabase Client Configuration](./1-supabase-client-configuration.md)      | Singleton client, env vars, partner helpers                     |
-| 2   | [Authentication Service](./2-authentication-service.md)                    | Sign-in/up, OAuth, session management, token storage            |
-| 3   | [Error Handling Utilities](./3-error-handling-utilities.md)                | Error classes, retry logic, network detection, error mapping    |
-| 4   | [Mood API Service](./4-mood-api-service.md)                                | Validated Supabase CRUD for mood entries                        |
-| 5   | [Mood Sync Service](./5-mood-sync-service.md)                              | IndexedDB-to-Supabase sync with Broadcast API                   |
-| 6   | [Interaction Service](./6-interaction-service.md)                          | Poke/kiss interactions with Realtime subscriptions              |
-| 7   | [Partner Service](./7-partner-service.md)                                  | User search, partner requests, connection management            |
-| 8   | [IndexedDB Services](./8-indexeddb-services.md)                            | BaseIndexedDBService, mood, message, photo IndexedDB CRUD       |
-| 9   | [Photo Services](./9-photo-services.md)                                    | Cloud storage, local storage, compression, love note images     |
-| 10  | [Validation Layer](./10-validation-layer.md)                               | Zod schemas, error formatting, custom error classes             |
-| 11  | [Service Worker & Background Sync](./11-service-worker-background-sync.md) | Workbox caching, background mood sync, SW-DB helpers            |
-| 12  | [Real-Time Subscriptions](./12-real-time-subscriptions.md)                 | Broadcast API, postgres_changes, channel management             |
-| 13  | [Scripture Reading Service](./13-scripture-reading-service.md)             | Cache-first CRUD for sessions, reflections, bookmarks, messages |
-| 14  | [Additional Services](./14-additional-services.md)                         | Performance monitor, migration service, legacy storage, sync    |
-
-## Source File Map
-
-```
-src/api/
-  supabaseClient.ts          -> Doc 1
-  authService.ts             -> Doc 2
-  auth/actionService.ts      -> Doc 2
-  auth/sessionService.ts     -> Doc 2
-  auth/types.ts              -> Doc 2
-  errorHandlers.ts           -> Doc 3
-  moodApi.ts                 -> Doc 4
-  moodSyncService.ts         -> Doc 5
-  interactionService.ts      -> Doc 6
-  partnerService.ts          -> Doc 7
-  validation/supabaseSchemas.ts -> Doc 10
-
-src/services/
-  BaseIndexedDBService.ts    -> Doc 8
-  dbSchema.ts                -> Doc 8
-  moodService.ts             -> Doc 8
-  customMessageService.ts    -> Doc 8
-  photoStorageService.ts     -> Doc 9
-  photoService.ts            -> Doc 9
-  imageCompressionService.ts -> Doc 9
-  loveNoteImageService.ts    -> Doc 9
-  scriptureReadingService.ts -> Doc 13
-  syncService.ts             -> Doc 5, Doc 14
-  realtimeService.ts         -> Doc 12
-  performanceMonitor.ts      -> Doc 14
-  migrationService.ts        -> Doc 14
-  storage.ts                 -> Doc 14
-
-src/validation/
-  schemas.ts                 -> Doc 10
-  errorMessages.ts           -> Doc 10
-
-src/sw.ts                    -> Doc 11
-src/sw-db.ts                 -> Doc 11
-
-supabase/functions/upload-love-note-image/index.ts -> Doc 9
-```
+- **Singleton services**: Each service is instantiated once at module level and exported (e.g., `export const moodApi = new MoodApi()`)
+- **Zod validation**: API responses validated via `SupabaseMoodSchema` etc.; service inputs validated via `MoodEntrySchema` etc.
+- **Offline-first**: IndexedDB stores data locally; background sync uploads pending entries when connectivity returns
+- **Error hierarchy**: `SupabaseServiceError` (DB errors) > `ApiValidationError` (response validation) > `ValidationError` (input validation)
+- **Cache-first reads**: Scripture service reads IndexedDB first, returns cached data, then refreshes from server in background
+- **Write-through**: Mutations go to Supabase first; on success, update local IndexedDB cache
+- **Broadcast API**: Used for partner mood updates (avoids RLS issues with postgres_changes)

@@ -113,14 +113,27 @@ subscribeToInteractions(callback) {
 }
 ```
 
+## Scripture Reading Realtime (`src/hooks/useScriptureBroadcast.ts`)
+
+The `useScriptureBroadcast` hook manages the private broadcast channel `scripture-session:{sessionId}` for together-mode reading sessions. This is the **only** place in the codebase that imports Supabase for scripture broadcast — the slice itself is decoupled and receives a `broadcastFn` via `setBroadcastFn()`.
+
+### Events
+
+The channel carries `state_updated` events with payloads including: role selection, ready toggles, countdown start, lock-in status, step advances, phase changes, and end-session signals.
+
+### Broadcast Nuke Condition
+
+On the receiving side (`onBroadcastReceived` in `scriptureReadingSlice`), the slice resets all session state **only** when `payload.triggered_by === 'end_session'`. Session completion uses a direct DB update (not broadcast), so a `currentPhase === 'complete'` broadcast does not trigger a reset.
+
 ## Channel Summary
 
-| Channel Pattern            | Feature       | Protocol                  | Direction     |
-| -------------------------- | ------------- | ------------------------- | ------------- |
-| `love-notes:{partnerId}`   | Love Notes    | Broadcast                 | Bidirectional |
-| `partner-mood:{partnerId}` | Partner Mood  | Broadcast                 | Bidirectional |
-| `incoming-interactions`    | Poke/Kiss     | postgres_changes (INSERT) | Receive only  |
-| `moods:user_id=eq.{id}`    | Mood Realtime | postgres_changes (INSERT) | Receive only  |
+| Channel Pattern                 | Feature           | Protocol                  | Direction     |
+| ------------------------------- | ----------------- | ------------------------- | ------------- |
+| `love-notes:{partnerId}`        | Love Notes        | Broadcast                 | Bidirectional |
+| `partner-mood:{partnerId}`      | Partner Mood      | Broadcast                 | Bidirectional |
+| `scripture-session:{sessionId}` | Scripture Reading | Broadcast                 | Bidirectional |
+| `incoming-interactions`         | Poke/Kiss         | postgres_changes (INSERT) | Receive only  |
+| `moods:user_id=eq.{id}`         | Mood Realtime     | postgres_changes (INSERT) | Receive only  |
 
 ## Supabase Client Configuration
 

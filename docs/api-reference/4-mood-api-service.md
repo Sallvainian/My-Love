@@ -4,100 +4,133 @@
 
 ## Overview
 
-The `MoodApi` class provides **Zod-validated** CRUD operations for mood entries in the Supabase `moods` table. Every response from Supabase is validated against `SupabaseMoodSchema` before being returned, ensuring type safety and data integrity at the API boundary.
+Provides validated CRUD operations for mood entries in the Supabase `moods` table. All API responses are validated through `SupabaseMoodSchema` (Zod) before being returned, ensuring type safety at the API boundary.
 
-## ApiValidationError Class
+**Singleton:** `export const moodApi = new MoodApi()`
+
+**Supabase table:** `moods`
+
+## Error Classes
+
+### `ApiValidationError`
 
 ```typescript
 class ApiValidationError extends Error {
-  public readonly validationErrors: ZodError | null;
-  constructor(message: string, validationErrors?: ZodError | null);
+  readonly validationErrors: ZodError | null;
 }
 ```
 
-Thrown when a Supabase response fails Zod schema validation. The `validationErrors` property contains the raw `ZodError` for debugging.
+Thrown when a Supabase response fails Zod schema validation. Wraps the underlying `ZodError` for inspection.
 
 ## Methods
-
-All methods check `isOnline()` before making network calls and throw `SupabaseServiceError` with `isNetworkError: true` when offline.
 
 ### `create(moodData: MoodInsert): Promise<SupabaseMood>`
 
 Inserts a new mood entry.
 
-| Parameter  | Type         | Description                                                               |
-| ---------- | ------------ | ------------------------------------------------------------------------- |
-| `moodData` | `MoodInsert` | Mood data (`user_id`, `mood_type`, `mood_types?`, `note?`, `created_at?`) |
-
 **Query:** `supabase.from('moods').insert(moodData).select().single()`
 
-**Validation:** Response parsed against `SupabaseMoodSchema`.
+**Validation:** Response validated via `SupabaseMoodSchema.parse(data)`
 
-**Throws:** `ApiValidationError` on response validation failure, `SupabaseServiceError` on DB error.
+**Throws:**
+
+- `SupabaseServiceError` -- on network/database error
+- `ApiValidationError` -- if response fails Zod validation
+
+**Precondition:** `isOnline()` check; throws network error if offline.
+
+---
 
 ### `fetchByUser(userId: string, limit?: number): Promise<SupabaseMood[]>`
 
-Fetches moods for a specific user, sorted newest first.
-
-| Parameter | Type     | Default | Description |
-| --------- | -------- | ------- | ----------- |
-| `userId`  | `string` | --      | User UUID   |
-| `limit`   | `number` | `50`    | Max results |
+Fetches moods for a user, sorted by `created_at` descending.
 
 **Query:** `supabase.from('moods').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(limit)`
 
-**Validation:** Response parsed against `MoodArraySchema` (array of `SupabaseMoodSchema`).
+**Default limit:** `50`
+
+**Validation:** `MoodArraySchema.parse(data || [])`
+
+---
 
 ### `fetchByDateRange(userId: string, startDate: string, endDate: string): Promise<SupabaseMood[]>`
 
-Fetches moods within a date range.
+Fetches moods within an ISO date range using `.gte()` and `.lte()` filters on `created_at`.
 
-| Parameter   | Type     | Description               |
-| ----------- | -------- | ------------------------- |
-| `userId`    | `string` | User UUID                 |
-| `startDate` | `string` | ISO timestamp (inclusive) |
-| `endDate`   | `string` | ISO timestamp (inclusive) |
+**Validation:** `MoodArraySchema.parse(data || [])`
 
-**Query:** Uses `.gte('created_at', startDate).lte('created_at', endDate)`.
+---
 
 ### `fetchById(moodId: string): Promise<SupabaseMood | null>`
 
-Fetches a single mood by ID. Returns `null` for `PGRST116` (no rows found) instead of throwing.
+Fetches a single mood by UUID. Returns `null` if not found (`PGRST116` handled gracefully).
+
+**Query:** `supabase.from('moods').select('*').eq('id', moodId).single()`
+
+**Validation:** `SupabaseMoodSchema.parse(data)`
+
+---
 
 ### `update(moodId: string, updates: Partial<MoodInsert>): Promise<SupabaseMood>`
 
-Updates an existing mood. Automatically appends `updated_at: new Date().toISOString()`.
+Updates a mood entry. Automatically sets `updated_at` to current ISO timestamp.
 
-**Query:** `supabase.from('moods').update({ ...updates, updated_at }).eq('id', moodId).select().single()`
+**Query:** `supabase.from('moods').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', moodId).select().single()`
+
+**Validation:** `SupabaseMoodSchema.parse(data)`
+
+---
 
 ### `delete(moodId: string): Promise<void>`
 
-Deletes a mood entry. No response validation needed.
+Deletes a mood entry by UUID. No response validation (void return).
 
 **Query:** `supabase.from('moods').delete().eq('id', moodId)`
 
+---
+
 ### `getMoodHistory(userId: string, offset?: number, limit?: number): Promise<SupabaseMood[]>`
 
-Paginated mood history.
+Paginated mood history using `.range()`.
 
-| Parameter | Type     | Default | Description       |
-| --------- | -------- | ------- | ----------------- |
-| `userId`  | `string` | --      | User UUID         |
-| `offset`  | `number` | `0`     | Starting position |
-| `limit`   | `number` | `50`    | Page size         |
+**Query:** `supabase.from('moods').select('*').eq('user_id', userId).order('created_at', { ascending: false }).range(offset, offset + limit - 1)`
 
-**Query:** Uses `.range(offset, offset + limit - 1)` for server-side pagination.
+**Defaults:** `offset = 0`, `limit = 50`
 
-## Singleton
+**Validation:** `MoodArraySchema.parse(data || [])`
+
+## Error Handling Pattern
+
+All methods follow the same error handling pattern:
+
+1. Check `isOnline()` -- throw `SupabaseServiceError` (network) if offline
+2. Execute Supabase query
+3. Validate response with Zod schema
+4. On `ApiValidationError` -- re-throw as-is
+5. On `PostgrestError` -- transform via `handleSupabaseError()`
+6. On other errors -- transform via `handleNetworkError()`
+
+## Types
 
 ```typescript
-export const moodApi = new MoodApi();
+// From src/api/validation/supabaseSchemas.ts
+type SupabaseMood = {
+  id: string; // UUID
+  user_id: string; // UUID
+  mood_type: MoodType; // enum: loved|happy|content|excited|thoughtful|grateful|sad|anxious|frustrated|angry|lonely|tired
+  mood_types: MoodType[] | null; // Multi-mood support (nullable for legacy records)
+  note: string | null;
+  created_at: string | null; // ISO timestamp
+  updated_at: string | null; // ISO timestamp
+};
+
+type MoodInsert = {
+  id?: string;
+  user_id: string;
+  mood_type: MoodType;
+  mood_types?: MoodType[];
+  note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
 ```
-
-## Validation Schemas Used
-
-- `SupabaseMoodSchema` -- validates individual mood records
-- `MoodArraySchema` -- validates arrays of mood records (wraps `SupabaseMoodSchema`)
-- `MoodInsert` type -- inferred from `MoodInsertSchema` for input validation
-
-All schemas are defined in `src/api/validation/supabaseSchemas.ts`.

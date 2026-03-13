@@ -1,152 +1,132 @@
-# API Reference -- Table of Contents
+# API Reference - Table of Contents
 
 ## 1. Supabase Client Configuration
 
-- Environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`)
-- Singleton client instance with `Database` typing (supabase-js 2.97.0)
-- Auth config: `persistSession`, `autoRefreshToken`, `detectSessionInUrl`
-- Realtime config: `eventsPerSecond: 10`
-- `getPartnerId()` -- query partner_id from users table
-- `getPartnerDisplayName()` -- fetch partner's display_name
-- `isSupabaseConfigured()` -- verify env vars present
+- Singleton client instance with typed `Database` generic
+- Environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
+- Client options: `persistSession`, `autoRefreshToken`, `detectSessionInUrl`, `eventsPerSecond: 10`
+- `getPartnerId()` - query current user's partner_id from users table
+- `getPartnerDisplayName()` - fetch partner's display_name
+- `isSupabaseConfigured()` - env var presence check
 
 ## 2. Authentication Service
 
-- Facade pattern: `authService` composes `sessionService` + `actionService`
+- Facade: `authService` object composing `sessionService` + `actionService`
 - Types: `AuthCredentials`, `AuthResult`, `AuthStatus`
-- `signIn(credentials)` -- email/password with IndexedDB token storage for Background Sync
-- `signUp(credentials)` -- email/password registration
-- `signOut()` -- logout with IndexedDB token cleanup
-- `signInWithGoogle()` -- OAuth with `access_type: 'offline'`, `prompt: 'consent'`
-- `resetPassword(email)` -- password reset email
-- `getSession()` -- current session from Supabase Auth
-- `getUser()` -- server-validated user object
-- `getCurrentUserId()` -- server-validated user ID
-- `getCurrentUserIdOfflineSafe()` -- cached session user ID (no network call)
-- `getAuthStatus()` -- `{ isAuthenticated, user, session }`
-- `onAuthStateChange(callback)` -- listener with automatic IndexedDB token sync
+- Actions: `signIn()`, `signUp()`, `signOut()`, `resetPassword()`, `signInWithGoogle()`
+- Sessions: `getSession()`, `getUser()`, `getCurrentUserId()`, `getCurrentUserIdOfflineSafe()`
+- `onAuthStateChange()` - listener with IndexedDB token persistence for SW
 
 ## 3. Error Handling Utilities
 
-- `SupabaseServiceError` class: `code`, `details`, `hint`, `isNetworkError`
-- `handleSupabaseError(error, context?)` -- PostgrestError to user-friendly message
-- Error code mapping: 23505 (duplicate), 23503 (FK violation), 23502 (null violation), 42501 (RLS denied), 42P01 (table not found), PGRST116 (no rows), PGRST301 (bad params)
-- `handleNetworkError(error, context?)` -- network failure with offline message
-- `isOnline()` -- `navigator.onLine` check
-- `isPostgrestError(error)` -- type guard
-- `isSupabaseServiceError(error)` -- type guard
-- `logSupabaseError(context, error)` -- structured console logging
-- `retryWithBackoff<T>(operation, config?)` -- exponential backoff
-- `RetryConfig`: `maxAttempts`, `initialDelayMs`, `maxDelayMs`, `backoffMultiplier`
-- `DEFAULT_RETRY_CONFIG`: 3 attempts, 1s initial, 30s max, 2x multiplier
-- `createOfflineMessage(operation)` -- user-friendly offline text
+- `SupabaseServiceError` class with `code`, `details`, `hint`, `isNetworkError`
+- `handleSupabaseError()` - maps PostgrestError codes (23505, 42501, PGRST116, etc.)
+- `handleNetworkError()` - wraps fetch failures
+- Type guards: `isPostgrestError()`, `isSupabaseServiceError()`
+- `retryWithBackoff<T>()` - generic exponential backoff (default: 3 attempts, 1s/2s/4s)
+- `logSupabaseError()`, `createOfflineMessage()`
 
 ## 4. Mood API Service
 
-- `MoodApi` class with Zod-validated Supabase CRUD
-- `ApiValidationError` class with `validationErrors: ZodError | null`
-- `create(moodData: MoodInsert)` -- insert + response validation
-- `fetchByUser(userId, limit=50)` -- query by user, descending
-- `fetchByDateRange(userId, startDate, endDate)` -- date range query
-- `fetchById(moodId)` -- single mood (returns `null` for PGRST116)
-- `update(moodId, updates)` -- partial update with `updated_at`
-- `delete(moodId)` -- remove mood
-- `getMoodHistory(userId, offset=0, limit=50)` -- paginated with `.range()`
+- `MoodApi` class (singleton `moodApi`)
+- `create(moodData: MoodInsert): Promise<SupabaseMood>`
+- `fetchByUser(userId, limit?): Promise<SupabaseMood[]>`
+- `fetchByDateRange(userId, startDate, endDate): Promise<SupabaseMood[]>`
+- `fetchById(moodId): Promise<SupabaseMood | null>`
+- `update(moodId, updates): Promise<SupabaseMood>`
+- `delete(moodId): Promise<void>`
+- `getMoodHistory(userId, offset?, limit?): Promise<SupabaseMood[]>`
+- `ApiValidationError` class with `validationErrors: ZodError`
 
 ## 5. Mood Sync Service
 
-- `MoodSyncService` class for IndexedDB-to-Supabase synchronization
-- `SyncResult`: `{ synced: number, failed: number, errors: string[] }`
-- `syncMood(mood: MoodEntry)` -- transform + upload + broadcast to partner
-- `syncPendingMoods()` -- batch sync with retry (1s/2s/4s backoff, max 3 retries)
-- `subscribeMoodUpdates(callback, onStatusChange?)` -- Broadcast API (not postgres_changes)
-- `fetchMoods(userId, limit=50)` -- delegates to validated `moodApi.fetchByUser()`
-- `getLatestPartnerMood(userId)` -- single most recent mood
-- `SyncService` class (services/syncService.ts): parallel `Promise.all` with partial failure
+- `MoodSyncService` class (singleton `moodSyncService`)
+- `syncMood(mood: MoodEntry): Promise<SupabaseMoodRecord>`
+- `syncPendingMoods(): Promise<SyncResult>`
+- `subscribeMoodUpdates(callback, onStatusChange?): Promise<() => void>`
+- `fetchMoods(userId, limit?): Promise<SupabaseMoodRecord[]>`
+- `getLatestPartnerMood(userId): Promise<SupabaseMoodRecord | null>`
+- Broadcast to partner after sync via ephemeral channel
 
 ## 6. Interaction Service
 
-- `InteractionService` class for poke/kiss interactions
-- Types: `InteractionType = 'poke' | 'kiss'`, `Interaction`, `SupabaseInteractionRecord`
-- `sendPoke(partnerId)` -- delegates to `sendInteraction('poke', partnerId)`
-- `sendKiss(partnerId)` -- delegates to `sendInteraction('kiss', partnerId)`
-- `subscribeInteractions(callback)` -- `postgres_changes` INSERT on interactions table
-- `getInteractionHistory(limit=50, offset=0)` -- bidirectional query with transform
-- `getUnviewedInteractions()` -- unread interactions for current user
-- `markAsViewed(interactionId)` -- update `viewed = true`
+- `InteractionService` class (singleton `interactionService`)
+- `sendPoke(partnerId): Promise<SupabaseInteractionRecord>`
+- `sendKiss(partnerId): Promise<SupabaseInteractionRecord>`
+- `subscribeInteractions(callback): Promise<() => void>` (postgres_changes INSERT)
+- `getInteractionHistory(limit?, offset?): Promise<Interaction[]>`
+- `getUnviewedInteractions(): Promise<Interaction[]>`
+- `markAsViewed(interactionId): Promise<void>`
 
 ## 7. Partner Service
 
-- `PartnerService` class for partner relationship management
-- Types: `UserSearchResult`, `PartnerInfo`, `PartnerRequest`
-- `getPartner()` -- current partner info from users table
-- `searchUsers(query, limit=10)` -- ilike search on email + display_name
-- `sendPartnerRequest(toUserId)` -- insert to partner_requests (checks both users have no partner)
-- `getPendingRequests()` -- returns `{ sent: PartnerRequest[], received: PartnerRequest[] }`
-- `acceptPartnerRequest(requestId)` -- calls `accept_partner_request` RPC
-- `declinePartnerRequest(requestId)` -- calls `decline_partner_request` RPC
-- `hasPartner()` -- boolean check
+- `PartnerService` class (singleton `partnerService`)
+- `getPartner(): Promise<PartnerInfo | null>`
+- `searchUsers(query, limit?): Promise<UserSearchResult[]>`
+- `sendPartnerRequest(toUserId): Promise<void>`
+- `acceptPartnerRequest(requestId): Promise<void>` (calls `accept_partner_request` RPC)
+- `declinePartnerRequest(requestId): Promise<void>` (calls `decline_partner_request` RPC)
+- `getPendingRequests(): Promise<{ sent, received }>`
+- `hasPartner(): Promise<boolean>`
 
 ## 8. IndexedDB Services
 
 - `BaseIndexedDBService<T, DBTypes, StoreName>` abstract class
-- Database schema: `MyLoveDBSchema` (8 stores, v1-v5)
-- `upgradeDb()` centralized migration function
-- `MoodService` -- mood tracking with sync status
-- `CustomMessageService` -- messages with filtering, export/import
-- `PhotoStorageService` -- photo blobs with v1-v2 data migration
-- Scripture stores: sessions, reflections, bookmarks, messages
+  - `init()`, `add()`, `get()`, `getAll()`, `update()`, `delete()`, `clear()`, `getPage()`
+- `MoodService` (store: `moods`, index: `by-date` unique)
+  - `create()`, `updateMood()`, `getMoodForDate()`, `getMoodsInRange()`, `getUnsyncedMoods()`, `markAsSynced()`
+- `PhotoStorageService` (store: `photos`, index: `by-date`)
+  - `create()`, `getAll()`, `getPage()`, `update()`, `getStorageSize()`, `estimateQuotaRemaining()`
+- `CustomMessageService` (store: `messages`, indexes: `by-category`, `by-date`)
+  - `create()`, `updateMessage()`, `getAll(filter?)`, `getActiveCustomMessages()`, `exportMessages()`, `importMessages()`
+- `StorageService` (legacy) - photos and messages CRUD
+- `localStorageHelper` - `get<T>()`, `set<T>()`, `remove()`, `clear()`
 
 ## 9. Photo Services
 
-- `PhotoService` (Supabase Storage) -- cloud photo CRUD with signed URLs
-- `PhotoStorageService` (IndexedDB) -- local photo storage with cursor pagination
-- `ImageCompressionService` -- Canvas API compression (max 2048px, 80% JPEG)
-- `LoveNoteImageService` -- Edge Function upload + signed URL cache with LRU eviction
-- Edge Function: `upload-love-note-image` -- server-side MIME validation + rate limiting
+- **PhotoService** (Supabase Storage, singleton `photoService`)
+  - `getSignedUrl()`, `getSignedUrls()`, `checkStorageQuota()`, `getPhotos()`, `uploadPhoto()`, `deletePhoto()`, `getPhoto()`, `updatePhoto()`
+- **LoveNoteImageService** (Edge Function + Storage)
+  - `uploadLoveNoteImage()`, `uploadCompressedBlob()`, `getSignedImageUrl()`, `batchGetSignedUrls()`, `deleteLoveNoteImage()`
+  - LRU signed URL cache with deduplication
+- **ImageCompressionService** (Canvas API)
+  - `compressImage()`, `validateImageFile()`, `estimateCompressedSize()`
 
 ## 10. Validation Layer
 
-- API schemas (`src/api/validation/supabaseSchemas.ts`): User, Mood, Interaction, Message, Photo, CoupleStats
-- Local schemas (`src/validation/schemas.ts`): Message, Photo, Mood, Settings, Export, Scripture
-- Error utilities (`src/validation/errorMessages.ts`): `ValidationError`, `formatZodError`, `getFieldErrors`
-- 12 mood types, 5 message categories, 3 photo MIME types
+- **Client-side schemas** (`src/validation/schemas.ts`): `MessageSchema`, `PhotoSchema`, `MoodEntrySchema`, `SettingsSchema`, `CustomMessagesExportSchema`, `SupabaseSessionSchema`, `SupabaseReflectionSchema`, `SupabaseBookmarkSchema`, `SupabaseMessageSchema`
+- **API response schemas** (`src/api/validation/supabaseSchemas.ts`): `SupabaseMoodSchema`, `SupabaseInteractionSchema`, `SupabaseUserSchema`, `CoupleStatsSchema`
+- **Error utilities** (`src/validation/errorMessages.ts`): `ValidationError`, `formatZodError()`, `getFieldErrors()`, `createValidationError()`, `isValidationError()`, `isZodError()`
 
 ## 11. Service Worker & Background Sync
 
-- Workbox: `precacheAndRoute`, `NetworkOnly` (JS/CSS), `NetworkFirst` (navigation), `CacheFirst` (assets)
-- Background Sync API for `sync-pending-moods` tag
-- Direct Supabase REST API calls from SW context (no JS client)
-- SW-DB helpers: `getPendingMoods`, `markMoodSynced`, `storeAuthToken`, `getAuthToken`, `clearAuthToken`
+- Workbox strategies: `NetworkOnly` (JS/CSS), `NetworkFirst` (navigation), `CacheFirst` (images/fonts/Google Fonts)
+- Background Sync: `sync-pending-moods` tag triggers `syncPendingMoods()`
+- `sw-db.ts`: `getPendingMoods()`, `markMoodSynced()`, `storeAuthToken()`, `getAuthToken()`, `clearAuthToken()`
+- Direct Supabase REST API calls with stored JWT
 
 ## 12. Real-Time Subscriptions
 
-- `RealtimeService` -- channel management with Map tracking
-- `useScriptureBroadcast` -- private broadcast channel for session state sync
-- `useScripturePresence` -- ephemeral partner position tracking with heartbeat and stale detection
-- `useRealtimeMessages` -- love notes delivery via Broadcast API
-- `usePartnerMood` -- partner mood updates via Broadcast API
-- Interaction realtime via postgres_changes INSERT events
-- 6 channel types: scripture-session, scripture-presence, love-notes, mood-updates, incoming-interactions, moods
+- `RealtimeService` class: postgres_changes on `moods` table
+- Mood broadcast: `channel('mood-updates:{userId}')` with Broadcast API
+- Interaction realtime: `channel('incoming-interactions')` with postgres_changes INSERT filter
+- Scripture session: private broadcast channels `scripture-session:{sessionId}`
 
 ## 13. Scripture Reading Service
 
-- `ScriptureReadingService` extends `BaseIndexedDBService<ScriptureSession>`
-- Cache-first read pattern: IndexedDB -> return -> background refresh from Supabase
-- Write-through pattern: Supabase RPC/table first -> update IndexedDB cache
-- Session CRUD: `createSession`, `getSession` (with onRefresh callback), `getUserSessions`, `updateSession`
-- Reflection CRUD: `addReflection` (via RPC), `getReflectionsBySession`
-- Bookmark CRUD: `addBookmark`, `toggleBookmark`, `getBookmarksBySession`, `updateSessionBookmarkSharing`
-- Message CRUD: `addMessage`, `getMessagesBySession`
-- `getCoupleStats()` -- RPC call with `CoupleStatsSchema` validation
-- `getSessionReportData()` -- server-fresh parallel fetch for Daily Prayer Report
-- Corruption recovery: `recoverAllCaches()`, per-store and per-session scoped recovery
-- `ScriptureErrorCode` enum: VERSION_MISMATCH, SESSION_NOT_FOUND, UNAUTHORIZED, SYNC_FAILED, OFFLINE, CACHE_CORRUPTED, VALIDATION_FAILED
+- `ScriptureReadingService` (extends `BaseIndexedDBService`, singleton `scriptureReadingService`)
+- Sessions: `createSession()`, `getSession()`, `getUserSessions()`, `updateSession()`
+- Reflections: `addReflection()`, `getReflectionsBySession()`
+- Bookmarks: `addBookmark()`, `toggleBookmark()`, `getBookmarksBySession()`, `updateSessionBookmarkSharing()`
+- Messages: `addMessage()`, `getMessagesBySession()`
+- Stats: `getCoupleStats()`
+- Cache recovery: `recoverSessionCache()`, `recoverAllCaches()`
+- Report: `getSessionReportData()`
+- Error codes: `VERSION_MISMATCH`, `SESSION_NOT_FOUND`, `UNAUTHORIZED`, `SYNC_FAILED`, `OFFLINE`, `CACHE_CORRUPTED`, `VALIDATION_FAILED`
 
 ## 14. Additional Services
 
-- `performanceMonitor` -- Web Performance API timing with min/max/avg/total stats, `measureAsync()`, `getReport()`
-- `migrateCustomMessagesFromLocalStorage()` -- one-time LocalStorage to IndexedDB migration with duplicate detection and Zod validation
-- `storageService` (legacy) -- direct IndexedDB photo/message operations, predates BaseIndexedDBService pattern
-- `localStorageHelper` -- type-safe localStorage get/set/remove/clear with error handling
-- `syncService` -- parallel `Promise.all` batch mood sync with `SyncSummary` reporting
+- `SyncService`: `syncPendingMoods()`, `hasPendingSync()`, `getPendingCount()`
+- `ImageCompressionService`: Canvas API compression (max 2048px, 80% JPEG quality)
+- `MigrationService`: `migrateCustomMessagesFromLocalStorage()`
+- `PerformanceMonitor`: `measureAsync()`, `recordMetric()`, `getReport()`

@@ -4,14 +4,19 @@
 
 ## Overview
 
-The `InteractionService` class handles partner interactions (poke, kiss) through Supabase. It provides methods for sending interactions, subscribing to incoming interactions in real time via `postgres_changes`, fetching interaction history, and marking interactions as viewed.
+Handles poke and kiss interactions between partners via Supabase. Provides sending, real-time subscription, history retrieval, and view tracking.
+
+**Singleton:** `export const interactionService = new InteractionService()`
+
+**Supabase table:** `interactions`
 
 ## Types
 
 ```typescript
+type InteractionType = 'poke' | 'kiss';
+
 type SupabaseInteractionRecord = Database['public']['Tables']['interactions']['Row'];
 type InteractionInsert = Database['public']['Tables']['interactions']['Insert'];
-type InteractionType = 'poke' | 'kiss';
 
 interface Interaction {
   id: string;
@@ -23,75 +28,83 @@ interface Interaction {
 }
 ```
 
-`SupabaseInteractionRecord` and `InteractionInsert` are derived directly from the auto-generated `Database` type. `Interaction` is the local camelCase representation used in the app.
-
 ## Methods
 
 ### `sendPoke(partnerId: string): Promise<SupabaseInteractionRecord>`
 
-Sends a poke interaction. Delegates to the private `sendInteraction()` with `type: 'poke'`.
+Sends a poke interaction. Delegates to `sendInteraction('poke', partnerId)`.
+
+---
 
 ### `sendKiss(partnerId: string): Promise<SupabaseInteractionRecord>`
 
-Sends a kiss interaction. Delegates to the private `sendInteraction()` with `type: 'kiss'`.
+Sends a kiss interaction. Delegates to `sendInteraction('kiss', partnerId)`.
 
-### Private: `sendInteraction(type, toUserId)`
-
-**Flow:**
-
-1. Check `isOnline()` -- throw `SupabaseServiceError` with `isNetworkError: true` if offline
-2. Get `currentUserId` via `getCurrentUserId()` from sessionService
-3. Build `InteractionInsert` payload (`type`, `from_user_id`, `to_user_id`, `viewed: false`)
-4. Insert into `interactions` table with `.select().single()`
-5. Return the created record
-
-**Error handling:** Standard pattern -- `logSupabaseError`, then throw `handleSupabaseError` for Postgrest errors or `handleNetworkError` for other failures.
+---
 
 ### `subscribeInteractions(callback): Promise<() => void>`
 
-Subscribes to real-time incoming interactions using `postgres_changes`.
+```typescript
+async subscribeInteractions(
+  callback: (interaction: SupabaseInteractionRecord) => void
+): Promise<() => void>
+```
 
-| Parameter  | Type                                               | Description                              |
-| ---------- | -------------------------------------------------- | ---------------------------------------- |
-| `callback` | `(interaction: SupabaseInteractionRecord) => void` | Called when partner sends an interaction |
+Subscribes to incoming interactions in real-time via `postgres_changes`.
 
 **Channel:** `incoming-interactions`
 
-**Filter:** `postgres_changes` with `event: 'INSERT'`, `schema: 'public'`, `table: 'interactions'`, `filter: to_user_id=eq.{currentUserId}`
+**Filter:** `INSERT` events on `interactions` table where `to_user_id=eq.{currentUserId}`
 
-**Returns:** Unsubscribe function that calls `supabase.removeChannel()` on the stored `realtimeChannel`.
+**Returns:** Unsubscribe function that removes the channel.
 
-**Note:** Unlike mood updates (which use Broadcast API), interactions use `postgres_changes` because the RLS policies on the interactions table are simple enough for Supabase Realtime to evaluate.
+**Throws:** Error if user is not authenticated.
 
-### `getInteractionHistory(limit?, offset?): Promise<Interaction[]>`
+---
 
-Fetches interactions where the current user is either sender or recipient.
+### `getInteractionHistory(limit?: number, offset?: number): Promise<Interaction[]>`
 
-| Parameter | Type     | Default | Description       |
-| --------- | -------- | ------- | ----------------- |
-| `limit`   | `number` | `50`    | Max results       |
-| `offset`  | `number` | `0`     | Starting position |
+Fetches interaction history (both sent and received) for the current user.
 
-**Query:** `.or(from_user_id.eq.{userId},to_user_id.eq.{userId})` with `.order('created_at', { ascending: false })` and `.range(offset, offset + limit - 1)`.
+**Query:** `supabase.from('interactions').select('*').or('from_user_id.eq.{userId},to_user_id.eq.{userId}').order('created_at', { ascending: false }).range(offset, offset + limit - 1)`
 
-**Transformation:** Maps snake_case `SupabaseInteractionRecord` fields to camelCase `Interaction` fields. Defaults `viewed` to `false` if null, and `createdAt` to `new Date()` if null.
+**Defaults:** `limit = 50`, `offset = 0`
+
+**Returns:** Array of local `Interaction` objects (transformed from Supabase records).
+
+---
 
 ### `getUnviewedInteractions(): Promise<Interaction[]>`
 
-Fetches interactions sent to the current user that have not been viewed.
+Fetches unviewed interactions sent to the current user.
 
-**Query:** `.eq('to_user_id', currentUserId).eq('viewed', false)` ordered by `created_at` descending.
+**Query:** `supabase.from('interactions').select('*').eq('to_user_id', currentUserId).eq('viewed', false).order('created_at', { ascending: false })`
 
-**Transformation:** Same snake_case-to-camelCase mapping as `getInteractionHistory`.
+---
 
 ### `markAsViewed(interactionId: string): Promise<void>`
 
 Marks a single interaction as viewed.
 
-**Query:** `.update({ viewed: true }).eq('id', interactionId)`
+**Query:** `supabase.from('interactions').update({ viewed: true }).eq('id', interactionId)`
 
-## Singleton
+## Private Methods
 
-```typescript
-export const interactionService = new InteractionService();
-```
+### `sendInteraction(type, toUserId): Promise<SupabaseInteractionRecord>`
+
+Internal method used by `sendPoke()` and `sendKiss()`.
+
+**Flow:**
+
+1. Checks `isOnline()` -- throws network error if offline
+2. Gets `currentUserId` via `getCurrentUserId()`
+3. Inserts interaction: `supabase.from('interactions').insert({ type, from_user_id, to_user_id, viewed: false }).select().single()`
+4. Returns the created record
+
+## Error Handling
+
+All methods use the standard error handling pattern:
+
+- `isPostgrestError()` check -- transforms via `handleSupabaseError()`
+- All other errors -- transforms via `handleNetworkError()`
+- Errors logged via `logSupabaseError()` before throwing

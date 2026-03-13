@@ -2,25 +2,24 @@
 
 **Sources:**
 
-- `src/api/authService.ts` (facade)
-- `src/api/auth/actionService.ts` (sign-in, sign-up, sign-out, reset, OAuth)
-- `src/api/auth/sessionService.ts` (session queries, state listener)
-- `src/api/auth/types.ts` (interfaces)
+- `src/api/authService.ts` -- Facade composing session + action services
+- `src/api/auth/actionService.ts` -- Sign in, sign up, sign out, password reset, Google OAuth
+- `src/api/auth/sessionService.ts` -- Session retrieval, user info, auth state change listener
+- `src/api/auth/types.ts` -- Type definitions
 
 ## Architecture
 
-The auth layer uses a **facade pattern**. The top-level `authService` object composes both `actionService` and `sessionService`, presenting a unified API while allowing hot paths to import only the narrow surface they need.
+The auth layer is split into two sub-services composed by a facade:
 
 ```
 authService (facade)
-  ├── actionService: signIn, signUp, signOut, resetPassword, signInWithGoogle
-  └── sessionService: getSession, getUser, getCurrentUserId, getCurrentUserIdOfflineSafe,
-                      getAuthStatus, onAuthStateChange
+  |-- sessionService  (read-only: session, user, auth status)
+  |-- actionService   (mutations: sign in/up/out, password reset, OAuth)
 ```
 
-## Types
+The `authService` object re-exports all functions from both sub-services, providing a single import point. Individual sub-services can also be imported directly for narrower dependency surfaces.
 
-**Source:** `src/api/auth/types.ts`
+## Types
 
 ```typescript
 interface AuthCredentials {
@@ -29,9 +28,9 @@ interface AuthCredentials {
 }
 
 interface AuthResult {
-  user: User | null; // @supabase/supabase-js User
-  session: Session | null; // @supabase/supabase-js Session
-  error: AuthError | null; // @supabase/supabase-js AuthError
+  user: User | null; // Supabase User object
+  session: Session | null; // Supabase Session object
+  error: AuthError | null; // Supabase AuthError
 }
 
 interface AuthStatus {
@@ -41,25 +40,39 @@ interface AuthStatus {
 }
 ```
 
-## Action Service Methods
+## Action Service Functions
 
 ### `signIn(credentials: AuthCredentials): Promise<AuthResult>`
 
-Signs in with email and password via `supabase.auth.signInWithPassword()`.
+Signs in with email/password via `supabase.auth.signInWithPassword()`.
 
-**Side effect:** On success, stores the auth token in IndexedDB (`sw-auth` store) for Background Sync service worker access using `storeAuthToken()` from `sw-db.ts`. The stored token includes `accessToken`, `refreshToken`, `expiresAt`, and `userId`.
+**Side effects:**
+
+- On success, stores the auth token in IndexedDB (`sw-auth` store) for Background Sync access via `storeAuthToken()`.
+
+**Error handling:** Catches all errors; returns `{ user: null, session: null, error }`. Never throws.
+
+---
 
 ### `signUp(credentials: AuthCredentials): Promise<AuthResult>`
 
-Registers a new user via `supabase.auth.signUp()`. Does not store tokens (user must sign in after email confirmation).
+Creates a new account via `supabase.auth.signUp()`.
+
+**Error handling:** Same pattern as `signIn` -- returns error in result, never throws.
+
+---
 
 ### `signOut(): Promise<void>`
 
 Signs out via `supabase.auth.signOut()`.
 
-**Side effect:** Clears the auth token from IndexedDB using `clearAuthToken()` from `sw-db.ts`.
+**Side effects:**
 
-**Throws:** Re-throws if `supabase.auth.signOut()` fails.
+- Clears the stored auth token from IndexedDB via `clearAuthToken()`.
+
+**Error handling:** Throws on failure (unlike signIn/signUp which return errors).
+
+---
 
 ### `resetPassword(email: string): Promise<AuthError | null>`
 
@@ -69,84 +82,74 @@ Sends a password reset email via `supabase.auth.resetPasswordForEmail()`.
 
 **Returns:** `null` on success, `AuthError` on failure.
 
+---
+
 ### `signInWithGoogle(): Promise<AuthError | null>`
 
 Initiates Google OAuth flow via `supabase.auth.signInWithOAuth()`.
 
-**Configuration:**
+**OAuth options:**
 
-```typescript
-{
-  provider: 'google',
-  options: {
-    redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
-    queryParams: {
-      access_type: 'offline',  // Request refresh token
-      prompt: 'consent',       // Always show consent screen
-    },
-  },
-}
-```
+- `provider: 'google'`
+- `redirectTo`: `${window.location.origin}${import.meta.env.BASE_URL}`
+- `access_type: 'offline'` (enables refresh tokens)
+- `prompt: 'consent'` (always shows consent screen)
 
-**Returns:** `null` on success (redirects to Google), `AuthError` on failure.
+**Returns:** `null` on success (redirect initiated), `AuthError` on failure.
 
-## Session Service Methods
+## Session Service Functions
 
 ### `getSession(): Promise<Session | null>`
 
-Retrieves the current session from `supabase.auth.getSession()`. Returns `null` if no session or on error.
+Retrieves the current session from Supabase auth. Returns `null` on error.
+
+---
 
 ### `getUser(): Promise<User | null>`
 
-Retrieves the current user via `supabase.auth.getUser()`. This makes a **server call** to validate the JWT, unlike `getSession()` which reads the local cache.
+Retrieves the current user via `supabase.auth.getUser()` (server-validated). Returns `null` on error.
+
+---
 
 ### `getCurrentUserId(): Promise<string | null>`
 
-Convenience method. Calls `getUser()` and returns `user.id`. Server-validated.
+Convenience wrapper: calls `getUser()` and returns `user.id`. Uses server-validated user data.
+
+---
 
 ### `getCurrentUserIdOfflineSafe(): Promise<string | null>`
 
-Returns the user ID from the **cached session** (no network call). Calls `getSession()` and returns `session.user.id`. Use this when offline operation is needed.
+Convenience wrapper: calls `getSession()` and returns `session.user.id`. Uses locally-cached session data, so it works offline (unlike `getCurrentUserId` which calls the Supabase server).
+
+---
 
 ### `getAuthStatus(): Promise<AuthStatus>`
 
-Returns the full auth status object:
+Returns a composite object with `isAuthenticated`, `user`, and `session` fields.
 
-```typescript
-{
-  isAuthenticated: boolean,  // true if session exists
-  user: User | null,
-  session: Session | null,
-}
-```
+---
 
 ### `onAuthStateChange(callback: (session: Session | null) => void): () => void`
 
-Subscribes to auth state changes via `supabase.auth.onAuthStateChange()`.
+Subscribes to Supabase auth state changes.
 
 **Side effects on events:**
 
-- `SIGNED_IN` or `TOKEN_REFRESHED`: Stores/updates auth token in IndexedDB
-- `SIGNED_OUT`: Clears auth token from IndexedDB
+- `SIGNED_IN` / `TOKEN_REFRESHED`: Updates the stored auth token in IndexedDB via `storeAuthToken()`
+- `SIGNED_OUT`: Clears the stored auth token via `clearAuthToken()`
 
-**Returns:** Unsubscribe function. Call it on component unmount to prevent memory leaks.
+**Returns:** An unsubscribe function that calls `subscription.unsubscribe()`.
 
-## Unified authService Object
+## IndexedDB Integration
+
+Auth tokens are persisted in the `sw-auth` IndexedDB store (key: `'current'`) to enable Background Sync in the service worker. The SW reads this token to authenticate Supabase REST API calls when the app is closed. Token structure:
 
 ```typescript
-export const authService = {
-  signIn,
-  signUp,
-  signOut,
-  getSession,
-  getUser,
-  getCurrentUserId,
-  getCurrentUserIdOfflineSafe,
-  getAuthStatus,
-  onAuthStateChange,
-  resetPassword,
-  signInWithGoogle,
-};
+interface StoredAuthToken {
+  id: 'current';
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  userId: string;
+}
 ```
-
-All methods are also available as individual named exports for tree-shaking.

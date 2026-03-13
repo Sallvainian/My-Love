@@ -4,26 +4,30 @@
 
 ## Overview
 
-Centralized error handling for all Supabase API interactions. Provides error detection, transformation to user-friendly messages, retry logic with exponential backoff, and graceful offline degradation.
+Provides error detection, transformation, retry logic, and offline messaging for Supabase API failures. All Supabase-facing services use these utilities to produce consistent, user-friendly errors.
 
-## SupabaseServiceError Class
+## Error Classes
+
+### `SupabaseServiceError`
 
 ```typescript
 class SupabaseServiceError extends Error {
-  public readonly code: string | undefined;
-  public readonly details: string | undefined;
-  public readonly hint: string | undefined;
-  public readonly isNetworkError: boolean;
+  readonly code: string | undefined;
+  readonly details: string | undefined;
+  readonly hint: string | undefined;
+  readonly isNetworkError: boolean;
 }
 ```
 
-Custom error class thrown by all API services. The `isNetworkError` flag distinguishes between database errors and connectivity issues.
+Custom error class wrapping PostgreSQL/network errors with structured fields for UI display.
 
-## Error Code Mapping
+## Error Transformation Functions
 
-`handleSupabaseError()` maps PostgrestError codes to user-friendly messages:
+### `handleSupabaseError(error: PostgrestError, context?: string): SupabaseServiceError`
 
-| Error Code | User Message                                          |
+Maps PostgrestError codes to user-friendly messages:
+
+| Code       | Message                                               |
 | ---------- | ----------------------------------------------------- |
 | `23505`    | This record already exists                            |
 | `23503`    | Referenced record not found                           |
@@ -32,86 +36,75 @@ Custom error class thrown by all API services. The `isNetworkError` flag disting
 | `42P01`    | Table not found - database schema may be out of sync  |
 | `PGRST116` | No rows found                                         |
 | `PGRST301` | Invalid request parameters                            |
-| _(other)_  | Database error: `{original message}`                  |
 
-## Functions
+Any unrecognized code falls through to: `Database error: {original message}`.
 
-### `isOnline(): boolean`
+**Sets** `isNetworkError = false`.
 
-```typescript
-export const isOnline = (): boolean => navigator.onLine;
-```
-
-Network connectivity check. Used by all API methods before attempting Supabase calls.
-
-### `handleSupabaseError(error: PostgrestError, context?: string): SupabaseServiceError`
-
-Transforms a `PostgrestError` into a `SupabaseServiceError` with a user-friendly message. The optional `context` string is prepended as a prefix (e.g., `[MoodApi.create] This record already exists`).
+---
 
 ### `handleNetworkError(error: unknown, context?: string): SupabaseServiceError`
 
-Creates a `SupabaseServiceError` with `isNetworkError: true` and the message pattern:
-`[context] Network error: {message}. Your changes will be synced when you're back online.`
+Wraps fetch failures, timeouts, and other non-PostgrestError errors.
+
+**Sets:**
+
+- `code = 'NETWORK_ERROR'`
+- `hint = 'Check your internet connection'`
+- `isNetworkError = true`
+- Message includes: "Your changes will be synced when you're back online."
+
+## Type Guards
 
 ### `isPostgrestError(error: unknown): error is PostgrestError`
 
-Type guard that checks for the presence of `code`, `message`, and `details` properties.
+Checks for `code`, `message`, and `details` properties.
 
 ### `isSupabaseServiceError(error: unknown): error is SupabaseServiceError`
 
-Type guard using `instanceof SupabaseServiceError`.
+Uses `instanceof` check.
+
+## Logging
 
 ### `logSupabaseError(context: string, error: unknown): void`
 
-Structured console logging. Detection order:
+Logs errors with structured context. Checks error type in order:
 
-1. `SupabaseServiceError` -- logs message, code, isNetworkError
-2. `PostgrestError` -- logs code, message, details, hint
-3. `Error` -- logs message
-4. Fallback -- logs raw value
+1. `SupabaseServiceError` -- logs `message`, `code`, `isNetworkError`
+2. `PostgrestError` -- logs `code`, `message`, `details`, `hint`
+3. `Error` -- logs `message`
+4. Unknown -- logs raw value
+
+## Retry Logic
 
 ### `retryWithBackoff<T>(operation: () => Promise<T>, config?: RetryConfig): Promise<T>`
 
-Generic exponential backoff retry for any async operation.
-
-**Algorithm:**
-
-1. Execute `operation()`
-2. On failure, wait `delay` ms then retry
-3. Increase delay by `backoffMultiplier`, capped at `maxDelayMs`
-4. After `maxAttempts` failures, throw the last error
-
-### RetryConfig Interface
+Executes an async operation with exponential backoff retry.
 
 ```typescript
 interface RetryConfig {
   maxAttempts: number; // Default: 3
-  initialDelayMs: number; // Default: 1000
-  maxDelayMs: number; // Default: 30000
+  initialDelayMs: number; // Default: 1000 (1s)
+  maxDelayMs: number; // Default: 30000 (30s)
   backoffMultiplier: number; // Default: 2
 }
 ```
 
-**Default schedule:** 1s, 2s, 4s (capped at 30s).
+**Default retry schedule:** 1s, 2s, 4s (3 attempts total).
+
+**Behavior:**
+
+- On success at any attempt, returns the result immediately
+- On failure at non-final attempt, waits `delay` ms then retries
+- Delay doubles each attempt, capped at `maxDelayMs`
+- After all attempts exhausted, throws the last error
+
+## Utility Functions
+
+### `isOnline(): boolean`
+
+Returns `navigator.onLine`. Used by services to check connectivity before attempting API calls.
 
 ### `createOfflineMessage(operation: string): string`
 
 Returns: `"You're offline. {operation} will sync automatically when you're back online."`
-
-## Usage Pattern
-
-Every API service follows this error handling pattern:
-
-```typescript
-try {
-  const { data, error } = await supabase.from('table').select('*');
-  if (error) throw error;
-  return data;
-} catch (error) {
-  logSupabaseError('ServiceName.method', error);
-  if (isPostgrestError(error)) {
-    throw handleSupabaseError(error, 'ServiceName.method');
-  }
-  throw handleNetworkError(error, 'ServiceName.method');
-}
-```

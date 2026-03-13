@@ -2,168 +2,16 @@
 
 **Sources:**
 
-- `src/services/performanceMonitor.ts` (operation timing)
-- `src/services/migrationService.ts` (LocalStorage to IndexedDB migration)
-- `src/services/storage.ts` (legacy IndexedDB operations)
-- `src/services/syncService.ts` (batch mood sync)
+- `src/services/syncService.ts` -- Offline-first mood sync
+- `src/services/imageCompressionService.ts` -- Canvas API compression (see also Section 9)
+- `src/services/migrationService.ts` -- LocalStorage to IndexedDB migration
+- `src/services/performanceMonitor.ts` -- Operation timing and metrics
 
-## PerformanceMonitor (src/services/performanceMonitor.ts)
+## SyncService
 
-**Singleton:** `performanceMonitor`
+**Singleton:** `export const syncService = new SyncService()`
 
-Tracks operation execution times using the Web Performance API (`performance.now()`). Maintains an in-memory Map of named metrics with min/max/avg/total/count statistics.
-
-### PerformanceMetric Interface
-
-```typescript
-interface PerformanceMetric {
-  name: string;
-  count: number;
-  avgDuration: number;
-  minDuration: number;
-  maxDuration: number;
-  totalDuration: number;
-  lastRecorded: number; // Date.now()
-}
-```
-
-### Methods
-
-#### `measureAsync<T>(name, operation): Promise<T>`
-
-Wraps an async operation with timing. Records the duration on success; does not record failed operations.
-
-```typescript
-const result = await performanceMonitor.measureAsync('db-read', () => db.get(id));
-```
-
-**Used by:** `photoStorageService.create()` to record photo storage sizes.
-
-#### `recordMetric(name, duration): void`
-
-Records a custom metric value. Creates a new entry or updates an existing one with running min/max/avg/total statistics. Logs to console in DEV mode.
-
-#### `getMetrics(name): PerformanceMetric | undefined`
-
-Returns metrics for a specific operation name.
-
-#### `getAllMetrics(): Map<string, PerformanceMetric>`
-
-Returns a shallow copy of all recorded metrics.
-
-#### `clear(): void`
-
-Clears all recorded metrics.
-
-#### `getReport(): string`
-
-Generates a human-readable text report sorted by total duration (slowest first). Format:
-
-```
-Performance Metrics Report
-==================================================
-
-operation-name:
-  count: 5
-  avg: 12.34ms
-  min: 8.00ms
-  max: 20.00ms
-  total: 61.70ms
-```
-
-## MigrationService (src/services/migrationService.ts)
-
-One-time migration from LocalStorage to IndexedDB for custom messages. No singleton -- exports a single function.
-
-### `migrateCustomMessagesFromLocalStorage(): Promise<MigrationResult>`
-
-```typescript
-interface MigrationResult {
-  success: boolean;
-  migratedCount: number;
-  skippedCount: number;
-  errors: string[];
-}
-```
-
-**LocalStorage key:** `my-love-custom-messages`
-
-**Flow:**
-
-1. Check for `localStorage.getItem('my-love-custom-messages')`
-2. If not found, return early (no migration needed)
-3. Parse JSON data, validate it is an array
-4. Get existing IndexedDB messages to detect duplicates (by normalized text)
-5. For each message:
-   a. Validate with `CreateMessageInputSchema.parse()`
-   b. Skip if duplicate (case-insensitive text match)
-   c. Create in IndexedDB via `customMessageService.create()`
-   d. On Zod validation error: skip with warning (don't fail the whole migration)
-6. Remove LocalStorage key after successful migration (all migrated or all duplicates)
-7. Return detailed `MigrationResult`
-
-**Error tolerance:** Individual message failures are logged and counted but do not abort the migration. Only parse failures or non-array data cause `success: false`.
-
-## StorageService (src/services/storage.ts) -- Legacy
-
-**Singleton:** `storageService`
-
-Direct IndexedDB operations for photos and messages. Predates the `BaseIndexedDBService` abstract class pattern. Still used by some components for backward compatibility.
-
-### Initialization
-
-Opens `my-love-db` at the current `DB_VERSION`. Has its own upgrade logic with `objectStoreNames.contains()` guards as a fallback for stores that should already exist. Uses the same concurrent-init guard pattern (`initPromise`) as `BaseIndexedDBService`.
-
-### Photo Operations
-
-| Method                     | Returns            | Error Strategy    |
-| -------------------------- | ------------------ | ----------------- |
-| `addPhoto(photo)`          | `Promise<number>`  | Throws            |
-| `getPhoto(id)`             | `Promise<Photo?>`  | Returns undefined |
-| `getAllPhotos()`           | `Promise<Photo[]>` | Returns []        |
-| `deletePhoto(id)`          | `Promise<void>`    | Throws            |
-| `updatePhoto(id, updates)` | `Promise<void>`    | Throws            |
-
-### Message Operations
-
-| Method                            | Returns              | Error Strategy    |
-| --------------------------------- | -------------------- | ----------------- |
-| `addMessage(message)`             | `Promise<number>`    | Throws            |
-| `getMessage(id)`                  | `Promise<Message?>`  | Returns undefined |
-| `getAllMessages()`                | `Promise<Message[]>` | Returns []        |
-| `getMessagesByCategory(category)` | `Promise<Message[]>` | Returns []        |
-| `updateMessage(id, updates)`      | `Promise<void>`      | Throws            |
-| `deleteMessage(id)`               | `Promise<void>`      | Throws            |
-| `toggleFavorite(messageId)`       | `Promise<void>`      | Throws            |
-
-### Bulk Operations
-
-| Method                    | Returns                                             | Description                   |
-| ------------------------- | --------------------------------------------------- | ----------------------------- |
-| `addMessages(messages[])` | `Promise<void>`                                     | Transaction-based bulk insert |
-| `clearAllData()`          | `Promise<void>`                                     | Clears photos + messages      |
-| `exportData()`            | `Promise<{ photos: Photo[], messages: Message[] }>` | Exports all data for backup   |
-
-### localStorageHelper
-
-Utility object for type-safe localStorage access with error handling:
-
-```typescript
-export const localStorageHelper = {
-  get<T>(key: string, defaultValue: T): T,
-  set<T>(key: string, value: T): void,
-  remove(key: string): void,
-  clear(): void,
-};
-```
-
-All methods silently catch errors and log to console. `get()` returns `defaultValue` on any error (JSON parse failure, missing key, storage access denied).
-
-## SyncService (src/services/syncService.ts)
-
-**Singleton:** `syncService`
-
-Batch mood sync using parallel `Promise.all` with partial failure handling. Simpler alternative to `MoodSyncService.syncPendingMoods()` which uses sequential sync with retry.
+Handles synchronization of mood entries from IndexedDB to Supabase with partial failure handling. Unlike `MoodSyncService` (Section 5), this is a simpler sync-only service without broadcast or real-time features.
 
 ### Types
 
@@ -187,12 +35,130 @@ interface SyncSummary {
 
 #### `syncPendingMoods(): Promise<SyncSummary>`
 
-Syncs all unsynced moods using `Promise.all()` for parallel execution. Each mood is synced independently -- failures do not block other moods. On success, marks the mood as synced in IndexedDB.
+Syncs all unsynced moods from IndexedDB to Supabase.
+
+**Flow:**
+
+1. Gets unsynced moods via `moodService.getUnsyncedMoods()`
+2. Syncs each mood in parallel via `Promise.all()`
+3. Each mood: transforms to `MoodInsert`, calls `moodApi.create()`, marks synced via `moodService.markAsSynced()`
+4. Continues on individual failures (partial failure handling)
+5. Returns detailed summary with per-mood results
+
+**Error handling:** Critical errors return empty summary. Individual mood failures are captured in `results` array.
+
+---
 
 #### `hasPendingSync(): Promise<boolean>`
 
-Returns `true` if there are any unsynced moods in IndexedDB (`synced === false`).
+Returns `true` if any unsynced moods exist in IndexedDB.
+
+---
 
 #### `getPendingCount(): Promise<number>`
 
-Returns the count of unsynced moods.
+Returns the count of unsynced moods. Returns `0` on error.
+
+---
+
+## MigrationService
+
+**Exported function** (not a class):
+
+### `migrateCustomMessagesFromLocalStorage(): Promise<MigrationResult>`
+
+One-time migration from `localStorage` key `my-love-custom-messages` to IndexedDB.
+
+```typescript
+interface MigrationResult {
+  success: boolean;
+  migratedCount: number;
+  skippedCount: number;
+  errors: string[];
+}
+```
+
+**Flow:**
+
+1. Reads `localStorage.getItem('my-love-custom-messages')`
+2. Parses JSON array of `CustomMessage` objects
+3. Gets existing custom messages from IndexedDB for duplicate detection
+4. For each message: validates with `CreateMessageInputSchema.parse()`, checks for duplicate (case-insensitive text match), creates via `customMessageService.create()`
+5. After migration: removes localStorage key to prevent re-migration
+6. Returns summary with migrated/skipped counts and errors
+
+**Duplicate detection:** Normalizes text to lowercase and trims before comparison.
+
+**Error handling:** Invalid messages are skipped (not counted as errors). Parse failures stop migration. Individual message failures are logged and tracked in `errors` array.
+
+---
+
+## PerformanceMonitor
+
+**Singleton:** `export const performanceMonitor = new PerformanceMonitor()`
+
+Tracks operation execution times using the Web Performance API (`performance.now()`). Stores metrics in an internal `Map<string, PerformanceMetric>`.
+
+### Types
+
+```typescript
+interface PerformanceMetric {
+  name: string;
+  count: number;
+  avgDuration: number; // ms
+  minDuration: number; // ms
+  maxDuration: number; // ms
+  totalDuration: number; // ms
+  lastRecorded: number; // Date.now() timestamp
+}
+```
+
+### Methods
+
+#### `measureAsync<T>(name: string, operation: () => Promise<T>): Promise<T>`
+
+Wraps an async operation and records its execution time. Failed operations are not recorded in metrics (error is re-thrown).
+
+**Used by:** `PhotoStorageService.create()`, `PhotoStorageService.getAll()`, `PhotoStorageService.getPage()`
+
+---
+
+#### `recordMetric(name: string, duration: number): void`
+
+Records a custom metric value. Updates running statistics (count, avg, min, max, total). Logs in dev mode.
+
+---
+
+#### `getMetrics(name: string): PerformanceMetric | undefined`
+
+Returns metrics for a specific operation name.
+
+---
+
+#### `getAllMetrics(): Map<string, PerformanceMetric>`
+
+Returns a copy of all recorded metrics.
+
+---
+
+#### `clear(): void`
+
+Clears all recorded metrics.
+
+---
+
+#### `getReport(): string`
+
+Generates a human-readable report string sorted by total duration (slowest operations first). Format:
+
+```
+Performance Metrics Report
+==================================================
+
+photo-create:
+  count: 5
+  avg: 23.45ms
+  min: 12.30ms
+  max: 45.67ms
+  total: 117.25ms
+```

@@ -17,6 +17,8 @@ type(scope): brief description
 | `chore(sprint)`  | Sprint tracking, status updates            |
 | `refactor`       | Code restructuring without behavior change |
 | `revert`         | Reverting previous changes                 |
+| `deps`           | Dependency updates (npm packages)          |
+| `ci`             | CI workflow changes (GitHub Actions)       |
 
 ### Commit Rules
 
@@ -37,11 +39,11 @@ When uncommitted changes span multiple stories:
 
 ## Branch Strategy
 
-| Branch Pattern         | Purpose                                     |
-| ---------------------- | ------------------------------------------- |
-| `main`                 | Production branch, deployed to GitHub Pages |
-| `epic-N/description`   | Feature branches for epic work              |
-| `epic-N/working-reset` | Working branches for cleanup/reset tasks    |
+| Branch Pattern       | Purpose                                     |
+| -------------------- | ------------------------------------------- |
+| `main`               | Production branch, deployed to GitHub Pages |
+| `epic-N/description` | Feature branches for epic work              |
+| `fix/description`    | Bug fix branches                            |
 
 All epic work stays on its feature branch until PR review. PRs target `main`.
 

@@ -105,11 +105,24 @@ The project uses manual chunks in `vite.config.ts` to split vendor dependencies 
 
 **Route-level splitting** (automatic via React.lazy):
 
-- `AdminPanel`, `MoodTracker`, `PartnerMoodView`, `PhotoGallery`, `PhotoCarousel`, `PhotoUpload`, `WelcomeSplash` are all separate chunks loaded on demand.
+- `PhotoGallery`, `MoodTracker`, `PartnerMoodView`, `AdminPanel`, `LoveNotes`, `ScriptureOverview`, `WelcomeSplash`, `PhotoUpload`, `PhotoCarousel` are all separate chunks loaded on demand.
 
 **Static data chunks**:
 
 - `defaultMessages` contains pre-loaded daily love messages. Separated to avoid bloating the main entry chunk with static string data.
+
+## Browser Targets
+
+The `browserslist` configuration in `package.json`:
+
+```json
+"browserslist": [
+  "defaults and supports es6-module",
+  "maintained node versions"
+]
+```
+
+This targets browsers with ES module support, which aligns with the ES2022 TypeScript target.
 
 ## Performance Monitoring Infrastructure
 
@@ -139,6 +152,10 @@ Centralized configuration for performance-related magic numbers:
 - **Pagination**: Default page size (20), max page size (100)
 - **Storage Quotas**: Warning threshold (80%), error threshold (95%), default quota (50MB), monitoring interval (5 minutes)
 - **Validation Limits**: Message text max (1000), caption max (500), mood note max (1000), partner name max (50)
+
+## CI Bundle Size Monitoring
+
+The `bundle-size.yml` workflow runs on PRs and uses `preactjs/compressed-size-action@v3` to track brotli-compressed bundle sizes. Changes smaller than 100 bytes are not reported. The workflow comments on PRs with a size comparison table showing deltas for each JS and CSS file.
 
 ## How to Regenerate Bundle Report
 

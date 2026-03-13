@@ -2,179 +2,133 @@
 
 **Sources:**
 
-- `src/validation/schemas.ts` (IndexedDB service boundary validation)
-- `src/validation/errorMessages.ts` (error transformation)
-- `src/api/validation/supabaseSchemas.ts` (Supabase API response validation)
+- `src/validation/schemas.ts` -- Client-side schemas (IndexedDB boundary)
+- `src/api/validation/supabaseSchemas.ts` -- API response schemas (Supabase boundary)
 
-Both layers import Zod v4 as `zod/v4`.
+**Zod version:** v4 (`zod/v4`)
 
-## 5.1 Local Validation Schemas (`validation/schemas.ts`)
+## Validation Architecture
 
-Validate data before IndexedDB writes. Used by `moodService`, `customMessageService`, and `photoStorageService`.
+Validation occurs at two boundaries:
+
+1. **Service boundary** -- Before IndexedDB writes. Validates user input.
+2. **API boundary** -- After Supabase reads. Validates server responses.
+
+## Client-Side Schemas
 
 ### MessageSchema
 
-Validates existing messages retrieved from IndexedDB.
-
-| Field        | Validation                                                    | Constraint              |
-| ------------ | ------------------------------------------------------------- | ----------------------- |
-| `id`         | `z.number().int().positive().optional()`                      | Auto-increment          |
-| `text`       | `z.string().min(1).max(MESSAGE_TEXT_MAX_LENGTH)`              | From performance config |
-| `category`   | `z.enum(['reason','memory','affirmation','future','custom'])` |                         |
-| `isCustom`   | `z.boolean()`                                                 |                         |
-| `active`     | `z.boolean().default(true)`                                   |                         |
-| `createdAt`  | `z.date()`                                                    |                         |
-| `isFavorite` | `z.boolean().optional()`                                      |                         |
-| `updatedAt`  | `z.date().optional()`                                         |                         |
-| `tags`       | `z.array(z.string()).optional()`                              |                         |
-
-**Related:** `CreateMessageInputSchema` (trims text, for creation), `UpdateMessageInputSchema` (requires `id`, for partial updates)
+| Field        | Schema                                   | Constraints                            |
+| ------------ | ---------------------------------------- | -------------------------------------- |
+| `id`         | `z.number().int().positive().optional()` | Auto-generated                         |
+| `text`       | `z.string().min(1).max(1000)`            | Required, max from `VALIDATION_LIMITS` |
+| `category`   | `z.enum([...])`                          | 5 categories                           |
+| `isCustom`   | `z.boolean()`                            | Required                               |
+| `active`     | `z.boolean().default(true)`              |                                        |
+| `createdAt`  | `z.date()`                               | Required                               |
+| `isFavorite` | `z.boolean().optional()`                 |                                        |
+| `updatedAt`  | `z.date().optional()`                    |                                        |
+| `tags`       | `z.array(z.string()).optional()`         |                                        |
 
 ### PhotoSchema
 
-| Field            | Validation                                        | Constraint |
-| ---------------- | ------------------------------------------------- | ---------- |
-| `id`             | `z.number().int().positive().optional()`          |            |
-| `imageBlob`      | `z.instanceof(Blob)`                              |            |
-| `caption`        | `z.string().max(500).optional()`                  |            |
-| `tags`           | `z.array(z.string()).default([])`                 |            |
-| `uploadDate`     | `z.date()`                                        |            |
-| `originalSize`   | `z.number().positive()`                           |            |
-| `compressedSize` | `z.number().positive()`                           |            |
-| `width`          | `z.number().int().positive()`                     |            |
-| `height`         | `z.number().int().positive()`                     |            |
-| `mimeType`       | `z.enum(['image/jpeg','image/png','image/webp'])` |            |
+| Field            | Schema                                            | Constraints  |
+| ---------------- | ------------------------------------------------- | ------------ |
+| `id`             | `z.number().int().positive().optional()`          |              |
+| `imageBlob`      | `z.instanceof(Blob)`                              | Must be Blob |
+| `caption`        | `z.string().max(500).optional()`                  |              |
+| `tags`           | `z.array(z.string()).default([])`                 |              |
+| `uploadDate`     | `z.date()`                                        | Required     |
+| `originalSize`   | `z.number().positive()`                           | Bytes        |
+| `compressedSize` | `z.number().positive()`                           | Bytes        |
+| `width`          | `z.number().int().positive()`                     | Pixels       |
+| `height`         | `z.number().int().positive()`                     | Pixels       |
+| `mimeType`       | `z.enum(['image/jpeg','image/png','image/webp'])` |              |
 
 ### MoodEntrySchema
 
-| Field   | Validation                                         | Constraint                           |
-| ------- | -------------------------------------------------- | ------------------------------------ |
-| `date`  | `IsoDateStringSchema`                              | YYYY-MM-DD with actual date validity |
-| `mood`  | `MoodTypeSchema`                                   | 12 mood types                        |
-| `moods` | `z.array(MoodTypeSchema).min(1).optional()`        | Multi-mood support                   |
-| `note`  | `z.string().max(200).optional().or(z.literal(''))` | Empty string allowed                 |
-
-`IsoDateStringSchema` validates both regex format and actual date validity (rejects `2025-02-30`).
+| Field   | Schema                                             | Constraints                     |
+| ------- | -------------------------------------------------- | ------------------------------- |
+| `date`  | ISO date string                                    | YYYY-MM-DD with date validation |
+| `mood`  | `z.enum([...12 types...])`                         | Primary mood                    |
+| `moods` | `z.array(MoodType).min(1).optional()`              | Multi-mood                      |
+| `note`  | `z.string().max(200).optional().or(z.literal(''))` | Allows empty                    |
 
 ### SettingsSchema
 
-Nested validation for all app settings:
+Nested object with:
 
-```
-SettingsSchema
-  ├── themeName: enum ['sunset','ocean','lavender','rose']
-  ├── notificationTime: HH:MM format with range validation
-  ├── relationship
-  │   ├── startDate: IsoDateStringSchema
-  │   ├── partnerName: string (min 1)
-  │   └── anniversaries: array of { id, date, label, description? }
-  ├── customization
-  │   ├── accentColor: string
-  │   └── fontFamily: string
-  └── notifications
-      ├── enabled: boolean
-      └── time: string
-```
+- `themeName`: `z.enum(['sunset','ocean','lavender','rose'])`
+- `notificationTime`: HH:MM regex with hour/minute range validation
+- `relationship.startDate`: ISO date string
+- `relationship.partnerName`: Non-empty string
+- `relationship.anniversaries`: Array of `{ id, date, label, description? }`
+- `customization.accentColor`, `customization.fontFamily`: Strings
+- `notifications.enabled`: Boolean, `notifications.time`: String
 
 ### CustomMessagesExportSchema
 
-Validates import/export JSON: `version: '1.0'`, `messageCount`, `messages[]` with `text`, `category`, `active`, `tags`, `createdAt`, `updatedAt`.
-
-### Scripture Schemas
-
-| Schema                     | Table                   | Key Validations                                                   |
-| -------------------------- | ----------------------- | ----------------------------------------------------------------- |
-| `SupabaseSessionSchema`    | `scripture_sessions`    | mode enum, phase enum, status enum, version >= 1, step_index >= 0 |
-| `SupabaseReflectionSchema` | `scripture_reflections` | rating 1-5, is_shared boolean                                     |
-| `SupabaseBookmarkSchema`   | `scripture_bookmarks`   | share_with_partner boolean                                        |
-| `SupabaseMessageSchema`    | `scripture_messages`    | message string required                                           |
-
-## 5.2 Supabase API Validation Schemas (`api/validation/supabaseSchemas.ts`)
-
-Validate every Supabase API response before the data is used in the application.
-
-### Common Schemas
-
-| Schema                  | Validation                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------------- |
-| `UUIDSchema`            | `z.string().uuid()`                                                                     |
-| `TimestampSchema`       | ISO 8601 regex accepting PostgreSQL format variations (microseconds, optional timezone) |
-| `MoodTypeSchema`        | `z.enum([...12 moods])`                                                                 |
-| `InteractionTypeSchema` | `z.enum(['poke','kiss'])`                                                               |
-| `MessageCategorySchema` | `z.enum(['reason','memory','affirmation','future','custom'])`                           |
-
-### Row Schemas
-
-| Schema                      | Validates              | Notable Fields                                                           |
-| --------------------------- | ---------------------- | ------------------------------------------------------------------------ |
-| `SupabaseUserSchema`        | `users` rows           | `partner_id` nullable+optional, `email`/`display_name` nullable+optional |
-| `SupabaseMoodSchema`        | `moods` rows           | `mood_type` (single), `mood_types` (array, nullable+optional)            |
-| `SupabaseInteractionSchema` | `interactions` rows    | `viewed` nullable boolean                                                |
-| `SupabaseMessageSchema`     | Messages (placeholder) | `text` 1-500, `category`, `is_custom`, `active`                          |
-| `SupabasePhotoSchema`       | Photos (placeholder)   | `mime_type` enum, positive dimensions                                    |
-
-### Insert/Update Schema Variants
-
-Each entity schema has corresponding Insert and Update variants with relaxed requirements:
-
-| Pattern         | Insert   | Update   |
-| --------------- | -------- | -------- |
-| `id`            | Optional | Optional |
-| Required fields | Required | Optional |
-| Timestamps      | Optional | Optional |
-
-Examples: `MoodInsertSchema`, `MoodUpdateSchema`, `UserInsertSchema`, `UserUpdateSchema`, `InteractionInsertSchema`, `InteractionUpdateSchema`
-
-### Array Schemas
-
-```typescript
-MoodArraySchema = z.array(SupabaseMoodSchema);
-InteractionArraySchema = z.array(SupabaseInteractionSchema);
-UserArraySchema = z.array(SupabaseUserSchema);
 ```
+{ version: '1.0', exportDate: string, messageCount: number, messages: [...] }
+```
+
+Each message: `{ text, category, active, tags, createdAt, updatedAt }`
+
+### Scripture Schemas (Client-Side)
+
+- **SupabaseSessionSchema**: `id`, `mode`, `user1_id`, `user2_id` (nullable), `current_phase` (6 enum), `current_step_index` (min 0), `status` (4 enum), `version` (min 1), `snapshot_json` (nullable record), `started_at`, `completed_at` (nullable)
+- **SupabaseReflectionSchema**: `id`, `session_id`, `step_index`, `user_id`, `rating` (1-5, nullable), `notes` (nullable), `is_shared`, `created_at`
+- **SupabaseBookmarkSchema**: `id`, `session_id`, `step_index`, `user_id`, `share_with_partner`, `created_at`
+- **SupabaseMessageSchema**: `id`, `session_id`, `sender_id`, `message`, `created_at`
+
+## API Response Schemas
+
+### Common Base Schemas
+
+- **UUIDSchema**: `z.string().uuid()`
+- **TimestampSchema**: Regex-validated ISO 8601 supporting microseconds, optional timezone (`Z`, `+HH`, `+HH:MM`)
+
+### SupabaseMoodSchema
+
+| Field        | Schema                                    |
+| ------------ | ----------------------------------------- |
+| `id`         | UUID                                      |
+| `user_id`    | UUID                                      |
+| `mood_type`  | Enum (12 mood types)                      |
+| `mood_types` | `z.array(MoodType).nullable().optional()` |
+| `note`       | `z.string().nullable()`                   |
+| `created_at` | Timestamp, nullable                       |
+| `updated_at` | Timestamp, nullable                       |
+
+### SupabaseInteractionSchema
+
+`id`, `type` (poke/kiss), `from_user_id`, `to_user_id` (UUIDs), `viewed` (nullable boolean), `created_at` (nullable timestamp)
+
+### SupabaseUserSchema
+
+`id`, `partner_name` (nullable), `device_id` (nullable UUID), `partner_id` (nullable UUID, optional), `email` (nullable, optional), `display_name` (nullable, optional), timestamps (nullable)
 
 ### CoupleStatsSchema
 
-Validates the JSONB response from the `scripture_get_couple_stats` RPC:
+`totalSessions` (int min 0), `totalSteps` (int min 0), `lastCompleted` (nullable timestamp), `avgRating` (0-5), `bookmarkCount` (int min 0)
+
+### Insert/Update Schemas
+
+Each entity has `*InsertSchema` (required fields + optional ID) and `*UpdateSchema` (all fields optional).
+
+### Array Schemas
+
+- `MoodArraySchema`: `z.array(SupabaseMoodSchema)`
+- `InteractionArraySchema`: `z.array(SupabaseInteractionSchema)`
+- `UserArraySchema`: `z.array(SupabaseUserSchema)`
+
+## Inferred Types
+
+All schemas export inferred TypeScript types:
 
 ```typescript
-export const CoupleStatsSchema = z.object({
-  totalSessions: z.number().int().min(0),
-  totalSteps: z.number().int().min(0),
-  lastCompleted: TimestampSchema.nullable(),
-  avgRating: z.number().min(0).max(5),
-  bookmarkCount: z.number().int().min(0),
-});
+type SupabaseMood = z.infer<typeof SupabaseMoodSchema>;
+type MoodInsert = z.infer<typeof MoodInsertSchema>;
+type CoupleStats = z.infer<typeof CoupleStatsSchema>;
+// etc.
 ```
-
-### Exported Types
-
-All schemas export inferred TypeScript types via `z.infer<typeof Schema>`:
-
-- `SupabaseUser`, `SupabaseMood`, `SupabaseInteraction`, `SupabaseMessage`, `SupabasePhoto`
-- `UserInsert`, `UserUpdate`, `MoodInsert`, `MoodUpdate`, `InteractionInsert`, `InteractionUpdate`
-- `CoupleStats`
-
-## 5.3 Error Transformation (`validation/errorMessages.ts`)
-
-### ValidationError Class
-
-```typescript
-class ValidationError extends Error {
-  public readonly fieldErrors: Map<string, string>;
-}
-```
-
-### Key Functions
-
-| Function                       | Input      | Output                                             |
-| ------------------------------ | ---------- | -------------------------------------------------- |
-| `formatZodError(error)`        | `ZodError` | Comma-separated user-friendly message string       |
-| `getFieldErrors(error)`        | `ZodError` | `Map<string, string>` of field path to first error |
-| `createValidationError(error)` | `ZodError` | `ValidationError` (combines both above)            |
-| `isValidationError(error)`     | `unknown`  | Type guard for `ValidationError`                   |
-| `isZodError(error)`            | `unknown`  | Type guard for `ZodError`                          |
-
-### Field Name Mapping
-
-Technical field paths are mapped to display names: `text` -> `"Message"`, `imageBlob` -> `"Image"`, `mimeType` -> `"File type"`, `relationship.startDate` -> `"Relationship start date"`, etc.
