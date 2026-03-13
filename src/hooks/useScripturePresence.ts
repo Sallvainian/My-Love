@@ -225,6 +225,7 @@ export function useScripturePresence(
       stepIndex: null,
       ts: null,
       isPartnerConnected: prev.isPartnerConnected,
+      isChannelSubscribed: prev.isChannelSubscribed,
     }));
     sendPresence();
   }, [stepIndex, sendPresence]);
