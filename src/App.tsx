@@ -199,9 +199,14 @@ function App() {
           setSession(currentSession);
           setAuthLoading(false);
 
+          // Populate store auth state for synchronous access by all slices
+          const { setAuthUser, clearAuth } = useAppStore.getState();
           if (currentSession?.user) {
+            setAuthUser(currentSession.user.id, currentSession.user.email);
             const partnerId = await getPartnerId();
             setSentryUser(currentSession.user.id, partnerId);
+          } else {
+            clearAuth();
           }
 
           if (import.meta.env.DEV) {
@@ -226,8 +231,12 @@ function App() {
       if (isMounted) {
         setSession(newSession);
 
+        // Update store auth state for synchronous access by all slices
+        const { setAuthUser, clearAuth: clearStoreAuth } = useAppStore.getState();
+
         // Check if user needs to set display name (for new OAuth signups)
         if (newSession?.user) {
+          setAuthUser(newSession.user.id, newSession.user.email);
           const hasDisplayName = newSession.user.user_metadata?.display_name;
           setNeedsDisplayName(!hasDisplayName);
 
@@ -243,6 +252,7 @@ function App() {
             });
           }
         } else {
+          clearStoreAuth();
           setNeedsDisplayName(false);
           clearSentryUser();
           if (import.meta.env.DEV) {

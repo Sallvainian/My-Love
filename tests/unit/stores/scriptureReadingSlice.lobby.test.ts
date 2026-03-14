@@ -24,9 +24,7 @@ import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptur
 const mockRpc = vi.fn();
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-    },
+    auth: {},
     rpc: (...args: unknown[]) => mockRpc(...args),
   },
 }));
@@ -75,9 +73,9 @@ async function createStoreWithTogetherSession() {
     startedAt: new Date(),
   });
   const store = createTestStore();
+  // Set userId from authSlice (normally populated by onAuthStateChange)
+  store.setState({ userId: 'user-1' });
   await store.getState().createSession('together', 'user-2');
-  // loadSession normally sets currentUserId; simulate that for tests
-  store.setState({ currentUserId: 'user-1' });
   return store;
 }
 
@@ -109,7 +107,6 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(state.myReady).toBe(false);
     expect(state.partnerReady).toBe(false);
     expect(state.countdownStartedAt).toBeNull();
-    expect(state.currentUserId).toBeNull();
   });
 
   test('[P1] selectRole sets myRole and updates session.currentPhase', async () => {
@@ -223,24 +220,24 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  test('[P1] selectRole uses currentUserId from state (set by loadSession)', async () => {
+  test('[P1] selectRole uses userId from authSlice state', async () => {
     const store = await createStoreWithTogetherSession();
 
-    // currentUserId is already set by createStoreWithTogetherSession (simulating loadSession)
-    expect(store.getState().currentUserId).toBe('user-1');
+    // userId is already set by createStoreWithTogetherSession (simulating authSlice)
+    expect(store.getState().userId).toBe('user-1');
 
     await store.getState().selectRole('reader');
 
-    // currentUserId remains set after selectRole
-    expect(store.getState().currentUserId).toBe('user-1');
+    // userId remains set after selectRole
+    expect(store.getState().userId).toBe('user-1');
   });
 
   test('[P1] onBroadcastReceived maps partnerReady as user2Ready when currentUser is user1', async () => {
     const store = await createStoreWithTogetherSession();
 
-    // Set currentUserId to match session.userId (user-1 = user1_id)
+    // userId matches session.userId (user-1 = user1_id)
     await store.getState().selectRole('reader');
-    expect(store.getState().currentUserId).toBe('user-1');
+    expect(store.getState().userId).toBe('user-1');
     expect(store.getState().session?.userId).toBe('user-1');
 
     // version must be higher than current session version (1) to pass version check
@@ -260,11 +257,11 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
   test('[P1] onBroadcastReceived maps partnerReady as user1Ready when currentUser is user2', async () => {
     const store = await createStoreWithTogetherSession();
 
-    // Simulate user2 client: session.userId is user1_id = 'user-1', currentUserId = 'user-2'
-    store.setState({ currentUserId: 'user-2' });
+    // Simulate user2 client: session.userId is user1_id = 'user-1', userId = 'user-2'
+    store.setState({ userId: 'user-2' });
 
     await store.getState().selectRole('responder');
-    expect(store.getState().currentUserId).toBe('user-2');
+    expect(store.getState().userId).toBe('user-2');
 
     // version must be higher than current
     store.getState().onBroadcastReceived({
@@ -301,7 +298,7 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     const store = await createStoreWithTogetherSession();
 
     // Simulate user2 client
-    store.setState({ currentUserId: 'user-2' });
+    store.setState({ userId: 'user-2' });
     await store.getState().selectRole('responder');
 
     store.getState().onBroadcastReceived({

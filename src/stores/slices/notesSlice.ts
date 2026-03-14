@@ -18,9 +18,7 @@
 
 import type { AppStateCreator } from '../types';
 import type { LoveNote } from '../../types/models';
-import { supabase } from '../../api/supabaseClient';
-import { getCurrentUserId } from '../../api/auth/sessionService';
-import { getPartnerId } from '../../api/supabaseClient';
+import { supabase, getPartnerId } from '../../api/supabaseClient';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { uploadCompressedBlob } from '../../services/loveNoteImageService';
 import { NOTES_CONFIG } from '../../config/images';
@@ -87,7 +85,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: true, notesError: null });
 
       // Get authenticated user ID
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -154,7 +152,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: true });
 
       // Get authenticated user ID
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -288,7 +286,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const { recentTimestamps, now } = get().checkRateLimit();
 
       // Get authenticated user ID and partner ID
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -514,7 +512,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       }
 
       // Get user ID for retry
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }

@@ -101,7 +101,6 @@ export interface ScriptureReadingState {
   myReady: boolean;
   partnerReady: boolean;
   countdownStartedAt: number | null; // Server UTC ms — stored as number (JSON-safe, not Date)
-  currentUserId: string | null; // Logged-in user's auth ID — used to distinguish user1 vs user2 in broadcasts
   // Story 4.2: Lock-in state
   partnerLocked: boolean;
   // Story 4.3: Disconnection state
@@ -174,7 +173,6 @@ const initialScriptureState: ScriptureReadingState = {
   myReady: false,
   partnerReady: false,
   countdownStartedAt: null,
-  currentUserId: null,
   // Story 4.2: Lock-in initial state
   partnerLocked: false,
   // Story 4.3: Disconnection initial state
@@ -225,19 +223,17 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      // Auth check FIRST — before any network call
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData.user?.id) {
+      // Auth check FIRST — userId from authSlice (synchronous, offline-safe)
+      const currentUserId = get().userId;
+      if (!currentUserId) {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.UNAUTHORIZED,
           message: 'Failed to verify user identity',
-          details: authError,
         };
         handleScriptureError(scriptureError);
         set({ scriptureError, scriptureLoading: false });
         return;
       }
-      const currentUserId = authData.user.id;
 
       const session = await scriptureReadingService.getSession(sessionId, (refreshed) =>
         set({ session: refreshed })
@@ -258,7 +254,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // sends the user to SoloReadingFlow instead of ReadingContainer/LobbyContainer.
       if (session.mode === 'together') {
         const soloSession = { ...session, mode: 'solo' as SessionMode };
-        set({ session: soloSession, scriptureLoading: false, isInitialized: true, currentUserId });
+        set({ session: soloSession, scriptureLoading: false, isInitialized: true });
         // Persist mode change to server (fire-and-forget, non-blocking)
         void scriptureReadingService.updateSession(sessionId, { mode: 'solo' }).catch((err) => {
           handleScriptureError({
@@ -270,7 +266,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
-      set({ session, scriptureLoading: false, isInitialized: true, currentUserId });
+      set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -308,8 +304,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isCheckingSession: true });
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
+      const userId = get().userId;
       if (!userId) {
         set({ isCheckingSession: false });
         return;
@@ -594,7 +589,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     const { session } = state;
     if (!session) return;
 
-    const currentUserId = get().currentUserId;
+    const currentUserId = get().userId;
     if (!currentUserId) {
       const scriptureError: ScriptureError = {
         code: ScriptureErrorCode.UNAUTHORIZED,
@@ -770,7 +765,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   // Called when 'state_updated' broadcast received — version-checked snapshot update
   onBroadcastReceived: (payload) => {
     const state = get();
-    const { session, currentUserId } = state;
+    const { session, userId: currentUserId } = state;
 
     // Version check FIRST — drop stale broadcasts entirely
     if (session && payload.version <= session.version) return;

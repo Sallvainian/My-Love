@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AppState } from './types';
 import { createAppSlice } from './slices/appSlice';
+import { createAuthSlice } from './slices/authSlice';
 import { createMessagesSlice } from './slices/messagesSlice';
 import { createPhotosSlice } from './slices/photosSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
@@ -67,6 +68,8 @@ export const useAppStore = create<AppState>()(
     (set, get, api) => ({
       // AppSlice FIRST - owns core state (isLoading, error, __isHydrated)
       ...createAppSlice(set, get, api),
+      // AuthSlice - single source of truth for user identity
+      ...createAuthSlice(set, get, api),
       // Compose all other slices
       ...createMessagesSlice(set, get, api),
       ...createPhotosSlice(set, get, api),

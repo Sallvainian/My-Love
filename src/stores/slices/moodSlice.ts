@@ -20,7 +20,6 @@ import type { MoodEntry } from '../../types';
 import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
-import { getCurrentUserIdOfflineSafe } from '../../api/auth/sessionService';
 
 export interface MoodSlice {
   // State
@@ -58,9 +57,8 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
   // Actions
   addMoodEntry: async (moods, note) => {
     try {
-      // Get authenticated user ID (offline-safe - uses cached session)
-      // Story 5.2: AC-5.2.6 - Use offline-safe auth for local saves
-      const userId = await getCurrentUserIdOfflineSafe();
+      // Get authenticated user ID from store (synchronous, offline-safe)
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
