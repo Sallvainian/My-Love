@@ -17,7 +17,6 @@ runs:
 
     - name: Start Supabase Local
       shell: bash
-      timeout-minutes: 5
       run: |
         set -euo pipefail
         supabase start
