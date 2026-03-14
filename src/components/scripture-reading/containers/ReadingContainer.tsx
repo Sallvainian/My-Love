@@ -20,9 +20,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
+import { ScriptureErrorCode } from '../../../services/scriptureReadingService';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useScripturePresence } from '../../../hooks/useScripturePresence';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { useFocusTrap } from '../../../hooks';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { RoleIndicator } from '../reading/RoleIndicator';
 import { PartnerPosition } from '../reading/PartnerPosition';
@@ -79,41 +81,13 @@ export function ReadingContainer(): ReactElement | null {
   // Local view state: verse or response tab
   const [localView, setLocalView] = useState<'verse' | 'response'>('verse');
   const [bookmarkedSteps, setBookmarkedSteps] = useState<Set<number>>(new Set());
-  const [isLockActionPending, setIsLockActionPending] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const exitDialogRef = useRef<HTMLDivElement>(null);
 
   // Escape key and focus trap for exit confirmation dialog
-  useEffect(() => {
-    if (!showExitConfirm) return;
-    const dialog = exitDialogRef.current;
-    if (!dialog) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowExitConfirm(false);
-        return;
-      }
-      if (e.key === 'Tab') {
-        const focusable = dialog.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showExitConfirm]);
+  useFocusTrap(exitDialogRef, showExitConfirm, {
+    onEscape: () => setShowExitConfirm(false),
+  });
 
   // Story 4.3: Reconnected toast (green tint, 2s auto-dismiss)
   const [showReconnectedToast, setShowReconnectedToast] = useState(false);
@@ -163,10 +137,6 @@ export function ReadingContainer(): ReactElement | null {
     }
   }, [partnerPresence.isPartnerConnected, setPartnerDisconnected]);
 
-  const handleEndSession = useCallback(() => {
-    void endSession();
-  }, [endSession]);
-
   // Track previous step index for animation direction
   const prevStepRef = useRef(session?.currentStepIndex ?? 0);
 
@@ -178,7 +148,7 @@ export function ReadingContainer(): ReactElement | null {
 
   // Watch scriptureError for 409 "Session updated" toast
   useEffect(() => {
-    if (scriptureError?.message === 'Session updated') {
+    if (scriptureError?.code === ScriptureErrorCode.VERSION_MISMATCH) {
       setShowToast(true);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setShowToast(false), 3000);
@@ -236,16 +206,12 @@ export function ReadingContainer(): ReactElement | null {
   }, [currentStepIndex]);
 
   const handleLockIn = useCallback(() => {
-    if (isLockActionPending || isPendingLockIn) return;
-    setIsLockActionPending(true);
-    void lockIn().finally(() => setIsLockActionPending(false));
-  }, [isLockActionPending, isPendingLockIn, lockIn]);
+    void lockIn();
+  }, [lockIn]);
 
   const handleUndoLockIn = useCallback(() => {
-    if (isLockActionPending) return;
-    setIsLockActionPending(true);
-    void undoLockIn().finally(() => setIsLockActionPending(false));
-  }, [isLockActionPending, undoLockIn]);
+    void undoLockIn();
+  }, [undoLockIn]);
 
   if (!session || !step) return null;
 
@@ -261,7 +227,7 @@ export function ReadingContainer(): ReactElement | null {
           partnerName={partnerName}
           disconnectedAt={partnerDisconnectedAt}
           onKeepWaiting={handleKeepWaiting}
-          onEndSession={handleEndSession}
+          onEndSession={() => void endSession()}
           isEnding={isSyncing}
         />
       )}
@@ -409,7 +375,7 @@ export function ReadingContainer(): ReactElement | null {
         <div className="mx-auto max-w-md">
           <LockInButton
             isLocked={isPendingLockIn}
-            isPending={isLockActionPending}
+            isPending={isSyncing}
             partnerLocked={partnerLocked}
             partnerName={partnerName}
             onLockIn={handleLockIn}
@@ -453,7 +419,7 @@ export function ReadingContainer(): ReactElement | null {
               </p>
               <div className="flex gap-3">
                 <button
-                  onClick={handleEndSession}
+                  onClick={() => void endSession()}
                   disabled={isSyncing}
                   className={`min-h-[48px] flex-1 rounded-xl bg-linear-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 ${FOCUS_RING}`}
                   data-testid="reading-exit-confirm-button"

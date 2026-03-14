@@ -553,7 +553,7 @@ describe('SoloReadingFlow', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('exit-button'));
       expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
-      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.keyDown(screen.getByTestId('exit-confirm-dialog'), { key: 'Escape' });
       expect(screen.queryByTestId('exit-confirm-dialog')).toBeNull();
     });
 

@@ -33,6 +33,7 @@ import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useAutoSave } from '../../../hooks/useAutoSave';
 import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { useFocusTrap } from '../../../hooks';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { ReflectionSummary } from '../reflection/ReflectionSummary';
 import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
@@ -112,6 +113,17 @@ export function SoloReadingFlow() {
 
   // Story 1.5: Screen reader announcement state (AC #2)
   const [announcement, setAnnouncement] = useState('');
+  const announcementTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-clear stale announcements after 1s so aria-live region doesn't retain old text
+  useEffect(() => {
+    if (!announcement) return;
+    if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+    announcementTimerRef.current = setTimeout(() => setAnnouncement(''), 1000);
+    return () => {
+      if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+    };
+  }, [announcement]);
 
   // Story 1.5: Focus management refs (AC #3)
   const verseHeadingRef = useRef<HTMLParagraphElement>(null);
@@ -612,34 +624,7 @@ export function SoloReadingFlow() {
   }, [saveAndExit]);
 
   // Story 1.5: Dialog focus trap + Escape handler (AC #1, #8)
-  useEffect(() => {
-    if (!showExitConfirm || !dialogRef.current) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleExitCancel();
-        return;
-      }
-      if (e.key === 'Tab') {
-        const focusable = dialogRef.current!.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showExitConfirm, handleExitCancel]);
+  useFocusTrap(dialogRef, showExitConfirm, { onEscape: handleExitCancel });
 
   // Story 1.5: Screen reader announcements + focus management on step change (AC #2, #3)
   // Combined into single effect to avoid shared-ref race condition between separate effects
