@@ -19,14 +19,14 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        supabase start
+        timeout 120 supabase start
         supabase status --output json | jq -e ".DB_URL" > /dev/null
         echo "Supabase Local started successfully"
 
     - name: Apply database migrations
       shell: bash
       run: |
-        supabase db reset
+        supabase db reset --linked=false
         echo "Migrations applied"
 
     - name: Export Supabase credentials
