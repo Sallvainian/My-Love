@@ -56,7 +56,6 @@ jobs:
                - Verify README updates for new features
                - Check API documentation accuracy
 
-            Use the repository's CLAUDE.md for guidance on style and conventions.
             Be constructive and helpful.
             Provide detailed feedback using inline comments for specific issues.
             Use top-level comments for general observations.
