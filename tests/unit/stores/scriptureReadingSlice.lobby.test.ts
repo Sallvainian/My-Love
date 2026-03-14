@@ -76,6 +76,8 @@ async function createStoreWithTogetherSession() {
   });
   const store = createTestStore();
   await store.getState().createSession('together', 'user-2');
+  // loadSession normally sets currentUserId; simulate that for tests
+  store.setState({ currentUserId: 'user-1' });
   return store;
 }
 
@@ -221,12 +223,15 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  test('[P1] selectRole stores currentUserId for correct partnerReady mapping', async () => {
+  test('[P1] selectRole uses currentUserId from state (set by loadSession)', async () => {
     const store = await createStoreWithTogetherSession();
+
+    // currentUserId is already set by createStoreWithTogetherSession (simulating loadSession)
+    expect(store.getState().currentUserId).toBe('user-1');
 
     await store.getState().selectRole('reader');
 
-    // auth.getUser mock returns { data: { user: { id: 'user-1' } } }
+    // currentUserId remains set after selectRole
     expect(store.getState().currentUserId).toBe('user-1');
   });
 
@@ -255,12 +260,8 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
   test('[P1] onBroadcastReceived maps partnerReady as user1Ready when currentUser is user2', async () => {
     const store = await createStoreWithTogetherSession();
 
-    // Simulate user2 by overriding auth.getUser mock to return user-2
-    // (session.userId is always user1_id = 'user-1'; currentUserId = 'user-2' means user2 client)
-    const { supabase: mockSupa } = await import('../../../src/api/supabaseClient');
-    vi.mocked(mockSupa.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      data: { user: { id: 'user-2' } },
-    });
+    // Simulate user2 client: session.userId is user1_id = 'user-1', currentUserId = 'user-2'
+    store.setState({ currentUserId: 'user-2' });
 
     await store.getState().selectRole('responder');
     expect(store.getState().currentUserId).toBe('user-2');
@@ -299,11 +300,9 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
   test('[P1] onBroadcastReceived reconciles myReady from authoritative snapshot for user2', async () => {
     const store = await createStoreWithTogetherSession();
 
-    const { supabase: mockSupa } = await import('../../../src/api/supabaseClient');
-    vi.mocked(mockSupa.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      data: { user: { id: 'user-2' } },
-    });
-    await store.getState().selectRole('responder'); // sets currentUserId = 'user-2'
+    // Simulate user2 client
+    store.setState({ currentUserId: 'user-2' });
+    await store.getState().selectRole('responder');
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-together-001',

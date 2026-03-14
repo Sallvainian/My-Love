@@ -43,6 +43,8 @@ interface LockInStatusChangedPayload {
   user2_locked: boolean;
 }
 
+const MAX_BROADCAST_RETRIES = 5;
+
 /** Side-effect hook: subscribes to the scripture session broadcast channel. Returns nothing. */
 export function useScriptureBroadcast(sessionId: string | null): void {
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -191,8 +193,12 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
             // Story 4.3: Mark as errored and attempt re-subscribe
             hasErroredRef.current = true;
-            // Guard: do not re-subscribe if session has ended or already retrying
-            if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
+            // Guard: do not re-subscribe if session has ended, already retrying, or max retries reached
+            if (
+              identityRef.current.sessionIdFromStore &&
+              !isRetryingRef.current &&
+              retryCount < MAX_BROADCAST_RETRIES
+            ) {
               isRetryingRef.current = true;
               void supabase.removeChannel(channel).then(() => {
                 if (channelRef.current === channel) {
@@ -205,7 +211,11 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             }
           } else if (status === 'CLOSED') {
             // Story 4.3: Channel closed — remove stale channel before re-subscribe
-            if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
+            if (
+              identityRef.current.sessionIdFromStore &&
+              !isRetryingRef.current &&
+              retryCount < MAX_BROADCAST_RETRIES
+            ) {
               hasErroredRef.current = true;
               isRetryingRef.current = true;
               void supabase.removeChannel(channel).then(() => {
