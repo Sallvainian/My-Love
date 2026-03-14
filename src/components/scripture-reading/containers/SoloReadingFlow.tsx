@@ -44,13 +44,7 @@ import {
   handleScriptureError,
   ScriptureErrorCode,
 } from '../../../services/scriptureReadingService';
-
-// Lavender Dreams design tokens (shared with ScriptureOverview)
-const scriptureTheme = {
-  primary: '#A855F7',
-  background: '#F3E5F5',
-  surface: '#FAF5FF',
-};
+import { FOCUS_RING, scriptureTheme } from '../constants';
 
 // Sub-view within a step: verse or response
 type StepSubView = 'verse' | 'response';
@@ -60,9 +54,6 @@ type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked' | 'completion-e
 
 // Direction for slide animation
 type SlideDirection = 'left' | 'right';
-
-// Shared focus ring classes (Story 1.5: AC #1)
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
 const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
 
 export function SoloReadingFlow() {

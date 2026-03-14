@@ -30,14 +30,7 @@ import { RoleIndicator } from '../reading/RoleIndicator';
 import { PartnerPosition } from '../reading/PartnerPosition';
 import { LockInButton } from '../session/LockInButton';
 import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
-
-// Lavender Dreams design tokens
-const scriptureTheme = {
-  primary: '#A855F7',
-  background: '#F3E5F5',
-};
-
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING, scriptureTheme } from '../constants';
 
 export function ReadingContainer(): ReactElement | null {
   const { slide } = useMotionConfig();

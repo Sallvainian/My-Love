@@ -36,16 +36,7 @@ import { LobbyContainer } from './LobbyContainer';
 import { ReadingContainer } from './ReadingContainer';
 import { StatsSection } from '../overview/StatsSection';
 import { useScriptureBroadcast } from '../../../hooks/useScriptureBroadcast';
-
-// Lavender Dreams design tokens
-const scriptureTheme = {
-  primary: '#A855F7', // Purple-500
-  background: '#F3E5F5', // Light lavender
-  surface: '#FAF5FF', // Very light purple
-};
-
-// Shared focus ring classes (Story 1.5: AC #1)
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING, scriptureTheme } from '../constants';
 
 // Partner status union type for explicit handling
 type PartnerStatus = 'loading' | 'linked' | 'unlinked';
