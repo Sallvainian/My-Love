@@ -71,7 +71,7 @@ jobs:
         run: npm run test:unit:coverage
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: unit-test-coverage
@@ -146,7 +146,7 @@ jobs:
         run: supabase stop --no-backup
 
       - name: Upload ${{ matrix.project }} test results
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: ${{ matrix.project }}-test-results
@@ -186,7 +186,7 @@ jobs:
         run: supabase stop --no-backup
 
       - name: Upload P0 results
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-p0-results
@@ -230,7 +230,7 @@ jobs:
         run: supabase stop --no-backup
 
       - name: Upload test results
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-results-shard-${{ matrix.shard }}
@@ -297,7 +297,7 @@ jobs:
 
       - name: Upload burn-in failures
         if: failure()
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         with:
           name: burn-in-failures
           path: |
@@ -341,7 +341,7 @@ jobs:
           fi
 
       - name: Upload merged report
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: merged-playwright-report
