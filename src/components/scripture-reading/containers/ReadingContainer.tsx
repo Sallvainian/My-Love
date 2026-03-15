@@ -129,10 +129,6 @@ export function ReadingContainer(): ReactElement | null {
     }
   }, [partnerPresence.isPartnerConnected, setPartnerDisconnected]);
 
-  const handleEndSession = useCallback(() => {
-    void endSession();
-  }, [endSession]);
-
   // Track previous step index for animation direction
   const prevStepRef = useRef(session?.currentStepIndex ?? 0);
 
@@ -227,7 +223,7 @@ export function ReadingContainer(): ReactElement | null {
           partnerName={partnerName}
           disconnectedAt={partnerDisconnectedAt}
           onKeepWaiting={handleKeepWaiting}
-          onEndSession={handleEndSession}
+          onEndSession={endSession}
           isEnding={isSyncing}
         />
       )}

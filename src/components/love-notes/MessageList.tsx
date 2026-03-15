@@ -153,8 +153,8 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
  * Calculate row height based on message content length and image presence
  * Story 2.4 - Task 1.3: Variable row height calculation
  */
-function calculateRowHeight(note: LoveNote | null, index: number): number {
-  if (!note || index < 0) {
+function calculateRowHeight(note: LoveNote | null): number {
+  if (!note) {
     return 80; // Default/loading height
   }
 
@@ -271,7 +271,7 @@ export function MessageList({
 
       const adjustedIndex = showBeginning ? index - 1 : index;
       const note = notes[adjustedIndex];
-      return calculateRowHeight(note, adjustedIndex);
+      return calculateRowHeight(note);
     },
     [notes, showBeginning]
   );
