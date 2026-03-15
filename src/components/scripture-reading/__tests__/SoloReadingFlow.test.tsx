@@ -1281,7 +1281,7 @@ describe('SoloReadingFlow', () => {
       });
     });
 
-    it('calls updatePhase("complete", "complete") after successful completion persistence', async () => {
+    it('calls updatePhase("complete") after successful completion persistence', async () => {
       mockStoreState.partner = linkedPartner;
       mockStoreState.session = createMockSession({
         currentPhase: 'report',
@@ -1293,7 +1293,7 @@ describe('SoloReadingFlow', () => {
       fireEvent.click(screen.getByTestId('scripture-message-skip-btn'));
 
       await vi.waitFor(() => {
-        expect(mockUpdatePhase).toHaveBeenCalledWith('complete', 'complete');
+        expect(mockUpdatePhase).toHaveBeenCalledWith('complete');
       });
     });
 
@@ -1317,7 +1317,7 @@ describe('SoloReadingFlow', () => {
       });
       expect(screen.queryByTestId('scripture-report-screen')).toBeNull();
       expect(mockUpdateSession).toHaveBeenCalledTimes(2);
-      expect(mockUpdatePhase).not.toHaveBeenCalledWith('complete', 'complete');
+      expect(mockUpdatePhase).not.toHaveBeenCalledWith('complete');
     });
 
     it('retry from completion error transitions to report once completion succeeds', async () => {
@@ -1344,7 +1344,7 @@ describe('SoloReadingFlow', () => {
       await vi.waitFor(() => {
         expect(screen.getByTestId('scripture-report-screen')).toBeDefined();
       });
-      expect(mockUpdatePhase).toHaveBeenCalledWith('complete', 'complete');
+      expect(mockUpdatePhase).toHaveBeenCalledWith('complete');
     });
 
     it('DailyPrayerReport appears after send/skip (2.3-INT-005)', async () => {

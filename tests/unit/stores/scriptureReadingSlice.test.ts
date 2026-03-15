@@ -620,8 +620,12 @@ describe('scriptureReadingSlice', () => {
         expect.objectContaining({
           currentStepIndex: 7,
           currentPhase: 'reading',
-          status: 'in_progress',
         })
+      );
+      // Should NOT send status — status transitions are handled by dedicated actions
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: expect.anything() })
       );
 
       // Should have reset state
@@ -693,14 +697,17 @@ describe('scriptureReadingSlice', () => {
 
       await store.getState().saveSession();
 
-      // Should have called updateSession
+      // Should have called updateSession with progress only (no status)
       expect(scriptureReadingService.updateSession).toHaveBeenCalledWith(
         'session-1',
         expect.objectContaining({
           currentStepIndex: 5,
           currentPhase: 'reading',
-          status: 'in_progress',
         })
+      );
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: expect.anything() })
       );
 
       // Session should NOT be cleared (unlike saveAndExit)

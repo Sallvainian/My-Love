@@ -15,7 +15,6 @@ import type {
   ScriptureSession,
   ScriptureSessionPhase as SessionPhase,
   ScriptureSessionMode as SessionMode,
-  ScriptureSessionStatus,
 } from '../../services/dbSchema';
 import { MAX_STEPS } from '../../data/scriptureSteps';
 
@@ -72,7 +71,6 @@ export interface PendingRetry {
     sessionId: string;
     currentStepIndex: number;
     currentPhase: SessionPhase;
-    status: ScriptureSessionStatus;
   };
 }
 
@@ -116,7 +114,7 @@ export interface ScriptureSlice extends ScriptureReadingState {
   createSession: (mode: SessionMode, partnerId?: string) => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   exitSession: () => void;
-  updatePhase: (phase: SessionPhase, status?: ScriptureSessionStatus) => void;
+  updatePhase: (phase: SessionPhase) => void;
   clearScriptureError: () => void;
   checkForActiveSession: () => Promise<void>;
   clearActiveSession: () => void;
@@ -284,14 +282,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set(resetSessionState(get));
   },
 
-  updatePhase: (phase, status) => {
+  updatePhase: (phase) => {
     set((state) => {
       if (!state.session) return {};
       return {
         session: {
           ...state.session,
           currentPhase: phase,
-          ...(status !== undefined && { status }),
         },
       };
     });
@@ -378,7 +375,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               sessionId: session.id,
               currentStepIndex: MAX_STEPS - 1,
               currentPhase: 'reflection',
-              status: session.status,
             },
           },
         });
@@ -417,7 +413,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               sessionId: session.id,
               currentStepIndex: nextStep,
               currentPhase: session.currentPhase,
-              status: session.status,
             },
           },
         });
@@ -438,7 +433,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       await scriptureReadingService.updateSession(session.id, {
         currentStepIndex: session.currentStepIndex,
         currentPhase: session.currentPhase,
-        status: session.status,
       });
 
       // Clear session from active state (return to overview)
@@ -457,12 +451,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   },
 
   // Story 1.4: Save session without clearing state (silent save)
-  //
-  // IMPORTANT: This writes session.status from the store back to the server.
-  // Any code that mutates status on the server (e.g. markSessionComplete)
-  // MUST also update session.status in the store, otherwise a concurrent
-  // saveSession call (e.g. from useAutoSave's beforeunload) will overwrite
-  // the server value with stale store state. See #143.
+  // Only persists progress (step + phase). Status transitions are handled
+  // by dedicated actions (markSessionComplete, abandonSession).
   saveSession: async () => {
     const state = get();
     const { session } = state;
@@ -474,7 +464,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       await scriptureReadingService.updateSession(session.id, {
         currentStepIndex: session.currentStepIndex,
         currentPhase: session.currentPhase,
-        status: session.status,
       });
       set({ isSyncing: false });
     } catch (error) {
@@ -525,14 +514,12 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         await scriptureReadingService.updateSession(pendingRetry.sessionData.sessionId, {
           currentStepIndex: pendingRetry.sessionData.currentStepIndex,
           currentPhase: pendingRetry.sessionData.currentPhase,
-          status: pendingRetry.sessionData.status,
         });
       } else {
         // Fallback: use current session (legacy pendingRetry without sessionData)
         await scriptureReadingService.updateSession(session.id, {
           currentStepIndex: session.currentStepIndex,
           currentPhase: session.currentPhase,
-          status: session.status,
         });
       }
       set({ isSyncing: false, pendingRetry: null, scriptureError: null });
