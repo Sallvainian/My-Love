@@ -519,7 +519,7 @@ describe('SoloReadingFlow', () => {
     it('dialog shows AC-spec description text', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('exit-button'));
-      expect(screen.getByText('Save your progress? You can continue later.')).toBeDefined();
+      expect(screen.getByText('You can continue where you left off.')).toBeDefined();
     });
 
     it('dialog has Save & Exit button', () => {

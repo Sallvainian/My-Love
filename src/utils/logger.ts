@@ -10,8 +10,4 @@ export const logger = {
   info: (...args: unknown[]): void => {
     console.info(...args);
   },
-  /** Always logs — general purpose */
-  log: (...args: unknown[]): void => {
-    console.log(...args);
-  },
 };

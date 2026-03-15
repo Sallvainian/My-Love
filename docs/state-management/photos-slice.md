@@ -60,4 +60,4 @@ interface UploadPhotoInput {
 
 ## Cross-Slice Dependencies
 
-None. Operates independently.
+- **AuthSlice** -- Reads `get().userId` to scope photo operations (upload, load, delete) to the authenticated user.

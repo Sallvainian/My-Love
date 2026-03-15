@@ -67,11 +67,17 @@ export function useSessionPersistence({
   // Story 2.1: Load bookmarks for current session on mount/session change
   useEffect(() => {
     if (!sessionId || !sessionUserId) return;
+    let isActive = true;
     void (async () => {
       const bookmarks = await scriptureReadingService.getBookmarksBySession(sessionId);
-      const userBookmarks = bookmarks.filter((b) => b.userId === sessionUserId);
-      setBookmarkedSteps(new Set(userBookmarks.map((b) => b.stepIndex)));
+      if (isActive) {
+        const userBookmarks = bookmarks.filter((b) => b.userId === sessionUserId);
+        setBookmarkedSteps(new Set(userBookmarks.map((b) => b.stepIndex)));
+      }
     })();
+    return () => {
+      isActive = false;
+    };
   }, [sessionId, sessionUserId]);
 
   // Story 2.1: Bookmark toggle handler (optimistic UI immediate, debounced server write)

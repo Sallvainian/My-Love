@@ -59,7 +59,7 @@ ESLint 9 with flat config (`eslint.config.js`). No `.eslintrc` file.
 | `eslint-plugin-react-hooks`   | All recommended rules enabled. `set-state-in-effect` and `purity` downgraded to `warn` for legitimate patterns (blob URL lifecycle, timer setup, animation randomization). |
 | `eslint-plugin-react-refresh` | `only-export-components` as warning, with `allowConstantExport: true`                                                                                                      |
 | `typescript-eslint`           | `no-explicit-any`: error. `no-unused-vars`: error with `_` prefix ignore pattern for args, vars, and caught errors.                                                        |
-| Built-in                      | `no-console`: error (allows `console.warn` and `console.error`). Use the `logger` utility instead of `console.log/info/debug`. See [Logger Utility](#logger-utility).       |
+| Built-in                      | `no-console`: error (allows `console.warn` and `console.error`). Use the `logger` utility instead of `console.log/info/debug`. See [Logger Utility](#logger-utility).      |
 
 ### Architectural Guardrails (ESLint-Enforced)
 
@@ -95,7 +95,7 @@ Container components must go through Zustand slice actions for all data operatio
 
 - `no-console` disabled (service workers run outside the window context and cannot use the logger utility)
 
-**Test files (`tests/**`, `*.test.*`, `*.spec.*`)**:
+**Test files (`tests/**`, `_.test._`, `_.spec._`)\*\*:
 
 - Both browser and Node globals enabled
 - `rules-of-hooks` disabled (test fixtures may use hooks unconventionally)
@@ -204,18 +204,14 @@ logger.debug('Subscription channel:', channelName);
 
 // Always logs -- operational events (sync completed, subscribed, etc.)
 logger.info('Mood sync completed', { count: 5 });
-
-// Always logs -- general purpose
-logger.log('Session started');
 ```
 
 ### Logger API
 
-| Method         | Behavior                                                    |
-| -------------- | ----------------------------------------------------------- |
+| Method         | Behavior                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `logger.debug` | Calls `console.debug()` only when `import.meta.env.DEV` is true (development mode). Silent in production builds. |
-| `logger.info`  | Calls `console.info()` in all environments.                 |
-| `logger.log`   | Calls `console.log()` in all environments.                  |
+| `logger.info`  | Calls `console.info()` in all environments.                                                                      |
 
 The logger file itself uses `/* eslint-disable no-console */` since it is the sanctioned wrapper for console output.
 

@@ -51,19 +51,19 @@ The scripture feature inverts the offline-first pattern:
 
 A single Zustand store (`src/stores/useAppStore.ts`) is composed from 11 slices using the slice pattern:
 
-| Slice                   | Responsibility                                          |
-| ----------------------- | ------------------------------------------------------- |
-| `appSlice`              | App initialization, loading states, hydration flag      |
-| `authSlice`             | User identity (userId, email, isAuthenticated)          |
-| `settingsSlice`         | Theme selection, relationship configuration             |
-| `navigationSlice`       | Current view routing (no router library)                |
-| `messagesSlice`         | Daily love messages, favorites management               |
-| `moodSlice`             | Mood tracking, partner mood sync                        |
-| `interactionsSlice`     | Poke/kiss partner interactions                          |
-| `partnerSlice`          | Partner data, display name resolution                   |
-| `notesSlice`            | Love notes chat messages                                |
-| `photosSlice`           | Photo gallery state                                     |
-| `scriptureReadingSlice` | Scripture reading session management                    |
+| Slice                   | Responsibility                                     |
+| ----------------------- | -------------------------------------------------- |
+| `appSlice`              | App initialization, loading states, hydration flag |
+| `authSlice`             | User identity (userId, email, isAuthenticated)     |
+| `settingsSlice`         | Theme selection, relationship configuration        |
+| `navigationSlice`       | Current view routing (no router library)           |
+| `messagesSlice`         | Daily love messages, favorites management          |
+| `moodSlice`             | Mood tracking, partner mood sync                   |
+| `interactionsSlice`     | Poke/kiss partner interactions                     |
+| `partnerSlice`          | Partner data, display name resolution              |
+| `notesSlice`            | Love notes chat messages                           |
+| `photosSlice`           | Photo gallery state                                |
+| `scriptureReadingSlice` | Scripture reading session management               |
 
 State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`. The `partialize` option restricts what is persisted: settings, onboarding state, messageHistory, and moods. Large data (messages, photos, custom messages) is stored in IndexedDB.
 
@@ -179,7 +179,6 @@ The project uses a centralized `logger` utility (`src/utils/logger.ts`) that rep
 
 - `logger.debug(...)` -- Only logs in development (`import.meta.env.DEV`). Used for verbose tracing and flow debugging.
 - `logger.info(...)` -- Always logs. Used for operational events (sync completed, subscribed, state hydrated, etc.).
-- `logger.log(...)` -- Always logs. General-purpose wrapper around `console.log`.
 - `console.error(...)` and `console.warn(...)` -- Used directly for errors and warnings (not wrapped by logger).
 
 ## Database Schema

@@ -190,7 +190,7 @@ test.describe('Solo Reading Flow', () => {
       await page.getByTestId('exit-button').click();
       const exitDialog = page.getByTestId('exit-confirm-dialog');
       await expect(exitDialog).toBeVisible();
-      await expect(exitDialog).toContainText('Save your progress? You can continue later.');
+      await expect(exitDialog).toContainText('You can continue where you left off.');
 
       await page.getByTestId('save-and-exit-button').click();
       await savePromise;

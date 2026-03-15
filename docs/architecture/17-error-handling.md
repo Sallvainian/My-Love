@@ -35,7 +35,6 @@ The project uses a centralized `logger` utility (`src/utils/logger.ts`) introduc
 
 - `logger.debug(...)` -- DEV only (`import.meta.env.DEV`). Verbose tracing, flow debugging.
 - `logger.info(...)` -- Always logs. Operational events (sync completed, subscribed, state hydrated).
-- `logger.log(...)` -- Always logs. General-purpose wrapper.
 - `console.error(...)` / `console.warn(...)` -- Used directly (not wrapped). ESLint `no-console` rule is configured with overrides to allow `error` and `warn`.
 
 This prevents debug noise from reaching production while preserving operational visibility.

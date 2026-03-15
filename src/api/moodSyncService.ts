@@ -238,7 +238,7 @@ export class MoodSyncService {
           const errorMessage = error instanceof Error ? error.message : String(error);
           result.errors.push(`Mood ${mood.id || 'unknown'}: ${errorMessage}`);
 
-          logger.debug(`[MoodSyncService] Failed to sync mood ${mood.id}:`, error);
+          logger.info(`[MoodSyncService] Failed to sync mood ${mood.id}:`, error);
         }
       }
 
@@ -251,7 +251,7 @@ export class MoodSyncService {
       // Catch-all for unexpected errors
       const errorMessage = error instanceof Error ? error.message : String(error);
       result.errors.push(`Unexpected error during sync: ${errorMessage}`);
-      console.error('[MoodSyncService] Unexpected error in syncPendingMoods:', error);
+      logger.info('[MoodSyncService] Unexpected error in syncPendingMoods:', error);
       return result;
     }
   }

@@ -34,7 +34,6 @@ Introduced in the 2026-03-13 refactor, replacing raw `console.log`/`info`/`debug
 
 - `logger.debug(...)` -- DEV only. Verbose tracing.
 - `logger.info(...)` -- Always logs. Operational events.
-- `logger.log(...)` -- Always logs. General-purpose.
 
 **Consumers**: Nearly every file in `src/api/`, `src/services/`, `src/stores/slices/`, `src/hooks/`, and `src/components/`. The `sw.ts` service worker does NOT use logger (uses raw `console.log` since `import.meta.env.DEV` is unavailable in SW context).
 

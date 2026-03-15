@@ -370,6 +370,7 @@ export function ReadingPhaseView({
                 className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl"
                 data-testid="exit-confirm-dialog"
                 role="dialog"
+                aria-modal="true"
                 aria-labelledby="exit-dialog-title"
                 aria-describedby="exit-dialog-desc"
                 onClick={(e) => e.stopPropagation()}
@@ -378,7 +379,7 @@ export function ReadingPhaseView({
                   Save your progress?
                 </h2>
                 <p id="exit-dialog-desc" className="text-sm text-purple-700">
-                  Save your progress? You can continue later.
+                  You can continue where you left off.
                 </p>
                 <div className="flex gap-3">
                   <button

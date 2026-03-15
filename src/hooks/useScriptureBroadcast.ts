@@ -153,6 +153,8 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     void supabase.realtime
       .setAuth()
       .then(async () => {
+        // Use supabase.auth.getUser() instead of get().userId because the Realtime
+        // setAuth() handshake requires a fresh token/session, not just the cached user ID.
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError) {
           throw authError;
