@@ -48,7 +48,7 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 | `npm run test:unit`          | Run all unit tests (Vitest)                                |
 | `npm run test:unit:watch`    | Vitest watch mode                                          |
 | `npm run test:unit:ui`       | Vitest interactive UI                                      |
-| `npm run test:unit:coverage` | Unit tests with V8 coverage (80% threshold)                |
+| `npm run test:unit:coverage` | Unit tests with V8 coverage (25% threshold)                |
 | `npm run test:e2e`           | All E2E tests with process cleanup                         |
 | `npm run test:e2e:raw`       | Playwright directly                                        |
 | `npm run test:e2e:ui`        | Playwright interactive UI mode                             |

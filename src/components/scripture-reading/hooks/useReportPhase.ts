@@ -16,6 +16,7 @@ import {
   handleScriptureError,
   ScriptureErrorCode,
 } from '../../../services/scriptureReadingService';
+import { logger } from '../../../utils/logger';
 
 // Story 2.3: Sub-phase within report phase
 export type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked' | 'completion-error';
@@ -72,6 +73,7 @@ export function useReportPhase({
   const [isRetryingCompletion, setIsRetryingCompletion] = useState(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
   const [reportLoadError, setReportLoadError] = useState<string | null>(null);
+  const [messageSendFailed, setMessageSendFailed] = useState(false);
   const [reportReloadKey, setReportReloadKey] = useState(0);
   const completionRetryTargetRef = useRef<'report' | 'complete-unlinked'>('report');
   const prevReportSubPhaseRef = useRef<ReportSubPhase | null>(null);
@@ -113,10 +115,18 @@ export function useReportPhase({
               details: e,
             });
           }
-          await scriptureReadingService.updateSession(session.id, {
-            currentPhase: 'report',
-          });
-          updatePhase('report');
+          try {
+            await scriptureReadingService.updateSession(session.id, {
+              currentPhase: 'report',
+            });
+            updatePhase('report');
+          } catch (phaseError) {
+            handleScriptureError({
+              code: ScriptureErrorCode.SYNC_FAILED,
+              message: 'Reflection saved but failed to advance to report phase',
+              details: phaseError,
+            });
+          }
         } catch (error) {
           handleScriptureError({
             code: ScriptureErrorCode.SYNC_FAILED,
@@ -166,14 +176,16 @@ export function useReportPhase({
       if (!session || isSendingMessage) return;
       setIsSendingMessage(true);
       setCompletionError(null);
+      setMessageSendFailed(false);
       completionRetryTargetRef.current = 'report';
 
       void (async () => {
         try {
           try {
             await scriptureReadingService.addMessage(session.id, session.userId, message);
-          } catch {
-            // Non-blocking: message write failure shouldn't block session completion
+          } catch (error) {
+            logger.info('Message write failed, proceeding with session completion', error);
+            setMessageSendFailed(true);
           }
 
           const completionSucceeded = await markSessionComplete();
@@ -469,6 +481,7 @@ export function useReportPhase({
     isRetryingCompletion,
     completionError,
     reportLoadError,
+    messageSendFailed,
 
     // Refs
     completionHeadingRef,

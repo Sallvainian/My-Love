@@ -84,6 +84,8 @@ export function useSessionPersistence({
   const handleBookmarkToggle = useCallback(() => {
     if (!session) return;
     const stepIndex = session.currentStepIndex;
+    const sessionId = session.id;
+    const userId = session.userId;
 
     // Optimistic toggle (instant per AC #1)
     setBookmarkedSteps((prev) => {
@@ -104,12 +106,7 @@ export function useSessionPersistence({
       bookmarkDebounceRef.current = null;
       void (async () => {
         try {
-          await scriptureReadingService.toggleBookmark(
-            session.id,
-            stepIndex,
-            session.userId,
-            false
-          );
+          await scriptureReadingService.toggleBookmark(sessionId, stepIndex, userId, false);
         } catch (error) {
           handleScriptureError({
             code: ScriptureErrorCode.SYNC_FAILED,

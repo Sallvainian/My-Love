@@ -17,7 +17,7 @@
 - **Runner**: Vitest 4.0.17 (`vitest.config.ts`)
 - **DOM**: happy-dom 20.8.3 (lightweight DOM implementation)
 - **Setup**: `tests/setup.ts` (global test setup)
-- **Coverage**: V8 coverage with 80% threshold (lines, functions, branches, statements)
+- **Coverage**: V8 coverage with 25% threshold (lines, functions, branches, statements)
 - **Path alias**: `@/` maps to `src/`
 - **IndexedDB mock**: `fake-indexeddb` 6.2.5
 

@@ -66,12 +66,14 @@ const mockOnPartnerJoined = vi.fn();
 const mockOnBroadcastReceived = vi.fn();
 const mockApplySessionConverted = vi.fn();
 const mockOnPartnerLockInChanged = vi.fn();
+const mockSetPartnerDisconnected = vi.fn();
 
 const mockStoreState = {
   onPartnerJoined: mockOnPartnerJoined,
   onBroadcastReceived: mockOnBroadcastReceived,
   applySessionConverted: mockApplySessionConverted,
   onPartnerLockInChanged: mockOnPartnerLockInChanged,
+  setPartnerDisconnected: mockSetPartnerDisconnected,
   userId: 'user-1',
   session: { userId: 'user-1' },
 };

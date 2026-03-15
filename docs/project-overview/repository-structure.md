@@ -235,5 +235,5 @@ My-Love/
 |-- tsconfig.node.json                # Node TypeScript config (vite.config.ts, vitest.config.ts)
 |-- tsconfig.test.json                # Test TypeScript config
 |-- vite.config.ts                    # Vite: base path, manual chunks, PWA plugin, visualizer, Sentry
-+-- vitest.config.ts                  # Vitest: happy-dom, path alias @/, coverage thresholds (80%)
++-- vitest.config.ts                  # Vitest: happy-dom, path alias @/, coverage thresholds (25%)
 ```

@@ -59,6 +59,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     onPartnerLockInChanged,
     loadSession,
     setBroadcastFn,
+    setPartnerDisconnected,
     currentUserId,
     sessionUserId,
     sessionIdFromStore,
@@ -70,6 +71,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       onPartnerLockInChanged: state.onPartnerLockInChanged,
       loadSession: state.loadSession,
       setBroadcastFn: state.setBroadcastFn,
+      setPartnerDisconnected: state.setPartnerDisconnected,
       currentUserId: state.userId,
       sessionUserId: state.session?.userId ?? null, // user1_id
       sessionIdFromStore: state.session?.id ?? null,
@@ -239,6 +241,13 @@ export function useScriptureBroadcast(sessionId: string | null): void {
           details: err,
         };
         handleScriptureError(scriptureError);
+        // Reset partner connection state on auth failure — channel is unusable
+        setPartnerDisconnected(true);
+        // Clean up dead channel so future effect re-runs can re-subscribe
+        if (channelRef.current) {
+          void supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
       });
 
     return () => {
@@ -258,5 +267,6 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     onPartnerLockInChanged,
     loadSession,
     setBroadcastFn,
+    setPartnerDisconnected,
   ]);
 }
