@@ -457,6 +457,12 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   },
 
   // Story 1.4: Save session without clearing state (silent save)
+  //
+  // IMPORTANT: This writes session.status from the store back to the server.
+  // Any code that mutates status on the server (e.g. markSessionComplete)
+  // MUST also update session.status in the store, otherwise a concurrent
+  // saveSession call (e.g. from useAutoSave's beforeunload) will overwrite
+  // the server value with stale store state. See #143.
   saveSession: async () => {
     const state = get();
     const { session } = state;
