@@ -116,7 +116,7 @@ export interface ScriptureSlice extends ScriptureReadingState {
   createSession: (mode: SessionMode, partnerId?: string) => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   exitSession: () => void;
-  updatePhase: (phase: SessionPhase) => void;
+  updatePhase: (phase: SessionPhase, status?: ScriptureSessionStatus) => void;
   clearScriptureError: () => void;
   checkForActiveSession: () => Promise<void>;
   clearActiveSession: () => void;
@@ -284,13 +284,14 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set(resetSessionState(get));
   },
 
-  updatePhase: (phase) => {
+  updatePhase: (phase, status) => {
     set((state) => {
       if (!state.session) return {};
       return {
         session: {
           ...state.session,
           currentPhase: phase,
+          ...(status !== undefined && { status }),
         },
       };
     });

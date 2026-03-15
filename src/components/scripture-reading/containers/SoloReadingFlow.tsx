@@ -314,7 +314,11 @@ export function SoloReadingFlow() {
           completedAt: new Date(),
           currentPhase: 'complete',
         });
-        updatePhase('complete');
+        // Update both currentPhase AND status in the store atomically.
+        // Without status update, useAutoSave's beforeunload handler sees
+        // session.status === 'in_progress' and overwrites the DB's
+        // status='complete' back to 'in_progress' via saveSession().
+        updatePhase('complete', 'complete');
         return true;
       } catch (error) {
         handleScriptureError({
