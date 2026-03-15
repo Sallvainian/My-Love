@@ -1,44 +1,39 @@
 # API Reference
 
-Complete API documentation for the My Love PWA backend services.
+Complete reference for the My Love PWA service layer, API clients, validation schemas, and utility modules.
 
-## Sections
+## Scope
 
-1. [Supabase Client Configuration](./1-supabase-client-configuration.md)
-2. [Authentication Service](./2-authentication-service.md)
-3. [Error Handling Utilities](./3-error-handling-utilities.md)
-4. [Mood API Service](./4-mood-api-service.md)
-5. [Mood Sync Service](./5-mood-sync-service.md)
-6. [Interaction Service](./6-interaction-service.md)
-7. [Partner Service](./7-partner-service.md)
-8. [IndexedDB Services](./8-indexeddb-services.md)
-9. [Photo Services](./9-photo-services.md)
-10. [Validation Layer](./10-validation-layer.md)
-11. [Service Worker & Background Sync](./11-service-worker-background-sync.md)
-12. [Real-Time Subscriptions](./12-real-time-subscriptions.md)
-13. [Scripture Reading Service](./13-scripture-reading-service.md)
-14. [Additional Services](./14-additional-services.md)
+This section covers all files in:
+
+- `src/api/` -- Supabase client, auth, mood API, interactions, partner service, realtime
+- `src/services/` -- IndexedDB CRUD, photo storage, scripture reading, sync, performance
+- `src/validation/` -- Zod schemas for runtime validation at service boundaries
+- `src/utils/` -- Logger, background sync, offline handling, date/message utilities
+- `src/sw.ts` / `src/sw-db.ts` -- Service worker with Workbox caching and Background Sync
 
 ## Architecture Overview
 
-```
-UI Components (React 19)
-    |
-Zustand Store (10 slices via AppState)
-    |
-Services Layer (IndexedDB CRUD, business logic, caching)
-    |
-API Layer (Supabase client, Zod validation, error handling)
-    |
-Supabase Backend (PostgreSQL + RLS, Storage, Realtime, Auth, Edge Functions)
-```
+The service layer follows an **online-first** architecture:
 
-### Key Patterns
+1. **Supabase Client** (`supabaseClient.ts`) -- singleton typed client for all remote operations
+2. **API Layer** (`moodApi.ts`, `interactionService.ts`, `partnerService.ts`) -- validated Supabase queries
+3. **Sync Services** (`moodSyncService.ts`, `syncService.ts`) -- IndexedDB-to-Supabase synchronization
+4. **IndexedDB Services** (`BaseIndexedDBService.ts` + concrete services) -- local-first CRUD with `idb` library
+5. **Validation** (`validation/schemas.ts`, `api/validation/supabaseSchemas.ts`) -- Zod v4 schemas at every boundary
+6. **Service Worker** (`sw.ts`) -- Workbox caching strategies + Background Sync API for offline mood uploads
 
-- **Singleton services**: Each service is instantiated once at module level and exported (e.g., `export const moodApi = new MoodApi()`)
-- **Zod validation**: API responses validated via `SupabaseMoodSchema` etc.; service inputs validated via `MoodEntrySchema` etc.
-- **Offline-first**: IndexedDB stores data locally; background sync uploads pending entries when connectivity returns
-- **Error hierarchy**: `SupabaseServiceError` (DB errors) > `ApiValidationError` (response validation) > `ValidationError` (input validation)
-- **Cache-first reads**: Scripture service reads IndexedDB first, returns cached data, then refreshes from server in background
-- **Write-through**: Mutations go to Supabase first; on success, update local IndexedDB cache
-- **Broadcast API**: Used for partner mood updates (avoids RLS issues with postgres_changes)
+## Error Handling Philosophy
+
+- **Read operations**: Return `null` or empty arrays on error (graceful degradation)
+- **Write operations**: Throw errors (data integrity must be explicit)
+- **Network errors**: Detected via `navigator.onLine`, wrapped in `SupabaseServiceError` or `OfflineError`
+- **Validation errors**: Zod errors transformed to user-friendly `ValidationError` with field-specific messages
+
+## Quick Navigation
+
+See [table-of-contents.md](./table-of-contents.md) for the full document listing.
+
+---
+
+*Generated: 2026-03-15 | Source: exhaustive scan of 207 source files, 24 SQL migrations*

@@ -69,4 +69,5 @@ The `useLoveNotes` hook (and `useRealtimeMessages` hook) set up a Supabase realt
 
 ## Cross-Slice Dependencies
 
-None. Operates independently. The `useLoveNotes` hook wraps this slice's actions.
+- **Reads:** `AuthSlice` (via `get().userId` in `fetchNotes`, `fetchOlderNotes`, `sendNote`, `retryFailedMessage` for user identity)
+- The `useLoveNotes` hook wraps this slice's actions for component consumption.

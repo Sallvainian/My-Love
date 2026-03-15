@@ -78,6 +78,7 @@ All workflows are in `.github/workflows/`:
 | -------------------- | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
 | Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs/reviews                   | Claude Code AI assistance (model: claude-opus-4-6)   |
 | Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready (non-draft)                   | Automated PR code review with Claude `/review` skill |
+| Auto-Retry Flaky     | `claude-flaky-tests.yml`   | Tests workflow failure                                     | AI-detect flaky test failures and auto-retry; comments on PRs |
 | Manual Code Analysis | `manual-code-analysis.yml` | Manual dispatch (choice: summarize-commit/security-review) | On-demand commit summarization or security review    |
 | CI Failure Auto-Fix  | `ci-failure-auto-fix.yml`  | Test workflow failure on non-main branches with open PRs   | Auto-fix CI failures with Claude Code                |
 
@@ -109,9 +110,10 @@ All workflows are in `.github/workflows/`:
 
 ### Composite Actions
 
-| Action         | Path                              | Purpose                                                                  |
-| -------------- | --------------------------------- | ------------------------------------------------------------------------ |
-| Setup Supabase | `.github/actions/setup-supabase/` | Install CLI (v2.72.7), start local, apply migrations, export credentials |
+| Action               | Path                                    | Purpose                                                                  |
+| -------------------- | --------------------------------------- | ------------------------------------------------------------------------ |
+| Setup Supabase       | `.github/actions/setup-supabase/`       | Install CLI (v2.72.7), start local, apply migrations, export credentials |
+| Setup Playwright E2E | `.github/actions/setup-playwright-e2e/` | Install deps, Playwright browsers, setup Supabase for E2E tests          |
 
 ### Test Pipeline Stages
 

@@ -16,6 +16,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import { initSentry } from './config/sentry';
+import { logger } from './utils/logger';
 import App from './App.tsx';
 import './index.css';
 
@@ -149,7 +150,7 @@ The Zustand store is created at module load time (before any component renders):
 ```
 Module loaded
   |
-  |-- create<AppState>()(persist(...))  // Store created with all 10 slices
+  |-- create<AppState>()(persist(...))  // Store created with all 11 slices
   |-- persist middleware reads localStorage('my-love-storage')
   |-- Custom storage with pre-hydration validation
   |-- Custom deserialization (Map from array entries for shownMessages)

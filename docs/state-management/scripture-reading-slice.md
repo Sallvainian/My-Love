@@ -156,4 +156,5 @@ ScriptureOverview (creates session)
 
 ## Cross-Slice Dependencies
 
-None directly. The ScriptureOverview container reads `partner` from PartnerSlice and `setView` from NavigationSlice, but the slice itself is independent.
+- **Reads:** `AuthSlice` (via `get().userId` in `loadSession`, `selectRole`, `onBroadcastReceived` for user identity)
+- The ScriptureOverview container additionally reads `partner` from PartnerSlice and `setView` from NavigationSlice, but those are component-level, not slice-level dependencies.

@@ -9,7 +9,7 @@
 | Vite          | 7.3.1   | Build tool, dev server, HMR                         |
 | Tailwind CSS  | 4.1.17  | Utility-first CSS (v4, PostCSS integration)         |
 | Framer Motion | 12.35.2 | Animation library (LazyMotion for tree-shaking)     |
-| Zustand       | 5.0.11  | State management (single store, 10 slices, persist) |
+| Zustand       | 5.0.11  | State management (single store, 11 slices, persist) |
 | Supabase      | 2.99.0  | Auth, PostgreSQL, Storage, Realtime                 |
 | Zod           | 4.3.6   | Runtime schema validation                           |
 | idb           | 8.0.3   | Promise-based IndexedDB wrapper                     |

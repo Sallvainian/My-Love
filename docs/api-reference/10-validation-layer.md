@@ -1,158 +1,81 @@
 # 10. Validation Layer
 
 **Sources:**
+- `src/validation/schemas.ts` -- App-level Zod schemas (IndexedDB boundaries)
+- `src/validation/errorMessages.ts` -- Error formatting and ValidationError class
+- `src/validation/index.ts` -- Centralized exports
+- `src/api/validation/supabaseSchemas.ts` -- Supabase API response schemas
 
-- `src/validation/schemas.ts` -- Client-side Zod schemas for IndexedDB writes
-- `src/api/validation/supabaseSchemas.ts` -- API response Zod schemas for Supabase data
-- `src/validation/errorMessages.ts` -- Error transformation utilities
+## App-Level Schemas (`src/validation/schemas.ts`)
 
-## Architecture
+### Message Schemas
 
-Validation occurs at two boundaries:
+**`MessageSchema`** -- Full message validation:
+- `text`: string, 1-500 chars (from `VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH`)
+- `category`: enum `reason | memory | affirmation | future | custom`
+- `isCustom`: boolean; `active`: boolean (default true); `isFavorite`: optional boolean
+- `createdAt`: Date; `updatedAt`: optional Date; `tags`: optional string[]
 
-1. **Service boundary** (before IndexedDB writes): `src/validation/schemas.ts` schemas validate user input before local storage.
-2. **API boundary** (after Supabase reads): `src/api/validation/supabaseSchemas.ts` schemas validate server responses before use in the application.
+**`CreateMessageInputSchema`** -- Input for new messages (text is trimmed)
 
-Both use Zod v4 (`zod/v4`).
+**`UpdateMessageInputSchema`** -- Partial update with required `id: number`
 
-## Client-Side Schemas (`src/validation/schemas.ts`)
+### Photo Schema
 
-### MessageSchema
+**`PhotoSchema`**: `imageBlob` (Blob), `caption` (max 500), `tags` (string[]), `uploadDate` (Date), `originalSize`/`compressedSize` (positive numbers), `width`/`height` (positive ints), `mimeType` (jpeg/png/webp)
 
-Validates existing messages from IndexedDB.
+**`PhotoUploadInputSchema`**: `file` (File), optional `caption`, optional `tags` (comma-separated string)
 
-| Field        | Type       | Constraints                                                |
-| ------------ | ---------- | ---------------------------------------------------------- |
-| `id`         | `number`   | Optional, positive integer                                 |
-| `text`       | `string`   | 1-1000 chars (`VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH`) |
-| `category`   | `enum`     | `reason`, `memory`, `affirmation`, `future`, `custom`      |
-| `isCustom`   | `boolean`  | Required                                                   |
-| `active`     | `boolean`  | Default: `true`                                            |
-| `createdAt`  | `Date`     | Required                                                   |
-| `isFavorite` | `boolean`  | Optional                                                   |
-| `updatedAt`  | `Date`     | Optional                                                   |
-| `tags`       | `string[]` | Optional                                                   |
+### Mood Schema
 
-### CreateMessageInputSchema
+**`MoodEntrySchema`**: `date` (YYYY-MM-DD with validation), `mood` (12-value enum), `moods` (optional array, min 1), `note` (max 200 chars or empty string)
 
-For new message creation. `text` is trimmed. `active` defaults to `true`.
+Mood types: `loved | happy | content | excited | thoughtful | grateful | sad | anxious | frustrated | angry | lonely | tired`
 
-### UpdateMessageInputSchema
+### Settings Schema
 
-For partial updates. Requires `id` (positive integer). All other fields optional.
-
-### PhotoSchema
-
-| Field            | Type       | Constraints                             |
-| ---------------- | ---------- | --------------------------------------- |
-| `id`             | `number`   | Optional, positive integer              |
-| `imageBlob`      | `Blob`     | `instanceof Blob` check                 |
-| `caption`        | `string`   | Max 500 chars, optional                 |
-| `tags`           | `string[]` | Default: `[]`                           |
-| `uploadDate`     | `Date`     | Required                                |
-| `originalSize`   | `number`   | Positive                                |
-| `compressedSize` | `number`   | Positive                                |
-| `width`          | `number`   | Positive integer                        |
-| `height`         | `number`   | Positive integer                        |
-| `mimeType`       | `enum`     | `image/jpeg`, `image/png`, `image/webp` |
-
-### PhotoUploadInputSchema
-
-For file upload form data. `file` must be `instanceof File`. `tags` is a comma-separated string (parsed to array).
-
-### MoodEntrySchema
-
-| Field   | Type         | Constraints                                   |
-| ------- | ------------ | --------------------------------------------- |
-| `date`  | `string`     | ISO format YYYY-MM-DD, validated as real date |
-| `mood`  | `enum`       | 12 mood types (loved, happy, content, etc.)   |
-| `moods` | `MoodType[]` | Min 1 element, optional                       |
-| `note`  | `string`     | Max 200 chars, optional (allows empty string) |
-
-### SettingsSchema
-
-Nested object validating theme, notifications, relationship, and customization settings. Includes `ThemeNameSchema` (`sunset`, `ocean`, `lavender`, `rose`), `TimeFormatSchema` (HH:MM with range validation), `IsoDateStringSchema`, and `AnniversarySchema`.
-
-### CustomMessagesExportSchema
-
-Validates import/export data structure: `version: '1.0'`, `exportDate`, `messageCount`, `messages[]`.
+**`SettingsSchema`**: `themeName` (sunset/ocean/lavender/rose), `notificationTime` (HH:MM), nested `relationship` (startDate, partnerName, anniversaries[]), `customization` (accentColor, fontFamily), `notifications` (enabled, time)
 
 ### Scripture Schemas
 
-- `SupabaseSessionSchema` -- Validates session rows from RPCs
-- `SupabaseReflectionSchema` -- Validates reflection rows
-- `SupabaseBookmarkSchema` -- Validates bookmark rows
-- `SupabaseMessageSchema` -- Validates message rows
+**`SupabaseSessionSchema`**, **`SupabaseReflectionSchema`**, **`SupabaseBookmarkSchema`**, **`SupabaseMessageSchema`** -- validate RPC responses at service boundary.
 
-## API Response Schemas (`src/api/validation/supabaseSchemas.ts`)
+### Export Schema
 
-### Common Base Schemas
+**`CustomMessagesExportSchema`**: version `'1.0'`, exportDate, messageCount, messages array with createdAt/updatedAt as strings.
 
-- `UUIDSchema` -- `z.string().uuid()`
-- `TimestampSchema` -- Regex-validated ISO 8601 format supporting microseconds, optional timezone
+## Supabase API Schemas (`src/api/validation/supabaseSchemas.ts`)
 
-### Entity Schemas
+### Core Schemas
 
-| Schema                      | Key Fields                                                                              |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| `SupabaseUserSchema`        | `id`, `partner_name`, `device_id`, `partner_id?`, `email?`, `display_name?`             |
-| `SupabaseMoodSchema`        | `id`, `user_id`, `mood_type` (enum), `mood_types` (array, nullable), `note`, timestamps |
-| `SupabaseInteractionSchema` | `id`, `type` (poke/kiss), `from_user_id`, `to_user_id`, `viewed`, `created_at`          |
-| `SupabaseMessageSchema`     | `id`, `user_id`, `text`, `category`, `is_custom`, `active`, `tags`, timestamps          |
-| `SupabasePhotoSchema`       | `id`, `user_id`, `storage_path`, `caption`, `tags`, dimensions, `mime_type`, timestamps |
-| `CoupleStatsSchema`         | `totalSessions`, `totalSteps`, `lastCompleted`, `avgRating`, `bookmarkCount`            |
-
-### Insert/Update Schemas
-
-Each entity has corresponding `*InsertSchema` and `*UpdateSchema` with optional fields for partial updates.
+**`SupabaseUserSchema`**, **`SupabaseMoodSchema`**, **`SupabaseInteractionSchema`**, **`SupabasePhotoSchema`**, **`SupabaseMessageSchema`** (not yet active)
 
 ### Array Schemas
 
-- `MoodArraySchema` -- `z.array(SupabaseMoodSchema)`
-- `InteractionArraySchema` -- `z.array(SupabaseInteractionSchema)`
-- `UserArraySchema` -- `z.array(SupabaseUserSchema)`
+`MoodArraySchema`, `InteractionArraySchema`, `UserArraySchema`
 
-### Inferred Types
+### Stats Schema
 
-All schemas export inferred TypeScript types via `z.infer<typeof Schema>`:
-`SupabaseUser`, `SupabaseMood`, `SupabaseInteraction`, `MoodInsert`, `MoodUpdate`, `CoupleStats`, etc.
+**`CoupleStatsSchema`**: `totalSessions`, `totalSteps`, `lastCompleted` (nullable timestamp), `avgRating` (0-5), `bookmarkCount`
 
-## Error Utilities (`src/validation/errorMessages.ts`)
+## Error Formatting (`src/validation/errorMessages.ts`)
 
-### `ValidationError` Class
-
+### `ValidationError` class
 ```typescript
 class ValidationError extends Error {
   readonly fieldErrors: Map<string, string>;
 }
 ```
 
-Custom error class for validation failures. `fieldErrors` maps field paths to user-friendly messages.
+### `formatZodError(error: ZodError): string`
+Formats issues into comma-separated user-friendly message. Maps field paths to display names via `FIELD_NAME_MAP`.
 
-### Functions
+### `getFieldErrors(error: ZodError): Map<string, string>`
+Returns per-field error messages (first error per field).
 
-#### `formatZodError(error: ZodError): string`
-
-Transforms all Zod issues into a single comma-separated string of user-friendly messages.
-
-**Field name mapping:** Technical paths (e.g., `text`, `mimeType`, `relationship.partnerName`) are mapped to display names (e.g., `Message`, `File type`, `Partner name`) via `FIELD_NAME_MAP`.
-
-**Issue type handling:**
-
-- `too_small` with min=1: "{Field} cannot be empty"
-- `too_big`: "{Field} cannot exceed {max} characters"
-- `invalid_value`: "Invalid {field}. Please select a valid option."
-- `invalid_type` (date): "{Field} must be a valid date"
-
-#### `getFieldErrors(error: ZodError): Map<string, string>`
-
-Returns a Map of field paths to error messages. Only stores the first error per field.
-
-#### `createValidationError(error: ZodError): ValidationError`
-
-Convenience: creates a `ValidationError` from a `ZodError` with both message string and field errors map.
+### `createValidationError(error: ZodError): ValidationError`
+Convenience wrapper combining `formatZodError` + `getFieldErrors`.
 
 ### Type Guards
-
-- `isValidationError(error): error is ValidationError` -- `instanceof` check
-- `isZodError(error): error is ZodError` -- `instanceof` check
+- `isValidationError(error): error is ValidationError`
+- `isZodError(error): error is ZodError`

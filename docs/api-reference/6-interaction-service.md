@@ -2,21 +2,36 @@
 
 **Source:** `src/api/interactionService.ts`
 
-## Overview
+## Purpose
 
-Handles poke and kiss interactions between partners via Supabase. Provides sending, real-time subscription, history retrieval, and view tracking.
+Manages poke/kiss interactions between partners via Supabase with real-time subscription support using `postgres_changes`.
 
-**Singleton:** `export const interactionService = new InteractionService()`
+## Class: `InteractionService`
 
-**Supabase table:** `interactions`
+Singleton exported as `interactionService`.
+
+### `sendPoke(partnerId: string, userId: string): Promise<SupabaseInteractionRecord>`
+Sends a "poke" interaction. Delegates to `sendInteraction('poke', partnerId, userId)`.
+
+### `sendKiss(partnerId: string, userId: string): Promise<SupabaseInteractionRecord>`
+Sends a "kiss" interaction. Delegates to `sendInteraction('kiss', partnerId, userId)`.
+
+### `subscribeInteractions(userId, callback): Promise<() => void>`
+Subscribes to `postgres_changes` on `interactions` table with filter `to_user_id=eq.{userId}`. Fires callback on INSERT events. Returns unsubscribe function.
+
+### `getInteractionHistory(userId, limit?, offset?): Promise<Interaction[]>`
+Fetches interactions where user is sender or recipient. Uses `.or()` filter. Transforms Supabase records to local `Interaction` format.
+
+### `getUnviewedInteractions(userId): Promise<Interaction[]>`
+Fetches interactions sent to user with `viewed: false`.
+
+### `markAsViewed(interactionId: string): Promise<void>`
+Updates `viewed: true` on the interaction record.
 
 ## Types
 
 ```typescript
 type InteractionType = 'poke' | 'kiss';
-
-type SupabaseInteractionRecord = Database['public']['Tables']['interactions']['Row'];
-type InteractionInsert = Database['public']['Tables']['interactions']['Insert'];
 
 interface Interaction {
   id: string;
@@ -28,83 +43,7 @@ interface Interaction {
 }
 ```
 
-## Methods
-
-### `sendPoke(partnerId: string): Promise<SupabaseInteractionRecord>`
-
-Sends a poke interaction. Delegates to `sendInteraction('poke', partnerId)`.
-
----
-
-### `sendKiss(partnerId: string): Promise<SupabaseInteractionRecord>`
-
-Sends a kiss interaction. Delegates to `sendInteraction('kiss', partnerId)`.
-
----
-
-### `subscribeInteractions(callback): Promise<() => void>`
-
-```typescript
-async subscribeInteractions(
-  callback: (interaction: SupabaseInteractionRecord) => void
-): Promise<() => void>
-```
-
-Subscribes to incoming interactions in real-time via `postgres_changes`.
-
-**Channel:** `incoming-interactions`
-
-**Filter:** `INSERT` events on `interactions` table where `to_user_id=eq.{currentUserId}`
-
-**Returns:** Unsubscribe function that removes the channel.
-
-**Throws:** Error if user is not authenticated.
-
----
-
-### `getInteractionHistory(limit?: number, offset?: number): Promise<Interaction[]>`
-
-Fetches interaction history (both sent and received) for the current user.
-
-**Query:** `supabase.from('interactions').select('*').or('from_user_id.eq.{userId},to_user_id.eq.{userId}').order('created_at', { ascending: false }).range(offset, offset + limit - 1)`
-
-**Defaults:** `limit = 50`, `offset = 0`
-
-**Returns:** Array of local `Interaction` objects (transformed from Supabase records).
-
----
-
-### `getUnviewedInteractions(): Promise<Interaction[]>`
-
-Fetches unviewed interactions sent to the current user.
-
-**Query:** `supabase.from('interactions').select('*').eq('to_user_id', currentUserId).eq('viewed', false).order('created_at', { ascending: false })`
-
----
-
-### `markAsViewed(interactionId: string): Promise<void>`
-
-Marks a single interaction as viewed.
-
-**Query:** `supabase.from('interactions').update({ viewed: true }).eq('id', interactionId)`
-
 ## Private Methods
 
-### `sendInteraction(type, toUserId): Promise<SupabaseInteractionRecord>`
-
-Internal method used by `sendPoke()` and `sendKiss()`.
-
-**Flow:**
-
-1. Checks `isOnline()` -- throws network error if offline
-2. Gets `currentUserId` via `getCurrentUserId()`
-3. Inserts interaction: `supabase.from('interactions').insert({ type, from_user_id, to_user_id, viewed: false }).select().single()`
-4. Returns the created record
-
-## Error Handling
-
-All methods use the standard error handling pattern:
-
-- `isPostgrestError()` check -- transforms via `handleSupabaseError()`
-- All other errors -- transforms via `handleNetworkError()`
-- Errors logged via `logSupabaseError()` before throwing
+### `sendInteraction(type, toUserId, userId): Promise<SupabaseInteractionRecord>`
+Checks network status, inserts interaction record with `from_user_id`, `to_user_id`, `type`, `viewed: false`.

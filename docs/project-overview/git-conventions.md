@@ -62,7 +62,7 @@ Dependabot runs weekly on Mondays and creates grouped PRs:
 
 ## CI Workflows
 
-The project has 18 GitHub Actions workflows:
+The project has 19 GitHub Actions workflows:
 
 | Workflow                      | Trigger                                                  | Purpose                                                 |
 | ----------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
@@ -72,6 +72,7 @@ The project has 18 GitHub Actions workflows:
 | `claude.yml`                  | `@claude` mentions in issues/PRs                         | Claude Code AI assistance                               |
 | `claude-code-review.yml`      | PR opened/synchronized/ready                             | Automated PR code review with Claude                    |
 | `ci-failure-auto-fix.yml`     | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code                   |
+| `claude-flaky-tests.yml`      | Test workflow completion                                 | Auto-retry flaky tests                                  |
 | `manual-code-analysis.yml`    | Manual dispatch                                          | On-demand commit summarization or security review       |
 | `codeql.yml`                  | Scheduled/PR                                             | CodeQL security scanning                                |
 | `dependency-review.yml`       | PRs                                                      | Dependency vulnerability review                         |

@@ -1,224 +1,77 @@
 # 4. TypeScript Type Definitions
 
 **Sources:**
+- `src/types/database.types.ts` -- Auto-generated from Supabase schema
+- `src/types/index.ts` -- App-level type definitions
+- `src/types/models.ts` -- Supabase model re-exports and Love Notes types
 
-- `src/types/index.ts` -- Core application types
-- `src/types/models.ts` -- Love notes and re-exports
-- `src/types/database.types.ts` -- Auto-generated Supabase types
-- `src/services/dbSchema.ts` -- IndexedDB entity types
+## Generated Database Types (`database.types.ts`)
 
-## Core Types (`src/types/index.ts`)
+Auto-generated via `supabase gen types typescript --local`. Defines `Database` type with `public.Tables`, `public.Functions`, `public.Enums`.
 
-### Enums
+### Table Row/Insert/Update Types
+Each table has three type variants:
+- `Row` -- Full record from SELECT
+- `Insert` -- Required/optional fields for INSERT
+- `Update` -- All-optional fields for UPDATE
 
-```typescript
-type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
+### Function Types
+All 13 RPC functions with `Args` and `Returns` types.
 
-type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
-
-type MoodType =
-  | 'loved'
-  | 'happy'
-  | 'content'
-  | 'excited'
-  | 'thoughtful'
-  | 'grateful'
-  | 'sad'
-  | 'anxious'
-  | 'frustrated'
-  | 'angry'
-  | 'lonely'
-  | 'tired';
-```
-
-### `Message`
-
-```typescript
-interface Message {
-  id: number;
-  text: string;
-  category: MessageCategory;
-  isCustom: boolean;
-  active?: boolean;
-  createdAt: Date;
-  isFavorite?: boolean;
-  updatedAt?: Date;
-  tags?: string[];
-}
-```
-
-### `Photo`
-
-```typescript
-interface Photo {
-  id: number;
-  imageBlob: Blob;
-  caption?: string;
-  tags: string[];
-  uploadDate: Date;
-  originalSize: number;
-  compressedSize: number;
-  width: number;
-  height: number;
-  mimeType: string;
-}
-```
-
-### `MoodEntry`
-
-```typescript
-interface MoodEntry {
-  id?: number; // Auto-increment (IndexedDB)
-  userId: string; // User UUID
-  mood: MoodType; // Primary mood (backward compat)
-  moods?: MoodType[]; // Multiple mood support
-  note?: string; // Max 200 chars
-  date: string; // ISO YYYY-MM-DD
-  timestamp: Date; // Full timestamp
-  synced: boolean; // Uploaded to Supabase
-  supabaseId?: string; // Supabase record UUID (after sync)
-}
-```
-
-### Compression Types
-
-```typescript
-interface CompressionOptions {
-  maxWidth: number; // Default: 2048
-  maxHeight: number; // Default: 2048
-  quality: number; // Default: 0.8
-}
-
-interface CompressionResult {
-  blob: Blob;
-  width: number;
-  height: number;
-  originalSize: number;
-  compressedSize: number;
-  fallbackUsed?: boolean;
-}
-```
-
-### Other Types
-
-```typescript
-interface Anniversary {
-  id: number;
-  date: string;
-  label: string;
-  description?: string;
-}
-
-interface PhotoUploadInput {
-  file: File;
-  caption?: string;
-  tags?: string; // Comma-separated
-}
-```
-
-## IndexedDB Types (`src/services/dbSchema.ts`)
-
-### `StoredAuthToken`
-
-```typescript
-interface StoredAuthToken {
-  id: 'current';
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-  userId: string;
-}
-```
-
-### Scripture Types
-
-```typescript
-type ScriptureSessionMode = 'solo' | 'together';
-type ScriptureSessionPhase =
-  | 'lobby'
-  | 'countdown'
-  | 'reading'
-  | 'reflection'
-  | 'report'
-  | 'complete';
-type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
-type ScriptureSessionRole = 'reader' | 'responder';
-
-interface ScriptureSession {
-  id: string;
-  mode: ScriptureSessionMode;
-  userId: string;
-  partnerId?: string;
-  currentPhase: ScriptureSessionPhase;
-  currentStepIndex: number;
-  status: ScriptureSessionStatus;
-  version: number;
-  snapshotJson?: Record<string, unknown>;
-  startedAt: Date;
-  completedAt?: Date;
-  myRole?: ScriptureSessionRole;
-  partnerRole?: ScriptureSessionRole;
-  user1Ready?: boolean;
-  user2Ready?: boolean;
-  countdownStartedAt?: Date;
-}
-
-interface ScriptureReflection {
-  id: string;
-  sessionId: string;
-  stepIndex: number;
-  userId: string;
-  rating?: number;
-  notes?: string;
-  isShared: boolean;
-  createdAt: Date;
-}
-
-interface ScriptureBookmark {
-  id: string;
-  sessionId: string;
-  stepIndex: number;
-  userId: string;
-  shareWithPartner: boolean;
-  createdAt: Date;
-}
-
-interface ScriptureMessage {
-  id: string;
-  sessionId: string;
-  senderId: string;
-  message: string;
-  createdAt: Date;
-}
-```
-
-## Auto-Generated Database Types (`src/types/database.types.ts`)
-
-Auto-generated from Supabase schema via `supabase gen types typescript --local`. **Do not edit manually.**
-
-### Tables (Row/Insert/Update types for each)
-
-- `interactions` -- `from_user_id`, `to_user_id`, `type`, `viewed`
-- `love_notes` -- `from_user_id`, `to_user_id`, `content`, `image_url`
-- `moods` -- `user_id`, `mood_type`, `mood_types[]`, `note`
-- `partner_requests` -- `from_user_id`, `to_user_id`, `status`
-- `photos` -- `user_id`, `storage_path`, `filename`, `caption`, `mime_type`, `file_size`, `width`, `height`
-- `scripture_bookmarks` -- `session_id`, `step_index`, `user_id`, `share_with_partner`
-- `scripture_messages` -- `session_id`, `sender_id`, `message`
-- `scripture_reflections` -- `session_id`, `step_index`, `user_id`, `rating`, `notes`, `is_shared`
-- `scripture_sessions` -- `mode`, `user1_id`, `user2_id`, `current_phase`, `current_step_index`, `status`, `version`, `snapshot_json`, roles, ready states
-- `scripture_step_states` -- `session_id`, `step_index`, `user1_locked_at`, `user2_locked_at`, `advanced_at`
-- `users` -- `partner_name`, `device_id`, `email`, `display_name`, `partner_id`
-
-### Functions (13 RPCs)
-
-See Section 6 for full RPC documentation.
-
-### Enums
-
+### Enum Types
 ```typescript
 scripture_session_mode: 'solo' | 'together';
 scripture_session_phase: 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete';
 scripture_session_role: 'reader' | 'responder';
-scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned';
+scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned' | 'ended_early';
 ```
+
+### Utility Types
+- `Tables<TableName>` -- Extract Row type for a table
+- `TablesInsert<TableName>` -- Extract Insert type
+- `TablesUpdate<TableName>` -- Extract Update type
+- `Enums<EnumName>` -- Extract enum values
+
+## App-Level Types (`src/types/index.ts`)
+
+### Core Types
+- `ThemeName`: `'sunset' | 'ocean' | 'lavender' | 'rose'`
+- `MessageCategory`: `'reason' | 'memory' | 'affirmation' | 'future' | 'custom'`
+- `MoodType`: 12 mood values (loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired)
+- `RouteType`: `'home' | 'memories' | 'moods' | 'countdown' | 'settings' | 'onboarding'`
+
+### Data Interfaces
+
+**`Message`**: id (number), text, category, isCustom, active?, createdAt (Date), isFavorite?, updatedAt?, tags?
+
+**`Photo`**: id (number), imageBlob (Blob), caption?, tags (string[]), uploadDate (Date), originalSize, compressedSize, width, height, mimeType
+
+**`MoodEntry`**: id? (number), userId, mood (MoodType), moods? (MoodType[]), note?, date (YYYY-MM-DD), timestamp (Date), synced (boolean), supabaseId?
+
+**`Settings`**: themeName, notificationTime (HH:MM), relationship (startDate, partnerName, anniversaries[]), customization (accentColor, fontFamily), notifications (enabled, time)
+
+**`MessageHistory`**: currentIndex, shownMessages (Map<string, number>), maxHistoryDays, favoriteIds
+
+### Custom Message Types
+- `CustomMessage`, `CreateMessageInput`, `UpdateMessageInput`, `MessageFilter`, `CustomMessagesExport`
+
+### Compression Types
+- `CompressionOptions`: maxWidth, maxHeight, quality
+- `CompressionResult`: blob, width, height, originalSize, compressedSize, fallbackUsed?
+
+## Model Re-exports (`src/types/models.ts`)
+
+### Photo Types (from `photoService.ts`)
+`SupabasePhoto`, `PhotoWithUrls`, `StorageQuota`, `PhotoUploadInput`
+
+### Scripture Types (from `dbSchema.ts`)
+`ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, `ScriptureSessionMode`, `ScriptureSessionPhase`, `ScriptureSessionStatus`
+
+### Love Notes Types (defined here)
+**`LoveNote`**: id, from_user_id, to_user_id, content, created_at, image_url?, sending?, error?, tempId?, imageUploading?, imageBlob?, imagePreviewUrl?
+
+**`LoveNotesState`**: notes[], isLoading, error, hasMore
+
+**`SendMessageInput`**: content, timestamp, imageFile?
+
+**`MessageValidationResult`**: valid, error?

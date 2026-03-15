@@ -124,16 +124,56 @@ This is used extensively in ScriptureOverview, ReadingContainer, LobbyContainer,
 
 Several custom hooks wrap store interactions for cleaner component APIs:
 
-| Hook                    | Wraps                                     | Used By                                                    |
-| ----------------------- | ----------------------------------------- | ---------------------------------------------------------- |
-| `useLoveNotes`          | notesSlice actions + realtime setup       | LoveNotes, MessageInput                                    |
-| `usePartnerMood`        | moodSlice partner mood fetching           | PartnerMoodDisplay                                         |
-| `useNetworkStatus`      | Browser online/offline events             | NetworkStatusIndicator, ScriptureOverview, SoloReadingFlow |
-| `useAutoSave`           | visibilitychange + beforeunload listeners | SoloReadingFlow                                            |
-| `useVibration`          | Navigator.vibrate API                     | MessageInput                                               |
-| `useMotionConfig`       | prefers-reduced-motion media query        | ScriptureOverview, ReadingContainer, Countdown             |
-| `useScriptureBroadcast` | Supabase realtime broadcast channel       | ScriptureOverview                                          |
-| `useScripturePresence`  | Supabase realtime presence channel        | ReadingContainer                                           |
+| Hook                    | Wraps                                                                                 | Used By                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `useSoloReadingFlow`    | Composes 4 sub-hooks (reading navigation, report phase, session persistence, dialogs) | SoloReadingFlow                                            |
+| `useReadingNavigation`  | Verse navigation, step transitions, slide direction                                   | useSoloReadingFlow                                         |
+| `useReportPhase`        | Report generation, reflection summary, prayer report state                            | useSoloReadingFlow                                         |
+| `useSessionPersistence` | Auto-save, bookmarks, retry logic                                                     | useSoloReadingFlow                                         |
+| `useReadingDialogs`     | Exit confirmation dialog, focus trap                                                  | useSoloReadingFlow                                         |
+| `useLoveNotes`          | notesSlice actions + realtime setup                                                   | LoveNotes, MessageInput                                    |
+| `usePartnerMood`        | moodSlice partner mood fetching                                                       | PartnerMoodDisplay                                         |
+| `useNetworkStatus`      | Browser online/offline events                                                         | NetworkStatusIndicator, ScriptureOverview, SoloReadingFlow |
+| `useAutoSave`           | visibilitychange + beforeunload listeners                                             | SoloReadingFlow                                            |
+| `useVibration`          | Navigator.vibrate API                                                                 | MessageInput                                               |
+| `useMotionConfig`       | prefers-reduced-motion media query                                                    | ScriptureOverview, ReadingContainer, Countdown             |
+| `useScriptureBroadcast` | Supabase realtime broadcast channel                                                   | ScriptureOverview                                          |
+| `useScripturePresence`  | Supabase realtime presence channel                                                    | ReadingContainer                                           |
+
+## Auth Centralization (AuthSlice)
+
+Since 2026-03-13, user identity is centralized in `AuthSlice` (`src/stores/slices/authSlice.ts`). Instead of each slice calling `supabase.auth.getUser()` asynchronously, all slices read `get().userId` synchronously from the store. The auth state is populated by `onAuthStateChange` in App.tsx.
+
+This pattern eliminates:
+
+- Redundant async auth calls in every slice action
+- Race conditions between auth state and slice operations
+- Inconsistent error handling for unauthenticated states
+
+## Sub-Hook Decomposition (SoloReadingFlow)
+
+Since 2026-03-13, `useSoloReadingFlow` has been refactored from a monolithic hook into a thin orchestrator that composes 4 sub-hooks by concern:
+
+| Sub-Hook                | Concern                               | Key State                             |
+| ----------------------- | ------------------------------------- | ------------------------------------- |
+| `useReadingNavigation`  | Verse navigation, step transitions    | `subView`, `slideDirection`           |
+| `useReportPhase`        | Report generation, reflection summary | `reportSubPhase`, `reportData`        |
+| `useSessionPersistence` | Auto-save, bookmarks, retry           | `bookmarkedSteps`, persistence timers |
+| `useReadingDialogs`     | Exit confirmation                     | `showExitConfirm`, dialog refs        |
+
+## Props Grouping (ReadingPhaseView)
+
+Since 2026-03-13, `ReadingPhaseView`'s 22 flat props have been restructured into 5 sub-objects for better readability and maintainability:
+
+```typescript
+interface ReadingPhaseViewProps {
+  session: { currentStepIndex: number };
+  state: { subView, slideDirection, showExitConfirm, isOnline, isSyncing, ... };
+  animations: { crossfade, slide };
+  elementRefs: { verseHeading, backToVerse, exitButton, dialog };
+  handlers: { onBookmarkToggle, onNextVerse, onViewResponse, ... };
+}
+```
 
 ## XSS Prevention
 

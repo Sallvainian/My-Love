@@ -270,12 +270,31 @@ Main entry point for Scripture Reading. Handles:
 - StatsSection for couple aggregate statistics
 - Uses `useShallow` for both partnerSlice and scriptureSlice selectors
 
-### SoloReadingFlow
+### SoloReadingFlow (Decomposed since 2026-03-13)
 
-**File:** `src/components/scripture-reading/containers/SoloReadingFlow.tsx` (~600 lines)
-**Type:** Container
+**File:** `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
+**Type:** Container (thin orchestrator)
 
-Step-by-step scripture reading for both solo and together post-reading phases. Manages:
+Step-by-step scripture reading for both solo and together post-reading phases. **Refactored** from a monolithic component into a thin orchestrator that delegates to the `useSoloReadingFlow` hook, which composes 4 sub-hooks by concern:
+
+**Sub-hooks** (`src/components/scripture-reading/hooks/`):
+
+- **`useSoloReadingFlow.ts`** -- Thin orchestrator that composes the 4 sub-hooks below
+- **`useReadingNavigation.ts`** -- Verse navigation, step transitions, slide direction tracking
+- **`useReportPhase.ts`** -- Report generation, reflection summary submission, prayer report state
+- **`useSessionPersistence.ts`** -- Auto-save on visibility change / beforeunload, bookmark set management, retry logic for failed writes
+- **`useReadingDialogs.ts`** -- Exit confirmation dialog state, focus trap wiring
+
+**ReadingPhaseView** (`src/components/scripture-reading/containers/ReadingPhaseView.tsx`):
+The 22 flat props from the previous version have been **restructured into sub-objects** for clarity:
+
+- `session: { currentStepIndex }` -- Session data
+- `state: { subView, slideDirection, showExitConfirm, isOnline, isSyncing, ... }` -- UI state
+- `animations: { crossfade, slide }` -- Motion transition configs
+- `elementRefs: { verseHeading, backToVerse, exitButton, dialog }` -- Ref objects
+- `handlers: { onBookmarkToggle, onNextVerse, onViewResponse, ... }` -- Callback functions
+
+Features remain the same:
 
 - Verse and response screen display with slide animation
 - Step navigation (next verse, view response, back to verse)
@@ -288,7 +307,6 @@ Step-by-step scripture reading for both solo and together post-reading phases. M
 - Auto-retry on reconnect
 - Session completion transition to reflection phase
 - Reflection flow: ReflectionSummary -> MessageCompose -> DailyPrayerReport
-- Uses `useAutoSave`, `useNetworkStatus`, `useMotionConfig` hooks
 - Focus management: heading focus on phase change, dialog focus trap
 
 ### LobbyContainer

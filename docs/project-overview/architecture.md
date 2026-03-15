@@ -9,7 +9,7 @@ User (Browser)
 React 19 UI Components (lazy-loaded routes via React.lazy)
   |
   v
-Zustand Store (10 slices, persisted to localStorage via zustand/persist)
+Zustand Store (11 slices, persisted to localStorage via zustand/persist)
   |
   +----> IndexedDB (via idb library)        [Primary local storage, offline-first]
   |         |
@@ -49,20 +49,21 @@ The scripture feature inverts the offline-first pattern:
 
 ## State Management: Zustand Sliced Store
 
-A single Zustand store (`src/stores/useAppStore.ts`) is composed from 10 slices using the slice pattern:
+A single Zustand store (`src/stores/useAppStore.ts`) is composed from 11 slices using the slice pattern:
 
-| Slice                   | Responsibility                              |
-| ----------------------- | ------------------------------------------- |
-| `appSlice`              | App initialization, loading states          |
-| `settingsSlice`         | Theme selection, relationship configuration |
-| `navigationSlice`       | Current view routing (no router library)    |
-| `messagesSlice`         | Daily love messages, favorites management   |
-| `moodSlice`             | Mood tracking, partner mood sync            |
-| `interactionsSlice`     | Poke/kiss partner interactions              |
-| `partnerSlice`          | Partner data, display name resolution       |
-| `notesSlice`            | Love notes chat messages                    |
-| `photosSlice`           | Photo gallery state                         |
-| `scriptureReadingSlice` | Scripture reading session management        |
+| Slice                   | Responsibility                                          |
+| ----------------------- | ------------------------------------------------------- |
+| `appSlice`              | App initialization, loading states, hydration flag      |
+| `authSlice`             | User identity (userId, email, isAuthenticated)          |
+| `settingsSlice`         | Theme selection, relationship configuration             |
+| `navigationSlice`       | Current view routing (no router library)                |
+| `messagesSlice`         | Daily love messages, favorites management               |
+| `moodSlice`             | Mood tracking, partner mood sync                        |
+| `interactionsSlice`     | Poke/kiss partner interactions                          |
+| `partnerSlice`          | Partner data, display name resolution                   |
+| `notesSlice`            | Love notes chat messages                                |
+| `photosSlice`           | Photo gallery state                                     |
+| `scriptureReadingSlice` | Scripture reading session management                    |
 
 State is persisted to `localStorage` via `zustand/persist`. The store uses custom serialization for `Map` objects in `messageHistory.shownMessages`. The `partialize` option restricts what is persisted: settings, onboarding state, messageHistory, and moods. Large data (messages, photos, custom messages) is stored in IndexedDB.
 
@@ -172,9 +173,18 @@ Key variables:
 
 For E2E tests, `.env.test` provides plain-text local Supabase values. The Playwright config auto-detects local Supabase credentials via `supabase status -o env` and re-signs JWT tokens for ES256 compatibility.
 
+## Logger Utility
+
+The project uses a centralized `logger` utility (`src/utils/logger.ts`) that replaced raw `console.log`/`console.info`/`console.debug` calls across 48+ source files. This was introduced to enforce the ESLint `no-console` rule while preserving operational logging:
+
+- `logger.debug(...)` -- Only logs in development (`import.meta.env.DEV`). Used for verbose tracing and flow debugging.
+- `logger.info(...)` -- Always logs. Used for operational events (sync completed, subscribed, state hydrated, etc.).
+- `logger.log(...)` -- Always logs. General-purpose wrapper around `console.log`.
+- `console.error(...)` and `console.warn(...)` -- Used directly for errors and warnings (not wrapped by logger).
+
 ## Database Schema
 
-Supabase Postgres with 23 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
+Supabase Postgres with 24 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
 
 - `users` -- App users with `partner_id` for partner linking
 - `moods` -- Mood tracking entries with emoji, multi-mood support, and optional notes

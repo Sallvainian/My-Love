@@ -1,6 +1,6 @@
 # State Connections
 
-The Zustand store (`useAppStore`) is composed of 10 slices. Below maps each component to the slices it consumes and the specific fields accessed.
+The Zustand store (`useAppStore`) is composed of 11 slices (including AuthSlice). Below maps each component to the slices it consumes and the specific fields accessed.
 
 ## Access Patterns
 
@@ -17,6 +17,18 @@ Components access the store in three ways:
 | Component | Fields/Actions Used                                                  |
 | --------- | -------------------------------------------------------------------- |
 | App       | `isLoading`, `error`, `__isHydrated` (indirectly via initialization) |
+
+### AuthSlice
+
+| Component          | Fields/Actions Used                                          |
+| ------------------ | ------------------------------------------------------------ |
+| App                | `setAuthUser`, `clearAuth` (called from `onAuthStateChange`) |
+| LoveNotes          | `userId` (via `useAppStore((state) => state.userId)`)        |
+| MoodTracker        | `userId` (via slice actions internally)                      |
+| PokeKissInterface  | `userId` (via slice actions internally)                      |
+| InteractionHistory | `userId` (via `useAppStore((state) => state.userId)`)        |
+
+All slices that need user identity read `get().userId` synchronously instead of calling `supabase.auth.getUser()`.
 
 ### SettingsSlice
 

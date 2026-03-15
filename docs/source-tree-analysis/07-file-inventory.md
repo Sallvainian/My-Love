@@ -10,10 +10,10 @@ Complete file counts, line counts, and quick reference for the entire codebase.
 | Tests in `src/` (`__tests__/`, `.test.`) | 29      | ~6,550      |
 | Unit tests in `tests/unit/`              | 27      | --          |
 | E2E tests in `tests/e2e/`                | 27      | --          |
-| SQL migrations                           | 23      | --          |
+| SQL migrations                           | 24      | --          |
 | pgTAP database tests                     | 14      | --          |
-| GitHub Actions workflows                 | 18      | --          |
-| **Total TypeScript/TSX in `src/`**       | **197** | **~45,050** |
+| GitHub Actions workflows                 | 19      | --          |
+| **Total TypeScript/TSX in `src/`**       | **207** | **~45,054** |
 
 ## Source Files by Directory
 
@@ -22,7 +22,7 @@ Sorted by total lines (excluding test files colocated in `src/`):
 | Directory                                      | Files | Lines | Description                                                |
 | ---------------------------------------------- | ----- | ----- | ---------------------------------------------------------- |
 | `src/services/`                                | 14    | 4,714 | IndexedDB services, sync, image compression, photo storage |
-| `src/stores/slices/`                           | 10    | 3,563 | Zustand slice implementations                              |
+| `src/stores/slices/`                           | 11    | 3,613 | Zustand slice implementations (includes authSlice)         |
 | `src/components/scripture-reading/containers/` | 4     | 2,665 | Scripture reading main containers                          |
 | `src/api/`                                     | 7     | 2,128 | Supabase API services (mood, interaction, partner)         |
 | `src/utils/`                                   | 17    | 2,007 | Utility functions (date, mood, validation, sync)           |

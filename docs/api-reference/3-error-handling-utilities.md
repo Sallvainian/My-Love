@@ -1,14 +1,12 @@
 # 3. Error Handling Utilities
 
-**Source:** `src/api/errorHandlers.ts`
+**Sources:**
+- `src/api/errorHandlers.ts` -- Supabase error handling, retry logic
+- `src/utils/offlineErrorHandler.ts` -- Offline detection, OfflineError class
 
-## Overview
+## SupabaseServiceError
 
-Provides error detection, transformation, retry logic, and offline messaging for Supabase API failures. All Supabase-facing services use these utilities to produce consistent, user-friendly errors.
-
-## Error Classes
-
-### `SupabaseServiceError`
+Custom error class wrapping PostgrestError with user-friendly messages.
 
 ```typescript
 class SupabaseServiceError extends Error {
@@ -19,92 +17,64 @@ class SupabaseServiceError extends Error {
 }
 ```
 
-Custom error class wrapping PostgreSQL/network errors with structured fields for UI display.
+### Error Code Mapping
 
-## Error Transformation Functions
+| Postgres Code | User Message |
+|---------------|-------------|
+| `23505` | This record already exists |
+| `23503` | Referenced record not found |
+| `23502` | Required field is missing |
+| `42501` | Permission denied - check RLS policies |
+| `42P01` | Table not found - schema may be out of sync |
+| `PGRST116` | No rows found |
+| `PGRST301` | Invalid request parameters |
+
+## Functions
+
+### `isOnline(): boolean`
+Returns `navigator.onLine`.
 
 ### `handleSupabaseError(error: PostgrestError, context?: string): SupabaseServiceError`
-
-Maps PostgrestError codes to user-friendly messages:
-
-| Code       | Message                                               |
-| ---------- | ----------------------------------------------------- |
-| `23505`    | This record already exists                            |
-| `23503`    | Referenced record not found                           |
-| `23502`    | Required field is missing                             |
-| `42501`    | Permission denied - check Row Level Security policies |
-| `42P01`    | Table not found - database schema may be out of sync  |
-| `PGRST116` | No rows found                                         |
-| `PGRST301` | Invalid request parameters                            |
-
-Any unrecognized code falls through to: `Database error: {original message}`.
-
-**Sets** `isNetworkError = false`.
-
----
+Maps PostgrestError codes to user-friendly messages.
 
 ### `handleNetworkError(error: unknown, context?: string): SupabaseServiceError`
+Wraps any error as network error with `isNetworkError: true` and hint text.
 
-Wraps fetch failures, timeouts, and other non-PostgrestError errors.
+### `isPostgrestError(error): error is PostgrestError`
+Type guard checking for `code`, `message`, `details` properties.
 
-**Sets:**
-
-- `code = 'NETWORK_ERROR'`
-- `hint = 'Check your internet connection'`
-- `isNetworkError = true`
-- Message includes: "Your changes will be synced when you're back online."
-
-## Type Guards
-
-### `isPostgrestError(error: unknown): error is PostgrestError`
-
-Checks for `code`, `message`, and `details` properties.
-
-### `isSupabaseServiceError(error: unknown): error is SupabaseServiceError`
-
-Uses `instanceof` check.
-
-## Logging
+### `isSupabaseServiceError(error): error is SupabaseServiceError`
+Type guard using `instanceof`.
 
 ### `logSupabaseError(context: string, error: unknown): void`
+Logs structured error info. Checks SupabaseServiceError first (more specific), then PostgrestError, then generic Error.
 
-Logs errors with structured context. Checks error type in order:
-
-1. `SupabaseServiceError` -- logs `message`, `code`, `isNetworkError`
-2. `PostgrestError` -- logs `code`, `message`, `details`, `hint`
-3. `Error` -- logs `message`
-4. Unknown -- logs raw value
-
-## Retry Logic
-
-### `retryWithBackoff<T>(operation: () => Promise<T>, config?: RetryConfig): Promise<T>`
-
-Executes an async operation with exponential backoff retry.
+### `retryWithBackoff<T>(operation, config?): Promise<T>`
+Exponential backoff retry. Default config: 3 attempts, 1s/2s/4s delays, 30s max delay, 2x multiplier.
 
 ```typescript
 interface RetryConfig {
-  maxAttempts: number; // Default: 3
-  initialDelayMs: number; // Default: 1000 (1s)
-  maxDelayMs: number; // Default: 30000 (30s)
-  backoffMultiplier: number; // Default: 2
+  maxAttempts: number;       // default: 3
+  initialDelayMs: number;    // default: 1000
+  maxDelayMs: number;        // default: 30000
+  backoffMultiplier: number; // default: 2
 }
 ```
 
-**Default retry schedule:** 1s, 2s, 4s (3 attempts total).
-
-**Behavior:**
-
-- On success at any attempt, returns the result immediately
-- On failure at non-final attempt, waits `delay` ms then retries
-- Delay doubles each attempt, capped at `maxDelayMs`
-- After all attempts exhausted, throws the last error
-
-## Utility Functions
-
-### `isOnline(): boolean`
-
-Returns `navigator.onLine`. Used by services to check connectivity before attempting API calls.
-
 ### `createOfflineMessage(operation: string): string`
-
 Returns: `"You're offline. {operation} will sync automatically when you're back online."`
+
+## Offline Error Handler (`src/utils/offlineErrorHandler.ts`)
+
+### `OfflineError` class
+Extends `Error` with `isRetryable: true` and `operation: string`.
+
+### `withOfflineCheck<T>(operation, asyncFn): Promise<T>`
+Checks `navigator.onLine` before executing; throws `OfflineError` if offline.
+
+### `safeOfflineOperation<T>(operation, asyncFn)`
+Non-throwing wrapper. Returns discriminated union: `{ success, data }` | `{ offline, message, retry }` | `{ error, message }`.
+
+### Constants
+- `OFFLINE_ERROR_MESSAGE`: "You're offline. Changes will sync when reconnected."
+- `OFFLINE_RETRY_MESSAGE`: "You're offline. Please check your connection and try again."

@@ -2,6 +2,8 @@
 
 Comprehensive developer reference for the My-Love PWA. Each section links to a dedicated page with full details.
 
+Last updated: 2026-03-15
+
 ## Table of Contents
 
 - [Prerequisites](./prerequisites.md) -- Required tools and versions
@@ -14,19 +16,17 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Modifying Secrets](./environment-setup.md#modifying-secrets)
   - [E2E Test Environment](./environment-setup.md#e2e-test-environment)
   - [CI Environment](./environment-setup.md#ci-environment)
-- [Configuration Customization](./configuration-customization.md) -- Partner name, start date, feature flags
-  - [APP_CONFIG](./configuration-customization.md#app_config)
+- [Configuration & Customization](./configuration-customization.md) -- Vite, TypeScript, PostCSS, Tailwind, ESLint configs
   - [Vite Configuration](./configuration-customization.md#vite-configuration)
-  - [Tailwind Theme](./configuration-customization.md#tailwind-theme)
   - [TypeScript Configuration](./configuration-customization.md#typescript-configuration)
   - [PostCSS Configuration](./configuration-customization.md#postcss-configuration)
-- [Available Scripts](./available-scripts.md) -- Every npm script with usage examples
+  - [Tailwind CSS v4](./configuration-customization.md#tailwind-css-v4)
+  - [ESLint Configuration](./configuration-customization.md#eslint-configuration)
+- [Available Scripts](./available-scripts.md) -- Every npm script (36 total) with usage examples
   - [Development](./available-scripts.md#development)
-  - [Build](./available-scripts.md#build)
+  - [Build & Performance](./available-scripts.md#build--performance)
   - [Code Quality](./available-scripts.md#code-quality)
   - [Testing](./available-scripts.md#testing)
-  - [Performance and Analysis](./available-scripts.md#performance-and-analysis)
-  - [Supabase](./available-scripts.md#supabase)
   - [Deployment](./available-scripts.md#deployment)
 - [Local Development URL](./local-development-url.md) -- Dev vs. production base paths
 - [Development Workflow](./development-workflow.md) -- Branch strategy, commit format, PR process
@@ -34,22 +34,20 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Step-by-Step Workflow](./development-workflow.md#step-by-step-workflow)
   - [Commit Message Format](./development-workflow.md#commit-message-format)
   - [Commit Rules](./development-workflow.md#commit-rules)
-  - [Uncommitted Change Workflow](./development-workflow.md#uncommitted-change-workflow)
   - [PR Review Process](./development-workflow.md#pr-review-process)
 - [Build Process](./build-process.md) -- Production build pipeline, code splitting, PWA generation
   - [Build Stages](./build-process.md#build-stages)
   - [Manual Chunks (Code Splitting)](./build-process.md#manual-chunks-code-splitting)
   - [PWA Manifest Generation](./build-process.md#pwa-manifest-generation)
   - [Service Worker](./build-process.md#service-worker)
+  - [Sentry Source Maps](./build-process.md#sentry-source-maps)
   - [Bundle Analysis](./build-process.md#bundle-analysis)
-  - [Build Output Structure](./build-process.md#build-output-structure)
 - [Project Structure](./project-structure.md) -- Annotated directory layout
   - [Source Code (src/)](./project-structure.md#source-code-src)
   - [Tests (tests/)](./project-structure.md#tests-tests)
   - [Supabase (supabase/)](./project-structure.md#supabase-supabase)
   - [Scripts (scripts/)](./project-structure.md#scripts-scripts)
   - [CI/CD (.github/)](./project-structure.md#cicd-github)
-  - [Configuration Files (Root)](./project-structure.md#configuration-files-root)
 - [Testing](./testing.md) -- Unit, E2E, database, smoke, and burn-in tests
   - [Unit Tests (Vitest)](./testing.md#unit-tests-vitest)
   - [E2E Tests (Playwright)](./testing.md#e2e-tests-playwright)
@@ -59,26 +57,38 @@ Comprehensive developer reference for the My-Love PWA. Each section links to a d
   - [Burn-In (Flaky Detection)](./testing.md#burn-in-flaky-detection)
   - [CI Test Pipeline](./testing.md#ci-test-pipeline)
   - [Priority Tags](./testing.md#priority-tags)
-  - [ATDD (Acceptance Test-Driven Development)](./testing.md#atdd-acceptance-test-driven-development)
-- [Code Style](./code-style.md) -- TypeScript, ESLint, Prettier, naming conventions
+- [Code Style](./code-style.md) -- TypeScript, ESLint, Prettier, logger utility, no-console rule
   - [TypeScript](./code-style.md#typescript)
   - [ESLint](./code-style.md#eslint)
+  - [Logger Utility](./code-style.md#logger-utility)
   - [Prettier](./code-style.md#prettier)
   - [Naming and Import Conventions](./code-style.md#naming-and-import-conventions)
-- [Database Migrations](./database-migrations.md) -- Local Supabase, migrations, type generation
+- [Database Migrations](./database-migrations.md) -- All 24 migrations, Supabase CLI, pgTAP tests
   - [Local Supabase Setup](./database-migrations.md#local-supabase-setup)
   - [Creating Migrations](./database-migrations.md#creating-migrations)
-  - [Applying Migrations](./database-migrations.md#applying-migrations)
+  - [Migration History](./database-migrations.md#migration-history)
   - [Generating TypeScript Types](./database-migrations.md#generating-typescript-types)
   - [CI Migration Validation](./database-migrations.md#ci-migration-validation)
-  - [Database Tests](./database-migrations.md#database-tests)
-  - [Seed Data](./database-migrations.md#seed-data)
-  - [Supabase Configuration](./database-migrations.md#supabase-configuration-configtoml)
-- [Deployment](./deployment.md) -- CI/CD workflows, GitHub Pages, health checks
+  - [Database Tests (pgTAP)](./database-migrations.md#database-tests-pgtap)
+- [Deployment](./deployment.md) -- All 19 CI/CD workflows, GitHub Pages, health checks
   - [Automatic Deployment](./deployment.md#automatic-deployment)
   - [CI/CD Workflows](./deployment.md#cicd-workflows)
   - [Required GitHub Secrets](./deployment.md#required-github-secrets)
-  - [Manual Deployment](./deployment.md#manual-deployment)
   - [Post-Deploy Verification](./deployment.md#post-deploy-verification)
-  - [GitHub Pages Configuration](./deployment.md#github-pages-configuration)
 - [Troubleshooting](./troubleshooting.md) -- Common issues and solutions
+
+## Quick Reference
+
+| Item | Value |
+|------|-------|
+| Live URL | <https://sallvainian.github.io/My-Love/> |
+| Stack | React 19.2.4, TypeScript 5.9.3, Vite 7.3.1, Tailwind CSS 4.2.1 |
+| Backend | Supabase 2.99.0 (Auth, Database, Realtime, Storage) |
+| Testing | Vitest 4.0.17, Playwright 1.58.2, pgTAP |
+| Node | v24.13.0 (managed by mise, pinned in `.node-version`) |
+| Package manager | npm |
+| Secrets | fnox with age provider (`fnox.toml`) |
+| Source files | ~207 |
+| Test files | ~85 |
+| Migrations | 24 |
+| CI workflows | 19 |

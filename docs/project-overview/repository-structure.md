@@ -61,7 +61,7 @@ My-Love/
 |   |-- inspect-db.sh                # Database inspection utility for local Supabase
 |   +-- fetch_comments.py            # GitHub PR comment fetcher
 |
-|-- src/                              # Application source (197 TypeScript/TSX files, ~46,450 lines)
+|-- src/                              # Application source (207 TypeScript/TSX files, ~45,054 lines)
 |   |-- App.tsx                       # Main application component (auth, routing, sync setup, ~624 lines)
 |   |-- main.tsx                      # Entry point (StrictMode, LazyMotion, SW registration)
 |   |-- index.css                     # Global CSS (Tailwind imports)
@@ -70,18 +70,19 @@ My-Love/
 |   |-- sw-types.d.ts                 # Service Worker type definitions
 |   |-- vite-env.d.ts                 # Vite environment type declarations
 |   |
-|   |-- api/                          # Supabase API integration layer (10 files)
+|   |-- api/                          # Supabase API integration layer (12 files)
 |   |   |-- supabaseClient.ts         # Client singleton (typed with Database schema)
-|   |   |-- auth/                     # Auth service modules
+|   |   |-- auth/                     # Auth service modules (centralized refactor)
 |   |   |   |-- actionService.ts      # signIn, signUp, signOut, resetPassword, signInWithGoogle
 |   |   |   |-- sessionService.ts     # getSession, getUser, getCurrentUserId, onAuthStateChange
 |   |   |   +-- types.ts              # Auth type definitions
-|   |   |-- authService.ts            # Legacy auth re-export
+|   |   |-- authService.ts            # Facade re-exporting both session and action services
 |   |   |-- errorHandlers.ts          # SupabaseServiceError, retry with backoff, offline messages
 |   |   |-- interactionService.ts     # Poke/kiss interaction CRUD + realtime subscriptions
 |   |   |-- moodApi.ts                # Mood CRUD with Zod-validated responses
 |   |   |-- moodSyncService.ts        # Mood sync: IndexedDB -> Supabase
 |   |   |-- partnerService.ts         # Partner search, requests, linking
+|   |   |-- realtimeChannel.ts        # Shared private channel auth setup utility
 |   |   +-- validation/
 |   |       +-- supabaseSchemas.ts    # Zod schemas for all Supabase API responses
 |   |
@@ -106,8 +107,9 @@ My-Love/
 |   |   |-- photos/                   # PhotoUploader utility component
 |   |   |-- PokeKissInterface/        # Playful partner interactions
 |   |   |-- RelationshipTimers/       # TimeTogether, BirthdayCountdown, EventCountdown
-|   |   |-- scripture-reading/        # Scripture reading flow (18+ files across 6 subdirs)
-|   |   |   |-- containers/           # ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer
+|   |   |-- scripture-reading/        # Scripture reading flow (24+ files across 7 subdirs)
+|   |   |   |-- containers/           # ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer, ReadingPhaseView, ReportPhaseView
+|   |   |   |-- hooks/                # useReadingDialogs, useReadingNavigation, useReportPhase, useSessionPersistence, useSoloReadingFlow (decomposed from SoloReadingFlow)
 |   |   |   |-- overview/             # StatsSection
 |   |   |   |-- reading/              # BookmarkFlag, PartnerPosition, RoleIndicator
 |   |   |   |-- reflection/           # DailyPrayerReport, MessageCompose, ReflectionSummary
@@ -133,9 +135,10 @@ My-Love/
 |   |   |-- defaultMessagesLoader.ts  # Lazy loader for default messages
 |   |   +-- scriptureSteps.ts         # 17 scripture steps with NKJV verses and response prayers
 |   |
-|   |-- hooks/                        # Custom React hooks (14: 1 barrel + 13 hooks)
+|   |-- hooks/                        # Custom React hooks (16: 1 barrel + 15 hooks)
 |   |   |-- useAuth.ts                # Authentication state hook
 |   |   |-- useAutoSave.ts            # Auto-save with visibility change detection
+|   |   |-- useFocusTrap.ts           # Focus trap for modal dialogs (accessibility)
 |   |   |-- useImageCompression.ts    # Image compression state wrapper
 |   |   |-- useLoveNotes.ts           # Love notes chat state + realtime subscription
 |   |   |-- useMoodHistory.ts         # Paginated mood history via Supabase API
@@ -164,17 +167,17 @@ My-Love/
 |   |   |-- storage.ts                # Legacy StorageService for messages + photos
 |   |   +-- syncService.ts            # Mood sync orchestration (local -> Supabase transform)
 |   |
-|   |-- stores/                       # Zustand state management (12 files)
-|   |   |-- useAppStore.ts            # Main store (compose 10 slices + persist middleware)
-|   |   |-- types.ts                  # AppState type, AppSlice, AppStateCreator
-|   |   +-- slices/                   # Individual slice files (10 slices)
+|   |-- stores/                       # Zustand state management (13 files)
+|   |   |-- useAppStore.ts            # Main store (compose 11 slices + persist middleware)
+|   |   |-- types.ts                  # AppState type, AppSlice, AppStateCreator, AppMiddleware
+|   |   +-- slices/                   # Individual slice files (11 slices, includes authSlice)
 |   |
 |   |-- types/                        # TypeScript type definitions (3 files)
 |   |   |-- index.ts                  # Core types (ThemeName, Message, MoodEntry, Settings, etc.)
 |   |   |-- models.ts                 # Domain model types (LoveNote, etc.)
 |   |   +-- database.types.ts         # Auto-generated from Supabase schema (DO NOT EDIT)
 |   |
-|   |-- utils/                        # Utility functions (17 files)
+|   |-- utils/                        # Utility functions (17 files, includes logger.ts)
 |   |   |-- backgroundSync.ts         # Background Sync API registration
 |   |   |-- calendarHelpers.ts        # Calendar grid calculations
 |   |   |-- countdownService.ts       # Anniversary countdown calculations
@@ -203,7 +206,7 @@ My-Love/
 |   |-- seed.sql                      # Database seed data for local development
 |   |-- functions/
 |   |   +-- upload-love-note-image/   # Edge function for love note image uploads
-|   |-- migrations/                   # 23 SQL migration files
+|   |-- migrations/                   # 24 SQL migration files
 |   +-- tests/
 |       +-- database/                 # 14 pgTAP database test files
 |

@@ -16,12 +16,13 @@ src/
 
   api/                             # Supabase API layer
     supabaseClient.ts              # Singleton Supabase client (typed with Database)
-    authService.ts                 # Legacy auth service (sign-in/out)
+    authService.ts                 # Auth facade (re-exports session + action services)
     moodSyncService.ts             # Mood sync: IndexedDB -> Supabase
     moodApi.ts                     # Mood CRUD via Supabase queries
     interactionService.ts          # Poke/kiss interaction service + realtime
     partnerService.ts              # Partner search, requests, linking
     errorHandlers.ts               # SupabaseServiceError, retryWithBackoff, handleNetworkError
+    realtimeChannel.ts             # Shared private channel auth setup utility
     auth/
       sessionService.ts            # Session management, token storage for SW
       actionService.ts             # Auth actions (sign-in, sign-up, sign-out, Google OAuth)
@@ -119,12 +120,21 @@ src/
       index.ts
     scripture-reading/
       index.ts                     # Barrel exports
+      constants.ts                 # Scripture-specific constants
       motionFeatures.ts            # Framer Motion feature flags
       containers/
         ScriptureOverview.tsx      # Scripture reading entry point + stats
-        SoloReadingFlow.tsx        # Solo reading session flow
+        SoloReadingFlow.tsx        # Solo reading session flow (decomposed into sub-hooks)
         LobbyContainer.tsx         # Together-mode lobby (broadcast + presence)
         ReadingContainer.tsx       # Together-mode reading session container
+        ReadingPhaseView.tsx       # Reading phase view (props grouped into sub-objects)
+        ReportPhaseView.tsx        # Report/completion phase view
+      hooks/                       # Decomposed from SoloReadingFlow (2026-03-13 refactor)
+        useReadingDialogs.ts       # Dialog state management
+        useReadingNavigation.ts    # Step navigation logic
+        useReportPhase.ts          # Report phase state
+        useSessionPersistence.ts   # Session save/resume logic
+        useSoloReadingFlow.ts      # Main solo reading flow orchestrator
       overview/
         StatsSection.tsx           # Couple completion stats display
       reading/
@@ -186,10 +196,11 @@ src/
     defaultMessagesLoader.ts       # Lazy loader for default messages
     scriptureSteps.ts              # Scripture reading step definitions
 
-  hooks/                           # React hooks (14: 1 barrel + 13 hooks)
+  hooks/                           # React hooks (16: 1 barrel + 15 hooks)
     index.ts                       # Barrel exports
     useAuth.ts                     # Supabase auth state
     useAutoSave.ts                 # Scripture auto-save on visibility change
+    useFocusTrap.ts                # Focus trap for modal dialogs (accessibility)
     useImageCompression.ts         # Image compression state wrapper
     useLoveNotes.ts                # Love notes + realtime composition
     useMoodHistory.ts              # Paginated mood history (Supabase API)
@@ -226,10 +237,11 @@ src/
       loveNoteImageService.test.ts
 
   stores/                          # Zustand state management
-    useAppStore.ts                 # Main store (compose 10 slices + persist)
-    types.ts                       # AppState, AppSlice, AppStateCreator
+    useAppStore.ts                 # Main store (compose 11 slices + persist)
+    types.ts                       # AppState, AppSlice, AuthSlice, AppStateCreator, AppMiddleware
     slices/
       appSlice.ts                  # Loading, error, hydration
+      authSlice.ts                 # User identity (userId, email, isAuthenticated)
       settingsSlice.ts             # Settings, onboarding, theme, init
       navigationSlice.ts           # View routing (6 views, history.pushState)
       messagesSlice.ts             # Daily messages, history, favorites, CRUD
@@ -255,6 +267,7 @@ src/
     deterministicRandom.ts         # Seeded PRNG for render-safe values
     haptics.ts                     # Vibration API haptic patterns
     interactionValidation.ts       # UUID + interaction type validation
+    logger.ts                      # Centralized logging (debug/info/log, replaces console.* across 48+ files)
     messageRotation.ts             # Deterministic daily message algorithm
     messageValidation.ts           # Love note validation + DOMPurify sanitize
     moodEmojis.ts                  # Mood type -> emoji mappings

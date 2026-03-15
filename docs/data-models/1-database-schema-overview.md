@@ -1,76 +1,60 @@
 # 1. Database Schema Overview
 
-The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on all tables. The schema covers two primary feature areas: the core couples app (users, moods, love notes, interactions, photos, partner requests) and the scripture reading feature (sessions, step states, reflections, bookmarks, messages).
+The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on all tables. The schema covers two primary feature areas: the core couples app and the scripture reading feature.
 
-## Tables Summary
+## Tables (10 total)
 
-| Table                   | PK Type                  | RLS | Purpose                        |
-| ----------------------- | ------------------------ | --- | ------------------------------ |
-| `users`                 | UUID (from `auth.users`) | Yes | User profiles, partner linking |
-| `moods`                 | UUID (auto)              | Yes | Mood tracking entries          |
-| `love_notes`            | UUID (auto)              | Yes | Chat messages between partners |
-| `interactions`          | UUID (auto)              | Yes | Poke/kiss interactions         |
-| `partner_requests`      | UUID (auto)              | Yes | Partner connection requests    |
-| `photos`                | UUID (auto)              | Yes | Photo metadata (storage refs)  |
-| `scripture_sessions`    | UUID (auto)              | Yes | Reading session state          |
-| `scripture_step_states` | UUID (auto)              | Yes | Per-step lock-in tracking      |
-| `scripture_reflections` | UUID (auto)              | Yes | Post-reading reflections       |
-| `scripture_bookmarks`   | UUID (auto)              | Yes | Step bookmarks                 |
-| `scripture_messages`    | UUID (auto)              | Yes | Daily prayer report messages   |
+### Core App Tables
+| Table | Purpose | FK References |
+|-------|---------|--------------|
+| `users` | User profiles, partner linking | `auth.users(id)`, self-ref `partner_id` |
+| `moods` | Mood tracking entries | `users(id)` via `user_id` |
+| `love_notes` | Chat messages between partners | `auth.users(id)` via `from_user_id`, `to_user_id` |
+| `interactions` | Poke/kiss interactions | `users(id)` via `from_user_id`, `to_user_id` |
+| `partner_requests` | Partner connection requests | `users(id)` via `from_user_id`, `to_user_id` |
+| `photos` | Photo metadata (storage in bucket) | `auth.users(id)` via `user_id` |
 
-## Custom Enum Types
+### Scripture Reading Tables
+| Table | Purpose | FK References |
+|-------|---------|--------------|
+| `scripture_sessions` | Reading sessions (solo/together) | `auth.users(id)` via `user1_id`, `user2_id` |
+| `scripture_step_states` | Per-step lock-in tracking | `scripture_sessions(id)` |
+| `scripture_reflections` | User reflections per step | `scripture_sessions(id)`, `auth.users(id)` |
+| `scripture_bookmarks` | Verse bookmarks | `scripture_sessions(id)`, `auth.users(id)` |
+| `scripture_messages` | Daily Prayer Report messages | `scripture_sessions(id)`, `auth.users(id)` |
 
-| Enum                       | Values                                                                                                                       |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `mood_type`                | `loved`, `happy`, `content`, `excited`, `thoughtful`, `grateful`, `sad`, `anxious`, `frustrated`, `angry`, `lonely`, `tired` |
-| `scripture_session_mode`   | `solo`, `together`                                                                                                           |
-| `scripture_session_phase`  | `lobby`, `countdown`, `reading`, `reflection`, `report`, `complete`                                                          |
-| `scripture_session_status` | `pending`, `in_progress`, `complete`, `abandoned`                                                                            |
-| `scripture_session_role`   | `reader`, `responder`                                                                                                        |
+## Enums (4 types)
 
-## Entity Relationships
+| Enum | Values |
+|------|--------|
+| `scripture_session_mode` | `solo`, `together` |
+| `scripture_session_phase` | `lobby`, `countdown`, `reading`, `reflection`, `report`, `complete` |
+| `scripture_session_status` | `pending`, `in_progress`, `complete`, `abandoned`, `ended_early` |
+| `scripture_session_role` | `reader`, `responder` |
 
-```
-auth.users (Supabase Auth)
-  |
-  +--< users (1:1, id = auth.users.id)
-  |     |
-  |     +--< users.partner_id (self-referencing FK)
-  |
-  +--< moods (1:many, user_id)
-  |
-  +--< love_notes (1:many, from_user_id / to_user_id)
-  |
-  +--< interactions (1:many, from_user_id / to_user_id)
-  |
-  +--< partner_requests (1:many, from_user_id / to_user_id)
-  |
-  +--< photos (1:many, user_id)
-  |
-  +--< scripture_sessions (1:many, user1_id / user2_id)
-        |
-        +--< scripture_step_states (1:many, session_id)
-        +--< scripture_reflections (1:many, session_id)
-        +--< scripture_bookmarks (1:many, session_id)
-        +--< scripture_messages (1:many, session_id)
-```
+**Note:** `mood_type`, `interaction_type`, and `partner_request_status` were originally enums but were converted to TEXT with CHECK constraints in migration `20251206024345`.
 
-## Storage Buckets
+## Storage Buckets (2)
 
-| Bucket              | Access                | Purpose                |
-| ------------------- | --------------------- | ---------------------- |
-| `photos`            | Private (signed URLs) | User photo uploads     |
-| `love-notes-images` | Private (signed URLs) | Chat image attachments |
+| Bucket | Public | Size Limit | Purpose |
+|--------|--------|------------|---------|
+| `photos` | No | 10MB | Photo gallery images |
+| `love-notes-images` | No | - | Love note chat image attachments |
 
-## RPC Functions (13 total)
+## RPC Functions (13)
 
-- **Partner management:** `accept_partner_request`, `decline_partner_request`, `get_my_partner_id`
-- **Scripture sessions:** `scripture_create_session`, `scripture_lock_in`, `scripture_submit_reflection`, `scripture_get_couple_stats`, `scripture_end_session`, `scripture_convert_to_solo`
-- **Helpers:** `is_scripture_session_member`, `get_partner_id` (SECURITY DEFINER)
-- **Testing:** `scripture_seed_test_data`
+See [RPC Functions](./6-supabase-rpc-functions.md) for full documentation.
 
-## IndexedDB (Client-Side)
+## Edge Functions (1)
 
-Database name: `my-love-db`, version: `5`
+| Function | Purpose |
+|----------|---------|
+| `upload-love-note-image` | Server-side image validation, MIME detection, rate limiting |
 
-8 object stores providing offline support and caching. See Section 3 for details.
+## Triggers (1)
+
+| Trigger | Table | Function | Events |
+|---------|-------|----------|--------|
+| `on_auth_user_created` | `auth.users` | `sync_user_profile()` | AFTER INSERT OR UPDATE |
+
+The trigger auto-syncs `auth.users` to `public.users` table on signup/profile update.

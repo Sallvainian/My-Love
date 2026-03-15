@@ -1,157 +1,82 @@
 # 6. Supabase RPC Functions
 
-All database functions are created in the `public` schema. Most use `SECURITY INVOKER` (respects RLS) unless noted. All scripture functions use `SET search_path = ''` for security.
+All database functions are in the `public` schema. Most use `SET search_path = ''` for security. Scripture functions use optimistic concurrency (version checks) and row-level locking (`FOR UPDATE`).
 
-## Partner Management
+## Core App Functions
 
-### `accept_partner_request(p_request_id UUID)`
+### `accept_partner_request(p_request_id UUID) -> void`
+**Security:** DEFINER | **Introduced:** Migration 001 (base schema)
 
-Atomically accepts a partner connection request.
+Atomically accepts a partner request: validates recipient is caller, checks neither user already has a partner, sets `partner_id` on both users, marks request as accepted, declines all other pending requests involving either user.
 
-**Actions:**
+### `decline_partner_request(p_request_id UUID) -> void`
+**Security:** DEFINER | **Introduced:** Migration 005 (remote_schema)
 
-1. Updates request status to `'accepted'`
-2. Sets `partner_id` on both users in the `users` table (bidirectional link)
+Validates caller is recipient, updates request status to `'declined'`.
 
-**Called by:** `partnerService.acceptPartnerRequest()`
+### `sync_user_profile() -> trigger`
+**Security:** DEFINER | **Introduced:** Migration 005 (remote_schema)
 
----
+Trigger function on `auth.users` AFTER INSERT/UPDATE. Upserts `public.users` with email and display_name from auth metadata.
 
-### `decline_partner_request(p_request_id UUID)`
+### `get_my_partner_id() -> UUID`
+**Security:** DEFINER | **Introduced:** Migration 010 (fix RLS recursion)
 
-Declines a partner connection request.
+Returns `partner_id` from `users` table for `auth.uid()`. Bypasses RLS to break circular policy evaluation.
 
-**Actions:** Updates request status to `'declined'`.
+### `is_scripture_session_member(p_session_id UUID) -> boolean`
+**Security:** DEFINER | **Introduced:** Migration 008 (scripture_reading)
 
-**Called by:** `partnerService.declinePartnerRequest()`
+Returns true if `auth.uid()` is user1 or user2 of the session. Used by RLS policies on all scripture tables.
 
----
+## Scripture Session Functions
 
-### `get_my_partner_id() RETURNS UUID`
+### `scripture_create_session(p_mode TEXT, p_partner_id UUID?) -> JSONB`
+**Security:** DEFINER | **Introduced:** Migration 009, updated in 016/021
 
-Returns the current user's `partner_id` from the `users` table. Uses `auth.uid()` to identify the caller.
+Creates a new scripture session. Solo starts in `reading` phase, together starts in `lobby`. Together mode reuses existing in-progress lobby sessions for the same user pair. Returns full session JSONB object.
 
-**Security:** `SECURITY DEFINER` -- bypasses RLS to avoid recursion when used inside RLS policies.
+### `scripture_submit_reflection(p_session_id, p_step_index, p_rating, p_notes, p_is_shared) -> JSONB`
+**Security:** DEFINER | **Introduced:** Migration 009
 
----
+Upserts a reflection (INSERT ... ON CONFLICT DO UPDATE). Validates session membership and rating range (1-5). Returns reflection JSONB.
 
-### `get_partner_id(user_id UUID) RETURNS UUID`
+### `scripture_select_role(p_session_id UUID, p_role TEXT) -> JSONB`
+**Security:** INVOKER | **Introduced:** Migration 015, phase guard added in 017
 
-Returns the `partner_id` for a given user. Used by RLS policies to check partner relationships.
+Sets caller's role (reader/responder) on the session. Phase guard: only allowed in lobby. Bumps version. Returns session snapshot JSONB (client broadcasts to partner).
 
-**Security:** `SECURITY DEFINER`, `STABLE`
+### `scripture_toggle_ready(p_session_id UUID, p_is_ready BOOLEAN) -> JSONB`
+**Security:** INVOKER | **Introduced:** Migration 015, phase guard added in 017
 
-## Scripture Reading
+Toggles caller's ready flag. Phase guard: only allowed in lobby. If both ready: sets `countdown_started_at = now()`, transitions to countdown phase. Returns snapshot.
 
-### `scripture_create_session(p_mode TEXT, p_partner_id UUID DEFAULT NULL) RETURNS JSONB`
+### `scripture_convert_to_solo(p_session_id UUID) -> JSONB`
+**Security:** INVOKER | **Introduced:** Migration 015, phase guard added in 017
 
-Creates a new scripture reading session.
+Converts together session to solo. Phase guard: lobby only. Clears partner state, resets ready flags, moves to reading phase. Returns snapshot.
 
-**Solo mode:** Creates session with `user1_id = auth.uid()`, `status = 'in_progress'`, `current_phase = 'reading'`.
+### `scripture_lock_in(p_session_id, p_step_index, p_expected_version) -> JSONB`
+**Security:** INVOKER | **Introduced:** Migration 018, updated 021/024
 
-**Together mode:** Creates session with both user IDs, `status = 'pending'`, `current_phase = 'lobby'`. Validates that `p_partner_id` is the caller's actual partner.
+Locks in user for current step. Uses optimistic concurrency (`version != p_expected_version` raises `409: version mismatch`). Phase guard: reading or countdown. Idempotent UPSERT on `scripture_step_states`. If both locked: advances step (or transitions to reflection on step 16 -- keeps status `in_progress`). Returns snapshot with `both_locked` boolean and optional `lock_status`.
 
-**Returns:** Full session row as JSONB.
+### `scripture_undo_lock_in(p_session_id, p_step_index) -> JSONB`
+**Security:** INVOKER | **Introduced:** Migration 018, updated 021
 
-**Called by:** `scriptureReadingService.createSession()`
+Clears caller's lock timestamp on step state. Phase guard: reading or countdown. Returns snapshot with `lock_status`.
 
----
+### `scripture_end_session(p_session_id UUID) -> JSONB`
+**Security:** INVOKER | **Introduced:** Migration 019, updated 021
 
-### `scripture_lock_in(p_session_id UUID, p_step_index INT, p_expected_version INT) RETURNS JSONB`
+Ends a together-mode session early. Status guard: only `in_progress`. Sets `status = 'ended_early'`, `completed_at = now()`. Returns snapshot.
 
-Locks in a user for the current reading step. When both users are locked in, advances the session.
+### `scripture_get_couple_stats() -> JSONB`
+**Security:** DEFINER | **Introduced:** Migration 013, optimized 014, precision fix 024
 
-**Preconditions:**
+Returns couple-aggregate stats using CTE-based query: `totalSessions`, `totalSteps`, `lastCompleted`, `avgRating` (rounded to 1 decimal), `bookmarkCount`. Queries across both partners' sessions.
 
-- Session must be in `'reading'` or `'countdown'` phase
-- `p_step_index` must match `current_step_index`
-- `p_expected_version` must match `version` (optimistic concurrency -- throws `'409: version mismatch'` on conflict)
+### `scripture_seed_test_data(p_session_count, p_include_reflections, p_include_messages, p_preset, p_bookmark_steps) -> JSONB`
+**Security:** DEFINER | **Introduced:** Migration 008, updated multiple times
 
-**Phase transition from countdown:** If session is in `'countdown'` phase, transitions to `'reading'` automatically.
-
-**Lock-in logic:**
-
-1. UPSERTs into `scripture_step_states` setting the caller's `locked_at` timestamp
-2. Checks if both users are locked in
-3. If both locked:
-   - Steps 0-15: Increments `current_step_index`, bumps `version`
-   - Step 16 (last): Transitions `current_phase` to `'reflection'`, keeps `status = 'in_progress'`
-4. If partial lock: Returns lock status payload
-
-**Returns JSONB:** `{ sessionId, currentPhase, currentStepIndex, version, both_locked, lock_status? }`
-
-**Called by:** Scripture reading components (via Zustand slice)
-
----
-
-### `scripture_submit_reflection(p_session_id UUID, p_step_index INT, p_rating INT, p_notes TEXT, p_is_shared BOOLEAN) RETURNS JSONB`
-
-Submits a post-reading reflection.
-
-**Inserts** into `scripture_reflections` table.
-
-**Returns:** Created reflection row as JSONB.
-
-**Called by:** `scriptureReadingService.addReflection()`
-
----
-
-### `scripture_get_couple_stats() RETURNS JSONB`
-
-Aggregates reading statistics for the current user and their partner.
-
-**Returns:**
-
-```jsonb
-{
-  "totalSessions": 12,
-  "totalSteps": 180,
-  "lastCompleted": "2026-03-01T10:30:00Z",
-  "avgRating": 4.2,
-  "bookmarkCount": 15
-}
-```
-
-**Called by:** `scriptureReadingService.getCoupleStats()`
-
----
-
-### `scripture_end_session(p_session_id UUID) RETURNS JSONB`
-
-Marks a session as complete or abandoned.
-
-**Called by:** Scripture components for session completion.
-
----
-
-### `scripture_convert_to_solo(p_session_id UUID) RETURNS JSONB`
-
-Converts a together-mode session to solo mode. Used when a partner disconnects or the user wants to continue alone.
-
-**Called by:** Scripture components.
-
----
-
-### `is_scripture_session_member(p_session_id UUID) RETURNS BOOLEAN`
-
-Checks if `auth.uid()` is `user1_id` or `user2_id` of the specified session.
-
-**Used by:** RLS policies on scripture tables to enforce session membership.
-
----
-
-### `scripture_seed_test_data(...)`
-
-Test data seeding function for development and testing. Accepts optional parameters for bookmark steps and message inclusion.
-
-## Helper Functions
-
-### `get_partner_id(user_id UUID) RETURNS UUID`
-
-Simple SQL function returning `partner_id` for a user. `SECURITY DEFINER` to avoid RLS recursion.
-
-```sql
-SELECT partner_id FROM users WHERE id = user_id;
-```
-
-Used by RLS policies on `moods`, `photos`, `interactions`, and `users` tables.
+Test data seeding function with environment guard (rejects in production). Presets: `default`, `mid_session`, `completed`, `with_help_flags`, `unlinked`, `at_reflection`.

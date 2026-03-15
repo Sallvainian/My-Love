@@ -15,7 +15,7 @@ Every npm script defined in `package.json`, organized by category.
 | Script              | Command                                  | Description                                                                                                                                                                            |
 | ------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run build`     | `tsc -p tsconfig.app.json && vite build` | Full production build: TypeScript type-check against `tsconfig.app.json`, then Vite build with code splitting, PWA generation, and optional Sentry source map upload. Output: `dist/`. |
-| `npm run typecheck` | `tsc --noEmit`                           | TypeScript type check only (no output files). Use to validate types without building.                                                                                                  |
+| `npm run typecheck` | `tsc -b --force`                         | TypeScript type check using project references (`-b` flag). Validates types across all three tsconfig files (app, node, test). The `--force` flag ensures a complete rebuild of all project references. |
 
 ## Code Quality
 
@@ -80,7 +80,7 @@ These commands use the Supabase CLI directly (not defined as npm scripts):
 | `supabase stop`                                                                                                             | Stop local Supabase.                                                                            |
 | `supabase stop --no-backup`                                                                                                 | Stop local Supabase without creating a database backup (faster, used in CI).                    |
 | `supabase status`                                                                                                           | Show local Supabase connection URLs, keys, and service status.                                  |
-| `supabase db reset`                                                                                                         | Reset local database: drop all data, re-run all 21 migrations, re-seed from `seed.sql`.         |
+| `supabase db reset`                                                                                                         | Reset local database: drop all data, re-run all 24 migrations, re-seed from `seed.sql`.         |
 | `supabase migration new <name>`                                                                                             | Create a new empty migration file in `supabase/migrations/` with the current timestamp.         |
 | `supabase gen types typescript --local \| grep -v '^Connecting to' > src/types/database.types.ts`                           | Regenerate TypeScript types from the local database schema.                                     |
 | `supabase gen types typescript --project-id xojempkrugifnaveqtqc \| grep -v '^Connecting to' > src/types/database.types.ts` | Regenerate TypeScript types from the remote Supabase project. Requires `SUPABASE_ACCESS_TOKEN`. |

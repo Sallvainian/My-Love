@@ -21,23 +21,30 @@ type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 
 ## Actions
 
-| Action         | Signature                  | Description                                      |
-| -------------- | -------------------------- | ------------------------------------------------ |
-| `setView`      | `(view: ViewType) => void` | Sets `currentView` and pushes to browser history |
-| `navigateHome` | `() => void`               | Convenience action, sets view to `'home'`        |
+| Action              | Signature                                         | Description                                      |
+| ------------------- | ------------------------------------------------- | ------------------------------------------------ |
+| `setView`           | `(view: ViewType, skipHistory?: boolean) => void` | Sets `currentView` and pushes to browser history |
+| `navigateHome`      | `() => void`                                      | Convenience: sets view to `'home'`               |
+| `navigatePhotos`    | `() => void`                                      | Convenience: sets view to `'photos'`             |
+| `navigateMood`      | `() => void`                                      | Convenience: sets view to `'mood'`               |
+| `navigatePartner`   | `() => void`                                      | Convenience: sets view to `'partner'`            |
+| `navigateNotes`     | `() => void`                                      | Convenience: sets view to `'notes'`              |
+| `navigateScripture` | `() => void`                                      | Convenience: sets view to `'scripture'`          |
 
 ## Browser History Integration
 
-When `setView` is called:
+When `setView` is called (with `skipHistory = false`):
 
 1. Updates `currentView` in Zustand state
-2. Pushes a new entry to `window.history` with `pushState({ view }, '', url)`
-3. The URL includes a `?view=` query parameter for the non-home views
+2. Builds URL path respecting `BASE_URL` for GitHub Pages (e.g., `/My-Love/photos`)
+3. Pushes to `window.history.pushState({ view }, '', fullPath)`
 
-A `popstate` event listener handles browser back/forward buttons by reading the view from `history.state`.
+The `skipHistory` parameter prevents loops during `popstate` handling and initial route detection.
+
+A `popstate` event listener in App.tsx handles browser back/forward buttons by parsing the pathname.
 
 ## Notes
 
-- No persistence -- `currentView` resets to `'home'` on page reload.
+- No persistence -- `currentView` is restored from URL on mount via App.tsx route detection.
 - No cross-slice dependencies.
 - Used by `BottomNavigation` component for tab switching and by components like `ScriptureOverview` for partner setup navigation (`setView('partner')`).

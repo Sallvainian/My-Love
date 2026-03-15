@@ -102,7 +102,7 @@ src/
     syncService.ts                  # Data synchronization service
 
   stores/
-    useAppStore.ts                  # Zustand store composed from 10 slices
+    useAppStore.ts                  # Zustand store composed from 11 slices
     slices/
       appSlice.ts                   # App-level state (loading, errors, initialization)
       settingsSlice.ts              # User settings and preferences
@@ -133,6 +133,7 @@ src/
     deterministicRandom.ts          # Deterministic random number generation
     haptics.ts                      # Haptic feedback utilities
     interactionValidation.ts        # Interaction input validation
+    logger.ts                       # Logger utility (wraps console.log/info/debug; debug is DEV-only)
     messageRotation.ts              # Daily message selection algorithm
     moodEmojis.ts                   # Mood emoji definitions
     moodGrouping.ts                 # Mood data grouping for history
@@ -200,7 +201,7 @@ tests/
 supabase/
   config.toml                       # Local Supabase configuration (ports, auth, storage, realtime)
   seed.sql                          # Database seed data for local development
-  migrations/                       # 23 SQL migration files (YYYYMMDDHHmmss_description.sql format)
+  migrations/                       # 24 SQL migration files (YYYYMMDDHHmmss_description.sql format)
   tests/
     database/                       # 14 pgTAP database test files
 ```
@@ -248,6 +249,8 @@ scripts/
   actions/
     setup-supabase/
       action.yml                    # Composite action: install CLI v2.72.7, start local, apply migrations, export credentials
+    setup-playwright-e2e/
+      action.yml                    # Composite action: install deps, Playwright browsers, setup Supabase for E2E
 
   workflows/
     # Core pipelines
@@ -260,6 +263,7 @@ scripts/
     # AI: Claude
     claude.yml                      # Claude Code for @claude mentions in issues/PRs (claude-opus-4-6)
     claude-code-review.yml          # Automated PR code review with Claude /review skill
+    claude-flaky-tests.yml          # Auto-detect flaky test failures and retry (triggered by Tests workflow failure)
     manual-code-analysis.yml        # On-demand commit summarization or security review
     ci-failure-auto-fix.yml         # Auto-fix CI failures with Claude Code on non-main branches
 

@@ -46,4 +46,4 @@ Note: `fart` interactions are local-only (no Supabase RPC) -- they play a local 
 
 ## Cross-Slice Dependencies
 
-None. Operates independently.
+- **Reads:** `AuthSlice` (via `get().userId` in `sendPoke`, `sendKiss`, `loadInteractionHistory`, `subscribeToInteractions` for user identity)

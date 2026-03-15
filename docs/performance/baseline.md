@@ -2,6 +2,8 @@
 
 Captured from `vite build` output on 2026-03-01 using Vite 7.3.1. All sizes are post-minification.
 
+Last reviewed: 2026-03-15
+
 ## Build Summary
 
 | Metric              | Value                 |
@@ -152,6 +154,10 @@ Centralized configuration for performance-related magic numbers:
 - **Pagination**: Default page size (20), max page size (100)
 - **Storage Quotas**: Warning threshold (80%), error threshold (95%), default quota (50MB), monitoring interval (5 minutes)
 - **Validation Limits**: Message text max (1000), caption max (500), mood note max (1000), partner name max (50)
+
+### Logger Utility (`src/utils/logger.ts`)
+
+The logger utility gates verbose debug output behind `import.meta.env.DEV`, ensuring that `logger.debug()` calls produce no output in production builds. This avoids performance overhead from console output in production while preserving detailed tracing in development. See the [Code Style guide](../development-guide/code-style.md#logger-utility) for details.
 
 ## CI Bundle Size Monitoring
 

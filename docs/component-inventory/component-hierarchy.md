@@ -76,8 +76,15 @@ App (root) -- src/App.tsx
 |       |       |   |-- StatsSection (couple aggregate stats)
 |       |       |   |
 |       |       |   |-- [session.mode === 'solo' || post-reading phases]
-|       |       |   |   |-- SoloReadingFlow (step-by-step reading, reflection, report)
-|       |       |   |       |-- BookmarkFlag (verse bookmark toggle)
+|       |       |   |   |-- SoloReadingFlow (thin orchestrator, delegates to sub-hooks)
+|       |       |   |       |-- uses useSoloReadingFlow (composes 4 sub-hooks):
+|       |       |   |       |   |-- useReadingNavigation (verse nav, step transitions, slide direction)
+|       |       |   |       |   |-- useReportPhase (report generation, reflection summary, prayer report)
+|       |       |   |       |   |-- useSessionPersistence (auto-save, bookmarks, retry logic)
+|       |       |   |       |   |-- useReadingDialogs (exit confirmation dialog, focus trap)
+|       |       |   |       |-- ReadingPhaseView (props grouped into sub-objects: session, state, animations, elementRefs, handlers)
+|       |       |   |       |   |-- BookmarkFlag (verse bookmark toggle)
+|       |       |   |       |-- ReportPhaseView (report sub-phases)
 |       |       |   |       |-- ReflectionSummary (standout verses, rating, notes)
 |       |       |   |       |-- MessageCompose (partner message textarea)
 |       |       |   |       |-- DailyPrayerReport (ratings, bookmarks, partner message)

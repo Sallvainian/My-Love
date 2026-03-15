@@ -11,7 +11,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 | React DOM    | 19.2.4  | DOM rendering                                             |
 | TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                |
 | Vite         | 7.3.1   | Build tool and dev server                                 |
-| Tailwind CSS | 4.1.17  | Utility-first CSS framework (v4 with PostCSS integration) |
+| Tailwind CSS | 4.1.17+ | Utility-first CSS framework (v4 with PostCSS integration) |
 | PostCSS      | 8.5.8   | CSS post-processing                                       |
 | Autoprefixer | 10.4.27 | Vendor prefix automation                                  |
 
@@ -25,12 +25,12 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology            | Version | Purpose                                                 |
 | --------------------- | ------- | ------------------------------------------------------- |
-| Zustand               | 5.0.11  | Client-side state management (10-slice store pattern)   |
+| Zustand               | 5.0.11  | Client-side state management (11-slice store pattern)   |
 | Zod                   | 4.3.6   | Schema validation for forms and API responses           |
 | idb                   | 8.0.3   | IndexedDB wrapper (offline-first local storage)         |
 | @supabase/supabase-js | 2.99.0  | Supabase client SDK (auth, database, storage, realtime) |
 
-**Why Zustand?** Zustand provides a lightweight, boilerplate-free store. The project uses the slice pattern with 10 slices composed into a single store (`useAppStore.ts`). State is persisted to `localStorage` via `zustand/persist` with custom serialization for `Map` objects.
+**Why Zustand?** Zustand provides a lightweight, boilerplate-free store. The project uses the slice pattern with 11 slices composed into a single store (`useAppStore.ts`). State is persisted to `localStorage` via `zustand/persist` with custom serialization for `Map` objects.
 
 **Why IndexedDB via idb?** The app follows an offline-first architecture. IndexedDB serves as the primary data store for moods, photos, and messages. Entries are created with `synced: false` and synced to Supabase in the background.
 
@@ -64,7 +64,7 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | Technology                         | Version | Purpose                                                                           |
 | ---------------------------------- | ------- | --------------------------------------------------------------------------------- |
 | Vitest                             | 4.0.17  | Unit test runner                                                                  |
-| @vitest/coverage-v8                | 4.0.18  | Code coverage (V8 provider, 80% threshold on lines/functions/branches/statements) |
+| @vitest/coverage-v8                | 4.0.18  | Code coverage (V8 provider, 25% threshold on lines/functions/branches/statements) |
 | @vitest/ui                         | 4.0.17  | Vitest interactive browser UI                                                     |
 | happy-dom                          | 20.8.3  | DOM environment for unit tests                                                    |
 | @testing-library/react             | 16.3.2  | React component testing utilities                                                 |

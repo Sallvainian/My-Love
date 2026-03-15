@@ -1,164 +1,112 @@
 # 14. Additional Services
 
-**Sources:**
+## Logger (`src/utils/logger.ts`)
 
-- `src/services/syncService.ts` -- Offline-first mood sync
-- `src/services/imageCompressionService.ts` -- Canvas API compression (see also Section 9)
-- `src/services/migrationService.ts` -- LocalStorage to IndexedDB migration
-- `src/services/performanceMonitor.ts` -- Operation timing and metrics
-
-## SyncService
-
-**Singleton:** `export const syncService = new SyncService()`
-
-Handles synchronization of mood entries from IndexedDB to Supabase with partial failure handling. Unlike `MoodSyncService` (Section 5), this is a simpler sync-only service without broadcast or real-time features.
-
-### Types
+Centralized logging utility that suppresses verbose output in production.
 
 ```typescript
-interface MoodSyncResult {
-  localId: number;
-  success: boolean;
-  supabaseId?: string;
-  error?: string;
-}
-
-interface SyncSummary {
-  total: number;
-  successful: number;
-  failed: number;
-  results: MoodSyncResult[];
-}
+export const logger = {
+  debug: (...args) => { if (isDev) console.debug(...args); },  // DEV only
+  info: (...args) => { console.info(...args); },                // Always
+  log: (...args) => { console.log(...args); },                  // Always
+};
 ```
 
-### Methods
+## PerformanceMonitor (`src/services/performanceMonitor.ts`)
 
-#### `syncPendingMoods(): Promise<SyncSummary>`
+Tracks operation execution times using `performance.now()`.
 
-Syncs all unsynced moods from IndexedDB to Supabase.
+### `measureAsync<T>(name, operation): Promise<T>`
+Wraps async operation, records duration metric.
 
-**Flow:**
+### `recordMetric(name, duration): void`
+Tracks count, avg/min/max/total duration per metric name.
 
-1. Gets unsynced moods via `moodService.getUnsyncedMoods()`
-2. Syncs each mood in parallel via `Promise.all()`
-3. Each mood: transforms to `MoodInsert`, calls `moodApi.create()`, marks synced via `moodService.markAsSynced()`
-4. Continues on individual failures (partial failure handling)
-5. Returns detailed summary with per-mood results
+### `getReport(): string`
+Human-readable report sorted by total duration descending.
 
-**Error handling:** Critical errors return empty summary. Individual mood failures are captured in `results` array.
+### `getMetrics(name)`, `getAllMetrics()`, `clear()`
+Accessors and reset.
 
----
+## StorageService (`src/services/storage.ts`)
 
-#### `hasPendingSync(): Promise<boolean>`
+Legacy IndexedDB service (predates BaseIndexedDBService). Provides direct CRUD for photos and messages, plus LocalStorage helpers. Still used by some store slices.
 
-Returns `true` if any unsynced moods exist in IndexedDB.
+### Key Methods
+- Photo: `addPhoto`, `getPhoto`, `getAllPhotos`, `deletePhoto`, `updatePhoto`
+- Message: `addMessage`, `getMessage`, `getAllMessages`, `getMessagesByCategory`, `updateMessage`, `deleteMessage`, `toggleFavorite`, `addMessages` (bulk)
+- Utility: `clearAllData`, `exportData`
 
----
+### `localStorageHelper`
+Object with `get<T>(key, default)`, `set<T>(key, value)`, `remove(key)`, `clear()`.
 
-#### `getPendingCount(): Promise<number>`
+## SyncService (`src/services/syncService.ts`)
 
-Returns the count of unsynced moods. Returns `0` on error.
+Offline-first mood sync from IndexedDB to Supabase. Uses `moodApi.create()` for validated uploads.
 
----
+### `syncPendingMoods(): Promise<SyncSummary>`
+Gets unsynced moods, uploads each with `Promise.all()` (parallel). Partial failure handling.
 
-## MigrationService
+### `hasPendingSync(): Promise<boolean>`
+Checks if unsynced moods exist.
 
-**Exported function** (not a class):
+### `getPendingCount(): Promise<number>`
+Returns count of unsynced moods.
+
+## MigrationService (`src/services/migrationService.ts`)
+
+One-time migration from LocalStorage to IndexedDB for custom messages.
 
 ### `migrateCustomMessagesFromLocalStorage(): Promise<MigrationResult>`
+Reads `my-love-custom-messages` from LocalStorage, validates each with `CreateMessageInputSchema`, deduplicates by text, creates via `customMessageService.create()`, removes LocalStorage key on success.
 
-One-time migration from `localStorage` key `my-love-custom-messages` to IndexedDB.
+## Utility Modules
 
-```typescript
-interface MigrationResult {
-  success: boolean;
-  migratedCount: number;
-  skippedCount: number;
-  errors: string[];
-}
-```
+### `dateUtils.ts`
+- `getRelativeTime(timestamp)` -- "2h ago", "Yesterday"
+- `formatMessageTimestamp(date)` -- Today: time, Yesterday: "Yesterday", This week: day name, Older: "Nov 20"
+- `formatDateISO(date)` -- Local timezone YYYY-MM-DD
+- `formatDateLong(date)` -- "January 1, 2024"
+- `formatCountdown(days)` -- "Today!", "3 days", "2 weeks", etc.
+- `formatRelativeDate(isoString)` -- "today", "3 days ago", "2 months ago"
+- `isToday(date)`, `isSameDay(d1, d2)`, `isPast(date)`, `isFuture(date)`
+- `addDays(date, n)`, `getDaysUntil(target)`, `getDaysSince(past)`
+- `getNextAnniversary(dateString)`
 
-**Flow:**
+### `messageRotation.ts`
+- `getDailyMessage(allMessages, date?)` -- Deterministic hash-based rotation
+- `hashDateString(dateString)` -- Character code sum hash
+- `getAvailableHistoryDays(history, settings)` -- Min of config, relationship duration, 30
+- `formatRelationshipDuration(startDate)` -- "3 months", "1 year and 2 months"
 
-1. Reads `localStorage.getItem('my-love-custom-messages')`
-2. Parses JSON array of `CustomMessage` objects
-3. Gets existing custom messages from IndexedDB for duplicate detection
-4. For each message: validates with `CreateMessageInputSchema.parse()`, checks for duplicate (case-insensitive text match), creates via `customMessageService.create()`
-5. After migration: removes localStorage key to prevent re-migration
-6. Returns summary with migrated/skipped counts and errors
+### `messageValidation.ts`
+- `validateMessageContent(content)` -- Max 1000 chars, non-empty
+- `sanitizeMessageContent(content)` -- DOMPurify strip all HTML
 
-**Duplicate detection:** Normalizes text to lowercase and trims before comparison.
+### `interactionValidation.ts`
+- `isValidUUID(uuid)` -- UUID regex check
+- `isValidInteractionType(type)` -- 'poke' or 'kiss'
+- `validatePartnerId(partnerId)` -- Non-null + UUID
+- `validateInteraction(partnerId, type)` -- Combined validation
+- `sanitizeInput(input)` -- Trim + 500 char limit
 
-**Error handling:** Invalid messages are skipped (not counted as errors). Parse failures stop migration. Individual message failures are logged and tracked in `errors` array.
+### `deterministicRandom.ts`
+- `generateDeterministicNumbers(seed, count, min?, max?)` -- FNV-1a hash + mulberry32 PRNG
 
----
+### `storageMonitor.ts`
+- `getLocalStorageUsage()` -- Byte count estimate
+- `getStorageQuotaInfo()` -- Usage %, warning levels (safe/warning/critical)
+- `logStorageQuota()` -- Dev console output
+- `hasStorageSpace(bytes, margin?)` -- Space check
 
-## PerformanceMonitor
+### `performanceMonitoring.ts`
+- `measureScrollPerformance()` -- PerformanceObserver for frame drops
+- `measureMemoryUsage()` -- Chrome `performance.memory` API
 
-**Singleton:** `export const performanceMonitor = new PerformanceMonitor()`
-
-Tracks operation execution times using the Web Performance API (`performance.now()`). Stores metrics in an internal `Map<string, PerformanceMetric>`.
-
-### Types
-
-```typescript
-interface PerformanceMetric {
-  name: string;
-  count: number;
-  avgDuration: number; // ms
-  minDuration: number; // ms
-  maxDuration: number; // ms
-  totalDuration: number; // ms
-  lastRecorded: number; // Date.now() timestamp
-}
-```
-
-### Methods
-
-#### `measureAsync<T>(name: string, operation: () => Promise<T>): Promise<T>`
-
-Wraps an async operation and records its execution time. Failed operations are not recorded in metrics (error is re-thrown).
-
-**Used by:** `PhotoStorageService.create()`, `PhotoStorageService.getAll()`, `PhotoStorageService.getPage()`
-
----
-
-#### `recordMetric(name: string, duration: number): void`
-
-Records a custom metric value. Updates running statistics (count, avg, min, max, total). Logs in dev mode.
-
----
-
-#### `getMetrics(name: string): PerformanceMetric | undefined`
-
-Returns metrics for a specific operation name.
-
----
-
-#### `getAllMetrics(): Map<string, PerformanceMetric>`
-
-Returns a copy of all recorded metrics.
-
----
-
-#### `clear(): void`
-
-Clears all recorded metrics.
-
----
-
-#### `getReport(): string`
-
-Generates a human-readable report string sorted by total duration (slowest operations first). Format:
-
-```
-Performance Metrics Report
-==================================================
-
-photo-create:
-  count: 5
-  avg: 23.45ms
-  min: 12.30ms
-  max: 45.67ms
-  total: 117.25ms
-```
+### Other Utils
+- `haptics.ts` -- Vibration API wrapper
+- `moodEmojis.ts` -- Mood type to emoji mapping
+- `moodGrouping.ts` -- Group moods by date ranges
+- `calendarHelpers.ts` -- Calendar view date math
+- `countdownService.ts` -- Anniversary countdown logic
+- `themes.ts` -- Theme color configurations

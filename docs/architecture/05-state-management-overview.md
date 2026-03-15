@@ -2,7 +2,7 @@
 
 ## Zustand Store Architecture
 
-The entire application state is managed by a single Zustand store composed from 10 domain-specific slices. The store is defined in `src/stores/useAppStore.ts` and wrapped with the `persist` middleware for selective localStorage persistence.
+The entire application state is managed by a single Zustand store composed from 11 domain-specific slices. The store is defined in `src/stores/useAppStore.ts` and wrapped with the `persist` middleware for selective localStorage persistence.
 
 ### Store Type System
 
@@ -10,24 +10,24 @@ The central type file (`src/stores/types.ts`) defines:
 
 ```typescript
 // AppState is the intersection of all slice interfaces
-export type AppState = AppSlice &
-  SettingsSlice &
-  NavigationSlice &
-  MessagesSlice &
-  MoodSlice &
-  InteractionsSlice &
-  PartnerSlice &
-  NotesSlice &
-  PhotosSlice &
-  ScriptureReadingSlice;
+export interface AppState extends
+  AppSlice,
+  AuthSlice,
+  MessagesSlice,
+  PhotosSlice,
+  SettingsSlice,
+  NavigationSlice,
+  MoodSlice,
+  InteractionsSlice,
+  PartnerSlice,
+  NotesSlice,
+  ScriptureSlice {}
+
+// Middleware tuple -- single source of truth
+export type AppMiddleware = [['zustand/persist', unknown]];
 
 // Slice creator type with persist middleware support
-export type AppStateCreator<T> = StateCreator<
-  AppState,
-  [['zustand/persist', Partial<AppState>]],
-  [],
-  T
->;
+export type AppStateCreator<Slice> = StateCreator<AppState, AppMiddleware, [], Slice>;
 ```
 
 The `AppSlice` interface is defined in `types.ts` (not in `appSlice.ts`) to prevent circular imports, since all slices need to reference the full `AppState` type.
@@ -36,16 +36,19 @@ The `AppSlice` interface is defined in `types.ts` (not in `appSlice.ts`) to prev
 
 | Slice                   | File                       | Persisted                       | Cross-Slice Deps              |
 | ----------------------- | -------------------------- | ------------------------------- | ----------------------------- |
-| `AppSlice`              | `appSlice.ts`              | No                              | None                          |
-| `SettingsSlice`         | `settingsSlice.ts`         | Yes (`settings`, `isOnboarded`) | MessagesSlice (initializeApp) |
-| `NavigationSlice`       | `navigationSlice.ts`       | No                              | None                          |
-| `MessagesSlice`         | `messagesSlice.ts`         | Yes (`messageHistory`)          | SettingsSlice (read settings) |
-| `MoodSlice`             | `moodSlice.ts`             | Yes (`moods`)                   | None                          |
-| `InteractionsSlice`     | `interactionsSlice.ts`     | No                              | None                          |
-| `PartnerSlice`          | `partnerSlice.ts`          | No                              | None                          |
-| `NotesSlice`            | `notesSlice.ts`            | No                              | None                          |
-| `PhotosSlice`           | `photosSlice.ts`           | No                              | None                          |
-| `ScriptureReadingSlice` | `scriptureReadingSlice.ts` | No                              | None                          |
+| `AppSlice`              | `appSlice.ts`              | No                              | None                                                 |
+| `AuthSlice`             | `authSlice.ts`             | No                              | None (populated by App.tsx onAuthStateChange)        |
+| `SettingsSlice`         | `settingsSlice.ts`         | Yes (`settings`, `isOnboarded`) | MessagesSlice (initializeApp)                        |
+| `NavigationSlice`       | `navigationSlice.ts`       | No                              | None                                                 |
+| `MessagesSlice`         | `messagesSlice.ts`         | Yes (`messageHistory`)          | SettingsSlice (read settings)                        |
+| `MoodSlice`             | `moodSlice.ts`             | Yes (`moods`)                   | None                                                 |
+| `InteractionsSlice`     | `interactionsSlice.ts`     | No                              | None                                                 |
+| `PartnerSlice`          | `partnerSlice.ts`          | No                              | None                                                 |
+| `NotesSlice`            | `notesSlice.ts`            | No                              | None                                                 |
+| `PhotosSlice`           | `photosSlice.ts`           | No                              | None                                                 |
+| `ScriptureReadingSlice` | `scriptureReadingSlice.ts` | No                              | None                                                 |
+
+The `AuthSlice` was introduced to centralize user identity (`userId`, `userEmail`, `isAuthenticated`). All slices can synchronously read `get().userId` instead of making async auth calls. It is populated by `App.tsx` via `onAuthStateChange` and is NOT persisted (derived from Supabase session on each app load).
 
 ### Persistence Configuration
 

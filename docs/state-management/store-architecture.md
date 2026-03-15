@@ -2,13 +2,17 @@
 
 ## Store Creation
 
-The Zustand store is created in `src/stores/useAppStore.ts` using `create<AppState>()` with the `persist` middleware. All 10 slices are composed by spreading their creators:
+The Zustand store is created in `src/stores/useAppStore.ts` using `create<AppState>()` with the `persist` middleware. All 11 slices are composed by spreading their creators:
 
 ```typescript
 export const useAppStore = create<AppState>()(
   persist(
     (set, get, api) => ({
+      // AppSlice FIRST - owns core state (isLoading, error, __isHydrated)
       ...createAppSlice(set, get, api),
+      // AuthSlice - single source of truth for user identity
+      ...createAuthSlice(set, get, api),
+      // Compose all other slices
       ...createMessagesSlice(set, get, api),
       ...createPhotosSlice(set, get, api),
       ...createSettingsSlice(set, get, api),
@@ -26,14 +30,14 @@ export const useAppStore = create<AppState>()(
 );
 ```
 
-AppSlice is spread first because it owns core state fields (`isLoading`, `error`, `__isHydrated`).
+AppSlice is spread first because it owns core state fields (`isLoading`, `error`, `__isHydrated`). AuthSlice is spread second as all other slices read `userId` from it synchronously.
 
 ## Type System
 
 All types are centralized in `src/stores/types.ts`:
 
 - **`AppSlice`** -- Interface for core app state. Defined in `types.ts` (not `appSlice.ts`) to avoid circular imports.
-- **`AppState`** -- Intersection of all 10 slice interfaces: `AppSlice & MessagesSlice & PhotosSlice & SettingsSlice & NavigationSlice & MoodSlice & InteractionsSlice & PartnerSlice & NotesSlice & ScriptureSlice`.
+- **`AppState`** -- Intersection of all 11 slice interfaces: `AppSlice & AuthSlice & MessagesSlice & PhotosSlice & SettingsSlice & NavigationSlice & MoodSlice & InteractionsSlice & PartnerSlice & NotesSlice & ScriptureSlice`.
 - **`AppMiddleware`** -- Tuple type `[['zustand/persist', unknown]]` for persist middleware.
 - **`AppStateCreator<Slice>`** -- Generic helper: `StateCreator<AppState, AppMiddleware, [], Slice>`. All slices use this for type-safe creation.
 

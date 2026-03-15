@@ -36,19 +36,23 @@ The `shownMessages` field is a `Map` at runtime but serialized as an array of `[
 
 ## Actions
 
-| Action                | Signature                                                          | Description                              |
-| --------------------- | ------------------------------------------------------------------ | ---------------------------------------- |
-| `loadMessages`        | `() => Promise<void>`                                              | Loads messages from IndexedDB into state |
-| `setCurrentMessage`   | `(message: Message) => void`                                       | Sets the currently displayed message     |
-| `markMessageShown`    | `(messageId: string) => void`                                      | Records message as shown with timestamp  |
-| `toggleFavorite`      | `(messageId: string) => void`                                      | Adds/removes message from favorites      |
-| `navigateMessage`     | `(direction: 'next' \| 'prev') => void`                            | Navigate to next/previous message        |
-| `loadCustomMessages`  | `() => Promise<void>`                                              | Loads custom messages from IndexedDB     |
-| `createCustomMessage` | `(message: CreateCustomMessageInput) => Promise<void>`             | Creates a custom message in IndexedDB    |
-| `updateCustomMessage` | `(id: string, updates: UpdateCustomMessageInput) => Promise<void>` | Updates a custom message                 |
-| `deleteCustomMessage` | `(id: string) => Promise<void>`                                    | Deletes a custom message from IndexedDB  |
-| `importMessages`      | `(messages: Message[]) => Promise<void>`                           | Bulk import messages to IndexedDB        |
-| `exportMessages`      | `() => Promise<Message[]>`                                         | Export all messages from IndexedDB       |
+| Action                      | Signature                                                        | Description                                     |
+| --------------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| `loadMessages`              | `() => Promise<void>`                                            | Loads messages from IndexedDB into state        |
+| `addMessage`                | `(text: string, category: Message['category']) => Promise<void>` | Adds a new message to IndexedDB and state       |
+| `toggleFavorite`            | `(messageId: number) => Promise<void>`                           | Toggles message favorite status in IndexedDB    |
+| `updateCurrentMessage`      | `() => void`                                                     | Recalculates current message from rotation pool |
+| `navigateToPreviousMessage` | `() => void`                                                     | Navigate to previous day's message              |
+| `navigateToNextMessage`     | `() => void`                                                     | Navigate to next day's message (toward today)   |
+| `canNavigateBack`           | `() => boolean`                                                  | Check if backward navigation is available       |
+| `canNavigateForward`        | `() => boolean`                                                  | Check if forward navigation is available        |
+| `loadCustomMessages`        | `() => Promise<void>`                                            | Loads custom messages from IndexedDB            |
+| `createCustomMessage`       | `(input: CreateMessageInput) => Promise<void>`                   | Creates a custom message in IndexedDB           |
+| `updateCustomMessage`       | `(input: UpdateMessageInput) => Promise<void>`                   | Updates a custom message                        |
+| `deleteCustomMessage`       | `(id: number) => Promise<void>`                                  | Deletes a custom message from IndexedDB         |
+| `getCustomMessages`         | `(filter?: MessageFilter) => CustomMessage[]`                    | Returns filtered custom messages (synchronous)  |
+| `exportCustomMessages`      | `() => Promise<void>`                                            | Exports custom messages as JSON download        |
+| `importCustomMessages`      | `(file: File) => Promise<{ imported: number; skipped: number }>` | Imports custom messages from JSON file          |
 
 ## Persistence Details
 

@@ -35,22 +35,25 @@ interface SyncStatus {
 
 ## Actions
 
-| Action             | Signature                                 | Description                                            |
-| ------------------ | ----------------------------------------- | ------------------------------------------------------ |
-| `addMood`          | `(mood: MoodType, note?: string) => void` | Creates a mood entry locally                           |
-| `deleteMood`       | `(id: string) => void`                    | Removes a mood entry                                   |
-| `syncMoods`        | `() => Promise<void>`                     | Syncs pending moods to Supabase                        |
-| `loadPartnerMoods` | `() => Promise<void>`                     | Fetches partner moods from Supabase                    |
-| `setOnlineStatus`  | `(isOnline: boolean) => void`             | Updates network status, triggers sync when back online |
-| `getMoodsByDate`   | `(date: string) => MoodEntry[]`           | Returns moods for a specific date                      |
+| Action                  | Signature                                                                    | Description                                        |
+| ----------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `addMoodEntry`          | `(moods: MoodEntry['mood'][], note?: string) => Promise<void>`               | Creates a mood entry (multi-select), triggers sync |
+| `getMoodForDate`        | `(date: string) => MoodEntry \| undefined`                                   | Returns mood for a specific date                   |
+| `updateMoodEntry`       | `(date: string, moods: MoodEntry['mood'][], note?: string) => Promise<void>` | Updates existing mood entry                        |
+| `loadMoods`             | `() => Promise<void>`                                                        | Loads all moods from IndexedDB                     |
+| `updateSyncStatus`      | `() => Promise<void>`                                                        | Refreshes pending/online status                    |
+| `syncPendingMoods`      | `() => Promise<{ synced: number; failed: number }>`                          | Syncs all pending moods to Supabase                |
+| `fetchPartnerMoods`     | `(limit?: number) => Promise<void>`                                          | Fetches partner moods from Supabase                |
+| `getPartnerMoodForDate` | `(date: string) => MoodEntry \| undefined`                                   | Returns partner's mood for a specific date         |
 
 ## Offline-First Pattern
 
-1. `addMood()` creates entry locally and adds to `pendingMoods`
-2. If online, immediately calls `syncMoods()`
-3. If offline, moods stay in `pendingMoods` until reconnect
-4. `setOnlineStatus(true)` triggers automatic sync of pending moods
-5. Failed syncs keep entries in `pendingMoods` for retry
+1. `addMoodEntry()` creates entry via `moodService.create()` in IndexedDB (validates with `MoodEntrySchema`)
+2. Optimistic UI update -- adds to state immediately
+3. If online, immediately calls `syncPendingMoods()` (fire-and-forget)
+4. If offline, registers background sync via service worker
+5. `syncPendingMoods()` calls `moodSyncService.syncPendingMoods()`, then reloads moods and refreshes partner moods
+6. Failed syncs are retried on next sync cycle (App.tsx has 5-minute periodic sync)
 
 ## Validation
 
@@ -58,4 +61,4 @@ Mood entries are validated with Zod schemas before storage and sync. Timestamps 
 
 ## Cross-Slice Dependencies
 
-None. Operates independently.
+- **Reads:** `AuthSlice` (via `get().userId` in `addMoodEntry`, `updateMoodEntry` for user identity)

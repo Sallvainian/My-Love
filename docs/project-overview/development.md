@@ -30,7 +30,7 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 | `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                 |
 | `npm run preview`   | Preview production build locally                                    |
 | `npm run build`     | Production build: `tsc -p tsconfig.app.json && vite build`          |
-| `npm run typecheck` | TypeScript type check: `tsc --noEmit`                               |
+| `npm run typecheck` | TypeScript type check: `tsc -b --force` (project references mode)  |
 
 ### Code Quality
 
@@ -102,7 +102,7 @@ npx playwright test --grep "mood tracker"
 - **ESLint**: `no-explicit-any` is enforced as an error
 - **Prettier**: Uses `prettier-plugin-tailwindcss` for Tailwind class sorting
 - **Secrets**: Managed via [fnox](https://fnox.jdx.dev) with age encryption provider; encrypted ciphertext committed in `fnox.toml`
-- **CI workflows**: Located in `.github/workflows/` -- 18 workflows covering deploy, test, migrations, code review, security, and AI assistance
+- **CI workflows**: Located in `.github/workflows/` -- 19 workflows covering deploy, test, migrations, code review, security, and AI assistance
 - **Base path**: Production uses `/My-Love/`, development uses `/`
 - **Module system**: ESM (`"type": "module"` in `package.json`)
 - **Browser target**: `defaults and supports es6-module`

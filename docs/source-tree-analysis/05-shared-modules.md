@@ -6,7 +6,7 @@ Cross-cutting modules that are used by multiple features and form the backbone o
 
 ### `src/stores/useAppStore.ts` -- Central State Store
 
-Used by every component and hook. Composes 10 slices into a single Zustand store with persist middleware. Custom storage handles `Map` serialization for `messageHistory.shownMessages`.
+Used by every component and hook. Composes 11 slices into a single Zustand store with persist middleware. Custom storage handles `Map` serialization for `messageHistory.shownMessages`.
 
 **Consumers**: All components via `useAppStore()`, E2E tests via `window.__APP_STORE__`
 
@@ -27,6 +27,22 @@ Abstract class providing CRUD operations for all IndexedDB services. Implements 
 Defines `MyLoveDBSchema` (8 stores), `DB_NAME`, `DB_VERSION`, and the centralized `upgradeDb()` migration function. The service worker duplicates this logic in `sw-db.ts`.
 
 **Consumers**: All IndexedDB services, `sw-db.ts` (duplicated for SW context)
+
+### `src/utils/logger.ts` -- Centralized Logging
+
+Introduced in the 2026-03-13 refactor, replacing raw `console.log`/`info`/`debug` across 48+ source files. Enforces the ESLint `no-console` rule while preserving operational logging:
+
+- `logger.debug(...)` -- DEV only. Verbose tracing.
+- `logger.info(...)` -- Always logs. Operational events.
+- `logger.log(...)` -- Always logs. General-purpose.
+
+**Consumers**: Nearly every file in `src/api/`, `src/services/`, `src/stores/slices/`, `src/hooks/`, and `src/components/`. The `sw.ts` service worker does NOT use logger (uses raw `console.log` since `import.meta.env.DEV` is unavailable in SW context).
+
+### `src/api/realtimeChannel.ts` -- Private Channel Auth Setup
+
+Shared utility for subscribing to private Supabase Realtime channels. Extracts the duplicated auth+channel setup pattern from `useScriptureBroadcast` and `useScripturePresence` into a single reusable function.
+
+**Consumers**: `useScriptureBroadcast.ts`, `useScripturePresence.ts`
 
 ## Validation Modules
 
@@ -138,7 +154,7 @@ TypeScript types generated from the Supabase database schema. Contains table row
 
 ### `src/stores/types.ts` -- Store Types
 
-`AppState` (intersection of all 10 slices), `AppSlice`, `AppStateCreator<T>`, `AppMiddleware`.
+`AppState` (intersection of all 11 slices), `AppSlice`, `AppStateCreator<T>`, `AppMiddleware`.
 
 **Consumers**: All 10 slice files, `useAppStore.ts`
 

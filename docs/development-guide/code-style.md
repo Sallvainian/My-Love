@@ -59,6 +59,7 @@ ESLint 9 with flat config (`eslint.config.js`). No `.eslintrc` file.
 | `eslint-plugin-react-hooks`   | All recommended rules enabled. `set-state-in-effect` and `purity` downgraded to `warn` for legitimate patterns (blob URL lifecycle, timer setup, animation randomization). |
 | `eslint-plugin-react-refresh` | `only-export-components` as warning, with `allowConstantExport: true`                                                                                                      |
 | `typescript-eslint`           | `no-explicit-any`: error. `no-unused-vars`: error with `_` prefix ignore pattern for args, vars, and caught errors.                                                        |
+| Built-in                      | `no-console`: error (allows `console.warn` and `console.error`). Use the `logger` utility instead of `console.log/info/debug`. See [Logger Utility](#logger-utility).       |
 
 ### Architectural Guardrails (ESLint-Enforced)
 
@@ -90,7 +91,11 @@ Container components must go through Zustand slice actions for all data operatio
 - `sourceType: 'commonjs'`
 - `no-require-imports` disabled
 
-**Test files (`tests/**`, `_.test._`, `_.spec._`)\*\*:
+**Service worker files (`src/sw.ts`, `src/sw-db.ts`)**:
+
+- `no-console` disabled (service workers run outside the window context and cannot use the logger utility)
+
+**Test files (`tests/**`, `*.test.*`, `*.spec.*`)**:
 
 - Both browser and Node globals enabled
 - `rules-of-hooks` disabled (test fixtures may use hooks unconventionally)
@@ -101,6 +106,7 @@ Container components must go through Zustand slice actions for all data operatio
 - `no-unused-expressions` disabled (tests may have expressions for side effects)
 - `no-restricted-syntax` disabled (tests may inspect store state directly)
 - `no-restricted-properties` disabled (tests may inspect store state directly)
+- `no-console` disabled (test output and diagnostics use console.log intentionally)
 
 **Scripture Reading feature** (`src/services/scriptureReadingService.ts`, `src/stores/slices/scriptureReadingSlice.ts`, `src/hooks/useScriptureBroadcast.ts`, `src/components/scripture-reading/**`):
 
@@ -186,6 +192,43 @@ playwright-report/
 test-results/
 ```
 
+## Logger Utility
+
+The project enforces `no-console` as an ESLint error across all production source code (with `console.warn` and `console.error` still allowed). Instead of using `console.log`, `console.info`, or `console.debug` directly, use the `logger` utility at `src/utils/logger.ts`:
+
+```typescript
+import { logger } from '../utils/logger';
+
+// DEV only -- verbose tracing, flow debugging (stripped in production)
+logger.debug('Subscription channel:', channelName);
+
+// Always logs -- operational events (sync completed, subscribed, etc.)
+logger.info('Mood sync completed', { count: 5 });
+
+// Always logs -- general purpose
+logger.log('Session started');
+```
+
+### Logger API
+
+| Method         | Behavior                                                    |
+| -------------- | ----------------------------------------------------------- |
+| `logger.debug` | Calls `console.debug()` only when `import.meta.env.DEV` is true (development mode). Silent in production builds. |
+| `logger.info`  | Calls `console.info()` in all environments.                 |
+| `logger.log`   | Calls `console.log()` in all environments.                  |
+
+The logger file itself uses `/* eslint-disable no-console */` since it is the sanctioned wrapper for console output.
+
+### Exceptions
+
+- **Service worker files** (`src/sw.ts`, `src/sw-db.ts`): `no-console` is disabled because the service worker runs outside the window context and cannot import the logger utility.
+- **Test files**: `no-console` is disabled for test output and diagnostics.
+- **Scripts** (`scripts/`): Excluded from ESLint entirely.
+
+### Migration Notes
+
+As of the 2026-03-13 scan, all 48 source files that previously used `console.log/info/debug` have been migrated to use the `logger` utility. The `@/utils/logger` path alias was replaced with relative paths for Vite build compatibility.
+
 ## Naming and Import Conventions
 
 ### Self-Documenting Code
@@ -211,7 +254,7 @@ const flag = p?.id !== undefined;
 
 ### State Management
 
-Zustand with one slice per domain area (10 slices). The main store is composed in `src/stores/useAppStore.ts`.
+Zustand with one slice per domain area (11 slices). The main store is composed in `src/stores/useAppStore.ts`.
 
 ### Validation
 
