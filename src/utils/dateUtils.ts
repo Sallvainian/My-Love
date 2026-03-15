@@ -187,8 +187,9 @@ export function isSameDay(date1: Date, date2: Date): boolean {
 export function isPast(date: Date): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  return date < today;
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d < today;
 }
 
 /**
@@ -197,8 +198,9 @@ export function isPast(date: Date): boolean {
 export function isFuture(date: Date): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  return date > today;
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d > today;
 }
 
 // ─── Date Arithmetic ─────────────────────────────────────────────────
@@ -225,9 +227,10 @@ export function addDays(date: Date, days: number): Date {
 export function getDaysUntil(targetDate: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  targetDate.setHours(0, 0, 0, 0);
+  const target = new Date(targetDate);
+  target.setHours(0, 0, 0, 0);
 
-  const diff = targetDate.getTime() - today.getTime();
+  const diff = target.getTime() - today.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -237,9 +240,10 @@ export function getDaysUntil(targetDate: Date): number {
 export function getDaysSince(pastDate: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  pastDate.setHours(0, 0, 0, 0);
+  const past = new Date(pastDate);
+  past.setHours(0, 0, 0, 0);
 
-  const diff = today.getTime() - pastDate.getTime();
+  const diff = today.getTime() - past.getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
