@@ -60,7 +60,7 @@ export default tseslint.config(
       ],
 
       // Warn on console.log in production code (console.warn/error are allowed)
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': ['error', { allow: ['warn', 'error'] }],
 
       // Disable problematic rules
       'no-useless-catch': 'off',
