@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useShallow } from 'zustand/react/shallow';
 import { supabase } from '../api/supabaseClient';
+import { subscribePrivateChannel } from '../api/realtimeChannel';
 import { useAppStore } from '../stores/useAppStore';
 import type { StateUpdatePayload } from '../stores/slices/scriptureReadingSlice';
 import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
@@ -150,15 +151,8 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
     // Set auth before subscribing (required for private channels).
     // Fetch the current user's ID here so the partner_joined payload satisfies the event contract.
-    void supabase.realtime
-      .setAuth()
-      .then(async () => {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) {
-          throw authError;
-        }
-        const userId = authData.user?.id ?? '';
-
+    subscribePrivateChannel({
+      onReady: (userId) => {
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
             // Story 4.3: If this is a re-subscribe after error, resync state
@@ -229,15 +223,16 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             }
           }
         });
-      })
-      .catch((err: unknown) => {
+      },
+      onError: (err) => {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SYNC_FAILED,
           message: err instanceof Error ? err.message : 'Failed to authenticate broadcast channel',
           details: err,
         };
         handleScriptureError(scriptureError);
-      });
+      },
+    });
 
     return () => {
       // Clear broadcast function so slice actions don't try to broadcast on a dead channel

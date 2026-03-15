@@ -9,18 +9,13 @@
 import { test, expect } from '../support/merged-fixtures';
 import { createTestSession, cleanupTestSession } from '../support/factories';
 import { getUserAccessToken } from '../support/helpers/supabase';
-import { faker } from '@faker-js/faker';
+import { generateReflectionNote } from '../support/helpers/reflection';
 import { z } from 'zod';
 import {
   SupabaseSessionSchema,
   SupabaseBookmarkSchema,
   SupabaseMessageSchema,
 } from '../../src/validation/schemas';
-
-/** Generate a dynamic reflection note for test isolation. */
-function generateReflectionNote(prefix = 'test'): string {
-  return `${prefix}-${faker.lorem.sentence()}`;
-}
 
 test.describe('Scripture Reflection API - Story 2.3', () => {
   // ============================================

@@ -23,12 +23,12 @@ import { waitForScriptureRpc, waitForScriptureStore } from '../../support/helper
 // ---------------------------------------------------------------------------
 
 test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
+  test.use({ timeout: 60_000 });
+
   test('[P2] should announce "Session starting in 3 seconds" via aria-live assertive when countdown begins', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
-    test.setTimeout(60_000);
-
     // GIVEN: User A navigates to Together mode and selects Reader role
     const userASelectRole = waitForScriptureRpc(page, 'scripture_select_role');
     await page.getByTestId('lobby-role-reader').click();
@@ -80,12 +80,12 @@ test.describe('[4.1-E2E-003] Countdown Aria-Live Announcements', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
+  test.use({ timeout: 60_000 });
+
   test('[P2] should announce partner ready state via aria-live polite region when partner toggles ready', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
-    test.setTimeout(60_000);
-
     // GIVEN: User A navigates to Together mode and selects Reader role
     const userASelectRole = waitForScriptureRpc(page, 'scripture_select_role');
     await page.getByTestId('lobby-role-reader').click();
@@ -134,12 +134,12 @@ test.describe('[4.1-E2E-004] Ready State Aria-Live Announcement', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.1-E2E-005] Language Compliance', () => {
+  test.use({ timeout: 30_000 });
+
   test('[P2] should display "Continue solo" button and non-accusatory waiting language in lobby', async ({
     page,
     supabaseAdmin,
   }) => {
-    test.setTimeout(30_000);
-
     // SETUP: Create session (single user — no partner needed for language check)
     const seed = await createTestSession(supabaseAdmin, { sessionCount: 1 });
     const sessionIdsToClean = [...seed.session_ids];

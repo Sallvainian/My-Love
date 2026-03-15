@@ -26,12 +26,12 @@ import { waitForScriptureRpc, waitForScriptureStore } from '../../support/helper
 // ---------------------------------------------------------------------------
 
 test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
+  test.use({ timeout: 60_000 });
+
   test('[P0] should complete full lobby flow: role selection → both ready → countdown → verse', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
-    test.setTimeout(60_000);
-
     // AC#1 — Role selection screen present with Reader and Responder cards
     await expect(page.getByTestId('lobby-role-selection')).toBeVisible();
     await expect(page.getByTestId('lobby-role-reader')).toBeVisible();
@@ -125,12 +125,12 @@ test.describe('[4.1-E2E-001] Full Together-Mode Lobby Flow', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.1-E2E-002] Continue Solo Fallback', () => {
+  test.use({ timeout: 30_000 });
+
   test('[P1] should convert together-mode session to solo when user taps "Continue solo"', async ({
     page,
     supabaseAdmin,
   }) => {
-    test.setTimeout(30_000);
-
     // SETUP: Create session; user is authenticated via workerStorageStatePath (auto-applied)
     const seed = await createTestSession(supabaseAdmin, {
       sessionCount: 1,
@@ -204,13 +204,13 @@ test.describe(
   '[4.1-ERR-001] Role Selection 500 Rollback',
   { annotation: [{ type: 'skipNetworkMonitoring' }] },
   () => {
+    test.use({ timeout: 30_000 });
+
     test('should rollback role selection when RPC fails with 500', async ({
       page,
       interceptNetworkCall,
       supabaseAdmin,
     }) => {
-      test.setTimeout(30_000);
-
       // SETUP: Create session so the overview has no stale resume state
       const seed = await createTestSession(supabaseAdmin, { sessionCount: 1 });
       const sessionIdsToClean = [...seed.session_ids];

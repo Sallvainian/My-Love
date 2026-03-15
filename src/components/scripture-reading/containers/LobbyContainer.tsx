@@ -18,7 +18,6 @@ import type { ReactElement } from 'react';
 import { ArrowLeft, BookOpen, MessageCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
-
 import { Countdown } from '../session/Countdown';
 import { FOCUS_RING, scriptureTheme } from '../constants';
 
