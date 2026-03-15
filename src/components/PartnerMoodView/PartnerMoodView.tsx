@@ -28,7 +28,7 @@ import type { MoodEntry } from '../../types';
 import { PARTNER_NAME } from '../../config/constants';
 import { moodSyncService } from '../../api/moodSyncService';
 import { PokeKissInterface } from '../PokeKissInterface';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {

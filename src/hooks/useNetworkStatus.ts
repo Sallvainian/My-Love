@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 export interface NetworkStatus {
   /** True when browser reports network connection available */

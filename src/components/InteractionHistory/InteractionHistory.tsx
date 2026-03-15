@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Hand, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 import type { Interaction } from '../../types';
 
 interface InteractionHistoryProps {

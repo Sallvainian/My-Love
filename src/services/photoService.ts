@@ -20,7 +20,7 @@
  */
 
 import { supabase } from '../api/supabaseClient';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Photo metadata as stored in Supabase database

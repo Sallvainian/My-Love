@@ -2,7 +2,7 @@ import { supabase } from '../supabaseClient';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import type { AuthError } from '@supabase/supabase-js';
 import type { AuthCredentials, AuthResult } from './types';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> => {
   try {

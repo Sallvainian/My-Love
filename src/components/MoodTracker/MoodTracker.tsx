@@ -32,7 +32,7 @@ import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandle
 import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {

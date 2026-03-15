@@ -9,7 +9,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 // Re-export Database type for convenience
 export type { Database } from '../types/database.types';

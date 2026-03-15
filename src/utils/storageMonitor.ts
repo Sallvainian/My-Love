@@ -8,7 +8,7 @@
  * Owner: Winston (Architect)
  */
 
-import { logger } from '@/utils/logger';
+import { logger } from './logger';
 
 export interface StorageQuotaInfo {
   used: number;

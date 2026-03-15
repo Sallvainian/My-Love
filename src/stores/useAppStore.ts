@@ -12,7 +12,7 @@ import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createPartnerSlice } from './slices/partnerSlice';
 import { createNotesSlice } from './slices/notesSlice';
 import { createScriptureReadingSlice } from './slices/scriptureReadingSlice';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 // Re-export AppState for consumers
 export type { AppState } from './types';

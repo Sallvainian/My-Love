@@ -7,7 +7,7 @@ import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
 import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../config/performance';
 import { performanceMonitor } from './performanceMonitor';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Photo Storage Service - IndexedDB CRUD operations for photos

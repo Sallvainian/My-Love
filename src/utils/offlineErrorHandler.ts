@@ -12,7 +12,7 @@
  * - No offline queue for writes - fail immediately with retry option
  */
 
-import { logger } from '@/utils/logger';
+import { logger } from './logger';
 
 /**
  * Custom error class for offline operation failures

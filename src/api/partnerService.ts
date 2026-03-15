@@ -13,7 +13,7 @@
  */
 
 import { supabase } from './supabaseClient';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 export interface UserSearchResult {
   id: string;

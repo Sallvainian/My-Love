@@ -1,6 +1,6 @@
 import type { DBSchema, IDBPDatabase } from 'idb';
 import type { MoodEntry, Message, Photo } from '../types';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Auth token stored for Background Sync SW access

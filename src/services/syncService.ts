@@ -12,7 +12,7 @@ import { moodService } from './moodService';
 import { moodApi } from '../api/moodApi';
 import type { MoodEntry } from '../types';
 import type { MoodInsert } from '../api/validation/supabaseSchemas';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Sync result for a single mood entry

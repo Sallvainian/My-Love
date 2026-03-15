@@ -19,7 +19,7 @@ import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import { Loader2 } from 'lucide-react';
 import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateUtils';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 import type { LoveNote } from '../../types/models';
 import { getSignedImageUrl } from '../../services/loveNoteImageService';
 import { FullScreenImageViewer } from './FullScreenImageViewer';

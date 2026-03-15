@@ -4,7 +4,7 @@ import { CreateMessageInputSchema } from '../validation/schemas';
 import { isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Migration Service - One-time migration from LocalStorage to IndexedDB

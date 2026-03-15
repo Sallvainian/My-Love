@@ -1,7 +1,7 @@
 import { supabase } from '../api/supabaseClient';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { SupabaseMood } from '../api/validation/supabaseSchemas';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 type MoodChangeCallback = (mood: SupabaseMood) => void;
 type ErrorCallback = (error: Error) => void;

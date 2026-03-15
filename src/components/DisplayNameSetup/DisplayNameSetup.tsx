@@ -16,7 +16,7 @@
 import { useState, type FormEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { supabase } from '../../api/supabaseClient';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 import './DisplayNameSetup.css';
 
 export interface DisplayNameSetupProps {

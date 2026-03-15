@@ -1,6 +1,6 @@
 import type { CompressionOptions, CompressionResult } from '../types';
 import { IMAGE_COMPRESSION, IMAGE_VALIDATION } from '../config/images';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Image Compression Service - Client-side image compression using Canvas API

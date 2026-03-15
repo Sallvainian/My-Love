@@ -17,7 +17,7 @@ import { isOnline, handleNetworkError } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import type { MoodEntry } from '../types';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Supabase mood record type (using validated schema)

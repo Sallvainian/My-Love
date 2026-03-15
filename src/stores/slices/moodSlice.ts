@@ -20,7 +20,7 @@ import type { MoodEntry } from '../../types';
 import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 export interface MoodSlice {
   // State

@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { authService } from '../../api/authService';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 import { AnniversarySettings } from './AnniversarySettings';
 import './Settings.css';
 

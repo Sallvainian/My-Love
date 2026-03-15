@@ -13,7 +13,7 @@ import {
 } from '../../utils/calendarHelpers';
 import { MoodDetailModal } from './MoodDetailModal';
 import { CalendarDay } from './CalendarDay';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 /**
  * Debounce delay for month navigation (Task 9: Performance optimization)

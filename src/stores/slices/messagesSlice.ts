@@ -24,7 +24,7 @@ import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
 import { getDailyMessage, getAvailableHistoryDays } from '../../utils/messageRotation';
 import { formatDateISO } from '../../utils/dateUtils';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 export interface MessagesSlice {
   // State

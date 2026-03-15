@@ -1,5 +1,5 @@
 import type { IDBPDatabase, DBSchema, StoreNames, StoreValue, StoreKey } from 'idb';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores

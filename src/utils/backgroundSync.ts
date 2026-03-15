@@ -7,7 +7,7 @@
  * Part of Hybrid Sync Solution (Part 2).
  */
 
-import { logger } from '@/utils/logger';
+import { logger } from './logger';
 
 /**
  * Register a background sync tag

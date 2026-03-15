@@ -12,7 +12,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { supabase } from '../api/supabaseClient';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { LoveNote } from '../types/models';
 

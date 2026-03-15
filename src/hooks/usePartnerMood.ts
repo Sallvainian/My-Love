@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { moodSyncService, type SupabaseMoodRecord } from '../api/moodSyncService';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 export interface UsePartnerMoodResult {
   partnerMood: SupabaseMoodRecord | null;

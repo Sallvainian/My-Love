@@ -8,7 +8,7 @@
  * @module utils/performanceMonitoring
  */
 
-import { logger } from '@/utils/logger';
+import { logger } from './logger';
 
 // Chrome-specific memory API (not in standard Performance interface)
 interface PerformanceMemory {

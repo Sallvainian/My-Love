@@ -7,7 +7,7 @@ import { APP_CONFIG } from '../../config/constants';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
 import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 interface DailyMessageProps {
   onShowWelcome?: () => void;

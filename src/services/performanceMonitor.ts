@@ -10,7 +10,7 @@
  *   console.log(performanceMonitor.getReport());
  */
 
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 interface PerformanceMetric {
   /** Operation name (e.g., 'db-read', 'photo-upload') */

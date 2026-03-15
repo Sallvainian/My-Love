@@ -20,7 +20,7 @@ import type { AppStateCreator } from '../types';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { InteractionService } from '../../api/interactionService';
 import { validateInteraction, INTERACTION_ERRORS } from '../../utils/interactionValidation';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 // Initialize interaction service singleton
 const interactionService = new InteractionService();

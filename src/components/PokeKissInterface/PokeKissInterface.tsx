@@ -25,7 +25,7 @@ import { Hand, History, Wind, Heart, X } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { getPartnerId } from '../../api/supabaseClient';
 import { InteractionHistory } from '../InteractionHistory';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 import type { Interaction } from '../../types';
 
 // Interaction animation type

@@ -19,7 +19,7 @@ import { setSentryUser, clearSentryUser } from './config/sentry';
 import type { Session } from '@supabase/supabase-js';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
-import { logger } from '@/utils/logger';
+import { logger } from './utils/logger';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>

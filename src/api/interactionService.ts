@@ -18,7 +18,7 @@ import {
   isPostgrestError,
 } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Supabase interaction record type (from database schema)

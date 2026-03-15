@@ -12,7 +12,7 @@ import {
   upgradeDb,
 } from './dbSchema';
 import { supabase } from '../api/supabaseClient';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 import {
   SupabaseSessionSchema,
   SupabaseReflectionSchema,

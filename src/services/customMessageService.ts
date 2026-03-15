@@ -16,7 +16,7 @@ import {
   isZodError,
 } from '../validation';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages

@@ -13,7 +13,7 @@
  */
 
 import type { AppStateCreator } from '../types';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 export type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 

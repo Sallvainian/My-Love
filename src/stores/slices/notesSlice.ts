@@ -22,7 +22,7 @@ import { supabase, getPartnerId } from '../../api/supabaseClient';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { uploadCompressedBlob } from '../../services/loveNoteImageService';
 import { NOTES_CONFIG } from '../../config/images';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 export interface NotesSlice {
   // State

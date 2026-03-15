@@ -24,7 +24,7 @@ import { APP_CONFIG } from '../../config/constants';
 import { SettingsSchema } from '../../validation/schemas';
 import { createValidationError, isZodError } from '../../validation/errorMessages';
 import { ZodError } from 'zod/v4';
-import { logger } from '@/utils/logger';
+import { logger } from '../../utils/logger';
 
 export interface SettingsSlice {
   // State
