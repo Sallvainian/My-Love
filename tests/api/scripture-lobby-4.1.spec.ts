@@ -49,8 +49,11 @@ async function seedLinkedPartners(supabaseAdmin: SupabaseClient) {
     user2Id,
     user1Token,
     cleanup: async () => {
-      await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
-      await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+      try {
+        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
+      } finally {
+        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+      }
     },
   };
 }
@@ -214,6 +217,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         const afterUser1 = await queryLobbyRow(supabaseAdmin, sessionId);
 
         expect(afterUser1.queryError).toBeNull();
+        expect(afterUser1.dbRow).toBeTruthy();
         expect(afterUser1.dbRow!.user1_ready).toBe(true);
         expect(afterUser1.dbRow!.user2_ready).toBe(false);
         expect(afterUser1.dbRow!.countdown_started_at).toBeNull();
@@ -237,6 +241,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         const afterBoth = await queryLobbyRow(supabaseAdmin, sessionId);
 
         expect(afterBoth.queryError).toBeNull();
+        expect(afterBoth.dbRow).toBeTruthy();
         expect(afterBoth.dbRow!.user1_ready).toBe(true);
         expect(afterBoth.dbRow!.user2_ready).toBe(true);
         expect(afterBoth.dbRow!.countdown_started_at).not.toBeNull();
