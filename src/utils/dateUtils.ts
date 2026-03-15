@@ -165,6 +165,30 @@ export function formatCountdown(days: number): string {
   return `${years} ${years === 1 ? 'year' : 'years'}`;
 }
 
+// ─── Relative Date (calendar-day) ────────────────────────────────────
+
+const relativeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+/**
+ * Format an ISO date string as a human-readable relative date
+ * using calendar-day boundaries (via getDaysSince), not wall-clock seconds.
+ *
+ * Examples: "today", "yesterday", "3 days ago", "2 months ago", "1 year ago"
+ */
+export function formatRelativeDate(isoString: string): string {
+  const date = new Date(isoString);
+  const days = getDaysSince(date);
+
+  if (days === 0) return relativeFormatter.format(0, 'day'); // "today"
+  if (days < 30) return relativeFormatter.format(-days, 'day');
+  if (days < 365) {
+    const months = Math.floor(days / 30);
+    return relativeFormatter.format(-months, 'month');
+  }
+  const years = Math.floor(days / 365);
+  return relativeFormatter.format(-years, 'year');
+}
+
 // ─── Date Comparison ─────────────────────────────────────────────────
 
 /**
