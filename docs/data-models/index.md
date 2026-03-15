@@ -20,4 +20,4 @@ For service layer functions, error handling, and sync logic, see [API Reference]
 
 ---
 
-*Generated: 2026-03-15 | Source: 24 SQL migrations, 207 source files*
+_Generated: 2026-03-15 | Source: 24 SQL migrations, 207 source files_

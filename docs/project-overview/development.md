@@ -30,7 +30,7 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 | `npm run dev:raw`   | Start Vite dev server directly (no cleanup wrapper)                 |
 | `npm run preview`   | Preview production build locally                                    |
 | `npm run build`     | Production build: `tsc -p tsconfig.app.json && vite build`          |
-| `npm run typecheck` | TypeScript type check: `tsc -b --force` (project references mode)  |
+| `npm run typecheck` | TypeScript type check: `tsc -b --force` (project references mode)   |
 
 ### Code Quality
 

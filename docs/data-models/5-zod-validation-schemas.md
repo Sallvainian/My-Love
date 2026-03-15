@@ -1,6 +1,7 @@
 # 5. Zod Validation Schemas
 
 **Sources:**
+
 - `src/validation/schemas.ts` -- App-level schemas (IndexedDB boundaries)
 - `src/api/validation/supabaseSchemas.ts` -- Supabase API response schemas
 
@@ -9,6 +10,7 @@ All schemas use Zod v4 (`zod/v4`).
 ## App-Level Schemas
 
 ### MessageSchema
+
 ```typescript
 z.object({
   id: z.number().int().positive().optional(),
@@ -20,20 +22,22 @@ z.object({
   isFavorite: z.boolean().optional(),
   updatedAt: z.date().optional(),
   tags: z.array(z.string()).optional(),
-})
+});
 ```
 
 ### MoodEntrySchema
+
 ```typescript
 z.object({
-  date: IsoDateStringSchema,  // YYYY-MM-DD with validation
-  mood: MoodTypeSchema,       // 12-value enum
+  date: IsoDateStringSchema, // YYYY-MM-DD with validation
+  mood: MoodTypeSchema, // 12-value enum
   moods: z.array(MoodTypeSchema).min(1).optional(),
   note: z.string().max(200).optional().or(z.literal('')),
-})
+});
 ```
 
 ### PhotoSchema
+
 ```typescript
 z.object({
   id: z.number().int().positive().optional(),
@@ -46,10 +50,11 @@ z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-})
+});
 ```
 
 ### SettingsSchema
+
 Nested object with `themeName`, `notificationTime` (HH:MM), `relationship` (startDate, partnerName, anniversaries[]), `customization`, `notifications`.
 
 ### Scripture Schemas (in `validation/schemas.ts`)
@@ -65,6 +70,7 @@ Nested object with `themeName`, `notificationTime` (HH:MM), `relationship` (star
 ## Supabase API Schemas
 
 ### SupabaseMoodSchema
+
 ```typescript
 z.object({
   id: UUIDSchema,
@@ -74,16 +80,19 @@ z.object({
   note: z.string().nullable(),
   created_at: TimestampSchema.nullable(),
   updated_at: TimestampSchema.nullable(),
-})
+});
 ```
 
 ### SupabaseUserSchema
+
 id, partner_name, device_id, created_at, updated_at, partner_id, email, display_name
 
 ### SupabaseInteractionSchema
+
 id, type (poke/kiss), from_user_id, to_user_id, viewed, created_at
 
 ### CoupleStatsSchema
+
 ```typescript
 z.object({
   totalSessions: z.number().int().min(0),
@@ -91,10 +100,11 @@ z.object({
   lastCompleted: TimestampSchema.nullable(),
   avgRating: z.number().min(0).max(5),
   bookmarkCount: z.number().int().min(0),
-})
+});
 ```
 
 ### Array Schemas
+
 `MoodArraySchema`, `InteractionArraySchema`, `UserArraySchema`
 
 ## Common Schemas

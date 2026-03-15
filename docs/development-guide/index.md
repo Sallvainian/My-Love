@@ -79,16 +79,16 @@ Last updated: 2026-03-15
 
 ## Quick Reference
 
-| Item | Value |
-|------|-------|
-| Live URL | <https://sallvainian.github.io/My-Love/> |
-| Stack | React 19.2.4, TypeScript 5.9.3, Vite 7.3.1, Tailwind CSS 4.2.1 |
-| Backend | Supabase 2.99.0 (Auth, Database, Realtime, Storage) |
-| Testing | Vitest 4.0.17, Playwright 1.58.2, pgTAP |
-| Node | v24.13.0 (managed by mise, pinned in `.node-version`) |
-| Package manager | npm |
-| Secrets | fnox with age provider (`fnox.toml`) |
-| Source files | ~207 |
-| Test files | ~85 |
-| Migrations | 24 |
-| CI workflows | 19 |
+| Item            | Value                                                          |
+| --------------- | -------------------------------------------------------------- |
+| Live URL        | <https://sallvainian.github.io/My-Love/>                       |
+| Stack           | React 19.2.4, TypeScript 5.9.3, Vite 7.3.1, Tailwind CSS 4.2.1 |
+| Backend         | Supabase 2.99.0 (Auth, Database, Realtime, Storage)            |
+| Testing         | Vitest 4.0.17, Playwright 1.58.2, pgTAP                        |
+| Node            | v24.13.0 (managed by mise, pinned in `.node-version`)          |
+| Package manager | npm                                                            |
+| Secrets         | fnox with age provider (`fnox.toml`)                           |
+| Source files    | ~207                                                           |
+| Test files      | ~85                                                            |
+| Migrations      | 24                                                             |
+| CI workflows    | 19                                                             |

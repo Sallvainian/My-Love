@@ -1,6 +1,7 @@
 # 10. Validation Layer
 
 **Sources:**
+
 - `src/validation/schemas.ts` -- App-level Zod schemas (IndexedDB boundaries)
 - `src/validation/errorMessages.ts` -- Error formatting and ValidationError class
 - `src/validation/index.ts` -- Centralized exports
@@ -11,6 +12,7 @@
 ### Message Schemas
 
 **`MessageSchema`** -- Full message validation:
+
 - `text`: string, 1-500 chars (from `VALIDATION_LIMITS.MESSAGE_TEXT_MAX_LENGTH`)
 - `category`: enum `reason | memory | affirmation | future | custom`
 - `isCustom`: boolean; `active`: boolean (default true); `isFavorite`: optional boolean
@@ -61,6 +63,7 @@ Mood types: `loved | happy | content | excited | thoughtful | grateful | sad | a
 ## Error Formatting (`src/validation/errorMessages.ts`)
 
 ### `ValidationError` class
+
 ```typescript
 class ValidationError extends Error {
   readonly fieldErrors: Map<string, string>;
@@ -68,14 +71,18 @@ class ValidationError extends Error {
 ```
 
 ### `formatZodError(error: ZodError): string`
+
 Formats issues into comma-separated user-friendly message. Maps field paths to display names via `FIELD_NAME_MAP`.
 
 ### `getFieldErrors(error: ZodError): Map<string, string>`
+
 Returns per-field error messages (first error per field).
 
 ### `createValidationError(error: ZodError): ValidationError`
+
 Convenience wrapper combining `formatZodError` + `getFieldErrors`.
 
 ### Type Guards
+
 - `isValidationError(error): error is ValidationError`
 - `isZodError(error): error is ZodError`

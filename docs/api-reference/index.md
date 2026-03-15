@@ -36,4 +36,4 @@ See [table-of-contents.md](./table-of-contents.md) for the full document listing
 
 ---
 
-*Generated: 2026-03-15 | Source: exhaustive scan of 207 source files, 24 SQL migrations*
+_Generated: 2026-03-15 | Source: exhaustive scan of 207 source files, 24 SQL migrations_
