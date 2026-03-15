@@ -72,7 +72,7 @@ const mockStoreState = {
   onBroadcastReceived: mockOnBroadcastReceived,
   applySessionConverted: mockApplySessionConverted,
   onPartnerLockInChanged: mockOnPartnerLockInChanged,
-  currentUserId: 'user-1',
+  userId: 'user-1',
   session: { userId: 'user-1' },
 };
 
@@ -133,7 +133,7 @@ describe('useScriptureBroadcast', () => {
     mockOnPartnerLockInChanged.mockReset();
     mockHandleScriptureError.mockReset();
     Object.assign(mockStoreState, {
-      currentUserId: 'user-1',
+      userId: 'user-1',
       session: { userId: 'user-1' },
     });
   });
@@ -181,7 +181,7 @@ describe('useScriptureBroadcast', () => {
     expect(supabase.removeChannel).not.toHaveBeenCalled();
 
     Object.assign(mockStoreState, {
-      currentUserId: 'user-2',
+      userId: 'user-2',
       session: { userId: 'user-1' },
     });
 
@@ -238,7 +238,7 @@ describe('useScriptureBroadcast', () => {
       renderHook(() => useScriptureBroadcast('session-abc'));
     });
 
-    // currentUserId == sessionUserId (user1), so partner lock is user2_locked
+    // userId == sessionUserId (user1), so partner lock is user2_locked
     broadcastHandlers['lock_in_status_changed']?.({
       payload: { step_index: 0, user1_locked: false, user2_locked: true },
     });
