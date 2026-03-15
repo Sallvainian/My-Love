@@ -17,6 +17,7 @@ import { isOnline, handleNetworkError } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import type { MoodEntry } from '../types';
+import { logger } from '@/utils/logger';
 
 /**
  * Supabase mood record type (using validated schema)
@@ -120,9 +121,7 @@ export class MoodSyncService {
   private async broadcastMoodToPartner(mood: SupabaseMoodRecord, partnerId: string): Promise<void> {
     try {
       if (!isOnline()) {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Skipping broadcast - device is offline');
-        }
+        logger.debug('[MoodSyncService] Skipping broadcast - device is offline');
         return;
       }
 
@@ -148,9 +147,7 @@ export class MoodSyncService {
                 },
               });
 
-              if (import.meta.env.DEV) {
-                console.log('[MoodSyncService] Broadcast sent to partner:', result);
-              }
+              logger.debug('[MoodSyncService] Broadcast sent to partner:', result);
               resolve();
             } catch (sendError) {
               reject(sendError);
@@ -206,9 +203,7 @@ export class MoodSyncService {
       if (!isOnline()) {
         const error = 'Device is offline - cannot sync moods';
         result.errors.push(error);
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] ' + error);
-        }
+        logger.debug('[MoodSyncService] ' + error);
         return result;
       }
 
@@ -216,15 +211,11 @@ export class MoodSyncService {
       const unsyncedMoods = await moodService.getUnsyncedMoods();
 
       if (unsyncedMoods.length === 0) {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] No pending moods to sync');
-        }
+        logger.debug('[MoodSyncService] No pending moods to sync');
         return result;
       }
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodSyncService] Starting sync for ${unsyncedMoods.length} pending moods`);
-      }
+      logger.debug(`[MoodSyncService] Starting sync for ${unsyncedMoods.length} pending moods`);
 
       // Sync each mood with retry logic
       for (const mood of unsyncedMoods) {
@@ -237,11 +228,9 @@ export class MoodSyncService {
             await moodService.markAsSynced(mood.id, syncedMood.id);
             result.synced++;
 
-            if (import.meta.env.DEV) {
-              console.log(
-                `[MoodSyncService] Synced mood ${mood.id} → Supabase ID: ${syncedMood.id}`
-              );
-            }
+            logger.debug(
+              `[MoodSyncService] Synced mood ${mood.id} → Supabase ID: ${syncedMood.id}`
+            );
           }
         } catch (error) {
           // On failure: Log error and continue with next mood
@@ -249,17 +238,13 @@ export class MoodSyncService {
           const errorMessage = error instanceof Error ? error.message : String(error);
           result.errors.push(`Mood ${mood.id || 'unknown'}: ${errorMessage}`);
 
-          if (import.meta.env.DEV) {
-            console.error(`[MoodSyncService] Failed to sync mood ${mood.id}:`, error);
-          }
+          logger.debug(`[MoodSyncService] Failed to sync mood ${mood.id}:`, error);
         }
       }
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[MoodSyncService] Sync complete: ${result.synced} synced, ${result.failed} failed`
-        );
-      }
+      logger.debug(
+        `[MoodSyncService] Sync complete: ${result.synced} synced, ${result.failed} failed`
+      );
 
       return result;
     } catch (error) {
@@ -309,21 +294,17 @@ export class MoodSyncService {
 
         // If this was the last retry, throw the error
         if (attempt === MAX_RETRIES) {
-          if (import.meta.env.DEV) {
-            console.error(
-              `[MoodSyncService] All ${MAX_RETRIES + 1} sync attempts failed for mood ${mood.id}`
-            );
-          }
+          logger.debug(
+            `[MoodSyncService] All ${MAX_RETRIES + 1} sync attempts failed for mood ${mood.id}`
+          );
           throw lastError;
         }
 
         // Wait before retrying (exponential backoff)
         const delay = RETRY_DELAYS[attempt];
-        if (import.meta.env.DEV) {
-          console.warn(
-            `[MoodSyncService] Sync attempt ${attempt + 1} failed for mood ${mood.id}, retrying in ${delay}ms...`
-          );
-        }
+        logger.debug(
+          `[MoodSyncService] Sync attempt ${attempt + 1} failed for mood ${mood.id}, retrying in ${delay}ms...`
+        );
 
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -377,9 +358,7 @@ export class MoodSyncService {
       return () => {};
     }
 
-    if (import.meta.env.DEV) {
-      console.log(`[MoodSyncService] Subscribing to mood-updates:${currentUserId}`);
-    }
+    logger.debug(`[MoodSyncService] Subscribing to mood-updates:${currentUserId}`);
 
     // Create Broadcast channel for receiving mood updates
     // Each user subscribes to their OWN channel; partner broadcasts TO this channel
@@ -390,9 +369,7 @@ export class MoodSyncService {
         },
       })
       .on('broadcast', { event: 'new_mood' }, (payload) => {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Received partner mood broadcast:', payload);
-        }
+        logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
 
         // Transform broadcast payload to SupabaseMoodRecord format
         const mood: SupabaseMoodRecord = {
@@ -407,9 +384,7 @@ export class MoodSyncService {
         callback(mood);
       })
       .subscribe((status) => {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Broadcast subscription status:', status);
-        }
+        logger.debug('[MoodSyncService] Broadcast subscription status:', status);
         if (onStatusChange) {
           onStatusChange(status);
         }
@@ -420,9 +395,7 @@ export class MoodSyncService {
       if (this.realtimeChannel) {
         supabase.removeChannel(this.realtimeChannel);
         this.realtimeChannel = null;
-        if (import.meta.env.DEV) {
-          console.log('[MoodSyncService] Unsubscribed from mood broadcasts');
-        }
+        logger.debug('[MoodSyncService] Unsubscribed from mood broadcasts');
       }
     };
   }

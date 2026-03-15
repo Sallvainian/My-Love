@@ -18,6 +18,7 @@ import {
   isPostgrestError,
 } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { logger } from '@/utils/logger';
 
 /**
  * Supabase interaction record type (from database schema)
@@ -145,7 +146,7 @@ export class InteractionService {
         throw new Error('No data returned from Supabase insert');
       }
 
-      console.log(`[InteractionService] Sent ${type} to ${toUserId}`);
+      logger.info(`[InteractionService] Sent ${type} to ${toUserId}`);
       return data;
     } catch (error) {
       logSupabaseError('InteractionService.sendInteraction', error);
@@ -194,12 +195,12 @@ export class InteractionService {
           filter: `to_user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('[InteractionService] Received interaction:', payload.new);
+          logger.info('[InteractionService] Received interaction:', payload.new);
           callback(payload.new as SupabaseInteractionRecord);
         }
       )
       .subscribe((status) => {
-        console.log('[InteractionService] Realtime subscription status:', status);
+        logger.info('[InteractionService] Realtime subscription status:', status);
       });
 
     // Return unsubscribe function
@@ -207,7 +208,7 @@ export class InteractionService {
       if (this.realtimeChannel) {
         supabase.removeChannel(this.realtimeChannel);
         this.realtimeChannel = null;
-        console.log('[InteractionService] Unsubscribed from interactions');
+        logger.info('[InteractionService] Unsubscribed from interactions');
       }
     };
   }
@@ -336,7 +337,7 @@ export class InteractionService {
         throw error;
       }
 
-      console.log(`[InteractionService] Marked interaction ${interactionId} as viewed`);
+      logger.info(`[InteractionService] Marked interaction ${interactionId} as viewed`);
     } catch (error) {
       logSupabaseError('InteractionService.markAsViewed', error);
 

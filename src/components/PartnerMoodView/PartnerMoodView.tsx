@@ -28,6 +28,7 @@ import type { MoodEntry } from '../../types';
 import { PARTNER_NAME } from '../../config/constants';
 import { moodSyncService } from '../../api/moodSyncService';
 import { PokeKissInterface } from '../PokeKissInterface';
+import { logger } from '@/utils/logger';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {
@@ -125,9 +126,7 @@ export function PartnerMoodView() {
       return; // Don't subscribe when offline
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[PartnerMoodView] Subscribing to partner mood updates');
-    }
+    logger.info('[PartnerMoodView] Subscribing to partner mood updates');
 
     // Track notification timeout IDs for cleanup (Task 11: prevent memory leaks)
     const timeoutIds: NodeJS.Timeout[] = [];
@@ -138,9 +137,7 @@ export function PartnerMoodView() {
       // Subscribe to partner mood INSERT events with status tracking
       unsubscribe = await moodSyncService.subscribeMoodUpdates(
         (newMood) => {
-          if (import.meta.env.DEV) {
-            console.log('[PartnerMoodView] Received partner mood update:', newMood);
-          }
+          logger.debug('[PartnerMoodView] Received partner mood update:', newMood);
 
           // Show notification toast
           const moodLabel = MOOD_CONFIG[newMood.mood_type]?.label || newMood.mood_type;
@@ -163,9 +160,7 @@ export function PartnerMoodView() {
         },
         (status) => {
           // Story 6.4: Task 7 - Map Supabase Realtime status to ConnectionStatus
-          if (import.meta.env.DEV) {
-            console.log('[PartnerMoodView] Realtime status changed:', status);
-          }
+          logger.info('[PartnerMoodView] Realtime status changed:', status);
 
           if (status === 'SUBSCRIBED') {
             setConnectionStatus('connected');
@@ -185,9 +180,7 @@ export function PartnerMoodView() {
 
     // Cleanup subscription on unmount (Task 11: prevent memory leaks)
     return () => {
-      if (import.meta.env.DEV) {
-        console.log('[PartnerMoodView] Unsubscribing from partner mood updates');
-      }
+      logger.debug('[PartnerMoodView] Unsubscribing from partner mood updates');
 
       // Clear all pending notification timeouts
       timeoutIds.forEach((id) => clearTimeout(id));

@@ -20,6 +20,7 @@ import type { MoodEntry } from '../../types';
 import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
+import { logger } from '@/utils/logger';
 
 export interface MoodSlice {
   // State
@@ -88,9 +89,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       if (navigator.onLine) {
         try {
           await get().syncPendingMoods();
-          if (import.meta.env.DEV) {
-            console.log('[MoodSlice] Immediate sync completed for new mood');
-          }
+          logger.debug('[MoodSlice] Immediate sync completed for new mood');
         } catch (syncError) {
           // Don't fail the add if sync fails - background sync will retry
           console.warn(
@@ -100,9 +99,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         }
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[MoodSlice] Added mood entry:', created);
-      }
+      logger.debug('[MoodSlice] Added mood entry:', created);
     } catch (error) {
       console.error('[MoodSlice] Error adding mood entry:', error);
       throw error; // Re-throw to allow UI to show error feedback
@@ -135,9 +132,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       if (navigator.onLine) {
         try {
           await get().syncPendingMoods();
-          if (import.meta.env.DEV) {
-            console.log('[MoodSlice] Immediate sync completed for updated mood');
-          }
+          logger.debug('[MoodSlice] Immediate sync completed for updated mood');
         } catch (syncError) {
           // Don't fail the update if sync fails - background sync will retry
           console.warn(
@@ -147,9 +142,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         }
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[MoodSlice] Updated mood entry:', updated);
-      }
+      logger.debug('[MoodSlice] Updated mood entry:', updated);
     } catch (error) {
       console.error('[MoodSlice] Error updating mood entry:', error);
       throw error; // Re-throw to allow UI to show error feedback
@@ -166,9 +159,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // Update sync status
       await get().updateSyncStatus();
 
-      if (import.meta.env.DEV) {
-        console.log('[MoodSlice] Loaded moods from IndexedDB:', allMoods.length);
-      }
+      logger.debug('[MoodSlice] Loaded moods from IndexedDB:', allMoods.length);
     } catch (error) {
       console.error('[MoodSlice] Error loading moods:', error);
       // Don't throw - graceful degradation with empty state
@@ -188,12 +179,10 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         },
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[MoodSlice] Sync status updated:', {
-          pendingMoods: unsyncedMoods.length,
-          isOnline,
-        });
-      }
+      logger.debug('[MoodSlice] Sync status updated:', {
+        pendingMoods: unsyncedMoods.length,
+        isOnline,
+      });
     } catch (error) {
       console.error('[MoodSlice] Error updating sync status:', error);
       // Don't throw - graceful degradation
@@ -221,9 +210,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         },
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[MoodSlice] Starting pending moods sync...');
-      }
+      logger.debug('[MoodSlice] Starting pending moods sync...');
 
       // Call moodSyncService to sync all pending moods
       const result = await moodSyncService.syncPendingMoods();
@@ -255,9 +242,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         },
       }));
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodSlice] Sync complete: ${result.synced} synced, ${result.failed} failed`);
-      }
+      logger.debug(`[MoodSlice] Sync complete: ${result.synced} synced, ${result.failed} failed`);
 
       return { synced: result.synced, failed: result.failed };
     } catch (error) {
@@ -294,9 +279,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
     try {
       // Check network status first
       if (!navigator.onLine) {
-        if (import.meta.env.DEV) {
-          console.log('[MoodSlice] Cannot fetch partner moods - device is offline');
-        }
+        logger.debug('[MoodSlice] Cannot fetch partner moods - device is offline');
         return;
       }
 
@@ -307,11 +290,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
         return;
       }
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[MoodSlice] Fetching partner moods (partnerId: ${partnerId}, limit: ${limit})`
-        );
-      }
+      logger.debug(`[MoodSlice] Fetching partner moods (partnerId: ${partnerId}, limit: ${limit})`);
 
       // Fetch partner moods from Supabase
       const partnerMoodRecords = await moodSyncService.fetchMoods(partnerId, limit);
@@ -341,9 +320,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       // Update state
       set({ partnerMoods: transformedMoods });
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodSlice] Fetched ${transformedMoods.length} partner moods`);
-      }
+      logger.debug(`[MoodSlice] Fetched ${transformedMoods.length} partner moods`);
     } catch (error) {
       console.error('[MoodSlice] Error fetching partner moods:', error);
       // Don't throw - graceful degradation (partner moods are optional feature)

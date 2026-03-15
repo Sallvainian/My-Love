@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import type { PhotoWithUrls } from '../../services/photoService';
 import { User } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface PhotoGridItemProps {
   photo: PhotoWithUrls;
@@ -52,7 +53,7 @@ export function PhotoGridItem({ photo, onPhotoClick }: PhotoGridItemProps) {
   // AC-4.2.7: Handle photo click for carousel view (Story 4.3)
   const handleClick = () => {
     onPhotoClick(photo.id);
-    console.log(`[PhotoGallery] Selected photo: ${photo.id}`);
+    logger.debug(`[PhotoGallery] Selected photo: ${photo.id}`);
   };
 
   return (

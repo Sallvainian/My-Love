@@ -1,11 +1,12 @@
 import * as Sentry from '@sentry/react';
+import { logger } from '@/utils/logger';
 
 /** Initialize Sentry error tracking. No-ops when VITE_SENTRY_DSN is absent. */
 export function initSentry(): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
 
   if (!dsn) {
-    console.log('[Sentry] Skipped: No VITE_SENTRY_DSN configured');
+    logger.debug('[Sentry] Skipped: No VITE_SENTRY_DSN configured');
     return;
   }
 

@@ -19,6 +19,7 @@
 import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { ImageIcon } from 'lucide-react';
+import { logger } from '@/utils/logger';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useVibration } from '../../hooks/useVibration';
 import { validateMessageContent, sanitizeMessageContent } from '../../utils/messageValidation';
@@ -76,7 +77,7 @@ export function MessageInput() {
 
     // Show warning for large files
     if (validation.warning) {
-      console.log('[MessageInput] Large file warning:', validation.warning);
+      logger.debug('[MessageInput] Large file warning:', validation.warning);
     }
 
     setSelectedImage(file);

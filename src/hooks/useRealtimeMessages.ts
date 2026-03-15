@@ -12,6 +12,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { supabase } from '../api/supabaseClient';
+import { logger } from '@/utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { LoveNote } from '../types/models';
 
@@ -39,9 +40,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     (payload: { type: string; event: string; payload: { message: LoveNote } }) => {
       const { message } = payload.payload;
 
-      if (import.meta.env.DEV) {
-        console.log('[useRealtimeMessages] New message received:', message.id);
-      }
+      logger.debug('[useRealtimeMessages] New message received:', message.id);
 
       // Add to store (with deduplication check in addNote)
       addNote(message);
@@ -62,9 +61,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
     let subscriptionActive = true;
 
-    if (import.meta.env.DEV) {
-      console.log('[useRealtimeMessages] Setting up Broadcast subscription for:', userId);
-    }
+    logger.info('[useRealtimeMessages] Setting up Broadcast subscription for:', userId);
 
     // Create user-specific channel for receiving messages
     const channel = supabase
@@ -76,9 +73,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
         );
       })
       .subscribe((status, err) => {
-        if (import.meta.env.DEV) {
-          console.log('[useRealtimeMessages] Subscription status:', status, err || '');
-        }
+        logger.info('[useRealtimeMessages] Subscription status:', status, err || '');
 
         // Reset retry count on successful subscription
         if (status === 'SUBSCRIBED') {
@@ -106,11 +101,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
 
           retryCountRef.current++;
 
-          if (import.meta.env.DEV) {
-            console.log(
-              `[useRealtimeMessages] Retry attempt ${retryCountRef.current}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
-            );
-          }
+          logger.debug(
+            `[useRealtimeMessages] Retry attempt ${retryCountRef.current}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
+          );
 
           // Clear any existing retry timeout
           if (retryTimeoutRef.current) {
@@ -138,9 +131,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       }
 
       if (channelRef.current) {
-        if (import.meta.env.DEV) {
-          console.log('[useRealtimeMessages] Unsubscribing from channel');
-        }
+        logger.debug('[useRealtimeMessages] Unsubscribing from channel');
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }

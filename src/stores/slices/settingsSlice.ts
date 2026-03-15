@@ -24,6 +24,7 @@ import { APP_CONFIG } from '../../config/constants';
 import { SettingsSchema } from '../../validation/schemas';
 import { createValidationError, isZodError } from '../../validation/errorMessages';
 import { ZodError } from 'zod/v4';
+import { logger } from '@/utils/logger';
 
 export interface SettingsSlice {
   // State
@@ -74,11 +75,11 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
   initializeApp: async () => {
     // Guard: Prevent concurrent/duplicate initialization (StrictMode protection)
     if (isInitializing) {
-      console.log('[App Init] Skipping - initialization already in progress');
+      logger.info('[App Init] Skipping - initialization already in progress');
       return;
     }
     if (isInitialized) {
-      console.log('[App Init] Skipping - app already initialized');
+      logger.info('[App Init] Skipping - app already initialized');
       return;
     }
 
@@ -113,7 +114,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         return;
       }
 
-      console.log('[App Init] Hydration verified - proceeding with IndexedDB initialization');
+      logger.info('[App Init] Hydration verified - proceeding with IndexedDB initialization');
 
       // Initialize IndexedDB
       await storageService.init();
@@ -149,7 +150,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
       get().setLoading(false);
 
       isInitialized = true;
-      console.log('[App Init] Initialization completed successfully');
+      logger.info('[App Init] Initialization completed successfully');
     } catch (error) {
       console.error('Error initializing app:', error);
 

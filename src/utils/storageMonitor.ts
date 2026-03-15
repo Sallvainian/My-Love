@@ -8,6 +8,8 @@
  * Owner: Winston (Architect)
  */
 
+import { logger } from '@/utils/logger';
+
 export interface StorageQuotaInfo {
   used: number;
   total: number;
@@ -79,45 +81,32 @@ export function getStorageQuotaInfo(): StorageQuotaInfo {
  * Should be called periodically or after significant state changes.
  */
 export function logStorageQuota(): void {
-  if (import.meta.env.DEV) {
-    const quota = getStorageQuotaInfo();
+  const quota = getStorageQuotaInfo();
 
-    const usedMB = (quota.used / (1024 * 1024)).toFixed(2);
-    const totalMB = (quota.total / (1024 * 1024)).toFixed(2);
-    const availableMB = (quota.available / (1024 * 1024)).toFixed(2);
+  const usedMB = (quota.used / (1024 * 1024)).toFixed(2);
+  const totalMB = (quota.total / (1024 * 1024)).toFixed(2);
+  const availableMB = (quota.available / (1024 * 1024)).toFixed(2);
 
-    const emoji =
-      quota.warningLevel === 'safe' ? '✅' : quota.warningLevel === 'warning' ? '⚠️' : '🚨';
+  logger.debug(
+    `LocalStorage Quota: ${quota.usagePercentage}% used (${usedMB}MB / ${totalMB}MB) - ${availableMB}MB available`
+  );
 
-    const style =
-      quota.warningLevel === 'safe'
-        ? 'color: green'
-        : quota.warningLevel === 'warning'
-          ? 'color: orange; font-weight: bold'
-          : 'color: red; font-weight: bold';
-
-    console.log(
-      `%c${emoji} LocalStorage Quota: ${quota.usagePercentage}% used (${usedMB}MB / ${totalMB}MB) - ${availableMB}MB available`,
-      style
+  if (quota.warningLevel === 'warning') {
+    console.warn(
+      `LocalStorage approaching limit (${quota.usagePercentage}%). Consider optimization:\n` +
+        `  - Review persisted state partializer in store configuration\n` +
+        `  - Move large data (photos, messages) to IndexedDB\n` +
+        `  - Implement data cleanup for old/unused entries`
     );
-
-    if (quota.warningLevel === 'warning') {
-      console.warn(
-        `⚠️ LocalStorage approaching limit (${quota.usagePercentage}%). Consider optimization:\n` +
-          `  - Review persisted state partializer in store configuration\n` +
-          `  - Move large data (photos, messages) to IndexedDB\n` +
-          `  - Implement data cleanup for old/unused entries`
-      );
-    } else if (quota.warningLevel === 'critical') {
-      console.error(
-        `🚨 LocalStorage CRITICAL (${quota.usagePercentage}%)! Quota exceeded error imminent!\n` +
-          `  ACTION REQUIRED:\n` +
-          `  1. Immediately review persisted state size\n` +
-          `  2. Migrate large data to IndexedDB\n` +
-          `  3. Clear unnecessary cached data\n` +
-          `  Current usage: ${usedMB}MB of ${totalMB}MB`
-      );
-    }
+  } else if (quota.warningLevel === 'critical') {
+    console.error(
+      `LocalStorage CRITICAL (${quota.usagePercentage}%)! Quota exceeded error imminent!\n` +
+        `  ACTION REQUIRED:\n` +
+        `  1. Immediately review persisted state size\n` +
+        `  2. Migrate large data to IndexedDB\n` +
+        `  3. Clear unnecessary cached data\n` +
+        `  Current usage: ${usedMB}MB of ${totalMB}MB`
+    );
   }
 }
 

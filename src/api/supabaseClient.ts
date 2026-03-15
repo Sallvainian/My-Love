@@ -9,6 +9,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
+import { logger } from '@/utils/logger';
 
 // Re-export Database type for convenience
 export type { Database } from '../types/database.types';
@@ -124,9 +125,7 @@ export const getPartnerDisplayName = async (): Promise<string | null> => {
     const partnerId = await getPartnerId();
 
     if (!partnerId) {
-      if (import.meta.env.DEV) {
-        console.log('[Supabase] No partner ID found, cannot get partner display name');
-      }
+      logger.debug('[Supabase] No partner ID found, cannot get partner display name');
       return null;
     }
 

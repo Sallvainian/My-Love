@@ -5,6 +5,7 @@ import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema'
 import { MoodEntrySchema } from '../validation/schemas';
 import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
+import { logger } from '@/utils/logger';
 
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking
@@ -33,9 +34,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
    */
   protected async _doInit(): Promise<void> {
     try {
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] Initializing IndexedDB (version ${DB_VERSION})...`);
-      }
+      logger.debug(`[MoodService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion) {
@@ -43,9 +42,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
         },
       });
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] IndexedDB initialized successfully (v${DB_VERSION})`);
-      }
+      logger.debug(`[MoodService] IndexedDB initialized successfully (v${DB_VERSION})`);
     } catch (error) {
       this.handleError('initialize', error as Error);
     }
@@ -87,9 +84,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
 
       const created = await super.add(moodEntry);
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] Created mood entry for ${today}:`, created);
-      }
+      logger.debug(`[MoodService] Created mood entry for ${today}:`, created);
 
       return created;
     } catch (error) {
@@ -143,9 +138,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
         throw new Error(`Failed to retrieve updated mood entry ${id}`);
       }
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] Updated mood entry ${id}:`, result);
-      }
+      logger.debug(`[MoodService] Updated mood entry ${id}:`, result);
 
       return result;
     } catch (error) {
@@ -172,9 +165,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       const index = tx.store.index('by-date');
       const mood = await index.get(dateString);
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] getMoodForDate(${dateString}):`, mood || 'not found');
-      }
+      logger.debug(`[MoodService] getMoodForDate(${dateString}):`, mood || 'not found');
 
       return mood || null;
     } catch (error) {
@@ -203,9 +194,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       const range = IDBKeyRange.bound(startString, endString);
       const moods = await index.getAll(range);
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] getMoodsInRange(${startString} to ${endString}):`, moods.length);
-      }
+      logger.debug(`[MoodService] getMoodsInRange(${startString} to ${endString}):`, moods.length);
 
       return moods;
     } catch (error) {
@@ -227,9 +216,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       const allMoods = await this.getAll();
       const unsynced = allMoods.filter((mood) => !mood.synced);
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] Found ${unsynced.length} unsynced mood entries`);
-      }
+      logger.debug(`[MoodService] Found ${unsynced.length} unsynced mood entries`);
 
       return unsynced;
     } catch (error) {
@@ -257,9 +244,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
         supabaseId,
       });
 
-      if (import.meta.env.DEV) {
-        console.log(`[MoodService] Marked mood entry ${id} as synced (supabaseId: ${supabaseId})`);
-      }
+      logger.debug(`[MoodService] Marked mood entry ${id} as synced (supabaseId: ${supabaseId})`);
     } catch (error) {
       this.handleError('markAsSynced', error as Error);
     }

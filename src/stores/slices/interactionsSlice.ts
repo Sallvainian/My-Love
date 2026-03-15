@@ -20,6 +20,7 @@ import type { AppStateCreator } from '../types';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { InteractionService } from '../../api/interactionService';
 import { validateInteraction, INTERACTION_ERRORS } from '../../utils/interactionValidation';
+import { logger } from '@/utils/logger';
 
 // Initialize interaction service singleton
 const interactionService = new InteractionService();
@@ -86,9 +87,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         interactions: [localInteraction, ...state.interactions],
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Poke sent:', pokeRecord.id);
-      }
+      logger.debug('[InteractionsSlice] Poke sent:', pokeRecord.id);
 
       return pokeRecord;
     } catch (error) {
@@ -121,9 +120,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         interactions: [localInteraction, ...state.interactions],
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Kiss sent:', kissRecord.id);
-      }
+      logger.debug('[InteractionsSlice] Kiss sent:', kissRecord.id);
 
       return kissRecord;
     } catch (error) {
@@ -145,9 +142,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         unviewedCount: Math.max(0, state.unviewedCount - 1),
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Interaction marked as viewed:', id);
-      }
+      logger.debug('[InteractionsSlice] Interaction marked as viewed:', id);
     } catch (error) {
       console.error('[InteractionsSlice] Error marking interaction as viewed:', error);
       throw error;
@@ -187,15 +182,13 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
       set({ unviewedCount });
 
-      if (import.meta.env.DEV) {
-        console.log(
-          '[InteractionsSlice] Loaded interaction history:',
-          interactions.length,
-          'interactions,',
-          unviewedCount,
-          'unviewed'
-        );
-      }
+      logger.debug(
+        '[InteractionsSlice] Loaded interaction history:',
+        interactions.length,
+        'interactions,',
+        unviewedCount,
+        'unviewed'
+      );
     } catch (error) {
       console.error('[InteractionsSlice] Error loading interaction history:', error);
       // Don't throw - graceful degradation with empty state
@@ -220,17 +213,13 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
       set({ isSubscribed: true });
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Subscribed to interactions');
-      }
+      logger.debug('[InteractionsSlice] Subscribed to interactions');
 
       // Return enhanced unsubscribe function that also updates state
       return () => {
         unsubscribe();
         set({ isSubscribed: false });
-        if (import.meta.env.DEV) {
-          console.log('[InteractionsSlice] Unsubscribed from interactions');
-        }
+        logger.debug('[InteractionsSlice] Unsubscribed from interactions');
       };
     } catch (error) {
       console.error('[InteractionsSlice] Error subscribing to interactions:', error);
@@ -245,9 +234,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
     // Only add if it's not already in the list (prevent duplicates)
     const exists = get().interactions.some((i) => i.id === record.id);
     if (exists) {
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Ignoring duplicate interaction:', record.id);
-      }
+      logger.debug('[InteractionsSlice] Ignoring duplicate interaction:', record.id);
       return;
     }
 
@@ -257,12 +244,10 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       unviewedCount: !localInteraction.viewed ? state.unviewedCount + 1 : state.unviewedCount,
     }));
 
-    if (import.meta.env.DEV) {
-      console.log('[InteractionsSlice] Incoming interaction added:', {
-        id: record.id,
-        type: record.type,
-        from: record.from_user_id,
-      });
-    }
+    logger.debug('[InteractionsSlice] Incoming interaction added:', {
+      id: record.id,
+      type: record.type,
+      from: record.from_user_id,
+    });
   },
 });

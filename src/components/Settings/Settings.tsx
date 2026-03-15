@@ -13,6 +13,7 @@
 
 import { useState } from 'react';
 import { authService } from '../../api/authService';
+import { logger } from '@/utils/logger';
 import { AnniversarySettings } from './AnniversarySettings';
 import './Settings.css';
 
@@ -35,9 +36,7 @@ export const Settings: React.FC = () => {
     try {
       await authService.signOut();
 
-      if (import.meta.env.DEV) {
-        console.log('[Settings] User signed out successfully');
-      }
+      logger.debug('[Settings] User signed out successfully');
 
       // Session will be cleared by auth state listener in App.tsx
       // User will automatically be redirected to LoginScreen

@@ -2,6 +2,7 @@ import { supabase } from '../supabaseClient';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import type { AuthError } from '@supabase/supabase-js';
 import type { AuthCredentials, AuthResult } from './types';
+import { logger } from '@/utils/logger';
 
 export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> => {
   try {
@@ -15,9 +16,7 @@ export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> 
       return { user: null, session: null, error };
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[AuthService] Sign-in successful:', data.user?.email);
-    }
+    logger.debug('[AuthService] Sign-in successful:', data.user?.email);
 
     if (data.session) {
       try {
@@ -27,9 +26,7 @@ export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> 
           expiresAt: data.session.expires_at ?? 0,
           userId: data.user?.id ?? '',
         });
-        if (import.meta.env.DEV) {
-          console.log('[AuthService] Stored auth token for Background Sync');
-        }
+        logger.debug('[AuthService] Stored auth token for Background Sync');
       } catch (tokenError) {
         console.error('[AuthService] Failed to store auth token:', tokenError);
       }
@@ -58,9 +55,7 @@ export const signUp = async (credentials: AuthCredentials): Promise<AuthResult> 
       return { user: null, session: null, error };
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[AuthService] Sign-up successful:', data.user?.email);
-    }
+    logger.debug('[AuthService] Sign-up successful:', data.user?.email);
 
     return { user: data.user, session: data.session, error: null };
   } catch (err) {
@@ -84,16 +79,12 @@ export const signOut = async (): Promise<void> => {
 
     try {
       await clearAuthToken();
-      if (import.meta.env.DEV) {
-        console.log('[AuthService] Cleared auth token from IndexedDB');
-      }
+      logger.debug('[AuthService] Cleared auth token from IndexedDB');
     } catch (tokenError) {
       console.error('[AuthService] Failed to clear auth token:', tokenError);
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[AuthService] Sign-out successful');
-    }
+    logger.debug('[AuthService] Sign-out successful');
   } catch (err) {
     console.error('[AuthService] Unexpected error during sign-out:', err);
     throw err;
@@ -111,9 +102,7 @@ export const resetPassword = async (email: string): Promise<AuthError | null> =>
       return error;
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[AuthService] Password reset email sent to:', email);
-    }
+    logger.debug('[AuthService] Password reset email sent to:', email);
 
     return null;
   } catch (err) {
@@ -140,9 +129,7 @@ export const signInWithGoogle = async (): Promise<AuthError | null> => {
       return error;
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[AuthService] Google OAuth redirect initiated');
-    }
+    logger.debug('[AuthService] Google OAuth redirect initiated');
 
     return null;
   } catch (err) {

@@ -13,6 +13,7 @@
  */
 
 import { supabase } from './supabaseClient';
+import { logger } from '@/utils/logger';
 
 export interface UserSearchResult {
   id: string;
@@ -194,9 +195,7 @@ class PartnerService {
         throw error;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PartnerService] Partner request sent successfully');
-      }
+      logger.debug('[PartnerService] Partner request sent successfully');
     } catch (error) {
       console.error('[PartnerService] Error sending partner request:', error);
       throw error;
@@ -296,9 +295,7 @@ class PartnerService {
         throw error;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PartnerService] Partner request accepted successfully');
-      }
+      logger.debug('[PartnerService] Partner request accepted successfully');
     } catch (error) {
       console.error('[PartnerService] Error accepting partner request:', error);
       throw error;
@@ -322,9 +319,7 @@ class PartnerService {
         throw error;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PartnerService] Partner request declined successfully');
-      }
+      logger.debug('[PartnerService] Partner request declined successfully');
     } catch (error) {
       console.error('[PartnerService] Error declining partner request:', error);
       throw error;

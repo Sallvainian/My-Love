@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import { initSentry } from './config/sentry';
+import { logger } from '@/utils/logger';
 import './index.css';
 import App from './App.tsx';
 
@@ -16,11 +17,11 @@ if (import.meta.env.PROD) {
       onNeedRefresh() {
         // Auto-reload when new service worker is available
         // This ensures users always get the latest code
-        console.log('[SW] New version available, reloading...');
+        logger.info('[SW] New version available, reloading...');
         updateSW(true); // true = reload after update
       },
       onOfflineReady() {
-        console.log('[SW] App ready to work offline');
+        logger.info('[SW] App ready to work offline');
       },
       onRegisterError(error) {
         console.error('[SW] Registration error:', error);
@@ -31,7 +32,7 @@ if (import.meta.env.PROD) {
   // In development: Unregister ALL service workers to prevent stale code
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((registration) => {
-      console.log('[Dev] Unregistering service worker:', registration.scope);
+      logger.debug('[Dev] Unregistering service worker:', registration.scope);
       registration.unregister();
     });
   });

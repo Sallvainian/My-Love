@@ -13,6 +13,7 @@ import {
 } from '../../utils/calendarHelpers';
 import { MoodDetailModal } from './MoodDetailModal';
 import { CalendarDay } from './CalendarDay';
+import { logger } from '@/utils/logger';
 
 /**
  * Debounce delay for month navigation (Task 9: Performance optimization)
@@ -78,9 +79,7 @@ export function MoodHistoryCalendar() {
       setMoodMap(map);
 
       // Log performance in development (Task 9: Performance measurement)
-      if (import.meta.env.DEV) {
-        console.log(`[MoodHistoryCalendar] Query time: ${queryTime.toFixed(2)}ms (target: <100ms)`);
-      }
+      logger.debug(`[MoodHistoryCalendar] Query time: ${queryTime.toFixed(2)}ms (target: <100ms)`);
     } catch (error) {
       console.error('[MoodHistoryCalendar] Failed to load moods:', error);
       setMoods([]);
@@ -193,8 +192,8 @@ export function MoodHistoryCalendar() {
   useEffect(() => {
     if (!isLoading && calendarDays.length > 0) {
       const renderTime = performance.now() - renderStartTimeRef.current;
-      if (import.meta.env.DEV && renderStartTimeRef.current > 0) {
-        console.log(
+      if (renderStartTimeRef.current > 0) {
+        logger.debug(
           `[MoodHistoryCalendar] Render time: ${renderTime.toFixed(2)}ms (target: <200ms)`
         );
       }

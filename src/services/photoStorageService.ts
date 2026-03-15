@@ -7,6 +7,7 @@ import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
 import { PAGINATION, STORAGE_QUOTAS, BYTES_PER_KB, BYTES_PER_MB } from '../config/performance';
 import { performanceMonitor } from './performanceMonitor';
+import { logger } from '@/utils/logger';
 
 /**
  * Photo Storage Service - IndexedDB CRUD operations for photos
@@ -41,9 +42,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
    */
   protected async _doInit(): Promise<void> {
     try {
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoStorage] Initializing IndexedDB (version ${DB_VERSION})...`);
-      }
+      logger.debug(`[PhotoStorage] Initializing IndexedDB (version ${DB_VERSION})...`);
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         async upgrade(db, oldVersion, newVersion, transaction) {
@@ -68,9 +67,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
             const oldPhotosStore = transaction.objectStore('photos');
             const allV1Photos = (await oldPhotosStore.getAll()) as unknown as V1Photo[];
 
-            if (import.meta.env.DEV) {
-              console.log(`[PhotoStorage] Found ${allV1Photos.length} photos to migrate from v1`);
-            }
+            logger.debug(`[PhotoStorage] Found ${allV1Photos.length} photos to migrate from v1`);
 
             // Step 2: Transform v1 schema to v2 schema (blob → imageBlob)
             const migratedPhotos: Photo[] = allV1Photos.map((photo) => ({
@@ -88,11 +85,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
               for (const photo of migratedPhotos) {
                 await newPhotosStore.add(photo);
               }
-              if (import.meta.env.DEV) {
-                console.log(
-                  `[PhotoStorage] Successfully migrated ${migratedPhotos.length} photos to v2 schema`
-                );
-              }
+              logger.debug(
+                `[PhotoStorage] Successfully migrated ${migratedPhotos.length} photos to v2 schema`
+              );
             }
           } else {
             // Standard upgrade path - delegate to centralized function
@@ -101,9 +96,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
         },
       });
 
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoStorage] IndexedDB initialized successfully (v${DB_VERSION})`);
-      }
+      logger.debug(`[PhotoStorage] IndexedDB initialized successfully (v${DB_VERSION})`);
     } catch (error) {
       this.handleError('initialize', error as Error);
     }
@@ -130,12 +123,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
         // Record photo size metric
         performanceMonitor.recordMetric('photo-size-kb', validated.compressedSize / BYTES_PER_KB);
 
-        if (import.meta.env.DEV) {
-          const sizeKB = (validated.compressedSize / BYTES_PER_KB).toFixed(0);
-          console.log(
-            `[PhotoStorage] Saved photo ID: ${created.id}, size: ${sizeKB}KB, dimensions: ${validated.width}x${validated.height}`
-          );
-        }
+        logger.debug(
+          `[PhotoStorage] Saved photo ID: ${created.id}, size: ${(validated.compressedSize / BYTES_PER_KB).toFixed(0)}KB, dimensions: ${validated.width}x${validated.height}`
+        );
 
         return created;
       } catch (error) {
@@ -172,9 +162,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
         // Reverse to get newest first
         const sortedPhotos = photos.reverse();
 
-        if (import.meta.env.DEV) {
-          console.log(`[PhotoStorage] Retrieved ${sortedPhotos.length} photos (newest first)`);
-        }
+        logger.debug(`[PhotoStorage] Retrieved ${sortedPhotos.length} photos (newest first)`);
         return sortedPhotos;
       } catch (error) {
         console.error('[PhotoStorage] Failed to load photos:', error);
@@ -224,11 +212,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
           cursor = await cursor.continue();
         }
 
-        if (import.meta.env.DEV) {
-          console.log(
-            `[PhotoStorage] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
-          );
-        }
+        logger.debug(
+          `[PhotoStorage] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
+        );
 
         return results;
       } catch (error) {
@@ -254,9 +240,7 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
       const validated = PhotoSchema.partial().parse(updates);
 
       await super.update(id, validated);
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoStorage] Updated photo ID: ${id}`);
-      }
+      logger.debug(`[PhotoStorage] Updated photo ID: ${id}`);
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
@@ -286,10 +270,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
       const photos = await this.getAll();
       const totalSize = photos.reduce((total, photo) => total + photo.compressedSize, 0);
 
-      if (import.meta.env.DEV) {
-        const sizeMB = (totalSize / BYTES_PER_MB).toFixed(2);
-        console.log(`[PhotoStorage] Total photo storage: ${sizeMB}MB (${photos.length} photos)`);
-      }
+      logger.debug(
+        `[PhotoStorage] Total photo storage: ${(totalSize / BYTES_PER_MB).toFixed(2)}MB (${photos.length} photos)`
+      );
 
       return totalSize;
     } catch (error) {
@@ -318,13 +301,9 @@ class PhotoStorageService extends BaseIndexedDBService<Photo, MyLoveDBSchema, 'p
         const remaining = quota - used;
         const percentUsed = (used / quota) * 100;
 
-        if (import.meta.env.DEV) {
-          const usedMB = (used / BYTES_PER_MB).toFixed(2);
-          const quotaMB = (quota / BYTES_PER_MB).toFixed(2);
-          console.log(
-            `[PhotoStorage] Quota: ${usedMB}MB / ${quotaMB}MB (${percentUsed.toFixed(0)}% used)`
-          );
-        }
+        logger.debug(
+          `[PhotoStorage] Quota: ${(used / BYTES_PER_MB).toFixed(2)}MB / ${(quota / BYTES_PER_MB).toFixed(2)}MB (${percentUsed.toFixed(0)}% used)`
+        );
 
         return { used, quota, remaining, percentUsed };
       } else {

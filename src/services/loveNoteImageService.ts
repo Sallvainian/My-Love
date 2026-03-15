@@ -14,6 +14,7 @@
 import { supabase } from '../api/supabaseClient';
 import { imageCompressionService } from './imageCompressionService';
 import { IMAGE_STORAGE } from '../config/images';
+import { logger } from '@/utils/logger';
 
 /** Edge Function URL for image upload with server-side validation */
 const UPLOAD_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-love-note-image`;
@@ -75,9 +76,7 @@ function cleanCache(): void {
       signedUrlCache.delete(path);
     }
 
-    if (import.meta.env.DEV) {
-      console.log('[LoveNoteImageService] Cache LRU eviction:', toRemove.length, 'entries');
-    }
+    logger.debug('[LoveNoteImageService] Cache LRU eviction:', toRemove.length, 'entries');
   }
 }
 
@@ -166,7 +165,7 @@ export async function uploadLoveNoteImage(file: File, _userId: string): Promise<
     throw new Error(errorMessage);
   }
 
-  console.log('[LoveNoteImageService] Image uploaded via Edge Function:', result.storagePath);
+  logger.info('[LoveNoteImageService] Image uploaded via Edge Function:', result.storagePath);
 
   return {
     storagePath: result.storagePath!,
@@ -236,9 +235,7 @@ export async function getSignedImageUrl(
     if (cached && isCacheValid(cached)) {
       // Update last accessed time for LRU tracking
       cached.lastAccessed = now;
-      if (import.meta.env.DEV) {
-        console.log('[LoveNoteImageService] Cache hit for:', storagePath);
-      }
+      logger.debug('[LoveNoteImageService] Cache hit for:', storagePath);
       return {
         url: cached.url,
         expiresAt: cached.expiresAt,
@@ -249,9 +246,7 @@ export async function getSignedImageUrl(
   // Check for in-flight request to prevent duplicate API calls
   const pending = pendingRequests.get(storagePath);
   if (pending && !forceRefresh) {
-    if (import.meta.env.DEV) {
-      console.log('[LoveNoteImageService] Deduplicating request for:', storagePath);
-    }
+    logger.debug('[LoveNoteImageService] Deduplicating request for:', storagePath);
     return pending;
   }
 
@@ -283,9 +278,7 @@ export async function getSignedImageUrl(
         cleanCache();
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[LoveNoteImageService] Cached new URL for:', storagePath);
-      }
+      logger.debug('[LoveNoteImageService] Cached new URL for:', storagePath);
 
       return result;
     } finally {
@@ -348,9 +341,7 @@ export async function batchGetSignedUrls(
   }
 
   if (pathsToFetch.length === 0) {
-    if (import.meta.env.DEV) {
-      console.log('[LoveNoteImageService] Batch: all URLs from cache');
-    }
+    logger.debug('[LoveNoteImageService] Batch: all URLs from cache');
     return results;
   }
 
@@ -371,11 +362,9 @@ export async function batchGetSignedUrls(
     results.set(path, result);
   }
 
-  if (import.meta.env.DEV) {
-    console.log(
-      `[LoveNoteImageService] Batch: ${storagePaths.length - pathsToFetch.length} cached, ${pathsToFetch.length} fetched`
-    );
-  }
+  logger.debug(
+    `[LoveNoteImageService] Batch: ${storagePaths.length - pathsToFetch.length} cached, ${pathsToFetch.length} fetched`
+  );
 
   // Clean cache after batch to handle edge case where parallel fetches
   // exceed max size before individual cleanup checks can trigger
