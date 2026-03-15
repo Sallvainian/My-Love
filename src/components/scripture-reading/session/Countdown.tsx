@@ -53,14 +53,14 @@ export function Countdown({ startedAt, onComplete }: CountdownProps): ReactEleme
 
     const interval = setInterval(() => {
       const current = getDigit(startedAt);
-      setDigit((prev) => (prev !== current ? current : prev));
+      setDigit(current);
 
       if (current === 0) {
         clearInterval(interval);
         setAnnounced('Session started');
         onComplete();
       }
-    }, 250); // 250ms is sufficient for integer digit transitions (3→2→1→0)
+    }, 100); // Poll at 100ms for smooth digit updates
 
     return () => clearInterval(interval);
   }, [startedAt, onComplete]);

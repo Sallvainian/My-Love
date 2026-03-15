@@ -235,12 +235,9 @@ export function ScriptureOverview() {
   }, [checkForActiveSession, clearActiveSession, freshStartRequested, session]);
 
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
-  // Clear stale announcement when activeSession is dismissed to keep aria-live in sync
   useEffect(() => {
     if (activeSession && !isCheckingSession) {
       setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
-    } else if (!activeSession && !isCheckingSession) {
-      setAnnouncement('');
     }
   }, [activeSession, isCheckingSession]);
 

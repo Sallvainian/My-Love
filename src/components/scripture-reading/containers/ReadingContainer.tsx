@@ -220,7 +220,7 @@ export function ReadingContainer(): ReactElement | null {
           partnerName={partnerName}
           disconnectedAt={partnerDisconnectedAt}
           onKeepWaiting={handleKeepWaiting}
-          onEndSession={endSession}
+          onEndSession={() => void endSession()}
           isEnding={isSyncing}
         />
       )}

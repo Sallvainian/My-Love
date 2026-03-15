@@ -19,7 +19,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../api/supabaseClient';
-import { subscribePrivateChannel } from '../api/realtimeChannel';
 import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
 import type { ScriptureError } from '../services/scriptureReadingService';
 
@@ -131,9 +130,13 @@ export function useScripturePresence(
 
     channelRef.current = channel;
 
-    subscribePrivateChannel({
-      onReady: (userId) => {
-        userIdRef.current = userId;
+    void supabase.realtime
+      .setAuth()
+      .then(async () => {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+
+        userIdRef.current = authData.user?.id ?? '';
 
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
@@ -181,16 +184,15 @@ export function useScripturePresence(
             }
           }
         });
-      },
-      onError: (err) => {
+      })
+      .catch((err: unknown) => {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SYNC_FAILED,
           message: err instanceof Error ? err.message : 'Failed to authenticate presence channel',
           details: err,
         };
         handleScriptureError(scriptureError);
-      },
-    });
+      });
 
     return () => {
       if (staleTimerRef.current) {

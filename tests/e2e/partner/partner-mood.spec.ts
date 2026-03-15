@@ -40,8 +40,8 @@ test.describe('Partner Mood View', () => {
     // loadPartner makes 2 sequential GET /rest/v1/users calls:
     //   1. select=partner_id,updated_at → current user's record
     //   2. select=id,email,display_name → partner's record
-    // Mock both with the correct shapes. Await to avoid race conditions.
-    await interceptNetworkCall({
+    // Mock both with the correct shapes.
+    interceptNetworkCall({
       url: '**/rest/v1/users?select=partner_id*',
       fulfillResponse: {
         status: 200,
@@ -49,7 +49,7 @@ test.describe('Partner Mood View', () => {
       },
     });
 
-    await interceptNetworkCall({
+    interceptNetworkCall({
       url: '**/rest/v1/users?select=id*',
       fulfillResponse: {
         status: 200,
@@ -57,7 +57,7 @@ test.describe('Partner Mood View', () => {
       },
     });
 
-    await interceptNetworkCall({
+    interceptNetworkCall({
       url: '**/rest/v1/partner_requests**',
       fulfillResponse: {
         status: 200,
@@ -66,7 +66,7 @@ test.describe('Partner Mood View', () => {
     });
 
     // Stub partner moods fetch
-    await interceptNetworkCall({
+    interceptNetworkCall({
       url: '**/rest/v1/moods**',
       fulfillResponse: {
         status: 200,
