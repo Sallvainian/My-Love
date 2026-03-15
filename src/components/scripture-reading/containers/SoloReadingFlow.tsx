@@ -92,31 +92,36 @@ export function SoloReadingFlow() {
   return (
     <ReadingPhaseView
       session={flow.session}
-      subView={flow.subView}
-      slideDirection={flow.slideDirection}
-      showExitConfirm={flow.showExitConfirm}
-      isOnline={flow.isOnline}
-      isSyncing={flow.isSyncing}
-      isNextDisabled={isNextDisabled}
-      isLastStep={isLastStep}
-      scriptureError={flow.scriptureError}
-      pendingRetry={flow.pendingRetry}
-      bookmarkedSteps={flow.bookmarkedSteps}
-      announcement={flow.announcement}
-      crossfade={flow.crossfade}
-      slide={flow.slide}
-      verseHeadingRef={flow.verseHeadingRef}
-      backToVerseRef={flow.backToVerseRef}
-      exitButtonRef={flow.exitButtonRef}
-      dialogRef={flow.dialogRef}
-      handleBookmarkToggle={flow.handleBookmarkToggle}
-      handleNextVerse={flow.handleNextVerse}
-      handleViewResponse={flow.handleViewResponse}
-      handleBackToVerse={flow.handleBackToVerse}
-      handleExitRequest={flow.handleExitRequest}
-      handleExitCancel={flow.handleExitCancel}
-      handleSaveAndExit={flow.handleSaveAndExit}
-      retryFailedWrite={flow.retryFailedWrite}
+      state={{
+        subView: flow.subView,
+        slideDirection: flow.slideDirection,
+        showExitConfirm: flow.showExitConfirm,
+        isOnline: flow.isOnline,
+        isSyncing: flow.isSyncing,
+        isNextDisabled,
+        isLastStep,
+        scriptureError: flow.scriptureError,
+        pendingRetry: flow.pendingRetry,
+        bookmarkedSteps: flow.bookmarkedSteps,
+        announcement: flow.announcement,
+      }}
+      animations={{ crossfade: flow.crossfade, slide: flow.slide }}
+      elementRefs={{
+        verseHeading: flow.verseHeadingRef,
+        backToVerse: flow.backToVerseRef,
+        exitButton: flow.exitButtonRef,
+        dialog: flow.dialogRef,
+      }}
+      handlers={{
+        onBookmarkToggle: flow.handleBookmarkToggle,
+        onNextVerse: flow.handleNextVerse,
+        onViewResponse: flow.handleViewResponse,
+        onBackToVerse: flow.handleBackToVerse,
+        onExitRequest: flow.handleExitRequest,
+        onExitCancel: flow.handleExitCancel,
+        onSaveAndExit: flow.handleSaveAndExit,
+        onRetryFailedWrite: flow.retryFailedWrite,
+      }}
     />
   );
 }

@@ -16,66 +16,55 @@ import type { SlideDirection } from '../hooks/useSoloReadingFlow';
 const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
 
 interface ReadingPhaseViewProps {
-  session: {
-    currentStepIndex: number;
+  session: { currentStepIndex: number };
+  state: {
+    subView: 'verse' | 'response';
+    slideDirection: SlideDirection;
+    showExitConfirm: boolean;
+    isOnline: boolean;
+    isSyncing: boolean;
+    isNextDisabled: boolean;
+    isLastStep: boolean;
+    scriptureError: { message: string } | string | null;
+    pendingRetry: { attempts: number; maxAttempts: number } | null;
+    bookmarkedSteps: Set<number>;
+    announcement: string;
   };
-  subView: 'verse' | 'response';
-  slideDirection: SlideDirection;
-  showExitConfirm: boolean;
-  isOnline: boolean;
-  isSyncing: boolean;
-  isNextDisabled: boolean;
-  isLastStep: boolean;
-  scriptureError: { message: string } | string | null;
-  pendingRetry: { attempts: number; maxAttempts: number } | null;
-  bookmarkedSteps: Set<number>;
-  announcement: string;
-  crossfade: { duration: number };
-  slide: { duration: number };
-  // Refs
-  verseHeadingRef: RefObject<HTMLParagraphElement | null>;
-  backToVerseRef: RefObject<HTMLButtonElement | null>;
-  exitButtonRef: RefObject<HTMLButtonElement | null>;
-  dialogRef: RefObject<HTMLDivElement | null>;
-  // Handlers
-  handleBookmarkToggle: () => void;
-  handleNextVerse: () => Promise<void>;
-  handleViewResponse: () => void;
-  handleBackToVerse: () => void;
-  handleExitRequest: () => void;
-  handleExitCancel: () => void;
-  handleSaveAndExit: () => Promise<void>;
-  retryFailedWrite: () => void;
+  animations: {
+    crossfade: { duration: number };
+    slide: { duration: number };
+  };
+  elementRefs: {
+    verseHeading: RefObject<HTMLParagraphElement | null>;
+    backToVerse: RefObject<HTMLButtonElement | null>;
+    exitButton: RefObject<HTMLButtonElement | null>;
+    dialog: RefObject<HTMLDivElement | null>;
+  };
+  handlers: {
+    onBookmarkToggle: () => void;
+    onNextVerse: () => Promise<void>;
+    onViewResponse: () => void;
+    onBackToVerse: () => void;
+    onExitRequest: () => void;
+    onExitCancel: () => void;
+    onSaveAndExit: () => Promise<void>;
+    onRetryFailedWrite: () => void;
+  };
 }
 
 export function ReadingPhaseView({
   session,
-  subView,
-  slideDirection,
-  showExitConfirm,
-  isOnline,
-  isSyncing,
-  isNextDisabled,
-  isLastStep,
-  scriptureError,
-  pendingRetry,
-  bookmarkedSteps,
-  announcement,
-  crossfade,
-  slide,
-  verseHeadingRef,
-  backToVerseRef,
-  exitButtonRef,
-  dialogRef,
-  handleBookmarkToggle,
-  handleNextVerse,
-  handleViewResponse,
-  handleBackToVerse,
-  handleExitRequest,
-  handleExitCancel,
-  handleSaveAndExit,
-  retryFailedWrite,
+  state,
+  animations,
+  elementRefs,
+  handlers,
 }: ReadingPhaseViewProps) {
+  const {
+    verseHeading: verseHeadingRef,
+    backToVerse: backToVerseRef,
+    exitButton: exitButtonRef,
+    dialog: dialogRef,
+  } = elementRefs;
   const currentStep = SCRIPTURE_STEPS[session.currentStepIndex];
 
   // Guard: currentStep should always exist for valid step index
@@ -106,14 +95,14 @@ export function ReadingPhaseView({
       >
         {/* Screen reader announcer */}
         <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="sr-announcer">
-          {announcement}
+          {state.announcement}
         </div>
 
         {/* Header with exit button and progress */}
         <header className="mx-auto flex w-full max-w-md items-center justify-between p-4">
           <button
             ref={exitButtonRef}
-            onClick={handleExitRequest}
+            onClick={handlers.onExitRequest}
             className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 transition-colors hover:text-purple-800 ${FOCUS_RING}`}
             aria-label="Exit reading"
             data-testid="exit-button"
@@ -150,18 +139,18 @@ export function ReadingPhaseView({
 
         {/* Main content area */}
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-4">
-          <AnimatePresence mode="wait" custom={slideDirection}>
+          <AnimatePresence mode="wait" custom={state.slideDirection}>
             <m.div
-              key={`step-${session.currentStepIndex}-${subView}`}
-              custom={slideDirection}
-              variants={subView === 'verse' ? slideVariants : undefined}
-              initial={subView === 'verse' ? 'enter' : { opacity: 0 }}
-              animate={subView === 'verse' ? 'center' : { opacity: 1 }}
-              exit={subView === 'verse' ? 'exit' : { opacity: 0 }}
-              transition={subView === 'verse' ? slide : crossfade}
+              key={`step-${session.currentStepIndex}-${state.subView}`}
+              custom={state.slideDirection}
+              variants={state.subView === 'verse' ? slideVariants : undefined}
+              initial={state.subView === 'verse' ? 'enter' : { opacity: 0 }}
+              animate={state.subView === 'verse' ? 'center' : { opacity: 1 }}
+              exit={state.subView === 'verse' ? 'exit' : { opacity: 0 }}
+              transition={state.subView === 'verse' ? animations.slide : animations.crossfade}
               className="flex w-full flex-1 flex-col justify-center pb-32"
             >
-              {subView === 'verse' ? (
+              {state.subView === 'verse' ? (
                 /* Verse Screen */
                 <div className="flex w-full flex-col space-y-6" data-testid="verse-screen">
                   <div className="flex items-center justify-between">
@@ -175,9 +164,9 @@ export function ReadingPhaseView({
                       {currentStep.verseReference}
                     </p>
                     <BookmarkFlag
-                      isBookmarked={bookmarkedSteps.has(session.currentStepIndex)}
-                      onToggle={handleBookmarkToggle}
-                      disabled={!isOnline}
+                      isBookmarked={state.bookmarkedSteps.has(session.currentStepIndex)}
+                      onToggle={handlers.onBookmarkToggle}
+                      disabled={!state.isOnline}
                     />
                   </div>
 
@@ -214,7 +203,7 @@ export function ReadingPhaseView({
           </AnimatePresence>
 
           {/* Offline indicator */}
-          {!isOnline && (
+          {!state.isOnline && (
             <div
               className="mb-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"
               data-testid="offline-indicator"
@@ -240,14 +229,14 @@ export function ReadingPhaseView({
           )}
 
           {/* Syncing indicator */}
-          {isSyncing && (
+          {state.isSyncing && (
             <div className="py-1 text-center text-xs text-purple-600" data-testid="sync-indicator">
               Saving...
             </div>
           )}
 
           {/* Error display */}
-          {scriptureError && !pendingRetry && (
+          {state.scriptureError && !state.pendingRetry && (
             <div
               className="mb-2 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
               data-testid="reading-error"
@@ -268,30 +257,32 @@ export function ReadingPhaseView({
                 />
               </svg>
               <span>
-                {typeof scriptureError === 'string' ? scriptureError : scriptureError.message}
+                {typeof state.scriptureError === 'string'
+                  ? state.scriptureError
+                  : state.scriptureError.message}
               </span>
             </div>
           )}
 
           {/* Retry UI */}
-          {pendingRetry && (
+          {state.pendingRetry && (
             <div
               className="mb-2 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
               data-testid="retry-banner"
             >
               <span className="text-sm text-amber-700">
-                {pendingRetry.attempts >= pendingRetry.maxAttempts
+                {state.pendingRetry.attempts >= state.pendingRetry.maxAttempts
                   ? 'Save failed. Your progress is saved locally.'
                   : 'Save failed. Tap to retry.'}
               </span>
-              {pendingRetry.attempts < pendingRetry.maxAttempts && (
+              {state.pendingRetry.attempts < state.pendingRetry.maxAttempts && (
                 <button
-                  onClick={retryFailedWrite}
+                  onClick={handlers.onRetryFailedWrite}
                   className={`flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg text-sm font-medium text-amber-800 hover:text-amber-900 ${FOCUS_RING}`}
                   data-testid="retry-button"
                   type="button"
                 >
-                  Retry ({pendingRetry.attempts}/{pendingRetry.maxAttempts})
+                  Retry ({state.pendingRetry.attempts}/{state.pendingRetry.maxAttempts})
                 </button>
               )}
             </div>
@@ -299,10 +290,10 @@ export function ReadingPhaseView({
 
           {/* Action buttons */}
           <div className="space-y-3 pt-4">
-            {subView === 'verse' ? (
+            {state.subView === 'verse' ? (
               <>
                 <button
-                  onClick={handleViewResponse}
+                  onClick={handlers.onViewResponse}
                   className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
                   data-testid="scripture-view-response-button"
                   type="button"
@@ -311,16 +302,16 @@ export function ReadingPhaseView({
                 </button>
 
                 <button
-                  onClick={handleNextVerse}
-                  disabled={isNextDisabled}
+                  onClick={handlers.onNextVerse}
+                  disabled={state.isNextDisabled}
                   className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
                   data-testid="scripture-next-verse-button"
                   type="button"
                 >
-                  {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                  {state.isLastStep ? 'Complete Reading' : 'Next Verse'}
                 </button>
 
-                {!isOnline && (
+                {!state.isOnline && (
                   <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
                     Connect to internet to continue
                   </p>
@@ -330,7 +321,7 @@ export function ReadingPhaseView({
               <>
                 <button
                   ref={backToVerseRef}
-                  onClick={handleBackToVerse}
+                  onClick={handlers.onBackToVerse}
                   className={`min-h-[48px] w-full rounded-xl border border-purple-200/50 bg-white/80 px-4 py-3 font-medium text-purple-700 backdrop-blur-sm transition-colors hover:bg-purple-50/80 active:bg-purple-100/80 ${FOCUS_RING}`}
                   data-testid="scripture-back-to-verse-button"
                   type="button"
@@ -339,16 +330,16 @@ export function ReadingPhaseView({
                 </button>
 
                 <button
-                  onClick={handleNextVerse}
-                  disabled={isNextDisabled}
+                  onClick={handlers.onNextVerse}
+                  disabled={state.isNextDisabled}
                   className={`min-h-[56px] w-full rounded-2xl bg-linear-to-r from-purple-500 to-purple-600 py-4 text-lg font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 disabled:opacity-50 ${FOCUS_RING}`}
                   data-testid="scripture-next-verse-button"
                   type="button"
                 >
-                  {isLastStep ? 'Complete Reading' : 'Next Verse'}
+                  {state.isLastStep ? 'Complete Reading' : 'Next Verse'}
                 </button>
 
-                {!isOnline && (
+                {!state.isOnline && (
                   <p className="text-center text-xs text-amber-700" data-testid="disabled-reason">
                     Connect to internet to continue
                   </p>
@@ -360,22 +351,22 @@ export function ReadingPhaseView({
 
         {/* Exit Confirmation Dialog */}
         <AnimatePresence>
-          {showExitConfirm && (
+          {state.showExitConfirm && (
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={crossfade}
+              transition={animations.crossfade}
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
               data-testid="exit-confirm-overlay"
-              onClick={handleExitCancel}
+              onClick={handlers.onExitCancel}
             >
               <m.div
                 ref={dialogRef}
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                transition={crossfade}
+                transition={animations.crossfade}
                 className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl"
                 data-testid="exit-confirm-dialog"
                 role="dialog"
@@ -391,17 +382,17 @@ export function ReadingPhaseView({
                 </p>
                 <div className="flex gap-3">
                   <button
-                    onClick={handleSaveAndExit}
-                    disabled={isSyncing}
+                    onClick={handlers.onSaveAndExit}
+                    disabled={state.isSyncing}
                     className={`min-h-[48px] flex-1 rounded-xl bg-linear-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 ${FOCUS_RING}`}
                     data-testid="save-and-exit-button"
                     type="button"
                     autoFocus
                   >
-                    {isSyncing ? 'Saving...' : 'Save & Exit'}
+                    {state.isSyncing ? 'Saving...' : 'Save & Exit'}
                   </button>
                   <button
-                    onClick={handleExitCancel}
+                    onClick={handlers.onExitCancel}
                     className={`min-h-[48px] rounded-lg px-4 py-3 font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
                     data-testid="cancel-exit-button"
                     type="button"
