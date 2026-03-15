@@ -9,19 +9,9 @@
 import { test, expect } from '../support/merged-fixtures';
 import { createTestSession, cleanupTestSession } from '../support/factories';
 import { getUserAccessToken } from '../support/helpers/supabase';
-import { faker } from '@faker-js/faker';
+import { generateReflectionNote, generateRating } from '../support/helpers/reflection';
 import { z } from 'zod';
 import { SupabaseReflectionSchema } from '../../src/validation/schemas';
-
-/** Generate a dynamic reflection note for test isolation. */
-function generateReflectionNote(prefix = 'test'): string {
-  return `${prefix}-${faker.lorem.sentence()}`;
-}
-
-/** Generate a dynamic rating (1-5) for test isolation. */
-function generateRating(): number {
-  return faker.number.int({ min: 1, max: 5 });
-}
 
 test.describe('Scripture Reflection API - Story 2.2', () => {
   // ============================================

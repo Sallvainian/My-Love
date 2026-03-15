@@ -20,8 +20,20 @@ import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 
-// Mock supabase client
-const mockRpc = vi.fn();
+// Mock supabase client & service — ScriptureErrorCode shared via vi.hoisted()
+const { mockRpc, SCRIPTURE_ERROR_CODE_MOCK } = vi.hoisted(() => ({
+  mockRpc: vi.fn(),
+  SCRIPTURE_ERROR_CODE_MOCK: {
+    VERSION_MISMATCH: 'VERSION_MISMATCH',
+    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+    UNAUTHORIZED: 'UNAUTHORIZED',
+    SYNC_FAILED: 'SYNC_FAILED',
+    OFFLINE: 'OFFLINE',
+    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
+    VALIDATION_FAILED: 'VALIDATION_FAILED',
+  },
+}));
+
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
     auth: {
@@ -31,7 +43,6 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   },
 }));
 
-// Mock the scriptureReadingService
 vi.mock('../../../src/services/scriptureReadingService', () => ({
   scriptureReadingService: {
     createSession: vi.fn(),
@@ -42,15 +53,7 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
     getCoupleStats: vi.fn(),
     recoverSessionCache: vi.fn(),
   },
-  ScriptureErrorCode: {
-    VERSION_MISMATCH: 'VERSION_MISMATCH',
-    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
-    UNAUTHORIZED: 'UNAUTHORIZED',
-    SYNC_FAILED: 'SYNC_FAILED',
-    OFFLINE: 'OFFLINE',
-    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
-    VALIDATION_FAILED: 'VALIDATION_FAILED',
-  },
+  ScriptureErrorCode: SCRIPTURE_ERROR_CODE_MOCK,
   handleScriptureError: vi.fn(),
 }));
 

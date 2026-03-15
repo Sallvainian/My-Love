@@ -83,8 +83,6 @@ test.describe('Scripture Accessibility', () => {
       await startSoloSession(page);
 
       // WHEN: User tabs through all elements multiple times
-      const _startFocus = await page.evaluate(() => document.activeElement?.tagName);
-
       // Tab 20 times
       for (let i = 0; i < 20; i++) {
         await page.keyboard.press('Tab');
@@ -163,9 +161,6 @@ test.describe('Scripture Accessibility', () => {
       await startSoloSession(page);
 
       const liveRegion = page.getByTestId('sr-announcer');
-
-      // Record initial announcement text
-      const _initialText = await liveRegion.textContent();
 
       // WHEN: View Response (not a semantic state change in terms of step)
       await page.getByTestId('scripture-view-response-button').click();
