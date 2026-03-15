@@ -191,6 +191,8 @@ function App() {
   // Story 6.7: Check authentication status on mount
   useEffect(() => {
     let isMounted = true;
+    // Track whether checkAuth already set Sentry user to avoid double getPartnerId() on fresh sign-in
+    let lastSentryUserId = '';
 
     const checkAuth = async () => {
       try {
@@ -200,6 +202,7 @@ function App() {
           setAuthLoading(false);
 
           if (currentSession?.user) {
+            lastSentryUserId = currentSession.user.id;
             const partnerId = await getPartnerId();
             setSentryUser(currentSession.user.id, partnerId);
           }
@@ -231,9 +234,13 @@ function App() {
           const hasDisplayName = newSession.user.user_metadata?.display_name;
           setNeedsDisplayName(!hasDisplayName);
 
-          getPartnerId().then((partnerId) => {
-            setSentryUser(newSession.user.id, partnerId);
-          });
+          // Skip redundant getPartnerId() if checkAuth already handled this user
+          if (newSession.user.id !== lastSentryUserId) {
+            getPartnerId().then((partnerId) => {
+              setSentryUser(newSession.user.id, partnerId);
+              lastSentryUserId = newSession.user.id;
+            });
+          }
 
           if (import.meta.env.DEV) {
             console.log('[App] Auth state changed:', {
@@ -245,6 +252,7 @@ function App() {
         } else {
           setNeedsDisplayName(false);
           clearSentryUser();
+          lastSentryUserId = '';
           if (import.meta.env.DEV) {
             console.log('[App] Auth state changed: signed out');
           }

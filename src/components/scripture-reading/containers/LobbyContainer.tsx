@@ -18,7 +18,6 @@ import type { ReactElement } from 'react';
 import { ArrowLeft, BookOpen, MessageCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
-import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
 import { Countdown } from '../session/Countdown';
 
 // Lavender Dreams design tokens (from ScriptureOverview)
@@ -67,24 +66,9 @@ export function LobbyContainer(): ReactElement {
 
   const partnerName = partner?.displayName ?? 'your partner';
 
-  const handleSelectRole = useCallback(
-    async (role: SessionRole) => {
-      await selectRole(role);
-    },
-    [selectRole]
-  );
-
   const handleToggleReady = useCallback(async () => {
     await toggleReady(!myReady);
   }, [toggleReady, myReady]);
-
-  const handleContinueSolo = useCallback(async () => {
-    await convertToSolo();
-  }, [convertToSolo]);
-
-  const handleBack = useCallback(() => {
-    exitSession();
-  }, [exitSession]);
 
   const handleCountdownComplete = useCallback(() => {
     if (session) {
@@ -117,7 +101,7 @@ export function LobbyContainer(): ReactElement {
           <button
             type="button"
             data-testid="lobby-back-button"
-            onClick={handleBack}
+            onClick={exitSession}
             aria-label="Back to overview"
             className={`-ml-2 rounded-full p-2 transition-colors hover:bg-purple-200/50 ${FOCUS_RING}`}
           >
@@ -137,7 +121,7 @@ export function LobbyContainer(): ReactElement {
               type="button"
               data-testid="lobby-role-reader"
               disabled={scriptureLoading}
-              onClick={() => void handleSelectRole('reader')}
+              onClick={() => void selectRole('reader')}
               className={`flex min-h-[140px] flex-col items-center gap-3 rounded-2xl border border-purple-200/50 bg-white/80 p-6 text-left backdrop-blur-sm transition-all duration-200 hover:border-purple-400 active:bg-purple-50/80 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING} `}
             >
               <BookOpen className="h-8 w-8 text-purple-500" />
@@ -152,7 +136,7 @@ export function LobbyContainer(): ReactElement {
               type="button"
               data-testid="lobby-role-responder"
               disabled={scriptureLoading}
-              onClick={() => void handleSelectRole('responder')}
+              onClick={() => void selectRole('responder')}
               className={`flex min-h-[140px] flex-col items-center gap-3 rounded-2xl border border-purple-200/50 bg-white/80 p-6 text-left backdrop-blur-sm transition-all duration-200 hover:border-purple-400 active:bg-purple-50/80 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING} `}
             >
               <MessageCircle className="h-8 w-8 text-purple-500" />
@@ -168,7 +152,7 @@ export function LobbyContainer(): ReactElement {
             <button
               type="button"
               data-testid="lobby-continue-solo"
-              onClick={() => void handleContinueSolo()}
+              onClick={() => void convertToSolo()}
               className={`text-sm text-purple-400 transition-colors hover:text-purple-600 ${FOCUS_RING} rounded-lg px-3 py-2`}
             >
               Continue solo
@@ -190,7 +174,7 @@ export function LobbyContainer(): ReactElement {
         <button
           type="button"
           data-testid="lobby-back-button"
-          onClick={handleBack}
+          onClick={exitSession}
           aria-label="Back to overview"
           className={`-ml-2 rounded-full p-2 transition-colors hover:bg-purple-200/50 ${FOCUS_RING}`}
         >
@@ -267,7 +251,7 @@ export function LobbyContainer(): ReactElement {
           <button
             type="button"
             data-testid="lobby-continue-solo"
-            onClick={() => void handleContinueSolo()}
+            onClick={() => void convertToSolo()}
             className={`text-sm text-purple-400 transition-colors hover:text-purple-600 ${FOCUS_RING} rounded-lg px-3 py-2`}
           >
             Continue solo
