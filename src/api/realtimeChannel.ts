@@ -7,7 +7,7 @@
  * Pattern:
  *   1. setAuth() on supabase.realtime (required for private channels)
  *   2. getUser() to obtain the current user ID
- *   3. Call the provided onReady callback with the channel and userId
+ *   3. Call the provided onReady callback with the userId
  *
  * Error handling is delegated to the caller via onError.
  */
