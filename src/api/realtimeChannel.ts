@@ -13,11 +13,8 @@
  */
 
 import { supabase } from './supabaseClient';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface SubscribePrivateChannelOptions {
-  /** The channel to subscribe (already created via supabase.channel()). */
-  channel: RealtimeChannel;
   /** Called after successful auth with the authenticated user's ID. */
   onReady: (userId: string) => void;
   /** Called if auth or getUser fails. */
@@ -32,7 +29,6 @@ interface SubscribePrivateChannelOptions {
  * `channel.subscribe()`.
  */
 export function subscribePrivateChannel({
-  channel,
   onReady,
   onError,
 }: SubscribePrivateChannelOptions): void {
@@ -43,8 +39,10 @@ export function subscribePrivateChannel({
       if (authError) {
         throw authError;
       }
-      const userId = authData.user?.id ?? '';
-      onReady(userId);
+      if (!authData.user) {
+        throw new Error('No authenticated user found');
+      }
+      onReady(authData.user.id);
     })
     .catch((err: unknown) => {
       onError(err);

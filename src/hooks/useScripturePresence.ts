@@ -132,7 +132,6 @@ export function useScripturePresence(
     channelRef.current = channel;
 
     subscribePrivateChannel({
-      channel,
       onReady: (userId) => {
         userIdRef.current = userId;
 

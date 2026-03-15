@@ -150,7 +150,6 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     // Set auth before subscribing (required for private channels).
     // Fetch the current user's ID here so the partner_joined payload satisfies the event contract.
     subscribePrivateChannel({
-      channel,
       onReady: (userId) => {
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {

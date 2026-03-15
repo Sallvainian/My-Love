@@ -192,7 +192,7 @@ function App() {
   useEffect(() => {
     let isMounted = true;
     // Track whether checkAuth already set Sentry user to avoid double getPartnerId() on fresh sign-in
-    let sentryUserSet = false;
+    let lastSentryUserId = '';
 
     const checkAuth = async () => {
       try {
@@ -202,9 +202,9 @@ function App() {
           setAuthLoading(false);
 
           if (currentSession?.user) {
+            lastSentryUserId = currentSession.user.id;
             const partnerId = await getPartnerId();
             setSentryUser(currentSession.user.id, partnerId);
-            sentryUserSet = true;
           }
 
           if (import.meta.env.DEV) {
@@ -235,13 +235,12 @@ function App() {
           setNeedsDisplayName(!hasDisplayName);
 
           // Skip redundant getPartnerId() if checkAuth already handled this user
-          if (!sentryUserSet) {
+          if (newSession.user.id !== lastSentryUserId) {
             getPartnerId().then((partnerId) => {
               setSentryUser(newSession.user.id, partnerId);
+              lastSentryUserId = newSession.user.id;
             });
           }
-          // Reset flag so subsequent auth changes (e.g., token refresh) still update Sentry
-          sentryUserSet = false;
 
           if (import.meta.env.DEV) {
             console.log('[App] Auth state changed:', {
@@ -253,6 +252,7 @@ function App() {
         } else {
           setNeedsDisplayName(false);
           clearSentryUser();
+          lastSentryUserId = '';
           if (import.meta.env.DEV) {
             console.log('[App] Auth state changed: signed out');
           }
