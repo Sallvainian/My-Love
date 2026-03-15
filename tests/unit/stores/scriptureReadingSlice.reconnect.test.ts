@@ -27,7 +27,7 @@ const { mockRpc, mockGetSession } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
 }));
 
-// Mock supabase client
+// Mock supabase client & service — ScriptureErrorCode shared via vi.hoisted()
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
     auth: {
@@ -37,7 +37,6 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   },
 }));
 
-// Mock the scriptureReadingService
 vi.mock('../../../src/services/scriptureReadingService', () => ({
   scriptureReadingService: {
     createSession: vi.fn(),

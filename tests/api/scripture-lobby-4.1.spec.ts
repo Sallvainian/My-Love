@@ -1,5 +1,5 @@
 /**
- * P1 API: Scripture Lobby — Role Selection, Ready State & Solo Conversion
+ * P1 API: Scripture Lobby -- Role Selection, Ready State & Solo Conversion
  *
  * Story 4.1: Lobby, Role Selection & Countdown
  * Tests role selection persistence, dual-ready countdown trigger, and solo conversion.
@@ -7,7 +7,7 @@
  * Test IDs: 4.1-API-001 (P1), 4.1-API-002 (P1), 4.1-API-003 (P1)
  * Risk Links: Role assignment must be server-authoritative; countdown start must be atomic
  *
- * TDD Phase: GREEN — implementation complete (migration 20260220000001)
+ * TDD Phase: GREEN -- implementation complete (migration 20260220000001)
  */
 import { test, expect } from '../support/merged-fixtures';
 import {
@@ -17,6 +17,7 @@ import {
   unlinkTestPartners,
 } from '../support/factories';
 import { getUserAccessToken } from '../support/helpers/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Type cast helper for new lobby columns not yet in database.types.ts
 // Remove after running: supabase gen types typescript --local > src/types/database.types.ts
@@ -30,6 +31,43 @@ interface ScriptureSessionLobbyRow {
   mode: string;
 }
 
+/** Shared seed/link/token setup for lobby API tests that need two linked partners. */
+async function seedLinkedPartners(supabaseAdmin: SupabaseClient) {
+  const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
+  const sessionId = seedResult.session_ids[0];
+  const user1Id = seedResult.test_user1_id;
+  const user2Id = seedResult.test_user2_id!;
+
+  await linkTestPartners(supabaseAdmin, user1Id, user2Id);
+
+  const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
+
+  return {
+    seedResult,
+    sessionId,
+    user1Id,
+    user2Id,
+    user1Token,
+    cleanup: async () => {
+      await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
+      await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+    },
+  };
+}
+
+/** Query a scripture session row and cast to lobby column types. */
+async function queryLobbyRow(supabaseAdmin: SupabaseClient, sessionId: string) {
+  const result = await supabaseAdmin
+    .from('scripture_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
+  return {
+    dbRow: result.data as unknown as ScriptureSessionLobbyRow | null,
+    queryError: result.error,
+  };
+}
+
 test.describe('Scripture Lobby API - Story 4.1', () => {
   // ============================================
   // 4.1-API-001: Role selection stored on session
@@ -40,15 +78,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-      // GIVEN: A session and two linked partners exist
-      const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
-      const sessionId = seedResult.session_ids[0];
-      const user1Id = seedResult.test_user1_id;
-      const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
-
-      const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
+      const { sessionId, user1Token, cleanup } = await seedLinkedPartners(supabaseAdmin);
 
       try {
         // WHEN: User1 calls scripture_select_role with role='reader'
@@ -67,14 +97,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(response.body).toBeTruthy();
 
         // AND: user1_role is persisted as 'reader' in the database
-        // Cast via unknown — new columns not yet in database.types.ts (pending supabase gen types)
-        const roleResult = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-        const dbRow = roleResult.data as unknown as ScriptureSessionLobbyRow | null;
-        const queryError = roleResult.error;
+        const { dbRow, queryError } = await queryLobbyRow(supabaseAdmin, sessionId);
 
         expect(queryError).toBeNull();
         expect(dbRow).toBeTruthy();
@@ -83,8 +106,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         // AND: user2_role is not affected by this call
         expect(dbRow!.user2_role).toBeNull();
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
-        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+        await cleanup();
       }
     });
 
@@ -92,15 +114,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-      // GIVEN: A session and two linked partners exist
-      const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
-      const sessionId = seedResult.session_ids[0];
-      const user1Id = seedResult.test_user1_id;
-      const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
-
-      const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
+      const { sessionId, user1Token, cleanup } = await seedLinkedPartners(supabaseAdmin);
 
       try {
         // WHEN: User1 selects role 'responder'
@@ -118,20 +132,13 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(response.status).toBe(200);
 
         // AND: user1_role is persisted as 'responder'
-        const responderResult = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-        const dbRow = responderResult.data as unknown as ScriptureSessionLobbyRow | null;
-        const queryError = responderResult.error;
+        const { dbRow, queryError } = await queryLobbyRow(supabaseAdmin, sessionId);
 
         expect(queryError).toBeNull();
         expect(dbRow).toBeTruthy();
         expect(dbRow!.user1_role).toBe('responder');
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
-        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+        await cleanup();
       }
     });
 
@@ -139,15 +146,9 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
       supabaseAdmin,
       apiRequest,
     }) => {
-      // GIVEN: A session and two linked partners exist
-      const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
-      const sessionId = seedResult.session_ids[0];
-      const user1Id = seedResult.test_user1_id;
-      const user2Id = seedResult.test_user2_id!;
+      const { sessionId, user2Id, cleanup } = await seedLinkedPartners(supabaseAdmin);
 
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
-
-      // Use user2's token — exercises the user2_id code path in the RPC
+      // Use user2's token -- exercises the user2_id code path in the RPC
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
 
       try {
@@ -166,13 +167,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(response.status).toBe(200);
 
         // AND: user2_role is persisted as 'responder'
-        const roleResult = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-        const dbRow = roleResult.data as unknown as ScriptureSessionLobbyRow | null;
-        const queryError = roleResult.error;
+        const { dbRow, queryError } = await queryLobbyRow(supabaseAdmin, sessionId);
 
         expect(queryError).toBeNull();
         expect(dbRow).toBeTruthy();
@@ -181,8 +176,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         // AND: user1_role is not affected by this call
         expect(dbRow!.user1_role).toBeNull();
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
-        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+        await cleanup();
       }
     });
   });
@@ -192,21 +186,13 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
   // Priority: P1
   // ============================================
   test.describe('[4.1-API-002] Both-ready state triggers countdown phase', () => {
+    test.use({ timeout: 30_000 });
+
     test('[P1] when both users toggle ready, countdown_started_at is set and phase becomes countdown', async ({
       supabaseAdmin,
       apiRequest,
     }) => {
-      test.setTimeout(30_000);
-
-      // GIVEN: A session and two linked partners exist
-      const seedResult = await createTestSession(supabaseAdmin, { sessionCount: 1 });
-      const sessionId = seedResult.session_ids[0];
-      const user1Id = seedResult.test_user1_id;
-      const user2Id = seedResult.test_user2_id!;
-
-      await linkTestPartners(supabaseAdmin, user1Id, user2Id);
-
-      const user1Token = await getUserAccessToken(supabaseAdmin, user1Id);
+      const { sessionId, user1Token, user2Id, cleanup } = await seedLinkedPartners(supabaseAdmin);
       const user2Token = await getUserAccessToken(supabaseAdmin, user2Id);
 
       try {
@@ -225,18 +211,12 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(user1ReadyResponse.status).toBe(200);
 
         // AND: Countdown has NOT started yet (only one user is ready)
-        const afterUser1Result = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-        const afterUser1 = afterUser1Result.data as unknown as ScriptureSessionLobbyRow | null;
-        const afterUser1Error = afterUser1Result.error;
+        const afterUser1 = await queryLobbyRow(supabaseAdmin, sessionId);
 
-        expect(afterUser1Error).toBeNull();
-        expect(afterUser1!.user1_ready).toBe(true);
-        expect(afterUser1!.user2_ready).toBe(false);
-        expect(afterUser1!.countdown_started_at).toBeNull();
+        expect(afterUser1.queryError).toBeNull();
+        expect(afterUser1.dbRow!.user1_ready).toBe(true);
+        expect(afterUser1.dbRow!.user2_ready).toBe(false);
+        expect(afterUser1.dbRow!.countdown_started_at).toBeNull();
 
         // WHEN: User2 also toggles ready = true
         const beforeCountdown = new Date();
@@ -254,27 +234,20 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(user2ReadyResponse.status).toBe(200);
 
         // AND: countdown_started_at is now set (server-authoritative timestamp)
-        const afterBothResult = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-        const afterBothReady = afterBothResult.data as unknown as ScriptureSessionLobbyRow | null;
-        const afterBothReadyError = afterBothResult.error;
+        const afterBoth = await queryLobbyRow(supabaseAdmin, sessionId);
 
-        expect(afterBothReadyError).toBeNull();
-        expect(afterBothReady!.user1_ready).toBe(true);
-        expect(afterBothReady!.user2_ready).toBe(true);
-        expect(afterBothReady!.countdown_started_at).not.toBeNull();
-        expect(afterBothReady!.current_phase).toBe('countdown');
+        expect(afterBoth.queryError).toBeNull();
+        expect(afterBoth.dbRow!.user1_ready).toBe(true);
+        expect(afterBoth.dbRow!.user2_ready).toBe(true);
+        expect(afterBoth.dbRow!.countdown_started_at).not.toBeNull();
+        expect(afterBoth.dbRow!.current_phase).toBe('countdown');
 
         // AND: countdown_started_at is a recent timestamp (set during this test)
-        const countdownTs = new Date(afterBothReady!.countdown_started_at!);
+        const countdownTs = new Date(afterBoth.dbRow!.countdown_started_at!);
         expect(countdownTs.getTime()).toBeGreaterThanOrEqual(beforeCountdown.getTime() - 1000);
         expect(countdownTs.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
       } finally {
-        await unlinkTestPartners(supabaseAdmin, user1Id, user2Id);
-        await cleanupTestSession(supabaseAdmin, seedResult.session_ids);
+        await cleanup();
       }
     });
   });
@@ -310,13 +283,7 @@ test.describe('Scripture Lobby API - Story 4.1', () => {
         expect(response.status).toBe(200);
 
         // AND: mode is set to 'solo' in the database
-        const soloResult = await supabaseAdmin
-          .from('scripture_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-        const dbRow = soloResult.data as unknown as ScriptureSessionLobbyRow | null;
-        const queryError = soloResult.error;
+        const { dbRow, queryError } = await queryLobbyRow(supabaseAdmin, sessionId);
 
         expect(queryError).toBeNull();
         expect(dbRow).toBeTruthy();
