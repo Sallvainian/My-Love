@@ -117,9 +117,14 @@ export function formatFullTimestamp(dateInput: string | Date): string {
 /**
  * Format date as YYYY-MM-DD using local timezone
  *
- * Uses local date components (not UTC) so the result is stable
- * regardless of the user's timezone offset. This matters for
- * deterministic hashing (e.g., daily message rotation).
+ * Uses local date components (not UTC) so the formatted date always
+ * matches the user's wall-clock date. The old implementation used
+ * `toISOString().split('T')[0]` which is UTC-based — at 11 PM EST
+ * that returns tomorrow's date, causing the wrong daily message.
+ *
+ * Output is persisted as cache keys in `messageHistory.shownMessages`
+ * (localStorage). A key mismatch from the format change is harmless:
+ * cache miss → deterministic recalculation via `getDailyMessage()`.
  */
 export function formatDateISO(date: Date): string {
   const year = date.getFullYear();
