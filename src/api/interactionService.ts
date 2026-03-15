@@ -151,7 +151,7 @@ export class InteractionService {
       }
 
       console.log(`[InteractionService] Sent ${type} to ${toUserId}`);
-      return data as unknown as SupabaseInteractionRecord;
+      return data;
     } catch (error) {
       logSupabaseError('InteractionService.sendInteraction', error);
 
@@ -258,7 +258,7 @@ export class InteractionService {
 
       // Transform Supabase records to local Interaction format
       return (
-        (data as unknown as SupabaseInteractionRecord[])?.map((record) => ({
+        data?.map((record) => ({
           id: record.id,
           type: record.type as InteractionType,
           fromUserId: record.from_user_id,
@@ -310,7 +310,7 @@ export class InteractionService {
       }
 
       return (
-        (data as unknown as SupabaseInteractionRecord[])?.map((record) => ({
+        data?.map((record) => ({
           id: record.id,
           type: record.type as InteractionType,
           fromUserId: record.from_user_id,
