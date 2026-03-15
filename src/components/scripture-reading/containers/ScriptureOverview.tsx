@@ -237,6 +237,7 @@ export function ScriptureOverview() {
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
   useEffect(() => {
     if (activeSession && !isCheckingSession) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- screen reader announcement on session load
       setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
     }
   }, [activeSession, isCheckingSession]);

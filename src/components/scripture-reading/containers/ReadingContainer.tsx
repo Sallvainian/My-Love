@@ -110,6 +110,7 @@ export function ReadingContainer(): ReactElement | null {
         void loadSession(session.id);
       }
       // Story 4.3: Show "Reconnected" toast (green tint, 2s auto-dismiss)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- presence transition drives toast
       setShowReconnectedToast(true);
       if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
       reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
@@ -142,6 +143,7 @@ export function ReadingContainer(): ReactElement | null {
   // Watch scriptureError for 409 "Session updated" toast
   useEffect(() => {
     if (scriptureError?.code === ScriptureErrorCode.VERSION_MISMATCH) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- toast triggered by error state change
       setShowToast(true);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setShowToast(false), 3000);
@@ -156,6 +158,7 @@ export function ReadingContainer(): ReactElement | null {
     if (!scriptureError || scriptureError.message === 'Session updated') return;
 
     const message = scriptureError.message.trim() || 'Something went wrong. Please try again.';
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- toast triggered by error state change
     setErrorToastMessage(message);
     if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
     errorToastTimerRef.current = setTimeout(() => setErrorToastMessage(null), 4000);
@@ -169,6 +172,7 @@ export function ReadingContainer(): ReactElement | null {
   useEffect(() => {
     if (session && session.currentStepIndex !== prevStepRef.current) {
       prevStepRef.current = session.currentStepIndex;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- view reset on step navigation
       setLocalView('verse');
     }
   }, [session?.currentStepIndex, session]);

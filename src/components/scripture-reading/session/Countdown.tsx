@@ -46,6 +46,7 @@ export function Countdown({ startedAt, onComplete }: CountdownProps): ReactEleme
   useEffect(() => {
     // If we mounted late (client received broadcast after 3s), complete immediately
     if (getDigit(startedAt) === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- announcement on countdown completion
       setAnnounced('Session started');
       onComplete();
       return;

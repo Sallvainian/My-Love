@@ -36,6 +36,7 @@ export function DisconnectionOverlay({
   const [isConfirmingEndSession, setIsConfirmingEndSession] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- elapsed timer init on disconnectedAt change
     setElapsed(Math.max(0, Date.now() - disconnectedAt));
     setIsConfirmingEndSession(false);
     const interval = setInterval(() => {
