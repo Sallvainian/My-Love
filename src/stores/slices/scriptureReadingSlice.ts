@@ -617,6 +617,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       set({
         scriptureLoading: false,
+        scriptureError: null,
         session: {
           ...session,
           currentPhase: snapshot.currentPhase,
@@ -877,15 +878,15 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             isPendingLockIn: false,
             partnerLocked: false,
           });
+          // Broadcast state_updated to partner (only when session exists)
+          broadcastFnRef?.('state_updated', {
+            sessionId: lockResult.sessionId,
+            currentPhase: lockResult.currentPhase,
+            currentStepIndex: lockResult.currentStepIndex,
+            version: lockResult.version,
+            triggered_by: 'lock_in',
+          });
         }
-        // Broadcast state_updated to partner.
-        broadcastFnRef?.('state_updated', {
-          sessionId: lockResult.sessionId,
-          currentPhase: lockResult.currentPhase,
-          currentStepIndex: lockResult.currentStepIndex,
-          version: lockResult.version,
-          triggered_by: 'lock_in',
-        });
       } else {
         // Partial lock → broadcast lock_in_status_changed
         broadcastFnRef?.('lock_in_status_changed', lockResult.lock_status);

@@ -172,6 +172,10 @@ export function useScripturePresence(
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
               }
+              if (staleTimerRef.current) {
+                clearTimeout(staleTimerRef.current);
+                staleTimerRef.current = null;
+              }
               setPartnerPresence((prev) => ({
                 ...prev,
                 isPartnerConnected: false,
@@ -192,6 +196,25 @@ export function useScripturePresence(
           details: err,
         };
         handleScriptureError(scriptureError);
+        // Reset connection state on auth failure — channel is unusable
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        if (staleTimerRef.current) {
+          clearTimeout(staleTimerRef.current);
+          staleTimerRef.current = null;
+        }
+        setPartnerPresence((prev) => ({
+          ...prev,
+          isPartnerConnected: false,
+          isChannelSubscribed: false,
+        }));
+        // Clean up dead channel so future effect re-runs can re-subscribe
+        if (channelRef.current) {
+          void supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
       });
 
     return () => {
