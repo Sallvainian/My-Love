@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getRelativeTime, isJustNow } from '../dateFormat';
+import { getRelativeTime, isJustNow } from '../dateUtils';
 
 describe('getRelativeTime', () => {
   it('returns "Just now" for timestamps < 1 minute ago', () => {

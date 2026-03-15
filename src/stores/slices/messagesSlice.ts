@@ -22,7 +22,8 @@ import type {
 } from '../../types';
 import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
-import { getDailyMessage, formatDate, getAvailableHistoryDays } from '../../utils/messageRotation';
+import { getDailyMessage, getAvailableHistoryDays } from '../../utils/messageRotation';
+import { formatDateISO } from '../../utils/dateUtils';
 
 export interface MessagesSlice {
   // State
@@ -146,7 +147,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
     // Get today's date
     const today = new Date();
-    const dateString = formatDate(today);
+    const dateString = formatDateISO(today);
 
     // Check if today's message is already cached
     let messageId = messageHistory.shownMessages.get(dateString);
@@ -219,7 +220,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     const today = new Date();
     const currentDate = new Date(today);
     currentDate.setDate(today.getDate() - messageHistory.currentIndex);
-    const currentDateString = formatDate(currentDate);
+    const currentDateString = formatDateISO(currentDate);
 
     const updatedShownMessages = new Map(messageHistory.shownMessages);
     if (!updatedShownMessages.has(currentDateString) && currentMessage) {
@@ -235,7 +236,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Calculate target date
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() - newIndex);
-    const dateString = formatDate(targetDate);
+    const dateString = formatDateISO(targetDate);
 
     // Check if message for target date is cached
     let messageId = updatedShownMessages.get(dateString);
@@ -294,7 +295,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     const today = new Date();
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() - newIndex);
-    const dateString = formatDate(targetDate);
+    const dateString = formatDateISO(targetDate);
 
     // Load message for target date (should be cached)
     const messageId = messageHistory.shownMessages.get(dateString);

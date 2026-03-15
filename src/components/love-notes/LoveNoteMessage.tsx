@@ -18,7 +18,7 @@ import { memo, type ReactElement, useMemo, useState, useEffect, useCallback, use
 import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import { Loader2 } from 'lucide-react';
-import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateFormatters';
+import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateUtils';
 import type { LoveNote } from '../../types/models';
 import { getSignedImageUrl } from '../../services/loveNoteImageService';
 import { FullScreenImageViewer } from './FullScreenImageViewer';
