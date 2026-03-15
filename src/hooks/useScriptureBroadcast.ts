@@ -70,7 +70,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       onPartnerLockInChanged: state.onPartnerLockInChanged,
       loadSession: state.loadSession,
       setBroadcastFn: state.setBroadcastFn,
-      currentUserId: state.currentUserId,
+      currentUserId: state.userId,
       sessionUserId: state.session?.userId ?? null, // user1_id
       sessionIdFromStore: state.session?.id ?? null,
     }))

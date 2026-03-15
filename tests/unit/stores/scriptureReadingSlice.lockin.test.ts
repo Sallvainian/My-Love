@@ -20,6 +20,7 @@ import 'fake-indexeddb/auto';
 import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
+import type { AuthSlice } from '../../../src/stores/slices/authSlice';
 
 // Use vi.hoisted() for values referenced inside vi.mock() factories
 const { mockRpc, mockGetSession } = vi.hoisted(() => ({
@@ -60,10 +61,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
+type TestStore = ScriptureSlice & Pick<AuthSlice, 'userId'>;
 function createTestStore() {
-  return create<ScriptureSlice>()(
-    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
-  );
+  return create<TestStore>()(createScriptureReadingSlice as unknown as StateCreator<TestStore>);
 }
 
 // Helper to set up a store with an active together session in reading phase
@@ -152,7 +152,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
   test('[P0] onBroadcastReceived with higher currentStepIndex clears lock flags and updates step', async () => {
     const store = await createStoreWithReadingSession();
     // Set currentUserId to enable isUser1 logic
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     // Simulate locked-in state
     store.setState({ isPendingLockIn: true, partnerLocked: true });
@@ -177,7 +177,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
 
   test('[P1] onBroadcastReceived with same step does NOT clear isPendingLockIn', async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     // Simulate locked-in state
     store.setState({ isPendingLockIn: true });
@@ -265,7 +265,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
 
   test('[P0] onBroadcastReceived discards stale events (version <= local)', async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     const initialVersion = store.getState().session?.version ?? 1;
 
@@ -285,7 +285,7 @@ describe('scriptureReadingSlice — lock-in state (Story 4.2)', () => {
 
   test("[P1] onBroadcastReceived with phase 'reflection' transitions to reflection", async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1', isPendingLockIn: true, partnerLocked: true });
+    store.setState({ userId: 'user-1', isPendingLockIn: true, partnerLocked: true });
 
     // Simulate last step lock-in → reflection transition
     store.getState().onBroadcastReceived({

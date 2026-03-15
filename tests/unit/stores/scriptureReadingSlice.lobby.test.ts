@@ -19,6 +19,7 @@ import 'fake-indexeddb/auto';
 import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
+import type { AuthSlice } from '../../../src/stores/slices/authSlice';
 
 // Mock supabase client
 const mockRpc = vi.fn();
@@ -52,10 +53,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
+type TestStore = ScriptureSlice & Pick<AuthSlice, 'userId'>;
 function createTestStore() {
-  return create<ScriptureSlice>()(
-    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
-  );
+  return create<TestStore>()(createScriptureReadingSlice as unknown as StateCreator<TestStore>);
 }
 
 // Helper to set up a store with an active together session

@@ -20,6 +20,7 @@ import 'fake-indexeddb/auto';
 import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
+import type { AuthSlice } from '../../../src/stores/slices/authSlice';
 
 // Use vi.hoisted() for values referenced inside vi.mock() factories
 const { mockRpc, mockGetSession } = vi.hoisted(() => ({
@@ -60,10 +61,9 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
+type TestStore = ScriptureSlice & Pick<AuthSlice, 'userId'>;
 function createTestStore() {
-  return create<ScriptureSlice>()(
-    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
-  );
+  return create<TestStore>()(createScriptureReadingSlice as unknown as StateCreator<TestStore>);
 }
 
 // Helper to set up a store with an active together session in reading phase
@@ -198,7 +198,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
 
   test('[P0] onBroadcastReceived with triggeredBy=end_session calls exitSession()', async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-reconnect-001',
@@ -213,7 +213,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
 
   test('[P0] onBroadcastReceived with currentPhase=complete does NOT reset session (no triggered_by=end_session)', async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-reconnect-001',
@@ -250,7 +250,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
   test('[P1] onBroadcastReceived with triggered_by (snake_case) = end_session calls exitSession()', async () => {
     // The code supports both camelCase (triggeredBy) and snake_case (triggered_by)
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-reconnect-001',
