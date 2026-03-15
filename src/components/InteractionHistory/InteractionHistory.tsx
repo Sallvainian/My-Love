@@ -19,7 +19,6 @@ import { useEffect, useState } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Hand, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { authService } from '../../api/authService';
 import type { Interaction } from '../../types';
 
 interface InteractionHistoryProps {
@@ -29,17 +28,8 @@ interface InteractionHistoryProps {
 
 export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps) {
   const { getInteractionHistory, loadInteractionHistory } = useAppStore();
+  const currentUserId = useAppStore((state) => state.userId);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // Load current user ID
-  useEffect(() => {
-    const loadUserId = async () => {
-      const userId = await authService.getCurrentUserId();
-      setCurrentUserId(userId);
-    };
-    loadUserId();
-  }, []);
 
   // Load interaction history when modal opens
   useEffect(() => {

@@ -63,6 +63,11 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
   // Actions
   sendPoke: async (partnerId) => {
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      throw new Error('Cannot send poke: User not authenticated');
+    }
+
     // Validate interaction data before sending
     const validation = validateInteraction(partnerId, 'poke');
     if (!validation.isValid) {
@@ -73,7 +78,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
     try {
       // Send poke via InteractionService
-      const pokeRecord = await interactionService.sendPoke(partnerId);
+      const pokeRecord = await interactionService.sendPoke(partnerId, currentUserId);
 
       // Add to local state immediately (optimistic UI)
       const localInteraction = toLocalInteraction(pokeRecord);
@@ -93,6 +98,11 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   sendKiss: async (partnerId) => {
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      throw new Error('Cannot send kiss: User not authenticated');
+    }
+
     // Validate interaction data before sending
     const validation = validateInteraction(partnerId, 'kiss');
     if (!validation.isValid) {
@@ -103,7 +113,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
     try {
       // Send kiss via InteractionService
-      const kissRecord = await interactionService.sendKiss(partnerId);
+      const kissRecord = await interactionService.sendKiss(partnerId, currentUserId);
 
       // Add to local state immediately (optimistic UI)
       const localInteraction = toLocalInteraction(kissRecord);
@@ -145,13 +155,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   getUnviewedInteractions: () => {
-    // getCurrentUserId returns Promise, but we need sync access
-    // This is safe because the user ID is cached after auth initialization
-    // For a more robust solution, we could store userId in state
     const interactions = get().interactions;
-
-    // Filter for received unviewed interactions
-    // We can't await getCurrentUserId here, so we check both directions
     return interactions.filter((interaction) => !interaction.viewed);
   },
 
@@ -165,10 +169,15 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   loadInteractionHistory: async (limit = 100) => {
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      throw new Error('Cannot load interaction history: User not authenticated');
+    }
+
     try {
       // Fetch interaction history from Supabase
       // Note: getInteractionHistory already returns Interaction[] (converted format)
-      const interactions = await interactionService.getInteractionHistory(limit);
+      const interactions = await interactionService.getInteractionHistory(currentUserId, limit);
 
       // Update state
       set({ interactions });
@@ -201,10 +210,13 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       }
 
       // Subscribe to incoming interactions
-      const unsubscribe = await interactionService.subscribeInteractions((record) => {
-        // Add incoming interaction to state
-        get().addIncomingInteraction(record);
-      });
+      const unsubscribe = await interactionService.subscribeInteractions(
+        currentUserId,
+        (record) => {
+          // Add incoming interaction to state
+          get().addIncomingInteraction(record);
+        }
+      );
 
       set({ isSubscribed: true });
 

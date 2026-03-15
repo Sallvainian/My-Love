@@ -18,18 +18,15 @@ vi.mock('../../api/supabaseClient', () => ({
   },
 }));
 
-// Mock auth session service
-vi.mock('../../api/auth/sessionService', () => ({
-  getCurrentUserId: vi.fn().mockResolvedValue('user-123'),
-}));
-
 // Mock app store
+const mockStoreState: Record<string, unknown> = {
+  addNote: vi.fn(),
+  userId: 'user-123',
+};
+
 vi.mock('../../stores/useAppStore', () => ({
-  useAppStore: vi.fn((selector) => {
-    const state = {
-      addNote: vi.fn(),
-    };
-    return selector(state);
+  useAppStore: vi.fn((selector: (state: Record<string, unknown>) => unknown) => {
+    return selector(mockStoreState);
   }),
 }));
 
@@ -98,11 +95,11 @@ describe('useRealtimeMessages', () => {
   });
 
   it('should not subscribe when user is not authenticated', async () => {
-    const sessionService = await import('../../api/auth/sessionService');
     const { supabase } = await import('../../api/supabaseClient');
 
     // Mock user not authenticated
-    vi.mocked(sessionService.getCurrentUserId).mockResolvedValueOnce(null);
+    const originalUserId = mockStoreState.userId;
+    mockStoreState.userId = null;
 
     renderHook(() => useRealtimeMessages());
 
@@ -111,6 +108,9 @@ describe('useRealtimeMessages', () => {
 
     // Should not attempt to create a channel
     expect(supabase.channel).not.toHaveBeenCalled();
+
+    // Restore
+    mockStoreState.userId = originalUserId;
   });
 
   describe('Error Handling and Retry Logic', () => {

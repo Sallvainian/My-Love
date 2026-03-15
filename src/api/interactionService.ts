@@ -10,7 +10,6 @@
 
 import { supabase } from './supabaseClient';
 import type { Database } from './supabaseClient';
-import { getCurrentUserId } from './auth/sessionService';
 import {
   isOnline,
   handleSupabaseError,
@@ -76,8 +75,8 @@ export class InteractionService {
    * }
    * ```
    */
-  async sendPoke(partnerId: string): Promise<SupabaseInteractionRecord> {
-    return this.sendInteraction('poke', partnerId);
+  async sendPoke(partnerId: string, userId: string): Promise<SupabaseInteractionRecord> {
+    return this.sendInteraction('poke', partnerId, userId);
   }
 
   /**
@@ -97,8 +96,8 @@ export class InteractionService {
    * }
    * ```
    */
-  async sendKiss(partnerId: string): Promise<SupabaseInteractionRecord> {
-    return this.sendInteraction('kiss', partnerId);
+  async sendKiss(partnerId: string, userId: string): Promise<SupabaseInteractionRecord> {
+    return this.sendInteraction('kiss', partnerId, userId);
   }
 
   /**
@@ -111,7 +110,8 @@ export class InteractionService {
    */
   private async sendInteraction(
     type: InteractionType,
-    toUserId: string
+    toUserId: string,
+    userId: string
   ): Promise<SupabaseInteractionRecord> {
     // Check network status
     if (!isOnline()) {
@@ -122,15 +122,10 @@ export class InteractionService {
     }
 
     try {
-      const currentUserId = await getCurrentUserId();
-      if (!currentUserId) {
-        throw new Error('Cannot send interaction: User not authenticated');
-      }
-
       // Create interaction insert payload
       const interactionInsert: InteractionInsert = {
         type,
-        from_user_id: currentUserId,
+        from_user_id: userId,
         to_user_id: toUserId,
         viewed: false,
       };
@@ -184,13 +179,9 @@ export class InteractionService {
    * ```
    */
   async subscribeInteractions(
+    userId: string,
     callback: (interaction: SupabaseInteractionRecord) => void
   ): Promise<() => void> {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) {
-      throw new Error('Cannot subscribe to interactions: User not authenticated');
-    }
-
     // Create Realtime channel for incoming interactions
     this.realtimeChannel = supabase
       .channel('incoming-interactions')
@@ -200,7 +191,7 @@ export class InteractionService {
           event: 'INSERT',
           schema: 'public',
           table: 'interactions',
-          filter: `to_user_id=eq.${currentUserId}`,
+          filter: `to_user_id=eq.${userId}`,
         },
         (payload) => {
           console.log('[InteractionService] Received interaction:', payload.new);
@@ -237,18 +228,17 @@ export class InteractionService {
    * console.log('Last 20 interactions:', interactions);
    * ```
    */
-  async getInteractionHistory(limit: number = 50, offset: number = 0): Promise<Interaction[]> {
+  async getInteractionHistory(
+    userId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<Interaction[]> {
     try {
-      const currentUserId = await getCurrentUserId();
-      if (!currentUserId) {
-        throw new Error('Cannot get interaction history: User not authenticated');
-      }
-
       // Query interactions where current user is sender or recipient
       const { data, error } = await supabase
         .from('interactions')
         .select('*')
-        .or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
+        .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -291,17 +281,12 @@ export class InteractionService {
    * console.log(`You have ${unviewed.length} new interactions`);
    * ```
    */
-  async getUnviewedInteractions(): Promise<Interaction[]> {
+  async getUnviewedInteractions(userId: string): Promise<Interaction[]> {
     try {
-      const currentUserId = await getCurrentUserId();
-      if (!currentUserId) {
-        throw new Error('Cannot get unviewed interactions: User not authenticated');
-      }
-
       const { data, error } = await supabase
         .from('interactions')
         .select('*')
-        .eq('to_user_id', currentUserId)
+        .eq('to_user_id', userId)
         .eq('viewed', false)
         .order('created_at', { ascending: false });
 
