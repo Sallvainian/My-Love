@@ -50,9 +50,9 @@ async function advanceToCompletion(page: import('@playwright/test').Page) {
 
 test.describe('Solo Reading Flow', () => {
   test.describe('[P0-009] Advance through 17 steps sequentially', () => {
-    test('should complete full solo reading flow from step 1 to 17', async ({ page }) => {
-      test.setTimeout(90_000);
+    test.use({ timeout: 90_000 });
 
+    test('should complete full solo reading flow from step 1 to 17', async ({ page }) => {
       // GIVEN: User navigates to scripture and starts a solo session
       await startSoloSession(page);
 
@@ -220,9 +220,9 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('[P2-012] Session completion boundary', () => {
-    test('should transition to completion phase after step 17', async ({ page }) => {
-      test.setTimeout(90_000);
+    test.use({ timeout: 90_000 });
 
+    test('should transition to completion phase after step 17', async ({ page }) => {
       // GIVEN: User starts a solo session
       await startSoloSession(page);
 
