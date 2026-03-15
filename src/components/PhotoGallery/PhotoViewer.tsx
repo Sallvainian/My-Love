@@ -64,7 +64,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.12 & WCAG 2.4.3: Focus trap for modal
   const containerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(containerRef);
+  useFocusTrap(containerRef, true, { onEscape: onClose });
 
   const currentPhoto = photos[currentIndex];
   const canNavigatePrev = currentIndex > 0;
