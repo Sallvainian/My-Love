@@ -1,6 +1,7 @@
 import { supabase } from '../api/supabaseClient';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { SupabaseMood } from '../api/validation/supabaseSchemas';
+import { logger } from '../utils/logger';
 
 type MoodChangeCallback = (mood: SupabaseMood) => void;
 type ErrorCallback = (error: Error) => void;
@@ -48,9 +49,7 @@ export class RealtimeService {
           },
           (payload) => {
             try {
-              if (import.meta.env.DEV) {
-                console.log(`[RealtimeService] Mood change event:`, payload);
-              }
+              logger.debug(`[RealtimeService] Mood change event:`, payload);
 
               // Extract mood data from payload
               const mood = payload.new as SupabaseMood;
@@ -65,9 +64,7 @@ export class RealtimeService {
         )
         .subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
-            if (import.meta.env.DEV) {
-              console.log(`[RealtimeService] Subscribed to ${channelId}`);
-            }
+            logger.info(`[RealtimeService] Subscribed to ${channelId}`);
           } else if (status === 'CHANNEL_ERROR') {
             this.handleError(
               new Error(`Realtime subscription error: ${err?.message || 'Unknown'}`),
@@ -103,9 +100,7 @@ export class RealtimeService {
       await supabase.removeChannel(channel);
       this.channels.delete(channelId);
 
-      if (import.meta.env.DEV) {
-        console.log(`[RealtimeService] Unsubscribed from ${channelId}`);
-      }
+      logger.info(`[RealtimeService] Unsubscribed from ${channelId}`);
     } catch (error) {
       this.handleError(error as Error);
     }

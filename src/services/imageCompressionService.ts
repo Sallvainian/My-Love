@@ -1,5 +1,6 @@
 import type { CompressionOptions, CompressionResult } from '../types';
 import { IMAGE_COMPRESSION, IMAGE_VALIDATION } from '../config/images';
+import { logger } from '../utils/logger';
 
 /**
  * Image Compression Service - Client-side image compression using Canvas API
@@ -87,7 +88,7 @@ class ImageCompressionService {
       const reductionPercent = (((file.size - blob.size) / file.size) * 100).toFixed(0);
 
       // AC-6.1.7: Log compression performance (target: <3000ms for 10MB)
-      console.log(
+      logger.info(
         `[Compression] ${originalSizeMB}MB → ${compressedSizeKB}KB (${reductionPercent}% reduction) in ${duration.toFixed(0)}ms`
       );
 

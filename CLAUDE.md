@@ -17,7 +17,7 @@ npm run dev              # Start dev server (runs cleanup script wrapper)
 npm run dev:raw          # Start Vite dev server directly
 npm run preview          # Preview production build
 npm run build            # Production build (tsc + vite)
-npm run typecheck        # tsc --noEmit
+npm run typecheck        # tsc -b (checks all project references)
 npm run lint             # ESLint (src, tests, scripts)
 npm run lint:fix         # ESLint fix + Prettier
 npm run format           # Prettier write

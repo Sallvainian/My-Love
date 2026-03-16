@@ -1,376 +1,97 @@
 # 6. Supabase RPC Functions
 
-All database functions are created in the `public` schema.
+All database functions are in the `public` schema. Most use `SET search_path = ''` for security. Scripture functions use optimistic concurrency (version checks) and row-level locking (`FOR UPDATE`).
 
-## 6.1 `get_partner_id(user_id UUID)` -> `UUID`
+## Core App Functions
 
-**Security:** `SECURITY DEFINER`, `STABLE`
-**Status:** Deprecated (dropped in migration `20251206024345`, replaced by `get_my_partner_id()`)
+### `accept_partner_request(p_request_id UUID) -> void`
 
-Originally used by RLS policies to look up a user's partner. Replaced because it required passing `user_id` as a parameter, which was less secure than the current `auth.uid()`-based approach.
+**Security:** DEFINER | **Introduced:** Migration 001 (base schema)
 
-## 6.2 `get_my_partner_id()` -> `UUID`
+Atomically accepts a partner request: validates recipient is caller, checks neither user already has a partner, sets `partner_id` on both users, marks request as accepted, declines all other pending requests involving either user.
 
-**Source:** Migration `20260205000001_fix_users_rls_recursion.sql`
-**Security:** `SECURITY DEFINER`, `STABLE`
-**Search path:** `public`
+### `decline_partner_request(p_request_id UUID) -> void`
 
-```sql
-SELECT partner_id FROM public.users WHERE id = auth.uid();
-```
+**Security:** DEFINER | **Introduced:** Migration 005 (remote_schema)
 
-Reads the current user's `partner_id` while bypassing RLS. Created to break infinite RLS recursion on the `users` table (PostgreSQL error 42P17), where the SELECT policy referenced `public.users` in its USING clause, triggering the same policy recursively.
+Validates caller is recipient, updates request status to `'declined'`.
 
-**Called by:** `users` table SELECT and UPDATE RLS policies.
+### `sync_user_profile() -> trigger`
 
-## 6.3 `accept_partner_request(p_request_id UUID)` -> `void`
+**Security:** DEFINER | **Introduced:** Migration 005 (remote_schema)
 
-**Source:** Migration `20251206024345_remote_schema.sql`
-**Security:** `SECURITY DEFINER`
-**Search path:** `public`, `pg_catalog`
-**Called by:** `partnerService.acceptPartnerRequest()`
+Trigger function on `auth.users` AFTER INSERT/UPDATE. Upserts `public.users` with email and display_name from auth metadata.
 
-**Flow:**
+### `get_my_partner_id() -> UUID`
 
-1. Look up the pending request by `p_request_id`
-2. Validate: request exists and `status = 'pending'`
-3. Validate: `auth.uid()` is the `to_user_id` (only recipient can accept)
-4. Validate: neither user already has a `partner_id` (partner-exists guard)
-5. Update request `status` to `'accepted'`
-6. Set `partner_id` on both users (bidirectional linking)
+**Security:** DEFINER | **Introduced:** Migration 010 (fix RLS recursion)
 
-**Errors:**
+Returns `partner_id` from `users` table for `auth.uid()`. Bypasses RLS to break circular policy evaluation.
 
-- `'Partner request not found or already processed'`
-- `'Only the recipient can accept a partner request'`
-- `'One or both users already have a partner'`
+### `is_scripture_session_member(p_session_id UUID) -> boolean`
 
-## 6.4 `decline_partner_request(p_request_id UUID)` -> `void`
+**Security:** DEFINER | **Introduced:** Migration 008 (scripture_reading)
 
-**Source:** Migration `20251206024345_remote_schema.sql`
-**Security:** `SECURITY DEFINER`
-**Search path:** `public`, `pg_catalog`
-**Called by:** `partnerService.declinePartnerRequest()`
+Returns true if `auth.uid()` is user1 or user2 of the session. Used by RLS policies on all scripture tables.
 
-**Flow:**
+## Scripture Session Functions
 
-1. Look up the pending request by `p_request_id`
-2. Validate: request exists and `status = 'pending'`
-3. Validate: `auth.uid()` is the `to_user_id`
-4. Update request `status` to `'declined'`
+### `scripture_create_session(p_mode TEXT, p_partner_id UUID?) -> JSONB`
 
-## 6.5 `sync_user_profile()` -> `trigger`
+**Security:** DEFINER | **Introduced:** Migration 009, updated in 016/021
 
-**Source:** Migration `20251206024345_remote_schema.sql`
-**Security:** `SECURITY DEFINER`
-**Trigger:** `AFTER INSERT OR UPDATE ON auth.users`
+Creates a new scripture session. Solo starts in `reading` phase, together starts in `lobby`. Together mode reuses existing in-progress lobby sessions for the same user pair. Returns full session JSONB object.
 
-Syncs `email` and `display_name` from `auth.users` to `public.users`. On INSERT, creates the `public.users` record. On UPDATE, updates the synced fields. Extracts `display_name` from `raw_user_meta_data->>'display_name'` or `raw_user_meta_data->>'full_name'`.
+### `scripture_submit_reflection(p_session_id, p_step_index, p_rating, p_notes, p_is_shared) -> JSONB`
 
-## 6.6 `is_scripture_session_member(p_session_id UUID)` -> `BOOLEAN`
+**Security:** DEFINER | **Introduced:** Migration 009
 
-**Source:** Migration `20260128000001_scripture_reading.sql`
-**Security:** `SECURITY DEFINER`
-**Search path:** `public`
+Upserts a reflection (INSERT ... ON CONFLICT DO UPDATE). Validates session membership and rating range (1-5). Returns reflection JSONB.
 
-Returns `true` if `auth.uid()` matches either `user1_id` or `user2_id` of the given session. Used by RLS policies on `scripture_step_states`, `scripture_reflections`, `scripture_bookmarks`, and `scripture_messages`.
+### `scripture_select_role(p_session_id UUID, p_role TEXT) -> JSONB`
 
-## 6.7 `scripture_create_session(p_mode TEXT, p_partner_id UUID DEFAULT NULL)` -> `JSONB`
+**Security:** INVOKER | **Introduced:** Migration 015, phase guard added in 017
 
-**Source:** Migrations `20260130000001` (original), `20260301000100` (current version)
-**Security:** `SECURITY DEFINER`
-**Search path:** `''`
-**Grant:** `authenticated`
+Sets caller's role (reader/responder) on the session. Phase guard: only allowed in lobby. Bumps version. Returns session snapshot JSONB (client broadcasts to partner).
 
-Creates a new scripture reading session or reuses an existing one for together mode.
+### `scripture_toggle_ready(p_session_id UUID, p_is_ready BOOLEAN) -> JSONB`
 
-| Parameter      | Required          | Description              |
-| -------------- | ----------------- | ------------------------ |
-| `p_mode`       | Yes               | `'solo'` or `'together'` |
-| `p_partner_id` | For together mode | Partner's user UUID      |
+**Security:** INVOKER | **Introduced:** Migration 015, phase guard added in 017
 
-**Validations:**
+Toggles caller's ready flag. Phase guard: only allowed in lobby. If both ready: sets `countdown_started_at = now()`, transitions to countdown phase. Returns snapshot.
 
-- Mode must be `'solo'` or `'together'`
-- Together mode requires `p_partner_id`
-- Partner cannot be the current user
-- Partner must exist in `auth.users`
+### `scripture_convert_to_solo(p_session_id UUID) -> JSONB`
 
-**Together mode behavior (migration 20):**
+**Security:** INVOKER | **Introduced:** Migration 015, phase guard added in 017
 
-- Starts in `lobby` phase (not `reading`)
-- Reuses existing in-progress together session for the same user pair (any user order) if still in `lobby` phase, preventing duplicate sessions
-- Only reuses sessions in `lobby` phase -- sessions that have progressed past lobby are not reused
+Converts together session to solo. Phase guard: lobby only. Clears partner state, resets ready flags, moves to reading phase. Returns snapshot.
 
-**Solo mode behavior:**
+### `scripture_lock_in(p_session_id, p_step_index, p_expected_version) -> JSONB`
 
-- Starts directly in `reading` phase
+**Security:** INVOKER | **Introduced:** Migration 018, updated 021/024
 
-**Returns:** Full session object as JSONB with all fields.
+Locks in user for current step. Uses optimistic concurrency (`version != p_expected_version` raises `409: version mismatch`). Phase guard: reading or countdown. Idempotent UPSERT on `scripture_step_states`. If both locked: advances step (or transitions to reflection on step 16 -- keeps status `in_progress`). Returns snapshot with `both_locked` boolean and optional `lock_status`.
 
-## 6.8 `scripture_submit_reflection(...)` -> `JSONB`
+### `scripture_undo_lock_in(p_session_id, p_step_index) -> JSONB`
 
-**Source:** Migration `20260130000001_scripture_rpcs.sql`
-**Security:** `SECURITY DEFINER`
-**Search path:** `''`
-**Grant:** `authenticated`
+**Security:** INVOKER | **Introduced:** Migration 018, updated 021
 
-Idempotent upsert for reflections using `ON CONFLICT (session_id, step_index, user_id)`.
+Clears caller's lock timestamp on step state. Phase guard: reading or countdown. Returns snapshot with `lock_status`.
 
-| Parameter      | Type      | Description        |
-| -------------- | --------- | ------------------ |
-| `p_session_id` | `UUID`    | Session ID         |
-| `p_step_index` | `INT`     | Step number        |
-| `p_rating`     | `INT`     | 1-5 rating         |
-| `p_notes`      | `TEXT`    | Reflection notes   |
-| `p_is_shared`  | `BOOLEAN` | Share with partner |
+### `scripture_end_session(p_session_id UUID) -> JSONB`
 
-**Validations:**
+**Security:** INVOKER | **Introduced:** Migration 019, updated 021
 
-- `is_scripture_session_member(p_session_id)` must be true
-- Rating must be 1-5
+Ends a together-mode session early. Status guard: only `in_progress`. Sets `status = 'ended_early'`, `completed_at = now()`. Returns snapshot.
 
-**Returns:** Full reflection object as JSONB.
+### `scripture_get_couple_stats() -> JSONB`
 
-## 6.9 `scripture_seed_test_data(...)` -> `JSONB`
+**Security:** DEFINER | **Introduced:** Migration 013, optimized 014, precision fix 024
 
-**Source:** Migrations `20260128000001`, `20260130000001`, `20260204000001`
-**Security:** `SECURITY DEFINER`
-**Search path:** `''`
-**Environment guard:** Rejects calls when `app.environment = 'production'`
+Returns couple-aggregate stats using CTE-based query: `totalSessions`, `totalSteps`, `lastCompleted`, `avgRating` (rounded to 1 decimal), `bookmarkCount`. Queries across both partners' sessions.
 
-Test data seeding function with preset configurations.
+### `scripture_seed_test_data(p_session_count, p_include_reflections, p_include_messages, p_preset, p_bookmark_steps) -> JSONB`
 
-| Parameter               | Type      | Default | Description                  |
-| ----------------------- | --------- | ------- | ---------------------------- |
-| `p_session_count`       | `INT`     | `1`     | Number of sessions to create |
-| `p_include_reflections` | `BOOLEAN` | `false` | Include test reflections     |
-| `p_include_messages`    | `BOOLEAN` | `false` | Include test prayer messages |
-| `p_preset`              | `TEXT`    | `NULL`  | Preset configuration         |
+**Security:** DEFINER | **Introduced:** Migration 008, updated multiple times
 
-### Presets
-
-| Preset              | Phase      | Step | Status        | Notes                               |
-| ------------------- | ---------- | ---- | ------------- | ----------------------------------- |
-| `NULL` (default)    | `lobby`    | 0    | `pending`     | Fresh session                       |
-| `'mid_session'`     | `reading`  | 7    | `in_progress` | Session in progress                 |
-| `'completed'`       | `complete` | 16   | `complete`    | Fully completed session             |
-| `'with_help_flags'` | `reading`  | 7    | `in_progress` | For testing help features           |
-| `'unlinked'`        | `reading`  | 7    | `in_progress` | Solo session with `user2_id = NULL` |
-
-**Returns:** JSONB with `session_ids`, `session_count`, `preset`, `test_user1_id`, `test_user2_id`, and optionally `reflection_ids` and `message_ids`.
-
-## 6.10 `scripture_get_couple_stats(p_partner_id UUID)` -> `JSONB`
-
-**Source:** Migrations `20260217150353` (original), `20260217184551` (CTE optimization)
-**Security:** `SECURITY DEFINER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Returns couple reading statistics using CTE-optimized queries.
-
-**Flow:**
-
-1. Get current user via `auth.uid()`
-2. Find all session IDs where either user is `user1_id` or `user2_id` (CTE)
-3. Aggregate 5 metrics from that set
-
-**Returned metrics:**
-
-| Metric               | Description                                     |
-| -------------------- | ----------------------------------------------- |
-| `total_sessions`     | All sessions for the pair                       |
-| `completed_sessions` | Sessions with `status = 'complete'`             |
-| `total_reflections`  | All reflections across pair sessions            |
-| `shared_reflections` | Reflections with `is_shared = true`             |
-| `total_messages`     | All prayer report messages across pair sessions |
-
-## 6.11 `scripture_select_role(p_session_id UUID, p_role TEXT)` -> `JSONB`
-
-**Source:** Migrations `20260220000001` (original), `20260221211137` (phase guard), `20260301000200` (removed broadcast)
-**Security:** `SECURITY INVOKER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Sets the calling user's role in the together-mode lobby.
-
-| Parameter      | Type   | Description                 |
-| -------------- | ------ | --------------------------- |
-| `p_session_id` | `UUID` | Session ID                  |
-| `p_role`       | `TEXT` | `'reader'` or `'responder'` |
-
-**Flow:**
-
-1. Authenticate via `auth.uid()`
-2. Validate role is `'reader'` or `'responder'`
-3. `SELECT ... FOR UPDATE` on session (member check)
-4. **Phase guard:** Raise exception if `current_phase != 'lobby'`
-5. Update the correct user's role column (`user1_role` or `user2_role`) based on whether caller is `user1_id`
-6. Bump `version`
-7. Return JSONB snapshot with `sessionId`, `currentPhase`, `version`, `user1Role`, `user2Role`, `user1Ready`, `user2Ready`, `countdownStartedAt`
-
-**Note:** After migration 21, the client broadcasts `state_updated` via `channel.send()` after this RPC succeeds.
-
-## 6.12 `scripture_toggle_ready(p_session_id UUID, p_is_ready BOOLEAN)` -> `JSONB`
-
-**Source:** Migrations `20260220000001` (original), `20260221211137` (phase guard), `20260301000200` (removed broadcast)
-**Security:** `SECURITY INVOKER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Toggles the calling user's ready state in the lobby. If both users become ready, starts the countdown.
-
-| Parameter      | Type      | Description     |
-| -------------- | --------- | --------------- |
-| `p_session_id` | `UUID`    | Session ID      |
-| `p_is_ready`   | `BOOLEAN` | New ready state |
-
-**Flow:**
-
-1. Authenticate via `auth.uid()`
-2. `SELECT ... FOR UPDATE` on session (member check)
-3. **Phase guard:** Raise exception if `current_phase != 'lobby'`
-4. Update the correct user's ready flag (`user1_ready` or `user2_ready`)
-5. Bump `version`
-6. Check if both users are ready (`user1_ready AND user2_ready AND user2_id IS NOT NULL`)
-7. If both ready and `countdown_started_at IS NULL`: set `countdown_started_at = now()`, transition to `countdown` phase, bump version again
-8. Return JSONB snapshot
-
-## 6.13 `scripture_convert_to_solo(p_session_id UUID)` -> `JSONB`
-
-**Source:** Migrations `20260220000001` (original), `20260221211137` (phase guard), `20260301000200` (removed broadcast)
-**Security:** `SECURITY INVOKER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Converts a together-mode session to solo mode. Called when one partner taps "Continue solo" in the lobby.
-
-**Flow:**
-
-1. Authenticate via `auth.uid()`
-2. `SELECT ... FOR UPDATE` on session (member check)
-3. **Phase guard:** Raise exception if `current_phase != 'lobby'`
-4. Update session: `mode = 'solo'`, `user2_id = NULL`, reset ready states, clear `countdown_started_at`, set `current_phase = 'reading'`, bump version
-5. Return JSONB snapshot with `sessionId`, `mode`, `currentPhase`, `version`
-
-**Note:** The client broadcasts `session_converted` to the partner before the channel is closed.
-
-## 6.14 `scripture_lock_in(p_session_id UUID, p_step_index INT, p_expected_version INT)` -> `JSONB`
-
-**Source:** Migrations `20260222000001` (original), `20260301000200` (removed broadcast)
-**Security:** `SECURITY INVOKER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Locks in a user for the current reading step. When both users lock, automatically advances to the next step.
-
-| Parameter            | Type   | Description                        |
-| -------------------- | ------ | ---------------------------------- |
-| `p_session_id`       | `UUID` | Session ID                         |
-| `p_step_index`       | `INT`  | Current step index                 |
-| `p_expected_version` | `INT`  | Optimistic concurrency check value |
-
-**Flow:**
-
-1. Authenticate via `auth.uid()`
-2. `SELECT ... FOR UPDATE` on session (member check)
-3. **Phase guard:** Only allow during `reading` or `countdown` phase
-4. If session is in `countdown` phase, auto-transition to `reading` (housekeeping, no version bump)
-5. **Step guard:** Verify `current_step_index = p_step_index`
-6. **Version check:** Raise `'409: version mismatch'` if `version != p_expected_version`
-7. Determine if caller is user1
-8. **Idempotent UPSERT:** `INSERT INTO scripture_step_states ... ON CONFLICT (session_id, step_index) DO UPDATE SET userN_locked_at = now()`
-9. Re-read step state to check if both users are locked
-10. **If both locked:**
-    - Mark step as advanced (`advanced_at = now()`)
-    - If `step_index < 16`: increment `current_step_index`, bump version, update `snapshot_json`
-    - If `step_index = 16` (last step): transition to `reflection` phase, set `status = 'complete'`
-    - Return snapshot with `both_locked: true`
-11. **If partial lock:**
-    - Return snapshot with `both_locked: false` and `lock_status` object
-
-**Return payload structure:**
-
-```json
-{
-  "sessionId": "uuid",
-  "currentPhase": "reading",
-  "currentStepIndex": 5,
-  "version": 12,
-  "both_locked": true,
-  "triggered_by": "lock_in"
-}
-```
-
-Or for partial lock:
-
-```json
-{
-  "sessionId": "uuid",
-  "currentPhase": "reading",
-  "currentStepIndex": 5,
-  "version": 11,
-  "both_locked": false,
-  "lock_status": {
-    "step_index": 5,
-    "user1_locked": true,
-    "user2_locked": false
-  }
-}
-```
-
-## 6.15 `scripture_undo_lock_in(p_session_id UUID, p_step_index INT)` -> `JSONB`
-
-**Source:** Migrations `20260222000001` (original), `20260301000200` (removed broadcast)
-**Security:** `SECURITY INVOKER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Clears a user's lock-in for the given step.
-
-| Parameter      | Type   | Description |
-| -------------- | ------ | ----------- |
-| `p_session_id` | `UUID` | Session ID  |
-| `p_step_index` | `INT`  | Step index  |
-
-**Flow:**
-
-1. Authenticate via `auth.uid()`
-2. `SELECT ... FOR UPDATE` on session (member check)
-3. **Phase guard:** Only allow during `reading` or `countdown` phase
-4. Clear caller's lock timestamp (`user1_locked_at = NULL` or `user2_locked_at = NULL`)
-5. Re-read step state for return payload
-6. Return snapshot with `lock_status` showing updated lock states
-
-**Note:** No version bump. This only affects the `scripture_step_states` row, not the session.
-
-## 6.16 `scripture_end_session(p_session_id UUID)` -> `JSONB`
-
-**Source:** Migrations `20260228000001` (original), `20260301000200` (removed broadcast)
-**Security:** `SECURITY INVOKER`
-**Search path:** `''`
-**Grant:** `authenticated`
-
-Ends a together-mode session early. Called when a user taps "End Session" after partner disconnects.
-
-| Parameter      | Type   | Description |
-| -------------- | ------ | ----------- |
-| `p_session_id` | `UUID` | Session ID  |
-
-**Flow:**
-
-1. Authenticate via `auth.uid()`
-2. `SELECT ... FOR UPDATE` on session (member check)
-3. **Status guard:** Raise exception if `status != 'in_progress'`
-4. Update session: `status = 'ended_early'`, `completed_at = now()`, bump version, update `snapshot_json` with `currentPhase: 'complete'` and `triggeredBy: 'end_session'`
-5. Return JSONB snapshot with `sessionId`, `currentPhase: 'complete'`, `currentStepIndex`, `version`, `triggered_by: 'end_session'`
-
-## Security Model Summary
-
-| Pattern                | Functions                                                                                                                                                                                                                                         | Notes                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `SECURITY DEFINER`     | `accept_partner_request`, `decline_partner_request`, `get_my_partner_id`, `is_scripture_session_member`, `sync_user_profile`, `scripture_create_session`, `scripture_submit_reflection`, `scripture_seed_test_data`, `scripture_get_couple_stats` | Bypass RLS for atomic operations or internal helpers                    |
-| `SECURITY INVOKER`     | `scripture_select_role`, `scripture_toggle_ready`, `scripture_convert_to_solo`, `scripture_lock_in`, `scripture_undo_lock_in`, `scripture_end_session`                                                                                            | RLS applies to calling user; combined with `FOR UPDATE` row locking     |
-| `SET search_path = ''` | All scripture RPCs                                                                                                                                                                                                                                | Prevents schema-injection attacks; all table references fully qualified |
-| Phase/status guards    | All scripture INVOKER RPCs                                                                                                                                                                                                                        | Prevents out-of-order state transitions                                 |
-| Optimistic concurrency | `scripture_lock_in`                                                                                                                                                                                                                               | `p_expected_version` parameter checked before mutation                  |
+Test data seeding function with environment guard (rejects in production). Presets: `default`, `mid_session`, `completed`, `with_help_flags`, `unlinked`, `at_reflection`.

@@ -12,6 +12,8 @@
  * - No offline queue for writes - fail immediately with retry option
  */
 
+import { logger } from './logger';
+
 /**
  * Custom error class for offline operation failures
  *
@@ -145,9 +147,7 @@ export async function withOfflineCheck<T>(
 ): Promise<T> {
   // Check network status before executing
   if (isOffline()) {
-    if (import.meta.env.DEV) {
-      console.log(`[OfflineErrorHandler] Operation "${operation}" blocked - device is offline`);
-    }
+    logger.debug(`[OfflineErrorHandler] Operation "${operation}" blocked - device is offline`);
     throw new OfflineError(operation);
   }
 

@@ -1,188 +1,122 @@
 # State Connections
 
-The Zustand store (`useAppStore`) is composed of 10 slices. Below maps each component to the slices it consumes and the specific fields accessed.
+The Zustand store (`useAppStore`) is composed of 11 slices (including AuthSlice). Below maps each component to the slices it consumes and the specific fields accessed.
 
 ## Access Patterns
 
 Components access the store in three ways:
 
-1. **Direct**: `useAppStore((state) => state.field)` or destructured `useAppStore()`
-2. **Via `useShallow`**: `useAppStore(useShallow((state) => ({ ... })))` -- prevents re-renders when unrelated state changes (used by ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer)
-3. **Via custom hooks**: `useLoveNotes()` and `usePhotos()` wrap store selectors with memoized callbacks and side-effect logic
+1. **Direct `useAppStore`** -- Single field selector: `useAppStore((state) => state.fieldName)`
+2. **`useShallow` selector** -- Multiple fields without re-render on unrelated changes
+3. **Custom hooks** -- Wrapping store access (e.g., `useLoveNotes`, `usePartnerMood`)
 
-## AppSlice
+## Component-to-Slice Matrix
 
-**File**: `src/stores/slices/appSlice.ts`
+### AppSlice
 
-**State**: `isLoading`, `error`, `__isHydrated`
-**Actions**: `setLoading`, `setError`, `setHydrated`
+| Component | Fields/Actions Used                                                  |
+| --------- | -------------------------------------------------------------------- |
+| App       | `isLoading`, `error`, `__isHydrated` (indirectly via initialization) |
 
-| Component      | Fields Used                  | Access Pattern     |
-| -------------- | ---------------------------- | ------------------ |
-| `App`          | `isLoading`, `initializeApp` | Direct destructure |
-| `DailyMessage` | `error`, `initializeApp`     | Direct destructure |
+### AuthSlice
 
-## MessagesSlice
+| Component          | Fields/Actions Used                                          |
+| ------------------ | ------------------------------------------------------------ |
+| App                | `setAuthUser`, `clearAuth` (called from `onAuthStateChange`) |
+| LoveNotes          | `userId` (via `useAppStore((state) => state.userId)`)        |
+| MoodTracker        | `userId` (via slice actions internally)                      |
+| PokeKissInterface  | `userId` (via slice actions internally)                      |
+| InteractionHistory | `userId` (via `useAppStore((state) => state.userId)`)        |
 
-**File**: `src/stores/slices/messagesSlice.ts`
+All slices that need user identity read `get().userId` synchronously instead of calling `supabase.auth.getUser()`.
 
-**State**: `messages`, `currentMessage`, `messageHistory`, `currentDayOffset`, `customMessages`, `customMessagesLoaded`
-**Actions**: `loadMessages`, `addMessage`, `toggleFavorite`, `updateCurrentMessage`, `navigateToPreviousMessage`, `navigateToNextMessage`, `canNavigateBack`, `canNavigateForward`, `loadCustomMessages`, `createCustomMessage`, `updateCustomMessage`, `deleteCustomMessage`, `getCustomMessages`, `exportCustomMessages`, `importCustomMessages`
+### SettingsSlice
 
-| Component             | Fields Used                                                                                                                                         | Access Pattern             |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `DailyMessage`        | `currentMessage`, `messageHistory`, `toggleFavorite`, `navigateToPreviousMessage`, `navigateToNextMessage`, `canNavigateBack`, `canNavigateForward` | Direct destructure via App |
-| `AdminPanel`          | `loadCustomMessages`, `customMessagesLoaded`, `exportCustomMessages`, `importCustomMessages`                                                        | Direct                     |
-| `MessageList` (admin) | `messages`, `customMessages`                                                                                                                        | Direct                     |
-| `CreateMessageForm`   | `createCustomMessage`                                                                                                                               | Direct                     |
-| `EditMessageForm`     | `updateCustomMessage`                                                                                                                               | Direct                     |
-| `DeleteConfirmDialog` | `deleteCustomMessage`                                                                                                                               | Direct                     |
+| Component           | Fields/Actions Used                                                 |
+| ------------------- | ------------------------------------------------------------------- |
+| App                 | `settings`, `isOnboarded`, `initializeApp`                          |
+| Settings            | `settings` (display), auth logout                                   |
+| AnniversarySettings | `settings`, `addAnniversary`, `removeAnniversary`, `updateSettings` |
 
-## PhotosSlice
+### NavigationSlice
 
-**File**: `src/stores/slices/photosSlice.ts`
+| Component         | Fields/Actions Used                  |
+| ----------------- | ------------------------------------ |
+| App               | `currentView` (view routing)         |
+| BottomNavigation  | `currentView`, `setView`             |
+| LoveNotes         | `navigateHome`                       |
+| ScriptureOverview | `setView` (navigate to partner view) |
 
-**State**: `photos`, `selectedPhotoId`, `isUploading`, `uploadProgress`, `error`, `storageWarning`
-**Actions**: `uploadPhoto`, `loadPhotos`, `deletePhoto`, `updatePhoto`, `selectPhoto`, `clearPhotoSelection`, `clearError`, `clearStorageWarning`
+### MessagesSlice
 
-| Component       | Fields Used                                                                                                                                           | Access Pattern       |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `PhotoGallery`  | `photos`, `loadPhotos`, `deletePhoto`, `error`, `clearError`                                                                                          | Via `usePhotos` hook |
-| `PhotoCarousel` | `photos`, `selectedPhotoId`, `selectPhoto`, `clearPhotoSelection`, `updatePhoto`, `deletePhoto`                                                       | Direct               |
-| `PhotoUpload`   | `uploadPhoto`, `storageWarning`                                                                                                                       | Direct               |
-| `PhotoUploader` | `photos`, `isUploading`, `uploadProgress`, `error`, `storageWarning`, `uploadPhoto`, `loadPhotos`, `deletePhoto`, `clearError`, `clearStorageWarning` | Via `usePhotos` hook |
+| Component           | Fields/Actions Used                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App                 | `loadMessages` (via initializeApp)                                                                                                               |
+| DailyMessage        | `messages`, `currentMessage`, `messageHistory`, `currentDayOffset`, `setCurrentMessage`, `markMessageShown`, `navigateMessage`, `toggleFavorite` |
+| AdminPanel          | `importMessages`, `exportMessages`                                                                                                               |
+| MessageList (Admin) | `messages`, `customMessages`                                                                                                                     |
 
-## SettingsSlice
+### MoodSlice
 
-**File**: `src/stores/slices/settingsSlice.ts`
+| Component          | Fields/Actions Used                                |
+| ------------------ | -------------------------------------------------- |
+| MoodTracker        | `moods`, `addMood`, `syncMoods`, `setOnlineStatus` |
+| PartnerMoodView    | `partnerMoods`, `loadPartnerMoods`                 |
+| PartnerMoodDisplay | Via `usePartnerMood` hook                          |
 
-**State**: `settings`, `isOnboarded`
-**Actions**: `initializeApp`, `setSettings`, `updateSettings`, `setOnboarded`, `addAnniversary`, `removeAnniversary`, `setTheme`
+### InteractionsSlice
 
-| Component             | Fields Used                                                         | Access Pattern             |
-| --------------------- | ------------------------------------------------------------------- | -------------------------- |
-| `App`                 | `settings` (theme application via `applyTheme`)                     | Direct destructure         |
-| `DailyMessage`        | `settings` (relationship anniversaries for CountdownTimer)          | Direct destructure via App |
-| `AnniversarySettings` | `settings`, `addAnniversary`, `removeAnniversary`, `updateSettings` | Direct                     |
+| Component          | Fields/Actions Used                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| PokeKissInterface  | `sendPoke`, `sendKiss`, `unviewedCount`, `getUnviewedInteractions`, `markInteractionViewed`, `subscribeToInteractions` |
+| InteractionHistory | `loadInteractionHistory`, `interactions`                                                                               |
 
-## NavigationSlice
+### PartnerSlice
 
-**File**: `src/stores/slices/navigationSlice.ts`
+| Component         | Fields/Actions Used                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PartnerMoodView   | `partner`, `isLoadingPartner`, `loadPartner`, `searchUsers`, `sendPartnerRequest`, `acceptPartnerRequest`, `rejectPartnerRequest`, `loadPartnerRequests`, `sentRequests`, `receivedRequests`, `searchResults` |
+| ScriptureOverview | `partner`, `isLoadingPartner`, `loadPartner`                                                                                                                                                                  |
+| LobbyContainer    | `partner` (displayName)                                                                                                                                                                                       |
+| ReadingContainer  | `partner` (displayName)                                                                                                                                                                                       |
 
-**State**: `currentView`
-**Actions**: `setView`, `navigateHome`, `navigatePhotos`, `navigateMood`, `navigatePartner`, `navigateNotes`, `navigateScripture`
+### NotesSlice
 
-| Component           | Fields Used                                                 | Access Pattern                               |
-| ------------------- | ----------------------------------------------------------- | -------------------------------------------- |
-| `App`               | `currentView`, `setView`                                    | Direct destructure                           |
-| `BottomNavigation`  | Receives `currentView` and `onViewChange` as props from App | Props (no direct store access)               |
-| `LoveNotes`         | `navigateHome`                                              | `useAppStore((state) => state.navigateHome)` |
-| `ScriptureOverview` | `setView` (navigate to partner view)                        | `useShallow`                                 |
+| Component    | Fields/Actions Used                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| LoveNotes    | Via `useLoveNotes`: `notes`, `isLoading`, `error`, `hasMore`, `fetchOlderNotes`, `clearError`, `retryFailedMessage` |
+| MessageInput | Via `useLoveNotes`: `sendNote`                                                                                      |
 
-## MoodSlice
+### PhotosSlice
 
-**File**: `src/stores/slices/moodSlice.ts`
+| Component      | Fields/Actions Used                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| PhotoGallery   | `photos`, `loadPhotos`, `loadMorePhotos`, `photosLoading`, `photosHasMore`, `selectPhoto` |
+| PhotoUpload    | `uploadPhoto`, `storageWarning`                                                           |
+| PhotoViewer    | `selectedPhotoId`, `deletePhoto`                                                          |
+| PhotoCarousel  | `photos`, `selectedPhotoId`, `selectPhoto`                                                |
+| PhotoEditModal | Via parent: `updatePhotoCaption`, `updatePhotoTags`                                       |
 
-**State**: `moods`, `partnerMoods`, `syncStatus`
-**Actions**: `addMoodEntry`, `getMoodForDate`, `updateMoodEntry`, `loadMoods`, `updateSyncStatus`, `syncPendingMoods`, `fetchPartnerMoods`, `getPartnerMoodForDate`
+### ScriptureSlice
 
-| Component         | Fields Used                                                                     | Access Pattern                                |
-| ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------- |
-| `App`             | `syncPendingMoods`, `updateSyncStatus`, `syncStatus`                            | Direct destructure                            |
-| `MoodTracker`     | `addMoodEntry`, `getMoodForDate`, `syncStatus`, `loadMoods`, `syncPendingMoods` | Direct                                        |
-| `PartnerMoodView` | `partnerMoods`, `fetchPartnerMoods`, `syncStatus`                               | Direct (combined with PartnerSlice selectors) |
+| Component         | Fields/Actions Used                                                                                                                                                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ScriptureOverview | `session`, `scriptureLoading`, `scriptureError`, `activeSession`, `isCheckingSession`, `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession`, `coupleStats`, `isStatsLoading`, `loadCoupleStats` |
+| SoloReadingFlow   | `session`, `scriptureLoading`, `scriptureError`, `saveSession`, `completeSession`, `exitSession`, `clearScriptureError`                                                                                                                                           |
+| LobbyContainer    | `session`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `scriptureLoading`, `selectRole`, `toggleReady`, `convertToSolo`, `updatePhase`, `exitSession`                                                                             |
+| ReadingContainer  | `session`, `myRole`, `isPendingLockIn`, `partnerLocked`, `scriptureError`, `lockIn`, `undoLockIn`, `partnerDisconnected`, `partnerDisconnectedAt`, `setPartnerDisconnected`, `endSession`, `loadSession`, `isSyncing`                                             |
 
-## InteractionsSlice
+## Hook-Mediated Access
 
-**File**: `src/stores/slices/interactionsSlice.ts`
+These custom hooks encapsulate store access patterns:
 
-**State**: `interactions`, `unviewedCount`, `isSubscribed`
-**Actions**: `sendPoke`, `sendKiss`, `markInteractionViewed`, `getUnviewedInteractions`, `getInteractionHistory`, `loadInteractionHistory`, `subscribeToInteractions`, `addIncomingInteraction`
-
-| Component            | Fields Used                                                                                                            | Access Pattern |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `PokeKissInterface`  | `sendPoke`, `sendKiss`, `unviewedCount`, `getUnviewedInteractions`, `markInteractionViewed`, `subscribeToInteractions` | Direct         |
-| `InteractionHistory` | `getInteractionHistory`, `loadInteractionHistory`                                                                      | Direct         |
-
-## PartnerSlice
-
-**File**: `src/stores/slices/partnerSlice.ts`
-
-**State**: `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `isLoadingRequests`, `searchResults`, `isSearching`
-**Actions**: `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest`, `hasPartner`
-
-| Component           | Fields Used                                                                                                                                                                                                                                  | Access Pattern                             |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `PartnerMoodView`   | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`, `searchResults`, `isSearching`, `loadPartner`, `loadPendingRequests`, `searchUsers`, `clearSearch`, `sendPartnerRequest`, `acceptPartnerRequest`, `declinePartnerRequest` | Direct (combined with MoodSlice selectors) |
-| `ScriptureOverview` | `partner`, `isLoadingPartner`, `loadPartner`                                                                                                                                                                                                 | `useShallow`                               |
-| `SoloReadingFlow`   | `partner`, `isLoadingPartner`                                                                                                                                                                                                                | `useShallow`                               |
-| `LobbyContainer`    | `partner` (for `displayName`)                                                                                                                                                                                                                | `useShallow`                               |
-| `ReadingContainer`  | `partner` (for `displayName`)                                                                                                                                                                                                                | `useShallow`                               |
-
-## NotesSlice
-
-**File**: `src/stores/slices/notesSlice.ts`
-
-**State**: `notes`, `notesIsLoading`, `notesError`, `notesHasMore`, `sentMessageTimestamps`
-**Actions**: `fetchNotes`, `fetchOlderNotes`, `addNote`, `setNotes`, `setNotesError`, `clearNotesError`, `checkRateLimit`, `sendNote`, `retryFailedMessage`, `cleanupPreviewUrls`, `removeFailedMessage`
-
-All access is through the `useLoveNotes` custom hook (`src/hooks/useLoveNotes.ts`), which wraps store selectors with memoized callbacks and integrates with `useRealtimeMessages` for live Supabase Broadcast subscriptions.
-
-| Component      | Fields Used (via `useLoveNotes`)                                                                                                                                | Access Pattern        |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `LoveNotes`    | `notes`, `isLoading`, `error`, `hasMore`, `fetchNotes`, `fetchOlderNotes`, `clearNotesError`, `retryFailedMessage`, `removeFailedMessage`, `cleanupPreviewUrls` | `useLoveNotes()` hook |
-| `MessageInput` | `sendNote`                                                                                                                                                      | `useLoveNotes()` hook |
-
-## ScriptureReadingSlice
-
-**File**: `src/stores/slices/scriptureReadingSlice.ts`
-
-**State**: `session`, `scriptureLoading`, `isInitialized`, `isPendingLockIn`, `isPendingReflection`, `isSyncing`, `scriptureError`, `activeSession`, `isCheckingSession`, `pendingRetry`, `coupleStats`, `isStatsLoading`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `currentUserId`, `partnerLocked`, `partnerDisconnected`, `partnerDisconnectedAt`, `_broadcastFn`
-**Actions**: `createSession`, `loadSession`, `exitSession`, `updatePhase`, `clearScriptureError`, `checkForActiveSession`, `clearActiveSession`, `advanceStep`, `saveAndExit`, `saveSession`, `abandonSession`, `retryFailedWrite`, `loadCoupleStats`, `selectRole`, `toggleReady`, `convertToSolo`, `applySessionConverted`, `onPartnerJoined`, `onPartnerReady`, `onCountdownStarted`, `onBroadcastReceived`, `lockIn`, `undoLockIn`, `onPartnerLockInChanged`, `setPartnerDisconnected`, `endSession`, `setBroadcastFn`
-
-| Component           | Fields Used                                                                                                                                                                                                                                                                                                   | Access Pattern |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `ScriptureOverview` | `session`, `scriptureLoading` (as `isSessionLoading`), `scriptureError` (as `sessionError`), `activeSession`, `isCheckingSession`, `createSession`, `loadSession`, `abandonSession`, `clearActiveSession`, `clearScriptureError`, `checkForActiveSession`, `coupleStats`, `isStatsLoading`, `loadCoupleStats` | `useShallow`   |
-| `SoloReadingFlow`   | `session`, `isSyncing`, `scriptureError`, `pendingRetry`, `advanceStep`, `saveAndExit`, `saveSession`, `exitSession`, `retryFailedWrite`, `updatePhase`                                                                                                                                                       | `useShallow`   |
-| `LobbyContainer`    | `session`, `myRole`, `partnerJoined`, `myReady`, `partnerReady`, `countdownStartedAt`, `scriptureLoading`, `selectRole`, `toggleReady`, `convertToSolo`, `updatePhase`, `partner`                                                                                                                             | `useShallow`   |
-| `ReadingContainer`  | `session`, `myRole`, `isPendingLockIn`, `partnerLocked`, `scriptureError`, `lockIn`, `undoLockIn`, `partner`, `partnerDisconnected`, `partnerDisconnectedAt`, `setPartnerDisconnected`, `endSession`, `loadSession`, `isSyncing`                                                                              | `useShallow`   |
-
-## Custom Hook Store Wrappers
-
-Two custom hooks encapsulate store access with additional logic:
-
-### `useLoveNotes` (`src/hooks/useLoveNotes.ts`)
-
-Wraps **NotesSlice** selectors with:
-
-- Memoized `fetchNotes`, `fetchOlderNotes`, `sendNote` callbacks
-- `useRealtimeMessages` integration for live Broadcast subscriptions
-- Auto-fetch on mount
-- Preview URL cleanup on unmount
-
-**Used by**: `LoveNotes`, `MessageInput`
-
-### `usePhotos` (`src/hooks/usePhotos.ts`)
-
-Wraps **PhotosSlice** selectors with:
-
-- Memoized `uploadPhoto`, `loadPhotos`, `deletePhoto` callbacks
-- `error`, `storageWarning`, `isUploading`, `uploadProgress` state
-- `clearError`, `clearStorageWarning` actions
-
-**Used by**: `PhotoGallery`, `PhotoUploader`
-
-## Components Without Store Access
-
-The following components receive all data via props and have no store connection:
-
-- All **RelationshipTimers** components (`TimeTogether`, `BirthdayCountdown`, `EventCountdown`, `RelationshipTimers`)
-- All **Error Boundary** components (`ErrorBoundary`, `ViewErrorBoundary`)
-- All **Scripture Presentational** components (`BookmarkFlag`, `PerStepReflection`, `ReflectionSummary`, `MessageCompose`, `DailyPrayerReport`, `StatsSection`, `Countdown`, `LockInButton`, `DisconnectionOverlay`, `RoleIndicator`, `PartnerPosition`)
-- All **Photo UI** components (`PhotoGridItem`, `PhotoGridSkeleton`, `PhotoViewer`, `PhotoCarouselControls`, `PhotoEditModal`, `PhotoDeleteConfirmation`)
-- All **Mood Display** components (`MoodButton`, `MoodHistoryItem`, `CalendarDay`, `MoodDetailModal`, `PartnerMoodDisplay`, `NoMoodLoggedState`, `MoodHistoryTimeline`, `MoodHistoryCalendar`)
-- All **Love Notes Presentational** components (`LoveNoteMessage`, `MessageList`, `ImagePreview`, `FullScreenImageViewer`)
-- All **Auth** components (`LoginScreen`, `DisplayNameSetup`)
-- `BottomNavigation`, `WelcomeSplash`, `WelcomeButton`, `CountdownTimer`, `SyncToast`, `NetworkStatusIndicator`, `NetworkStatusDot`
-
----
+| Hook                    | Store Access                                            | Components                                                 |
+| ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
+| `useLoveNotes`          | notesSlice (notes, loading, error, send, fetch, retry)  | LoveNotes, MessageInput                                    |
+| `usePartnerMood`        | moodSlice (partnerMoods, loadPartnerMoods)              | PartnerMoodDisplay                                         |
+| `useNetworkStatus`      | Browser API (not store)                                 | NetworkStatusIndicator, ScriptureOverview, SoloReadingFlow |
+| `useScriptureBroadcast` | scriptureSlice (setBroadcastFn, handleBroadcastMessage) | ScriptureOverview                                          |
+| `useScripturePresence`  | Supabase presence (not store directly)                  | ReadingContainer                                           |
+| `useAutoSave`           | scriptureSlice (saveSession)                            | SoloReadingFlow                                            |
+| `useVibration`          | Browser API (not store)                                 | MessageInput                                               |
+| `useMotionConfig`       | Browser API (prefers-reduced-motion)                    | ScriptureOverview, ReadingContainer, Countdown             |

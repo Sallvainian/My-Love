@@ -2,18 +2,18 @@
 
 **Source:** `src/api/supabaseClient.ts`
 
-## Overview
+## Purpose
 
-The Supabase client is a **singleton** instance typed against the auto-generated `Database` schema from `src/types/database.types.ts`. It is imported by every API module and provides access to Auth, Postgres, Storage, and Realtime. Uses `@supabase/supabase-js` v2.97.0.
+Singleton Supabase client instance configured with typed `Database` generics, environment variable validation, and partner lookup helpers.
 
 ## Environment Variables
 
-| Variable                                | Purpose                  | Required |
-| --------------------------------------- | ------------------------ | -------- |
-| `VITE_SUPABASE_URL`                     | Supabase project URL     | Yes      |
-| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon/public key | Yes      |
+| Variable                                | Required | Description              |
+| --------------------------------------- | -------- | ------------------------ |
+| `VITE_SUPABASE_URL`                     | Yes      | Supabase project URL     |
+| `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Yes      | Supabase anon/public key |
 
-The module throws immediately at import time if either variable is missing, logging which are present/absent.
+Missing variables throw an `Error` at module load time with diagnostic output.
 
 ## Client Configuration
 
@@ -23,78 +23,42 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
   supabaseAnonKey,
   {
     auth: {
-      persistSession: true, // Sessions survive page reload (localStorage)
-      autoRefreshToken: true, // JWT auto-refresh before expiry
-      detectSessionInUrl: true, // OAuth callback detection (Google)
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true, // OAuth callback detection
     },
     realtime: {
-      params: {
-        eventsPerSecond: 10, // Throttle to 10 realtime events/second
-      },
+      params: { eventsPerSecond: 10 },
     },
   }
 );
 ```
 
-## Exported Members
+## Exported Functions
 
 ### `supabase`
 
-```typescript
-export const supabase: SupabaseClient<Database>;
-```
+- **Type:** `SupabaseClient<Database>`
+- Default export. Singleton instance used by all API modules.
 
-The singleton client instance. All API modules import this for database queries, auth operations, storage uploads, and realtime subscriptions.
+### `getPartnerId(): Promise<string | null>`
 
-### `getPartnerId()`
+Queries the `users` table for the current user's `partner_id`. Returns `null` if unauthenticated, no user record exists (`PGRST116`), or no partner is linked.
 
-```typescript
-export const getPartnerId = async (): Promise<string | null>
-```
+### `getPartnerDisplayName(): Promise<string | null>`
 
-Queries the `users` table for the current user's `partner_id` column.
+Fetches the partner's `display_name` from the `users` table. Calls `getPartnerId()` internally.
 
-**Flow:**
+### `isSupabaseConfigured(): boolean`
 
-1. Get current session via `supabase.auth.getSession()`
-2. Extract `user.id` from session
-3. Query `users` table: `SELECT partner_id WHERE id = currentUserId`
-4. Return `partner_id` or `null`
+Returns `true` if both env vars are set. Synchronous check.
 
-**Error handling:**
+## Re-exports
 
-- Returns `null` if not authenticated
-- Returns `null` if no users table record (`PGRST116`)
-- Returns `null` on any query error (graceful degradation)
+- `Database` type from `src/types/database.types.ts`
 
-### `getPartnerDisplayName()`
+## Dependencies
 
-```typescript
-export const getPartnerDisplayName = async (): Promise<string | null>
-```
-
-Fetches the partner's `display_name` from the `users` table.
-
-**Flow:**
-
-1. Call `getPartnerId()` to get partner UUID
-2. Query `users` table: `SELECT display_name WHERE id = partnerId`
-3. Return `display_name` or `null`
-
-**Error handling:** Returns `null` on any failure.
-
-### `isSupabaseConfigured()`
-
-```typescript
-export const isSupabaseConfigured = (): boolean
-```
-
-Returns `true` if both `supabaseUrl` and `supabaseAnonKey` are truthy. Synchronous check.
-
-### `Database` type
-
-```typescript
-export type { Database } from '../types/database.types';
-```
-
-Re-exported for convenience. The `Database` type is auto-generated from the Supabase schema using `supabase gen types typescript --local`.
+- `@supabase/supabase-js` (`createClient`, `SupabaseClient`)
+- `src/types/database.types` (generated types)
+- `src/utils/logger`

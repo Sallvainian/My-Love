@@ -16,6 +16,7 @@
 import { useState, type FormEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { supabase } from '../../api/supabaseClient';
+import { logger } from '../../utils/logger';
 import './DisplayNameSetup.css';
 
 export interface DisplayNameSetupProps {
@@ -86,9 +87,7 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
         // Don't throw - this is not critical, user_metadata update is what matters
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[DisplayNameSetup] Display name set successfully:', displayName.trim());
-      }
+      logger.debug('[DisplayNameSetup] Display name set successfully:', displayName.trim());
 
       onComplete();
     } catch (err) {

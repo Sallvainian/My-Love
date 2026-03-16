@@ -23,12 +23,6 @@ runs:
         supabase status --output json | jq -e ".DB_URL" > /dev/null
         echo "Supabase Local started successfully"
 
-    - name: Apply database migrations
-      shell: bash
-      run: |
-        supabase db reset
-        echo "Migrations applied"
-
     - name: Export Supabase credentials
       shell: bash
       run: |

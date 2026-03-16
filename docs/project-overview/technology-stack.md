@@ -11,8 +11,8 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 | React DOM    | 19.2.4  | DOM rendering                                             |
 | TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                |
 | Vite         | 7.3.1   | Build tool and dev server                                 |
-| Tailwind CSS | 4.1.17  | Utility-first CSS framework (v4 with PostCSS integration) |
-| PostCSS      | 8.5.6   | CSS post-processing                                       |
+| Tailwind CSS | 4.1.17+ | Utility-first CSS framework (v4 with PostCSS integration) |
+| PostCSS      | 8.5.8   | CSS post-processing                                       |
 | Autoprefixer | 10.4.27 | Vendor prefix automation                                  |
 
 **Why Vite?** Vite provides near-instant hot module replacement during development and fast production builds via Rollup. The project uses Vite's InjectManifest strategy for PWA service worker compilation, the `vite-plugin-checker` for in-browser TypeScript error overlays, and `rollup-plugin-visualizer` for bundle analysis.
@@ -25,23 +25,23 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology            | Version | Purpose                                                 |
 | --------------------- | ------- | ------------------------------------------------------- |
-| Zustand               | 5.0.11  | Client-side state management (10-slice store pattern)   |
+| Zustand               | 5.0.11  | Client-side state management (11-slice store pattern)   |
 | Zod                   | 4.3.6   | Schema validation for forms and API responses           |
 | idb                   | 8.0.3   | IndexedDB wrapper (offline-first local storage)         |
-| @supabase/supabase-js | 2.97.0  | Supabase client SDK (auth, database, storage, realtime) |
+| @supabase/supabase-js | 2.99.0  | Supabase client SDK (auth, database, storage, realtime) |
 
-**Why Zustand?** Zustand provides a lightweight, boilerplate-free store. The project uses the slice pattern with 10 slices composed into a single store (`useAppStore.ts`). State is persisted to `localStorage` via `zustand/persist` with custom serialization for `Map` objects.
+**Why Zustand?** Zustand provides a lightweight, boilerplate-free store. The project uses the slice pattern with 11 slices composed into a single store (`useAppStore.ts`). State is persisted to `localStorage` via `zustand/persist` with custom serialization for `Map` objects.
 
-**Why IndexedDB via idb?** The app follows an offline-first architecture. IndexedDB serves as the primary data store for moods, photos, and interactions. Entries are created with `synced: false` and synced to Supabase in the background.
+**Why IndexedDB via idb?** The app follows an offline-first architecture. IndexedDB serves as the primary data store for moods, photos, and messages. Entries are created with `synced: false` and synced to Supabase in the background.
 
 ## UI and Animation
 
 | Technology                   | Version | Purpose                                                              |
 | ---------------------------- | ------- | -------------------------------------------------------------------- |
-| Framer Motion                | 12.34.3 | Animation library (lazy-loaded via `LazyMotion` with `domAnimation`) |
-| Lucide React                 | 0.575.0 | Icon library (tree-shakeable)                                        |
-| DOMPurify                    | 3.3.1   | HTML sanitization for user-generated content                         |
-| react-window                 | 2.2.7   | Virtualized list rendering for photo gallery                         |
+| Framer Motion                | 12.35.2 | Animation library (lazy-loaded via `LazyMotion` with `domAnimation`) |
+| Lucide React                 | 0.577.0 | Icon library (tree-shakeable)                                        |
+| DOMPurify                    | 3.3.2   | HTML sanitization for user-generated content                         |
+| react-window                 | 2.2.7   | Virtualized list rendering for photo gallery and love notes          |
 | react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists                                |
 
 ## PWA
@@ -55,7 +55,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology    | Version | Purpose                                                     |
 | ------------- | ------- | ----------------------------------------------------------- |
-| @sentry/react | 10.39.0 | Error tracking and performance monitoring (20% sample rate) |
+| @sentry/react | 10.42.0 | Error tracking and performance monitoring (20% sample rate) |
 
 Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs reach Sentry). Source maps are uploaded during CI builds via `@sentry/vite-plugin` and deleted from the `dist/` directory after upload.
 
@@ -66,7 +66,7 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | Vitest                             | 4.0.17  | Unit test runner                                                                  |
 | @vitest/coverage-v8                | 4.0.18  | Code coverage (V8 provider, 25% threshold on lines/functions/branches/statements) |
 | @vitest/ui                         | 4.0.17  | Vitest interactive browser UI                                                     |
-| happy-dom                          | 20.7.0  | DOM environment for unit tests                                                    |
+| happy-dom                          | 20.8.3  | DOM environment for unit tests                                                    |
 | @testing-library/react             | 16.3.2  | React component testing utilities                                                 |
 | @testing-library/jest-dom          | 6.9.1   | Custom DOM matchers (`toBeInTheDocument`, `toHaveTextContent`, etc.)              |
 | @testing-library/user-event        | 14.6.1  | User interaction simulation                                                       |
@@ -83,7 +83,7 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | Technology                  | Version | Purpose                                                                               |
 | --------------------------- | ------- | ------------------------------------------------------------------------------------- |
 | ESLint                      | 9.39.2  | Linting (flat config format, `eslint.config.js`)                                      |
-| typescript-eslint           | 8.56.1  | TypeScript ESLint rules                                                               |
+| typescript-eslint           | 8.57.0  | TypeScript ESLint rules                                                               |
 | eslint-plugin-react-hooks   | 7.0.1   | React hooks linting (including React 19 rules for `set-state-in-effect` and `purity`) |
 | eslint-plugin-react-refresh | 0.5.2   | React Refresh HMR validation                                                          |
 | Prettier                    | 3.8.1   | Code formatting                                                                       |
@@ -93,7 +93,7 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | rollup-plugin-visualizer    | 6.0.5   | Bundle analysis (generates `dist/stats.html` with gzip and brotli sizes)              |
 | gh-pages                    | 6.3.0   | GitHub Pages deployment                                                               |
 | tsx                         | 4.21.0  | TypeScript script execution                                                           |
-| Supabase CLI                | 2.76.15 | Local Supabase development, migrations, type generation                               |
+| Supabase CLI                | 2.77.1  | Local Supabase development, migrations, type generation                               |
 | @sentry/vite-plugin         | 5.0.0   | Sentry source map upload during builds                                                |
 | mise                        | --      | Tool version management (Node.js version pinned in `.mise.toml`)                      |
 
@@ -124,6 +124,15 @@ Production builds split dependencies into independently cacheable chunks via `ma
 | `vendor-icons`     | `lucide-react`          |
 
 This ensures that updating application code does not invalidate cached vendor bundles.
+
+## Package Overrides
+
+| Package                | Override Version | Reason                 |
+| ---------------------- | ---------------- | ---------------------- |
+| `glob`                 | ^12.0.0          | Security/compatibility |
+| `js-yaml`              | ^4.1.1           | Security patch         |
+| `serialize-javascript` | ^7.0.3           | Security patch         |
+| `tar`                  | ^7.5.8           | Security patch         |
 
 ## Package Manager
 

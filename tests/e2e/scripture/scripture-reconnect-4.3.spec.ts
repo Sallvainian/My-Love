@@ -31,13 +31,13 @@ import {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
-  test.use({ timeout: 90_000 });
-
   test('[P0] should show disconnect overlay, timeout, and end session cleanly', async ({
     page,
     supabaseAdmin,
     togetherMode: { partnerPage, uiSessionId },
   }) => {
+    test.setTimeout(90_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -95,13 +95,13 @@ test.describe('[4.3-E2E-001] End Session on Partner Disconnect', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
-  test.use({ timeout: 90_000 });
-
   test('[P1] should show disconnect overlay, keep waiting, then reconnect and resume', async ({
     page,
     supabaseAdmin,
     togetherMode: { partnerPage, partnerContext, uiSessionId },
   }) => {
+    test.setTimeout(90_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -173,13 +173,13 @@ test.describe('[4.3-E2E-002] Keep Waiting then Reconnect', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.3-E2E-003] Reconnect After Step Advance', () => {
-  test.use({ timeout: 90_000 });
-
   test('[P1] should resync reconnecting partner to canonical state after step advanced while offline', async ({
     page,
     supabaseAdmin,
     togetherMode: { partnerPage, partnerContext, uiSessionId },
   }) => {
+    test.setTimeout(90_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 

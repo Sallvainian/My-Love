@@ -22,14 +22,9 @@ vi.mock('@/api/supabaseClient', () => ({
   getPartnerId: vi.fn(),
 }));
 
-vi.mock('@/api/auth/sessionService', () => ({
-  getCurrentUserIdOfflineSafe: vi.fn(),
-}));
-
 import { moodService } from '@/services/moodService';
 import { moodSyncService } from '@/api/moodSyncService';
 import { getPartnerId } from '@/api/supabaseClient';
-import { getCurrentUserIdOfflineSafe } from '@/api/auth/sessionService';
 
 // Import Zustand store factory
 import { createMoodSlice, type MoodSlice } from '@/stores/slices/moodSlice';
@@ -37,21 +32,24 @@ import { createMoodSlice, type MoodSlice } from '@/stores/slices/moodSlice';
 const mockedMoodService = vi.mocked(moodService);
 const mockedMoodSyncService = vi.mocked(moodSyncService);
 const mockedGetPartnerId = vi.mocked(getPartnerId);
-const mockedGetCurrentUserId = vi.mocked(getCurrentUserIdOfflineSafe);
 
 /** Create a standalone store-like object from the slice */
-function createTestStore() {
-  const stateRef = { current: null as MoodSlice | null };
+function createTestStore(extraState: Record<string, unknown> = {}) {
+  const stateRef = { current: null as (MoodSlice & Record<string, unknown>) | null };
 
   const get = () => stateRef.current!;
-  const set = (updater: Partial<MoodSlice> | ((s: MoodSlice) => Partial<MoodSlice>)) => {
+  const set = (
+    updater:
+      | Partial<MoodSlice & Record<string, unknown>>
+      | ((s: MoodSlice & Record<string, unknown>) => Partial<MoodSlice & Record<string, unknown>>)
+  ) => {
     const update = typeof updater === 'function' ? updater(stateRef.current!) : updater;
     stateRef.current = { ...stateRef.current!, ...update };
   };
   const api = {} as never;
 
   const state = createMoodSlice(set as never, get as never, api);
-  stateRef.current = state;
+  stateRef.current = { ...state, ...extraState };
   return { get, set };
 }
 
@@ -98,7 +96,6 @@ describe('moodSlice', () => {
   describe('addMoodEntry', () => {
     it('creates a mood entry and adds to state', async () => {
       const entry = makeMoodEntry();
-      mockedGetCurrentUserId.mockResolvedValue('user-123');
       mockedMoodService.create.mockResolvedValue(entry);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([entry]);
       mockedMoodSyncService.syncPendingMoods.mockResolvedValue({
@@ -108,7 +105,7 @@ describe('moodSlice', () => {
       });
       mockedMoodService.getAll.mockResolvedValue([entry]);
 
-      const { get } = createTestStore();
+      const { get } = createTestStore({ userId: 'user-123' });
       await get().addMoodEntry(['happy']);
 
       expect(mockedMoodService.create).toHaveBeenCalledWith('user-123', ['happy'], undefined);
@@ -116,17 +113,14 @@ describe('moodSlice', () => {
     });
 
     it('throws if user is not authenticated', async () => {
-      mockedGetCurrentUserId.mockResolvedValue(null);
-
       const { get } = createTestStore();
       await expect(get().addMoodEntry(['happy'])).rejects.toThrow('User not authenticated');
     });
 
     it('delegates to updateMoodEntry if mood already exists for today', async () => {
       const existing = makeMoodEntry({ id: 5 });
-      mockedGetCurrentUserId.mockResolvedValue('user-123');
 
-      const { get, set } = createTestStore();
+      const { get, set } = createTestStore({ userId: 'user-123' });
       // Seed state with existing mood for today
       set({ moods: [existing] } as Partial<MoodSlice>);
 
@@ -147,14 +141,13 @@ describe('moodSlice', () => {
 
     it('handles sync failure gracefully (does not throw)', async () => {
       const entry = makeMoodEntry();
-      mockedGetCurrentUserId.mockResolvedValue('user-123');
       mockedMoodService.create.mockResolvedValue(entry);
       mockedMoodService.getUnsyncedMoods.mockResolvedValue([entry]);
       mockedMoodSyncService.syncPendingMoods.mockRejectedValue(new Error('network'));
       // syncPendingMoods failure re-throws, but addMoodEntry catches sync errors
       mockedMoodService.getAll.mockResolvedValue([entry]);
 
-      const { get } = createTestStore();
+      const { get } = createTestStore({ userId: 'user-123' });
       // Should not throw — sync failure is caught internally
       await get().addMoodEntry(['happy']);
       expect(get().moods).toContainEqual(entry);

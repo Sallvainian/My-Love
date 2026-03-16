@@ -8,6 +8,7 @@
 import type { StateCreator } from 'zustand';
 
 // Import slice interfaces (NOT the slice creators, NOT AppSlice)
+import type { AuthSlice } from './slices/authSlice';
 import type { MessagesSlice } from './slices/messagesSlice';
 import type { PhotosSlice } from './slices/photosSlice';
 import type { SettingsSlice } from './slices/settingsSlice';
@@ -48,6 +49,7 @@ export type AppMiddleware = [['zustand/persist', unknown]];
 export interface AppState
   extends
     AppSlice,
+    AuthSlice,
     MessagesSlice,
     PhotosSlice,
     SettingsSlice,
