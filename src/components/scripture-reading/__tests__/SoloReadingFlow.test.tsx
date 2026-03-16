@@ -519,7 +519,7 @@ describe('SoloReadingFlow', () => {
     it('dialog shows AC-spec description text', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('exit-button'));
-      expect(screen.getByText('Save your progress? You can continue later.')).toBeDefined();
+      expect(screen.getByText('You can continue where you left off.')).toBeDefined();
     });
 
     it('dialog has Save & Exit button', () => {
@@ -553,7 +553,7 @@ describe('SoloReadingFlow', () => {
       render(<SoloReadingFlow />);
       fireEvent.click(screen.getByTestId('exit-button'));
       expect(screen.getByTestId('exit-confirm-dialog')).toBeDefined();
-      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.keyDown(screen.getByTestId('exit-confirm-dialog'), { key: 'Escape' });
       expect(screen.queryByTestId('exit-confirm-dialog')).toBeNull();
     });
 
@@ -1125,8 +1125,10 @@ describe('SoloReadingFlow', () => {
       fireEvent.click(screen.getByTestId('scripture-session-rating-4'));
       // Submit the reflection summary
       fireEvent.click(screen.getByTestId('scripture-reflection-summary-continue'));
-      // Verify updatePhase was called with 'report'
-      expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+      // Verify updatePhase was called with 'report' (now async — awaits addReflection first)
+      await vi.waitFor(() => {
+        expect(mockUpdatePhase).toHaveBeenCalledWith('report');
+      });
       await vi.waitFor(() => {
         expect(mockUpdateSessionBookmarkSharing).toHaveBeenCalledWith(
           'session-123',

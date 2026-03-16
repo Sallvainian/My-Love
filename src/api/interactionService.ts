@@ -10,7 +10,6 @@
 
 import { supabase } from './supabaseClient';
 import type { Database } from './supabaseClient';
-import { getCurrentUserId } from './auth/sessionService';
 import {
   isOnline,
   handleSupabaseError,
@@ -19,6 +18,7 @@ import {
   isPostgrestError,
 } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { logger } from '../utils/logger';
 
 /**
  * Supabase interaction record type (from database schema)
@@ -76,8 +76,8 @@ export class InteractionService {
    * }
    * ```
    */
-  async sendPoke(partnerId: string): Promise<SupabaseInteractionRecord> {
-    return this.sendInteraction('poke', partnerId);
+  async sendPoke(partnerId: string, userId: string): Promise<SupabaseInteractionRecord> {
+    return this.sendInteraction('poke', partnerId, userId);
   }
 
   /**
@@ -97,8 +97,8 @@ export class InteractionService {
    * }
    * ```
    */
-  async sendKiss(partnerId: string): Promise<SupabaseInteractionRecord> {
-    return this.sendInteraction('kiss', partnerId);
+  async sendKiss(partnerId: string, userId: string): Promise<SupabaseInteractionRecord> {
+    return this.sendInteraction('kiss', partnerId, userId);
   }
 
   /**
@@ -111,7 +111,8 @@ export class InteractionService {
    */
   private async sendInteraction(
     type: InteractionType,
-    toUserId: string
+    toUserId: string,
+    userId: string
   ): Promise<SupabaseInteractionRecord> {
     // Check network status
     if (!isOnline()) {
@@ -122,15 +123,10 @@ export class InteractionService {
     }
 
     try {
-      const currentUserId = await getCurrentUserId();
-      if (!currentUserId) {
-        throw new Error('Cannot send interaction: User not authenticated');
-      }
-
       // Create interaction insert payload
       const interactionInsert: InteractionInsert = {
         type,
-        from_user_id: currentUserId,
+        from_user_id: userId,
         to_user_id: toUserId,
         viewed: false,
       };
@@ -150,8 +146,8 @@ export class InteractionService {
         throw new Error('No data returned from Supabase insert');
       }
 
-      console.log(`[InteractionService] Sent ${type} to ${toUserId}`);
-      return data as unknown as SupabaseInteractionRecord;
+      logger.info(`[InteractionService] Sent ${type} to ${toUserId}`);
+      return data;
     } catch (error) {
       logSupabaseError('InteractionService.sendInteraction', error);
 
@@ -184,13 +180,9 @@ export class InteractionService {
    * ```
    */
   async subscribeInteractions(
+    userId: string,
     callback: (interaction: SupabaseInteractionRecord) => void
   ): Promise<() => void> {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) {
-      throw new Error('Cannot subscribe to interactions: User not authenticated');
-    }
-
     // Create Realtime channel for incoming interactions
     this.realtimeChannel = supabase
       .channel('incoming-interactions')
@@ -200,15 +192,15 @@ export class InteractionService {
           event: 'INSERT',
           schema: 'public',
           table: 'interactions',
-          filter: `to_user_id=eq.${currentUserId}`,
+          filter: `to_user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('[InteractionService] Received interaction:', payload.new);
+          logger.info('[InteractionService] Received interaction:', payload.new);
           callback(payload.new as SupabaseInteractionRecord);
         }
       )
       .subscribe((status) => {
-        console.log('[InteractionService] Realtime subscription status:', status);
+        logger.info('[InteractionService] Realtime subscription status:', status);
       });
 
     // Return unsubscribe function
@@ -216,7 +208,7 @@ export class InteractionService {
       if (this.realtimeChannel) {
         supabase.removeChannel(this.realtimeChannel);
         this.realtimeChannel = null;
-        console.log('[InteractionService] Unsubscribed from interactions');
+        logger.info('[InteractionService] Unsubscribed from interactions');
       }
     };
   }
@@ -237,18 +229,17 @@ export class InteractionService {
    * console.log('Last 20 interactions:', interactions);
    * ```
    */
-  async getInteractionHistory(limit: number = 50, offset: number = 0): Promise<Interaction[]> {
+  async getInteractionHistory(
+    userId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<Interaction[]> {
     try {
-      const currentUserId = await getCurrentUserId();
-      if (!currentUserId) {
-        throw new Error('Cannot get interaction history: User not authenticated');
-      }
-
       // Query interactions where current user is sender or recipient
       const { data, error } = await supabase
         .from('interactions')
         .select('*')
-        .or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
+        .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -258,7 +249,7 @@ export class InteractionService {
 
       // Transform Supabase records to local Interaction format
       return (
-        (data as unknown as SupabaseInteractionRecord[])?.map((record) => ({
+        data?.map((record) => ({
           id: record.id,
           type: record.type as InteractionType,
           fromUserId: record.from_user_id,
@@ -291,17 +282,12 @@ export class InteractionService {
    * console.log(`You have ${unviewed.length} new interactions`);
    * ```
    */
-  async getUnviewedInteractions(): Promise<Interaction[]> {
+  async getUnviewedInteractions(userId: string): Promise<Interaction[]> {
     try {
-      const currentUserId = await getCurrentUserId();
-      if (!currentUserId) {
-        throw new Error('Cannot get unviewed interactions: User not authenticated');
-      }
-
       const { data, error } = await supabase
         .from('interactions')
         .select('*')
-        .eq('to_user_id', currentUserId)
+        .eq('to_user_id', userId)
         .eq('viewed', false)
         .order('created_at', { ascending: false });
 
@@ -310,7 +296,7 @@ export class InteractionService {
       }
 
       return (
-        (data as unknown as SupabaseInteractionRecord[])?.map((record) => ({
+        data?.map((record) => ({
           id: record.id,
           type: record.type as InteractionType,
           fromUserId: record.from_user_id,
@@ -351,7 +337,7 @@ export class InteractionService {
         throw error;
       }
 
-      console.log(`[InteractionService] Marked interaction ${interactionId} as viewed`);
+      logger.info(`[InteractionService] Marked interaction ${interactionId} as viewed`);
     } catch (error) {
       logSupabaseError('InteractionService.markAsViewed', error);
 

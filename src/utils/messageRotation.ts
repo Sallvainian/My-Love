@@ -1,14 +1,5 @@
 import type { Message, MessageHistory, Settings } from '../types';
-
-/**
- * Format date as YYYY-MM-DD string (deterministic format for hashing)
- */
-export function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { formatDateISO } from './dateUtils';
 
 /**
  * Hash a date string to a deterministic number
@@ -37,7 +28,7 @@ export function getDailyMessage(allMessages: Message[], date: Date = new Date())
   }
 
   // Generate deterministic hash from date
-  const dateString = formatDate(date);
+  const dateString = formatDateISO(date);
   const hash = hashDateString(dateString);
 
   // Calculate message index using modulo

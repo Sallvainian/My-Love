@@ -261,8 +261,8 @@ select is(
 select is(
   (select status::text from public.scripture_sessions
    where id = current_setting('tests.session_last')::uuid),
-  'complete',
-  '4.2-DB-005: status transitions to complete after last step lock-in'
+  'in_progress',
+  '4.2-DB-005: status remains in_progress after last step lock-in (completion happens after report phase)'
 );
 
 -- ============================================

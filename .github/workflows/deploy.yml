@@ -65,6 +65,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
@@ -93,7 +95,7 @@ jobs:
       - name: Health Check - HTTP Status (with retry)
         run: |
           echo "🔍 Running HTTP health checks..."
-          DEPLOYMENT_URL="https://sallvainian.github.io/My-Love/"
+          DEPLOYMENT_URL="${{ needs.deploy.outputs.page_url }}"
           MAX_ATTEMPTS=3
           RETRY_DELAY=10
 
@@ -219,6 +221,6 @@ jobs:
           echo "✅ All health checks passed"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-          echo "Deployment URL: https://sallvainian.github.io/My-Love/"
+          echo "Deployment URL: ${{ needs.deploy.outputs.page_url }}"
           echo "Status: Healthy"
           echo ""

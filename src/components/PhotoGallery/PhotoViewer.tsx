@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback, useRef, type RefObject } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
+import { useFocusTrap } from '../../hooks';
 import type { PhotoWithUrls } from '../../services/photoService';
 
 interface PhotoViewerProps {
@@ -10,46 +11,6 @@ interface PhotoViewerProps {
   selectedPhotoId: string;
   onClose: () => void;
 }
-
-// AC 6.4.12 & WCAG 2.4.3: Focus trap hook for accessibility
-const useFocusTrap = (containerRef: RefObject<HTMLDivElement | null>) => {
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const focusableElements = container.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-
-    const firstElement = focusableElements[0] as HTMLElement;
-    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
-
-    const handleTabKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-
-      if (e.shiftKey) {
-        // Shift + Tab
-        if (document.activeElement === firstElement) {
-          lastElement.focus();
-          e.preventDefault();
-        }
-      } else {
-        // Tab
-        if (document.activeElement === lastElement) {
-          firstElement.focus();
-          e.preventDefault();
-        }
-      }
-    };
-
-    container.addEventListener('keydown', handleTabKey);
-    firstElement?.focus(); // Focus first element on mount
-
-    return () => {
-      container.removeEventListener('keydown', handleTabKey);
-    };
-  }, [containerRef]);
-};
 
 // AC 6.4.2: Swipe gesture configuration
 const SWIPE_CONFIDENCE_THRESHOLD = 10000;
@@ -103,7 +64,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
 
   // AC 6.4.12 & WCAG 2.4.3: Focus trap for modal
   const containerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(containerRef);
+  useFocusTrap(containerRef, true, { onEscape: onClose });
 
   const currentPhoto = photos[currentIndex];
   const canNavigatePrev = currentIndex > 0;

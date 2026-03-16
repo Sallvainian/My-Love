@@ -41,7 +41,7 @@ Edit TypeScript, React components, and Tailwind styles in the `src/` directory. 
 ### 4. Verify Before Committing
 
 ```bash
-npm run typecheck      # TypeScript compilation check (tsc --noEmit)
+npm run typecheck      # TypeScript type check (tsc -b --force, all project references)
 npm run lint           # ESLint on src/, tests/, scripts/
 npm run test:unit      # Run all Vitest unit tests
 npm run test:e2e       # Run Playwright E2E tests (requires supabase start)

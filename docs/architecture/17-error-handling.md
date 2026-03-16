@@ -29,6 +29,16 @@ try {
 **Operational errors** are re-thrown to allow the calling component to handle them.
 **Non-critical errors** (sync failures, partner mood fetch) are logged and swallowed for graceful degradation.
 
+### Logging Strategy
+
+The project uses a centralized `logger` utility (`src/utils/logger.ts`) introduced in the 2026-03-13 refactor, replacing raw `console.log`/`info`/`debug` calls across 48+ source files:
+
+- `logger.debug(...)` -- DEV only (`import.meta.env.DEV`). Verbose tracing, flow debugging.
+- `logger.info(...)` -- Always logs. Operational events (sync completed, subscribed, state hydrated).
+- `console.error(...)` / `console.warn(...)` -- Used directly (not wrapped). ESLint `no-console` rule is configured with overrides to allow `error` and `warn`.
+
+This prevents debug noise from reaching production while preserving operational visibility.
+
 ### Service Layer (IndexedDB)
 
 `BaseIndexedDBService` follows a split error strategy:

@@ -42,14 +42,14 @@ Views are rendered conditionally based on `currentView` from `NavigationSlice`. 
 type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 ```
 
-| View        | Component           | Lazy | Contains                                                                                                     |
-| ----------- | ------------------- | ---- | ------------------------------------------------------------------------------------------------------------ |
-| `home`      | Inline in App.tsx   | No   | DailyMessage, RelationshipTimers, CountdownTimer                                                             |
-| `photos`    | `PhotoGallery`      | Yes  | PhotoGridItem, PhotoViewer, PhotoUpload, PhotoCarousel, PhotoEditModal, PhotoDeleteConfirmation              |
-| `mood`      | `MoodTracker`       | Yes  | MoodButton, MoodHistoryItem, MoodHistoryTimeline, MoodHistoryCalendar, PartnerMoodDisplay, NoMoodLoggedState |
-| `partner`   | Inline partner view | Yes  | PokeKissInterface, InteractionHistory, PartnerMoodView                                                       |
-| `notes`     | `LoveNotes`         | Yes  | MessageList, MessageInput, LoveNoteMessage, ImagePreview, FullScreenImageViewer                              |
-| `scripture` | `ScriptureOverview` | Yes  | SoloReadingFlow, PerStepReflection, BookmarkFlag, DailyPrayerReport, ReflectionSummary, MessageCompose       |
+| View        | Component           | Lazy | Contains                                                                                                                            |
+| ----------- | ------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `home`      | Inline in App.tsx   | No   | DailyMessage, RelationshipTimers, CountdownTimer                                                                                    |
+| `photos`    | `PhotoGallery`      | Yes  | PhotoGridItem, PhotoViewer, PhotoUpload, PhotoCarousel, PhotoEditModal, PhotoDeleteConfirmation                                     |
+| `mood`      | `MoodTracker`       | Yes  | MoodButton, MoodHistoryItem, MoodHistoryTimeline, MoodHistoryCalendar, PartnerMoodDisplay, NoMoodLoggedState                        |
+| `partner`   | Inline partner view | Yes  | PokeKissInterface, InteractionHistory, PartnerMoodView                                                                              |
+| `notes`     | `LoveNotes`         | Yes  | MessageList, MessageInput, LoveNoteMessage, ImagePreview, FullScreenImageViewer                                                     |
+| `scripture` | `ScriptureOverview` | Yes  | SoloReadingFlow, LobbyContainer, ReadingContainer, StatsSection, BookmarkFlag, ReflectionSummary, DailyPrayerReport, MessageCompose |
 
 ## Component Directory Structure
 
@@ -132,14 +132,22 @@ src/components/
     containers/
       ScriptureOverview.tsx     # Scripture reading entry point
       SoloReadingFlow.tsx       # Solo reading session flow
+      LobbyContainer.tsx        # Together-mode lobby
+      ReadingContainer.tsx      # Together-mode reading container
+    overview/
+      StatsSection.tsx          # Session statistics display
     reading/
       BookmarkFlag.tsx          # Bookmark toggle for steps
+      PartnerPosition.tsx       # Partner position indicator
+      RoleIndicator.tsx         # Reader/listener role display
     reflection/
-      PerStepReflection.tsx     # Rating + notes per step
       ReflectionSummary.tsx     # Session summary view
       DailyPrayerReport.tsx     # Prayer/devotion report
       MessageCompose.tsx        # In-session chat compose
-      charCounter.ts            # Character count utility
+    session/
+      Countdown.tsx             # Session countdown timer
+      DisconnectionOverlay.tsx  # Partner disconnect overlay
+      LockInButton.tsx          # Lock-in confirmation button
     motionFeatures.ts           # Framer Motion feature flags
     index.ts
   Settings/

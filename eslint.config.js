@@ -59,6 +59,9 @@ export default tseslint.config(
         },
       ],
 
+      // Warn on console.log in production code (console.warn/error are allowed)
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+
       // Disable problematic rules
       'no-useless-catch': 'off',
     },
@@ -113,6 +116,13 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  // Service worker files — no window context, can't use logger utility
+  {
+    files: ['src/sw.ts', 'src/sw-db.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
   // Special config for test files (unit tests and E2E)
   {
     files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'e2e/**/*.{ts,tsx}'],
@@ -131,6 +141,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
       'no-restricted-syntax': 'off', // Tests may inspect store state directly
       'no-restricted-properties': 'off', // Tests may inspect store state directly
+      'no-console': 'off', // Test output and diagnostics use console.log intentionally
     },
   },
   // Scripture containers must not import Supabase clients directly

@@ -7,6 +7,8 @@
  * Part of Hybrid Sync Solution (Part 2).
  */
 
+import { logger } from './logger';
+
 /**
  * Register a background sync tag
  *
@@ -26,9 +28,7 @@
 export async function registerBackgroundSync(tag: string): Promise<void> {
   // Check if Background Sync API is supported
   if (!('serviceWorker' in navigator) || !('SyncManager' in window)) {
-    if (import.meta.env.DEV) {
-      console.log('[BackgroundSync] Background Sync API not supported');
-    }
+    logger.debug('[BackgroundSync] Background Sync API not supported');
     return;
   }
 
@@ -39,9 +39,7 @@ export async function registerBackgroundSync(tag: string): Promise<void> {
     // Register the sync tag
     await registration.sync.register(tag);
 
-    if (import.meta.env.DEV) {
-      console.log(`[BackgroundSync] Registered sync tag: ${tag}`);
-    }
+    logger.debug(`[BackgroundSync] Registered sync tag: ${tag}`);
   } catch (error) {
     console.error('[BackgroundSync] Failed to register sync:', error);
   }
@@ -69,9 +67,7 @@ export async function registerBackgroundSync(tag: string): Promise<void> {
 export function setupServiceWorkerListener(onSyncCompleted: () => Promise<void>): () => void {
   // Guard: Check if service workers are supported (defense-in-depth)
   if (!isServiceWorkerSupported()) {
-    if (import.meta.env.DEV) {
-      console.log('[BackgroundSync] Service Worker not supported, skipping listener setup');
-    }
+    logger.debug('[BackgroundSync] Service Worker not supported, skipping listener setup');
     // Return noop cleanup function
     return () => {};
   }
@@ -79,12 +75,10 @@ export function setupServiceWorkerListener(onSyncCompleted: () => Promise<void>)
   const handleMessage = (event: MessageEvent) => {
     // Handle sync completion notification from SW
     if (event.data?.type === 'BACKGROUND_SYNC_COMPLETED') {
-      if (import.meta.env.DEV) {
-        console.log('[BackgroundSync] Service Worker completed background sync:', {
-          successCount: event.data.successCount,
-          failCount: event.data.failCount,
-        });
-      }
+      logger.debug('[BackgroundSync] Service Worker completed background sync:', {
+        successCount: event.data.successCount,
+        failCount: event.data.failCount,
+      });
 
       // Refresh local state after SW sync
       onSyncCompleted().catch((error) => {

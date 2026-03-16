@@ -1,198 +1,136 @@
 # 14. Additional Services
 
-**Sources:**
+## Logger (`src/utils/logger.ts`)
 
-- `src/services/performanceMonitor.ts` (operation timing)
-- `src/services/migrationService.ts` (LocalStorage to IndexedDB migration)
-- `src/services/storage.ts` (legacy IndexedDB operations)
-- `src/services/syncService.ts` (batch mood sync)
-
-## PerformanceMonitor (src/services/performanceMonitor.ts)
-
-**Singleton:** `performanceMonitor`
-
-Tracks operation execution times using the Web Performance API (`performance.now()`). Maintains an in-memory Map of named metrics with min/max/avg/total/count statistics.
-
-### PerformanceMetric Interface
+Centralized logging utility that suppresses verbose output in production.
 
 ```typescript
-interface PerformanceMetric {
-  name: string;
-  count: number;
-  avgDuration: number;
-  minDuration: number;
-  maxDuration: number;
-  totalDuration: number;
-  lastRecorded: number; // Date.now()
-}
-```
-
-### Methods
-
-#### `measureAsync<T>(name, operation): Promise<T>`
-
-Wraps an async operation with timing. Records the duration on success; does not record failed operations.
-
-```typescript
-const result = await performanceMonitor.measureAsync('db-read', () => db.get(id));
-```
-
-**Used by:** `photoStorageService.create()` to record photo storage sizes.
-
-#### `recordMetric(name, duration): void`
-
-Records a custom metric value. Creates a new entry or updates an existing one with running min/max/avg/total statistics. Logs to console in DEV mode.
-
-#### `getMetrics(name): PerformanceMetric | undefined`
-
-Returns metrics for a specific operation name.
-
-#### `getAllMetrics(): Map<string, PerformanceMetric>`
-
-Returns a shallow copy of all recorded metrics.
-
-#### `clear(): void`
-
-Clears all recorded metrics.
-
-#### `getReport(): string`
-
-Generates a human-readable text report sorted by total duration (slowest first). Format:
-
-```
-Performance Metrics Report
-==================================================
-
-operation-name:
-  count: 5
-  avg: 12.34ms
-  min: 8.00ms
-  max: 20.00ms
-  total: 61.70ms
-```
-
-## MigrationService (src/services/migrationService.ts)
-
-One-time migration from LocalStorage to IndexedDB for custom messages. No singleton -- exports a single function.
-
-### `migrateCustomMessagesFromLocalStorage(): Promise<MigrationResult>`
-
-```typescript
-interface MigrationResult {
-  success: boolean;
-  migratedCount: number;
-  skippedCount: number;
-  errors: string[];
-}
-```
-
-**LocalStorage key:** `my-love-custom-messages`
-
-**Flow:**
-
-1. Check for `localStorage.getItem('my-love-custom-messages')`
-2. If not found, return early (no migration needed)
-3. Parse JSON data, validate it is an array
-4. Get existing IndexedDB messages to detect duplicates (by normalized text)
-5. For each message:
-   a. Validate with `CreateMessageInputSchema.parse()`
-   b. Skip if duplicate (case-insensitive text match)
-   c. Create in IndexedDB via `customMessageService.create()`
-   d. On Zod validation error: skip with warning (don't fail the whole migration)
-6. Remove LocalStorage key after successful migration (all migrated or all duplicates)
-7. Return detailed `MigrationResult`
-
-**Error tolerance:** Individual message failures are logged and counted but do not abort the migration. Only parse failures or non-array data cause `success: false`.
-
-## StorageService (src/services/storage.ts) -- Legacy
-
-**Singleton:** `storageService`
-
-Direct IndexedDB operations for photos and messages. Predates the `BaseIndexedDBService` abstract class pattern. Still used by some components for backward compatibility.
-
-### Initialization
-
-Opens `my-love-db` at the current `DB_VERSION`. Has its own upgrade logic with `objectStoreNames.contains()` guards as a fallback for stores that should already exist. Uses the same concurrent-init guard pattern (`initPromise`) as `BaseIndexedDBService`.
-
-### Photo Operations
-
-| Method                     | Returns            | Error Strategy    |
-| -------------------------- | ------------------ | ----------------- |
-| `addPhoto(photo)`          | `Promise<number>`  | Throws            |
-| `getPhoto(id)`             | `Promise<Photo?>`  | Returns undefined |
-| `getAllPhotos()`           | `Promise<Photo[]>` | Returns []        |
-| `deletePhoto(id)`          | `Promise<void>`    | Throws            |
-| `updatePhoto(id, updates)` | `Promise<void>`    | Throws            |
-
-### Message Operations
-
-| Method                            | Returns              | Error Strategy    |
-| --------------------------------- | -------------------- | ----------------- |
-| `addMessage(message)`             | `Promise<number>`    | Throws            |
-| `getMessage(id)`                  | `Promise<Message?>`  | Returns undefined |
-| `getAllMessages()`                | `Promise<Message[]>` | Returns []        |
-| `getMessagesByCategory(category)` | `Promise<Message[]>` | Returns []        |
-| `updateMessage(id, updates)`      | `Promise<void>`      | Throws            |
-| `deleteMessage(id)`               | `Promise<void>`      | Throws            |
-| `toggleFavorite(messageId)`       | `Promise<void>`      | Throws            |
-
-### Bulk Operations
-
-| Method                    | Returns                                             | Description                   |
-| ------------------------- | --------------------------------------------------- | ----------------------------- |
-| `addMessages(messages[])` | `Promise<void>`                                     | Transaction-based bulk insert |
-| `clearAllData()`          | `Promise<void>`                                     | Clears photos + messages      |
-| `exportData()`            | `Promise<{ photos: Photo[], messages: Message[] }>` | Exports all data for backup   |
-
-### localStorageHelper
-
-Utility object for type-safe localStorage access with error handling:
-
-```typescript
-export const localStorageHelper = {
-  get<T>(key: string, defaultValue: T): T,
-  set<T>(key: string, value: T): void,
-  remove(key: string): void,
-  clear(): void,
+export const logger = {
+  debug: (...args) => {
+    if (isDev) console.debug(...args);
+  }, // DEV only
+  info: (...args) => {
+    console.info(...args);
+  }, // Always
+  log: (...args) => {
+    console.log(...args);
+  }, // Always
 };
 ```
 
-All methods silently catch errors and log to console. `get()` returns `defaultValue` on any error (JSON parse failure, missing key, storage access denied).
+## PerformanceMonitor (`src/services/performanceMonitor.ts`)
 
-## SyncService (src/services/syncService.ts)
+Tracks operation execution times using `performance.now()`.
 
-**Singleton:** `syncService`
+### `measureAsync<T>(name, operation): Promise<T>`
 
-Batch mood sync using parallel `Promise.all` with partial failure handling. Simpler alternative to `MoodSyncService.syncPendingMoods()` which uses sequential sync with retry.
+Wraps async operation, records duration metric.
 
-### Types
+### `recordMetric(name, duration): void`
 
-```typescript
-interface MoodSyncResult {
-  localId: number;
-  success: boolean;
-  supabaseId?: string;
-  error?: string;
-}
+Tracks count, avg/min/max/total duration per metric name.
 
-interface SyncSummary {
-  total: number;
-  successful: number;
-  failed: number;
-  results: MoodSyncResult[];
-}
-```
+### `getReport(): string`
 
-### Methods
+Human-readable report sorted by total duration descending.
 
-#### `syncPendingMoods(): Promise<SyncSummary>`
+### `getMetrics(name)`, `getAllMetrics()`, `clear()`
 
-Syncs all unsynced moods using `Promise.all()` for parallel execution. Each mood is synced independently -- failures do not block other moods. On success, marks the mood as synced in IndexedDB.
+Accessors and reset.
 
-#### `hasPendingSync(): Promise<boolean>`
+## StorageService (`src/services/storage.ts`)
 
-Returns `true` if there are any unsynced moods in IndexedDB (`synced === false`).
+Legacy IndexedDB service (predates BaseIndexedDBService). Provides direct CRUD for photos and messages, plus LocalStorage helpers. Still used by some store slices.
 
-#### `getPendingCount(): Promise<number>`
+### Key Methods
 
-Returns the count of unsynced moods.
+- Photo: `addPhoto`, `getPhoto`, `getAllPhotos`, `deletePhoto`, `updatePhoto`
+- Message: `addMessage`, `getMessage`, `getAllMessages`, `getMessagesByCategory`, `updateMessage`, `deleteMessage`, `toggleFavorite`, `addMessages` (bulk)
+- Utility: `clearAllData`, `exportData`
+
+### `localStorageHelper`
+
+Object with `get<T>(key, default)`, `set<T>(key, value)`, `remove(key)`, `clear()`.
+
+## SyncService (`src/services/syncService.ts`)
+
+Offline-first mood sync from IndexedDB to Supabase. Uses `moodApi.create()` for validated uploads.
+
+### `syncPendingMoods(): Promise<SyncSummary>`
+
+Gets unsynced moods, uploads each with `Promise.all()` (parallel). Partial failure handling.
+
+### `hasPendingSync(): Promise<boolean>`
+
+Checks if unsynced moods exist.
+
+### `getPendingCount(): Promise<number>`
+
+Returns count of unsynced moods.
+
+## MigrationService (`src/services/migrationService.ts`)
+
+One-time migration from LocalStorage to IndexedDB for custom messages.
+
+### `migrateCustomMessagesFromLocalStorage(): Promise<MigrationResult>`
+
+Reads `my-love-custom-messages` from LocalStorage, validates each with `CreateMessageInputSchema`, deduplicates by text, creates via `customMessageService.create()`, removes LocalStorage key on success.
+
+## Utility Modules
+
+### `dateUtils.ts`
+
+- `getRelativeTime(timestamp)` -- "2h ago", "Yesterday"
+- `formatMessageTimestamp(date)` -- Today: time, Yesterday: "Yesterday", This week: day name, Older: "Nov 20"
+- `formatDateISO(date)` -- Local timezone YYYY-MM-DD
+- `formatDateLong(date)` -- "January 1, 2024"
+- `formatCountdown(days)` -- "Today!", "3 days", "2 weeks", etc.
+- `formatRelativeDate(isoString)` -- "today", "3 days ago", "2 months ago"
+- `isToday(date)`, `isSameDay(d1, d2)`, `isPast(date)`, `isFuture(date)`
+- `addDays(date, n)`, `getDaysUntil(target)`, `getDaysSince(past)`
+- `getNextAnniversary(dateString)`
+
+### `messageRotation.ts`
+
+- `getDailyMessage(allMessages, date?)` -- Deterministic hash-based rotation
+- `hashDateString(dateString)` -- Character code sum hash
+- `getAvailableHistoryDays(history, settings)` -- Min of config, relationship duration, 30
+- `formatRelationshipDuration(startDate)` -- "3 months", "1 year and 2 months"
+
+### `messageValidation.ts`
+
+- `validateMessageContent(content)` -- Max 1000 chars, non-empty
+- `sanitizeMessageContent(content)` -- DOMPurify strip all HTML
+
+### `interactionValidation.ts`
+
+- `isValidUUID(uuid)` -- UUID regex check
+- `isValidInteractionType(type)` -- 'poke' or 'kiss'
+- `validatePartnerId(partnerId)` -- Non-null + UUID
+- `validateInteraction(partnerId, type)` -- Combined validation
+- `sanitizeInput(input)` -- Trim + 500 char limit
+
+### `deterministicRandom.ts`
+
+- `generateDeterministicNumbers(seed, count, min?, max?)` -- FNV-1a hash + mulberry32 PRNG
+
+### `storageMonitor.ts`
+
+- `getLocalStorageUsage()` -- Byte count estimate
+- `getStorageQuotaInfo()` -- Usage %, warning levels (safe/warning/critical)
+- `logStorageQuota()` -- Dev console output
+- `hasStorageSpace(bytes, margin?)` -- Space check
+
+### `performanceMonitoring.ts`
+
+- `measureScrollPerformance()` -- PerformanceObserver for frame drops
+- `measureMemoryUsage()` -- Chrome `performance.memory` API
+
+### Other Utils
+
+- `haptics.ts` -- Vibration API wrapper
+- `moodEmojis.ts` -- Mood type to emoji mapping
+- `moodGrouping.ts` -- Group moods by date ranges
+- `calendarHelpers.ts` -- Calendar view date math
+- `countdownService.ts` -- Anniversary countdown logic
+- `themes.ts` -- Theme color configurations

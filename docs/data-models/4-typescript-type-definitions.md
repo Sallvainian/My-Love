@@ -2,191 +2,88 @@
 
 **Sources:**
 
-- `src/types/database.types.ts` (auto-generated from Supabase schema)
-- `src/types/index.ts` (application types)
-- `src/types/models.ts` (Supabase model types and re-exports)
+- `src/types/database.types.ts` -- Auto-generated from Supabase schema
+- `src/types/index.ts` -- App-level type definitions
+- `src/types/models.ts` -- Supabase model re-exports and Love Notes types
 
-## 4.1 Generated Supabase Types (`database.types.ts`)
+## Generated Database Types (`database.types.ts`)
 
-Auto-generated using `supabase gen types typescript --local`. Do not edit manually.
+Auto-generated via `supabase gen types typescript --local`. Defines `Database` type with `public.Tables`, `public.Functions`, `public.Enums`.
 
-### Database Type Structure
+### Table Row/Insert/Update Types
 
-```typescript
-type Database = {
-  public: {
-    Tables: {
-      interactions: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      love_notes: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [] };
-      moods: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      partner_requests: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      photos: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      scripture_bookmarks: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      scripture_messages: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      scripture_reflections: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      scripture_sessions: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      scripture_step_states: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-      users: { Row: {...}; Insert: {...}; Update: {...}; Relationships: [...] };
-    };
-    Functions: {
-      accept_partner_request: { Args: { p_request_id: string }; Returns: undefined };
-      decline_partner_request: { Args: { p_request_id: string }; Returns: undefined };
-      get_my_partner_id: { Args: Record<string, never>; Returns: string };
-      is_scripture_session_member: { Args: { p_session_id: string }; Returns: boolean };
-      scripture_create_session: { Args: { p_mode: string; p_partner_id?: string }; Returns: Json };
-      scripture_seed_test_data: { Args: {...}; Returns: Json };
-      scripture_submit_reflection: { Args: {...}; Returns: Json };
-    };
-    Enums: {
-      scripture_session_mode: 'solo' | 'together';
-      scripture_session_phase: 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete';
-      scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned';
-    };
-  };
-};
-```
+Each table has three type variants:
 
-Each table provides three type variants:
+- `Row` -- Full record from SELECT
+- `Insert` -- Required/optional fields for INSERT
+- `Update` -- All-optional fields for UPDATE
 
-- **Row**: All columns, all non-nullable (matches SELECT results)
-- **Insert**: Required columns non-optional, generated columns optional
-- **Update**: All columns optional (for partial updates)
-- **Relationships**: Foreign key metadata for Supabase client join syntax
+### Function Types
 
-### Usage Pattern
+All 13 RPC functions with `Args` and `Returns` types.
+
+### Enum Types
 
 ```typescript
-type InteractionRow = Database['public']['Tables']['interactions']['Row'];
-type InteractionInsert = Database['public']['Tables']['interactions']['Insert'];
+scripture_session_mode: 'solo' | 'together';
+scripture_session_phase: 'lobby' | 'countdown' | 'reading' | 'reflection' | 'report' | 'complete';
+scripture_session_role: 'reader' | 'responder';
+scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned' | 'ended_early';
 ```
 
-## 4.2 Application Types (`types/index.ts`)
+### Utility Types
 
-Hand-written types for the client-side application.
+- `Tables<TableName>` -- Extract Row type for a table
+- `TablesInsert<TableName>` -- Extract Insert type
+- `TablesUpdate<TableName>` -- Extract Update type
+- `Enums<EnumName>` -- Extract enum values
 
-### Enums (Union Types)
+## App-Level Types (`src/types/index.ts`)
 
-```typescript
-type ThemeName = 'sunset' | 'ocean' | 'lavender' | 'rose';
-type MessageCategory = 'reason' | 'memory' | 'affirmation' | 'future' | 'custom';
-type MoodType =
-  | 'loved'
-  | 'happy'
-  | 'content'
-  | 'excited'
-  | 'thoughtful'
-  | 'grateful'
-  | 'sad'
-  | 'anxious'
-  | 'frustrated'
-  | 'angry'
-  | 'lonely'
-  | 'tired';
-type RouteType = 'home' | 'memories' | 'moods' | 'countdown' | 'settings' | 'onboarding';
-```
+### Core Types
 
-### Core Interfaces
+- `ThemeName`: `'sunset' | 'ocean' | 'lavender' | 'rose'`
+- `MessageCategory`: `'reason' | 'memory' | 'affirmation' | 'future' | 'custom'`
+- `MoodType`: 12 mood values (loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired)
+- `RouteType`: `'home' | 'memories' | 'moods' | 'countdown' | 'settings' | 'onboarding'`
 
-| Interface        | Key Fields                                                                                                                        | Used By                               |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `Message`        | `id: number`, `text`, `category`, `isCustom`, `active`, `createdAt`, `tags`                                                       | `customMessageService`, messagesSlice |
-| `Photo`          | `id: number`, `imageBlob: Blob`, `caption`, `tags`, `uploadDate`, `originalSize`, `compressedSize`, `width`, `height`, `mimeType` | `photoStorageService`, photosSlice    |
-| `MoodEntry`      | `id?: number`, `userId`, `mood`, `moods?`, `note`, `date`, `timestamp`, `synced: boolean`, `supabaseId?`                          | `moodService`, moodSlice              |
-| `Settings`       | `themeName`, `notificationTime`, `relationship` (nested), `customization` (nested), `notifications` (nested)                      | settingsSlice                         |
-| `Anniversary`    | `id: number`, `date`, `label`, `description?`                                                                                     | Settings.relationship                 |
-| `MessageHistory` | `currentIndex`, `shownMessages: Map<string, number>`, `maxHistoryDays`, `favoriteIds`                                             | messagesSlice                         |
-| `AppState`       | `settings`, `messageHistory`, `messages`, `photos`, `moods`, `isOnboarded`                                                        | useAppStore                           |
+### Data Interfaces
+
+**`Message`**: id (number), text, category, isCustom, active?, createdAt (Date), isFavorite?, updatedAt?, tags?
+
+**`Photo`**: id (number), imageBlob (Blob), caption?, tags (string[]), uploadDate (Date), originalSize, compressedSize, width, height, mimeType
+
+**`MoodEntry`**: id? (number), userId, mood (MoodType), moods? (MoodType[]), note?, date (YYYY-MM-DD), timestamp (Date), synced (boolean), supabaseId?
+
+**`Settings`**: themeName, notificationTime (HH:MM), relationship (startDate, partnerName, anniversaries[]), customization (accentColor, fontFamily), notifications (enabled, time)
+
+**`MessageHistory`**: currentIndex, shownMessages (Map<string, number>), maxHistoryDays, favoriteIds
+
+### Custom Message Types
+
+- `CustomMessage`, `CreateMessageInput`, `UpdateMessageInput`, `MessageFilter`, `CustomMessagesExport`
 
 ### Compression Types
 
-```typescript
-interface CompressionOptions {
-  maxWidth: number; // Default: 2048
-  maxHeight: number; // Default: 2048
-  quality: number; // Default: 0.8
-}
+- `CompressionOptions`: maxWidth, maxHeight, quality
+- `CompressionResult`: blob, width, height, originalSize, compressedSize, fallbackUsed?
 
-interface CompressionResult {
-  blob: Blob;
-  width: number;
-  height: number;
-  originalSize: number;
-  compressedSize: number;
-  fallbackUsed?: boolean;
-}
-```
+## Model Re-exports (`src/types/models.ts`)
 
-### Message Management Types
+### Photo Types (from `photoService.ts`)
 
-| Interface              | Purpose                                                      |
-| ---------------------- | ------------------------------------------------------------ |
-| `CreateMessageInput`   | `text`, `category`, `active?`, `tags?`                       |
-| `UpdateMessageInput`   | `id` (required), `text?`, `category?`, `active?`, `tags?`    |
-| `MessageFilter`        | `category?`, `isCustom?`, `active?`, `searchTerm?`, `tags?`  |
-| `CustomMessagesExport` | `version: '1.0'`, `exportDate`, `messageCount`, `messages[]` |
+`SupabasePhoto`, `PhotoWithUrls`, `StorageQuota`, `PhotoUploadInput`
 
-### Re-exports
+### Scripture Types (from `dbSchema.ts`)
 
-`types/index.ts` re-exports from `interactionService`:
+`ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, `ScriptureSessionMode`, `ScriptureSessionPhase`, `ScriptureSessionStatus`
 
-- `Interaction`, `SupabaseInteractionRecord`, `InteractionType`
+### Love Notes Types (defined here)
 
-### Legacy Types (Deprecated)
+**`LoveNote`**: id, from_user_id, to_user_id, content, created_at, image_url?, sending?, error?, tempId?, imageUploading?, imageBlob?, imagePreviewUrl?
 
-`PocketbaseUser`, `PocketbaseMood`, `PocketbaseInteraction` -- from the original PocketBase backend, replaced by Supabase in Epic 6. Kept for migration reference only.
+**`LoveNotesState`**: notes[], isLoading, error, hasMore
 
-## 4.3 Supabase Model Types (`types/models.ts`)
+**`SendMessageInput`**: content, timestamp, imageFile?
 
-Re-exports and additional interfaces for Supabase data models.
-
-### Re-exports
-
-From `photoService`: `SupabasePhoto`, `PhotoWithUrls`, `StorageQuota`, `PhotoUploadInput`
-
-From `dbSchema`: `ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, `ScriptureSessionMode`, `ScriptureSessionPhase`, `ScriptureSessionStatus`
-
-From `api/validation/supabaseSchemas`: `CoupleStats` (inferred from `CoupleStatsSchema`)
-
-### LoveNote Interface
-
-```typescript
-interface LoveNote {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
-  content: string;
-  created_at: string;
-  image_url?: string | null;
-  // Client-side only fields for optimistic updates:
-  sending?: boolean;
-  error?: boolean;
-  tempId?: string;
-  imageUploading?: boolean;
-  imageBlob?: Blob;
-  imagePreviewUrl?: string;
-}
-```
-
-The `sending`, `error`, `tempId`, `imageUploading`, `imageBlob`, and `imagePreviewUrl` fields exist only on the client for optimistic UI updates. They are never persisted to Supabase.
-
-### Supporting Interfaces
-
-```typescript
-interface LoveNotesState {
-  notes: LoveNote[];
-  isLoading: boolean;
-  error: string | null;
-  hasMore: boolean;
-}
-
-interface SendMessageInput {
-  content: string;
-  timestamp: string;
-  imageFile?: File;
-}
-
-interface MessageValidationResult {
-  valid: boolean;
-  error?: string;
-}
-```
+**`MessageValidationResult`**: valid, error?

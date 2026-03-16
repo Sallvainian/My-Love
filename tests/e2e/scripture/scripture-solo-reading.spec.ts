@@ -50,9 +50,9 @@ async function advanceToCompletion(page: import('@playwright/test').Page) {
 
 test.describe('Solo Reading Flow', () => {
   test.describe('[P0-009] Advance through 17 steps sequentially', () => {
-    test.use({ timeout: 90_000 });
-
     test('should complete full solo reading flow from step 1 to 17', async ({ page }) => {
+      test.setTimeout(90_000);
+
       // GIVEN: User navigates to scripture and starts a solo session
       await startSoloSession(page);
 
@@ -190,7 +190,7 @@ test.describe('Solo Reading Flow', () => {
       await page.getByTestId('exit-button').click();
       const exitDialog = page.getByTestId('exit-confirm-dialog');
       await expect(exitDialog).toBeVisible();
-      await expect(exitDialog).toContainText('Save your progress? You can continue later.');
+      await expect(exitDialog).toContainText('You can continue where you left off.');
 
       await page.getByTestId('save-and-exit-button').click();
       await savePromise;
@@ -220,9 +220,9 @@ test.describe('Solo Reading Flow', () => {
   });
 
   test.describe('[P2-012] Session completion boundary', () => {
-    test.use({ timeout: 90_000 });
-
     test('should transition to completion phase after step 17', async ({ page }) => {
+      test.setTimeout(90_000);
+
       // GIVEN: User starts a solo session
       await startSoloSession(page);
 

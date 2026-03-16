@@ -172,9 +172,9 @@ describe('ReadingContainer', () => {
     expect(roleIndicator).toHaveTextContent('You read this');
   });
 
-  test('[P1] shows "Session updated" toast when SYNC_FAILED error with Session updated message', () => {
+  test('[P1] shows "Session updated" toast when VERSION_MISMATCH error', () => {
     mockStoreState.scriptureError = {
-      code: 'SYNC_FAILED',
+      code: 'VERSION_MISMATCH',
       message: 'Session updated',
     };
     render(<ReadingContainer />);
@@ -216,24 +216,14 @@ describe('ReadingContainer', () => {
     expect(screen.getByTestId('scripture-bookmark-button')).toBeVisible();
   });
 
-  test('[P1] prevents duplicate lock-in clicks while request is pending', async () => {
-    let resolveLockIn: (() => void) | null = null;
-    mockLockIn.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveLockIn = resolve;
-        })
-    );
+  test('[P1] lock-in button is disabled when isPendingLockIn is true (slice guards duplicates)', () => {
+    mockStoreState.isPendingLockIn = true;
 
     render(<ReadingContainer />);
+
+    // When isPendingLockIn is true, LockInButton renders "Waiting..." disabled state
     const lockInButton = screen.getByTestId('lock-in-button');
-
-    await userEvent.click(lockInButton);
-    await userEvent.click(lockInButton);
-
-    expect(mockLockIn).toHaveBeenCalledTimes(1);
-
-    resolveLockIn!();
+    expect(lockInButton).toBeDisabled();
   });
 
   // ===========================================================================

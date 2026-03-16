@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AppState } from './types';
 import { createAppSlice } from './slices/appSlice';
+import { createAuthSlice } from './slices/authSlice';
 import { createMessagesSlice } from './slices/messagesSlice';
 import { createPhotosSlice } from './slices/photosSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
@@ -11,6 +12,7 @@ import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createPartnerSlice } from './slices/partnerSlice';
 import { createNotesSlice } from './slices/notesSlice';
 import { createScriptureReadingSlice } from './slices/scriptureReadingSlice';
+import { logger } from '../utils/logger';
 
 // Re-export AppState for consumers
 export type { AppState } from './types';
@@ -67,6 +69,8 @@ export const useAppStore = create<AppState>()(
     (set, get, api) => ({
       // AppSlice FIRST - owns core state (isLoading, error, __isHydrated)
       ...createAppSlice(set, get, api),
+      // AuthSlice - single source of truth for user identity
+      ...createAuthSlice(set, get, api),
       // Compose all other slices
       ...createMessagesSlice(set, get, api),
       ...createPhotosSlice(set, get, api),
@@ -171,7 +175,7 @@ export const useAppStore = create<AppState>()(
               state.messageHistory.shownMessages = new Map();
             } else if (raw instanceof Map) {
               // Already a Map, OK (shouldn't happen but handle gracefully)
-              console.log('[Zustand Persist] shownMessages is already a Map');
+              logger.info('[Zustand Persist] shownMessages is already a Map');
             } else if (Array.isArray(raw)) {
               // Validate array structure before converting to Map
               const isValidArray = raw.every(
@@ -181,7 +185,7 @@ export const useAppStore = create<AppState>()(
 
               if (isValidArray) {
                 state.messageHistory.shownMessages = new Map(raw) as Map<string, number>;
-                console.log(
+                logger.info(
                   '[Zustand Persist] Message history Map deserialized successfully:',
                   `${raw.length} entries`
                 );
@@ -254,12 +258,12 @@ export const useAppStore = create<AppState>()(
 
         // Log hydration result
         if (state && state.settings) {
-          console.log(
+          logger.info(
             '[Zustand Persist] State successfully rehydrated from LocalStorage',
             `with settings (theme: ${state.settings.themeName})`
           );
         } else {
-          console.log('[Zustand Persist] No persisted state found - using initial defaults');
+          logger.info('[Zustand Persist] No persisted state found - using initial defaults');
         }
 
         // Set internal hydration flag in state

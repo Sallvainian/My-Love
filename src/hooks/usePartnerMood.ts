@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { moodSyncService, type SupabaseMoodRecord } from '../api/moodSyncService';
+import { logger } from '../utils/logger';
 
 export interface UsePartnerMoodResult {
   partnerMood: SupabaseMoodRecord | null;
@@ -45,6 +46,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
 
   useEffect(() => {
     if (!partnerId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- state reset when partnerId clears
       setPartnerMood(null);
       setError(null);
       setIsLoading(false);
@@ -80,9 +82,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
           (newMood) => {
             // Only update if this mood is from our partner
             if (newMood.user_id === partnerId) {
-              if (import.meta.env.DEV) {
-                console.log('[usePartnerMood] Received partner mood update:', newMood);
-              }
+              logger.debug('[usePartnerMood] Received partner mood update:', newMood);
               setPartnerMood(newMood);
             }
           },

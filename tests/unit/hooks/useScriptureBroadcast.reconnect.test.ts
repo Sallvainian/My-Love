@@ -27,6 +27,7 @@ const { mockChannel, mockRemoveChannel, mockStoreState } = vi.hoisted(() => {
     onBroadcastReceived: vi.fn(),
     applySessionConverted: vi.fn(),
     onPartnerLockInChanged: vi.fn(),
+    setPartnerDisconnected: vi.fn(),
     loadSession: vi.fn(),
     currentUserId: 'user-1',
     sessionUserId: 'user-1',

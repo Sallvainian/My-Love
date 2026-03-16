@@ -14,3 +14,4 @@ export { useVibration, type UseVibrationReturn, type VibrationPattern } from './
 export { useMotionConfig } from './useMotionConfig';
 export { useScriptureBroadcast } from './useScriptureBroadcast';
 export { useScripturePresence, type PartnerPresenceInfo } from './useScripturePresence';
+export { useFocusTrap } from './useFocusTrap';

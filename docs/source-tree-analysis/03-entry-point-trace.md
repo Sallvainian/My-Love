@@ -16,6 +16,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import { initSentry } from './config/sentry';
+import { logger } from './utils/logger';
 import App from './App.tsx';
 import './index.css';
 
@@ -119,8 +120,9 @@ The service worker has its own entry point, compiled separately from the main ap
 ```
 src/sw.ts
   |
-  |-- precacheAndRoute(__WB_MANIFEST)  // Precache static assets (images, fonts only)
-  |-- cleanupOutdatedCaches()          // Remove old caches
+  |-- skipWaiting() + clientsClaim()     // Auto-activate new SW
+  |-- precacheAndRoute(__WB_MANIFEST)    // Precache static assets (images, fonts only)
+  |-- cleanupOutdatedCaches()            // Remove old caches
   |
   |-- Cache Strategies:
   |   |-- NetworkOnly: JS/CSS bundles (always fresh code)
@@ -129,14 +131,14 @@ src/sw.ts
   |   |-- CacheFirst: Google Fonts (1-year expiry, 30 max entries)
   |
   |-- Event Listeners:
-  |   |-- 'sync': syncPendingMoods()   // Background Sync: read IDB, call Supabase REST
-  |   |-- 'message': SKIP_WAITING      // Client communication
-  |   |-- 'activate': clients.claim()  // Auto-activate new SW
+  |   |-- 'sync': syncPendingMoods()     // Background Sync: read IDB, call Supabase REST
+  |   |-- 'activate': log ready          // Activation logging
   |
   |-- syncPendingMoods():
   |   |-- getPendingMoods() from IndexedDB
   |   |-- getAuthToken() from IndexedDB (sw-auth store)
-  |   |-- POST to Supabase REST API via fetch
+  |   |-- Check token expiry (5 min buffer)
+  |   |-- POST to Supabase REST API via fetch (per mood)
   |   |-- markMoodSynced() in IndexedDB
   |   |-- postMessage(BACKGROUND_SYNC_COMPLETED) to clients
 ```
@@ -148,7 +150,7 @@ The Zustand store is created at module load time (before any component renders):
 ```
 Module loaded
   |
-  |-- create<AppState>()(persist(...))  // Store created with all 10 slices
+  |-- create<AppState>()(persist(...))  // Store created with all 11 slices
   |-- persist middleware reads localStorage('my-love-storage')
   |-- Custom storage with pre-hydration validation
   |-- Custom deserialization (Map from array entries for shownMessages)
@@ -160,5 +162,5 @@ Module loaded
 ## Related Documentation
 
 - [Directory Tree](./02-directory-tree.md)
-- [Critical Folders](./04-critical-folders.md)
+- [Critical Code Paths](./04-critical-code-paths.md)
 - [Architecture - Navigation](../architecture/09-navigation.md)

@@ -2,171 +2,70 @@
 
 **Source:** `src/services/dbSchema.ts`
 
-## Database Configuration
+Database name: `my-love-db` | Current version: **5**
 
-```typescript
-const DB_NAME = 'my-love-db';
-const DB_VERSION = 5;
-```
+## Store Definitions
 
-All services share a single database with centralized upgrade logic via `upgradeDb()`.
+### `messages` (v1)
 
-## 3.1 `messages`
+- **Key:** `number` (auto-increment)
+- **Value:** `Message` (text, category, isCustom, active, isFavorite, createdAt, updatedAt, tags)
+- **Indexes:** `by-category` (string), `by-date` (Date)
 
-Custom love messages for the daily message rotation.
+### `photos` (v2)
 
-| Field        | Type              | Description                                                     |
-| ------------ | ----------------- | --------------------------------------------------------------- |
-| `id`         | `number`          | Auto-increment primary key                                      |
-| `text`       | `string`          | Message text (1-500 chars)                                      |
-| `category`   | `MessageCategory` | `'reason'`, `'memory'`, `'affirmation'`, `'future'`, `'custom'` |
-| `isCustom`   | `boolean`         | `true` for user-created messages                                |
-| `active`     | `boolean`         | Controls participation in daily rotation                        |
-| `createdAt`  | `Date`            |                                                                 |
-| `isFavorite` | `boolean?`        |                                                                 |
-| `updatedAt`  | `Date?`           |                                                                 |
-| `tags`       | `string[]?`       |                                                                 |
+- **Key:** `number` (auto-increment)
+- **Value:** `Photo` (imageBlob, caption, tags, uploadDate, originalSize, compressedSize, width, height, mimeType)
+- **Indexes:** `by-date` (Date, non-unique)
+- Note: v1 had `blob` field, renamed to `imageBlob` in v2 with data migration
 
-**Indexes:** `by-category` (category), `by-date` (createdAt)
+### `moods` (v3)
 
-**Service:** `customMessageService` (Story 3.5)
+- **Key:** `number` (auto-increment)
+- **Value:** `MoodEntry` (userId, mood, moods[], note, date, timestamp, synced, supabaseId)
+- **Indexes:** `by-date` (string, **unique**) -- one mood per date
 
-## 3.2 `photos`
+### `sw-auth` (v4)
 
-Compressed photo blobs stored locally with metadata.
+- **Key:** `'current'` (literal string)
+- **Value:** `StoredAuthToken` (id, accessToken, refreshToken, expiresAt, userId)
+- **Indexes:** none
+- Purpose: Stores auth token for Background Sync service worker access
 
-| Field            | Type       | Description                                      |
-| ---------------- | ---------- | ------------------------------------------------ |
-| `id`             | `number`   | Auto-increment primary key                       |
-| `imageBlob`      | `Blob`     | Compressed image data                            |
-| `caption`        | `string?`  | Photo caption (max 500 chars)                    |
-| `tags`           | `string[]` | Tag array (default `[]`)                         |
-| `uploadDate`     | `Date`     |                                                  |
-| `originalSize`   | `number`   | Original file size in bytes                      |
-| `compressedSize` | `number`   | Compressed size in bytes                         |
-| `width`          | `number`   | Image width in pixels                            |
-| `height`         | `number`   | Image height in pixels                           |
-| `mimeType`       | `string`   | `'image/jpeg'`, `'image/png'`, or `'image/webp'` |
+### `scripture-sessions` (v5)
 
-**Indexes:** `by-date` (uploadDate)
+- **Key:** `string` (UUID from Supabase)
+- **Value:** `ScriptureSession` (id, mode, userId, partnerId, currentPhase, currentStepIndex, status, version, snapshotJson, myRole, partnerRole, user1Ready, user2Ready, countdownStartedAt, startedAt, completedAt)
+- **Indexes:** `by-user` (string)
 
-**Service:** `photoStorageService` (Story 4.1)
+### `scripture-reflections` (v5)
 
-**Migration note:** v1 used `blob` field name; v2 renamed to `imageBlob`. The `photoStorageService._doInit()` handles data migration for existing v1 records.
+- **Key:** `string` (UUID)
+- **Value:** `ScriptureReflection` (id, sessionId, stepIndex, userId, rating, notes, isShared, createdAt)
+- **Indexes:** `by-session` (string)
 
-## 3.3 `moods`
+### `scripture-bookmarks` (v5)
 
-Mood entries with offline-first sync tracking.
+- **Key:** `string` (UUID)
+- **Value:** `ScriptureBookmark` (id, sessionId, stepIndex, userId, shareWithPartner, createdAt)
+- **Indexes:** `by-session` (string)
 
-| Field        | Type          | Description                             |
-| ------------ | ------------- | --------------------------------------- |
-| `id`         | `number`      | Auto-increment primary key              |
-| `userId`     | `string`      | Authenticated user's UUID               |
-| `mood`       | `MoodType`    | Primary mood (backward compatibility)   |
-| `moods`      | `MoodType[]?` | All selected moods (multi-mood support) |
-| `note`       | `string?`     | Optional note (max 200 chars)           |
-| `date`       | `string`      | ISO date string (`YYYY-MM-DD`)          |
-| `timestamp`  | `Date`        | Full timestamp when logged              |
-| `synced`     | `boolean`     | `false` until uploaded to Supabase      |
-| `supabaseId` | `string?`     | Supabase record UUID after sync         |
+### `scripture-messages` (v5)
 
-**Indexes:** `by-date` (date, **unique**) -- enforces one mood per day
-
-**Service:** `moodService` (Story 6.2)
-
-## 3.4 `sw-auth`
-
-Auth token storage for Background Sync service worker access.
-
-| Field          | Type        | Description                    |
-| -------------- | ----------- | ------------------------------ |
-| `id`           | `'current'` | Fixed key (single record)      |
-| `accessToken`  | `string`    | JWT for API authorization      |
-| `refreshToken` | `string`    | For token refresh              |
-| `expiresAt`    | `number`    | Unix timestamp of token expiry |
-| `userId`       | `string`    | User UUID for REST API calls   |
-
-**No indexes.** Single record keyed by `'current'`.
-
-**Access:** Written by `authService` (sign-in, token refresh), read by `sw-db.ts` (Background Sync).
-
-## 3.5 `scripture-sessions`
-
-Cached scripture reading sessions for offline support.
-
-| Field                | Type                       | Description                                                         |
-| -------------------- | -------------------------- | ------------------------------------------------------------------- |
-| `id`                 | `string`                   | UUID from Supabase                                                  |
-| `mode`               | `'solo' \| 'together'`     | Session mode                                                        |
-| `userId`             | `string`                   | Current user's ID                                                   |
-| `partnerId`          | `string?`                  | Partner's ID (together mode)                                        |
-| `currentPhase`       | `ScriptureSessionPhase`    | `lobby`, `countdown`, `reading`, `reflection`, `report`, `complete` |
-| `currentStepIndex`   | `number`                   |                                                                     |
-| `status`             | `ScriptureSessionStatus`   | `pending`, `in_progress`, `complete`, `abandoned`                   |
-| `version`            | `number`                   | Optimistic concurrency control                                      |
-| `snapshotJson`       | `Record<string, unknown>?` |                                                                     |
-| `startedAt`          | `Date`                     |                                                                     |
-| `completedAt`        | `Date?`                    |                                                                     |
-| `myRole`             | `ScriptureSessionRole?`    | `'reader'` or `'responder'` (from server snapshot)                  |
-| `partnerRole`        | `ScriptureSessionRole?`    | Partner's role (from server snapshot)                               |
-| `user1Ready`         | `boolean?`                 | User1 ready state (from server snapshot)                            |
-| `user2Ready`         | `boolean?`                 | User2 ready state (from server snapshot)                            |
-| `countdownStartedAt` | `Date?`                    | Server UTC when both users ready (from server snapshot)             |
-
-**Indexes:** `by-user` (userId)
-
-## 3.6 `scripture-reflections`
-
-Cached per-step reflections.
-
-| Field       | Type      | Description              |
-| ----------- | --------- | ------------------------ |
-| `id`        | `string`  | UUID                     |
-| `sessionId` | `string`  | FK to scripture-sessions |
-| `stepIndex` | `number`  |                          |
-| `userId`    | `string`  |                          |
-| `rating`    | `number?` | 1-5                      |
-| `notes`     | `string?` |                          |
-| `isShared`  | `boolean` |                          |
-| `createdAt` | `Date`    |                          |
-
-**Indexes:** `by-session` (sessionId)
-
-## 3.7 `scripture-bookmarks`
-
-Cached bookmarked reading steps.
-
-| Field              | Type      | Description              |
-| ------------------ | --------- | ------------------------ |
-| `id`               | `string`  | UUID                     |
-| `sessionId`        | `string`  | FK to scripture-sessions |
-| `stepIndex`        | `number`  |                          |
-| `userId`           | `string`  |                          |
-| `shareWithPartner` | `boolean` |                          |
-| `createdAt`        | `Date`    |                          |
-
-**Indexes:** `by-session` (sessionId)
-
-## 3.8 `scripture-messages`
-
-Cached Daily Prayer Report messages.
-
-| Field       | Type     | Description              |
-| ----------- | -------- | ------------------------ |
-| `id`        | `string` | UUID                     |
-| `sessionId` | `string` | FK to scripture-sessions |
-| `senderId`  | `string` |                          |
-| `message`   | `string` |                          |
-| `createdAt` | `Date`   |                          |
-
-**Indexes:** `by-session` (sessionId)
+- **Key:** `string` (UUID)
+- **Value:** `ScriptureMessage` (id, sessionId, senderId, message, createdAt)
+- **Indexes:** `by-session` (string)
 
 ## Version History
 
-| Version | Migration       | Stores Added                                                                               |
-| ------- | --------------- | ------------------------------------------------------------------------------------------ |
-| v1      | Initial         | `messages` with by-category and by-date indexes                                            |
-| v2      | Photos          | `photos` with by-date index (deleted and recreated old v1 photos store)                    |
-| v3      | Moods           | `moods` with by-date unique index                                                          |
-| v4      | Background Sync | `sw-auth` for service worker auth token storage                                            |
-| v5      | Scripture       | `scripture-sessions`, `scripture-reflections`, `scripture-bookmarks`, `scripture-messages` |
+| Version | Changes                                                         |
+| ------- | --------------------------------------------------------------- |
+| 1       | `messages` store with category/date indexes                     |
+| 2       | `photos` store with enhanced schema (blob renamed to imageBlob) |
+| 3       | `moods` store with unique by-date index                         |
+| 4       | `sw-auth` store for Background Sync auth token                  |
+| 5       | 4 scripture stores (sessions, reflections, bookmarks, messages) |
+
+## Upgrade Function
+
+`upgradeDb(db, oldVersion, newVersion)` in `dbSchema.ts` handles all migrations centrally. Each service calls this during `_doInit()`. Exception: `PhotoStorageService` handles v1->v2 photo migration with data preservation (requires transaction access).

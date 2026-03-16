@@ -15,7 +15,6 @@ import type {
   ScriptureSession,
   ScriptureSessionPhase as SessionPhase,
   ScriptureSessionMode as SessionMode,
-  ScriptureSessionStatus,
 } from '../../services/dbSchema';
 import { MAX_STEPS } from '../../data/scriptureSteps';
 
@@ -38,6 +37,12 @@ export interface StateUpdatePayload {
   currentStepIndex?: number; // Story 4.2: present when step advances via lock-in
   triggered_by?: 'lock_in' | 'phase_advance' | 'reconnect' | 'end_session';
 }
+
+// ============================================
+// Module-level broadcast ref (not in Zustand state — avoids serialization issues)
+// ============================================
+
+let broadcastFnRef: ((event: string, payload: unknown) => void) | null = null;
 
 // ============================================
 // Helpers
@@ -66,7 +71,6 @@ export interface PendingRetry {
     sessionId: string;
     currentStepIndex: number;
     currentPhase: SessionPhase;
-    status: ScriptureSessionStatus;
   };
 }
 
@@ -95,15 +99,11 @@ export interface ScriptureReadingState {
   myReady: boolean;
   partnerReady: boolean;
   countdownStartedAt: number | null; // Server UTC ms — stored as number (JSON-safe, not Date)
-  currentUserId: string | null; // Logged-in user's auth ID — used to distinguish user1 vs user2 in broadcasts
   // Story 4.2: Lock-in state
   partnerLocked: boolean;
   // Story 4.3: Disconnection state
   partnerDisconnected: boolean;
   partnerDisconnectedAt: number | null;
-  // Internal: broadcast function set by useScriptureBroadcast hook.
-  // Not for external use — prefixed with underscore to signal internal.
-  _broadcastFn: ((event: string, payload: unknown) => void) | null;
 }
 
 // ============================================
@@ -171,14 +171,11 @@ const initialScriptureState: ScriptureReadingState = {
   myReady: false,
   partnerReady: false,
   countdownStartedAt: null,
-  currentUserId: null,
   // Story 4.2: Lock-in initial state
   partnerLocked: false,
   // Story 4.3: Disconnection initial state
   partnerDisconnected: false,
   partnerDisconnectedAt: null,
-  // Internal: no broadcast function until useScriptureBroadcast wires it
-  _broadcastFn: null,
 };
 
 // ============================================
@@ -224,19 +221,17 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      // Auth check FIRST — before any network call
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData.user?.id) {
+      // Auth check FIRST — userId from authSlice (synchronous, offline-safe)
+      const currentUserId = get().userId;
+      if (!currentUserId) {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.UNAUTHORIZED,
           message: 'Failed to verify user identity',
-          details: authError,
         };
         handleScriptureError(scriptureError);
         set({ scriptureError, scriptureLoading: false });
         return;
       }
-      const currentUserId = authData.user.id;
 
       const session = await scriptureReadingService.getSession(sessionId, (refreshed) =>
         set({ session: refreshed })
@@ -257,7 +252,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // sends the user to SoloReadingFlow instead of ReadingContainer/LobbyContainer.
       if (session.mode === 'together') {
         const soloSession = { ...session, mode: 'solo' as SessionMode };
-        set({ session: soloSession, scriptureLoading: false, isInitialized: true, currentUserId });
+        set({ session: soloSession, scriptureLoading: false, isInitialized: true });
         // Persist mode change to server (fire-and-forget, non-blocking)
         void scriptureReadingService.updateSession(sessionId, { mode: 'solo' }).catch((err) => {
           handleScriptureError({
@@ -269,7 +264,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
-      set({ session, scriptureLoading: false, isInitialized: true, currentUserId });
+      set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)
         ? error
@@ -307,8 +302,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     set({ isCheckingSession: true });
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
+      const userId = get().userId;
       if (!userId) {
         set({ isCheckingSession: false });
         return;
@@ -381,7 +375,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               sessionId: session.id,
               currentStepIndex: MAX_STEPS - 1,
               currentPhase: 'reflection',
-              status: session.status,
             },
           },
         });
@@ -420,7 +413,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
               sessionId: session.id,
               currentStepIndex: nextStep,
               currentPhase: session.currentPhase,
-              status: session.status,
             },
           },
         });
@@ -441,7 +433,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       await scriptureReadingService.updateSession(session.id, {
         currentStepIndex: session.currentStepIndex,
         currentPhase: session.currentPhase,
-        status: session.status,
       });
 
       // Clear session from active state (return to overview)
@@ -460,6 +451,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   },
 
   // Story 1.4: Save session without clearing state (silent save)
+  // Only persists progress (step + phase). Status transitions are handled
+  // by dedicated actions (markSessionComplete, abandonSession).
   saveSession: async () => {
     const state = get();
     const { session } = state;
@@ -471,7 +464,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       await scriptureReadingService.updateSession(session.id, {
         currentStepIndex: session.currentStepIndex,
         currentPhase: session.currentPhase,
-        status: session.status,
       });
       set({ isSyncing: false });
     } catch (error) {
@@ -522,14 +514,12 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         await scriptureReadingService.updateSession(pendingRetry.sessionData.sessionId, {
           currentStepIndex: pendingRetry.sessionData.currentStepIndex,
           currentPhase: pendingRetry.sessionData.currentPhase,
-          status: pendingRetry.sessionData.status,
         });
       } else {
         // Fallback: use current session (legacy pendingRetry without sessionData)
         await scriptureReadingService.updateSession(session.id, {
           currentStepIndex: session.currentStepIndex,
           currentPhase: session.currentPhase,
-          status: session.status,
         });
       }
       set({ isSyncing: false, pendingRetry: null, scriptureError: null });
@@ -593,23 +583,20 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
     const { session } = state;
     if (!session) return;
 
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      const scriptureError: ScriptureError = {
+        code: ScriptureErrorCode.UNAUTHORIZED,
+        message: 'Failed to verify user identity for role selection',
+      };
+      handleScriptureError(scriptureError);
+      set({ scriptureError });
+      return;
+    }
+
     set({ scriptureLoading: true, scriptureError: null });
 
     try {
-      // Auth check FIRST — before optimistic update so UI doesn't flash role then revert
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData.user?.id) {
-        const scriptureError: ScriptureError = {
-          code: ScriptureErrorCode.UNAUTHORIZED,
-          message: 'Failed to verify user identity for role selection',
-          details: authError,
-        };
-        handleScriptureError(scriptureError);
-        set({ scriptureLoading: false, scriptureError });
-        return;
-      }
-      const currentUserId = authData.user.id;
-
       // Optimistic update: set myRole now that auth is confirmed
       set({ myRole: role });
 
@@ -629,8 +616,8 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       const partnerRole = isUser1 ? snapshot.user2Role : snapshot.user1Role;
 
       set({
-        currentUserId,
         scriptureLoading: false,
+        scriptureError: null,
         session: {
           ...session,
           currentPhase: snapshot.currentPhase,
@@ -640,7 +627,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       });
 
       // Client-side broadcast: notify partner of state update
-      get()._broadcastFn?.('state_updated', snapshot);
+      broadcastFnRef?.('state_updated', snapshot);
     } catch (error) {
       const scriptureError: ScriptureError = {
         code: ScriptureErrorCode.SYNC_FAILED,
@@ -688,7 +675,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       }));
 
       // Client-side broadcast: notify partner of state update
-      get()._broadcastFn?.('state_updated', snapshot);
+      broadcastFnRef?.('state_updated', snapshot);
     } catch (error) {
       // Roll back optimistic update on failure
       set({ myReady: !isReady });
@@ -719,7 +706,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
 
       // Client-side broadcast: notify partner that session was converted to solo.
       // Must broadcast BEFORE clearing local state, because _broadcastFn is still wired.
-      get()._broadcastFn?.('session_converted', { mode: 'solo', sessionId: session.id });
+      broadcastFnRef?.('session_converted', { mode: 'solo', sessionId: session.id });
 
       set({
         scriptureLoading: false,
@@ -773,13 +760,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   // Called when 'state_updated' broadcast received — version-checked snapshot update
   onBroadcastReceived: (payload) => {
     const state = get();
-    const { session, currentUserId } = state;
+    const { session, userId: currentUserId } = state;
 
     // Version check FIRST — drop stale broadcasts entirely
     if (session && payload.version <= session.version) return;
 
-    // Story 4.3: End session or complete phase → exit
-    if (payload.triggered_by === 'end_session' || payload.currentPhase === 'complete') {
+    // Only reset on explicit end_session — markSessionComplete uses direct DB update, not broadcast
+    if (payload.triggered_by === 'end_session') {
       set(resetSessionState(get));
       return;
     }
@@ -876,7 +863,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // Client-side broadcast: the RPC returns both_locked flag and lock_status payload.
       // Broadcast the appropriate event based on whether both users are now locked.
       const lockResult = data as Record<string, unknown>;
-      const broadcastFn = get()._broadcastFn;
       if (lockResult.both_locked) {
         // Both locked → step advanced. Update local state (channel is self:false,
         // so this client won't receive its own broadcast).
@@ -892,18 +878,18 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
             isPendingLockIn: false,
             partnerLocked: false,
           });
+          // Broadcast state_updated to partner (only when session exists)
+          broadcastFnRef?.('state_updated', {
+            sessionId: lockResult.sessionId,
+            currentPhase: lockResult.currentPhase,
+            currentStepIndex: lockResult.currentStepIndex,
+            version: lockResult.version,
+            triggered_by: 'lock_in',
+          });
         }
-        // Broadcast state_updated to partner.
-        broadcastFn?.('state_updated', {
-          sessionId: lockResult.sessionId,
-          currentPhase: lockResult.currentPhase,
-          currentStepIndex: lockResult.currentStepIndex,
-          version: lockResult.version,
-          triggered_by: 'lock_in',
-        });
       } else {
         // Partial lock → broadcast lock_in_status_changed
-        broadcastFn?.('lock_in_status_changed', lockResult.lock_status);
+        broadcastFnRef?.('lock_in_status_changed', lockResult.lock_status);
       }
     } catch (error) {
       if (isScriptureError(error) && error.code === ScriptureErrorCode.VERSION_MISMATCH) {
@@ -964,7 +950,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // Client-side broadcast: notify partner that lock was undone
       const undoResult = data as Record<string, unknown>;
       if (undoResult.lock_status) {
-        get()._broadcastFn?.('lock_in_status_changed', undoResult.lock_status);
+        broadcastFnRef?.('lock_in_status_changed', undoResult.lock_status);
       }
     } catch (error) {
       // Rollback: re-set pending lock-in
@@ -1012,7 +998,7 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // Client-side broadcast: notify partner that session was ended.
       // Must broadcast BEFORE clearing local state, because _broadcastFn is still wired.
       const endSnapshot = data as unknown as StateUpdatePayload;
-      get()._broadcastFn?.('state_updated', endSnapshot);
+      broadcastFnRef?.('state_updated', endSnapshot);
 
       // Success: reset all session state
       set(resetSessionState(get));
@@ -1030,6 +1016,6 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
   // Internal: wiring between useScriptureBroadcast hook and the store.
   // Called by the hook when channel subscribes (set fn) or cleanup (set null).
   setBroadcastFn: (fn) => {
-    set({ _broadcastFn: fn });
+    broadcastFnRef = fn;
   },
 });

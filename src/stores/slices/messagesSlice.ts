@@ -22,7 +22,9 @@ import type {
 } from '../../types';
 import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
-import { getDailyMessage, formatDate, getAvailableHistoryDays } from '../../utils/messageRotation';
+import { getDailyMessage, getAvailableHistoryDays } from '../../utils/messageRotation';
+import { formatDateISO } from '../../utils/dateUtils';
+import { logger } from '../../utils/logger';
 
 export interface MessagesSlice {
   // State
@@ -146,7 +148,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
 
     // Get today's date
     const today = new Date();
-    const dateString = formatDate(today);
+    const dateString = formatDateISO(today);
 
     // Check if today's message is already cached
     let messageId = messageHistory.shownMessages.get(dateString);
@@ -168,9 +170,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
         },
       });
 
-      if (import.meta.env.DEV) {
-        console.log(`[MessageRotation] New day! Today's message ID: ${messageId}`);
-      }
+      logger.debug(`[MessageRotation] New day! Today's message ID: ${messageId}`);
     } else {
       // Story 3.3 Fix: Always reset to today on app initialization
       // Even if message is cached, ensure currentIndex = 0 for new session
@@ -181,11 +181,9 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
             currentIndex: 0, // Reset to today
           },
         });
-        if (import.meta.env.DEV) {
-          console.log(
-            `[MessageRotation] Reset to today (index 0) from index ${messageHistory.currentIndex}`
-          );
-        }
+        logger.debug(
+          `[MessageRotation] Reset to today (index 0) from index ${messageHistory.currentIndex}`
+        );
       }
     }
 
@@ -219,14 +217,12 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     const today = new Date();
     const currentDate = new Date(today);
     currentDate.setDate(today.getDate() - messageHistory.currentIndex);
-    const currentDateString = formatDate(currentDate);
+    const currentDateString = formatDateISO(currentDate);
 
     const updatedShownMessages = new Map(messageHistory.shownMessages);
     if (!updatedShownMessages.has(currentDateString) && currentMessage) {
       updatedShownMessages.set(currentDateString, currentMessage.id);
-      if (import.meta.env.DEV) {
-        console.log(`[MessageHistory] Cached current date ${currentDateString} before navigating`);
-      }
+      logger.debug(`[MessageHistory] Cached current date ${currentDateString} before navigating`);
     }
 
     // Increment index (0 → 1 = today → yesterday)
@@ -235,7 +231,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     // Calculate target date
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() - newIndex);
-    const dateString = formatDate(targetDate);
+    const dateString = formatDateISO(targetDate);
 
     // Check if message for target date is cached
     let messageId = updatedShownMessages.get(dateString);
@@ -263,9 +259,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       set({ currentMessage: targetMessage });
     }
 
-    if (import.meta.env.DEV) {
-      console.log(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
-    }
+    logger.debug(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
   },
 
   navigateToNextMessage: () => {
@@ -294,7 +288,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
     const today = new Date();
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() - newIndex);
-    const dateString = formatDate(targetDate);
+    const dateString = formatDateISO(targetDate);
 
     // Load message for target date (should be cached)
     const messageId = messageHistory.shownMessages.get(dateString);
@@ -310,9 +304,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       currentMessage: targetMessage || null,
     });
 
-    if (import.meta.env.DEV) {
-      console.log(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
-    }
+    logger.debug(`[MessageHistory] Navigated to ${dateString}, message ID: ${messageId}`);
   },
 
   canNavigateBack: () => {
@@ -348,9 +340,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       }));
 
       set({ customMessages, customMessagesLoaded: true });
-      if (import.meta.env.DEV) {
-        console.log(`[AdminPanel] Loaded ${customMessages.length} custom messages from IndexedDB`);
-      }
+      logger.debug(`[AdminPanel] Loaded ${customMessages.length} custom messages from IndexedDB`);
     } catch (error) {
       console.error('[AdminPanel] Error loading custom messages from IndexedDB:', error);
       set({ customMessages: [], customMessagesLoaded: true });
@@ -382,11 +372,9 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       // Also update main messages array for rotation
       await get().loadMessages();
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[AdminPanel] Created custom message ID: ${message.id}, category: ${input.category}`
-        );
-      }
+      logger.debug(
+        `[AdminPanel] Created custom message ID: ${message.id}, category: ${input.category}`
+      );
     } catch (error) {
       console.error('[AdminPanel] Failed to create custom message:', error);
       throw error; // Re-throw for UI error handling
@@ -418,9 +406,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       // Reload messages to update rotation pool
       await get().loadMessages();
 
-      if (import.meta.env.DEV) {
-        console.log(`[AdminPanel] Updated custom message ID: ${input.id}`);
-      }
+      logger.debug(`[AdminPanel] Updated custom message ID: ${input.id}`);
     } catch (error) {
       console.error('[AdminPanel] Failed to update custom message:', error);
       throw error; // Re-throw for UI error handling
@@ -440,9 +426,7 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       // Reload messages to update rotation pool
       await get().loadMessages();
 
-      if (import.meta.env.DEV) {
-        console.log(`[AdminPanel] Deleted custom message ID: ${id}`);
-      }
+      logger.debug(`[AdminPanel] Deleted custom message ID: ${id}`);
     } catch (error) {
       console.error('[AdminPanel] Failed to delete custom message:', error);
       throw error; // Re-throw for UI error handling
@@ -506,11 +490,9 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[AdminPanel] Exported ${exportData.messageCount} custom messages to ${filename}`
-        );
-      }
+      logger.debug(
+        `[AdminPanel] Exported ${exportData.messageCount} custom messages to ${filename}`
+      );
     } catch (error) {
       console.error('[AdminPanel] Failed to export custom messages:', error);
       throw error;
@@ -531,11 +513,9 @@ export const createMessagesSlice: AppStateCreator<MessagesSlice> = (set, get, _a
       await get().loadCustomMessages();
       await get().loadMessages();
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[AdminPanel] Import complete: ${result.imported} imported, ${result.skipped} duplicates skipped`
-        );
-      }
+      logger.debug(
+        `[AdminPanel] Import complete: ${result.imported} imported, ${result.skipped} duplicates skipped`
+      );
 
       // Return result for UI feedback
       return result;

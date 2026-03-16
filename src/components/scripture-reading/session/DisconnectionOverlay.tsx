@@ -13,9 +13,9 @@
 import { useState, useEffect, type ReactElement } from 'react';
 import { WifiOff } from 'lucide-react';
 
-const TIMEOUT_MS = 30_000;
+import { FOCUS_RING } from '../constants';
 
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+const TIMEOUT_MS = 30_000;
 
 interface DisconnectionOverlayProps {
   partnerName: string;
@@ -36,6 +36,7 @@ export function DisconnectionOverlay({
   const [isConfirmingEndSession, setIsConfirmingEndSession] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- elapsed timer init on disconnectedAt change
     setElapsed(Math.max(0, Date.now() - disconnectedAt));
     setIsConfirmingEndSession(false);
     const interval = setInterval(() => {

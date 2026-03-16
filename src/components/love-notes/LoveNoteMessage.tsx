@@ -18,7 +18,8 @@ import { memo, type ReactElement, useMemo, useState, useEffect, useCallback, use
 import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import { Loader2 } from 'lucide-react';
-import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateFormatters';
+import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateUtils';
+import { logger } from '../../utils/logger';
 import type { LoveNote } from '../../types/models';
 import { getSignedImageUrl } from '../../services/loveNoteImageService';
 import { FullScreenImageViewer } from './FullScreenImageViewer';
@@ -178,9 +179,7 @@ function LoveNoteMessageComponent({
     }
 
     if (message.image_url && !message.imagePreviewUrl) {
-      if (import.meta.env.DEV) {
-        console.log('[LoveNoteMessage] Image load failed, attempt', imageRetryCount + 1);
-      }
+      logger.debug('[LoveNoteMessage] Image load failed, attempt', imageRetryCount + 1);
       try {
         setImageRetryCount((prev) => prev + 1);
         // Force refresh to get a new URL (the cached one may have expired)

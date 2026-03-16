@@ -1,5 +1,6 @@
 import type { DBSchema, IDBPDatabase } from 'idb';
 import type { MoodEntry, Message, Photo } from '../types';
+import { logger } from '../utils/logger';
 
 /**
  * Auth token stored for Background Sync SW access
@@ -210,9 +211,7 @@ export function upgradeDb(
   oldVersion: number,
   _newVersion: number | null
 ): void {
-  if (import.meta.env.DEV) {
-    console.log(`[dbSchema] Upgrading database from v${oldVersion} to v${DB_VERSION}`);
-  }
+  logger.debug(`[dbSchema] Upgrading database from v${oldVersion} to v${DB_VERSION}`);
 
   // v1: messages store
   if (oldVersion < 1) {
@@ -222,9 +221,7 @@ export function upgradeDb(
     });
     messageStore.createIndex('by-category', 'category');
     messageStore.createIndex('by-date', 'createdAt');
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created messages store with indexes (v1)');
-    }
+    logger.debug('[dbSchema] Created messages store with indexes (v1)');
   }
 
   // v2: photos store
@@ -234,9 +231,7 @@ export function upgradeDb(
     // Delete old v1 store if it exists (had 'blob' instead of 'imageBlob')
     if (db.objectStoreNames.contains('photos')) {
       db.deleteObjectStore('photos');
-      if (import.meta.env.DEV) {
-        console.log('[dbSchema] Deleted old photos store from v1');
-      }
+      logger.debug('[dbSchema] Deleted old photos store from v1');
     }
 
     // Create new v2 photos store with enhanced schema
@@ -245,9 +240,7 @@ export function upgradeDb(
       autoIncrement: true,
     });
     photosStore.createIndex('by-date', 'uploadDate', { unique: false });
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created photos store with by-date index (v2)');
-    }
+    logger.debug('[dbSchema] Created photos store with by-date index (v2)');
   }
 
   // v3: moods store
@@ -257,43 +250,31 @@ export function upgradeDb(
       autoIncrement: true,
     });
     moodsStore.createIndex('by-date', 'date', { unique: true });
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created moods store with by-date unique index (v3)');
-    }
+    logger.debug('[dbSchema] Created moods store with by-date unique index (v3)');
   }
 
   // v4: sw-auth store for Background Sync
   if (oldVersion < 4) {
     db.createObjectStore('sw-auth', { keyPath: 'id' });
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created sw-auth store for Background Sync (v4)');
-    }
+    logger.debug('[dbSchema] Created sw-auth store for Background Sync (v4)');
   }
 
   // v5: scripture stores for offline support
   if (oldVersion < 5) {
     const sessionsStore = db.createObjectStore('scripture-sessions', { keyPath: 'id' });
     sessionsStore.createIndex('by-user', 'userId');
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created scripture-sessions store with by-user index (v5)');
-    }
+    logger.debug('[dbSchema] Created scripture-sessions store with by-user index (v5)');
 
     const reflectionsStore = db.createObjectStore('scripture-reflections', { keyPath: 'id' });
     reflectionsStore.createIndex('by-session', 'sessionId');
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created scripture-reflections store with by-session index (v5)');
-    }
+    logger.debug('[dbSchema] Created scripture-reflections store with by-session index (v5)');
 
     const bookmarksStore = db.createObjectStore('scripture-bookmarks', { keyPath: 'id' });
     bookmarksStore.createIndex('by-session', 'sessionId');
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created scripture-bookmarks store with by-session index (v5)');
-    }
+    logger.debug('[dbSchema] Created scripture-bookmarks store with by-session index (v5)');
 
     const messagesStore = db.createObjectStore('scripture-messages', { keyPath: 'id' });
     messagesStore.createIndex('by-session', 'sessionId');
-    if (import.meta.env.DEV) {
-      console.log('[dbSchema] Created scripture-messages store with by-session index (v5)');
-    }
+    logger.debug('[dbSchema] Created scripture-messages store with by-session index (v5)');
   }
 }

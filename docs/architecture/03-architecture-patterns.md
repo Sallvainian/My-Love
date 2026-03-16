@@ -155,12 +155,12 @@ export abstract class BaseIndexedDBService<
 
 Concrete implementations:
 
-| Service                   | Extends                                                                        | Overrides                           | Extra Methods                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| `MoodService`             | `BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods'>`                     | None                                | `create()`, `getMoodForDate()`, `getMoodsInRange()`, `getUnsyncedMoods()`, `markAsSynced()` |
-| `CustomMessageService`    | `BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'>`                    | `getAll()` (filtering)              | `create()`, `getActiveCustomMessages()`, `exportMessages()`, `importMessages()`             |
-| `PhotoStorageService`     | `BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'>`                        | `getAll()`, `getPage()`, `update()` | `create()`, `getStorageSize()`, `estimateQuotaRemaining()`                                  |
-| `ScriptureReadingService` | `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>` | None                                | Session/Reflection/Bookmark/Message CRUD, cache helpers, corruption recovery                |
+| Service                   | Extends                                                                        | Extra Methods                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `MoodService`             | `BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods'>`                     | `create()`, `getMoodForDate()`, `getMoodsInRange()`, `getUnsyncedMoods()`, `markAsSynced()` |
+| `CustomMessageService`    | `BaseIndexedDBService<Message, MyLoveDBSchema, 'messages'>`                    | `create()`, `getActiveCustomMessages()`, `exportMessages()`, `importMessages()`             |
+| `PhotoStorageService`     | `BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'>`                        | `create()`, `getStorageSize()`, `estimateQuotaRemaining()`                                  |
+| `ScriptureReadingService` | `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>` | Session/Reflection/Bookmark/Message CRUD, cache helpers, corruption recovery                |
 
 ## Pattern 7: Validation at Service Boundaries
 
@@ -185,7 +185,7 @@ The `ValidationError` class wraps Zod errors with a `fieldErrors: Map<string, st
 
 Two realtime patterns are used:
 
-**Broadcast API** (Love Notes, Partner Mood):
+**Broadcast API** (Love Notes, Partner Mood, Scripture):
 
 ```typescript
 // src/hooks/useRealtimeMessages.ts
@@ -194,7 +194,7 @@ channel.on('broadcast', { event: 'new_note' }, (payload) => {
 });
 ```
 
-**postgres_changes** (Mood Realtime, legacy):
+**postgres_changes** (Interactions, legacy Mood Realtime):
 
 ```typescript
 // src/services/realtimeService.ts

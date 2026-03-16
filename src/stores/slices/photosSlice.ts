@@ -20,7 +20,6 @@
 import type { AppStateCreator } from '../types';
 import { photoService } from '../../services/photoService';
 import type { PhotoWithUrls, PhotoUploadInput, SupabasePhoto } from '../../services/photoService';
-import { supabase } from '../../api/supabaseClient';
 
 export interface PhotosSlice {
   // State
@@ -42,7 +41,7 @@ export interface PhotosSlice {
   clearStorageWarning: () => void;
 }
 
-export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, _get, _api) => ({
+export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) => ({
   // Initial state
   photos: [],
   selectedPhotoId: null,
@@ -92,13 +91,13 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, _get, _api)
 
       // Get signed URL for the uploaded photo
       const signedUrl = await photoService.getSignedUrl(photo.storage_path);
-      const { data: currentUser } = await supabase.auth.getUser();
 
       // Create PhotoWithUrls from SupabasePhoto
+      const currentUserId = get().userId;
       const photoWithUrl: PhotoWithUrls = {
         ...photo,
         signedUrl,
-        isOwn: currentUser?.user ? photo.user_id === currentUser.user.id : false,
+        isOwn: currentUserId ? photo.user_id === currentUserId : false,
       };
 
       // Add uploaded photo to state (optimistic update)

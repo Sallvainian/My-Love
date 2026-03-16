@@ -15,7 +15,7 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 ```
 
-The `__WB_MANIFEST` array is injected at build time by Vite's PWA plugin. It includes image and font assets. JavaScript and CSS files are **not** precached -- they use NetworkFirst instead.
+The `__WB_MANIFEST` array is injected at build time by Vite's PWA plugin. It includes image and font assets. JavaScript and CSS files are **not** precached -- they use NetworkOnly instead.
 
 ### Cache Strategies
 
@@ -89,26 +89,37 @@ Custom type definitions extend `ServiceWorkerGlobalScope` with:
 
 ## Registration (`src/main.tsx`)
 
-Service worker registration is conditional:
+Service worker registration uses `virtual:pwa-register` from `vite-plugin-pwa`:
 
 ```typescript
 // Production: register with auto-reload on update
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  const wb = new Workbox('/My-Love/sw.js');
-  wb.addEventListener('waiting', () => {
-    wb.messageSkipWaiting(); // Auto-activate new SW
-    window.location.reload(); // Reload to use new version
+if (import.meta.env.PROD) {
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    const updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        console.log('[SW] New version available, reloading...');
+        updateSW(true); // true = reload after update
+      },
+      onOfflineReady() {
+        console.log('[SW] App ready to work offline');
+      },
+      onRegisterError(error) {
+        console.error('[SW] Registration error:', error);
+      },
+    });
   });
-  wb.register();
 }
 
 // Development: unregister any stale service workers
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
   navigator.serviceWorker
-    ?.getRegistrations()
+    .getRegistrations()
     .then((regs) => regs.forEach((reg) => reg.unregister()));
 }
 ```
+
+The `immediate: true` option triggers immediate registration on page load. When a new service worker version is detected (`onNeedRefresh`), the app auto-reloads to activate the new version without requiring user interaction.
 
 ## Background Sync Registration
 

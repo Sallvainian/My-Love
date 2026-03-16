@@ -36,24 +36,17 @@ export function LoveNotes(): ReactElement {
   const { notes, isLoading, error, hasMore, fetchOlderNotes, clearError, retryFailedMessage } =
     useLoveNotes();
 
-  // Get navigation function
+  // Get navigation function and userId from store
   const navigateHome = useAppStore((state) => state.navigateHome);
-
-  // State for current user info
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const currentUserId = useAppStore((state) => state.userId) ?? '';
   const [userName, setUserName] = useState<string>('You');
   // Partner name fetched from database (not local config)
   const [partnerName, setPartnerName] = useState<string>('Partner');
 
-  // Fetch current user info and partner name on mount
+  // Fetch display names on mount
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const userId = await authService.getCurrentUserId();
-        if (userId) {
-          setCurrentUserId(userId);
-        }
-
         // Get display name from user metadata
         const user = await authService.getUser();
         if (user?.user_metadata?.display_name) {

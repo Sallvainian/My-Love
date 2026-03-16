@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
 import { getMoodEmoji } from '../../utils/moodEmojis';
-import { getRelativeTime } from '../../utils/dateFormat';
+import { getRelativeTime } from '../../utils/dateUtils';
 
 interface MoodHistoryItemProps {
   mood: SupabaseMood;

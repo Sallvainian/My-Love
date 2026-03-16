@@ -14,15 +14,15 @@ The application serves exactly two users (a couple) and is scoped for personal u
 | Language         | TypeScript          | 5.9.3   | Strict mode, ES2022 target, bundler module resolution            |
 | Build Tool       | Vite                | 7.3.1   | Dev server, HMR, manual chunk splitting, PWA plugin              |
 | Styling          | Tailwind CSS        | 4.1.17  | v4 with PostCSS, Prettier class sorting                          |
-| Animation        | Framer Motion       | 12.34.3 | Page transitions, micro-interactions, reduced-motion support     |
-| State Management | Zustand             | 5.0.11  | Single store, 10 slices, persist middleware                      |
-| Backend / Auth   | Supabase            | 2.97.0  | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
+| Animation        | Framer Motion       | 12.35.2 | Page transitions, micro-interactions, reduced-motion support     |
+| State Management | Zustand             | 5.0.11  | Single store, 11 slices, persist middleware                      |
+| Backend / Auth   | Supabase            | 2.99.0  | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |
 | Validation       | Zod                 | 4.3.6   | Runtime schema validation at all service boundaries              |
 | Local Storage    | IndexedDB via `idb` | 8.0.3   | 8 object stores, versioned migrations (v1-v5)                    |
-| Icons            | Lucide React        | 0.575.0 | Tree-shakeable SVG icons                                         |
+| Icons            | Lucide React        | 0.577.0 | Tree-shakeable SVG icons                                         |
 | Virtualization   | react-window        | 2.2.7   | Windowed rendering for large lists                               |
-| Sanitization     | DOMPurify           | 3.3.1   | XSS protection for user-generated content                        |
-| Error Tracking   | Sentry              | 10.39.0 | Error reporting with PII stripping                               |
+| Sanitization     | DOMPurify           | 3.3.2   | XSS protection for user-generated content                        |
+| Error Tracking   | Sentry              | 10.42.0 | Error reporting with PII stripping                               |
 
 ## Architecture Philosophy
 
@@ -34,7 +34,7 @@ The application follows a **hybrid data architecture** where the storage pattern
 
 3. **Supabase-direct features** -- Love notes chat, photo gallery (Supabase Storage), and poke/kiss interactions write directly to Supabase with optimistic UI updates and rollback on failure.
 
-4. **Single Zustand store, sliced by domain** -- A single composable store (`useAppStore`) with 10 domain-specific slices, persisted selectively to localStorage via Zustand's `persist` middleware. Only settings, onboarding state, message history, and moods are persisted.
+4. **Single Zustand store, sliced by domain** -- A single composable store (`useAppStore`) with 11 domain-specific slices (including `authSlice` for centralized user identity), persisted selectively to localStorage via Zustand's `persist` middleware. Only settings, onboarding state, message history, and moods are persisted.
 
 5. **Validation at every service boundary** -- Zod schemas validate data before IndexedDB writes, before Supabase API calls, and when parsing API responses. Two validation layers: `src/validation/` for local schemas and `src/api/validation/` for Supabase response schemas.
 
@@ -81,7 +81,7 @@ index.html
   -> src/main.tsx
        -> Sentry.init() (production only)
        -> React.StrictMode > LazyMotion > App
-            -> App.tsx (625 lines)
+            -> App.tsx (~624 lines)
                  -> Auth check (getSession + onAuthStateChange)
                  -> initializeApp() via settingsSlice
                  -> View routing (home, photos, mood, partner, notes, scripture)

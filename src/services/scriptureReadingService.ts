@@ -12,6 +12,7 @@ import {
   upgradeDb,
 } from './dbSchema';
 import { supabase } from '../api/supabaseClient';
+import { logger } from '../utils/logger';
 import {
   SupabaseSessionSchema,
   SupabaseReflectionSchema,
@@ -159,9 +160,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
 
   protected async _doInit(): Promise<void> {
     try {
-      if (import.meta.env.DEV) {
-        console.log(`[ScriptureService] Initializing IndexedDB (version ${DB_VERSION})...`);
-      }
+      logger.debug(`[ScriptureService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion) {
@@ -169,9 +168,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
         },
       });
 
-      if (import.meta.env.DEV) {
-        console.log(`[ScriptureService] IndexedDB initialized successfully (v${DB_VERSION})`);
-      }
+      logger.debug(`[ScriptureService] IndexedDB initialized successfully (v${DB_VERSION})`);
     } catch (error) {
       this.handleError('initialize', error as Error);
     }
@@ -843,9 +840,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
       await this.init();
       const db = this.getTypedDB();
       await db.clear('scripture-sessions');
-      if (import.meta.env.DEV) {
-        console.log('[ScriptureService] Cleared corrupted session cache');
-      }
+      logger.debug('[ScriptureService] Cleared corrupted session cache');
     } catch (error) {
       console.error('[ScriptureService] Failed to clear session cache:', error);
     }
@@ -921,9 +916,7 @@ class ScriptureReadingService extends BaseIndexedDBService<
     await this.recoverReflectionCache();
     await this.recoverBookmarkCache();
     await this.recoverMessageCache();
-    if (import.meta.env.DEV) {
-      console.log('[ScriptureService] All scripture caches cleared');
-    }
+    logger.debug('[ScriptureService] All scripture caches cleared');
   }
 
   // ============================================
