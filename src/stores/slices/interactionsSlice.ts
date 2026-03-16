@@ -19,8 +19,8 @@
 import type { AppStateCreator } from '../types';
 import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { InteractionService } from '../../api/interactionService';
-import { getCurrentUserId } from '../../api/auth/sessionService';
 import { validateInteraction, INTERACTION_ERRORS } from '../../utils/interactionValidation';
+import { logger } from '../../utils/logger';
 
 // Initialize interaction service singleton
 const interactionService = new InteractionService();
@@ -64,6 +64,11 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
   // Actions
   sendPoke: async (partnerId) => {
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      throw new Error('Cannot send poke: User not authenticated');
+    }
+
     // Validate interaction data before sending
     const validation = validateInteraction(partnerId, 'poke');
     if (!validation.isValid) {
@@ -74,7 +79,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
     try {
       // Send poke via InteractionService
-      const pokeRecord = await interactionService.sendPoke(partnerId);
+      const pokeRecord = await interactionService.sendPoke(partnerId, currentUserId);
 
       // Add to local state immediately (optimistic UI)
       const localInteraction = toLocalInteraction(pokeRecord);
@@ -82,9 +87,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         interactions: [localInteraction, ...state.interactions],
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Poke sent:', pokeRecord.id);
-      }
+      logger.debug('[InteractionsSlice] Poke sent:', pokeRecord.id);
 
       return pokeRecord;
     } catch (error) {
@@ -94,6 +97,11 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   sendKiss: async (partnerId) => {
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      throw new Error('Cannot send kiss: User not authenticated');
+    }
+
     // Validate interaction data before sending
     const validation = validateInteraction(partnerId, 'kiss');
     if (!validation.isValid) {
@@ -104,7 +112,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
     try {
       // Send kiss via InteractionService
-      const kissRecord = await interactionService.sendKiss(partnerId);
+      const kissRecord = await interactionService.sendKiss(partnerId, currentUserId);
 
       // Add to local state immediately (optimistic UI)
       const localInteraction = toLocalInteraction(kissRecord);
@@ -112,9 +120,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         interactions: [localInteraction, ...state.interactions],
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Kiss sent:', kissRecord.id);
-      }
+      logger.debug('[InteractionsSlice] Kiss sent:', kissRecord.id);
 
       return kissRecord;
     } catch (error) {
@@ -136,9 +142,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         unviewedCount: Math.max(0, state.unviewedCount - 1),
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Interaction marked as viewed:', id);
-      }
+      logger.debug('[InteractionsSlice] Interaction marked as viewed:', id);
     } catch (error) {
       console.error('[InteractionsSlice] Error marking interaction as viewed:', error);
       throw error;
@@ -146,13 +150,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   getUnviewedInteractions: () => {
-    // getCurrentUserId returns Promise, but we need sync access
-    // This is safe because the user ID is cached after auth initialization
-    // For a more robust solution, we could store userId in state
     const interactions = get().interactions;
-
-    // Filter for received unviewed interactions
-    // We can't await getCurrentUserId here, so we check both directions
     return interactions.filter((interaction) => !interaction.viewed);
   },
 
@@ -166,10 +164,15 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
   },
 
   loadInteractionHistory: async (limit = 100) => {
+    const currentUserId = get().userId;
+    if (!currentUserId) {
+      throw new Error('Cannot load interaction history: User not authenticated');
+    }
+
     try {
       // Fetch interaction history from Supabase
       // Note: getInteractionHistory already returns Interaction[] (converted format)
-      const interactions = await interactionService.getInteractionHistory(limit);
+      const interactions = await interactionService.getInteractionHistory(currentUserId, limit);
 
       // Update state
       set({ interactions });
@@ -179,15 +182,13 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
       set({ unviewedCount });
 
-      if (import.meta.env.DEV) {
-        console.log(
-          '[InteractionsSlice] Loaded interaction history:',
-          interactions.length,
-          'interactions,',
-          unviewedCount,
-          'unviewed'
-        );
-      }
+      logger.debug(
+        '[InteractionsSlice] Loaded interaction history:',
+        interactions.length,
+        'interactions,',
+        unviewedCount,
+        'unviewed'
+      );
     } catch (error) {
       console.error('[InteractionsSlice] Error loading interaction history:', error);
       // Don't throw - graceful degradation with empty state
@@ -196,30 +197,29 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
   subscribeToInteractions: async () => {
     try {
-      const currentUserId = await getCurrentUserId();
+      const currentUserId = get().userId;
       if (!currentUserId) {
         throw new Error('Cannot subscribe: User not authenticated');
       }
 
       // Subscribe to incoming interactions
-      const unsubscribe = await interactionService.subscribeInteractions((record) => {
-        // Add incoming interaction to state
-        get().addIncomingInteraction(record);
-      });
+      const unsubscribe = await interactionService.subscribeInteractions(
+        currentUserId,
+        (record) => {
+          // Add incoming interaction to state
+          get().addIncomingInteraction(record);
+        }
+      );
 
       set({ isSubscribed: true });
 
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Subscribed to interactions');
-      }
+      logger.debug('[InteractionsSlice] Subscribed to interactions');
 
       // Return enhanced unsubscribe function that also updates state
       return () => {
         unsubscribe();
         set({ isSubscribed: false });
-        if (import.meta.env.DEV) {
-          console.log('[InteractionsSlice] Unsubscribed from interactions');
-        }
+        logger.debug('[InteractionsSlice] Unsubscribed from interactions');
       };
     } catch (error) {
       console.error('[InteractionsSlice] Error subscribing to interactions:', error);
@@ -234,9 +234,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
     // Only add if it's not already in the list (prevent duplicates)
     const exists = get().interactions.some((i) => i.id === record.id);
     if (exists) {
-      if (import.meta.env.DEV) {
-        console.log('[InteractionsSlice] Ignoring duplicate interaction:', record.id);
-      }
+      logger.debug('[InteractionsSlice] Ignoring duplicate interaction:', record.id);
       return;
     }
 
@@ -246,12 +244,10 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
       unviewedCount: !localInteraction.viewed ? state.unviewedCount + 1 : state.unviewedCount,
     }));
 
-    if (import.meta.env.DEV) {
-      console.log('[InteractionsSlice] Incoming interaction added:', {
-        id: record.id,
-        type: record.type,
-        from: record.from_user_id,
-      });
-    }
+    logger.debug('[InteractionsSlice] Incoming interaction added:', {
+      id: record.id,
+      type: record.type,
+      from: record.from_user_id,
+    });
   },
 });

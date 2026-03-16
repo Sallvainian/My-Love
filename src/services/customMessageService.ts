@@ -16,6 +16,7 @@ import {
   isZodError,
 } from '../validation';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
+import { logger } from '../utils/logger';
 
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages
@@ -42,9 +43,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
    */
   protected async _doInit(): Promise<void> {
     try {
-      if (import.meta.env.DEV) {
-        console.log(`[CustomMessageService] Initializing IndexedDB (version ${DB_VERSION})...`);
-      }
+      logger.debug(`[CustomMessageService] Initializing IndexedDB (version ${DB_VERSION})...`);
 
       this.db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion) {
@@ -52,9 +51,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         },
       });
 
-      if (import.meta.env.DEV) {
-        console.log(`[CustomMessageService] IndexedDB initialized successfully (v${DB_VERSION})`);
-      }
+      logger.debug(`[CustomMessageService] IndexedDB initialized successfully (v${DB_VERSION})`);
     } catch (error) {
       this.handleError('initialize', error as Error);
     }
@@ -83,9 +80,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       };
 
       const created = await super.add(message);
-      if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Custom message created, id:', created.id);
-      }
+      logger.debug('[CustomMessageService] Custom message created, id:', created.id);
 
       return created;
     } catch (error) {
@@ -120,9 +115,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
       };
 
       await super.update(validated.id, updates);
-      if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Custom message updated, id:', validated.id);
-      }
+      logger.debug('[CustomMessageService] Custom message updated, id:', validated.id);
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages
       if (isZodError(error)) {
@@ -176,14 +169,12 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         );
       }
 
-      if (import.meta.env.DEV) {
-        console.log(
-          '[CustomMessageService] Retrieved messages, count:',
-          messages.length,
-          'filter:',
-          filter
-        );
-      }
+      logger.debug(
+        '[CustomMessageService] Retrieved messages, count:',
+        messages.length,
+        'filter:',
+        filter
+      );
       return messages;
     } catch (error) {
       console.error('[CustomMessageService] Failed to get all messages:', error);
@@ -228,9 +219,7 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         })),
       };
 
-      if (import.meta.env.DEV) {
-        console.log('[CustomMessageService] Exported messages, count:', messages.length);
-      }
+      logger.debug('[CustomMessageService] Exported messages, count:', messages.length);
       return exportData;
     } catch (error) {
       console.error('[CustomMessageService] Failed to export messages:', error);
@@ -272,12 +261,10 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
 
         if (existingTexts.has(normalizedText)) {
           skippedCount++;
-          if (import.meta.env.DEV) {
-            console.log(
-              '[CustomMessageService] Skipping duplicate message:',
-              msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
-            );
-          }
+          logger.debug(
+            '[CustomMessageService] Skipping duplicate message:',
+            msg.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
+          );
         } else {
           await this.create({
             text: msg.text,
@@ -290,14 +277,12 @@ class CustomMessageService extends BaseIndexedDBService<Message, MyLoveDBSchema,
         }
       }
 
-      if (import.meta.env.DEV) {
-        console.log(
-          '[CustomMessageService] Import complete - imported:',
-          importedCount,
-          'skipped:',
-          skippedCount
-        );
-      }
+      logger.debug(
+        '[CustomMessageService] Import complete - imported:',
+        importedCount,
+        'skipped:',
+        skippedCount
+      );
       return { imported: importedCount, skipped: skippedCount };
     } catch (error) {
       // Transform Zod validation errors into user-friendly messages

@@ -2,169 +2,377 @@
 
 ## Home View (Inline, Not Lazy-Loaded)
 
-The home view renders inline (not lazy-loaded) to guarantee offline availability. It consists of:
+The home view renders inline (not lazy-loaded) to guarantee offline availability.
 
-- **TimeTogether** (`RelationshipTimers/TimeTogether.tsx`, ~98 lines): Real-time count-up from `RELATIONSHIP_DATES.datingStart` using `calculateTimeDifference()`. Updates every 1 second via `setInterval`. Displays years and days in large text, hours:minutes:seconds in `tabular-nums` font with zero-padded values. Seconds digit uses `animate-pulse`. Uses `m as motion` for hover scale effect.
+### DailyMessage
 
-- **BirthdayCountdown** (`RelationshipTimers/BirthdayCountdown.tsx`, ~132 lines): Countdown to next birthday with upcoming age calculation. Uses `calculateTimeDifference()` with 1-second updates. Cake icon (Lucide). Detects birthday-today for celebration state with scale bounce animation. Displays calendar days + HH:MM:SS.
+**File:** `src/components/DailyMessage/DailyMessage.tsx`
+**Type:** Container
 
-- **EventCountdown** (`RelationshipTimers/EventCountdown.tsx`, ~181 lines): Generic event countdown supporting three icon types: `ring` (Gem/amber), `plane` (Plane/blue), `calendar` (Calendar/green). Each type has distinct color themes for bg, text, and border. Shows `XX:XX:XX` placeholder when date is null. Calculates calendar days using midnight-to-midnight comparison. Detects event-today with green celebration styling.
+Displays the daily love message with swipe navigation between days. Core features:
 
-- **DailyMessage** (`DailyMessage/DailyMessage.tsx`, 375 lines): The core daily love message experience. Features include:
-  - Swipe gestures via Framer Motion `drag="x"` with `onDragEnd` threshold detection (50px)
-  - Category badges (reason/memory/affirmation/future/custom) with color coding
-  - Favorite toggle with floating hearts animation (using `AnimatePresence`)
-  - Share via `navigator.share()` Web Share API with `navigator.clipboard.writeText()` fallback
-  - Keyboard navigation: ArrowLeft (previous) and ArrowRight (next)
-  - 10-second loading timeout with retry button
-  - Store connections: `currentMessage`, `settings`, `messageHistory`, `toggleFavorite`, navigation actions
+- Swipe left/right (touch and mouse) for day navigation
+- Favorite toggle (heart icon, persists to messageHistory.favoriteIds)
+- Share via Web Share API
+- Day offset tracking (`currentDayOffset`)
+- Message cycling through pool based on `shownMessages` Map
+- Connects heavily to messagesSlice: `messages`, `currentMessage`, `messageHistory`, `setCurrentMessage`, `markMessageShown`, `navigateMessage`, `toggleFavorite`
 
-- **CountdownTimer** (`CountdownTimer/CountdownTimer.tsx`, 275 lines): Anniversary countdown with celebration animations. Uses `getUpcomingAnniversaries()` to filter and sort. 60-second update interval for battery optimization. Celebration detection via `shouldTriggerCelebration()` with 3-second celebration timeout. `CelebrationAnimation` uses `generateDeterministicNumbers()` for consistent random positions across renders.
+### CountdownTimer
 
-- **WelcomeSplash** (`WelcomeSplash/WelcomeSplash.tsx`, 120 lines): Full-screen welcome with raining hearts (15 heart emojis, 4-6 second fall duration, random horizontal drift). `useMemo` for stable heart configs. Gradient background (pink-50/rose-50/purple-50). Spring-animated center Heart icon. Staggered content entrance.
+**File:** `src/components/CountdownTimer/CountdownTimer.tsx`
+**Type:** Presentational
 
-- **WelcomeButton** (`WelcomeButton/WelcomeButton.tsx`, 68 lines): Fixed-position FAB (bottom-8 right-8, z-50). Tooltip on hover (desktop only via `hidden md:block`). Infinite pulse ring animation (2s loop). Heart icon with fill. Spring entrance.
+Countdown display with celebration animations when countdown reaches zero. Pure props-based rendering.
 
-## Photo Gallery and Management
+### RelationshipTimers
 
-The photo feature spans 10 components across 6 folders:
+**File:** `src/components/RelationshipTimers/RelationshipTimers.tsx`
+**Type:** Presentational
 
-- **PhotoGallery** (`PhotoGallery/PhotoGallery.tsx`, ~323 lines): Responsive grid (3-col mobile / 4-col desktop). IntersectionObserver-based infinite scroll with 20 photos per page. Skeleton loaders during fetch (`PhotoGridSkeleton`). Empty state with upload prompt. Error state with retry. Floating upload FAB. Uses `usePhotos` hook.
+Container component that renders all timer cards. Reads from `RELATIONSHIP_DATES` config (not from store). Contains:
 
-- **PhotoGridItem** (`PhotoGallery/PhotoGridItem.tsx`, ~122 lines): Square aspect-ratio thumbnails. Lazy image loading via IntersectionObserver with `rootMargin: '200px'` for preloading. Caption overlay on hover/focus. Owner badge distinguishing user vs partner photos.
+- `TimeTogether` -- Real-time count-up from dating start date. Uses `setInterval(1000)` for live seconds display. Shows years, days, hours, minutes, seconds with padded formatting.
+- `BirthdayCountdown` -- Countdown to next birthday with upcoming age. Special "Happy Birthday" state with celebration animation when date matches.
+- `EventCountdown` -- Generic countdown for wedding and visit events. Supports null date with "XX:XX:XX" placeholder. Uses calendar days for intuitive display.
 
-- **PhotoViewer** (`PhotoGallery/PhotoViewer.tsx`, ~561 lines): Full-screen modal (z-50) with touch interaction:
-  - Focus trap for WCAG compliance
-  - Pinch-to-zoom with double-tap zoom toggle
-  - Swipe left/right for navigation, swipe-down-to-close
-  - Photo preloading (preloads previous and next images)
-  - Delete with RLS permission checking
-  - Edit caption and tags inline
+### Settings / AnniversarySettings
 
-- **PhotoUpload** (`PhotoUpload/PhotoUpload.tsx`, 458 lines): Multi-step modal flow: Select -> Preview -> Uploading -> Success/Error. Uses `imageCompressionService` for client-side compression. Storage warning banner from store. Caption (500 chars) and tags (max 10) inputs.
+**Files:** `src/components/Settings/Settings.tsx`, `src/components/Settings/AnniversarySettings.tsx`
+**Type:** Container
 
-- **PhotoCarousel** (`PhotoCarousel/PhotoCarousel.tsx`, ~180 lines): Modal carousel that renders when a photo is selected. Controlled by `selectedPhotoId` from store. Prev/next navigation with `PhotoCarouselControls`. Integrates `PhotoEditModal` and `PhotoDeleteConfirmation`.
+Settings shows account info and logout. AnniversarySettings provides CRUD for anniversary dates with Framer Motion list animations. Connects to settingsSlice for `settings`, `addAnniversary`, `removeAnniversary`, `updateSettings`.
 
-- **PhotoUploader** (`photos/PhotoUploader.tsx`, 482 lines): Alternative upload component using `usePhotos` + `useImageCompression` hooks. Provides a different upload UX path.
+---
 
-## Mood Tracking System
+## Auth Components
 
-The mood feature spans 9 components across 2 folders:
+### LoginScreen
 
-- **MoodTracker** (`MoodTracker/MoodTracker.tsx`, ~350 lines): Main container with 3 tabs: Log, Timeline, Calendar. 12 mood buttons arranged in a 3x4 grid (6 positive: loved, happy, content, excited, thoughtful, grateful; 6 challenging: sad, anxious, frustrated, angry, lonely, tired). Multi-select support (select multiple moods per entry). Optional note input. Offline-safe saves via `getCurrentUserIdOfflineSafe()`. Background sync registration. Haptic feedback on save/error.
+**File:** `src/components/LoginScreen/LoginScreen.tsx`
+**Type:** Container
 
-- **MoodButton** (`MoodTracker/MoodButton.tsx`): Individual mood selection button with Framer Motion scale animation (1.1x when selected). Pink when selected, gray when not. Lucide icons per mood.
+Handles email/password login and Google OAuth. Uses `authService` directly (not Zustand store). Error display for invalid credentials.
 
-- **MoodHistoryTimeline** (`MoodTracker/MoodHistoryTimeline.tsx`): react-window virtualized list with infinite scroll. Uses `useMoodHistory` hook for paginated data (50 per page). Internal sub-components: DateHeader, MoodHistoryItem, LoadingSpinner, EmptyMoodHistoryState.
+### DisplayNameSetup
 
-- **PartnerMoodDisplay** (`MoodTracker/PartnerMoodDisplay.tsx`): Real-time partner mood using `usePartnerMood` hook (Supabase Broadcast API). Connection status indicator (connecting/connected/disconnected). Falls back to `NoMoodLoggedState` when no data.
+**File:** `src/components/DisplayNameSetup/DisplayNameSetup.tsx`
+**Type:** Container
 
-- **MoodHistoryCalendar** (`MoodHistory/MoodHistoryCalendar.tsx`): Month grid view. Navigable months with prev/next. Uses `CalendarDay` (memoized) per cell with mood dot colors. Click to open `MoodDetailModal` for full-day detail.
+Modal shown after OAuth when user has no display name set. Updates user metadata via `authService`.
 
-## Partner View and Interactions
+---
 
-- **PartnerMoodView** (`PartnerMoodView/PartnerMoodView.tsx`, 669 lines): Dual-mode component:
-  - **Connection mode**: User search, send partner request, accept/decline requests. Uses partner slice actions (searchUsers, sendPartnerRequest, acceptPartnerRequest, declinePartnerRequest).
-  - **Mood feed mode**: After partner is linked, shows partner's mood entries as `MoodCard` list (memoized), real-time mood updates via Supabase Broadcast, connection status indicator, refresh button. Integrates `PokeKissInterface` for interactions.
+## Photos Feature
 
-- **PokeKissInterface** (`PokeKissInterface/PokeKissInterface.tsx`, 582 lines): Expandable FAB with three interaction types: poke, kiss, fart. Full-screen animations for each type. Cooldown timer between sends. Vibration feedback via `useVibration` hook. Unviewed interaction count badge. Opens `InteractionHistory` modal.
+### PhotoGallery
 
-- **InteractionHistory** (`InteractionHistory/InteractionHistory.tsx`, 214 lines): Modal showing last 7 days of poke/kiss interactions. Sent (pink) vs received (purple) color coding. Direction indicators (arrows). Relative timestamps. "New" badge for unviewed received interactions.
+**File:** `src/components/PhotoGallery/PhotoGallery.tsx`
+**Type:** Container (lazy-loaded)
 
-## Love Notes (Real-Time Chat)
+Responsive photo grid with infinite scroll via `IntersectionObserver`. Loads photos from Supabase on mount via `loadPhotos()`. Grid uses CSS grid with responsive columns. Each photo rendered via `PhotoGridItem`.
 
-- **LoveNotes** (`love-notes/LoveNotes.tsx`, ~200 lines): Full chat page container. Header with back navigation and partner name (fetched from database via `getPartnerDisplayName`). Composes `MessageList` + `MessageInput`. Error banner with clear action. Uses `useLoveNotes` hook which integrates `useRealtimeMessages` for real-time delivery.
+### PhotoUpload
 
-- **MessageList** (`love-notes/MessageList.tsx`, ~300 lines): react-window v2 virtualized list. Auto-scroll to bottom on new messages. Infinite scroll up for pagination. Internal sub-components: MessageRow, BeginningOfConversation, LoadingSpinner. Renders `LoveNoteMessage` per row.
+**File:** `src/components/PhotoUpload/PhotoUpload.tsx`
+**Type:** Container (lazy-loaded)
 
-- **LoveNoteMessage** (`love-notes/LoveNoteMessage.tsx`, ~250 lines): Memoized chat bubble. Own messages right-aligned (pink), partner messages left-aligned (gray). DOMPurify sanitization for XSS prevention. Image display with click-to-expand (`FullScreenImageViewer`). Sending state (dimmed + spinner). Failed state (red border + retry/remove buttons). Timestamp display.
+Multi-step upload modal with states: `select` -> `preview` -> `uploading` -> `success`/`error`.
 
-- **MessageInput** (`love-notes/MessageInput.tsx`, ~200 lines): Auto-resize textarea. Image picker button (camera icon). Send button (disabled when empty). Character limit display. Image preview via `ImagePreview` component. Rate limiting (10 messages/minute enforced by store).
+- File validation: JPEG/PNG/WebP, max 50MB
+- Preview with blob URL
+- Caption (500 chars max) and tags (10 max, 50 chars each) inputs
+- Storage warning banner from `storageWarning` state
+- Auto-close after 3 seconds on success
+- Retry on error
 
-- **ImagePreview** (`love-notes/ImagePreview.tsx`): Memoized thumbnail preview of selected image file with file size display and remove button.
+### PhotoCarousel
 
-- **FullScreenImageViewer** (`love-notes/FullScreenImageViewer.tsx`): Memoized full-screen modal for viewing images. Click backdrop or press Escape to close.
+**File:** `src/components/PhotoCarousel/PhotoCarousel.tsx`
+**Type:** Container (lazy-loaded)
 
-## Scripture Reading
+Lightbox carousel with swipe gesture and keyboard navigation. Uses `PhotoCarouselControls` for top bar (close, edit, delete buttons).
 
-The scripture reading feature is the largest feature area with 13 component files across 5 subdirectories, plus 3 hooks.
+### PhotoViewer
 
-### Solo Mode (Stories 1.1-1.5)
+**File:** `src/components/PhotoGallery/PhotoViewer.tsx`
+**Type:** Container
 
-- **ScriptureOverview** (`containers/ScriptureOverview.tsx`, ~400 lines): Main entry point with "Lavender Dreams" purple theme. Features:
-  - Partner status detection (loading/linked/unlinked)
-  - Start button -> mode selection reveal (Solo always available, Together conditional)
-  - Session resume for incomplete solo sessions (with "Start fresh" abandon option)
-  - `StatsSection` for couple-aggregate stats
-  - Offline blocking of Start/mode selection buttons
-  - Routes to `SoloReadingFlow`, `LobbyContainer`, or `ReadingContainer` based on session state
+Full-screen photo viewer with pinch-to-zoom gestures and delete functionality.
 
-- **SoloReadingFlow** (`containers/SoloReadingFlow.tsx`, ~600 lines): Step-by-step reading flow with `LazyMotion` wrapper. Features:
-  - Verse screen and response screen per step, toggled via tabs
-  - Step navigation (Next verse / View response / Back to verse)
-  - Progress tracking ("Verse X of 17")
-  - Exit confirmation dialog with save
-  - `BookmarkFlag` per verse
-  - Session completion transitions to reflection phase
-  - `useAutoSave` for visibility change / beforeunload saves
-  - Offline indicator and blocked advancement
-  - Retry UI for failed server writes with auto-retry on reconnect
-  - `ReflectionSummary` -> `MessageCompose` -> `DailyPrayerReport` flow
+---
 
-- **StatsSection** (`overview/StatsSection.tsx`, ~200 lines): Presentational component displaying couple-aggregate stats. Five stat cards: total sessions, total steps, average rating, bookmarks, last active date. Zero-state messaging when no sessions exist. Relative date formatting.
+## Mood Tracking Feature
 
-### Together Mode (Stories 4.1, 4.2, 4.3)
+### MoodTracker
 
-- **LobbyContainer** (`containers/LobbyContainer.tsx`, ~300 lines): Three-phase lobby orchestration:
-  - **Phase A** (Role Selection): `session.currentPhase === 'lobby' && !myRole`. Two role cards: Reader (BookOpen icon) and Responder (MessageCircle icon).
-  - **Phase B** (Lobby Waiting): Role selected, waiting for partner. Ready toggle button. Partner status indicators. "Convert to solo" fallback.
-  - **Phase C** (Countdown): Both users ready. `Countdown` component with 3-second synchronized countdown.
+**File:** `src/components/MoodTracker/MoodTracker.tsx`
+**Type:** Container (lazy-loaded)
 
-- **ReadingContainer** (`containers/ReadingContainer.tsx`, ~400 lines): Together-mode reading with:
-  - `RoleIndicator` showing alternating reader/responder per step
-  - Verse / response navigation tabs
-  - `LockInButton` + waiting state
-  - `PartnerPosition` via `useScripturePresence` hook
-  - Step advance animation (slide-left on lock-in complete)
-  - "Session updated" toast on 409 version mismatch
-  - `DisconnectionOverlay` when partner drops
+Main mood tracking component with three tabs:
 
-- **Countdown** (`session/Countdown.tsx`, ~100 lines): 3-second synchronized countdown derived from server UTC timestamp. Auto-corrects clock skew. Reduced-motion support (instant number swap). Focus management on mount. aria-live="assertive" for screen reader announcements.
+1. **Tracker** -- 12 mood type buttons (6 positive, 6 challenging) arranged in a grid. Multi-select support. Optional note text. Submit creates mood entry and triggers sync.
+2. **Timeline** -- Virtualized timeline via `MoodHistoryTimeline` using react-window.
+3. **Calendar** -- Monthly calendar view via `MoodHistoryCalendar` with day-level mood indicators.
 
-- **LockInButton** (`session/LockInButton.tsx`, ~100 lines): Four states: Unlocked ("Ready for next verse"), Locked ("Waiting for partner..." + undo link), Partner locked (green check indicator), Pending (loading/disabled). Disconnected + unlocked shows "Holding your place" disabled state.
+Each `MoodButton` is animated (scale on tap) with distinct icon and color per mood type.
 
-- **DisconnectionOverlay** (`session/DisconnectionOverlay.tsx`, ~120 lines): Two-phase overlay:
-  - Phase A (<30s): "Partner reconnecting..." with WifiOff icon and pulse animation
-  - Phase B (>=30s): "Partner seems to have stepped away" with Keep Waiting / End Session buttons. End Session requires confirmation click.
+### MoodHistoryTimeline
 
-- **RoleIndicator** (`reading/RoleIndicator.tsx`, ~30 lines): Pill badge. Reader: primary purple (#A855F7), "You read this". Responder: lighter purple (#C084FC), "Partner reads this".
+**File:** `src/components/MoodTracker/MoodHistoryTimeline.tsx`
+**Type:** Container
 
-- **PartnerPosition** (`reading/PartnerPosition.tsx`, ~40 lines): Shows where partner is looking (verse or response). Eye icon. Renders nothing when presence is null. Uses `PartnerPresenceInfo` from `useScripturePresence` hook.
+Uses react-window v2 `List` component for virtualized rendering of mood history. Supports infinite scroll for loading older entries.
 
-- **BookmarkFlag** (`reading/BookmarkFlag.tsx`, ~40 lines): Amber-colored Bookmark icon toggle. 48x48px minimum touch target. aria-pressed reflects bookmark state. Shared between SoloReadingFlow and ReadingContainer.
+### MoodHistoryCalendar
 
-### Reflection Components (Stories 2.2, 2.3)
+**File:** `src/components/MoodHistory/MoodHistoryCalendar.tsx`
+**Type:** Container
 
-- **ReflectionSummary** (`reflection/ReflectionSummary.tsx`, ~200 lines): End-of-session reflection. Bookmarked verses as selectable chips (multi-select for "standout verses"). Session-level 1-5 rating scale with keyboard-navigable radiogroup. Optional note textarea (200 chars). Continue button with validation.
+Calendar grid with month navigation. Loads moods per month via `moodService`. Each day rendered via `CalendarDay` (memo). Clicking a day with a mood opens `MoodDetailModal`.
 
-- **MessageCompose** (`reflection/MessageCompose.tsx`, ~120 lines): Partner message composition. "Write something for [Partner Name]" heading. 300 char textarea with counter at 250+. Send and Skip buttons. Auto-grow textarea. Auto-focus on mount.
+### MoodDetailModal
 
-- **DailyPrayerReport** (`reflection/DailyPrayerReport.tsx`, ~200 lines): Full prayer report display. User's step-by-step ratings with bookmark indicators. Standout verse selections as read-only chips. Partner message reveal (Dancing Script font). Waiting state for incomplete partner. Side-by-side partner ratings when available. Return to Overview button.
+**File:** `src/components/MoodHistory/MoodDetailModal.tsx`
+**Type:** Presentational
+
+Modal showing full mood details: mood type with icon/color, formatted date ("Monday, Nov 15, 2025"), formatted time ("3:42 PM"), note text. Features focus trap (Tab cycles within modal), ESC key dismiss, slide-up animation with backdrop fade.
+
+---
+
+## Partner Feature
+
+### PartnerMoodView
+
+**File:** `src/components/PartnerMoodView/PartnerMoodView.tsx`
+**Type:** Container (lazy-loaded)
+
+Partner connection management combined with partner mood viewing. Shows:
+
+- Partner search and request flow (if no partner linked)
+- Partner's current mood with realtime updates via `usePartnerMood` hook
+- `PokeKissInterface` FAB for sending interactions
+- Realtime subscription for incoming interactions
+
+### PokeKissInterface
+
+**File:** `src/components/PokeKissInterface/PokeKissInterface.tsx`
+**Type:** Container
+
+Expandable FAB (Floating Action Button) with staggered animation. Features:
+
+- 4 action buttons: History, Poke, Kiss, Fart
+- 30-minute cooldown per interaction type (stored in localStorage)
+- Notification badge showing `unviewedCount`
+- Full-screen animations on receive: PokeAnimation (finger wiggle), KissAnimation (rising hearts), FartAnimation (expanding clouds)
+- Realtime subscription via `subscribeToInteractions()`
+- `InteractionHistory` modal access from History button
+
+---
+
+## Love Notes Feature
+
+### LoveNotes
+
+**File:** `src/components/love-notes/LoveNotes.tsx`
+**Type:** Container (lazy-loaded)
+
+Full chat page assembling header, MessageList, and MessageInput. Features:
+
+- Back button navigation via `navigateHome`
+- Error banner with dismiss
+- Fetches current user ID and partner display name on mount
+- Uses `useLoveNotes` hook for notes, loading, error, pagination
+
+### MessageList
+
+**File:** `src/components/love-notes/MessageList.tsx`
+**Type:** Container
+
+Virtualized message list using react-window v2 `List` with `useInfiniteLoader` for pagination. Features:
+
+- Variable row height calculation based on content length and image presence
+- Auto-scroll to bottom on initial load and new messages
+- Scroll position preservation during pagination
+- "New message" indicator button when scrolled up
+- "Beginning of conversation" indicator when all history loaded
+- `MessageRow` extracted outside component for react-window performance
+
+### LoveNoteMessage
+
+**File:** `src/components/love-notes/LoveNoteMessage.tsx`
+**Type:** Presentational (memo)
+
+Chat bubble with visual distinction between own (coral #FF6B6B, right-aligned) and partner (gray #E9ECEF, left-aligned) messages. Features:
+
+- DOMPurify XSS sanitization of message content
+- Image display with loading/error states and retry (max 2 retries)
+- Signed URL fetching via `getSignedImageUrl`
+- Full-screen image viewer on tap
+- Optimistic update indicators: "Sending...", "Failed to send - Tap to retry"
+- Mounted state tracking to prevent post-unmount state updates
+
+### MessageInput
+
+**File:** `src/components/love-notes/MessageInput.tsx`
+**Type:** Container
+
+Chat input with image attachment support. Features:
+
+- Auto-resize textarea (grows with content, max 200px)
+- Character counter visible at 900+ chars, warning at 950+, error at 1000+
+- Image picker button with file validation via `imageCompressionService`
+- Keyboard shortcuts: Enter (send), Shift+Enter (new line), Escape (clear)
+- Haptic feedback via `useVibration` hook
+- `ImagePreview` shown when image selected
+- Send disabled until valid content or image present
+
+### ImagePreview
+
+**File:** `src/components/love-notes/ImagePreview.tsx`
+**Type:** Presentational (memo)
+
+Thumbnail preview of selected image before sending. Shows:
+
+- Image thumbnail (max 150x200px)
+- Remove button (X icon)
+- Original file size and estimated compressed size
+- "Compressing..." overlay during upload
+- Large file indicator for files above compression threshold
+
+### FullScreenImageViewer
+
+**File:** `src/components/love-notes/FullScreenImageViewer.tsx`
+**Type:** Presentational (memo)
+
+Full-screen modal for viewing images. Dark overlay (90% opacity), centered image (max 90vh/90vw), close button, ESC key handler, focus management (stores previous focus, restores on close), body scroll lock.
+
+---
+
+## Scripture Reading Feature
+
+### ScriptureOverview
+
+**File:** `src/components/scripture-reading/containers/ScriptureOverview.tsx`
+**Type:** Container (lazy-loaded)
+
+Main entry point for Scripture Reading. Handles:
+
+- Partner status detection (loading/linked/unlinked)
+- Start button with mode selection reveal (animated)
+- Solo mode: always available (when online)
+- Together mode: conditional on partner link
+- Session resume for incomplete solo sessions
+- Offline blocking of start/mode selection
+- "Start fresh" calls `abandonSession()` to mark server session as abandoned
+- Phase routing: routes to SoloReadingFlow, LobbyContainer, or ReadingContainer based on `session.mode` and `session.currentPhase`
+- `useScriptureBroadcast` mounted here (persists across phase transitions)
+- StatsSection for couple aggregate statistics
+- Uses `useShallow` for both partnerSlice and scriptureSlice selectors
+
+### SoloReadingFlow (Decomposed since 2026-03-13)
+
+**File:** `src/components/scripture-reading/containers/SoloReadingFlow.tsx`
+**Type:** Container (thin orchestrator)
+
+Step-by-step scripture reading for both solo and together post-reading phases. **Refactored** from a monolithic component into a thin orchestrator that delegates to the `useSoloReadingFlow` hook, which composes 4 sub-hooks by concern:
+
+**Sub-hooks** (`src/components/scripture-reading/hooks/`):
+
+- **`useSoloReadingFlow.ts`** -- Thin orchestrator that composes the 4 sub-hooks below
+- **`useReadingNavigation.ts`** -- Verse navigation, step transitions, slide direction tracking
+- **`useReportPhase.ts`** -- Report generation, reflection summary submission, prayer report state
+- **`useSessionPersistence.ts`** -- Auto-save on visibility change / beforeunload, bookmark set management, retry logic for failed writes
+- **`useReadingDialogs.ts`** -- Exit confirmation dialog state, focus trap wiring
+
+**ReadingPhaseView** (`src/components/scripture-reading/containers/ReadingPhaseView.tsx`):
+The 22 flat props from the previous version have been **restructured into sub-objects** for clarity:
+
+- `session: { currentStepIndex }` -- Session data
+- `state: { subView, slideDirection, showExitConfirm, isOnline, isSyncing, ... }` -- UI state
+- `animations: { crossfade, slide }` -- Motion transition configs
+- `elementRefs: { verseHeading, backToVerse, exitButton, dialog }` -- Ref objects
+- `handlers: { onBookmarkToggle, onNextVerse, onViewResponse, ... }` -- Callback functions
+
+Features remain the same:
+
+- Verse and response screen display with slide animation
+- Step navigation (next verse, view response, back to verse)
+- Progress tracking ("Verse X of 17")
+- Bookmark toggle per verse via `BookmarkFlag`
+- Exit confirmation dialog with save
+- Auto-save on visibility change and `beforeunload`
+- Offline indicator and blocked advancement
+- Retry UI for failed server writes
+- Auto-retry on reconnect
+- Session completion transition to reflection phase
+- Reflection flow: ReflectionSummary -> MessageCompose -> DailyPrayerReport
+- Focus management: heading focus on phase change, dialog focus trap
+
+### LobbyContainer
+
+**File:** `src/components/scripture-reading/containers/LobbyContainer.tsx`
+**Type:** Container
+
+Together-mode lobby with three phases:
+
+- **Phase A (Role Selection):** Two cards (Reader/Responder) with Lucide icons, "Continue solo" option
+- **Phase B (Lobby Waiting):** Shows partner join status, ready toggle button, partner ready indicator
+- **Phase C (Countdown):** Renders `Countdown` component when `countdownStartedAt` is set
+- Back button to exit session at any phase
+
+### ReadingContainer
+
+**File:** `src/components/scripture-reading/containers/ReadingContainer.tsx`
+**Type:** Container
+
+Together-mode reading orchestrator. Features:
+
+- Role indicator (alternating reader/responder via step index parity)
+- Verse/response navigation tabs
+- Step content with slide-left animation on advance
+- Lock-in button with undo support
+- Partner position via `useScripturePresence` hook
+- Disconnection overlay with keep-waiting and end-session options
+- "Session updated" toast on 409 version mismatch
+- "Reconnected" green toast on partner reconnect
+- Error toast for non-409 sync failures
+- Exit confirmation dialog
+
+### Presentational Sub-Components
+
+- **BookmarkFlag** -- Amber Lucide Bookmark icon toggle. 48px touch target, `aria-pressed`.
+- **RoleIndicator** -- Pill badge. Reader: purple-500, "You read this". Responder: purple-300, "Partner reads this".
+- **PartnerPosition** -- Shows "[partner] is reading the verse/response". Hidden sentinel div when no presence data.
+- **LockInButton** -- 4 states: unlocked ("Ready for next verse"), locked ("Waiting for [name]..." + undo), partner locked indicator (green check), disconnected ("Holding your place").
+- **DisconnectionOverlay** -- Phase A (<30s): "Partner reconnecting..." with pulse. Phase B (>=30s): "stepped away" with keep waiting / end session buttons. End session has additional confirmation step.
+- **Countdown** -- 3-second countdown from server UTC timestamp. Derives digit from elapsed time. Supports reduced motion. `aria-live="assertive"` announces start/end.
+- **ReflectionSummary** -- Bookmarked verses as selectable chips, 1-5 rating radiogroup with keyboard nav (ArrowLeft/Right), optional note (200 chars), share bookmarks toggle. Quiet validation messages.
+- **MessageCompose** -- "Write something for [Partner Name]" heading, textarea (300 chars, auto-grow), Send button, "Skip for now" link. Auto-focus on mount.
+- **DailyPrayerReport** -- User's step-by-step ratings with bookmark indicators, standout verse chips, partner message reveal (Dancing Script font), side-by-side partner ratings when available, waiting state for incomplete partner.
+- **StatsSection** -- 5 stat cards with Lucide icons (BookOpen, CheckCircle, Calendar, Star, Bookmark). Shows skeleton on loading. Zero state with em dash values and "Begin your first reading" message. Uses `Intl.RelativeTimeFormat` for "last completed" display.
+
+---
 
 ## Admin Panel
 
-The admin panel (route: `/admin`) is lazy-loaded and consists of 6 components:
+### AdminPanel
 
-- **AdminPanel** (`AdminPanel/AdminPanel.tsx`, 192 lines): Main container with sticky header. Action buttons: Export (JSON), Import (JSON), Create Message, Exit Admin. Manages modal state for create/edit/delete. Loads custom messages on mount.
+**File:** `src/components/AdminPanel/AdminPanel.tsx`
+**Type:** Container (lazy-loaded)
 
-- **MessageList** (admin) (`AdminPanel/MessageList.tsx`, 157 lines): Combined view of default + custom messages. Category filter dropdown. Text search input. Results count with custom message count highlight. Table with MessageRow per entry.
+Message management interface with import/export functionality. Connects to messagesSlice.
 
-- **MessageRow** (`AdminPanel/MessageRow.tsx`, 107 lines): Table row per message. Truncated text (100 chars). Category label with emoji. Type badge (Custom/Default). Draft badge for inactive custom messages. Edit/Delete buttons (custom only, read-only for defaults).
+### MessageList (Admin)
 
-- **CreateMessageForm** (`AdminPanel/CreateMessageForm.tsx`, 240 lines): Modal form for creating custom messages. Fields: text (500 chars with remaining counter), category (5 options), active toggle. Validation error display (field-specific via `isValidationError`).
+**File:** `src/components/AdminPanel/MessageList.tsx`
+**Type:** Container
 
-- **EditMessageForm** (`AdminPanel/EditMessageForm.tsx`, 262 lines): Modal form pre-filled with message data. Change detection (save disabled when no changes). Message metadata display (ID, created, updated). Same validation as create.
+Filtered and searchable message table. Renders `MessageRow` for each message. Connects to `useAppStore` for `messages` and `customMessages`.
 
-- **DeleteConfirmDialog** (`AdminPanel/DeleteConfirmDialog.tsx`, 97 lines): Confirmation modal with AlertTriangle warning icon. Message preview (text, category, ID). Cancel/Delete buttons.
+### CreateMessageForm / EditMessageForm / DeleteConfirmDialog
 
----
+**Files:** `src/components/AdminPanel/CreateMessageForm.tsx`, `EditMessageForm.tsx`, `DeleteConfirmDialog.tsx`
+**Type:** Presentational
+
+Modal forms for message CRUD. All receive callbacks via props (onSubmit, onClose, onConfirm, onCancel). CreateMessageForm and EditMessageForm include input validation.

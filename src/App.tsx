@@ -19,6 +19,7 @@ import { setSentryUser, clearSentryUser } from './config/sentry';
 import type { Session } from '@supabase/supabase-js';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
+import { logger } from './utils/logger';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>
@@ -178,7 +179,7 @@ function App() {
                   ? 'scripture'
                   : 'home';
       setView(view, true); // Skip history update to prevent loop
-      console.log(`[App] Popstate: navigated to ${view}`);
+      logger.debug(`[App] Popstate: navigated to ${view}`);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -191,8 +192,6 @@ function App() {
   // Story 6.7: Check authentication status on mount
   useEffect(() => {
     let isMounted = true;
-    // Track whether checkAuth already set Sentry user to avoid double getPartnerId() on fresh sign-in
-    let lastSentryUserId = '';
 
     const checkAuth = async () => {
       try {
@@ -201,18 +200,17 @@ function App() {
           setSession(currentSession);
           setAuthLoading(false);
 
+          // Populate store auth state for synchronous access by all slices
+          const { setAuthUser, clearAuth } = useAppStore.getState();
           if (currentSession?.user) {
-            lastSentryUserId = currentSession.user.id;
+            setAuthUser(currentSession.user.id, currentSession.user.email);
             const partnerId = await getPartnerId();
             setSentryUser(currentSession.user.id, partnerId);
+          } else {
+            clearAuth();
           }
 
-          if (import.meta.env.DEV) {
-            console.log(
-              '[App] Auth check:',
-              currentSession ? 'authenticated' : 'not authenticated'
-            );
-          }
+          logger.debug('[App] Auth check:', currentSession ? 'authenticated' : 'not authenticated');
         }
       } catch (error) {
         console.error('[App] Auth check failed:', error);
@@ -229,33 +227,29 @@ function App() {
       if (isMounted) {
         setSession(newSession);
 
+        // Update store auth state for synchronous access by all slices
+        const { setAuthUser, clearAuth: clearStoreAuth } = useAppStore.getState();
+
         // Check if user needs to set display name (for new OAuth signups)
         if (newSession?.user) {
+          setAuthUser(newSession.user.id, newSession.user.email);
           const hasDisplayName = newSession.user.user_metadata?.display_name;
           setNeedsDisplayName(!hasDisplayName);
 
-          // Skip redundant getPartnerId() if checkAuth already handled this user
-          if (newSession.user.id !== lastSentryUserId) {
-            getPartnerId().then((partnerId) => {
-              setSentryUser(newSession.user.id, partnerId);
-              lastSentryUserId = newSession.user.id;
-            });
-          }
+          getPartnerId().then((partnerId) => {
+            setSentryUser(newSession.user.id, partnerId);
+          });
 
-          if (import.meta.env.DEV) {
-            console.log('[App] Auth state changed:', {
-              authenticated: true,
-              hasDisplayName,
-              needsSetup: !hasDisplayName,
-            });
-          }
+          logger.debug('[App] Auth state changed:', {
+            authenticated: true,
+            hasDisplayName,
+            needsSetup: !hasDisplayName,
+          });
         } else {
+          clearStoreAuth();
           setNeedsDisplayName(false);
           clearSentryUser();
-          lastSentryUserId = '';
-          if (import.meta.env.DEV) {
-            console.log('[App] Auth state changed: signed out');
-          }
+          logger.debug('[App] Auth state changed: signed out');
         }
       }
     });
@@ -282,7 +276,7 @@ function App() {
         try {
           const migrationResult = await migrateCustomMessagesFromLocalStorage();
           if (migrationResult.migratedCount > 0) {
-            console.log('[App] Migration completed:', {
+            logger.debug('[App] Migration completed:', {
               migrated: migrationResult.migratedCount,
               skipped: migrationResult.skippedCount,
               success: migrationResult.success,
@@ -320,9 +314,7 @@ function App() {
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
   useEffect(() => {
     const handleOnline = () => {
-      if (import.meta.env.DEV) {
-        console.log('[App] Network: ONLINE - triggering sync');
-      }
+      logger.debug('[App] Network: ONLINE - triggering sync');
 
       // Update sync status to reflect online state
       updateSyncStatus();
@@ -334,9 +326,7 @@ function App() {
     };
 
     const handleOffline = () => {
-      if (import.meta.env.DEV) {
-        console.log('[App] Network: OFFLINE');
-      }
+      logger.debug('[App] Network: OFFLINE');
 
       // Update sync status to reflect offline state
       updateSyncStatus();
@@ -360,9 +350,7 @@ function App() {
   useEffect(() => {
     // Part 1: Immediate sync on app mount (if online and authenticated)
     if (syncStatus.isOnline && session) {
-      if (import.meta.env.DEV) {
-        console.log('[App] Initial sync on mount - checking for pending moods');
-      }
+      logger.debug('[App] Initial sync on mount - checking for pending moods');
       syncPendingMoods().catch((error) => {
         console.error('[App] Initial sync on mount failed:', error);
       });
@@ -372,9 +360,7 @@ function App() {
     const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
     const syncInterval = setInterval(() => {
       if (syncStatus.isOnline && session) {
-        if (import.meta.env.DEV) {
-          console.log('[App] Periodic sync triggered (5-minute interval)');
-        }
+        logger.debug('[App] Periodic sync triggered (5-minute interval)');
         syncPendingMoods().catch((error) => {
           console.error('[App] Periodic sync failed:', error);
         });
@@ -384,9 +370,7 @@ function App() {
     // Cleanup interval on unmount
     return () => {
       clearInterval(syncInterval);
-      if (import.meta.env.DEV) {
-        console.log('[App] Periodic sync interval cleared');
-      }
+      logger.debug('[App] Periodic sync interval cleared');
     };
   }, [syncPendingMoods, syncStatus.isOnline, session]);
 
@@ -396,9 +380,7 @@ function App() {
     // Guard: Skip setup if service workers are not supported
     // (e.g., Safari private mode, older browsers, test environment)
     if (!isServiceWorkerSupported() || !navigator.serviceWorker) {
-      if (import.meta.env.DEV) {
-        console.log('[App] Service Worker not supported, skipping background sync listener');
-      }
+      logger.debug('[App] Service Worker not supported, skipping background sync listener');
       return; // No cleanup needed
     }
 
@@ -407,12 +389,10 @@ function App() {
       if (event.data?.type === 'BACKGROUND_SYNC_COMPLETED') {
         const { successCount, failCount } = event.data;
 
-        if (import.meta.env.DEV) {
-          console.log('[App] Service Worker completed background sync:', {
-            successCount,
-            failCount,
-          });
-        }
+        logger.debug('[App] Service Worker completed background sync:', {
+          successCount,
+          failCount,
+        });
 
         // Refresh local state after SW completed sync
         await updateSyncStatus();
@@ -451,9 +431,7 @@ function App() {
         <LoginScreen
           onLoginSuccess={() => {
             // Session will be updated by auth state listener
-            if (import.meta.env.DEV) {
-              console.log('[App] Login successful');
-            }
+            logger.debug('[App] Login successful');
           }}
         />
       </ErrorBoundary>

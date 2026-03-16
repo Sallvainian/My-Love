@@ -18,12 +18,11 @@
 
 import type { AppStateCreator } from '../types';
 import type { LoveNote } from '../../types/models';
-import { supabase } from '../../api/supabaseClient';
-import { getCurrentUserId } from '../../api/auth/sessionService';
-import { getPartnerId } from '../../api/supabaseClient';
+import { supabase, getPartnerId } from '../../api/supabaseClient';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { uploadCompressedBlob } from '../../services/loveNoteImageService';
 import { NOTES_CONFIG } from '../../config/images';
+import { logger } from '../../utils/logger';
 
 export interface NotesSlice {
   // State
@@ -87,7 +86,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: true, notesError: null });
 
       // Get authenticated user ID
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -98,9 +97,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         throw new Error('Partner not configured');
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Fetching notes for conversation:', { userId, partnerId, limit });
-      }
+      logger.debug('[NotesSlice] Fetching notes for conversation:', { userId, partnerId, limit });
 
       // Fetch messages for conversation between user and partner
       const { data, error } = await supabase
@@ -125,9 +122,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         notesHasMore: (data?.length || 0) === limit,
       });
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Fetched notes:', notesInChatOrder.length);
-      }
+      logger.debug('[NotesSlice] Fetched notes:', notesInChatOrder.length);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch notes';
       console.error('[NotesSlice] Error fetching notes:', error);
@@ -154,7 +149,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       set({ notesIsLoading: true });
 
       // Get authenticated user ID
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -172,9 +167,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         return;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Fetching older notes before:', oldestNote.created_at);
-      }
+      logger.debug('[NotesSlice] Fetching older notes before:', oldestNote.created_at);
 
       // Fetch messages older than the oldest we have
       const { data, error } = await supabase
@@ -200,9 +193,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         notesHasMore: (data?.length || 0) === limit,
       });
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Fetched older notes:', olderNotes.length);
-      }
+      logger.debug('[NotesSlice] Fetched older notes:', olderNotes.length);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch older notes';
       console.error('[NotesSlice] Error fetching older notes:', error);
@@ -222,9 +213,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       // Deduplication: check if message already exists by ID
       const exists = state.notes.some((n) => n.id === note.id);
       if (exists) {
-        if (import.meta.env.DEV) {
-          console.log('[NotesSlice] Duplicate message ignored:', note.id);
-        }
+        logger.debug('[NotesSlice] Duplicate message ignored:', note.id);
         return state; // No change
       }
 
@@ -288,7 +277,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       const { recentTimestamps, now } = get().checkRateLimit();
 
       // Get authenticated user ID and partner ID
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -334,13 +323,11 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         sentMessageTimestamps: [...recentTimestamps, now],
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Sending note (optimistic):', {
-          tempId,
-          content,
-          hasImage: !!imageFile,
-        });
-      }
+      logger.debug('[NotesSlice] Sending note (optimistic):', {
+        tempId,
+        content,
+        hasImage: !!imageFile,
+      });
 
       // Handle image compression and upload if provided
       let storagePath: string | null = null;
@@ -362,9 +349,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           const uploadResult = await uploadCompressedBlob(imageBlob, userId);
           storagePath = uploadResult.storagePath;
 
-          if (import.meta.env.DEV) {
-            console.log('[NotesSlice] Image uploaded:', storagePath);
-          }
+          logger.debug('[NotesSlice] Image uploaded:', storagePath);
         } catch (imageError) {
           console.error('[NotesSlice] Image upload failed:', imageError);
           // Mark message as failed with image error
@@ -401,9 +386,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           ),
         }));
 
-        if (import.meta.env.DEV) {
-          console.error('[NotesSlice] Failed to send note:', error);
-        }
+        logger.debug('[NotesSlice] Failed to send note:', error);
 
         return;
       }
@@ -422,9 +405,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         ),
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Note sent successfully:', data.id);
-      }
+      logger.debug('[NotesSlice] Note sent successfully:', data.id);
 
       // Story 2.3: Broadcast message to partner's channel for realtime delivery
       // Must subscribe before sending to avoid REST fallback deprecation warning
@@ -441,9 +422,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
                   payload: { message: data },
                 });
 
-                if (import.meta.env.DEV) {
-                  console.log('[NotesSlice] Broadcast sent to partner:', partnerId);
-                }
+                logger.debug('[NotesSlice] Broadcast sent to partner:', partnerId);
                 resolve();
               } catch (sendError) {
                 reject(sendError);
@@ -507,14 +486,12 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         ),
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Retrying failed message:', tempId, {
-          hasImage: !!failedNote.imageBlob,
-        });
-      }
+      logger.debug('[NotesSlice] Retrying failed message:', tempId, {
+        hasImage: !!failedNote.imageBlob,
+      });
 
       // Get user ID for retry
-      const userId = await getCurrentUserId();
+      const userId = get().userId;
       if (!userId) {
         throw new Error('User not authenticated');
       }
@@ -526,9 +503,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           const uploadResult = await uploadCompressedBlob(failedNote.imageBlob, userId);
           storagePath = uploadResult.storagePath;
 
-          if (import.meta.env.DEV) {
-            console.log('[NotesSlice] Retry image uploaded:', storagePath);
-          }
+          logger.debug('[NotesSlice] Retry image uploaded:', storagePath);
         } catch (imageError) {
           console.error('[NotesSlice] Retry image upload failed:', imageError);
           set((state) => ({
@@ -564,9 +539,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
           ),
         }));
 
-        if (import.meta.env.DEV) {
-          console.error('[NotesSlice] Retry failed:', error);
-        }
+        logger.debug('[NotesSlice] Retry failed:', error);
 
         return;
       }
@@ -586,9 +559,7 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         sentMessageTimestamps: [...recentTimestamps, now],
       }));
 
-      if (import.meta.env.DEV) {
-        console.log('[NotesSlice] Retry successful:', data.id);
-      }
+      logger.debug('[NotesSlice] Retry successful:', data.id);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to retry message';
       console.error('[NotesSlice] Error retrying message:', error);
@@ -610,11 +581,9 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
     const { notes } = get();
     revokePreviewUrlsFromNotes(notes);
 
-    if (import.meta.env.DEV) {
-      const previewCount = notes.filter((n) => n.imagePreviewUrl?.startsWith('blob:')).length;
-      if (previewCount > 0) {
-        console.log('[NotesSlice] Cleaned up', previewCount, 'preview URLs');
-      }
+    const previewCount = notes.filter((n) => n.imagePreviewUrl?.startsWith('blob:')).length;
+    if (previewCount > 0) {
+      logger.debug('[NotesSlice] Cleaned up', previewCount, 'preview URLs');
     }
   },
 
@@ -634,8 +603,6 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
       notes: state.notes.filter((n) => n.tempId !== tempId),
     }));
 
-    if (import.meta.env.DEV) {
-      console.log('[NotesSlice] Removed failed message:', tempId);
-    }
+    logger.debug('[NotesSlice] Removed failed message:', tempId);
   },
 });

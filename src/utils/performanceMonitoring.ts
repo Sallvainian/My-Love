@@ -8,6 +8,8 @@
  * @module utils/performanceMonitoring
  */
 
+import { logger } from './logger';
+
 // Chrome-specific memory API (not in standard Performance interface)
 interface PerformanceMemory {
   usedJSHeapSize: number;
@@ -41,7 +43,7 @@ export function measureScrollPerformance(): PerformanceObserver {
   const observer = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
       if (entry.entryType === 'measure') {
-        console.debug('[Performance] Scroll frame time:', entry.duration, 'ms');
+        logger.debug('[Performance] Scroll frame time:', entry.duration, 'ms');
 
         if (entry.duration > 16.67) {
           console.warn('[Performance] Frame drop detected:', entry.duration, 'ms');
@@ -72,7 +74,7 @@ export function measureMemoryUsage(): number {
   const perf = performance as PerformanceWithMemory;
   if (perf.memory) {
     const usedMB = perf.memory.usedJSHeapSize / 1048576;
-    console.debug('[Memory] Used heap size:', usedMB.toFixed(2), 'MB');
+    logger.debug('[Memory] Used heap size:', usedMB.toFixed(2), 'MB');
     return usedMB;
   }
   return 0;

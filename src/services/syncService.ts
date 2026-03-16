@@ -12,6 +12,7 @@ import { moodService } from './moodService';
 import { moodApi } from '../api/moodApi';
 import type { MoodEntry } from '../types';
 import type { MoodInsert } from '../api/validation/supabaseSchemas';
+import { logger } from '../utils/logger';
 
 /**
  * Sync result for a single mood entry
@@ -80,9 +81,7 @@ export class SyncService {
       // Mark as synced in IndexedDB
       await moodService.markAsSynced(mood.id, created.id);
 
-      if (import.meta.env.DEV) {
-        console.log(`[SyncService] Successfully synced mood ${mood.id} → ${created.id}`);
-      }
+      logger.debug(`[SyncService] Successfully synced mood ${mood.id} → ${created.id}`);
 
       return {
         localId: mood.id,
@@ -134,9 +133,7 @@ export class SyncService {
       // Get all unsynced moods from IndexedDB
       const unsyncedMoods = await moodService.getUnsyncedMoods();
 
-      if (import.meta.env.DEV) {
-        console.log(`[SyncService] Starting sync for ${unsyncedMoods.length} unsynced moods`);
-      }
+      logger.info(`[SyncService] Starting sync for ${unsyncedMoods.length} unsynced moods`);
 
       // No moods to sync
       if (unsyncedMoods.length === 0) {
@@ -162,11 +159,9 @@ export class SyncService {
         results,
       };
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[SyncService] Sync complete: ${successful}/${unsyncedMoods.length} successful, ${failed} failed`
-        );
-      }
+      logger.info(
+        `[SyncService] Sync complete: ${successful}/${unsyncedMoods.length} successful, ${failed} failed`
+      );
 
       return summary;
     } catch (error) {

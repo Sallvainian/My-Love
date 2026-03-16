@@ -10,6 +10,8 @@
  *   console.log(performanceMonitor.getReport());
  */
 
+import { logger } from '../utils/logger';
+
 interface PerformanceMetric {
   /** Operation name (e.g., 'db-read', 'photo-upload') */
   name: string;
@@ -83,9 +85,7 @@ class PerformanceMonitor {
       });
     }
 
-    if (import.meta.env.DEV) {
-      console.log(`[PerfMonitor] ${name}: ${duration.toFixed(2)}ms`);
-    }
+    logger.debug(`[PerfMonitor] ${name}: ${duration.toFixed(2)}ms`);
   }
 
   /**

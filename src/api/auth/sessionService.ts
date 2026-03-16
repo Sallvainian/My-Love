@@ -2,6 +2,7 @@ import { supabase } from '../supabaseClient';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import type { Session, User } from '@supabase/supabase-js';
 import type { AuthStatus } from './types';
+import { logger } from '../../utils/logger';
 
 export const getSession = async (): Promise<Session | null> => {
   try {
@@ -68,9 +69,7 @@ export const onAuthStateChange = (callback: (session: Session | null) => void): 
           expiresAt: session.expires_at ?? 0,
           userId: session.user?.id ?? '',
         });
-        if (import.meta.env.DEV) {
-          console.log(`[AuthService] Updated stored auth token (${event})`);
-        }
+        logger.debug(`[AuthService] Updated stored auth token (${event})`);
       } catch (tokenError) {
         console.error('[AuthService] Failed to update stored auth token:', tokenError);
       }
@@ -79,9 +78,7 @@ export const onAuthStateChange = (callback: (session: Session | null) => void): 
     if (event === 'SIGNED_OUT') {
       try {
         await clearAuthToken();
-        if (import.meta.env.DEV) {
-          console.log('[AuthService] Cleared stored auth token (SIGNED_OUT)');
-        }
+        logger.debug('[AuthService] Cleared stored auth token (SIGNED_OUT)');
       } catch (tokenError) {
         console.error('[AuthService] Failed to clear stored auth token:', tokenError);
       }

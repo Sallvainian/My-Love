@@ -16,13 +16,11 @@ import 'fake-indexeddb/auto';
 import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
+import type { AuthSlice } from '../../../src/stores/slices/authSlice';
 // Mock supabase client
-const mockGetUser = vi.fn();
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
-    auth: {
-      getUser: () => mockGetUser(),
-    },
+    auth: {},
   },
 }));
 
@@ -47,19 +45,15 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
   handleScriptureError: vi.fn(),
 }));
 
-// Create a test store with just the scripture slice
+// Create a test store with the scripture slice + userId from authSlice
+type TestStore = ScriptureSlice & Pick<AuthSlice, 'userId'>;
 function createTestStore() {
-  return create<ScriptureSlice>()(
-    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
-  );
+  return create<TestStore>()(createScriptureReadingSlice as unknown as StateCreator<TestStore>);
 }
 
 describe('scriptureReadingSlice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-    });
   });
 
   describe('initial state', () => {
@@ -156,6 +150,7 @@ describe('scriptureReadingSlice', () => {
       });
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().loadSession('session-1');
 
       expect(store.getState().scriptureLoading).toBe(false);
@@ -172,6 +167,7 @@ describe('scriptureReadingSlice', () => {
       vi.mocked(scriptureReadingService.getSession).mockResolvedValue(null);
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().loadSession('nonexistent');
 
       expect(store.getState().scriptureLoading).toBe(false);
@@ -187,6 +183,7 @@ describe('scriptureReadingSlice', () => {
       vi.mocked(scriptureReadingService.getSession).mockRejectedValue(new Error('DB error'));
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().loadSession('session-1');
 
       expect(store.getState().scriptureError).not.toBeNull();
@@ -325,10 +322,6 @@ describe('scriptureReadingSlice', () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      });
-
       const incompleteSession = {
         id: 'session-abc',
         mode: 'solo' as const,
@@ -343,6 +336,7 @@ describe('scriptureReadingSlice', () => {
       vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([incompleteSession]);
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       expect(store.getState().isCheckingSession).toBe(false);
 
       await store.getState().checkForActiveSession();
@@ -355,10 +349,6 @@ describe('scriptureReadingSlice', () => {
     it('should set activeSession to null when no incomplete solo session found', async () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');
-
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      });
 
       vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
         {
@@ -375,18 +365,16 @@ describe('scriptureReadingSlice', () => {
       ]);
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().checkForActiveSession();
 
       expect(store.getState().isCheckingSession).toBe(false);
       expect(store.getState().activeSession).toBeNull();
     });
 
-    it('should handle getUser failure gracefully (no crash, no activeSession)', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-      });
-
+    it('should handle missing userId gracefully (no crash, no activeSession)', async () => {
       const store = createTestStore();
+      // userId is not set (null by default), simulating unauthenticated state
       await store.getState().checkForActiveSession();
 
       expect(store.getState().isCheckingSession).toBe(false);
@@ -398,15 +386,12 @@ describe('scriptureReadingSlice', () => {
       const { scriptureReadingService, handleScriptureError } =
         await import('../../../src/services/scriptureReadingService');
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      });
-
       vi.mocked(scriptureReadingService.getUserSessions).mockRejectedValue(
         new Error('Network error')
       );
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().checkForActiveSession();
 
       expect(store.getState().isCheckingSession).toBe(false);
@@ -419,10 +404,6 @@ describe('scriptureReadingSlice', () => {
     it('should ignore together mode sessions when finding active session', async () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');
-
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      });
 
       vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
         {
@@ -438,6 +419,7 @@ describe('scriptureReadingSlice', () => {
       ]);
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().checkForActiveSession();
 
       expect(store.getState().activeSession).toBeNull();
@@ -638,8 +620,12 @@ describe('scriptureReadingSlice', () => {
         expect.objectContaining({
           currentStepIndex: 7,
           currentPhase: 'reading',
-          status: 'in_progress',
         })
+      );
+      // Should NOT send status — status transitions are handled by dedicated actions
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: expect.anything() })
       );
 
       // Should have reset state
@@ -711,14 +697,17 @@ describe('scriptureReadingSlice', () => {
 
       await store.getState().saveSession();
 
-      // Should have called updateSession
+      // Should have called updateSession with progress only (no status)
       expect(scriptureReadingService.updateSession).toHaveBeenCalledWith(
         'session-1',
         expect.objectContaining({
           currentStepIndex: 5,
           currentPhase: 'reading',
-          status: 'in_progress',
         })
+      );
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: expect.anything() })
       );
 
       // Session should NOT be cleared (unlike saveAndExit)
@@ -997,10 +986,6 @@ describe('scriptureReadingSlice', () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      });
-
       vi.mocked(scriptureReadingService.getUserSessions).mockResolvedValue([
         {
           id: 'session-abc',
@@ -1015,6 +1000,7 @@ describe('scriptureReadingSlice', () => {
       ]);
 
       const store = createTestStore();
+      store.setState({ userId: 'user-123' });
       await store.getState().checkForActiveSession();
       expect(store.getState().activeSession).not.toBeNull();
 

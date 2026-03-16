@@ -2,106 +2,84 @@
 
 ## NetworkStatusIndicator
 
-**File**: `src/components/shared/NetworkStatusIndicator.tsx` (224 lines)
+**File:** `src/components/shared/NetworkStatusIndicator.tsx`
+**Exports:** `NetworkStatusIndicator` (default + named), `NetworkStatusDot` (named)
 
-Two variants exported from the same file:
+### NetworkStatusIndicator
 
-### Banner Variant (`NetworkStatusIndicator`)
+Full-featured network status indicator with banner and dot modes. Uses `useNetworkStatus` hook.
 
-```typescript
-interface NetworkStatusIndicatorProps {
-  className?: string;
-  showOnlyWhenOffline?: boolean;
-}
-```
+**Props:**
 
-Full-width bar with icon, colored dot, label text, and description. Three states:
+- `className?: string` -- Additional CSS classes
+- `showOnlyWhenOffline?: boolean` -- Hide when online (default: false)
 
-| State      | Dot Color                   | Icon                 | Label           | Description                                           |
-| ---------- | --------------------------- | -------------------- | --------------- | ----------------------------------------------------- |
-| Online     | `#51CF66` (green)           | `Wifi`               | "Online"        | (hidden unless `showOnlyWhenOffline=false`)           |
-| Connecting | `#FCC419` (yellow, pulsing) | `Loader2` (spinning) | "Connecting..." | "Reconnecting to the network..."                      |
-| Offline    | `#FF6B6B` (red)             | `WifiOff`            | "Offline"       | "You're offline. Changes will sync when reconnected." |
+**States:**
+| State | Dot Color | Icon | Label | Banner |
+|-------|-----------|------|-------|--------|
+| Online | `#51CF66` (green) | Wifi | "Online" | No (compact dot only) |
+| Connecting | `#FCC419` (yellow) | Loader2 (spinning) | "Connecting..." | Yes, with "Reconnecting..." |
+| Offline | `#FF6B6B` (coral red) | WifiOff | "Offline" | Yes, with "Changes will sync when reconnected" |
 
-Uses `useNetworkStatus()` hook. ARIA: `role="status"`, `aria-live="polite"`, descriptive `aria-label`. `data-testid="network-status-indicator"` with `data-status` attribute.
+The banner includes a colored dot, icon, label text, and description text. Uses `aria-live="polite"` for screen reader announcements.
 
-### Dot Variant (`NetworkStatusDot`)
+### NetworkStatusDot
 
-```typescript
-function NetworkStatusDot({ className = '' }: { className?: string });
-```
+Compact inline dot indicator for header/status bar integration. Same three-state color scheme. Uses `aria-label` for accessibility. Pulse animation on connecting state.
 
-Compact 10px (`w-2.5 h-2.5`) circle for inline/header integration. Same three-state color coding. Pulse animation when connecting. `role="status"`, `aria-label` with status text.
+---
 
 ## SyncToast
 
-**File**: `src/components/shared/SyncToast.tsx` (163 lines)
+**File:** `src/components/shared/SyncToast.tsx`
+**Export:** `SyncToast` (default + named)
 
-```typescript
-interface SyncResult {
-  successCount: number;
-  failCount: number;
-}
+Toast notification for sync completion feedback. Uses Framer Motion for spring-based entrance/exit animation.
 
-interface SyncToastProps {
-  syncResult: SyncResult | null;
-  onDismiss: () => void;
-  autoDismissMs?: number; // Default: 5000
-}
-```
+**Props:**
 
-Fixed-position toast notification (top-center, `z-[100]`, min-width 280px). Spring animation entrance (`stiffness: 500`, `damping: 30`). Four display variants:
+- `syncResult: SyncResult | null` -- `{ successCount: number, failCount: number }`
+- `onDismiss: () => void` -- Called when toast is dismissed
+- `autoDismissMs?: number` -- Auto-dismiss duration (default: 5000ms, 0 = no auto-dismiss)
 
-| Condition       | Background     | Icon                   | Message Pattern                  |
-| --------------- | -------------- | ---------------------- | -------------------------------- |
-| All success     | `bg-green-50`  | `CheckCircle` (green)  | "Synced N pending item(s)"       |
-| Partial success | `bg-yellow-50` | `AlertCircle` (yellow) | "Synced X of Y items (Z failed)" |
-| All failed      | `bg-red-50`    | `AlertCircle` (red)    | "Failed to sync N item(s)"       |
-| No items        | `bg-gray-50`   | `Cloud` (gray)         | "No pending items to sync"       |
+**Variants:**
+| Condition | Icon | Colors | Message Example |
+|-----------|------|--------|-----------------|
+| Full success | CheckCircle | Green | "Synced 3 pending items" |
+| Partial success | AlertCircle | Yellow | "Synced 2 of 3 items (1 failed)" |
+| All failed | AlertCircle | Red | "Failed to sync 2 items" |
+| No items | Cloud | Gray | "No pending items to sync" |
 
-Auto-dismisses after `autoDismissMs` (default 5000ms). Manual dismiss via X button. Uses `AnimatePresence` for exit animation with 300ms delay before `onDismiss` callback.
-
-## charCounter
-
-**File**: `src/components/scripture-reading/reflection/charCounter.ts` (6 lines)
-
-```typescript
-export const CHAR_COUNTER_RATIO = 0.75;
-
-export function getCharCounterThreshold(maxLength: number): number {
-  return Math.floor(maxLength * CHAR_COUNTER_RATIO);
-}
-```
-
-Utility function used by `PerStepReflection` to determine when to show character counters. For a 200-char max, the counter appears at 150 characters.
-
-## motionFeatures
-
-**File**: `src/components/scripture-reading/motionFeatures.ts` (4 lines)
-
-```typescript
-import { domAnimation } from 'framer-motion';
-export default domAnimation;
-```
-
-Re-export for dynamic import by `SoloReadingFlow`'s `LazyMotion` component. Enables tree-shaking of Framer Motion animation features.
-
-## LoadingSpinner
-
-**File**: `src/App.tsx` (inline, not exported)
-
-Inline component defined within `App.tsx` used as the `<Suspense fallback>` for all lazy-loaded routes:
-
-```tsx
-function LoadingSpinner() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-pink-500 border-t-transparent" />
-    </div>
-  );
-}
-```
-
-Centered full-screen pink spinning border circle. Not exported -- used only as Suspense fallback within App.
+Fixed positioned at top center (`z-[100]`), min width 280px. Dismiss button (X icon) in top-right corner.
 
 ---
+
+## ErrorBoundary
+
+**File:** `src/components/ErrorBoundary/ErrorBoundary.tsx`
+**Type:** Class component (React error boundary)
+
+Global error boundary wrapping the entire application. Features:
+
+- Catches all React rendering errors
+- Reports errors to Sentry (`@sentry/react`)
+- Displays fallback UI with error message
+- "Try Again" button to reset error state
+
+---
+
+## ViewErrorBoundary
+
+**File:** `src/components/ViewErrorBoundary/ViewErrorBoundary.tsx`
+**Type:** Class component (React error boundary)
+
+Per-view error boundary that keeps the bottom navigation visible when a view crashes. Features:
+
+- Wraps each view section independently
+- Detects offline errors (network-related exceptions)
+- Detects chunk load errors (lazy loading failures, e.g., stale service worker)
+- Shows appropriate messaging based on error type:
+  - Offline: "You appear to be offline. Please check your connection."
+  - Chunk error: "A new version is available. Please refresh."
+  - Other: Generic error message with retry button
+- Navigation (`BottomNavigation`) remains functional during error state
