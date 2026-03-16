@@ -4,6 +4,7 @@ import { CreateMessageInputSchema } from '../validation/schemas';
 import { isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
+import { logger } from '../utils/logger';
 
 /**
  * Migration Service - One-time migration from LocalStorage to IndexedDB
@@ -38,13 +39,13 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
   };
 
   try {
-    console.log('[MigrationService] Starting LocalStorage to IndexedDB migration...');
+    logger.info('[MigrationService] Starting LocalStorage to IndexedDB migration...');
 
     // Check for existing LocalStorage data
     const localStorageData = localStorage.getItem(LOCALSTORAGE_KEY);
 
     if (!localStorageData) {
-      console.log('[MigrationService] No LocalStorage data found - migration not needed');
+      logger.info('[MigrationService] No LocalStorage data found - migration not needed');
       return result;
     }
 
@@ -52,7 +53,7 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
     let customMessages: CustomMessage[];
     try {
       customMessages = JSON.parse(localStorageData);
-      console.log('[MigrationService] Found', customMessages.length, 'messages in LocalStorage');
+      logger.info('[MigrationService] Found', customMessages.length, 'messages in LocalStorage');
     } catch (parseError) {
       const errorMsg = 'Failed to parse LocalStorage data';
       console.error('[MigrationService]', errorMsg, parseError);
@@ -91,7 +92,7 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
         // Check for duplicates (same text already in IndexedDB)
         const normalizedText = validated.text.trim().toLowerCase();
         if (existingTexts.has(normalizedText)) {
-          console.log(
+          logger.debug(
             '[MigrationService] Skipping duplicate message:',
             validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
           );
@@ -105,7 +106,7 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
 
         existingTexts.add(normalizedText); // Prevent duplicates within same migration
         result.migratedCount++;
-        console.log(
+        logger.info(
           '[MigrationService] Migrated message:',
           validated.text.substring(0, LOG_TRUNCATE_LENGTH) + '...'
         );
@@ -127,11 +128,11 @@ export async function migrateCustomMessagesFromLocalStorage(): Promise<Migration
     // Remove LocalStorage data after successful migration
     if (result.migratedCount > 0 || result.skippedCount === customMessages.length) {
       localStorage.removeItem(LOCALSTORAGE_KEY);
-      console.log('[MigrationService] Removed LocalStorage data after migration');
+      logger.info('[MigrationService] Removed LocalStorage data after migration');
     }
 
     // Log migration summary
-    console.log('[MigrationService] Migration complete:', {
+    logger.info('[MigrationService] Migration complete:', {
       migratedCount: result.migratedCount,
       skippedCount: result.skippedCount,
       errorCount: result.errors.length,

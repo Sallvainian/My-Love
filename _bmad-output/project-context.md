@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-03-07'
+date: '2026-03-15'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 108
+rule_count: 119
 optimized_for_llm: true
 ---
 
@@ -21,21 +21,21 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **UI Framework:** React ^19.2.4 (react-jsx transform)
 - **Build:** Vite ^7.3.1 (bundler module resolution, manual chunk splitting, vite-plugin-checker for dev overlay)
 - **State:** Zustand ^5.0.11 (slice-based, persist middleware -> localStorage)
-- **Backend:** Supabase ^2.97.0 (PostgreSQL 17 + RLS + Realtime subscriptions + Storage + Broadcast channels)
+- **Backend:** Supabase ^2.99.0 (PostgreSQL 17 + RLS + Realtime subscriptions + Storage + Broadcast channels)
 - **Local DB:** idb ^8.0.3 (IndexedDB for offline-first persistence)
 - **Validation:** Zod ^4.3.6 (schema validation at data boundaries)
 - **Styling:** Tailwind CSS ^4.1.17 (utility-first, PostCSS, class sorting via Prettier plugin)
-- **Animation:** Framer Motion ^12.34.3 (lazy-loaded via `LazyMotion` with `domAnimation`)
-- **Icons:** Lucide React ^0.575.0 (tree-shakeable)
+- **Animation:** Framer Motion ^12.35.2 (lazy-loaded via `LazyMotion` with `domAnimation`)
+- **Icons:** Lucide React ^0.577.0 (tree-shakeable)
 - **PWA:** vite-plugin-pwa ^1.2.0 (injectManifest strategy, custom sw.ts) + workbox-window ^7.4.0
-- **Sanitization:** DOMPurify ^3.3.1 (XSS prevention for user content)
+- **Sanitization:** DOMPurify ^3.3.2 (XSS prevention for user content)
 - **Virtualization:** react-window ^2.2.7 + react-window-infinite-loader ^2.0.1
 - **SSE:** eventsource ^4.1.0
-- **Error Tracking:** @sentry/react ^10.39.0 (prod-only, PII-stripped, ignores chunk/network/ResizeObserver errors)
-- **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 25% thresholds)
+- **Error Tracking:** @sentry/react ^10.42.0 (prod-only, PII-stripped, ignores chunk/network/ResizeObserver errors)
+- **Unit Tests:** Vitest ^4.0.17 (happy-dom, V8 coverage, 25% thresholds) + @vitest/coverage-v8 ^4.0.18
 - **E2E Tests:** Playwright ^1.58.2 (Chromium) + @seontechnologies/playwright-utils ^3.14.0 + @axe-core/playwright ^4.11.1
 - **Test Data:** @faker-js/faker ^10.3.0
-- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.56.1 (flat config)
+- **Linting:** ESLint ^9.39.2 + typescript-eslint ^8.57.0 (flat config)
 - **Formatting:** Prettier ^3.8.1 (100 char width, single quotes, trailing commas ES5)
 - **Package Manager:** npm (package-lock.json)
 - **Secrets Management:** fnox with age encryption provider (encrypted ciphertext in `fnox.toml`, committed to git; age keys at `~/.age/key.txt`)
@@ -48,7 +48,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **No `any`:** ESLint enforces `@typescript-eslint/no-explicit-any: 'error'` -- use `unknown`, specific types, or generics instead
 - **Explicit return types:** All exported functions must declare return types (components return `ReactElement`)
 - **Unused vars prefix:** Unused parameters/variables must be prefixed with `_` (e.g., `_event`, `_unused`)
-- **Path alias:** Use `@/` for imports from `src/` (e.g., `import { X } from '@/services/myService'`) -- configured in vitest.config.ts only, NOT in vite.config.ts
+- **Path alias:** Use `@/` for imports from `src/` (e.g., `import { X } from '@/services/myService'`) -- configured in vitest.config.ts and tsconfig.app.json, NOT in vite.config.ts
 - **Named exports only:** No default exports for components or services -- use named exports + barrel files
 - **Import order:** Node built-ins -> External packages -> `@/` internal modules -> Relative imports
 - **Error handling split:** Read operations return `null`/`[]` on failure; write operations throw `SupabaseServiceError`
@@ -57,6 +57,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Dual validation:** Local schemas in `src/validation/schemas.ts` validate IndexedDB writes; API response schemas in `src/api/validation/supabaseSchemas.ts` validate Supabase responses -- agents must use the correct schema layer
 - **Re-export Zod types via `stores/types.ts`:** Zod-inferred types from `src/api/validation/supabaseSchemas.ts` that are consumed by UI components must be re-exported through `src/stores/types.ts` using `export type { X } from '../api/validation/supabaseSchemas'` -- this is the single source of truth; never import from `supabaseSchemas.ts` directly in components
 - **Catch blocks must never be empty:** In scripture code, catch blocks must call `handleScriptureError()` or re-throw. Outside scripture code, catch blocks must re-throw or map to the feature's error handler.
+- **No `console.log` in src code:** ESLint enforces `no-console: 'error'` (only `console.warn` and `console.error` are allowed). Use `logger.debug()` (dev-only) or `logger.info()` (operational) from `src/utils/logger.ts`. Exception: `src/sw.ts` and `src/sw-db.ts` (service workers) are exempt since they can't import the logger utility.
+- **Logger imports use relative paths:** Import logger via relative paths (e.g., `../../utils/logger`), NOT the `@/utils/logger` path alias. The alias is not configured in `vite.config.ts` and will break production builds. The `@/` alias only works in vitest.config.ts and tsconfig.app.json.
+- **Date utilities consolidated:** All date formatting/comparison/arithmetic lives in `src/utils/dateUtils.ts`. Functions include `formatDateISO()` (local timezone, NOT UTC), `formatRelativeDate()`, `isToday()`, `isSameDay()`, `addDays()`, `getRelativeTime()`, etc. Do not create new date utility files or inline date logic -- import from `dateUtils.ts`.
 
 ### Framework-Specific Rules (React + Zustand)
 
@@ -84,6 +87,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **ESLint submission control enforcement:** Scripture submit/continue buttons must include a `disabled` prop -- ESLint `no-restricted-syntax` enforces via data-testid matching (`scripture-message-send-btn`, `scripture-reflection-continue`, `scripture-reflection-summary-continue`).
 - **ESLint container import restrictions:** Scripture container components (`src/components/scripture-reading/containers/`) must NOT import from `@supabase/supabase-js` or service modules directly -- they must go through Zustand slice actions. Exception: `scriptureReadingService` is allowed.
 - **Love notes rate limiting:** Client-side rate limit of 10 messages per minute enforced in NotesSlice.
+- **Auth centralization (authSlice):** User identity (`userId`, `userEmail`, `isAuthenticated`) is centralized in `src/stores/slices/authSlice.ts`. Populated by `onAuthStateChange` in `App.tsx`, NOT persisted to localStorage. All slices read `userId` synchronously via `get().userId` instead of making async `supabase.auth.getUser()` calls. Use `setAuthUser(userId, email?)` after auth, `clearAuth()` on sign-out.
+- **Typecheck command:** `npm run typecheck` runs `tsc -b --force` (project references build mode), NOT `tsc --noEmit`. The build command uses `tsc -p tsconfig.app.json` for the production build only.
 
 ### Together Mode / Realtime Architecture (Epic 4)
 
@@ -125,7 +130,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 - **Prettier config:** 100 char width, 2-space indent, single quotes, ES5 trailing commas, LF line endings, Tailwind class sorting
 - **ESLint flat config:** `eslint.config.js` (not `.eslintrc`) -- uses `typescript-eslint` with recommended config
-- **File naming:** PascalCase for components (`LoveNoteMessage.tsx`), camelCase for services/utils (`dateFormatters.ts`), kebab-case for feature directories (`love-notes/`)
+- **File naming:** PascalCase for components (`LoveNoteMessage.tsx`), camelCase for services/utils (`dateUtils.ts`), kebab-case for feature directories (`love-notes/`)
 - **Slice naming:** `{domain}Slice.ts` (e.g., `messagesSlice.ts`, `moodSlice.ts`)
 - **Story annotations:** Components reference Story/AC numbers in JSDoc headers (e.g., `Story 2.1: AC-2.1.1`)
 - **Validation at boundaries:** Zod schemas in `src/validation/schemas.ts` validate data entering the app from Supabase -- validate in the service layer before IndexedDB writes
@@ -166,7 +171,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **No server-side broadcasts:** `PERFORM realtime.send()` does NOT work in local Docker Supabase. All Realtime broadcast events must be sent client-side via `channel.send()` after a successful RPC call. This was explicitly removed in migration `20260301000200_remove_server_side_broadcasts.sql`.
 - **Sentry PII rules:** Only UUIDs reach Sentry -- `beforeSend` strips `event.user.email` and `event.user.ip_address`. Use `setSentryUser(userId, partnerId)` after auth (sets user ID + partner tag). Never pass PII to Sentry tags or breadcrumbs.
 - **ES256 JWT re-signing:** Supabase CLI v2.71.1+ defaults GoTrue to ES256 but `supabase status -o env` still outputs stale HS256-signed keys. `playwright.config.ts` re-signs tokens using the GoTrue ES256 private key extracted from the Docker container. If E2E auth fails with 401s, check that the re-signing logic in `playwright.config.ts` is running.
-- **TypeScript config composition:** Three tsconfig files composed via project references: `tsconfig.app.json` (src/), `tsconfig.node.json` (vite/vitest configs), `tsconfig.test.json` (tests, relaxed strictness). Build uses `tsc -p tsconfig.app.json`, not `tsc -b`.
+- **TypeScript config composition:** Three tsconfig files composed via project references: `tsconfig.app.json` (src/), `tsconfig.node.json` (vite/vitest configs), `tsconfig.test.json` (tests, relaxed strictness). Build uses `tsc -p tsconfig.app.json`; typecheck uses `tsc -b --force` (validates all project references).
+- **Vite manual chunk splitting:** Production builds split vendor code into named chunks (`vendor-react`, `vendor-supabase`, `vendor-state`, `vendor-animation`, `vendor-icons`) for optimal caching. New heavy dependencies should be added to an appropriate chunk in `vite.config.ts` `rollupOptions.output.manualChunks`.
+- **`no-useless-catch` disabled:** ESLint's `no-useless-catch` is turned off project-wide -- catch-and-rethrow is allowed for debugging breakpoints and error boundary patterns.
+- **Tailwind v4 import syntax:** Uses `@import 'tailwindcss'` (not `@tailwind` directives) with `@config` reference and `@layer components` for custom utility classes.
+- **Test JUnit output:** Vitest outputs JUnit XML to `test-results/vitest-junit.xml` for CI consumption.
 
 ---
 
@@ -186,4 +195,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-07
+Last Updated: 2026-03-15

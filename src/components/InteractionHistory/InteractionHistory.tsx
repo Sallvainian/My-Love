@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Hand, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { authService } from '../../api/authService';
+import { logger } from '../../utils/logger';
 import type { Interaction } from '../../types';
 
 interface InteractionHistoryProps {
@@ -29,17 +29,8 @@ interface InteractionHistoryProps {
 
 export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps) {
   const { getInteractionHistory, loadInteractionHistory } = useAppStore();
+  const currentUserId = useAppStore((state) => state.userId);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // Load current user ID
-  useEffect(() => {
-    const loadUserId = async () => {
-      const userId = await authService.getCurrentUserId();
-      setCurrentUserId(userId);
-    };
-    loadUserId();
-  }, []);
 
   // Load interaction history when modal opens
   useEffect(() => {
@@ -48,7 +39,7 @@ export function InteractionHistory({ isOpen, onClose }: InteractionHistoryProps)
         setIsLoading(true);
         try {
           await loadInteractionHistory(100); // Load last 100 interactions
-          console.log('[InteractionHistory] History loaded successfully');
+          logger.debug('[InteractionHistory] History loaded successfully');
         } catch (error) {
           console.error('[InteractionHistory] Failed to load history:', error);
         } finally {

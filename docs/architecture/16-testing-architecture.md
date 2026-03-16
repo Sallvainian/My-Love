@@ -15,9 +15,9 @@
 ### Configuration
 
 - **Runner**: Vitest 4.0.17 (`vitest.config.ts`)
-- **DOM**: happy-dom 20.7.0 (lightweight DOM implementation)
+- **DOM**: happy-dom 20.8.3 (lightweight DOM implementation)
 - **Setup**: `tests/setup.ts` (global test setup)
-- **Coverage**: V8 coverage with 25% threshold
+- **Coverage**: V8 coverage with 25% threshold (lines, functions, branches, statements)
 - **Path alias**: `@/` maps to `src/`
 - **IndexedDB mock**: `fake-indexeddb` 6.2.5
 
@@ -154,12 +154,14 @@ npm run test:db
 # Expands to: supabase test db
 ```
 
-Test files are in `supabase/tests/database/` and validate:
+Test files are in `supabase/tests/database/` (14 files) and validate:
 
-- RLS policies
-- Database functions
-- Migration correctness
+- Schema structure and constraints
+- RLS policies (read/write access control)
+- Database functions and RPCs
 - Trigger behavior
+- Migration correctness
+- Scripture lobby, lock-in, and session semantics
 
 ## Smoke Tests
 
@@ -169,7 +171,7 @@ Post-build verification (`scripts/smoke-tests.cjs`):
 npm run test:smoke
 ```
 
-Validates the build output exists and contains expected files.
+Validates the build output exists and contains expected files (index.html, manifest, icons, JS bundles, service worker).
 
 ## Related Documentation
 

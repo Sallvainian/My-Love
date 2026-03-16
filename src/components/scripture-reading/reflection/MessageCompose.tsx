@@ -16,8 +16,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ReactElement } from 'react';
-
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING } from '../constants';
 const MAX_MESSAGE_LENGTH = 300;
 const CHAR_COUNTER_THRESHOLD = 250;
 

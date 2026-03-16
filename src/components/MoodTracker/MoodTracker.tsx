@@ -32,6 +32,7 @@ import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandle
 import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
+import { logger } from '../../utils/logger';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {
@@ -195,11 +196,10 @@ export function MoodTracker() {
       triggerMoodSaveHaptic(); // Story 5.2: AC-5.2.2 - Haptic feedback on successful save
       setTimeout(() => setShowSuccess(false), 3000);
 
-      if (import.meta.env.DEV) {
-        const elapsed = performance.now() - mountTime;
-        console.log('[MoodTracker] Mood entry saved successfully:', selectedMoods);
-        console.debug(`[Mood Log] Complete flow: ${elapsed.toFixed(0)}ms (target: <5000ms)`);
-      }
+      logger.debug('[MoodTracker] Mood entry saved successfully:', selectedMoods);
+      logger.debug(
+        `[Mood Log] Complete flow: ${(performance.now() - mountTime).toFixed(0)}ms (target: <5000ms)`
+      );
 
       // Story 6.4: AC #1 - Trigger background sync after mood entry
       // Run in background (don't await) - sync should not block UI
@@ -244,9 +244,7 @@ export function MoodTracker() {
   const handleRetrySync = async () => {
     if (isOffline()) {
       // Still offline - show feedback
-      if (import.meta.env.DEV) {
-        console.log('[MoodTracker] Retry blocked - still offline');
-      }
+      logger.debug('[MoodTracker] Retry blocked - still offline');
       return;
     }
 
@@ -257,9 +255,7 @@ export function MoodTracker() {
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
 
-      if (import.meta.env.DEV) {
-        console.log('[MoodTracker] Retry sync successful');
-      }
+      logger.debug('[MoodTracker] Retry sync successful');
     } catch (err) {
       console.error('[MoodTracker] Retry sync failed:', err);
       setError('Sync failed. Please try again later.');

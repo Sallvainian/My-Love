@@ -52,7 +52,11 @@ Files must follow the format `YYYYMMDDHHmmss_short_description.sql` in UTC time.
 
 ### Current Migration Count
 
-The project has 21 migration files spanning from `20251203000001` (initial base schema) through `20260301000200` (latest scripture session improvements).
+The project has 24 migration files spanning from `20251203000001_create_base_schema.sql` through `20260315044923_fix_avg_rating_precision.sql`.
+
+### Current Database Test Count
+
+There are 14 pgTAP test files in `supabase/tests/database/`, covering schema validation, RLS policies, scripture RPCs, reflections, bookmarks, session completion, couple stats, lobby, lock-in, and session ending.
 
 ### Writing Migration SQL
 
@@ -104,7 +108,7 @@ create index idx_reflections_user_id on public.reflections using btree (user_id)
 ### Locally
 
 ```bash
-supabase db reset    # Drop all data, re-run all 21 migrations, re-seed
+supabase db reset    # Drop all data, re-run all migrations, re-seed
 ```
 
 This is the recommended approach during development. It ensures a clean slate with all migrations applied in order, followed by `seed.sql`.
@@ -130,7 +134,7 @@ supabase gen types typescript --local | grep -v '^Connecting to' > src/types/dat
 ### From Remote Database
 
 ```bash
-supabase gen types typescript --project-id xojempkrugifnaveqtqc | grep -v '^Connecting to' > src/types/database.types.ts
+supabase gen types typescript --project-id $SUPABASE_PROJECT_ID | grep -v '^Connecting to' > src/types/database.types.ts
 ```
 
 This requires the `SUPABASE_ACCESS_TOKEN` environment variable to be set.
@@ -147,7 +151,7 @@ In the deploy workflow (`deploy.yml`), types are generated from the remote schem
     SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
   run: |
     npx supabase gen types typescript \
-      --project-id xojempkrugifnaveqtqc \
+      --project-id ${{ vars.SUPABASE_PROJECT_ID }} \
       | grep -v '^Connecting to' \
       > src/types/database.types.ts
 ```
@@ -157,17 +161,19 @@ In the deploy workflow (`deploy.yml`), types are generated from the remote schem
 The `supabase-migrations.yml` workflow runs on PRs that modify files under the `supabase/` directory:
 
 1. Checks out the PR code
-2. Sets up local Supabase via the composite action (`.github/actions/setup-supabase/`)
-3. Applies all migrations via `supabase db reset`
-4. Validates that all migrations apply cleanly
+2. Sets up Supabase CLI (latest version)
+3. Starts local Supabase with `--ignore-health-check`
+4. Applies all migrations via `supabase db reset --debug`
+5. Validates RLS policies via `supabase db lint --level warning`
+6. Checks for security advisories via `supabase db lint --level error`
 
-The composite action (`setup-supabase`) handles:
+The test pipeline (`test.yml`) also validates migrations via the composite action (`.github/actions/setup-supabase/`), which handles:
 
-1. Installing the Supabase CLI
+1. Installing the Supabase CLI (v2.72.7)
 2. Starting local Supabase
 3. Running `supabase db reset` to apply all migrations
 4. Exporting Supabase connection credentials as environment variables
-5. Verifying database connectivity
+5. Verifying database connectivity via API health check
 
 ## Database Tests
 
@@ -177,7 +183,26 @@ pgTAP tests validate database constraints, RLS policies, triggers, and functions
 npm run test:db    # Runs supabase test db
 ```
 
-Test files are in `supabase/tests/database/`. They run against the local Supabase Postgres instance and require `supabase start`.
+Test files are in `supabase/tests/database/`:
+
+| File                                                 | Purpose                         |
+| ---------------------------------------------------- | ------------------------------- |
+| `00_helpers.sql`                                     | Test helper functions           |
+| `01_schema.sql`                                      | Schema structure validation     |
+| `02_rls_policies.sql`                                | RLS policy enforcement          |
+| `03_scripture_rpcs.sql`                              | Scripture reading RPC functions |
+| `04_reflection_upsert.sql`                           | Reflection upsert operations    |
+| `05_bookmarks.sql`                                   | Bookmark functionality          |
+| `06_session_reflection.sql`                          | Session reflection flows        |
+| `07_messages.sql`                                    | Message operations              |
+| `08_session_completion.sql`                          | Session completion logic        |
+| `09_scripture_couple_stats.sql`                      | Couple statistics RPCs          |
+| `10_scripture_lobby.sql`                             | Scripture lobby mechanics       |
+| `11_scripture_lockin.sql`                            | Lock-in phase validation        |
+| `12_scripture_end_session.sql`                       | Session ending flows            |
+| `13_scripture_create_session_together_semantics.sql` | Together mode session creation  |
+
+They run against the local Supabase Postgres instance and require `supabase start`.
 
 ## Seed Data
 

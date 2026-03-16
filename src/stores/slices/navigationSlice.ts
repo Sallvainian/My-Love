@@ -13,6 +13,7 @@
  */
 
 import type { AppStateCreator } from '../types';
+import { logger } from '../../utils/logger';
 
 export type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 
@@ -53,7 +54,7 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
       const base = import.meta.env.BASE_URL || '/';
       const fullPath = base === '/' ? basePath : base.slice(0, -1) + basePath;
       window.history.pushState({ view }, '', fullPath);
-      console.log(`[AppStore] View changed to '${view}', URL: ${fullPath}`);
+      logger.info(`[AppStore] View changed to '${view}', URL: ${fullPath}`);
     }
   },
 

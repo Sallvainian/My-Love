@@ -20,22 +20,17 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
+import { ScriptureErrorCode } from '../../../services/scriptureReadingService';
 import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import { useScripturePresence } from '../../../hooks/useScripturePresence';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { useFocusTrap } from '../../../hooks';
 import { BookmarkFlag } from '../reading/BookmarkFlag';
 import { RoleIndicator } from '../reading/RoleIndicator';
 import { PartnerPosition } from '../reading/PartnerPosition';
 import { LockInButton } from '../session/LockInButton';
 import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
-
-// Lavender Dreams design tokens
-const scriptureTheme = {
-  primary: '#A855F7',
-  background: '#F3E5F5',
-};
-
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING, scriptureTheme } from '../constants';
 
 export function ReadingContainer(): ReactElement | null {
   const { slide } = useMotionConfig();
@@ -79,7 +74,13 @@ export function ReadingContainer(): ReactElement | null {
   // Local view state: verse or response tab
   const [localView, setLocalView] = useState<'verse' | 'response'>('verse');
   const [bookmarkedSteps, setBookmarkedSteps] = useState<Set<number>>(new Set());
-  const [isLockActionPending, setIsLockActionPending] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const exitDialogRef = useRef<HTMLDivElement>(null);
+
+  // Escape key and focus trap for exit confirmation dialog
+  useFocusTrap(exitDialogRef, showExitConfirm, {
+    onEscape: () => setShowExitConfirm(false),
+  });
 
   // Story 4.3: Reconnected toast (green tint, 2s auto-dismiss)
   const [showReconnectedToast, setShowReconnectedToast] = useState(false);
@@ -109,6 +110,7 @@ export function ReadingContainer(): ReactElement | null {
         void loadSession(session.id);
       }
       // Story 4.3: Show "Reconnected" toast (green tint, 2s auto-dismiss)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- presence transition drives toast
       setShowReconnectedToast(true);
       if (reconnectedToastTimerRef.current) clearTimeout(reconnectedToastTimerRef.current);
       reconnectedToastTimerRef.current = setTimeout(() => setShowReconnectedToast(false), 2000);
@@ -140,7 +142,8 @@ export function ReadingContainer(): ReactElement | null {
 
   // Watch scriptureError for 409 "Session updated" toast
   useEffect(() => {
-    if (scriptureError?.message === 'Session updated') {
+    if (scriptureError?.code === ScriptureErrorCode.VERSION_MISMATCH) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- toast triggered by error state change
       setShowToast(true);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setShowToast(false), 3000);
@@ -155,6 +158,7 @@ export function ReadingContainer(): ReactElement | null {
     if (!scriptureError || scriptureError.message === 'Session updated') return;
 
     const message = scriptureError.message.trim() || 'Something went wrong. Please try again.';
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- toast triggered by error state change
     setErrorToastMessage(message);
     if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
     errorToastTimerRef.current = setTimeout(() => setErrorToastMessage(null), 4000);
@@ -168,6 +172,7 @@ export function ReadingContainer(): ReactElement | null {
   useEffect(() => {
     if (session && session.currentStepIndex !== prevStepRef.current) {
       prevStepRef.current = session.currentStepIndex;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- view reset on step navigation
       setLocalView('verse');
     }
   }, [session?.currentStepIndex, session]);
@@ -198,16 +203,12 @@ export function ReadingContainer(): ReactElement | null {
   }, [currentStepIndex]);
 
   const handleLockIn = useCallback(() => {
-    if (isLockActionPending || isPendingLockIn) return;
-    setIsLockActionPending(true);
-    void lockIn().finally(() => setIsLockActionPending(false));
-  }, [isLockActionPending, isPendingLockIn, lockIn]);
+    void lockIn();
+  }, [lockIn]);
 
   const handleUndoLockIn = useCallback(() => {
-    if (isLockActionPending) return;
-    setIsLockActionPending(true);
-    void undoLockIn().finally(() => setIsLockActionPending(false));
-  }, [isLockActionPending, undoLockIn]);
+    void undoLockIn();
+  }, [undoLockIn]);
 
   if (!session || !step) return null;
 
@@ -223,7 +224,7 @@ export function ReadingContainer(): ReactElement | null {
           partnerName={partnerName}
           disconnectedAt={partnerDisconnectedAt}
           onKeepWaiting={handleKeepWaiting}
-          onEndSession={endSession}
+          onEndSession={() => void endSession()}
           isEnding={isSyncing}
         />
       )}
@@ -262,8 +263,24 @@ export function ReadingContainer(): ReactElement | null {
       )}
 
       <div className="mx-auto w-full max-w-md flex-1 p-4">
-        {/* Step progress */}
-        <header className="mb-4 text-center">
+        {/* Step progress with exit button */}
+        <header className="relative mb-4 text-center">
+          <button
+            onClick={() => setShowExitConfirm(true)}
+            className={`absolute top-0 left-0 flex min-h-[48px] min-w-[48px] items-center justify-center rounded-lg p-2 text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
+            aria-label="Exit reading"
+            data-testid="reading-exit-button"
+            type="button"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
           <p className="text-sm font-medium text-purple-600" data-testid="reading-step-progress">
             Verse {currentStepIndex + 1} of {MAX_STEPS}
           </p>
@@ -355,7 +372,7 @@ export function ReadingContainer(): ReactElement | null {
         <div className="mx-auto max-w-md">
           <LockInButton
             isLocked={isPendingLockIn}
-            isPending={isLockActionPending}
+            isPending={isSyncing}
             partnerLocked={partnerLocked}
             partnerName={partnerName}
             onLockIn={handleLockIn}
@@ -364,6 +381,63 @@ export function ReadingContainer(): ReactElement | null {
           />
         </div>
       </div>
+
+      {/* Exit confirmation dialog */}
+      <AnimatePresence>
+        {showExitConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            data-testid="reading-exit-confirm-overlay"
+            onClick={() => setShowExitConfirm(false)}
+          >
+            <motion.div
+              ref={exitDialogRef}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl"
+              data-testid="reading-exit-confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reading-exit-dialog-title"
+              aria-describedby="reading-exit-dialog-desc"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="reading-exit-dialog-title" className="text-lg font-semibold text-purple-900">
+                End this session?
+              </h2>
+              <p id="reading-exit-dialog-desc" className="text-sm text-purple-700">
+                This will end the session for both of you.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => void endSession()}
+                  disabled={isSyncing}
+                  className={`min-h-[48px] flex-1 rounded-xl bg-linear-to-r from-purple-500 to-purple-600 px-4 py-3 font-medium text-white hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 ${FOCUS_RING}`}
+                  data-testid="reading-exit-confirm-button"
+                  type="button"
+                  autoFocus
+                >
+                  {isSyncing ? 'Ending...' : 'End Session'}
+                </button>
+                <button
+                  onClick={() => setShowExitConfirm(false)}
+                  className={`min-h-[48px] rounded-lg px-4 py-3 font-medium text-purple-600 hover:text-purple-800 ${FOCUS_RING}`}
+                  data-testid="reading-exit-cancel-button"
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

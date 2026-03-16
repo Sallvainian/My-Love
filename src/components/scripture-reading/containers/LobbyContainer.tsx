@@ -18,16 +18,9 @@ import type { ReactElement } from 'react';
 import { ArrowLeft, BookOpen, MessageCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
+
 import { Countdown } from '../session/Countdown';
-
-// Lavender Dreams design tokens (from ScriptureOverview)
-const scriptureTheme = {
-  primary: '#A855F7',
-  background: '#F3E5F5',
-  surface: '#FAF5FF',
-};
-
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING, scriptureTheme } from '../constants';
 
 export function LobbyContainer(): ReactElement {
   const {

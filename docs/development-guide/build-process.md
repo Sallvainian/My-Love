@@ -18,7 +18,7 @@ Environment variables are decrypted by fnox (using the age provider) before the 
 
 ### Stage 1: TypeScript Type Check
 
-`tsc -p tsconfig.app.json` runs the TypeScript compiler against the application config, checking types for all source files in `src/` (excluding test files).
+`tsc -p tsconfig.app.json` runs the TypeScript compiler against the application config, checking types for all source files in `src/` (excluding test files). Note: the `npm run build` script uses `tsc -p tsconfig.app.json` (project-specific), while `npm run typecheck` uses `tsc -b --force` (project references mode, checking all three tsconfig files: app, node, and test).
 
 Key TypeScript settings for the build:
 

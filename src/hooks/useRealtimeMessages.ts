@@ -12,7 +12,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { supabase } from '../api/supabaseClient';
-import { getCurrentUserId } from '../api/auth/sessionService';
+import { logger } from '../utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { LoveNote } from '../types/models';
 
@@ -34,14 +34,13 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   const retryCountRef = useRef(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addNote = useAppStore((state) => state.addNote);
+  const userId = useAppStore((state) => state.userId);
 
   const handleNewMessage = useCallback(
     (payload: { type: string; event: string; payload: { message: LoveNote } }) => {
       const { message } = payload.payload;
 
-      if (import.meta.env.DEV) {
-        console.log('[useRealtimeMessages] New message received:', message.id);
-      }
+      logger.debug('[useRealtimeMessages] New message received:', message.id);
 
       // Add to store (with deduplication check in addNote)
       addNote(message);
@@ -58,91 +57,69 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   );
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !userId) return;
 
     let subscriptionActive = true;
 
-    const setupSubscription = async () => {
-      try {
-        const userId = await getCurrentUserId();
-        if (!userId) {
-          if (import.meta.env.DEV) {
-            console.log('[useRealtimeMessages] No user ID, skipping subscription');
-          }
+    logger.info('[useRealtimeMessages] Setting up Broadcast subscription for:', userId);
+
+    // Create user-specific channel for receiving messages
+    const channel = supabase
+      .channel(`love-notes:${userId}`)
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        if (!subscriptionActive) return;
+        handleNewMessage(
+          payload as unknown as { type: string; event: string; payload: { message: LoveNote } }
+        );
+      })
+      .subscribe((status, err) => {
+        logger.info('[useRealtimeMessages] Subscription status:', status, err || '');
+
+        // Reset retry count on successful subscription
+        if (status === 'SUBSCRIBED') {
+          retryCountRef.current = 0;
           return;
         }
 
-        if (import.meta.env.DEV) {
-          console.log('[useRealtimeMessages] Setting up Broadcast subscription for:', userId);
-        }
+        // Handle subscription errors with exponential backoff (AC-2.3.5)
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[useRealtimeMessages] Subscription error:', err);
 
-        // Create user-specific channel for receiving messages
-        const channel = supabase
-          .channel(`love-notes:${userId}`)
-          .on('broadcast', { event: 'new_message' }, (payload) => {
-            if (!subscriptionActive) return;
-            handleNewMessage(
-              payload as unknown as { type: string; event: string; payload: { message: LoveNote } }
+          // Check if max retries exceeded
+          if (retryCountRef.current >= RETRY_CONFIG.maxRetries) {
+            console.error(
+              `[useRealtimeMessages] Max retries (${RETRY_CONFIG.maxRetries}) exceeded. Giving up.`
             );
-          })
-          .subscribe((status, err) => {
-            if (import.meta.env.DEV) {
-              console.log('[useRealtimeMessages] Subscription status:', status, err || '');
+            return;
+          }
+
+          // Calculate delay with exponential backoff: baseDelay * 2^retryCount
+          const delay = Math.min(
+            RETRY_CONFIG.baseDelay * Math.pow(2, retryCountRef.current),
+            RETRY_CONFIG.maxDelay
+          );
+
+          retryCountRef.current++;
+
+          logger.debug(
+            `[useRealtimeMessages] Retry attempt ${retryCountRef.current}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
+          );
+
+          // Clear any existing retry timeout
+          if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+          }
+
+          // Schedule retry with exponential backoff
+          retryTimeoutRef.current = setTimeout(() => {
+            if (subscriptionActive && channelRef.current) {
+              channelRef.current.subscribe();
             }
+          }, delay);
+        }
+      });
 
-            // Reset retry count on successful subscription
-            if (status === 'SUBSCRIBED') {
-              retryCountRef.current = 0;
-              return;
-            }
-
-            // Handle subscription errors with exponential backoff (AC-2.3.5)
-            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              console.error('[useRealtimeMessages] Subscription error:', err);
-
-              // Check if max retries exceeded
-              if (retryCountRef.current >= RETRY_CONFIG.maxRetries) {
-                console.error(
-                  `[useRealtimeMessages] Max retries (${RETRY_CONFIG.maxRetries}) exceeded. Giving up.`
-                );
-                return;
-              }
-
-              // Calculate delay with exponential backoff: baseDelay * 2^retryCount
-              const delay = Math.min(
-                RETRY_CONFIG.baseDelay * Math.pow(2, retryCountRef.current),
-                RETRY_CONFIG.maxDelay
-              );
-
-              retryCountRef.current++;
-
-              if (import.meta.env.DEV) {
-                console.log(
-                  `[useRealtimeMessages] Retry attempt ${retryCountRef.current}/${RETRY_CONFIG.maxRetries} in ${delay}ms`
-                );
-              }
-
-              // Clear any existing retry timeout
-              if (retryTimeoutRef.current) {
-                clearTimeout(retryTimeoutRef.current);
-              }
-
-              // Schedule retry with exponential backoff
-              retryTimeoutRef.current = setTimeout(() => {
-                if (subscriptionActive && channelRef.current) {
-                  channelRef.current.subscribe();
-                }
-              }, delay);
-            }
-          });
-
-        channelRef.current = channel;
-      } catch (error) {
-        console.error('[useRealtimeMessages] Error setting up subscription:', error);
-      }
-    };
-
-    setupSubscription();
+    channelRef.current = channel;
 
     return () => {
       subscriptionActive = false;
@@ -154,9 +131,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       }
 
       if (channelRef.current) {
-        if (import.meta.env.DEV) {
-          console.log('[useRealtimeMessages] Unsubscribing from channel');
-        }
+        logger.debug('[useRealtimeMessages] Unsubscribing from channel');
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
@@ -164,7 +139,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Reset retry count on cleanup
       retryCountRef.current = 0;
     };
-  }, [enabled, handleNewMessage]);
+  }, [enabled, userId, handleNewMessage]);
 
   // Return empty object - subscription status can be checked via side effects
   // Note: Accessing refs during render is not recommended

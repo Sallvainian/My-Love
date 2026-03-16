@@ -20,6 +20,7 @@
  */
 
 import { supabase } from '../api/supabaseClient';
+import { logger } from '../utils/logger';
 
 /**
  * Photo metadata as stored in Supabase database
@@ -104,9 +105,7 @@ class PhotoService {
         return null;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PhotoService] Created signed URL for:', storagePath);
-      }
+      logger.debug('[PhotoService] Created signed URL for:', storagePath);
 
       return data?.signedUrl ?? null;
     } catch (error) {
@@ -143,9 +142,7 @@ class PhotoService {
         }
       }
 
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoService] Generated ${urlMap.size}/${storagePaths.length} signed URLs`);
-      }
+      logger.debug(`[PhotoService] Generated ${urlMap.size}/${storagePaths.length} signed URLs`);
     } catch (error) {
       console.error('[PhotoService] Error in getSignedUrls:', error);
     }
@@ -198,9 +195,7 @@ class PhotoService {
         warning = 'approaching';
       }
 
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoService] Storage usage: ${percent.toFixed(1)}% (${warning})`);
-      }
+      logger.debug(`[PhotoService] Storage usage: ${percent.toFixed(1)}% (${warning})`);
 
       return {
         used: usedBytes,
@@ -264,9 +259,7 @@ class PhotoService {
         isOwn: photo.user_id === currentUser.user.id,
       }));
 
-      if (import.meta.env.DEV) {
-        console.log(`[PhotoService] Fetched ${photosWithUrls.length} photos`);
-      }
+      logger.debug(`[PhotoService] Fetched ${photosWithUrls.length} photos`);
 
       return photosWithUrls;
     } catch (error) {
@@ -362,9 +355,7 @@ class PhotoService {
         throw insertError;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PhotoService] Photo uploaded:', photo?.id);
-      }
+      logger.debug('[PhotoService] Photo uploaded:', photo?.id);
 
       // Check quota after upload and warn if approaching limit
       const newQuota = await this.checkStorageQuota();
@@ -435,9 +426,7 @@ class PhotoService {
         return false;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PhotoService] Photo deleted:', photoId);
-      }
+      logger.debug('[PhotoService] Photo deleted:', photoId);
 
       return true;
     } catch (error) {
@@ -521,9 +510,7 @@ class PhotoService {
         return false;
       }
 
-      if (import.meta.env.DEV) {
-        console.log('[PhotoService] Photo updated:', photoId);
-      }
+      logger.debug('[PhotoService] Photo updated:', photoId);
 
       return true;
     } catch (error) {

@@ -93,7 +93,7 @@ function fetchUrl(targetUrl) {
  * @param {string} [details] - Optional details to display
  */
 function logTest(testName, passed, details = '') {
-  const safeDetails = details.replace(/[\n\r]/g, '');
+  const safeDetails = String(details).replace(/[\n\r]/g, '');
   if (passed) {
     console.log(
       `${colors.green}✅ ${testName}${colors.reset}${safeDetails ? `: ${safeDetails}` : ''}`

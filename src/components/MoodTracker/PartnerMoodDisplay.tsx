@@ -18,7 +18,7 @@ import { m as motion } from 'framer-motion';
 import { usePartnerMood } from '../../hooks/usePartnerMood';
 import { NoMoodLoggedState } from './NoMoodLoggedState';
 import { getMoodEmoji } from '../../utils/moodEmojis';
-import { getRelativeTime, isJustNow } from '../../utils/dateFormat';
+import { getRelativeTime, isJustNow } from '../../utils/dateUtils';
 
 interface PartnerMoodDisplayProps {
   partnerId: string;

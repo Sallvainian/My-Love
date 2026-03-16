@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
+import { useFocusTrap } from '../../hooks';
 import {
   X,
   Heart,
@@ -91,59 +92,8 @@ function MoodDetailContent({
   const formattedDate = formatModalDate(moodDate);
   const formattedTime = formatModalTime(moodDate);
 
-  /**
-   * ESC key handler - AC-4: Close modal on ESC
-   */
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
-  /**
-   * Focus trap - AC-4: Tab cycles within modal
-   */
-  useEffect(() => {
-    if (!modalRef.current) return;
-
-    // Focus close button when modal opens
-    closeButtonRef.current?.focus();
-
-    const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-
-    if (focusableElements.length === 0) return;
-
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
-    const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-
-      if (e.shiftKey) {
-        // Shift+Tab: if on first element, go to last
-        if (document.activeElement === firstElement) {
-          e.preventDefault();
-          lastElement.focus();
-        }
-      } else {
-        // Tab: if on last element, go to first
-        if (document.activeElement === lastElement) {
-          e.preventDefault();
-          firstElement.focus();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleTab);
-    return () => window.removeEventListener('keydown', handleTab);
-  }, []);
+  // AC-4: Focus trap (WCAG 2.4.3) + ESC to close
+  useFocusTrap(modalRef, true, { onEscape: onClose, initialFocusRef: closeButtonRef });
 
   return (
     <>

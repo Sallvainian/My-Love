@@ -15,7 +15,7 @@ import { Calendar, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
 import type { Anniversary } from '../../types';
 import { useAppStore } from '../../stores/useAppStore';
 import { isValidationError } from '../../validation/errorMessages';
-import { formatDateLong } from '../../utils/dateHelpers';
+import { formatDateLong } from '../../utils/dateUtils';
 
 export function AnniversarySettings() {
   const { settings, addAnniversary, removeAnniversary, updateSettings } = useAppStore();

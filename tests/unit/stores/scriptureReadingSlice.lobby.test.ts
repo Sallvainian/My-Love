@@ -19,30 +19,18 @@ import 'fake-indexeddb/auto';
 import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
+import type { AuthSlice } from '../../../src/stores/slices/authSlice';
 
-// Mock supabase client & service — ScriptureErrorCode shared via vi.hoisted()
-const { mockRpc, SCRIPTURE_ERROR_CODE_MOCK } = vi.hoisted(() => ({
-  mockRpc: vi.fn(),
-  SCRIPTURE_ERROR_CODE_MOCK: {
-    VERSION_MISMATCH: 'VERSION_MISMATCH',
-    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
-    UNAUTHORIZED: 'UNAUTHORIZED',
-    SYNC_FAILED: 'SYNC_FAILED',
-    OFFLINE: 'OFFLINE',
-    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
-    VALIDATION_FAILED: 'VALIDATION_FAILED',
-  },
-}));
-
+// Mock supabase client
+const mockRpc = vi.fn();
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-    },
+    auth: {},
     rpc: (...args: unknown[]) => mockRpc(...args),
   },
 }));
 
+// Mock the scriptureReadingService
 vi.mock('../../../src/services/scriptureReadingService', () => ({
   scriptureReadingService: {
     createSession: vi.fn(),
@@ -53,14 +41,21 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
     getCoupleStats: vi.fn(),
     recoverSessionCache: vi.fn(),
   },
-  ScriptureErrorCode: SCRIPTURE_ERROR_CODE_MOCK,
+  ScriptureErrorCode: {
+    VERSION_MISMATCH: 'VERSION_MISMATCH',
+    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+    UNAUTHORIZED: 'UNAUTHORIZED',
+    SYNC_FAILED: 'SYNC_FAILED',
+    OFFLINE: 'OFFLINE',
+    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
+    VALIDATION_FAILED: 'VALIDATION_FAILED',
+  },
   handleScriptureError: vi.fn(),
 }));
 
+type TestStore = ScriptureSlice & Pick<AuthSlice, 'userId'>;
 function createTestStore() {
-  return create<ScriptureSlice>()(
-    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
-  );
+  return create<TestStore>()(createScriptureReadingSlice as unknown as StateCreator<TestStore>);
 }
 
 // Helper to set up a store with an active together session
@@ -78,6 +73,8 @@ async function createStoreWithTogetherSession() {
     startedAt: new Date(),
   });
   const store = createTestStore();
+  // Set userId from authSlice (normally populated by onAuthStateChange)
+  store.setState({ userId: 'user-1' });
   await store.getState().createSession('together', 'user-2');
   return store;
 }
@@ -110,7 +107,6 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(state.myReady).toBe(false);
     expect(state.partnerReady).toBe(false);
     expect(state.countdownStartedAt).toBeNull();
-    expect(state.currentUserId).toBeNull();
   });
 
   test('[P1] selectRole sets myRole and updates session.currentPhase', async () => {
@@ -224,21 +220,24 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  test('[P1] selectRole stores currentUserId for correct partnerReady mapping', async () => {
+  test('[P1] selectRole uses userId from authSlice state', async () => {
     const store = await createStoreWithTogetherSession();
+
+    // userId is already set by createStoreWithTogetherSession (simulating authSlice)
+    expect(store.getState().userId).toBe('user-1');
 
     await store.getState().selectRole('reader');
 
-    // auth.getUser mock returns { data: { user: { id: 'user-1' } } }
-    expect(store.getState().currentUserId).toBe('user-1');
+    // userId remains set after selectRole
+    expect(store.getState().userId).toBe('user-1');
   });
 
   test('[P1] onBroadcastReceived maps partnerReady as user2Ready when currentUser is user1', async () => {
     const store = await createStoreWithTogetherSession();
 
-    // Set currentUserId to match session.userId (user-1 = user1_id)
+    // userId matches session.userId (user-1 = user1_id)
     await store.getState().selectRole('reader');
-    expect(store.getState().currentUserId).toBe('user-1');
+    expect(store.getState().userId).toBe('user-1');
     expect(store.getState().session?.userId).toBe('user-1');
 
     // version must be higher than current session version (1) to pass version check
@@ -258,15 +257,11 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
   test('[P1] onBroadcastReceived maps partnerReady as user1Ready when currentUser is user2', async () => {
     const store = await createStoreWithTogetherSession();
 
-    // Simulate user2 by overriding auth.getUser mock to return user-2
-    // (session.userId is always user1_id = 'user-1'; currentUserId = 'user-2' means user2 client)
-    const { supabase: mockSupa } = await import('../../../src/api/supabaseClient');
-    vi.mocked(mockSupa.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      data: { user: { id: 'user-2' } },
-    });
+    // Simulate user2 client: session.userId is user1_id = 'user-1', userId = 'user-2'
+    store.setState({ userId: 'user-2' });
 
     await store.getState().selectRole('responder');
-    expect(store.getState().currentUserId).toBe('user-2');
+    expect(store.getState().userId).toBe('user-2');
 
     // version must be higher than current
     store.getState().onBroadcastReceived({
@@ -302,11 +297,9 @@ describe('scriptureReadingSlice — lobby state (Story 4.1)', () => {
   test('[P1] onBroadcastReceived reconciles myReady from authoritative snapshot for user2', async () => {
     const store = await createStoreWithTogetherSession();
 
-    const { supabase: mockSupa } = await import('../../../src/api/supabaseClient');
-    vi.mocked(mockSupa.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      data: { user: { id: 'user-2' } },
-    });
-    await store.getState().selectRole('responder'); // sets currentUserId = 'user-2'
+    // Simulate user2 client
+    store.setState({ userId: 'user-2' });
+    await store.getState().selectRole('responder');
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-together-001',

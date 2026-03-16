@@ -22,7 +22,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useShallow } from 'zustand/react/shallow';
 import { supabase } from '../api/supabaseClient';
-import { subscribePrivateChannel } from '../api/realtimeChannel';
 import { useAppStore } from '../stores/useAppStore';
 import type { StateUpdatePayload } from '../stores/slices/scriptureReadingSlice';
 import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
@@ -44,6 +43,8 @@ interface LockInStatusChangedPayload {
   user2_locked: boolean;
 }
 
+const MAX_BROADCAST_RETRIES = 5;
+
 /** Side-effect hook: subscribes to the scripture session broadcast channel. Returns nothing. */
 export function useScriptureBroadcast(sessionId: string | null): void {
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -58,6 +59,7 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     onPartnerLockInChanged,
     loadSession,
     setBroadcastFn,
+    setPartnerDisconnected,
     currentUserId,
     sessionUserId,
     sessionIdFromStore,
@@ -69,7 +71,8 @@ export function useScriptureBroadcast(sessionId: string | null): void {
       onPartnerLockInChanged: state.onPartnerLockInChanged,
       loadSession: state.loadSession,
       setBroadcastFn: state.setBroadcastFn,
-      currentUserId: state.currentUserId,
+      setPartnerDisconnected: state.setPartnerDisconnected,
+      currentUserId: state.userId,
       sessionUserId: state.session?.userId ?? null, // user1_id
       sessionIdFromStore: state.session?.id ?? null,
     }))
@@ -149,8 +152,17 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
     // Set auth before subscribing (required for private channels).
     // Fetch the current user's ID here so the partner_joined payload satisfies the event contract.
-    subscribePrivateChannel({
-      onReady: (userId) => {
+    void supabase.realtime
+      .setAuth()
+      .then(async () => {
+        // Use supabase.auth.getUser() instead of get().userId because the Realtime
+        // setAuth() handshake requires a fresh token/session, not just the cached user ID.
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) {
+          throw authError;
+        }
+        const userId = authData.user?.id ?? '';
+
         channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
             // Story 4.3: If this is a re-subscribe after error, resync state
@@ -185,8 +197,12 @@ export function useScriptureBroadcast(sessionId: string | null): void {
 
             // Story 4.3: Mark as errored and attempt re-subscribe
             hasErroredRef.current = true;
-            // Guard: do not re-subscribe if session has ended or already retrying
-            if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
+            // Guard: do not re-subscribe if session has ended, already retrying, or max retries reached
+            if (
+              identityRef.current.sessionIdFromStore &&
+              !isRetryingRef.current &&
+              retryCount < MAX_BROADCAST_RETRIES
+            ) {
               isRetryingRef.current = true;
               void supabase.removeChannel(channel).then(() => {
                 if (channelRef.current === channel) {
@@ -199,7 +215,11 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             }
           } else if (status === 'CLOSED') {
             // Story 4.3: Channel closed — remove stale channel before re-subscribe
-            if (identityRef.current.sessionIdFromStore && !isRetryingRef.current) {
+            if (
+              identityRef.current.sessionIdFromStore &&
+              !isRetryingRef.current &&
+              retryCount < MAX_BROADCAST_RETRIES
+            ) {
               hasErroredRef.current = true;
               isRetryingRef.current = true;
               void supabase.removeChannel(channel).then(() => {
@@ -213,16 +233,22 @@ export function useScriptureBroadcast(sessionId: string | null): void {
             }
           }
         });
-      },
-      onError: (err) => {
+      })
+      .catch((err: unknown) => {
         const scriptureError: ScriptureError = {
           code: ScriptureErrorCode.SYNC_FAILED,
           message: err instanceof Error ? err.message : 'Failed to authenticate broadcast channel',
           details: err,
         };
         handleScriptureError(scriptureError);
-      },
-    });
+        // Reset partner connection state on auth failure — channel is unusable
+        setPartnerDisconnected(true);
+        // Clean up dead channel so future effect re-runs can re-subscribe
+        if (channelRef.current) {
+          void supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      });
 
     return () => {
       // Clear broadcast function so slice actions don't try to broadcast on a dead channel
@@ -241,5 +267,6 @@ export function useScriptureBroadcast(sessionId: string | null): void {
     onPartnerLockInChanged,
     loadSession,
     setBroadcastFn,
+    setPartnerDisconnected,
   ]);
 }

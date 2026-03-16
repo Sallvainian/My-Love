@@ -85,6 +85,7 @@ jobs:
     name: Database Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [lint]
     permissions:
       contents: read
     steps:
@@ -108,14 +109,19 @@ jobs:
         run: supabase stop --no-backup
 
   # ============================================
-  # Stage 4: Integration Tests (Playwright API project)
+  # Stage 4: Backend Tests (Integration + API via matrix)
   # ============================================
-  integration-tests:
-    name: Integration Tests
+  backend-tests:
+    name: Backend Tests (${{ matrix.project }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [lint]
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [integration, api]
     steps:
       - uses: actions/checkout@v6
 
@@ -124,68 +130,21 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Setup Playwright E2E
+        uses: ./.github/actions/setup-playwright-e2e
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Setup Supabase Local
-        uses: ./.github/actions/setup-supabase
-
-      - name: Run integration tests
-        run: npx playwright test --project=integration
+      - name: Run ${{ matrix.project }} tests
+        run: npx playwright test --project=${{ matrix.project }}
 
       - name: Stop Supabase
         if: always()
         run: supabase stop --no-backup
 
-      - name: Upload integration results
+      - name: Upload ${{ matrix.project }} test results
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: integration-test-results
-          path: |
-            test-results/
-            playwright-report/
-          retention-days: 7
-
-  # ============================================
-  # Stage 5: API Tests (Playwright API project)
-  # ============================================
-  api-tests:
-    name: API Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - run: npm ci
-
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Setup Supabase Local
-        uses: ./.github/actions/setup-supabase
-
-      - name: Run API tests
-        run: npx playwright test --project=api
-
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop --no-backup
-
-      - name: Upload API test results
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: api-test-results
+          name: ${{ matrix.project }}-test-results
           path: |
             test-results/
             playwright-report/
@@ -211,26 +170,8 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        id: pw-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-playwright-
-
-      - run: npm ci
-
-      - name: Setup Supabase Local
-        uses: ./.github/actions/setup-supabase
-
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright system deps
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      - name: Setup Playwright E2E
+        uses: ./.github/actions/setup-playwright-e2e
 
       - name: Run P0 tests
         run: npx playwright test tests/e2e --project=chromium --grep "\[P0\]"
@@ -273,26 +214,8 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        id: pw-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-playwright-
-
-      - run: npm ci
-
-      - name: Setup Supabase Local
-        uses: ./.github/actions/setup-supabase
-
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright system deps
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      - name: Setup Playwright E2E
+        uses: ./.github/actions/setup-playwright-e2e
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/2)
         run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/2
@@ -335,26 +258,8 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        id: pw-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-playwright-
-
-      - run: npm ci
-
-      - name: Setup Supabase Local
-        uses: ./.github/actions/setup-supabase
-
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright system deps
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      - name: Setup Playwright E2E
+        uses: ./.github/actions/setup-playwright-e2e
 
       - name: Detect changed E2E test files
         id: changed-tests
@@ -413,7 +318,8 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Install Playwright for report merge
+        run: npm install --no-save @playwright/test
 
       - name: Download shard results
         uses: actions/download-artifact@v8
@@ -446,7 +352,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: [lint, unit-tests, db-tests, integration-tests, api-tests, e2e-tests, burn-in]
+    needs: [lint, unit-tests, db-tests, backend-tests, e2e-tests, burn-in]
     if: always()
     steps:
       - name: Evaluate results
@@ -454,8 +360,7 @@ jobs:
           echo "Lint:              ${{ needs.lint.result }}"
           echo "Unit Tests:        ${{ needs.unit-tests.result }}"
           echo "DB Tests:          ${{ needs.db-tests.result }}"
-          echo "Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "API Tests:         ${{ needs.api-tests.result }}"
+          echo "Backend Tests:     ${{ needs.backend-tests.result }}"
           echo "E2E Tests:         ${{ needs.e2e-tests.result }}"
           echo "Burn-In:           ${{ needs.burn-in.result }}"
 
@@ -463,8 +368,7 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
              [[ "${{ needs.db-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.integration-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.api-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.backend-tests.result }}" != "success" ]] || \
              [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
             echo "One or more standard stages failed"
             exit 1

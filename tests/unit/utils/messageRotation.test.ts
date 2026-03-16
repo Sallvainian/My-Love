@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  formatDate,
   hashDateString,
   getDailyMessage,
   getMessageForDate,
@@ -13,6 +12,7 @@ import {
   getNextMessage,
   getPreviousMessage,
 } from '@/utils/messageRotation';
+import { formatDateISO } from '@/utils/dateUtils';
 import type { Message, MessageHistory, Settings } from '@/types';
 
 /** Factory: create a minimal Message */
@@ -33,17 +33,17 @@ function createMessages(count: number): Message[] {
   );
 }
 
-describe('formatDate', () => {
+describe('formatDateISO', () => {
   it('formats date as YYYY-MM-DD', () => {
-    expect(formatDate(new Date(2025, 0, 5))).toBe('2025-01-05');
+    expect(formatDateISO(new Date(2025, 0, 5))).toBe('2025-01-05');
   });
 
   it('pads single-digit month and day', () => {
-    expect(formatDate(new Date(2025, 2, 9))).toBe('2025-03-09');
+    expect(formatDateISO(new Date(2025, 2, 9))).toBe('2025-03-09');
   });
 
   it('handles December 31st', () => {
-    expect(formatDate(new Date(2025, 11, 31))).toBe('2025-12-31');
+    expect(formatDateISO(new Date(2025, 11, 31))).toBe('2025-12-31');
   });
 });
 

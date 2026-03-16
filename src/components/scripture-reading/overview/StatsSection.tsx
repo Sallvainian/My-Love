@@ -6,31 +6,11 @@
 import type { ReactElement } from 'react';
 import { BookOpen, CheckCircle, Calendar, Star, Bookmark } from 'lucide-react';
 import type { CoupleStats } from '../../../stores/types';
+import { formatRelativeDate } from '../../../utils/dateUtils';
 
 interface StatsSectionProps {
   stats: CoupleStats | null;
   isLoading: boolean;
-}
-
-const relativeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-
-function formatRelativeDate(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-
-  if (Math.abs(diffSeconds) < 86400) return relativeFormatter.format(0, 'day'); // "today"
-  if (Math.abs(diffSeconds) < 2592000) {
-    const days = -Math.floor(diffSeconds / 86400);
-    return relativeFormatter.format(days, 'day');
-  }
-  if (Math.abs(diffSeconds) < 31536000) {
-    const months = -Math.floor(diffSeconds / 2592000);
-    return relativeFormatter.format(months, 'month');
-  }
-  const years = -Math.floor(diffSeconds / 31536000);
-  return relativeFormatter.format(years, 'year');
 }
 
 function isZeroState(stats: CoupleStats): boolean {

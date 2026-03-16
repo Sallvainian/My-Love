@@ -11,7 +11,7 @@
  * - endSession() on error calls handleScriptureError
  * - endSession() is a no-op when session is null
  * - onBroadcastReceived with triggeredBy='end_session' calls exitSession()
- * - onBroadcastReceived with currentPhase='complete' calls exitSession()
+ * - onBroadcastReceived with currentPhase='complete' does NOT reset session (no end_session trigger)
  * - partnerDisconnected and partnerDisconnectedAt in initial state
  */
 
@@ -20,23 +20,15 @@ import 'fake-indexeddb/auto';
 import { create, type StateCreator } from 'zustand';
 import type { ScriptureSlice } from '../../../src/stores/slices/scriptureReadingSlice';
 import { createScriptureReadingSlice } from '../../../src/stores/slices/scriptureReadingSlice';
+import type { AuthSlice } from '../../../src/stores/slices/authSlice';
 
 // Use vi.hoisted() for values referenced inside vi.mock() factories
-const { mockRpc, mockGetSession, SCRIPTURE_ERROR_CODE_MOCK } = vi.hoisted(() => ({
+const { mockRpc, mockGetSession } = vi.hoisted(() => ({
   mockRpc: vi.fn(),
   mockGetSession: vi.fn(),
-  SCRIPTURE_ERROR_CODE_MOCK: {
-    VERSION_MISMATCH: 'VERSION_MISMATCH',
-    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
-    UNAUTHORIZED: 'UNAUTHORIZED',
-    SYNC_FAILED: 'SYNC_FAILED',
-    OFFLINE: 'OFFLINE',
-    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
-    VALIDATION_FAILED: 'VALIDATION_FAILED',
-  },
 }));
 
-// Mock supabase client & service
+// Mock supabase client
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
     auth: {
@@ -46,6 +38,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   },
 }));
 
+// Mock the scriptureReadingService
 vi.mock('../../../src/services/scriptureReadingService', () => ({
   scriptureReadingService: {
     createSession: vi.fn(),
@@ -56,14 +49,21 @@ vi.mock('../../../src/services/scriptureReadingService', () => ({
     getCoupleStats: vi.fn(),
     recoverSessionCache: vi.fn(),
   },
-  ScriptureErrorCode: SCRIPTURE_ERROR_CODE_MOCK,
+  ScriptureErrorCode: {
+    VERSION_MISMATCH: 'VERSION_MISMATCH',
+    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+    UNAUTHORIZED: 'UNAUTHORIZED',
+    SYNC_FAILED: 'SYNC_FAILED',
+    OFFLINE: 'OFFLINE',
+    CACHE_CORRUPTED: 'CACHE_CORRUPTED',
+    VALIDATION_FAILED: 'VALIDATION_FAILED',
+  },
   handleScriptureError: vi.fn(),
 }));
 
+type TestStore = ScriptureSlice & Pick<AuthSlice, 'userId'>;
 function createTestStore() {
-  return create<ScriptureSlice>()(
-    createScriptureReadingSlice as unknown as StateCreator<ScriptureSlice>
-  );
+  return create<TestStore>()(createScriptureReadingSlice as unknown as StateCreator<TestStore>);
 }
 
 // Helper to set up a store with an active together session in reading phase
@@ -198,7 +198,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
 
   test('[P0] onBroadcastReceived with triggeredBy=end_session calls exitSession()', async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-reconnect-001',
@@ -211,9 +211,9 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
     expect(store.getState().session).toBeNull();
   });
 
-  test('[P0] onBroadcastReceived with currentPhase=complete calls exitSession()', async () => {
+  test('[P0] onBroadcastReceived with currentPhase=complete does NOT reset session (no triggered_by=end_session)', async () => {
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-reconnect-001',
@@ -221,8 +221,9 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
       version: 10,
     });
 
-    // Session should be cleared
-    expect(store.getState().session).toBeNull();
+    // Session should NOT be cleared — only triggered_by='end_session' resets
+    expect(store.getState().session).not.toBeNull();
+    expect(store.getState().session?.currentPhase).toBe('complete');
   });
 
   // ===========================================================================
@@ -249,7 +250,7 @@ describe('scriptureReadingSlice — reconnection & end session (Story 4.3)', () 
   test('[P1] onBroadcastReceived with triggered_by (snake_case) = end_session calls exitSession()', async () => {
     // The code supports both camelCase (triggeredBy) and snake_case (triggered_by)
     const store = await createStoreWithReadingSession();
-    store.setState({ currentUserId: 'user-1' });
+    store.setState({ userId: 'user-1' });
 
     store.getState().onBroadcastReceived({
       sessionId: 'session-reconnect-001',

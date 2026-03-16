@@ -24,8 +24,10 @@ test.describe('Love Notes', () => {
     await notesCall;
 
     // THEN: Love notes interface is visible
-    await expect(page.getByRole('heading', { name: /love notes/i })).toBeVisible();
-    await expect(page.getByTestId('virtualized-list')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /love notes/i })).toBeVisible();
+    await expect(
+      page.getByTestId('virtualized-list').or(page.getByText('No love notes yet'))
+    ).toBeVisible();
   });
 
   test('[P0] 4.2-E2E-002 should display message input field', async ({

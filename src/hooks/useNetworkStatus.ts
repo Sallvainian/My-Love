@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { logger } from '../utils/logger';
 
 export interface NetworkStatus {
   /** True when browser reports network connection available */
@@ -71,9 +72,7 @@ export function useNetworkStatus(): NetworkStatus {
       setIsOnline(true);
       setIsConnecting(false);
 
-      if (import.meta.env.DEV) {
-        console.log('[useNetworkStatus] Network status: ONLINE');
-      }
+      logger.debug('[useNetworkStatus] Network status: ONLINE');
     }, CONNECTING_DEBOUNCE_MS);
   }, [clearConnectingTimeout]);
 
@@ -86,9 +85,7 @@ export function useNetworkStatus(): NetworkStatus {
     setIsOnline(false);
     setIsConnecting(false);
 
-    if (import.meta.env.DEV) {
-      console.log('[useNetworkStatus] Network status: OFFLINE');
-    }
+    logger.debug('[useNetworkStatus] Network status: OFFLINE');
   }, [clearConnectingTimeout]);
 
   useEffect(() => {

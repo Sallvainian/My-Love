@@ -176,10 +176,29 @@ Covers `vite.config.ts` and `vitest.config.ts` with ES2022 target.
 
 Extends `tsconfig.app.json` with relaxed unused variable checks and test-specific types (`vitest/globals`, `@testing-library/jest-dom/vitest`).
 
+### Project References and `tsc -b`
+
+The `tsconfig.json` root file defines three project references:
+
+```json
+{
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
+}
+```
+
+The `npm run typecheck` script uses `tsc -b --force`, which checks all three project references in one invocation. The `-b` (build) flag enables project references mode, while `--force` ensures a complete rebuild (no incremental caching). This replaced the earlier `tsc --noEmit` approach.
+
+The `npm run build` script uses `tsc -p tsconfig.app.json` to type-check only the application code before running `vite build`.
+
 ### Path Aliases
 
 - **In application code**: `@/` maps to `src/` (configured in `tsconfig.app.json` via `paths`)
 - **In tests**: `@/` maps to `src/` (configured in `vitest.config.ts` via the `resolve.alias` option)
+- **Note**: The `@/` path alias is not configured in `vite.config.ts` itself -- only in `vitest.config.ts` for test resolution and `tsconfig.app.json` for TypeScript resolution. Vite resolves `@/` imports via TypeScript's `paths` configuration.
 
 ## PostCSS Configuration
 

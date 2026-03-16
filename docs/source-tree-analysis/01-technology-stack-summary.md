@@ -8,9 +8,9 @@
 | TypeScript    | 5.9.3   | Strict type system (`no-explicit-any` enforced)     |
 | Vite          | 7.3.1   | Build tool, dev server, HMR                         |
 | Tailwind CSS  | 4.1.17  | Utility-first CSS (v4, PostCSS integration)         |
-| Framer Motion | 12.34.3 | Animation library (LazyMotion for tree-shaking)     |
-| Zustand       | 5.0.11  | State management (single store, 10 slices, persist) |
-| Supabase      | 2.97.0  | Auth, PostgreSQL, Storage, Realtime                 |
+| Framer Motion | 12.35.2 | Animation library (LazyMotion for tree-shaking)     |
+| Zustand       | 5.0.11  | State management (single store, 11 slices, persist) |
+| Supabase      | 2.99.0  | Auth, PostgreSQL, Storage, Realtime                 |
 | Zod           | 4.3.6   | Runtime schema validation                           |
 | idb           | 8.0.3   | Promise-based IndexedDB wrapper                     |
 
@@ -18,11 +18,11 @@
 
 | Library                      | Version | Purpose                                   |
 | ---------------------------- | ------- | ----------------------------------------- |
-| @sentry/react                | 10.39.0 | Error tracking and performance monitoring |
-| lucide-react                 | 0.575.0 | Tree-shakeable SVG icons                  |
+| @sentry/react                | 10.42.0 | Error tracking and performance monitoring |
+| lucide-react                 | 0.577.0 | Tree-shakeable SVG icons                  |
 | react-window                 | 2.2.7   | Virtualized list rendering                |
 | react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists     |
-| dompurify                    | 3.3.1   | XSS sanitization for user content         |
+| dompurify                    | 3.3.2   | XSS sanitization for user content         |
 | workbox-window               | 7.4.0   | Service worker lifecycle management       |
 | eventsource                  | 4.1.0   | SSE polyfill for Supabase Realtime        |
 
@@ -56,7 +56,7 @@
 | @testing-library/react             | 16.3.2  | Component testing            |
 | @testing-library/jest-dom          | 6.9.1   | DOM matchers                 |
 | @testing-library/user-event        | 14.6.1  | User interaction simulation  |
-| happy-dom                          | 20.7.0  | Lightweight DOM for tests    |
+| happy-dom                          | 20.8.3  | Lightweight DOM for tests    |
 | fake-indexeddb                     | 6.2.5   | IndexedDB mock               |
 | @playwright/test                   | 1.58.2  | E2E testing                  |
 | @seontechnologies/playwright-utils | 3.14.0  | Playwright fixture utilities |
@@ -69,7 +69,7 @@
 | Tool                        | Version | Purpose                                         |
 | --------------------------- | ------- | ----------------------------------------------- |
 | ESLint                      | 9.39.2  | Linting (flat config, no-explicit-any as error) |
-| typescript-eslint           | 8.56.1  | TypeScript ESLint rules                         |
+| typescript-eslint           | 8.57.0  | TypeScript ESLint rules                         |
 | eslint-plugin-react-hooks   | 7.0.1   | React hooks linting                             |
 | eslint-plugin-react-refresh | 0.5.2   | Fast Refresh compatibility linting              |
 | Prettier                    | 3.8.1   | Code formatting                                 |
@@ -79,7 +79,7 @@
 
 | Tool           | Version   | Purpose                                |
 | -------------- | --------- | -------------------------------------- |
-| supabase (CLI) | 2.76.15   | Local dev, migrations, type generation |
+| supabase (CLI) | 2.77.1    | Local dev, migrations, type generation |
 | Node.js        | 24.13.0   | Runtime (see `.mise.toml`)             |
 | npm            | (bundled) | Package manager                        |
 

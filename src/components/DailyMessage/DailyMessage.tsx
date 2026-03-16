@@ -7,6 +7,7 @@ import { APP_CONFIG } from '../../config/constants';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
 import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
+import { logger } from '../../utils/logger';
 
 interface DailyMessageProps {
   onShowWelcome?: () => void;
@@ -166,7 +167,7 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
         });
       } catch {
         // User cancelled share - this is expected behavior, no error handling needed
-        console.log('Share cancelled');
+        logger.debug('Share cancelled');
       }
     } else {
       // Fallback: copy to clipboard

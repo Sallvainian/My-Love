@@ -38,12 +38,13 @@ const TOTAL_VERSES = 17;
 
 test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
   // Implementation complete — Story 4.2
-  test.use({ timeout: 60_000 });
 
   test('[P0] should complete full lock-in flow: both ready → advance to step 2 with role alternation', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
+    test.setTimeout(60_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -85,12 +86,13 @@ test.describe('[4.2-E2E-001] Full Together-Mode Lock-In Flow', () => {
 
 test.describe('[4.2-E2E-002] Undo Lock-In', () => {
   // Implementation complete — Story 4.2
-  test.use({ timeout: 60_000 });
 
   test('[P1] should revert lock-in when user taps "Tap to undo"', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
+    test.setTimeout(60_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -115,12 +117,13 @@ test.describe('[4.2-E2E-002] Undo Lock-In', () => {
 
 test.describe('[4.2-E2E-003] Role Alternation', () => {
   // Implementation complete — Story 4.2
-  test.use({ timeout: 60_000 });
 
   test('[P1] should alternate roles after step advance', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
+    test.setTimeout(60_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -147,13 +150,14 @@ test.describe('[4.2-E2E-003] Role Alternation', () => {
 
 test.describe('[4.2-E2E-004] Last Step Completion', () => {
   // Implementation complete — Story 4.2
-  test.use({ timeout: 60_000 });
 
   test('[P1] should transition to reflection phase after both lock in on last step', async ({
     page,
     supabaseAdmin,
     togetherMode: { partnerPage, uiSessionId },
   }) => {
+    test.setTimeout(60_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -184,12 +188,12 @@ test.describe('[4.2-E2E-004] Last Step Completion', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('[4.2-E2E-005] PartnerPosition Indicator Visibility', () => {
-  test.use({ timeout: 60_000 });
-
   test('[P1] should show partner position indicator with view text during reading phase', async ({
     page,
     togetherMode: { partnerPage },
   }) => {
+    test.setTimeout(60_000);
+
     // GIVEN: Both users navigate through lobby to reading phase
     await navigateBothToReadingPhase(page, partnerPage);
 
@@ -236,13 +240,13 @@ test.describe(
   '[4.2-ERR-001] Lock-In 500 Error Toast',
   { annotation: [{ type: 'skipNetworkMonitoring' }] },
   () => {
-    test.use({ timeout: 60_000 });
-
     test('should show error toast when lock-in RPC fails with 500', async ({
       page,
       interceptNetworkCall,
       togetherMode: { partnerPage },
     }) => {
+      test.setTimeout(60_000);
+
       // GIVEN: Both users navigate through lobby to reading phase
       await navigateBothToReadingPhase(page, partnerPage);
 

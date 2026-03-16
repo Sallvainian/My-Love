@@ -73,7 +73,7 @@ fnox get VITE_SUPABASE_URL  # Test single secret decryption
 **Fix**:
 
 ```bash
-npm run typecheck        # Identify TypeScript errors (tsc --noEmit)
+npm run typecheck        # Identify TypeScript errors (tsc -b --force)
 npm run lint             # Identify ESLint errors
 npm install              # Ensure all dependencies are installed
 ```
@@ -141,7 +141,7 @@ To test PWA behavior locally, you can temporarily set `devOptions.enabled: true`
 ```bash
 npx playwright install           # Install browsers
 supabase start                   # Start local Supabase (requires Docker)
-supabase db reset                # Reset database and apply all 21 migrations + seed
+supabase db reset                # Reset database and apply all 24 migrations + seed
 npm run test:e2e                 # Run with cleanup script
 ```
 

@@ -46,6 +46,7 @@ export function Countdown({ startedAt, onComplete }: CountdownProps): ReactEleme
   useEffect(() => {
     // If we mounted late (client received broadcast after 3s), complete immediately
     if (getDigit(startedAt) === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- announcement on countdown completion
       setAnnounced('Session started');
       onComplete();
       return;
@@ -60,7 +61,7 @@ export function Countdown({ startedAt, onComplete }: CountdownProps): ReactEleme
         setAnnounced('Session started');
         onComplete();
       }
-    }, 250); // 250ms is sufficient for integer digit transitions (3→2→1→0)
+    }, 250); // Poll at 250ms — digit changes at 1s intervals so 250ms is sufficient
 
     return () => clearInterval(interval);
   }, [startedAt, onComplete]);

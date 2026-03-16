@@ -25,6 +25,7 @@ import { Hand, History, Wind, Heart, X } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { getPartnerId } from '../../api/supabaseClient';
 import { InteractionHistory } from '../InteractionHistory';
+import { logger } from '../../utils/logger';
 import type { Interaction } from '../../types';
 
 // Interaction animation type
@@ -118,9 +119,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
   // Subscribe to real-time interactions on mount
   useEffect(() => {
     if (isSubscribingRef.current || subscriptionRef.current) {
-      if (import.meta.env.DEV) {
-        console.log('[PokeKissInterface] Subscription already active, skipping');
-      }
+      logger.debug('[PokeKissInterface] Subscription already active, skipping');
       return;
     }
 
@@ -130,7 +129,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       try {
         const unsubscribe = await subscribeToInteractions();
         subscriptionRef.current = unsubscribe;
-        console.log('[PokeKissInterface] Subscribed to real-time interactions');
+        logger.info('[PokeKissInterface] Subscribed to real-time interactions');
       } catch (error) {
         console.error('[PokeKissInterface] Failed to subscribe:', error);
       } finally {
@@ -144,7 +143,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
       if (subscriptionRef.current) {
         subscriptionRef.current();
         subscriptionRef.current = null;
-        console.log('[PokeKissInterface] Unsubscribed from interactions');
+        logger.debug('[PokeKissInterface] Unsubscribed from interactions');
       }
     };
   }, [subscribeToInteractions]);
@@ -255,7 +254,7 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
 
     try {
       await markInteractionViewed(currentInteraction.id);
-      console.log('[PokeKissInterface] Interaction marked as viewed:', currentInteraction.id);
+      logger.debug('[PokeKissInterface] Interaction marked as viewed:', currentInteraction.id);
     } catch (error) {
       console.error('[PokeKissInterface] Failed to mark as viewed:', error);
     } finally {

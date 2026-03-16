@@ -1,4 +1,5 @@
 import type { IDBPDatabase, DBSchema, StoreNames, StoreValue, StoreKey } from 'idb';
+import { logger } from '../utils/logger';
 
 /**
  * Base IndexedDB Service - Generic CRUD operations for IndexedDB stores
@@ -46,17 +47,13 @@ export abstract class BaseIndexedDBService<
   async init(): Promise<void> {
     // Return existing promise if initialization already in progress
     if (this.initPromise) {
-      if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Init already in progress, waiting...`);
-      }
+      logger.debug(`[${this.constructor.name}] Init already in progress, waiting...`);
       return this.initPromise;
     }
 
     // Return immediately if already initialized
     if (this.db) {
-      if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Already initialized`);
-      }
+      logger.debug(`[${this.constructor.name}] Already initialized`);
       return Promise.resolve();
     }
 
@@ -109,9 +106,7 @@ export abstract class BaseIndexedDBService<
       const storeName = this.getStoreName();
       // Type assertion needed: idb can't infer T matches DBTypes[StoreName]['value']
       const id = await db.add(storeName, item as unknown as StoreValue<DBTypes, StoreName>);
-      if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Added item to ${String(storeName)}, id: ${id}`);
-      }
+      logger.debug(`[${this.constructor.name}] Added item to ${String(storeName)}, id: ${id}`);
 
       return { ...item, id: id as T['id'] } as T;
     } catch (error) {
@@ -134,11 +129,9 @@ export abstract class BaseIndexedDBService<
       const item = await db.get(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
       if (item) {
-        if (import.meta.env.DEV) {
-          console.log(
-            `[${this.constructor.name}] Retrieved item from ${String(storeName)}, id: ${id}`
-          );
-        }
+        logger.debug(
+          `[${this.constructor.name}] Retrieved item from ${String(storeName)}, id: ${id}`
+        );
       } else {
         console.warn(
           `[${this.constructor.name}] Item not found in ${String(storeName)}, id: ${id}`
@@ -164,11 +157,9 @@ export abstract class BaseIndexedDBService<
       const storeName = this.getStoreName();
       const items = await db.getAll(storeName);
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[${this.constructor.name}] Retrieved ${items.length} items from ${String(storeName)}`
-        );
-      }
+      logger.debug(
+        `[${this.constructor.name}] Retrieved ${items.length} items from ${String(storeName)}`
+      );
       return items as T[];
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to get all items:`, error);
@@ -196,9 +187,7 @@ export abstract class BaseIndexedDBService<
       const updated = { ...item, ...updates } as unknown as StoreValue<DBTypes, StoreName>;
       await db.put(storeName, updated);
 
-      if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Updated item in ${String(storeName)}, id: ${id}`);
-      }
+      logger.debug(`[${this.constructor.name}] Updated item in ${String(storeName)}, id: ${id}`);
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to update item ${id}:`, error);
       throw error;
@@ -217,9 +206,7 @@ export abstract class BaseIndexedDBService<
       const storeName = this.getStoreName();
       await db.delete(storeName, id as unknown as StoreKey<DBTypes, StoreName>);
 
-      if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Deleted item from ${String(storeName)}, id: ${id}`);
-      }
+      logger.debug(`[${this.constructor.name}] Deleted item from ${String(storeName)}, id: ${id}`);
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to delete item ${id}:`, error);
       throw error;
@@ -237,9 +224,7 @@ export abstract class BaseIndexedDBService<
       const storeName = this.getStoreName();
       await db.clear(storeName);
 
-      if (import.meta.env.DEV) {
-        console.log(`[${this.constructor.name}] Cleared all items from ${String(storeName)}`);
-      }
+      logger.debug(`[${this.constructor.name}] Cleared all items from ${String(storeName)}`);
     } catch (error) {
       console.error(`[${this.constructor.name}] Failed to clear store:`, error);
       throw error;
@@ -285,11 +270,9 @@ export abstract class BaseIndexedDBService<
         cursor = await cursor.continue();
       }
 
-      if (import.meta.env.DEV) {
-        console.log(
-          `[${this.constructor.name}] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
-        );
-      }
+      logger.debug(
+        `[${this.constructor.name}] Retrieved page (cursor): offset=${offset}, limit=${limit}, returned=${results.length}`
+      );
 
       return results;
     } catch (error) {

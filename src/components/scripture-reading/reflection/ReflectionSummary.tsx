@@ -14,8 +14,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING } from '../constants';
 const MAX_NOTE_LENGTH = 200;
 const CHAR_COUNTER_THRESHOLD = 150;
 

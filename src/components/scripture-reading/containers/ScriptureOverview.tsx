@@ -36,16 +36,7 @@ import { LobbyContainer } from './LobbyContainer';
 import { ReadingContainer } from './ReadingContainer';
 import { StatsSection } from '../overview/StatsSection';
 import { useScriptureBroadcast } from '../../../hooks/useScriptureBroadcast';
-
-// Lavender Dreams design tokens
-const scriptureTheme = {
-  primary: '#A855F7', // Purple-500
-  background: '#F3E5F5', // Light lavender
-  surface: '#FAF5FF', // Very light purple
-};
-
-// Shared focus ring classes (Story 1.5: AC #1)
-const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2';
+import { FOCUS_RING, scriptureTheme } from '../constants';
 
 // Partner status union type for explicit handling
 type PartnerStatus = 'loading' | 'linked' | 'unlinked';
@@ -244,12 +235,10 @@ export function ScriptureOverview() {
   }, [checkForActiveSession, clearActiveSession, freshStartRequested, session]);
 
   // Story 1.5: Announce session resume when activeSession loads (AC #2)
-  // Clear stale announcement when activeSession is dismissed to keep aria-live in sync
   useEffect(() => {
     if (activeSession && !isCheckingSession) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- screen reader announcement on session load
       setAnnouncement(`Session resumed at verse ${activeSession.currentStepIndex + 1}`);
-    } else if (!activeSession && !isCheckingSession) {
-      setAnnouncement('');
     }
   }, [activeSession, isCheckingSession]);
 
@@ -305,6 +294,19 @@ export function ScriptureOverview() {
 
   // Story 1.3: Also route to SoloReadingFlow for completion screen
   if (session && (session.status === 'complete' || session.currentPhase === 'reflection')) {
+    return <SoloReadingFlow />;
+  }
+
+  // Route to SoloReadingFlow for together-mode post-reading phases.
+  // After the RPC fix, together-mode sessions stay status='in_progress' through reflection/report,
+  // so the status='complete' check above no longer catches them.
+  if (
+    session &&
+    session.mode === 'together' &&
+    (session.currentPhase === 'reflection' ||
+      session.currentPhase === 'report' ||
+      session.currentPhase === 'complete')
+  ) {
     return <SoloReadingFlow />;
   }
 

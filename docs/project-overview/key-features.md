@@ -1,5 +1,18 @@
 # Key Features
 
+## Feature Summary
+
+| Feature            | Data Pattern   | Primary Storage            | Sync Target      | Realtime Channel            |
+| ------------------ | -------------- | -------------------------- | ---------------- | --------------------------- |
+| Daily Messages     | Offline-first  | IndexedDB `messages` store | N/A (local only) | None                        |
+| Mood Tracking      | Offline-first  | IndexedDB `moods` store    | Supabase `moods` | Broadcast API (partner)     |
+| Photo Gallery      | Supabase-first | Supabase Storage `photos`  | N/A (direct)     | None                        |
+| Love Notes Chat    | Supabase-first | Supabase `love_notes`      | N/A (direct)     | Broadcast API (partner)     |
+| Scripture Reading  | Online-first   | Supabase + IDB cache       | Supabase RPCs    | Broadcast + Presence        |
+| Poke/Kiss          | Supabase-first | Supabase `interactions`    | N/A (direct)     | `postgres_changes` (INSERT) |
+| Settings/Theme     | Local-only     | localStorage (persist)     | N/A              | None                        |
+| Partner Management | Supabase-first | Supabase `users`/RPCs      | N/A (direct)     | None                        |
+
 ## Daily Love Messages
 
 365 pre-written messages distributed across 5 categories (73 per category):
@@ -22,18 +35,25 @@ A validation script (`scripts/validate-messages.cjs`) verifies:
 - Valid category values
 - Reasonable length distribution
 
+### Custom Messages
+
+Users can create, edit, and delete custom messages via the Admin Panel (accessible at `/admin`). Custom messages are stored in IndexedDB alongside default messages. Import/export as JSON is supported for backup and sharing. All custom message operations are validated with Zod schemas (`CreateMessageInputSchema`, `UpdateMessageInputSchema`).
+
 ## Mood Tracking
 
 - 12 emoji mood options (loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired) with multi-mood selection support
-- Optional text notes per mood entry
+- Optional text notes per mood entry (max 200 characters)
 - Daily mood logging stored in IndexedDB with cloud sync to Supabase
 - Mood history timeline view for pattern analysis over time
-- Calendar view with mood detail modal
-- Background Sync via service worker ensures mood entries are persisted even when the app is closed or the network is unavailable
+- Calendar view (`MoodHistoryCalendar`) with per-day mood display and detail modal
+- Partner mood display via Supabase Broadcast realtime
+- Three-tier sync: immediate (on create), periodic (5 min interval), Background Sync API (service worker)
+- Offline-first: entries created in IndexedDB with `synced: false`, synced asynchronously
+- Paginated history fetch via `useMoodHistory` hook with cursor-based pagination
 
 ## Partner Mood View
 
-- Real-time partner mood display using Supabase Realtime subscriptions (`postgres_changes` on moods table)
+- Real-time partner mood display using Supabase Broadcast channels
 - Shows partner's current mood and timestamp
 - Automatic updates when partner logs a new mood
 - Connection status indicator (connecting, connected, disconnected)
@@ -41,29 +61,39 @@ A validation script (`scripts/validate-messages.cjs`) verifies:
 
 ## Love Notes Chat
 
-- Real-time messaging between partners via Supabase Realtime
-- Message persistence in Supabase Postgres
-- Image support via Supabase Storage (`love_note_images` table) with compression
-- DOMPurify sanitization for message content to prevent XSS
-- Pagination support with fetch-older-notes
-- Full-screen image viewer for attached images
+- Real-time bidirectional messaging between partners via Supabase Broadcast
+- Message persistence in Supabase Postgres (`love_notes` table)
+- Image attachments with client-side compression (Canvas API, max 2048px, 80% JPEG quality)
+- Edge Function upload for images (`upload-love-note-image`)
+- DOMPurify sanitization for all message content (XSS prevention, no HTML tags allowed)
+- Client-side rate limiting (10 messages per minute)
+- Optimistic UI with temporary IDs, replaced on server confirmation
+- Virtualized message list via react-window for performance
+- Full-screen image viewer for attachments
+- Signed URL caching with LRU eviction (max 100 entries, 1-hour expiry)
+- Retry mechanism for failed messages
+- Blob URL memory management for image attachments
 
 ## Photo Gallery
 
-- Photo upload with captions stored in Supabase Storage
-- Image compression service for optimized storage
-- Grid display with lazy loading via `react-window` and `react-window-infinite-loader`
-- Photo carousel view for browsing
-- Photo edit modal for caption updates
-- Photo delete with confirmation dialog
-- Shows both user and partner photos sorted newest first
+- Grid view with lazy-loaded thumbnails (`PhotoGridItem`, `PhotoGridSkeleton`)
+- Full-screen photo viewer and carousel (`PhotoViewer`, `PhotoCarousel`)
+- Photo upload with client-side compression (Canvas API, max 2048px, 80% JPEG quality)
+- File validation: max 25MB, allowed MIME types (JPEG, PNG, WebP)
+- Captions (max 500 chars) and tags per photo
+- Edit modal for updating captions/tags
+- Delete confirmation dialog
+- Storage quota monitoring (80% warning, 95% upload block)
+- Photos stored in Supabase Storage with signed URLs (1-hour expiry)
+- Upload progress tracking in `PhotosSlice`
 
 ## Partner Interactions
 
 - Two interaction types: poke, kiss
 - Fun animations and visual feedback via Framer Motion
-- Real-time delivery to partner via Supabase Realtime
-- Interaction history view
+- Real-time delivery to partner via Supabase `postgres_changes` subscriptions
+- Interaction history timeline with viewed/unviewed status
+- UUID and interaction type validation before send (`interactionValidation.ts`)
 - Haptic feedback via `useVibration` hook
 - Stored in the `interactions` table with RLS policies ensuring privacy
 
@@ -109,27 +139,21 @@ The scripture feature uses an **online-first** pattern (the inverse of the rest 
 - **IndexedDB is a read cache.** Reads use cache-first with fire-and-forget background refresh.
 - **Optimistic UI.** The Zustand slice updates state before server confirmation, with `pendingRetry` state for user-triggered retry on failure.
 
-ESLint enforces that scripture container components (`src/components/scripture-reading/containers/**`) must not import `@supabase/supabase-js`, `src/api/supabaseClient`, or service modules directly. They must go through Zustand slice actions. The sole legacy exception is `scriptureReadingService`.
-
 ### Scripture Realtime Channels
 
-- **Broadcast channel** (`scripture-session:{sessionId}`): Private channel for partner_joined, state_updated, session_converted, and lock_in_status_changed events. Managed by `useScriptureBroadcast` hook.
-- **Presence channel** (`scripture-presence:{sessionId}`): Ephemeral channel for partner view position tracking. 10-second heartbeat, 20-second stale TTL. Managed by `useScripturePresence` hook.
+- **Broadcast channel** (`scripture-session:{sessionId}`): Private channel for partner_joined, state_updated, session_converted, and lock_in_status_changed events. Managed by `useScriptureBroadcast` hook with exponential backoff retry.
+- **Presence channel** (`scripture-presence:{sessionId}`): Ephemeral channel for partner position tracking. 10-second heartbeat, 20-second stale TTL. Managed by `useScripturePresence` hook.
 
 ## Settings and Configuration
 
 - Partner name configuration (displayed throughout the app)
 - Relationship start date (used for anniversary countdown and duration counter)
 - Theme selection from 4 available themes
+- Notification time configuration (HH:MM format)
+- Font and accent color customization
+- Settings validated with Zod `SettingsSchema` before save
+- Persisted to localStorage via Zustand persist middleware
 - Pre-configured mode via `src/config/constants.ts` -- when `isPreConfigured` is `true`, no onboarding wizard is shown
-
-```typescript
-export const APP_CONFIG = {
-  defaultPartnerName: 'Gracie',
-  defaultStartDate: '2025-10-18',
-  isPreConfigured: true,
-} as const;
-```
 
 ## Themes
 
@@ -157,10 +181,6 @@ The home view is rendered inline in `App.tsx` (not lazy-loaded) to guarantee off
 - **EventCountdown** -- Countdown timers for wedding date and upcoming visits
 - **DailyMessage** -- The daily love message card with rotation and favorites
 
-## Anniversary Countdown
-
-Real-time countdown timers to special dates with celebration animations powered by Framer Motion. Event dates are configured in `src/config/relationshipDates.ts` via the `RELATIONSHIP_DATES` constant, which includes birthdays, wedding date, and visit schedules.
-
 ## Welcome Splash
 
 A welcome screen displayed on first visit and after every 60 minutes of inactivity (controlled by the `WELCOME_DISPLAY_INTERVAL` constant in `App.tsx`). The splash timestamp is stored in `localStorage` under the `lastWelcomeView` key. The splash can also be triggered manually from the daily message card.
@@ -179,26 +199,28 @@ A welcome screen displayed on first visit and after every 60 minutes of inactivi
 - Precaching for static assets (images and fonts only)
 - Runtime caching: NetworkOnly for JS/CSS, NetworkFirst for navigation, CacheFirst for images/fonts/Google Fonts
 - PWA manifest: theme color `#FF6B9D`, background color `#FFE5EC`, standalone display, portrait orientation
-- Auto-update registration via `workbox-window`
+- Auto-update registration via `workbox-window` with immediate reload on new version
 
 ## Admin Panel
 
-Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provides administrative controls including message management (create, edit, delete with confirmation). The admin route is detected on initial load in `App.tsx` and renders outside the normal navigation flow.
+Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provides administrative controls including custom message management (create, edit, delete with confirmation dialog). The admin route is detected on initial load in `App.tsx` and renders outside the normal navigation flow.
 
 ## Error Tracking
 
-Sentry (`@sentry/react` 10.39.0) provides production error tracking:
+Sentry (`@sentry/react` 10.42.0) provides production error tracking:
 
 - Initialized in `src/config/sentry.ts` with 20% trace sample rate
 - PII stripping: only UUIDs reach Sentry (email and IP address removed)
 - Filtered errors: chunk load failures, network errors, ResizeObserver noise
 - Source maps uploaded during CI build via `@sentry/vite-plugin`, then deleted from dist/
+- User context set with user ID and partner ID only
 
 ## Privacy and Security
 
 - Row Level Security (RLS) enabled on all Supabase tables
 - Policies ensure only the two linked partner users can access their shared data
-- DOMPurify sanitization for user-generated HTML content
+- DOMPurify sanitization for user-generated content (no HTML tags or attributes allowed)
 - Encrypted secrets via fnox with age encryption provider -- ciphertext committed in `fnox.toml`, private keys never in repo
 - Zod runtime validation at service boundaries for all data entering or leaving the app
 - CodeQL security analysis configured with `security-extended` and `security-and-quality` query suites
+- Client-side rate limiting on love notes (10 messages per minute)
