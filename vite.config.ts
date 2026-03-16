@@ -41,12 +41,11 @@ export default defineConfig(({ mode }) => ({
       // With injectManifest, THIS is where precache config goes (not workbox section)
       // All runtime caching is handled in sw.ts
       injectManifest: {
-        // Only precache static assets - NO JS/CSS/HTML
-        // This ensures registerRoute(NetworkOnly) in sw.ts actually runs for code
-        globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'],
-        globIgnores: ['**/*.js', '**/*.css', '**/*.html'],
-        // Force SW update on every build with timestamp revision
-        additionalManifestEntries: [{ url: 'index.html', revision: Date.now().toString() }],
+        // Precache JS, CSS, and static assets — NOT HTML
+        // HTML must stay out so PrecacheRoute doesn't intercept navigation requests
+        // (NavigationRoute with NetworkFirst handles HTML instead)
+        globPatterns: ['**/*.{js,css,png,jpg,jpeg,svg,woff2,ico}'],
+        globIgnores: ['**/*.map', '**/*.html'],
       },
       devOptions: {
         enabled: false,
