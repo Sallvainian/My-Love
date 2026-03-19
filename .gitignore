@@ -85,6 +85,7 @@ _bmad/
 # MCP server artifacts
 .mcp.json
 .playwright-mcp/
+.playwright-cli/
 .serena/
 
 # Test environment - .env.test contains local Supabase dev values (safe to commit)
