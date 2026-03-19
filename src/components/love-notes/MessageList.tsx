@@ -279,10 +279,16 @@ export function MessageList({
   // Auto-scroll to bottom on initial load
   useEffect(() => {
     if (notes.length > 0 && listRef.current && !hasScrolledToBottom.current) {
-      // Use react-window v2 API: scrollToRow({ align, behavior, index })
-      listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
       hasScrolledToBottom.current = true;
-      queueMicrotask(() => setIsAtBottom(true));
+      // Defer scroll to next frame so react-window can complete its layout pass.
+      // Without this, scrollToRow fires before the list has measured its rows,
+      // causing the chat to stay scrolled to the top when re-entering the tab.
+      requestAnimationFrame(() => {
+        if (listRef.current) {
+          listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
+          queueMicrotask(() => setIsAtBottom(true));
+        }
+      });
     }
   }, [listRef, notes.length, totalRowCount]);
 
