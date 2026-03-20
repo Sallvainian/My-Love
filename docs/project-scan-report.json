@@ -1,9 +1,9 @@
 {
   "workflow_version": "1.3.0",
   "timestamps": {
-    "started": "2026-03-15T00:00:00Z",
-    "last_updated": "2026-03-15T12:30:00Z",
-    "completed": "2026-03-15T12:30:00Z"
+    "started": "2026-03-20T18:30:00Z",
+    "last_updated": "2026-03-20T19:15:00Z",
+    "completed": "2026-03-20T19:15:00Z"
   },
   "mode": "full_rescan",
   "scan_level": "exhaustive",
@@ -13,44 +13,44 @@
     {
       "step": "step_1",
       "status": "completed",
-      "timestamp": "2026-03-15T00:01:00Z",
-      "summary": "Classified as monolith with 1 part: web (React 19.2.4 PWA + TS 5.9.3 + Vite 7.3.1 + Supabase 2.99.0 + Zustand 5.0.11 + Tailwind 4.2.1 + Zod 4.3.6)"
+      "timestamp": "2026-03-20T18:30:00Z",
+      "summary": "Classified as monolith with 1 part: web (React 19.2.4 PWA + TS 5.9.3 + Vite 7.3.1 + Supabase 2.99.0 + Zustand 5.0.11 + Tailwind 4.1.17 + Zod 4.3.6)"
     },
     {
       "step": "step_2",
       "status": "completed",
-      "timestamp": "2026-03-15T00:02:00Z",
-      "summary": "Found 103 existing doc files in docs/, 207 source files in src/ (45,054 lines), 85 test files in tests/, 24 SQL migrations, 19 CI workflows, CLAUDE.md, AGENTS.md"
+      "timestamp": "2026-03-20T18:31:00Z",
+      "summary": "Found 104 existing doc files in docs/, ~177 source files in src/ (~45,102 lines), 108 test files in tests/, 25 SQL migrations, 19 CI workflows, CLAUDE.md, AGENTS.md"
     },
     {
       "step": "step_3",
       "status": "completed",
-      "timestamp": "2026-03-15T00:03:00Z",
-      "summary": "Tech stack: React 19.2.4, TS 5.9.3, Vite 7.3.1, Zustand 5.0.11, Supabase 2.99.0, Tailwind 4.2.1, Framer Motion 12.35.2, Zod 4.3.6, Sentry 10.42.0, Vitest 4.0.17, Playwright 1.58.2"
+      "timestamp": "2026-03-20T18:32:00Z",
+      "summary": "Tech stack: React 19.2.4, TS 5.9.3, Vite 7.3.1, Zustand 5.0.11, Supabase 2.99.0, Tailwind 4.1.17, Framer Motion 12.35.2, Zod 4.3.6, Sentry 10.42.0, Vitest 4.0.18, Playwright 1.58.2"
     },
     {
       "step": "step_4-9",
       "status": "completed",
-      "timestamp": "2026-03-15T12:15:00Z",
-      "summary": "4 parallel agents completed exhaustive scan: Agent A (project-overview 9 files + architecture 20 files + source-tree 8 files), Agent B (api-reference 16 files + data-models 11 files), Agent C (component-inventory 9 files + state-management 13 files incl new auth-slice.md), Agent D (development-guide 15 files + performance 2 files)"
+      "timestamp": "2026-03-20T19:05:00Z",
+      "summary": "4 parallel agents completed exhaustive scan: Agent A (project-overview 7 files + architecture 7 files + source-tree 6 files), Agent B (api-reference 4 files + data-models 10 files), Agent C (component-inventory 6 files + state-management 5 files), Agent D (development-guide 10 files + performance 2 files)"
     },
     {
       "step": "step_10",
       "status": "completed",
-      "timestamp": "2026-03-15T12:25:00Z",
-      "summary": "Master index.md updated: added auth-slice.md, corrected migration count to 24, CI workflow count to 19, updated timestamps and version"
+      "timestamp": "2026-03-20T19:10:00Z",
+      "summary": "Master index.md updated: corrected Tailwind 4.2.1->4.1.17, Vitest 4.0.17->4.0.18, source files 207->177, hooks 13->15, scripts 36->30, migrations 24->25, updated timestamps"
     },
     {
       "step": "step_11",
       "status": "completed",
-      "timestamp": "2026-03-15T12:28:00Z",
-      "summary": "Validation: No '(To be generated)' markers found. No TBD/TODO/Pending placeholder markers found."
+      "timestamp": "2026-03-20T19:12:00Z",
+      "summary": "Validation: No '(To be generated)' markers found. No TBD/TODO/Pending placeholder markers found. Checklist verified."
     },
     {
       "step": "step_12",
       "status": "completed",
-      "timestamp": "2026-03-15T12:30:00Z",
-      "summary": "Finalized. 104 markdown files across 10 sections. Key changes from prior scan: authSlice added as 11th slice, logger utility documented, SoloReadingFlow 4 sub-hooks, auth centralization, realtimeChannel.ts, useFocusTrap, migration count 23->24, CI workflow count 18->19, tsc -b switch"
+      "timestamp": "2026-03-20T19:15:00Z",
+      "summary": "Finalized. ~104 markdown files across 10 sections. Key changes from prior scan: Tailwind version corrected 4.2.1->4.1.17, source files 207->177 (consolidation), test files 85->108, npm scripts 36->30, migrations 24->25 (claude_bot_config), SW precache strategy corrected (JS/CSS now precached), coverage threshold corrected 80%->25%, mood slice SyncStatus type fixed, notes slice 6->11 actions, photos slice nonexistent fields removed, scripture slice missing state added, logger docs corrected, component store connections fixed, performance baseline refreshed (main entry +23% to 129KB gzip)"
     }
   ],
   "current_step": "complete",
@@ -62,46 +62,40 @@
     }
   ],
   "stats": {
-    "source_files": 207,
-    "source_lines": 45054,
-    "test_files": 85,
-    "sql_migrations": 24,
+    "source_files": 177,
+    "source_lines": 45102,
+    "test_files": 108,
+    "sql_migrations": 25,
     "ci_workflows": 19,
+    "npm_scripts": 30,
     "zustand_slices": 11,
+    "custom_hooks": 15,
     "indexeddb_stores": 8,
     "indexeddb_version": 5
   },
   "delta_since_last_scan": {
-    "date": "2026-03-13",
-    "commits": "~20",
+    "date": "2026-03-15",
+    "commits": "~5",
     "changes": [
-      "logger utility added (src/utils/logger.ts) replacing console.log across 48 files",
-      "ESLint no-console rule enforced",
-      "authSlice added as 11th Zustand slice for centralized user identity",
-      "SoloReadingFlow decomposed into 4 sub-hooks",
-      "ReadingPhaseView props grouped into sub-objects",
-      "auth centralized into actionService + sessionService facade",
-      "realtimeChannel.ts shared utility extracted",
-      "dead code removal",
-      "test helper consolidation",
-      "date utility fixes",
-      "VibratePattern type fix",
-      "scripture userId rename",
-      "tsc -b switch for project references",
-      "1 new migration (fix_avg_rating_precision)",
-      "1 new CI workflow (claude-flaky-tests.yml)",
-      "useFocusTrap hook added"
+      "Love Notes chat scroll-to-bottom fix on re-entry (requestAnimationFrame)",
+      "SW precache strategy fix: JS/CSS now precached, HTML excluded via NetworkFirst NavigationRoute",
+      "Scripture bugs/refactoring + CI improvements + logger utility",
+      "claude_bot_config migration added (25th migration)",
+      "UI test findings from manual QA session",
+      "Source file consolidation (207->177 files)",
+      "Test file growth (85->108 files)",
+      "npm scripts reduced (36->30)"
     ]
   },
   "findings": {
     "project_classification": "monolith, 1 part, React 19 + TypeScript 5.9 + Vite 7.3 + Supabase",
     "existing_docs_count": "104",
-    "source_files_count": "207",
-    "source_lines_count": "45054",
-    "test_files_count": "85",
-    "migrations_count": "24",
+    "source_files_count": "177",
+    "source_lines_count": "45102",
+    "test_files_count": "108",
+    "migrations_count": "25",
     "ci_workflows_count": "19",
-    "technology_stack": "React 19.2.4, TS 5.9.3, Vite 7.3.1, Zustand 5.0.11, Supabase 2.99.0, Tailwind 4.2.1, Framer Motion 12.35.2, Zod 4.3.6, Sentry 10.42.0",
+    "technology_stack": "React 19.2.4, TS 5.9.3, Vite 7.3.1, Zustand 5.0.11, Supabase 2.99.0, Tailwind 4.1.17, Framer Motion 12.35.2, Zod 4.3.6, Sentry 10.42.0",
     "yolo_mode": true
   },
   "outputs_generated": [

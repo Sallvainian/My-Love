@@ -42,7 +42,7 @@ This reads `supabase/config.toml` and starts the local Supabase stack. Default p
 After starting, apply migrations and seed data:
 
 ```bash
-supabase db reset   # Runs all 24 migrations + seed.sql
+supabase db reset   # Runs all 25 migrations + seed.sql
 ```
 
 ## Verify Installation

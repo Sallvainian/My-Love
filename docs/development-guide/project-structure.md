@@ -105,6 +105,7 @@ src/
     useAppStore.ts                  # Zustand store composed from 11 slices
     slices/
       appSlice.ts                   # App-level state (loading, errors, initialization)
+      authSlice.ts                  # Authentication state (session, user, sign-in/out)
       settingsSlice.ts              # User settings and preferences
       navigationSlice.ts            # Navigation and routing state (setView, currentView)
       messagesSlice.ts              # Daily love message selection and rotation
@@ -201,7 +202,7 @@ tests/
 supabase/
   config.toml                       # Local Supabase configuration (ports, auth, storage, realtime)
   seed.sql                          # Database seed data for local development
-  migrations/                       # 24 SQL migration files (YYYYMMDDHHmmss_description.sql format)
+  migrations/                       # 25 SQL migration files (YYYYMMDDHHmmss_description.sql format)
   tests/
     database/                       # 14 pgTAP database test files
 ```

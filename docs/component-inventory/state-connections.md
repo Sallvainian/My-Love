@@ -58,11 +58,11 @@ All slices that need user identity read `get().userId` synchronously instead of 
 
 ### MoodSlice
 
-| Component          | Fields/Actions Used                                |
-| ------------------ | -------------------------------------------------- |
-| MoodTracker        | `moods`, `addMood`, `syncMoods`, `setOnlineStatus` |
-| PartnerMoodView    | `partnerMoods`, `loadPartnerMoods`                 |
-| PartnerMoodDisplay | Via `usePartnerMood` hook                          |
+| Component          | Fields/Actions Used                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| MoodTracker        | `addMoodEntry`, `getMoodForDate`, `syncStatus`, `loadMoods`, `syncPendingMoods` + `useAuth` hook |
+| PartnerMoodView    | `partnerMoods`, `loadPartnerMoods`                                                               |
+| PartnerMoodDisplay | Via `usePartnerMood` hook                                                                        |
 
 ### InteractionsSlice
 
@@ -82,20 +82,21 @@ All slices that need user identity read `get().userId` synchronously instead of 
 
 ### NotesSlice
 
-| Component    | Fields/Actions Used                                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------------------------------- |
-| LoveNotes    | Via `useLoveNotes`: `notes`, `isLoading`, `error`, `hasMore`, `fetchOlderNotes`, `clearError`, `retryFailedMessage` |
-| MessageInput | Via `useLoveNotes`: `sendNote`                                                                                      |
+| Component    | Fields/Actions Used                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| LoveNotes    | Via `useLoveNotes`: `notes`, `isLoading`, `error`, `hasMore`, `fetchOlderNotes`, `clearError`, `retryFailedMessage`, `removeFailedMessage` |
+| MessageInput | Via `useLoveNotes`: `sendNote`                                                                                                             |
 
 ### PhotosSlice
 
-| Component      | Fields/Actions Used                                                                       |
-| -------------- | ----------------------------------------------------------------------------------------- |
-| PhotoGallery   | `photos`, `loadPhotos`, `loadMorePhotos`, `photosLoading`, `photosHasMore`, `selectPhoto` |
-| PhotoUpload    | `uploadPhoto`, `storageWarning`                                                           |
-| PhotoViewer    | `selectedPhotoId`, `deletePhoto`                                                          |
-| PhotoCarousel  | `photos`, `selectedPhotoId`, `selectPhoto`                                                |
-| PhotoEditModal | Via parent: `updatePhotoCaption`, `updatePhotoTags`                                       |
+| Component      | Fields/Actions Used                               |
+| -------------- | ------------------------------------------------- |
+| PhotoGallery   | `photos`, `loadPhotos`, `selectPhoto`             |
+| PhotoUpload    | `uploadPhoto`, `storageWarning`                   |
+| PhotoViewer    | `selectedPhotoId`, `deletePhoto`                  |
+| PhotoCarousel  | `photos`, `selectedPhotoId`, `selectPhoto`        |
+| PhotoEditModal | Via parent: `updatePhoto`                         |
+| usePhotos hook | Wraps all slice actions for component consumption |
 
 ### ScriptureSlice
 
@@ -110,13 +111,16 @@ All slices that need user identity read `get().userId` synchronously instead of 
 
 These custom hooks encapsulate store access patterns:
 
-| Hook                    | Store Access                                            | Components                                                 |
-| ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
-| `useLoveNotes`          | notesSlice (notes, loading, error, send, fetch, retry)  | LoveNotes, MessageInput                                    |
-| `usePartnerMood`        | moodSlice (partnerMoods, loadPartnerMoods)              | PartnerMoodDisplay                                         |
-| `useNetworkStatus`      | Browser API (not store)                                 | NetworkStatusIndicator, ScriptureOverview, SoloReadingFlow |
-| `useScriptureBroadcast` | scriptureSlice (setBroadcastFn, handleBroadcastMessage) | ScriptureOverview                                          |
-| `useScripturePresence`  | Supabase presence (not store directly)                  | ReadingContainer                                           |
-| `useAutoSave`           | scriptureSlice (saveSession)                            | SoloReadingFlow                                            |
-| `useVibration`          | Browser API (not store)                                 | MessageInput                                               |
-| `useMotionConfig`       | Browser API (prefers-reduced-motion)                    | ScriptureOverview, ReadingContainer, Countdown             |
+| Hook                    | Store Access                                                            | Components                                                 |
+| ----------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `useAuth`               | AuthSlice (userId, userEmail)                                           | MoodTracker                                                |
+| `useLoveNotes`          | notesSlice (notes, loading, error, send, fetch, retry, remove, cleanup) | LoveNotes, MessageInput                                    |
+| `useMoodHistory`        | moodApi (not store -- direct Supabase query with pagination)            | MoodHistoryTimeline                                        |
+| `usePartnerMood`        | moodSyncService (not store -- direct Supabase + broadcast)              | PartnerMoodDisplay                                         |
+| `usePhotos`             | photosSlice (photos, upload, delete, load, clear)                       | (available for photo components)                           |
+| `useNetworkStatus`      | Browser API (not store)                                                 | NetworkStatusIndicator, ScriptureOverview, SoloReadingFlow |
+| `useScriptureBroadcast` | scriptureSlice (setBroadcastFn) + Supabase broadcast channel            | ScriptureOverview                                          |
+| `useScripturePresence`  | Supabase presence (not store directly)                                  | ReadingContainer                                           |
+| `useAutoSave`           | scriptureSlice (saveSession)                                            | SoloReadingFlow                                            |
+| `useVibration`          | Browser API (not store)                                                 | MessageInput                                               |
+| `useMotionConfig`       | Browser API (prefers-reduced-motion)                                    | ScriptureOverview, ReadingContainer, Countdown             |

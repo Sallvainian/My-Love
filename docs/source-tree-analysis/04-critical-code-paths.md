@@ -66,7 +66,7 @@ MoodSlice.addMoodEntry(moods, note)
 
 **Files**: `src/stores/slices/scriptureReadingSlice.ts` -> `src/services/scriptureReadingService.ts`
 
-The largest slice (1035 lines) with the most complex state machine.
+The largest slice (1021 lines) with the most complex state machine.
 
 ```
 ScriptureSlice.createSession('solo')
@@ -172,16 +172,16 @@ Special case: v1->v2 photos migration
 
 | File                                         | Lines | Impact | Reason                                           |
 | -------------------------------------------- | ----- | ------ | ------------------------------------------------ |
-| `src/App.tsx`                                | 624   | High   | Auth gate, routing, sync setup, lazy loading     |
-| `src/stores/slices/scriptureReadingSlice.ts` | 1035  | High   | Largest slice, complex state machine             |
-| `src/stores/useAppStore.ts`                  | 286   | High   | All app state, persist config, Map serialization |
-| `src/services/dbSchema.ts`                   | 299   | High   | Shared IndexedDB schema, all migration logic     |
+| `src/App.tsx`                                | 610   | High   | Auth gate, routing, sync setup, lazy loading     |
+| `src/stores/slices/scriptureReadingSlice.ts` | 1021  | High   | Largest slice, complex state machine             |
+| `src/stores/useAppStore.ts`                  | 290   | High   | All app state, persist config, Map serialization |
+| `src/services/dbSchema.ts`                   | 280   | High   | Shared IndexedDB schema, all migration logic     |
 | `src/api/supabaseClient.ts`                  | 159   | High   | Singleton client, env var validation at import   |
-| `src/stores/slices/notesSlice.ts`            | 641   | Medium | Realtime chat, rate limiting, image handling     |
-| `src/stores/slices/messagesSlice.ts`         | 547   | Medium | Message rotation, custom CRUD, history           |
-| `src/stores/slices/moodSlice.ts`             | 364   | Medium | Offline sync, partner mood, auto-update          |
-| `src/sw.ts`                                  | 268   | Medium | Background sync, cache strategies                |
-| `src/stores/slices/settingsSlice.ts`         | 257   | Medium | initializeApp, hydration validation              |
+| `src/stores/slices/notesSlice.ts`            | 608   | Medium | Realtime chat, rate limiting, image handling     |
+| `src/stores/slices/messagesSlice.ts`         | 527   | Medium | Message rotation, custom CRUD, history           |
+| `src/stores/slices/moodSlice.ts`             | 339   | Medium | Offline sync, partner mood, auto-update          |
+| `src/sw.ts`                                  | 261   | Medium | Background sync, cache strategies                |
+| `src/stores/slices/settingsSlice.ts`         | 258   | Medium | initializeApp, hydration validation              |
 
 ## Related Documentation
 

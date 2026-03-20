@@ -92,7 +92,7 @@ The store's `partialize` function selects which state keys to persist: `settings
 
 ## Pattern 5: Sliced Store Composition
 
-The entire app state lives in a single Zustand store composed from 10 domain slices:
+The entire app state lives in a single Zustand store composed from 11 domain slices:
 
 ```typescript
 // src/stores/useAppStore.ts
@@ -100,6 +100,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (...args) => ({
       ...createAppSlice(...args),
+      ...createAuthSlice(...args),
       ...createSettingsSlice(...args),
       ...createNavigationSlice(...args),
       ...createMessagesSlice(...args),

@@ -15,7 +15,6 @@ Manages the love notes chat feature with optimistic updates, pagination, rate li
 | `notesIsLoading`        | `boolean`        | `false` | No        | Loading state for note operations                        |
 | `notesError`            | `string \| null` | `null`  | No        | Error message for note operations                        |
 | `notesHasMore`          | `boolean`        | `true`  | No        | Whether more messages exist for pagination               |
-| `notesCursor`           | `string \| null` | `null`  | No        | Pagination cursor for fetching older messages            |
 | `sentMessageTimestamps` | `number[]`       | `[]`    | No        | Timestamps of recently sent messages (for rate limiting) |
 
 ## LoveNote Shape
@@ -38,14 +37,19 @@ interface LoveNote {
 
 ## Actions
 
-| Action               | Signature                                              | Description                                    |
-| -------------------- | ------------------------------------------------------ | ---------------------------------------------- |
-| `sendNote`           | `(content: string, imageFile?: File) => Promise<void>` | Sends message with optimistic update           |
-| `fetchNotes`         | `() => Promise<void>`                                  | Loads initial messages from Supabase           |
-| `fetchOlderNotes`    | `() => Promise<void>`                                  | Loads older messages for pagination            |
-| `clearNotesError`    | `() => void`                                           | Clears error state                             |
-| `retryFailedMessage` | `(tempId: string) => Promise<void>`                    | Retries sending a failed message               |
-| `addRealtimeNote`    | `(note: LoveNote) => void`                             | Adds a message received via realtime broadcast |
+| Action                | Signature                                              | Description                                                           |
+| --------------------- | ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `fetchNotes`          | `(limit?: number) => Promise<void>`                    | Loads initial messages from Supabase (default page size from config)  |
+| `fetchOlderNotes`     | `(limit?: number) => Promise<void>`                    | Loads older messages for pagination                                   |
+| `addNote`             | `(note: LoveNote) => void`                             | Adds a message with deduplication (used by realtime and optimistic)   |
+| `setNotes`            | `(notes: LoveNote[]) => void`                          | Sets the entire notes array (revokes old preview URLs)                |
+| `setNotesError`       | `(error: string \| null) => void`                      | Sets error state                                                      |
+| `clearNotesError`     | `() => void`                                           | Clears error state                                                    |
+| `checkRateLimit`      | `() => { recentTimestamps: number[]; now: number }`    | Validates rate limit, throws if exceeded (10 msgs per minute)         |
+| `sendNote`            | `(content: string, imageFile?: File) => Promise<void>` | Sends message with optimistic update and realtime broadcast           |
+| `retryFailedMessage`  | `(tempId: string) => Promise<void>`                    | Retries sending a failed message (uses cached imageBlob if available) |
+| `cleanupPreviewUrls`  | `() => void`                                           | Revokes blob URLs from notes to prevent memory leaks                  |
+| `removeFailedMessage` | `(tempId: string) => void`                             | Removes a failed message and cleans up its preview URL                |
 
 ## Optimistic Updates Pattern
 
@@ -65,7 +69,7 @@ When `sendNote()` is called:
 
 ## Realtime Integration
 
-The `useLoveNotes` hook (and `useRealtimeMessages` hook) set up a Supabase realtime broadcast channel. When a message arrives from the partner, `addRealtimeNote()` inserts it into the `notes` array.
+The `useLoveNotes` hook (and `useRealtimeMessages` hook) set up a Supabase realtime broadcast channel. When a message arrives from the partner, `addNote()` inserts it into the `notes` array with deduplication (checks by `id` to prevent duplicate messages).
 
 ## Cross-Slice Dependencies
 

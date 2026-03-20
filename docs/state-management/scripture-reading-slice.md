@@ -9,13 +9,18 @@ The largest and most complex slice. Manages the full scripture reading feature: 
 
 ## State -- Session Core
 
-| Field               | Type                        | Default | Persisted | Description                            |
-| ------------------- | --------------------------- | ------- | --------- | -------------------------------------- |
-| `session`           | `ScriptureSession \| null`  | `null`  | No        | Active reading session                 |
-| `scriptureLoading`  | `boolean`                   | `false` | No        | Loading state for scripture operations |
-| `scriptureError`    | `ScriptureError \| null`    | `null`  | No        | Error with message and optional code   |
-| `activeSession`     | `ActiveSessionInfo \| null` | `null`  | No        | Incomplete session for resume prompt   |
-| `isCheckingSession` | `boolean`                   | `false` | No        | Whether checking for active session    |
+| Field                 | Type                       | Default | Persisted | Description                                          |
+| --------------------- | -------------------------- | ------- | --------- | ---------------------------------------------------- |
+| `session`             | `ScriptureSession \| null` | `null`  | No        | Active reading session                               |
+| `scriptureLoading`    | `boolean`                  | `false` | No        | Loading state for scripture operations               |
+| `isInitialized`       | `boolean`                  | `false` | No        | Whether the slice has been initialized               |
+| `isPendingLockIn`     | `boolean`                  | `false` | No        | Whether user has locked in (also in Lock-In section) |
+| `isPendingReflection` | `boolean`                  | `false` | No        | Whether reflection phase is pending                  |
+| `isSyncing`           | `boolean`                  | `false` | No        | Whether a sync operation is in flight                |
+| `scriptureError`      | `ScriptureError \| null`   | `null`  | No        | Error with message and optional code                 |
+| `activeSession`       | `ScriptureSession \| null` | `null`  | No        | Incomplete session for resume prompt                 |
+| `isCheckingSession`   | `boolean`                  | `false` | No        | Whether checking for active session                  |
+| `pendingRetry`        | `PendingRetry \| null`     | `null`  | No        | Retry state for failed writes                        |
 
 ## State -- Together Mode / Lobby
 
@@ -29,11 +34,11 @@ The largest and most complex slice. Manages the full scripture reading feature: 
 
 ## State -- Lock-In (Together Reading)
 
-| Field             | Type      | Default | Persisted | Description                                 |
-| ----------------- | --------- | ------- | --------- | ------------------------------------------- |
-| `isPendingLockIn` | `boolean` | `false` | No        | Whether user has locked in for current step |
-| `partnerLocked`   | `boolean` | `false` | No        | Whether partner has locked in               |
-| `isSyncing`       | `boolean` | `false` | No        | Whether a lock-in/advance RPC is in flight  |
+| Field           | Type      | Default | Persisted | Description                   |
+| --------------- | --------- | ------- | --------- | ----------------------------- |
+| `partnerLocked` | `boolean` | `false` | No        | Whether partner has locked in |
+
+Note: `isPendingLockIn` and `isSyncing` are listed in Session Core above as they are shared across modes.
 
 ## State -- Disconnection (Together Mode)
 
@@ -44,10 +49,7 @@ The largest and most complex slice. Manages the full scripture reading feature: 
 
 ## State -- Broadcast
 
-| Field          | Type                        | Default | Persisted | Description                                       |
-| -------------- | --------------------------- | ------- | --------- | ------------------------------------------------- |
-| `broadcastFn`  | `BroadcastFunction \| null` | `null`  | No        | Function injected by `useScriptureBroadcast` hook |
-| `pendingRetry` | `PendingRetry \| null`      | `null`  | No        | Retry state for failed lock-in/advance operations |
+Note: The broadcast function is stored in a **module-level variable** (`broadcastFnRef`), not in Zustand state, to avoid serialization issues. The `setBroadcastFn` action updates this module-level ref.
 
 ## State -- Stats
 
@@ -82,37 +84,48 @@ type SessionRole = 'reader' | 'responder';
 | ----------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
 | `createSession`         | `(mode: 'solo' \| 'together', partnerId?: string) => Promise<void>` | Creates new session via Supabase RPC        |
 | `loadSession`           | `(sessionId: string) => Promise<void>`                              | Loads existing session from Supabase        |
-| `saveSession`           | `(stepIndex: number) => Promise<void>`                              | Saves current progress to Supabase          |
-| `completeSession`       | `(reflectionData: ReflectionData) => Promise<void>`                 | Marks session complete with reflection      |
-| `abandonSession`        | `(sessionId: string) => Promise<void>`                              | Marks session as abandoned                  |
-| `endSession`            | `() => Promise<void>`                                               | Ends together-mode session for both users   |
 | `exitSession`           | `() => void`                                                        | Clears local session state (no server call) |
+| `updatePhase`           | `(phase: SessionPhase) => void`                                     | Updates session phase locally               |
+| `clearScriptureError`   | `() => void`                                                        | Clears error state                          |
 | `checkForActiveSession` | `() => Promise<void>`                                               | Checks Supabase for incomplete sessions     |
 | `clearActiveSession`    | `() => void`                                                        | Clears activeSession prompt                 |
-| `clearScriptureError`   | `() => void`                                                        | Clears error state                          |
+
+## Actions -- Solo Reading Flow
+
+| Action             | Signature                              | Description                                           |
+| ------------------ | -------------------------------------- | ----------------------------------------------------- |
+| `advanceStep`      | `() => Promise<void>`                  | Advances to next verse step                           |
+| `saveAndExit`      | `() => Promise<void>`                  | Saves current progress and exits                      |
+| `saveSession`      | `() => Promise<void>`                  | Saves current progress to Supabase                    |
+| `abandonSession`   | `(sessionId: string) => Promise<void>` | Marks session as abandoned on server                  |
+| `retryFailedWrite` | `() => Promise<void>`                  | Retries a failed advanceStep or saveSession operation |
 
 ## Actions -- Together Mode / Lobby
 
-| Action          | Signature                              | Description                                              |
-| --------------- | -------------------------------------- | -------------------------------------------------------- |
-| `selectRole`    | `(role: SessionRole) => Promise<void>` | Selects reader/responder role via RPC                    |
-| `toggleReady`   | `(ready: boolean) => Promise<void>`    | Toggles ready status, triggers countdown when both ready |
-| `convertToSolo` | `() => Promise<void>`                  | Converts together session to solo mode                   |
-| `updatePhase`   | `(phase: string) => void`              | Updates session phase locally                            |
+| Action                  | Signature                               | Description                                              |
+| ----------------------- | --------------------------------------- | -------------------------------------------------------- |
+| `selectRole`            | `(role: SessionRole) => Promise<void>`  | Selects reader/responder role via RPC                    |
+| `toggleReady`           | `(isReady: boolean) => Promise<void>`   | Toggles ready status, triggers countdown when both ready |
+| `convertToSolo`         | `() => Promise<void>`                   | Converts together session to solo mode                   |
+| `applySessionConverted` | `() => void`                            | Applies session conversion locally                       |
+| `onPartnerJoined`       | `() => void`                            | Updates state when partner joins lobby                   |
+| `onPartnerReady`        | `(isReady: boolean) => void`            | Updates state when partner toggles ready                 |
+| `onCountdownStarted`    | `(startTs: number) => void`             | Sets countdown timestamp                                 |
+| `onBroadcastReceived`   | `(payload: StateUpdatePayload) => void` | Processes incoming broadcast messages                    |
 
 ## Actions -- Lock-In
 
-| Action       | Signature             | Description                                                     |
-| ------------ | --------------------- | --------------------------------------------------------------- |
-| `lockIn`     | `() => Promise<void>` | Locks in for current step; advances both if partner also locked |
-| `undoLockIn` | `() => Promise<void>` | Undoes lock-in before partner locks                             |
+| Action                   | Signature                   | Description                                                     |
+| ------------------------ | --------------------------- | --------------------------------------------------------------- |
+| `lockIn`                 | `() => Promise<void>`       | Locks in for current step; advances both if partner also locked |
+| `undoLockIn`             | `() => Promise<void>`       | Undoes lock-in before partner locks                             |
+| `onPartnerLockInChanged` | `(locked: boolean) => void` | Updates partner lock-in state from broadcast                    |
 
 ## Actions -- Broadcast
 
-| Action                   | Signature                                 | Description                           |
-| ------------------------ | ----------------------------------------- | ------------------------------------- |
-| `setBroadcastFn`         | `(fn: BroadcastFunction \| null) => void` | Injects broadcast function from hook  |
-| `handleBroadcastMessage` | `(message: BroadcastMessage) => void`     | Processes incoming broadcast messages |
+| Action           | Signature                                                           | Description                                        |
+| ---------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| `setBroadcastFn` | `(fn: ((event: string, payload: unknown) => void) \| null) => void` | Sets module-level broadcast function ref from hook |
 
 ## Actions -- Stats
 
@@ -122,9 +135,10 @@ type SessionRole = 'reader' | 'responder';
 
 ## Actions -- Disconnection
 
-| Action                   | Signature                         | Description                             |
-| ------------------------ | --------------------------------- | --------------------------------------- |
-| `setPartnerDisconnected` | `(disconnected: boolean) => void` | Sets disconnection state with timestamp |
+| Action                   | Signature                         | Description                               |
+| ------------------------ | --------------------------------- | ----------------------------------------- |
+| `setPartnerDisconnected` | `(disconnected: boolean) => void` | Sets disconnection state with timestamp   |
+| `endSession`             | `() => Promise<void>`             | Ends together-mode session for both users |
 
 ## Broadcast Architecture
 

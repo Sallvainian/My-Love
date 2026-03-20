@@ -43,7 +43,7 @@ The application follows a **hybrid data architecture** where the storage pattern
    - **Periodic**: Every 5 minutes while the app is open (`setInterval` in `App.tsx`)
    - **Background Sync API**: Via service worker when the app is closed and connectivity returns
 
-7. **PWA-first** -- Custom InjectManifest service worker with Workbox strategies: `NetworkOnly` for JS/CSS (always fresh code), `CacheFirst` for images/fonts, `NetworkFirst` for navigation. Background Sync for offline mood uploads.
+7. **PWA-first** -- Custom InjectManifest service worker with Workbox: JS/CSS are precached (content-hashed filenames), `CacheFirst` for images/fonts, `NetworkFirst` for HTML navigation. Background Sync for offline mood uploads.
 
 ## Feature Map
 
@@ -81,7 +81,7 @@ index.html
   -> src/main.tsx
        -> Sentry.init() (production only)
        -> React.StrictMode > LazyMotion > App
-            -> App.tsx (~624 lines)
+            -> App.tsx (~610 lines)
                  -> Auth check (getSession + onAuthStateChange)
                  -> initializeApp() via settingsSlice
                  -> View routing (home, photos, mood, partner, notes, scripture)

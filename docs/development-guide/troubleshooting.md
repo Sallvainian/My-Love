@@ -141,7 +141,7 @@ To test PWA behavior locally, you can temporarily set `devOptions.enabled: true`
 ```bash
 npx playwright install           # Install browsers
 supabase start                   # Start local Supabase (requires Docker)
-supabase db reset                # Reset database and apply all 24 migrations + seed
+supabase db reset                # Reset database and apply all 25 migrations + seed
 npm run test:e2e                 # Run with cleanup script
 ```
 
@@ -202,7 +202,7 @@ Then run the tests again. The global setup will recreate test users and auth sta
 
 ## Service Worker Caching Stale Content
 
-**Cause**: Browser has cached an old service worker that serves stale JavaScript or HTML.
+**Cause**: Browser has cached an old service worker that serves stale HTML. As of the 2026-03-15 SW precache strategy fix, HTML is no longer precached. Instead, navigation requests use a NetworkFirst strategy with a 3-second timeout, so the browser always attempts to fetch fresh HTML from the network. However, users on older service worker versions may still experience stale content until the SW auto-updates.
 
 **Fix**:
 

@@ -2,7 +2,7 @@
 
 Comprehensive developer reference for the My-Love PWA. Each section links to a dedicated page with full details.
 
-Last updated: 2026-03-15
+Last updated: 2026-03-20
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ Last updated: 2026-03-15
   - [PostCSS Configuration](./configuration-customization.md#postcss-configuration)
   - [Tailwind CSS v4](./configuration-customization.md#tailwind-css-v4)
   - [ESLint Configuration](./configuration-customization.md#eslint-configuration)
-- [Available Scripts](./available-scripts.md) -- Every npm script (36 total) with usage examples
+- [Available Scripts](./available-scripts.md) -- Every npm script (30 total) with usage examples
   - [Development](./available-scripts.md#development)
   - [Build & Performance](./available-scripts.md#build--performance)
   - [Code Quality](./available-scripts.md#code-quality)
@@ -63,7 +63,7 @@ Last updated: 2026-03-15
   - [Logger Utility](./code-style.md#logger-utility)
   - [Prettier](./code-style.md#prettier)
   - [Naming and Import Conventions](./code-style.md#naming-and-import-conventions)
-- [Database Migrations](./database-migrations.md) -- All 24 migrations, Supabase CLI, pgTAP tests
+- [Database Migrations](./database-migrations.md) -- All 25 migrations, Supabase CLI, pgTAP tests
   - [Local Supabase Setup](./database-migrations.md#local-supabase-setup)
   - [Creating Migrations](./database-migrations.md#creating-migrations)
   - [Migration History](./database-migrations.md#migration-history)
@@ -84,11 +84,11 @@ Last updated: 2026-03-15
 | Live URL        | <https://sallvainian.github.io/My-Love/>                       |
 | Stack           | React 19.2.4, TypeScript 5.9.3, Vite 7.3.1, Tailwind CSS 4.2.1 |
 | Backend         | Supabase 2.99.0 (Auth, Database, Realtime, Storage)            |
-| Testing         | Vitest 4.0.17, Playwright 1.58.2, pgTAP                        |
+| Testing         | Vitest 4.0.18, Playwright 1.58.2, pgTAP                        |
 | Node            | v24.13.0 (managed by mise, pinned in `.node-version`)          |
 | Package manager | npm                                                            |
 | Secrets         | fnox with age provider (`fnox.toml`)                           |
-| Source files    | ~207                                                           |
-| Test files      | ~85                                                            |
-| Migrations      | 24                                                             |
+| Source files    | ~177                                                           |
+| Test files      | ~108 (94 TS/TSX + 14 pgTAP)                                    |
+| Migrations      | 25                                                             |
 | CI workflows    | 19                                                             |

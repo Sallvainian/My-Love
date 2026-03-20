@@ -6,7 +6,7 @@ The project uses multiple testing layers:
 
 | Layer             | Framework         | Location                                | Environment                            |
 | ----------------- | ----------------- | --------------------------------------- | -------------------------------------- |
-| Unit tests        | Vitest 4.0.17     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
+| Unit tests        | Vitest 4.0.18     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
 | E2E tests         | Playwright 1.58.2 | `tests/e2e/`                            | Real Chromium browser + local Supabase |
 | API tests         | Playwright 1.58.2 | `tests/api/`                            | Supabase API endpoints                 |
 | Integration tests | Playwright 1.58.2 | `tests/integration/`                    | Playwright integration project         |
