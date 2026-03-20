@@ -95,7 +95,7 @@ GitHub Secrets are used directly in workflow environment variables:
 
 ## CI/CD Workflows
 
-Located in `.github/workflows/` (18 total):
+Located in `.github/workflows/` (19 total):
 
 | Workflow                  | Trigger           | Purpose                                 |
 | ------------------------- | ----------------- | --------------------------------------- |
@@ -154,7 +154,7 @@ The `vite-plugin-pwa` configuration in `vite.config.ts`:
 - **Strategy**: `injectManifest` (custom service worker in `src/sw.ts`)
 - **Service Worker**: Compiled from `src/sw.ts`
 - **Update**: Auto-reload on new version detection
-- **Precache**: Only static assets (images, fonts, icons). JS/CSS are excluded from precache since they use `NetworkOnly` strategy in the service worker.
+- **Precache**: JS, CSS, images, fonts, and icons. HTML is excluded from precache -- navigation requests use `NetworkFirst` via the service worker. Content-hashed JS/CSS filenames ensure stale bundles are never served after deployments.
 - **Navigation fallback**: `index.html` is added to the manifest with a timestamp revision to force SW update on every build.
 
 The web app manifest includes:

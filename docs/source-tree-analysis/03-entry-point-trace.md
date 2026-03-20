@@ -121,12 +121,12 @@ The service worker has its own entry point, compiled separately from the main ap
 src/sw.ts
   |
   |-- skipWaiting() + clientsClaim()     // Auto-activate new SW
-  |-- precacheAndRoute(__WB_MANIFEST)    // Precache static assets (images, fonts only)
+  |-- precacheAndRoute(__WB_MANIFEST)    // Precache JS, CSS, images, fonts
   |-- cleanupOutdatedCaches()            // Remove old caches
   |
   |-- Cache Strategies:
-  |   |-- NetworkOnly: JS/CSS bundles (always fresh code)
-  |   |-- NetworkFirst: Navigation (3s timeout, falls back to precache)
+  |   |-- Precached: JS/CSS bundles (content-hashed filenames, via __WB_MANIFEST)
+  |   |-- NetworkFirst: Navigation (3s timeout, falls back to cache)
   |   |-- CacheFirst: Images, fonts (30-day expiry, 100 max entries)
   |   |-- CacheFirst: Google Fonts (1-year expiry, 30 max entries)
   |

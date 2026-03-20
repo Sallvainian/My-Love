@@ -86,15 +86,14 @@ VitePWA({
   srcDir: 'src',
   filename: 'sw.ts',
   injectManifest: {
-    globPatterns: ['**/*.{png,jpg,jpeg,svg,woff2,ico}'], // Only precache static assets
-    globIgnores: ['**/*.js', '**/*.css', '**/*.html'], // Do NOT precache code
-    additionalManifestEntries: [
-      { url: 'index.html', revision: Date.now().toString() }, // Force SW update per build
-    ],
+    globPatterns: ['**/*.{js,css,png,jpg,jpeg,svg,woff2,ico}'], // Precache JS, CSS, and static assets
+    globIgnores: ['**/*.map', '**/*.html'], // Do NOT precache HTML or source maps
   },
   devOptions: { enabled: false }, // PWA disabled in development
 });
 ```
+
+HTML is intentionally excluded from precaching so that `PrecacheRoute` does not intercept navigation requests. Instead, the custom service worker (`src/sw.ts`) uses a `NavigationRoute` with `NetworkFirst` strategy (3-second timeout) to always attempt fetching fresh HTML from the network, preventing stale content after deployments.
 
 ## Tailwind Theme
 

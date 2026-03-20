@@ -11,7 +11,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 | React DOM    | 19.2.4  | DOM rendering                                             |
 | TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                |
 | Vite         | 7.3.1   | Build tool and dev server                                 |
-| Tailwind CSS | 4.1.17+ | Utility-first CSS framework (v4 with PostCSS integration) |
+| Tailwind CSS | 4.1.17  | Utility-first CSS framework (v4 with PostCSS integration) |
 | PostCSS      | 8.5.8   | CSS post-processing                                       |
 | Autoprefixer | 10.4.27 | Vendor prefix automation                                  |
 

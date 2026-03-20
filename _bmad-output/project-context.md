@@ -1,11 +1,11 @@
 ---
 project_name: 'My-Love'
 user_name: 'Sallvain'
-date: '2026-03-15'
+date: '2026-03-20'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 119
+rule_count: 120
 optimized_for_llm: true
 ---
 
@@ -75,7 +75,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Unmount safety:** Use `isMountedRef` pattern in effects that set state after async operations
 - **Combined-effects rule:** Effects that share refs and trigger on the same dependency must be combined into a single effect to prevent race conditions.
 - **DOMPurify required:** All user-generated HTML content must be sanitized with `DOMPurify.sanitize()` before rendering
-- **PWA pitfall:** `vite-plugin-pwa` uses `injectManifest` -- runtime caching is in `src/sw.ts`, NOT in vite config's workbox section (which is ignored)
+- **PWA pitfall:** `vite-plugin-pwa` uses `injectManifest` -- runtime caching is in `src/sw.ts`, NOT in vite config's workbox section (which is ignored). Navigation requests use `NetworkFirst` via `NavigationRoute` in `sw.ts` -- `index.html` is intentionally excluded from the precache manifest (`globIgnores: ['**/*.html']`) so stale HTML is never served after deployments
 - **Two data models:** Most features are offline-first (IndexedDB primary, Supabase syncs). Scripture reading is the opposite -- online-first (Supabase RPC is source of truth, IndexedDB is read cache). Agents must check which model a feature uses before implementing data layer code.
 - **PendingRetry pattern:** Scripture feature uses `isPendingLockIn`/`isPendingReflection` flags + `retryFailedWrite()` for graceful offline recovery of failed Supabase writes
 - **React 19 hooks lint rules:** `react-hooks/set-state-in-effect` and `react-hooks/purity` are set to `warn` (not error) -- legitimate patterns like blob URL lifecycle and timer setup trigger these
@@ -89,6 +89,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Love notes rate limiting:** Client-side rate limit of 10 messages per minute enforced in NotesSlice.
 - **Auth centralization (authSlice):** User identity (`userId`, `userEmail`, `isAuthenticated`) is centralized in `src/stores/slices/authSlice.ts`. Populated by `onAuthStateChange` in `App.tsx`, NOT persisted to localStorage. All slices read `userId` synchronously via `get().userId` instead of making async `supabase.auth.getUser()` calls. Use `setAuthUser(userId, email?)` after auth, `clearAuth()` on sign-out.
 - **Typecheck command:** `npm run typecheck` runs `tsc -b --force` (project references build mode), NOT `tsc --noEmit`. The build command uses `tsc -p tsconfig.app.json` for the production build only.
+- **react-window scroll-to-row timing:** When using `react-window` virtualised lists, wrap `scrollToRow()` / `scrollToItem()` in `requestAnimationFrame()` to defer one frame -- this allows react-window to complete its layout pass before scrolling. Direct calls will silently no-op or scroll to the wrong position.
 
 ### Together Mode / Realtime Architecture (Epic 4)
 
@@ -195,4 +196,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-15
+Last Updated: 2026-03-20

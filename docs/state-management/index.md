@@ -2,7 +2,7 @@
 
 Zustand 5.0.11-based state management architecture for the **My-Love** PWA with 11 slices (including AuthSlice), localStorage persistence, custom Map serialization, and IndexedDB for large data.
 
-> Last updated: 2026-03-15
+> Last updated: 2026-03-20
 
 ## Documentation Files
 
@@ -23,19 +23,19 @@ Zustand 5.0.11-based state management architecture for the **My-Love** PWA with 
 
 ## Quick Reference
 
-| Slice        | Key State                                                          | Persisted                     | Cross-Slice Deps                        |
-| ------------ | ------------------------------------------------------------------ | ----------------------------- | --------------------------------------- |
-| App          | `isLoading`, `error`, `__isHydrated`                               | No                            | None                                    |
-| Auth         | `userId`, `userEmail`, `isAuthenticated`                           | No                            | None (set by App.tsx onAuthStateChange) |
-| Settings     | `settings`, `isOnboarded`                                          | Yes (localStorage)            | Reads AppSlice, writes MessagesSlice    |
-| Navigation   | `currentView`                                                      | No                            | None                                    |
-| Messages     | `messages`, `messageHistory`, `currentMessage`, `customMessages`   | Partial (messageHistory only) | Reads Settings (via `get()`)            |
-| Mood         | `moods`, `partnerMoods`, `syncStatus`                              | Yes (moods in localStorage)   | Reads AuthSlice (`userId`)              |
-| Interactions | `interactions`, `unviewedCount`, `isSubscribed`                    | No                            | Reads AuthSlice (`userId`)              |
-| Partner      | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`  | No                            | None                                    |
-| Notes        | `notes`, `notesIsLoading`, `notesError`, `notesHasMore`            | No                            | Reads AuthSlice (`userId`)              |
-| Photos       | `photos`, `selectedPhotoId`, `isUploading`, `storageWarning`       | No                            | Reads AuthSlice (`userId`)              |
-| Scripture    | `session`, `scriptureLoading`, `myRole`, `partnerLocked`, +20 more | No                            | Reads AuthSlice (`userId`)              |
+| Slice        | Key State                                                                                                                                  | Persisted                     | Cross-Slice Deps                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | --------------------------------------- |
+| App          | `isLoading`, `error`, `__isHydrated`                                                                                                       | No                            | None                                    |
+| Auth         | `userId`, `userEmail`, `isAuthenticated`                                                                                                   | No                            | None (set by App.tsx onAuthStateChange) |
+| Settings     | `settings`, `isOnboarded`                                                                                                                  | Yes (localStorage)            | Reads AppSlice, writes MessagesSlice    |
+| Navigation   | `currentView`                                                                                                                              | No                            | None                                    |
+| Messages     | `messages`, `messageHistory`, `currentMessage`, `customMessages`                                                                           | Partial (messageHistory only) | Reads Settings (via `get()`)            |
+| Mood         | `moods`, `partnerMoods`, `syncStatus` (pendingMoods count)                                                                                 | Yes (moods in localStorage)   | Reads AuthSlice (`userId`)              |
+| Interactions | `interactions`, `unviewedCount`, `isSubscribed`                                                                                            | No                            | Reads AuthSlice (`userId`)              |
+| Partner      | `partner`, `isLoadingPartner`, `sentRequests`, `receivedRequests`                                                                          | No                            | None                                    |
+| Notes        | `notes`, `notesIsLoading`, `notesError`, `notesHasMore`, `sentMessageTimestamps`                                                           | No                            | Reads AuthSlice (`userId`)              |
+| Photos       | `photos`, `selectedPhotoId`, `isUploading`, `error`, `storageWarning`                                                                      | No                            | Reads AuthSlice (`userId`)              |
+| Scripture    | `session`, `scriptureLoading`, `isInitialized`, `isPendingLockIn`, `isPendingReflection`, `isSyncing`, `myRole`, `partnerLocked`, +15 more | No                            | Reads AuthSlice (`userId`)              |
 
 ## Architecture Overview
 

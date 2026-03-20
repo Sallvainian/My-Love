@@ -8,7 +8,7 @@ My-Love/
 |   |-- codeql/
 |   |   +-- codeql-config.yml         # CodeQL security analysis (security-extended + security-and-quality)
 |   |-- commands/                     # Gemini AI command configurations (5 TOML files)
-|   |-- workflows/                    # 18 GitHub Actions workflows
+|   |-- workflows/                    # 19 GitHub Actions workflows
 |   |   |-- deploy.yml                # Build + smoke test + deploy to GitHub Pages + health check
 |   |   |-- test.yml                  # Full test pipeline: lint, unit, E2E, merge reports
 |   |   |-- supabase-migrations.yml   # Migration validation on PRs touching supabase/ paths
@@ -61,8 +61,8 @@ My-Love/
 |   |-- inspect-db.sh                # Database inspection utility for local Supabase
 |   +-- fetch_comments.py            # GitHub PR comment fetcher
 |
-|-- src/                              # Application source (207 TypeScript/TSX files, ~45,054 lines)
-|   |-- App.tsx                       # Main application component (auth, routing, sync setup, ~624 lines)
+|-- src/                              # Application source (207 TypeScript/TSX files, ~45,102 lines)
+|   |-- App.tsx                       # Main application component (auth, routing, sync setup, ~610 lines)
 |   |-- main.tsx                      # Entry point (StrictMode, LazyMotion, SW registration)
 |   |-- index.css                     # Global CSS (Tailwind imports)
 |   |-- sw.ts                         # Custom Service Worker (precache, cache strategies, background sync)
@@ -135,7 +135,7 @@ My-Love/
 |   |   |-- defaultMessagesLoader.ts  # Lazy loader for default messages
 |   |   +-- scriptureSteps.ts         # 17 scripture steps with NKJV verses and response prayers
 |   |
-|   |-- hooks/                        # Custom React hooks (16: 1 barrel + 15 hooks)
+|   |-- hooks/                        # Custom React hooks (15: 1 barrel + 14 hooks)
 |   |   |-- useAuth.ts                # Authentication state hook
 |   |   |-- useAutoSave.ts            # Auto-save with visibility change detection
 |   |   |-- useFocusTrap.ts           # Focus trap for modal dialogs (accessibility)
@@ -177,13 +177,11 @@ My-Love/
 |   |   |-- models.ts                 # Domain model types (LoveNote, etc.)
 |   |   +-- database.types.ts         # Auto-generated from Supabase schema (DO NOT EDIT)
 |   |
-|   |-- utils/                        # Utility functions (17 files, includes logger.ts)
+|   |-- utils/                        # Utility functions (16 files, includes logger.ts)
 |   |   |-- backgroundSync.ts         # Background Sync API registration
 |   |   |-- calendarHelpers.ts        # Calendar grid calculations
 |   |   |-- countdownService.ts       # Anniversary countdown calculations
-|   |   |-- dateFormat.ts             # Relative time formatting
-|   |   |-- dateFormatters.ts         # Chat message timestamp formatting
-|   |   |-- dateHelpers.ts            # General date utilities
+|   |   |-- dateUtils.ts              # Date formatting (relative time, timestamps, helpers)
 |   |   |-- deterministicRandom.ts    # Seeded PRNG (FNV-1a + Mulberry32) for render-safe values
 |   |   |-- haptics.ts                # Vibration API haptic patterns
 |   |   |-- interactionValidation.ts  # UUID + interaction type validation
@@ -206,16 +204,16 @@ My-Love/
 |   |-- seed.sql                      # Database seed data for local development
 |   |-- functions/
 |   |   +-- upload-love-note-image/   # Edge function for love note image uploads
-|   |-- migrations/                   # 24 SQL migration files
+|   |-- migrations/                   # 25 SQL migration files
 |   +-- tests/
 |       +-- database/                 # 14 pgTAP database test files
 |
 |-- tests/
 |   |-- setup.ts                      # Vitest setup: fake-indexeddb, browser API mocks
 |   |-- api/                          # API-level tests (4 Playwright specs)
-|   |-- e2e/                          # E2E browser tests (Playwright, 25+ spec files)
+|   |-- e2e/                          # E2E browser tests (Playwright, 28 spec files)
 |   |-- integration/                  # Integration tests (1 spec)
-|   |-- unit/                         # Unit tests (Vitest + happy-dom, 25+ test files)
+|   |-- unit/                         # Unit tests (Vitest + happy-dom, 27 test files)
 |   +-- support/                      # Test infrastructure (fixtures, factories, helpers)
 |
 |-- .env.example                      # Template showing required environment variables

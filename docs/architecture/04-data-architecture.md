@@ -176,17 +176,18 @@ Pre-hydration validation (`validateHydratedState()`) checks for critical corrupt
 
 Key tables:
 
-| Table                   | Key  | Purpose                              | RLS | Access Pattern                           |
-| ----------------------- | ---- | ------------------------------------ | --- | ---------------------------------------- |
-| `users`                 | UUID | User profiles with `partner_id` link | Yes | Direct query                             |
-| `moods`                 | UUID | Synced mood entries                  | Yes | Via `moodApi.ts` with Zod validation     |
-| `interactions`          | UUID | Poke/kiss events between partners    | Yes | Via `interactionService.ts`              |
-| `photos`                | UUID | Photo metadata (blob in Storage)     | Yes | Via `photoService.ts`                    |
-| `love_notes`            | UUID | Love notes chat messages             | Yes | Direct in `notesSlice.ts`                |
-| `scripture_sessions`    | UUID | Reading session state + snapshot     | Yes | Via RPCs in `scriptureReadingService.ts` |
-| `scripture_reflections` | UUID | Per-step reflections with ratings    | Yes | Via RPCs in `scriptureReadingService.ts` |
-| `scripture_bookmarks`   | UUID | Bookmarked steps with sharing        | Yes | Direct in `scriptureReadingService.ts`   |
-| `scripture_messages`    | UUID | In-session chat messages             | Yes | Direct in `scriptureReadingService.ts`   |
+| Table                   | Key  | Purpose                              | RLS | Access Pattern                            |
+| ----------------------- | ---- | ------------------------------------ | --- | ----------------------------------------- |
+| `users`                 | UUID | User profiles with `partner_id` link | Yes | Direct query                              |
+| `moods`                 | UUID | Synced mood entries                  | Yes | Via `moodApi.ts` with Zod validation      |
+| `interactions`          | UUID | Poke/kiss events between partners    | Yes | Via `interactionService.ts`               |
+| `photos`                | UUID | Photo metadata (blob in Storage)     | Yes | Via `photoService.ts`                     |
+| `love_notes`            | UUID | Love notes chat messages             | Yes | Direct in `notesSlice.ts`                 |
+| `scripture_sessions`    | UUID | Reading session state + snapshot     | Yes | Via RPCs in `scriptureReadingService.ts`  |
+| `scripture_reflections` | UUID | Per-step reflections with ratings    | Yes | Via RPCs in `scriptureReadingService.ts`  |
+| `scripture_bookmarks`   | UUID | Bookmarked steps with sharing        | Yes | Direct in `scriptureReadingService.ts`    |
+| `scripture_messages`    | UUID | In-session chat messages             | Yes | Direct in `scriptureReadingService.ts`    |
+| `claude_bot_config`     | text | Claude bot test credentials          | Yes | Service role only (no anon/auth policies) |
 
 Storage buckets:
 

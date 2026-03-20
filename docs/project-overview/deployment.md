@@ -110,8 +110,8 @@ Source maps are generated as `hidden` when `SENTRY_AUTH_TOKEN` is present (uploa
 ### Service Worker
 
 - Strategy: InjectManifest (`src/sw.ts`)
-- Precached: `**/*.{png,jpg,jpeg,svg,woff2,ico}` only
-- Excluded from precache: `**/*.js`, `**/*.css`, `**/*.html`
+- Precached: `**/*.{js,css,png,jpg,jpeg,svg,woff2,ico}` (content-hashed filenames ensure cache-busting)
+- Excluded from precache: `**/*.html` (navigation handled by NetworkFirst route)
 - `index.html` included with timestamp-based revision for forced SW updates
 
 ### Vite Plugins

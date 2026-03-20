@@ -71,6 +71,7 @@ Key implementation details:
 - `MessageRow` extracted outside component to prevent function recreation per render
 - `rowProps` passed as a single object for stable reference
 - `getRowHeight` callback calculates height based on content length and image presence
+- Auto-scroll to bottom uses `requestAnimationFrame` to defer scroll until after react-window completes its layout pass. Without this, `scrollToRow` fires before rows are measured, causing the chat to stay scrolled to the top when re-entering the tab (fix added 2026-03-15)
 
 ## Focus Management and Accessibility
 
@@ -131,8 +132,11 @@ Several custom hooks wrap store interactions for cleaner component APIs:
 | `useReportPhase`        | Report generation, reflection summary, prayer report state                            | useSoloReadingFlow                                         |
 | `useSessionPersistence` | Auto-save, bookmarks, retry logic                                                     | useSoloReadingFlow                                         |
 | `useReadingDialogs`     | Exit confirmation dialog, focus trap                                                  | useSoloReadingFlow                                         |
-| `useLoveNotes`          | notesSlice actions + realtime setup                                                   | LoveNotes, MessageInput                                    |
-| `usePartnerMood`        | moodSlice partner mood fetching                                                       | PartnerMoodDisplay                                         |
+| `useAuth`               | AuthSlice (userId, email) into `{ user, isLoading, error }`                           | MoodTracker                                                |
+| `useLoveNotes`          | notesSlice actions + realtime setup + preview URL cleanup                             | LoveNotes, MessageInput                                    |
+| `useMoodHistory`        | moodApi pagination (offset-based, page size 50)                                       | MoodHistoryTimeline                                        |
+| `usePartnerMood`        | moodSyncService partner mood + broadcast subscription                                 | PartnerMoodDisplay                                         |
+| `usePhotos`             | photosSlice actions (upload, delete, load, clear)                                     | (available for photo components)                           |
 | `useNetworkStatus`      | Browser online/offline events                                                         | NetworkStatusIndicator, ScriptureOverview, SoloReadingFlow |
 | `useAutoSave`           | visibilitychange + beforeunload listeners                                             | SoloReadingFlow                                            |
 | `useVibration`          | Navigator.vibrate API                                                                 | MessageInput                                               |

@@ -56,7 +56,7 @@ import 'fake-indexeddb/auto'; // IndexedDB mock (auto-injected)
             'src/**/*.test.ts', 'src/**/*.test.tsx'],
   coverage: {
     provider: 'v8',
-    thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
+    thresholds: { lines: 25, functions: 25, branches: 25, statements: 25 },
   },
 }
 ```

@@ -26,7 +26,7 @@
 | `src/components/InteractionHistory/`      | 1               | InteractionHistory                                                                                                                                                                                                                                                                                                                                                                   |
 | `src/components/LoginScreen/`             | 1               | LoginScreen                                                                                                                                                                                                                                                                                                                                                                          |
 | `src/components/MoodHistory/`             | 3               | MoodHistoryCalendar, CalendarDay (memo), MoodDetailModal                                                                                                                                                                                                                                                                                                                             |
-| `src/components/MoodTracker/`             | 5               | MoodTracker, MoodButton, MoodHistoryTimeline, MoodHistoryItem, NoMoodLoggedState, PartnerMoodDisplay                                                                                                                                                                                                                                                                                 |
+| `src/components/MoodTracker/`             | 6               | MoodTracker, MoodButton, MoodHistoryTimeline, MoodHistoryItem, NoMoodLoggedState, PartnerMoodDisplay                                                                                                                                                                                                                                                                                 |
 | `src/components/Navigation/`              | 1               | BottomNavigation                                                                                                                                                                                                                                                                                                                                                                     |
 | `src/components/PartnerMoodView/`         | 1               | PartnerMoodView                                                                                                                                                                                                                                                                                                                                                                      |
 | `src/components/PhotoCarousel/`           | 2               | PhotoCarousel, PhotoCarouselControls                                                                                                                                                                                                                                                                                                                                                 |
@@ -68,7 +68,7 @@
 | Category              | Count | Components                                                                                                                                                                                                                                                                       |
 | --------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Direct useAppStore    | ~18   | App, DailyMessage, BottomNavigation, Settings, AnniversarySettings, PhotoGallery, PhotoUpload, PhotoViewer, PhotoCarousel, MoodTracker, PartnerMoodView, PokeKissInterface, InteractionHistory, ScriptureOverview, SoloReadingFlow, LobbyContainer, ReadingContainer, AdminPanel |
-| Via Custom Hook       | ~4    | LoveNotes, MessageInput (useLoveNotes), PartnerMoodDisplay (usePartnerMood), NetworkStatusIndicator (useNetworkStatus)                                                                                                                                                           |
+| Via Custom Hook       | ~5    | LoveNotes, MessageInput (useLoveNotes), MoodTracker (useAuth), PartnerMoodDisplay (usePartnerMood), NetworkStatusIndicator (useNetworkStatus)                                                                                                                                    |
 | Props Only (no store) | ~45   | All presentational components                                                                                                                                                                                                                                                    |
 
 ### By Animation Library
@@ -80,24 +80,24 @@
 | CSS animations only (animate-pulse, animate-spin) | ~8 components  |
 | No animations                                     | ~29 components |
 
-## Custom Hooks
+## Custom Hooks (14 total)
 
-| Hook                  | File                                 | Purpose                                           |
-| --------------------- | ------------------------------------ | ------------------------------------------------- |
-| useAuth               | `src/hooks/useAuth.ts`               | Authentication state management (wraps AuthSlice) |
-| useAutoSave           | `src/hooks/useAutoSave.ts`           | Visibility change / beforeunload auto-save        |
-| useImageCompression   | `src/hooks/useImageCompression.ts`   | Client-side image compression                     |
-| useLoveNotes          | `src/hooks/useLoveNotes.ts`          | Love notes CRUD + realtime                        |
-| useMoodHistory        | `src/hooks/useMoodHistory.ts`        | Mood history data loading                         |
-| useMotionConfig       | `src/hooks/useMotionConfig.ts`       | Reduced motion detection + animation configs      |
-| useNetworkStatus      | `src/hooks/useNetworkStatus.ts`      | Online/offline/connecting state                   |
-| usePartnerMood        | `src/hooks/usePartnerMood.ts`        | Partner mood realtime fetching                    |
-| usePhotos             | `src/hooks/usePhotos.ts`             | Photo operations wrapper                          |
-| useRealtimeMessages   | `src/hooks/useRealtimeMessages.ts`   | Supabase realtime broadcast for notes             |
-| useScriptureBroadcast | `src/hooks/useScriptureBroadcast.ts` | Scripture session broadcast channel               |
-| useScripturePresence  | `src/hooks/useScripturePresence.ts`  | Scripture partner presence tracking               |
-| useFocusTrap          | `src/hooks/useFocusTrap.ts`          | Focus trap for modals/dialogs                     |
-| useVibration          | `src/hooks/useVibration.ts`          | Navigator.vibrate API wrapper                     |
+| Hook                  | File                                 | Purpose                                                 | Exported from barrel |
+| --------------------- | ------------------------------------ | ------------------------------------------------------- | -------------------- |
+| useAuth               | `src/hooks/useAuth.ts`               | Authentication state from AuthSlice (userId, email)     | No                   |
+| useAutoSave           | `src/hooks/useAutoSave.ts`           | Visibility change / beforeunload auto-save              | Yes                  |
+| useFocusTrap          | `src/hooks/useFocusTrap.ts`          | Focus trap for modals/dialogs                           | Yes                  |
+| useImageCompression   | `src/hooks/useImageCompression.ts`   | Client-side image compression                           | No                   |
+| useLoveNotes          | `src/hooks/useLoveNotes.ts`          | Love notes CRUD + realtime + preview URL cleanup        | Yes                  |
+| useMoodHistory        | `src/hooks/useMoodHistory.ts`        | Mood history pagination (offset-based, page size 50)    | No                   |
+| useMotionConfig       | `src/hooks/useMotionConfig.ts`       | Reduced motion detection + animation configs            | Yes                  |
+| useNetworkStatus      | `src/hooks/useNetworkStatus.ts`      | Online/offline/connecting state                         | Yes                  |
+| usePartnerMood        | `src/hooks/usePartnerMood.ts`        | Partner mood realtime fetching + broadcast subscription | No                   |
+| usePhotos             | `src/hooks/usePhotos.ts`             | Photo operations wrapper (upload, delete, load, clear)  | No                   |
+| useRealtimeMessages   | `src/hooks/useRealtimeMessages.ts`   | Supabase realtime broadcast for notes                   | No                   |
+| useScriptureBroadcast | `src/hooks/useScriptureBroadcast.ts` | Scripture session broadcast channel                     | Yes                  |
+| useScripturePresence  | `src/hooks/useScripturePresence.ts`  | Scripture partner presence tracking                     | Yes                  |
+| useVibration          | `src/hooks/useVibration.ts`          | Navigator.vibrate API wrapper                           | Yes                  |
 
 ### Scripture Reading Sub-Hooks (co-located with components)
 

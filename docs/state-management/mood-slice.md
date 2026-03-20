@@ -19,9 +19,9 @@ Manages mood tracking with 12 mood types (6 positive, 6 challenging), partner mo
 
 ```typescript
 interface SyncStatus {
-  pendingMoods: MoodEntry[]; // Moods created offline, awaiting sync
-  isOnline: boolean; // Network status
-  lastSyncAt: string | null; // ISO timestamp of last successful sync
+  pendingMoods: number; // Count of unsynced moods (not an array)
+  isOnline: boolean; // Network status (from navigator.onLine)
+  lastSyncAt?: Date; // Date object of last successful sync (undefined initially)
   isSyncing: boolean; // Whether a sync operation is in progress
 }
 ```
@@ -48,12 +48,13 @@ interface SyncStatus {
 
 ## Offline-First Pattern
 
-1. `addMoodEntry()` creates entry via `moodService.create()` in IndexedDB (validates with `MoodEntrySchema`)
-2. Optimistic UI update -- adds to state immediately
-3. If online, immediately calls `syncPendingMoods()` (fire-and-forget)
-4. If offline, registers background sync via service worker
-5. `syncPendingMoods()` calls `moodSyncService.syncPendingMoods()`, then reloads moods and refreshes partner moods
-6. Failed syncs are retried on next sync cycle (App.tsx has 5-minute periodic sync)
+1. `addMoodEntry()` checks for existing mood today -- if found, delegates to `updateMoodEntry()`
+2. Creates entry via `moodService.create()` in IndexedDB (validates with `MoodEntrySchema`)
+3. Optimistic UI update -- adds to state immediately
+4. Calls `updateSyncStatus()` to refresh pending count
+5. If online, immediately calls `syncPendingMoods()` in a try/catch (non-blocking -- sync failure does not fail the add)
+6. `syncPendingMoods()` calls `moodSyncService.syncPendingMoods()`, reloads moods from IndexedDB, refreshes partner moods (fire-and-forget), then updates sync status and `lastSyncAt` timestamp
+7. Failed syncs are retried on next sync cycle (App.tsx has periodic sync)
 
 ## Validation
 
@@ -61,4 +62,5 @@ Mood entries are validated with Zod schemas before storage and sync. Timestamps 
 
 ## Cross-Slice Dependencies
 
-- **Reads:** `AuthSlice` (via `get().userId` in `addMoodEntry`, `updateMoodEntry` for user identity)
+- **Reads:** `AuthSlice` (via `get().userId` in `addMoodEntry` for user identity)
+- **External:** Uses `getPartnerId()` from `supabaseClient` in `fetchPartnerMoods`

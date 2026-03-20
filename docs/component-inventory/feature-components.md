@@ -109,20 +109,20 @@ Full-screen photo viewer with pinch-to-zoom gestures and delete functionality.
 **File:** `src/components/MoodTracker/MoodTracker.tsx`
 **Type:** Container (lazy-loaded)
 
-Main mood tracking component with three tabs:
+Main mood tracking component with three tabs (tab types: `'tracker' | 'history' | 'timeline'`):
 
-1. **Tracker** -- 12 mood type buttons (6 positive, 6 challenging) arranged in a grid. Multi-select support. Optional note text. Submit creates mood entry and triggers sync.
-2. **Timeline** -- Virtualized timeline via `MoodHistoryTimeline` using react-window.
-3. **Calendar** -- Monthly calendar view via `MoodHistoryCalendar` with day-level mood indicators.
+1. **Log Mood** (`tracker`) -- 12 mood type buttons (6 positive, 6 challenging) arranged in 3x2 grids per category. Multi-select support. Collapsible note field (200-char limit, collapsed by default for faster flow). Submit creates mood entry and triggers sync. Success/offline/error toasts. Uses `useAuth` hook for user identity. Checks for existing mood today on mount (pre-populates form in edit mode). Offline error with retry button and background sync registration. Partner mood display via `PartnerMoodDisplay` sub-component.
+2. **Timeline** (`timeline`) -- Virtualized timeline via `MoodHistoryTimeline` using react-window. Requires `user.id` from `useAuth`.
+3. **Calendar** (`history`) -- Monthly calendar view via `MoodHistoryCalendar` with day-level mood indicators.
 
-Each `MoodButton` is animated (scale on tap) with distinct icon and color per mood type.
+Each `MoodButton` is animated (scale on tap) with distinct Lucide icon and color per mood type.
 
 ### MoodHistoryTimeline
 
 **File:** `src/components/MoodTracker/MoodHistoryTimeline.tsx`
 **Type:** Container
 
-Uses react-window v2 `List` component for virtualized rendering of mood history. Supports infinite scroll for loading older entries.
+Uses react-window `List` component with `useInfiniteLoader` for virtualized rendering of mood history. Uses the `useMoodHistory` hook for offset-based pagination from Supabase (page size 50). Takes `userId` and optional `isPartnerView` props.
 
 ### MoodHistoryCalendar
 
@@ -192,7 +192,7 @@ Full chat page assembling header, MessageList, and MessageInput. Features:
 Virtualized message list using react-window v2 `List` with `useInfiniteLoader` for pagination. Features:
 
 - Variable row height calculation based on content length and image presence
-- Auto-scroll to bottom on initial load and new messages
+- Auto-scroll to bottom on initial load and new messages, using `requestAnimationFrame` to defer scroll until after react-window completes its layout pass (fixes scroll-to-bottom on re-entry)
 - Scroll position preservation during pagination
 - "New message" indicator button when scrolled up
 - "Beginning of conversation" indicator when all history loaded

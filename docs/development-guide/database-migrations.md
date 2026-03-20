@@ -52,7 +52,7 @@ Files must follow the format `YYYYMMDDHHmmss_short_description.sql` in UTC time.
 
 ### Current Migration Count
 
-The project has 24 migration files spanning from `20251203000001_create_base_schema.sql` through `20260315044923_fix_avg_rating_precision.sql`.
+The project has 25 migration files spanning from `20251203000001_create_base_schema.sql` through `20260316031209_create_claude_bot_config.sql`.
 
 ### Current Database Test Count
 
