@@ -15,16 +15,18 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 ```
 
-The `__WB_MANIFEST` array is injected at build time by Vite's PWA plugin. It includes image and font assets. JavaScript and CSS files are **not** precached -- they use NetworkOnly instead.
+The `__WB_MANIFEST` array is injected at build time by Vite's PWA plugin. It includes JavaScript, CSS, image, and font assets. HTML files are excluded from precache -- navigation requests are handled by a NetworkFirst route instead.
 
 ### Cache Strategies
 
-| Resource Type     | Strategy     | Cache Name         | Config                                                 | Rationale                                                        |
-| ----------------- | ------------ | ------------------ | ------------------------------------------------------ | ---------------------------------------------------------------- |
-| JS/CSS bundles    | NetworkOnly  | (none)             | (none)                                                 | Always serve latest code; prevents stale code after deployments  |
-| Navigation (HTML) | NetworkFirst | `navigation-cache` | `networkTimeoutSeconds: 3`                             | Show latest content, fall back to precached version when offline |
-| Images/Fonts      | CacheFirst   | `static-assets-v2` | `maxEntries: 100`, `maxAge: 30d`                       | Static assets rarely change; fast cached response                |
-| Google Fonts      | CacheFirst   | `google-fonts-v2`  | `maxEntries: 30`, `maxAge: 365d`, `statuses: [0, 200]` | Cross-origin fonts cached with 1-year expiry                     |
+| Resource Type     | Strategy     | Cache Name         | Config                                                 | Rationale                                                                    |
+| ----------------- | ------------ | ------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| JS/CSS bundles    | Precached    | Workbox precache   | Via `__WB_MANIFEST`                                    | Hashed filenames ensure cache-busting; precache ensures offline availability |
+| Navigation (HTML) | NetworkFirst | `navigation-cache` | `networkTimeoutSeconds: 3`                             | Always serve latest HTML from network; fall back to cache when offline       |
+| Images/Fonts      | CacheFirst   | `static-assets-v2` | `maxEntries: 100`, `maxAge: 30d`                       | Static assets rarely change; fast cached response                            |
+| Google Fonts      | CacheFirst   | `google-fonts-v2`  | `maxEntries: 30`, `maxAge: 365d`, `statuses: [0, 200]` | Cross-origin fonts cached with 1-year expiry                                 |
+
+**Note on precache strategy change (2026-03-15):** JS and CSS bundles were previously excluded from precache and served via NetworkOnly. This caused stale HTML after deployments -- the cached `index.html` could reference old JS bundle filenames that no longer existed on the server, breaking the app. The fix precaches JS/CSS (which have content-hashed filenames) so the service worker always holds matching bundles for its cached HTML. HTML remains excluded from precache to ensure `NavigationRoute` with `NetworkFirst` always fetches the latest `index.html` from the network.
 
 ### Background Sync
 

@@ -25,13 +25,13 @@ Documentation for the My-Love Progressive Web App -- a couples app for daily lov
 | Build Tool       | Vite 7.3.1 with manual chunk splitting                  |
 | State Management | Zustand 5.0.11 (single store, 11 slices, persist)       |
 | Backend          | Supabase 2.99.0 (Auth, Postgres, Storage, Realtime)     |
-| Styling          | Tailwind CSS 4.2.1 with 4 custom themes                 |
+| Styling          | Tailwind CSS 4.1.17 with 4 custom themes                |
 | Validation       | Zod 4.3.6 at all service boundaries                     |
 | Local Storage    | IndexedDB via idb 8.0.3 (8 object stores, schema v5)    |
 | PWA              | Custom InjectManifest SW with Workbox + Background Sync |
 | Testing          | Vitest 4.0.17 (unit) + Playwright 1.58.2 (E2E) + pgTAP  |
 | Deployment       | GitHub Pages at `/My-Love/` via GitHub Actions          |
 | Secrets          | fnox with age encryption provider                       |
-| Source Files     | 207 TypeScript/TSX files, ~45,054 lines in src/         |
-| Migrations       | 24 SQL migrations in supabase/migrations/               |
+| Source Files     | 207 TypeScript/TSX files, ~45,102 lines in src/         |
+| Migrations       | 25 SQL migrations in supabase/migrations/               |
 | CI Workflows     | 19 GitHub Actions workflows                             |

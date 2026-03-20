@@ -196,7 +196,7 @@ src/
     defaultMessagesLoader.ts       # Lazy loader for default messages
     scriptureSteps.ts              # Scripture reading step definitions
 
-  hooks/                           # React hooks (16: 1 barrel + 15 hooks)
+  hooks/                           # React hooks (15: 1 barrel + 14 hooks)
     index.ts                       # Barrel exports
     useAuth.ts                     # Supabase auth state
     useAutoSave.ts                 # Scripture auto-save on visibility change
@@ -257,13 +257,11 @@ src/
     models.ts                      # Supabase models (LoveNote, etc.)
     database.types.ts              # Auto-generated Supabase database types (DO NOT EDIT)
 
-  utils/                           # Utility functions (17 files)
+  utils/                           # Utility functions (16 files)
     backgroundSync.ts              # Background Sync API registration
     calendarHelpers.ts             # Calendar grid calculations
     countdownService.ts            # Anniversary countdown calculations
-    dateFormat.ts                  # Relative time formatting
-    dateFormatters.ts              # Chat message timestamp formatting
-    dateHelpers.ts                 # General date utilities
+    dateUtils.ts                   # Date formatting (relative time, timestamps, helpers)
     deterministicRandom.ts         # Seeded PRNG for render-safe values
     haptics.ts                     # Vibration API haptic patterns
     interactionValidation.ts       # UUID + interaction type validation
@@ -292,7 +290,7 @@ supabase/
   config.toml                      # Local Supabase config (Postgres 17, ports, auth)
   seed.sql                         # Database seed data
 
-  migrations/                      # SQL migrations (23 files)
+  migrations/                      # SQL migrations (25 files)
     20251203000001_create_base_schema.sql
     20251203190800_create_photos_table.sql
     20251205000001_add_love_notes_images.sql
@@ -314,8 +312,10 @@ supabase/
     20260228000001_scripture_end_session.sql
     20260301000100_fix_scripture_create_session_together_lobby.sql
     20260301000200_remove_server_side_broadcasts.sql
-    20260313000001_fix_lock_in_last_step.sql           # Pending (unstaged)
-    (additional pending migrations)
+    20260309000001_at_reflection_preset.sql
+    20260313000001_fix_lock_in_last_step.sql
+    20260315044923_fix_avg_rating_precision.sql
+    20260316031209_create_claude_bot_config.sql
 
   tests/                           # pgTAP database tests (14 files)
     database/
@@ -346,9 +346,9 @@ tests/
   setup.ts                         # Global test setup (Vitest)
   README.md                        # Test directory documentation
 
-  e2e/                             # E2E browser tests (Playwright, 25+ specs)
+  e2e/                             # E2E browser tests (Playwright, 28 specs)
     auth/                          # Login, logout, OAuth, display name (4 specs)
-    home/                          # Error boundary, welcome splash (2 specs)
+    home/                          # Error boundary, routing, welcome splash (3 specs)
     mood/                          # Mood tracker (1 spec)
     navigation/                    # Routing (1 spec)
     notes/                         # Love notes (1 spec)
@@ -359,7 +359,7 @@ tests/
 
   api/                             # API-level tests (4 Playwright specs)
   integration/                     # Integration tests (1 spec)
-  unit/                            # Unit tests (Vitest + happy-dom, 25+ files)
+  unit/                            # Unit tests (Vitest + happy-dom, 27 files)
 
   support/                         # Test infrastructure
     merged-fixtures.ts             # Main test entry point
@@ -394,7 +394,7 @@ scripts/                           # Utility scripts (12 files)
   dependabot.yml                   # Dependabot configuration
   copilot-instructions.md          # GitHub Copilot instructions
 
-  workflows/                       # GitHub Actions workflows (18 files)
+  workflows/                       # GitHub Actions workflows (19 files)
     deploy.yml                     # Build + deploy to GitHub Pages (3 jobs)
     test.yml                       # Unit + E2E test suite
     bundle-size.yml                # Bundle size tracking
@@ -404,6 +404,7 @@ scripts/                           # Utility scripts (12 files)
     supabase-migrations.yml        # Migration validation
     claude.yml                     # Claude AI assistant
     claude-code-review.yml         # Claude code review
+    claude-flaky-tests.yml         # Auto-retry flaky tests on test completion
     ci-failure-auto-fix.yml        # Auto-fix CI failures
     manual-code-analysis.yml       # Manual code analysis trigger
     bmad-story-sync.yml            # BMAD story sync automation

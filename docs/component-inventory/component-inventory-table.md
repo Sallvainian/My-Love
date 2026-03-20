@@ -33,32 +33,32 @@
 
 ## Photos
 
-| Component               | Path                                                                 | Type           | Store Connections                                             | Key Features                                                 |
-| ----------------------- | -------------------------------------------------------------------- | -------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| PhotoGallery            | `src/components/PhotoGallery/PhotoGallery.tsx`                       | Container      | photosSlice (photos, loadPhotos, loadMorePhotos, selectPhoto) | Responsive grid, IntersectionObserver infinite scroll        |
-| PhotoGridItem           | `src/components/PhotoGallery/PhotoGridItem.tsx`                      | Presentational | None (props)                                                  | Lazy-loaded thumbnail, owner badge                           |
-| PhotoGridSkeleton       | `src/components/PhotoGallery/PhotoGridSkeleton.tsx`                  | Presentational | None                                                          | Loading skeleton grid                                        |
-| PhotoViewer             | `src/components/PhotoGallery/PhotoViewer.tsx`                        | Container      | photosSlice (selectedPhotoId, deletePhoto)                    | Full-screen viewer with gestures, zoom, delete               |
-| PhotoCarousel           | `src/components/PhotoCarousel/PhotoCarousel.tsx`                     | Container      | photosSlice (photos, selectedPhotoId, selectPhoto)            | Lightbox carousel, swipe/keyboard navigation                 |
-| PhotoCarouselControls   | `src/components/PhotoCarousel/PhotoCarouselControls.tsx`             | Presentational | None (props)                                                  | Top bar controls (close, edit, delete)                       |
-| PhotoDeleteConfirmation | `src/components/PhotoDeleteConfirmation/PhotoDeleteConfirmation.tsx` | Presentational | None (props: onConfirm, onCancel)                             | Delete confirmation dialog                                   |
-| PhotoEditModal          | `src/components/PhotoEditModal/PhotoEditModal.tsx`                   | Presentational | None (props: photo, onSave, onClose)                          | Edit caption and tags modal                                  |
-| PhotoUpload             | `src/components/PhotoUpload/PhotoUpload.tsx`                         | Container      | photosSlice (uploadPhoto, storageWarning)                     | Multi-step upload: select -> preview -> uploading -> success |
-| PhotoUploader           | `src/components/photos/PhotoUploader.tsx`                            | Container      | photosSlice                                                   | Alternative uploader with compression, progress bar, toasts  |
+| Component               | Path                                                                 | Type           | Store Connections                                  | Key Features                                                 |
+| ----------------------- | -------------------------------------------------------------------- | -------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| PhotoGallery            | `src/components/PhotoGallery/PhotoGallery.tsx`                       | Container      | photosSlice (photos, loadPhotos, selectPhoto)      | Responsive grid, IntersectionObserver infinite scroll        |
+| PhotoGridItem           | `src/components/PhotoGallery/PhotoGridItem.tsx`                      | Presentational | None (props)                                       | Lazy-loaded thumbnail, owner badge                           |
+| PhotoGridSkeleton       | `src/components/PhotoGallery/PhotoGridSkeleton.tsx`                  | Presentational | None                                               | Loading skeleton grid                                        |
+| PhotoViewer             | `src/components/PhotoGallery/PhotoViewer.tsx`                        | Container      | photosSlice (selectedPhotoId, deletePhoto)         | Full-screen viewer with gestures, zoom, delete               |
+| PhotoCarousel           | `src/components/PhotoCarousel/PhotoCarousel.tsx`                     | Container      | photosSlice (photos, selectedPhotoId, selectPhoto) | Lightbox carousel, swipe/keyboard navigation                 |
+| PhotoCarouselControls   | `src/components/PhotoCarousel/PhotoCarouselControls.tsx`             | Presentational | None (props)                                       | Top bar controls (close, edit, delete)                       |
+| PhotoDeleteConfirmation | `src/components/PhotoDeleteConfirmation/PhotoDeleteConfirmation.tsx` | Presentational | None (props: onConfirm, onCancel)                  | Delete confirmation dialog                                   |
+| PhotoEditModal          | `src/components/PhotoEditModal/PhotoEditModal.tsx`                   | Presentational | None (props: photo, onSave, onClose)               | Edit caption and tags modal (uses `updatePhoto` via parent)  |
+| PhotoUpload             | `src/components/PhotoUpload/PhotoUpload.tsx`                         | Container      | photosSlice (uploadPhoto, storageWarning)          | Multi-step upload: select -> preview -> uploading -> success |
+| PhotoUploader           | `src/components/photos/PhotoUploader.tsx`                            | Container      | photosSlice                                        | Alternative uploader with compression, progress bar, toasts  |
 
 ## Mood
 
-| Component           | Path                                                 | Type                  | Store Connections                     | Key Features                                                               |
-| ------------------- | ---------------------------------------------------- | --------------------- | ------------------------------------- | -------------------------------------------------------------------------- |
-| MoodTracker         | `src/components/MoodTracker/MoodTracker.tsx`         | Container             | moodSlice (moods, addMood, syncMoods) | 12 mood types (6+6), multi-select, notes, tabs (tracker/timeline/calendar) |
-| MoodButton          | `src/components/MoodTracker/MoodButton.tsx`          | Presentational        | None (props: mood, selected, onClick) | Animated mood selection button                                             |
-| MoodHistoryTimeline | `src/components/MoodTracker/MoodHistoryTimeline.tsx` | Container             | None (props: moods)                   | react-window virtualized timeline with infinite scroll                     |
-| MoodHistoryItem     | `src/components/MoodTracker/MoodHistoryItem.tsx`     | Presentational        | None (props: mood)                    | Single mood entry with expand/collapse                                     |
-| NoMoodLoggedState   | `src/components/MoodTracker/NoMoodLoggedState.tsx`   | Presentational        | None                                  | Empty state for partner mood                                               |
-| PartnerMoodDisplay  | `src/components/MoodTracker/PartnerMoodDisplay.tsx`  | Container             | `usePartnerMood` hook                 | Partner's current mood with realtime updates                               |
-| MoodHistoryCalendar | `src/components/MoodHistory/MoodHistoryCalendar.tsx` | Container             | moodService                           | Calendar view with month navigation                                        |
-| CalendarDay         | `src/components/MoodHistory/CalendarDay.tsx`         | Presentational (memo) | None (props)                          | Single calendar day cell                                                   |
-| MoodDetailModal     | `src/components/MoodHistory/MoodDetailModal.tsx`     | Presentational        | None (props: mood, onClose)           | Mood detail with focus trap, ESC dismiss, slide-up animation               |
+| Component           | Path                                                 | Type                  | Store Connections                                                                                  | Key Features                                                                                |
+| ------------------- | ---------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| MoodTracker         | `src/components/MoodTracker/MoodTracker.tsx`         | Container             | moodSlice (addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods) + `useAuth` hook | 12 mood types (6+6), multi-select, notes, 3 tabs (Log Mood/Timeline/Calendar)               |
+| MoodButton          | `src/components/MoodTracker/MoodButton.tsx`          | Presentational        | None (props: mood, selected, onClick)                                                              | Animated mood selection button                                                              |
+| MoodHistoryTimeline | `src/components/MoodTracker/MoodHistoryTimeline.tsx` | Container             | `useMoodHistory` hook (props: userId, isPartnerView?)                                              | react-window virtualized timeline with infinite scroll via `useInfiniteLoader`              |
+| MoodHistoryItem     | `src/components/MoodTracker/MoodHistoryItem.tsx`     | Presentational        | None (props: mood)                                                                                 | Single mood entry with expand/collapse                                                      |
+| NoMoodLoggedState   | `src/components/MoodTracker/NoMoodLoggedState.tsx`   | Presentational        | None                                                                                               | Empty state for partner mood                                                                |
+| PartnerMoodDisplay  | `src/components/MoodTracker/PartnerMoodDisplay.tsx`  | Container             | `usePartnerMood` hook (props: partnerId)                                                           | Partner's current mood with realtime broadcast updates, connection status, loading skeleton |
+| MoodHistoryCalendar | `src/components/MoodHistory/MoodHistoryCalendar.tsx` | Container             | moodService                                                                                        | Calendar view with month navigation                                                         |
+| CalendarDay         | `src/components/MoodHistory/CalendarDay.tsx`         | Presentational (memo) | None (props)                                                                                       | Single calendar day cell                                                                    |
+| MoodDetailModal     | `src/components/MoodHistory/MoodDetailModal.tsx`     | Presentational        | None (props: mood, onClose)                                                                        | Mood detail with focus trap, ESC dismiss, slide-up animation                                |
 
 ## Partner
 
@@ -70,14 +70,14 @@
 
 ## Love Notes
 
-| Component             | Path                                                  | Type                  | Store Connections                       | Key Features                                                                    |
-| --------------------- | ----------------------------------------------------- | --------------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
-| LoveNotes             | `src/components/love-notes/LoveNotes.tsx`             | Container             | `useLoveNotes` hook, `navigateHome`     | Full chat page: header, message list, input, error banner                       |
-| MessageList           | `src/components/love-notes/MessageList.tsx`           | Container             | None (props from LoveNotes)             | react-window v2 virtualized list, infinite scroll, "new message" indicator      |
-| LoveNoteMessage       | `src/components/love-notes/LoveNoteMessage.tsx`       | Presentational (memo) | None (props)                            | Chat bubble, XSS sanitization (DOMPurify), image display, optimistic states     |
-| MessageInput          | `src/components/love-notes/MessageInput.tsx`          | Container             | `useLoveNotes` hook, `useVibration`     | Auto-resize textarea, image picker, character counter, Enter/Shift+Enter/Escape |
-| ImagePreview          | `src/components/love-notes/ImagePreview.tsx`          | Presentational (memo) | None (props: file, onRemove)            | Thumbnail preview, compression estimate, remove button                          |
-| FullScreenImageViewer | `src/components/love-notes/FullScreenImageViewer.tsx` | Presentational (memo) | None (props: imageUrl, isOpen, onClose) | Full-screen modal, ESC dismiss, focus trap, body scroll lock                    |
+| Component             | Path                                                  | Type                  | Store Connections                       | Key Features                                                                                                           |
+| --------------------- | ----------------------------------------------------- | --------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| LoveNotes             | `src/components/love-notes/LoveNotes.tsx`             | Container             | `useLoveNotes` hook, `navigateHome`     | Full chat page: header, message list, input, error banner                                                              |
+| MessageList           | `src/components/love-notes/MessageList.tsx`           | Container             | None (props from LoveNotes)             | react-window v2 virtualized list, infinite scroll, "new message" indicator, requestAnimationFrame scroll-to-bottom fix |
+| LoveNoteMessage       | `src/components/love-notes/LoveNoteMessage.tsx`       | Presentational (memo) | None (props)                            | Chat bubble, XSS sanitization (DOMPurify), image display, optimistic states                                            |
+| MessageInput          | `src/components/love-notes/MessageInput.tsx`          | Container             | `useLoveNotes` hook, `useVibration`     | Auto-resize textarea, image picker, character counter, Enter/Shift+Enter/Escape                                        |
+| ImagePreview          | `src/components/love-notes/ImagePreview.tsx`          | Presentational (memo) | None (props: file, onRemove)            | Thumbnail preview, compression estimate, remove button                                                                 |
+| FullScreenImageViewer | `src/components/love-notes/FullScreenImageViewer.tsx` | Presentational (memo) | None (props: imageUrl, isOpen, onClose) | Full-screen modal, ESC dismiss, focus trap, body scroll lock                                                           |
 
 ## Scripture Reading
 

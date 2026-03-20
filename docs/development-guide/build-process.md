@@ -91,9 +91,9 @@ The service worker is compiled from `src/sw.ts` using the InjectManifest strateg
 
 - **Precache manifest** is injected into `sw.js` by the VitePWA plugin
 - **Runtime caching strategies** are defined in `src/sw.ts` (NetworkFirst, CacheFirst, etc.)
-- **Precached assets**: only static assets (`*.png`, `*.jpg`, `*.jpeg`, `*.svg`, `*.woff2`, `*.ico`)
-- **Not precached**: JavaScript, CSS, and HTML files (these use runtime caching strategies defined in `sw.ts`)
-- **`index.html`** is included in precache with a timestamp-based revision, forcing service worker updates on every build
+- **Precached assets**: JavaScript, CSS, and static assets (`*.js`, `*.css`, `*.png`, `*.jpg`, `*.jpeg`, `*.svg`, `*.woff2`, `*.ico`)
+- **Not precached**: HTML files and source maps (`*.html`, `*.map`) -- HTML is served via a NetworkFirst NavigationRoute in `sw.ts` to prevent stale HTML after deployments
+- **Navigation requests**: Handled by a NetworkFirst strategy with a 3-second timeout, falling back to cache only when offline
 
 The `workbox` section in VitePWA config is intentionally omitted because InjectManifest ignores it. All runtime caching behavior is controlled in `src/sw.ts`.
 

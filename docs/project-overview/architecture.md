@@ -123,9 +123,9 @@ All lazy-loaded components are wrapped in `<Suspense>` with a spinner fallback a
 
 Uses the InjectManifest strategy (not GenerateSW). The custom service worker handles:
 
-- **Precaching**: Static assets only (images, fonts via `**/*.{png,jpg,jpeg,svg,woff2,ico}`) -- JS and CSS are excluded from precache and handled by runtime caching
+- **Precaching**: JS, CSS, images, and fonts via `**/*.{js,css,png,jpg,jpeg,svg,woff2,ico}` -- HTML is excluded from precache (handled by NetworkFirst navigation route)
 - **Background Sync**: Mood entries via direct IndexedDB reads and Supabase REST API calls
-- **Cache strategies**: NetworkOnly for JS/CSS, NetworkFirst for navigation (3s timeout), CacheFirst for images/fonts/Google Fonts
+- **Cache strategies**: Precached JS/CSS (content-hashed filenames), NetworkFirst for navigation (3s timeout), CacheFirst for images/fonts/Google Fonts
 - **Database operations**: Isolated in `src/sw-db.ts` (separate from app IndexedDB code)
 - **Sync notification**: Posts `BACKGROUND_SYNC_COMPLETED` message to the main thread with `successCount` and `failCount` for toast notification
 - **Auto-update**: `skipWaiting()` + `clientsClaim()` for immediate activation
@@ -183,7 +183,7 @@ The project uses a centralized `logger` utility (`src/utils/logger.ts`) that rep
 
 ## Database Schema
 
-Supabase Postgres with 24 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
+Supabase Postgres with 25 migration files in `supabase/migrations/`. Postgres major version: 17. Tables include:
 
 - `users` -- App users with `partner_id` for partner linking
 - `moods` -- Mood tracking entries with emoji, multi-mood support, and optional notes

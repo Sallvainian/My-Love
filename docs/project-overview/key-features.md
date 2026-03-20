@@ -196,8 +196,8 @@ A welcome screen displayed on first visit and after every 60 minutes of inactivi
 
 - Installable on iOS (Safari "Add to Home Screen") and Android (Chrome "Install App")
 - Offline functionality via custom service worker with InjectManifest strategy
-- Precaching for static assets (images and fonts only)
-- Runtime caching: NetworkOnly for JS/CSS, NetworkFirst for navigation, CacheFirst for images/fonts/Google Fonts
+- Precaching for JS, CSS, images, and fonts (HTML excluded -- served via NetworkFirst)
+- Runtime caching: NetworkFirst for navigation (3s timeout), CacheFirst for images/fonts/Google Fonts
 - PWA manifest: theme color `#FF6B9D`, background color `#FFE5EC`, standalone display, portrait orientation
 - Auto-update registration via `workbox-window` with immediate reload on new version
 
