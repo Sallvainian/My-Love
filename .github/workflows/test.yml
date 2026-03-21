@@ -102,7 +102,7 @@ jobs:
         uses: ./.github/actions/setup-supabase
 
       - name: Run pgTAP tests
-        run: npx supabase test db
+        run: supabase test db
 
       - name: Stop Supabase
         if: always()
