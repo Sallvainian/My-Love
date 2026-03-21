@@ -16,7 +16,7 @@ import {
   type TimeDifference,
 } from '../../config/relationshipDates';
 
-export interface BirthdayCountdownProps {
+interface BirthdayCountdownProps {
   birthday: BirthdayInfo;
 }
 

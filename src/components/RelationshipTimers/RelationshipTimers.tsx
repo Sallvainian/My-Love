@@ -14,7 +14,7 @@ import { BirthdayCountdown } from './BirthdayCountdown';
 import { EventCountdown } from './EventCountdown';
 import { TimeTogether } from './TimeTogether';
 
-export interface RelationshipTimersProps {
+interface RelationshipTimersProps {
   className?: string;
 }
 

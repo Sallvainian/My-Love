@@ -7,6 +7,6 @@
  * import { NetworkStatusIndicator, NetworkStatusDot } from './components/shared';
  */
 
-export { NetworkStatusDot, NetworkStatusIndicator } from './NetworkStatusIndicator';
+export { NetworkStatusIndicator } from './NetworkStatusIndicator';
 
 export { SyncToast, type SyncResult } from './SyncToast';

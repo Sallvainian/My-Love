@@ -12,9 +12,8 @@ import {
   CreateMessageInputSchema,
   CustomMessagesExportSchema,
   UpdateMessageInputSchema,
-  createValidationError,
-  isZodError,
-} from '../validation';
+} from '../validation/schemas';
+import { createValidationError, isZodError } from '../validation/errorMessages';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 

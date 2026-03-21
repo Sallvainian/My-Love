@@ -24,7 +24,7 @@ import {
 } from '../../utils/countdownService';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 
-export interface CountdownTimerProps {
+interface CountdownTimerProps {
   anniversaries: Anniversary[];
   className?: string;
   maxDisplay?: number;

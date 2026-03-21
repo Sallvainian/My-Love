@@ -16,7 +16,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { IMAGE_VALIDATION } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
 
-export interface ImagePreviewProps {
+interface ImagePreviewProps {
   file: File;
   onRemove: () => void;
   isCompressing?: boolean;

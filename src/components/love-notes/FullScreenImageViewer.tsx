@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 
-export interface FullScreenImageViewerProps {
+interface FullScreenImageViewerProps {
   imageUrl: string | null;
   isOpen: boolean;
   onClose: () => void;

@@ -13,7 +13,7 @@ import { calculateTimeDifference, type TimeDifference } from '../../config/relat
 
 type IconType = 'ring' | 'plane' | 'calendar';
 
-export interface EventCountdownProps {
+interface EventCountdownProps {
   label: string;
   icon: IconType;
   date: Date | null;
