@@ -35,6 +35,10 @@ done < <(grep -ohrE "import\('[^']+'\)" src/ | grep -oE "'[^']+'" | sort -u)
 exclude_parts=(
   "database[.]types[.]ts"
   "tests/setup[.]ts"
+  # Barrel files where consumers import sub-modules directly (not dead, just bypassed)
+  "validation/index[.]ts"
+  # Hooks barrel — useFocusTrap and useNetworkStatus are imported through it
+  "hooks/index[.]ts"
 )
 
 # Add lazy-imported component names
