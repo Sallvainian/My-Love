@@ -182,4 +182,3 @@ function getDaysSince(pastDate: Date): number {
   const diff = today.getTime() - past.getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
-
