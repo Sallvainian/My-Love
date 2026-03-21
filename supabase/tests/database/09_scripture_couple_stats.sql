@@ -316,11 +316,11 @@ select ok(
   '3.1-DB-002c: lastCompleted is session 2 completed_at'
 );
 
--- avgRating: 13 ratings totaling 51 → 51/13 ≈ 3.923
--- Allow small floating point tolerance
+-- avgRating: 13 ratings totaling 51 → 51/13 ≈ 3.923 → round(_, 1) = 3.9
+-- The RPC rounds to 1 decimal place (see fix_avg_rating_precision migration)
 select ok(
-  abs((current_setting('tests.stats_result_a2')::jsonb->>'avgRating')::numeric - 3.923) < 0.01,
-  '3.1-DB-002d: avgRating ≈ 3.92 (51/13 ratings across both partners)'
+  abs((current_setting('tests.stats_result_a2')::jsonb->>'avgRating')::numeric - 3.9) < 0.01,
+  '3.1-DB-002d: avgRating ≈ 3.9 (51/13 ratings across both partners, rounded to 1dp)'
 );
 
 -- bookmarkCount: 5 total bookmarks (2 from session 1 + 3 from session 2)
