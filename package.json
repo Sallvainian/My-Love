@@ -82,7 +82,6 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "rollup-plugin-visualizer": "^6.0.5",
-    "supabase": "^2.77.1",
     "tailwindcss": "^4.1.17",
     "tdd-guard-vitest": "^0.1.6",
     "tsx": "^4.21.0",
