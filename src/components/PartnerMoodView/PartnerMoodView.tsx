@@ -620,8 +620,12 @@ interface MoodCardProps {
 
 const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps) {
   const { mood, date, note, timestamp } = moodEntry;
-  const config = MOOD_CONFIG[mood];
-  const Icon = config.icon;
+
+  // Read moods array, fall back to [mood] for legacy entries
+  const allMoods = moodEntry.moods && moodEntry.moods.length > 0 ? moodEntry.moods : [mood];
+
+  const primaryConfig = MOOD_CONFIG[allMoods[0]];
+  const PrimaryIcon = primaryConfig.icon;
 
   return (
     <motion.div
@@ -633,17 +637,19 @@ const MoodCard = memo(function MoodCard({ moodEntry, formatDate }: MoodCardProps
     >
       <div className="flex items-start gap-4">
         {/* Mood Icon */}
-        <div className={`${config.color} mt-1`}>
-          <Icon className="h-6 w-6" />
+        <div className={`${primaryConfig.color} mt-1`}>
+          <PrimaryIcon className="h-6 w-6" />
         </div>
 
         {/* Mood Content */}
         <div className="flex-1">
           {/* Date and Mood Label */}
           <div className="mb-2 flex items-center justify-between">
-            <div>
-              <span className="font-semibold text-gray-900">{config.label}</span>
-              <span className="ml-2 text-sm text-gray-500">{formatDate(date)}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-gray-900">
+                {allMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
+              </span>
+              <span className="text-sm text-gray-500">{formatDate(date)}</span>
             </div>
             <span className="text-xs text-gray-400">
               {new Date(timestamp).toLocaleTimeString('en-US', {

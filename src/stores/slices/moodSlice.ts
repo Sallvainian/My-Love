@@ -201,6 +201,12 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    * Story 6.4: AC #1 - Background sync with retry logic
    */
   syncPendingMoods: async () => {
+    // Concurrency guard: skip if already syncing to prevent duplicate DB rows
+    if (get().syncStatus.isSyncing) {
+      logger.debug('[MoodSlice] Skipping sync - already in progress');
+      return { synced: 0, failed: 0 };
+    }
+
     try {
       // Mark sync as in-progress
       set((state) => ({
