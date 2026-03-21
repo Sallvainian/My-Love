@@ -1,18 +1,18 @@
-import { memo } from 'react';
 import { m as motion } from 'framer-motion';
 import {
-  Heart,
-  Smile,
-  Meh,
-  MessageCircle,
-  Sparkles,
-  Frown,
   AlertCircle,
   Angry,
-  UserMinus,
   Battery,
+  Frown,
+  Heart,
+  Meh,
+  MessageCircle,
+  Smile,
+  Sparkles,
+  UserMinus,
   Zap,
 } from 'lucide-react';
+import { memo } from 'react';
 import type { MoodEntry, MoodType } from '../../types';
 
 /**
@@ -67,6 +67,17 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
 }) {
   const hasMood = !!mood;
 
+  // Read moods array, fall back to [mood.mood] for legacy entries
+  const allMoods: MoodType[] =
+    hasMood && mood.moods && mood.moods.length > 0
+      ? mood.moods
+      : hasMood
+        ? [mood.mood as MoodType]
+        : [];
+
+  // Use the first mood for bg color and icon
+  const primaryMood = allMoods.length > 0 ? allMoods[0] : undefined;
+
   // Visual hierarchy: current day > mood days > empty days
   // Task 10: Added focus indicators for accessibility
   const dayClasses = [
@@ -88,8 +99,8 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
     hasMood ? 'cursor-pointer' : '',
     isToday
       ? 'bg-pink-100 border-2 border-pink-500'
-      : hasMood
-        ? MOOD_CONFIG[mood.mood as MoodType].bgColor
+      : hasMood && primaryMood
+        ? MOOD_CONFIG[primaryMood].bgColor
         : 'bg-gray-50 hover:bg-gray-100',
   ].join(' ');
 
@@ -101,7 +112,7 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
       data-has-mood={hasMood ? 'true' : 'false'}
       aria-label={
         hasMood
-          ? `${monthName} ${dayNumber}, ${year} - ${mood.mood} mood. Press enter to view details.`
+          ? `${monthName} ${dayNumber}, ${year} - ${allMoods.join(', ')} mood. Press enter to view details.`
           : `${monthName} ${dayNumber}, ${year}`
       }
       aria-disabled={!hasMood}
@@ -116,16 +127,16 @@ export const CalendarDay = memo<CalendarDayProps>(function CalendarDay({
         {dayNumber}
       </span>
 
-      {/* Mood indicator */}
-      {hasMood && (
+      {/* Mood indicator - use first mood for icon */}
+      {hasMood && primaryMood && (
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.1, type: 'spring' }}
-          className={`mt-1 ${MOOD_CONFIG[mood.mood as MoodType].color}`}
+          className={`mt-1 ${MOOD_CONFIG[primaryMood].color}`}
         >
           {(() => {
-            const Icon = MOOD_CONFIG[mood.mood as MoodType].icon;
+            const Icon = MOOD_CONFIG[primaryMood].icon;
             return <Icon className="h-4 w-4" />;
           })()}
         </motion.div>

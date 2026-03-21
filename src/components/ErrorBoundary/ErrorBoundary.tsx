@@ -1,6 +1,6 @@
-import { Component } from 'react';
-import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/react';
+import type { ReactNode } from 'react';
+import { Component } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -92,5 +92,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-export default ErrorBoundary;

@@ -7,10 +7,10 @@
  * Love Notes Images: Task 11 - Component tests (AC-1 through AC-6, AC-10, AC-11)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { HTMLAttributes, ReactNode } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { HTMLAttributes, ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessageInput } from '../MessageInput';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };

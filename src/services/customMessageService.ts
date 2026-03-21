@@ -1,22 +1,21 @@
 import { openDB } from 'idb';
+import { LOG_TRUNCATE_LENGTH } from '../config/performance';
 import type {
-  Message,
   CreateMessageInput,
-  UpdateMessageInput,
-  MessageFilter,
   CustomMessagesExport,
+  Message,
+  MessageFilter,
+  UpdateMessageInput,
 } from '../types';
-import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
+import { logger } from '../utils/logger';
 import {
   CreateMessageInputSchema,
-  UpdateMessageInputSchema,
   CustomMessagesExportSchema,
-  createValidationError,
-  isZodError,
-} from '../validation';
-import { LOG_TRUNCATE_LENGTH } from '../config/performance';
-import { logger } from '../utils/logger';
+  UpdateMessageInputSchema,
+} from '../validation/schemas';
+import { createValidationError, isZodError } from '../validation/errorMessages';
+import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 
 /**
  * Custom Message Service - IndexedDB CRUD operations for custom messages

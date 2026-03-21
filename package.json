@@ -33,7 +33,8 @@
     "postdeploy": "echo 'Deployment complete! Run: node scripts/post-deploy-check.cjs [YOUR_URL]'",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint:fix": "eslint src tests scripts --fix --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**' && prettier --write ."
+    "lint:fix": "eslint src tests scripts --fix --no-error-on-unmatched-pattern --ignore-pattern 'tests/playwright-report/**' --ignore-pattern 'tests/test-results/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**' --ignore-pattern '_bmad-output/**' --ignore-pattern '_bmad/**' --ignore-pattern '.codex/**' && prettier --write .",
+    "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
     "@sentry/react": "^10.45.0",

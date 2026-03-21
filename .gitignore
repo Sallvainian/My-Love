@@ -10,7 +10,7 @@ gha-creds-*.json
 # Test failure reports
 failures-ai.md
 playwright-results.json
-_bmad-output/pw-test-results/
+_bmad-output/
 
 # Logs
 logs

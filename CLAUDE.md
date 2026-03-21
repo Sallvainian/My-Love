@@ -127,6 +127,7 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 
 - Always read relevant documentation/docs files BEFORE making changes. Never rush into implementation without understanding the full context first.
 - Prefer comprehensive fixes over minimal fixes. When fixing issues, fix them thoroughly rather than suggesting the smallest possible change.
+- When using playwright-cli for browser automation, always open in headed mode (`playwright-cli open --headed`) so the browser window is visible.
 
 ## Communication
 

@@ -1,5 +1,5 @@
 import type { DBSchema, IDBPDatabase } from 'idb';
-import type { MoodEntry, Message, Photo } from '../types';
+import type { Message, MoodEntry, Photo } from '../types';
 import { logger } from '../utils/logger';
 
 /**
@@ -31,10 +31,7 @@ export type ScriptureSessionPhase =
   | 'reflection'
   | 'report'
   | 'complete';
-export type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
-
-/** Story 4.1: Role a participant takes in a together-mode lobby */
-export type ScriptureSessionRole = 'reader' | 'responder';
+type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
 
 /**
  * Scripture session stored in IndexedDB for offline support
@@ -52,8 +49,8 @@ export interface ScriptureSession {
   startedAt: Date;
   completedAt?: Date;
   // Story 4.1: Role and ready state (populated from server snapshot)
-  myRole?: ScriptureSessionRole;
-  partnerRole?: ScriptureSessionRole;
+  myRole?: 'reader' | 'responder';
+  partnerRole?: 'reader' | 'responder';
   user1Ready?: boolean;
   user2Ready?: boolean;
   countdownStartedAt?: Date;
@@ -189,11 +186,6 @@ export const STORE_NAMES = {
   SCRIPTURE_BOOKMARKS: 'scripture-bookmarks',
   SCRIPTURE_MESSAGES: 'scripture-messages',
 } as const;
-
-/**
- * Store name literal types for type-safe store access
- */
-export type MyLoveStoreName = keyof MyLoveDBSchema;
 
 /**
  * Centralized IndexedDB upgrade function

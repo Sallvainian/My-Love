@@ -9,14 +9,14 @@
  * - Broadcast API provides consistent cross-user messaging
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import { useAppStore } from '../stores/useAppStore';
-import { supabase } from '../api/supabaseClient';
-import { logger } from '../utils/logger';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useCallback, useEffect, useRef } from 'react';
+import { supabase } from '../api/supabaseClient';
+import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
+import { logger } from '../utils/logger';
 
-export interface UseRealtimeMessagesOptions {
+interface UseRealtimeMessagesOptions {
   onNewMessage?: (message: LoveNote) => void;
   enabled?: boolean;
 }
@@ -145,5 +145,3 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   // Note: Accessing refs during render is not recommended
   return {};
 }
-
-export default useRealtimeMessages;

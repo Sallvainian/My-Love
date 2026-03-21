@@ -19,7 +19,7 @@ import { supabase } from '../../api/supabaseClient';
 import { logger } from '../../utils/logger';
 import './DisplayNameSetup.css';
 
-export interface DisplayNameSetupProps {
+interface DisplayNameSetupProps {
   /** Whether the modal is open */
   isOpen: boolean;
   /** Callback when display name is set successfully */
@@ -197,5 +197,3 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
     </div>
   );
 };
-
-export default DisplayNameSetup;

@@ -18,14 +18,14 @@
  * to handle React StrictMode double-mount.
  */
 
-import { useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { supabase } from '../api/supabaseClient';
-import { useAppStore } from '../stores/useAppStore';
-import type { StateUpdatePayload } from '../stores/slices/scriptureReadingSlice';
-import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
 import type { ScriptureError } from '../services/scriptureReadingService';
+import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
+import type { StateUpdatePayload } from '../stores/slices/scriptureReadingSlice';
+import { useAppStore } from '../stores/useAppStore';
 
 interface PartnerJoinedPayload {
   user_id: string;

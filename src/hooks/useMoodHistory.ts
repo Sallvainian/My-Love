@@ -7,7 +7,7 @@
  * @module hooks/useMoodHistory
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { moodApi } from '../api/moodApi';
 import type { SupabaseMood } from '../api/validation/supabaseSchemas';
 

@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, Camera, Loader } from 'lucide-react';
+import { AnimatePresence, m as motion } from 'framer-motion';
+import { Camera, Loader, Upload, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 
 interface PhotoUploadProps {

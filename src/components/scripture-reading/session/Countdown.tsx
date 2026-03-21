@@ -14,9 +14,9 @@
  * and "Session started" when done.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { ReactElement } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
 
 interface CountdownProps {
