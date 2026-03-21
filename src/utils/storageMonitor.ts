@@ -109,25 +109,3 @@ export function logStorageQuota(): void {
     );
   }
 }
-
-/**
- * Check if there's enough space to store data of given size
- *
- * @param estimatedBytes - Estimated size of data to store
- * @param safetyMargin - Safety margin as percentage (default: 10%)
- * @returns true if storage has sufficient space
- */
-export function hasStorageSpace(estimatedBytes: number, safetyMargin: number = 0.1): boolean {
-  const quota = getStorageQuotaInfo();
-  const requiredSpace = estimatedBytes * (1 + safetyMargin);
-  return quota.available >= requiredSpace;
-}
-
-/**
- * Format bytes to human-readable string
- */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}

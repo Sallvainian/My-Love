@@ -64,10 +64,3 @@ export const BYTES_PER_MB = 1024 * 1024;
  * Log message truncation length for debugging
  */
 export const LOG_TRUNCATE_LENGTH = 50;
-
-/**
- * Type exports for readonly constant objects
- */
-export type PaginationConfig = typeof PAGINATION;
-export type StorageQuotaConfig = typeof STORAGE_QUOTAS;
-export type ValidationLimitsConfig = typeof VALIDATION_LIMITS;

@@ -15,30 +15,6 @@ export interface BirthdayInfo {
   birthYear: number;
 }
 
-export interface VisitInfo {
-  id: string;
-  label: string;
-  date: Date | null; // null = not yet planned
-  description?: string;
-}
-
-export interface RelationshipDatesConfig {
-  /** The date and time the relationship started */
-  datingStart: Date;
-
-  /** Birthday information for both partners */
-  birthdays: {
-    frank: BirthdayInfo;
-    gracie: BirthdayInfo;
-  };
-
-  /** Wedding date - null if not yet set */
-  wedding: Date | null;
-
-  /** Planned visits to each other */
-  visits: VisitInfo[];
-}
-
 /**
  * Relationship dates configuration
  *
@@ -46,7 +22,7 @@ export interface RelationshipDatesConfig {
  * Frank's birthday: July 9th, 1997
  * Gracie's birthday: March 10th, 1998
  */
-export const RELATIONSHIP_DATES: RelationshipDatesConfig = {
+export const RELATIONSHIP_DATES = {
   // October 18, 2025 at 6:00pm local time
   datingStart: new Date('2025-10-18T18:00:00'),
 
@@ -145,46 +121,4 @@ export function calculateTimeDifference(from: Date, to: Date): TimeDifference {
     totalMilliseconds: absDiff,
     isPast,
   };
-}
-
-/**
- * Format time together as a readable string
- * Format: "X year(s) Y day(s) Z hour(s) M minute(s) and S second(s) together"
- */
-export function formatTimeTogether(diff: TimeDifference): string {
-  const parts: string[] = [];
-
-  if (diff.years > 0) {
-    parts.push(`${diff.years} ${diff.years === 1 ? 'year' : 'years'}`);
-  }
-
-  if (diff.days > 0 || diff.years > 0) {
-    parts.push(`${diff.days} ${diff.days === 1 ? 'day' : 'days'}`);
-  }
-
-  parts.push(`${diff.hours} ${diff.hours === 1 ? 'hour' : 'hours'}`);
-  parts.push(`${diff.minutes} ${diff.minutes === 1 ? 'minute' : 'minutes'}`);
-  parts.push(`${diff.seconds} ${diff.seconds === 1 ? 'second' : 'seconds'}`);
-
-  // Join with commas and "and" before the last item
-  if (parts.length > 1) {
-    const lastPart = parts.pop();
-    return `${parts.join(', ')} and ${lastPart} together`;
-  }
-
-  return `${parts[0]} together`;
-}
-
-/**
- * Format countdown as days, hours, minutes, seconds
- */
-export function formatCountdown(diff: TimeDifference): string {
-  const totalDays = diff.years * 365 + diff.days;
-
-  const dayStr = `${totalDays} ${totalDays === 1 ? 'day' : 'days'}`;
-  const hourStr = String(diff.hours).padStart(2, '0');
-  const minStr = String(diff.minutes).padStart(2, '0');
-  const secStr = String(diff.seconds).padStart(2, '0');
-
-  return `${dayStr} ${hourStr}:${minStr}:${secStr}`;
 }
