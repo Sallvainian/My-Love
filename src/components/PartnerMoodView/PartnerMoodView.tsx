@@ -1,34 +1,34 @@
-import { useState, useEffect, useCallback, memo } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  Heart,
-  Smile,
-  Meh,
-  MessageCircle,
-  Sparkles,
-  RefreshCw,
-  Calendar,
-  Bell,
-  Wifi,
-  WifiOff,
-  Search,
-  UserPlus,
-  Check,
-  X,
-  Users,
-  Frown,
   AlertCircle,
   Angry,
-  UserMinus,
   Battery,
+  Bell,
+  Calendar,
+  Check,
+  Frown,
+  Heart,
+  Meh,
+  MessageCircle,
+  RefreshCw,
+  Search,
+  Smile,
+  Sparkles,
+  UserMinus,
+  UserPlus,
+  Users,
+  Wifi,
+  WifiOff,
+  X,
   Zap,
 } from 'lucide-react';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { moodSyncService } from '../../api/moodSyncService';
+import { PARTNER_NAME } from '../../config/constants';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
-import { PARTNER_NAME } from '../../config/constants';
-import { moodSyncService } from '../../api/moodSyncService';
-import { PokeKissInterface } from '../PokeKissInterface';
 import { logger } from '../../utils/logger';
+import { PokeKissInterface } from '../PokeKissInterface';
 
 // Mood icon mapping (same as MoodTracker)
 const MOOD_CONFIG = {

@@ -3,8 +3,8 @@
  * Story 3.1: AC #1, #2, #5
  */
 
+import { Bookmark, BookOpen, Calendar, CheckCircle, Star } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { BookOpen, CheckCircle, Calendar, Star, Bookmark } from 'lucide-react';
 import type { CoupleStats } from '../../../stores/types';
 import { formatRelativeDate } from '../../../utils/dateUtils';
 

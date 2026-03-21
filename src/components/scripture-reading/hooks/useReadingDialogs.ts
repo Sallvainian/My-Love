@@ -5,7 +5,7 @@
  * focus save/restore for the reading flow.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusTrap } from '../../../hooks';
 
 interface UseReadingDialogsParams {

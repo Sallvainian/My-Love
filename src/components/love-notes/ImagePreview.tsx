@@ -10,13 +10,13 @@
  * - isCompressing: Whether compression is in progress
  */
 
-import { memo, useMemo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2 } from 'lucide-react';
-import { imageCompressionService } from '../../services/imageCompressionService';
+import { Loader2, X } from 'lucide-react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { IMAGE_VALIDATION } from '../../config/images';
+import { imageCompressionService } from '../../services/imageCompressionService';
 
-export interface ImagePreviewProps {
+interface ImagePreviewProps {
   file: File;
   onRemove: () => void;
   isCompressing?: boolean;

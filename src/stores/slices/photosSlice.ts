@@ -17,9 +17,9 @@
  * - No local persistence (photos loaded on demand)
  */
 
-import type { AppStateCreator } from '../types';
+import type { PhotoUploadInput, PhotoWithUrls, SupabasePhoto } from '../../services/photoService';
 import { photoService } from '../../services/photoService';
-import type { PhotoWithUrls, PhotoUploadInput, SupabasePhoto } from '../../services/photoService';
+import type { AppStateCreator } from '../types';
 
 export interface PhotosSlice {
   // State

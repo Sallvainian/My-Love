@@ -7,12 +7,12 @@
  * Love Notes Images: Task 11 - Unit tests
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  uploadLoveNoteImage,
-  uploadCompressedBlob,
-  getSignedImageUrl,
   deleteLoveNoteImage,
+  getSignedImageUrl,
+  uploadCompressedBlob,
+  uploadLoveNoteImage,
 } from '../loveNoteImageService';
 
 type SessionResponse = Awaited<

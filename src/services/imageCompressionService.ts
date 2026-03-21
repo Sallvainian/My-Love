@@ -1,5 +1,5 @@
-import type { CompressionOptions, CompressionResult } from '../types';
 import { IMAGE_COMPRESSION, IMAGE_VALIDATION } from '../config/images';
+import type { CompressionOptions, CompressionResult } from '../types';
 import { logger } from '../utils/logger';
 
 /**

@@ -3,11 +3,11 @@
  * Story 5.2: AC-5.2.2 - Device vibrates on successful mood save
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isVibrationSupported,
-  triggerMoodSaveHaptic,
   triggerErrorHaptic,
+  triggerMoodSaveHaptic,
   triggerSelectionHaptic,
 } from '../haptics';
 

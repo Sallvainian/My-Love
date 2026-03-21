@@ -22,12 +22,12 @@ import { useCallback, useMemo } from 'react';
 /**
  * Vibration pattern type - single duration or array of durations
  */
-export type VibrationPattern = number | number[];
+type VibrationPattern = number | number[];
 
 /**
  * Hook return type
  */
-export interface UseVibrationReturn {
+interface UseVibrationReturn {
   /**
    * Triggers device vibration with the given pattern
    * @param pattern - Duration in ms (number) or pattern array [vibrate, pause, vibrate, ...]

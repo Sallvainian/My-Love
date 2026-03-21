@@ -10,10 +10,10 @@
  * - 3.1-UNIT-013 (P3): Zod schema validates RPC response shape (CoupleStatsSchema)
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
-// Mock Supabase client (same pattern as scriptureReadingService.service.test.ts)
+// Mock Supabase client (same pattern as scriptureReadingService.cache.test.ts)
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: {
     auth: {
@@ -53,9 +53,22 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 
 describe('scriptureReadingService — getCoupleStats', () => {
-  beforeEach(async () => {
+  // Import once — getCoupleStats() has no module-level state, so
+  // vi.clearAllMocks() between tests is sufficient for isolation.
+  let scriptureReadingService: Awaited<
+    typeof import('../../../src/services/scriptureReadingService')
+  >['scriptureReadingService'];
+  let supabase: Awaited<typeof import('../../../src/api/supabaseClient')>['supabase'];
+
+  beforeAll(async () => {
+    const svc = await import('../../../src/services/scriptureReadingService');
+    scriptureReadingService = svc.scriptureReadingService;
+    const client = await import('../../../src/api/supabaseClient');
+    supabase = client.supabase;
+  });
+
+  beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   // ============================================
@@ -63,8 +76,6 @@ describe('scriptureReadingService — getCoupleStats', () => {
   // ============================================
   describe('getCoupleStats success', () => {
     it('should call supabase.rpc with scripture_get_couple_stats and return typed CoupleStats', async () => {
-      const { supabase } = await import('../../../src/api/supabaseClient');
-
       const rpcResponse = {
         totalSessions: 12,
         totalSteps: 204,
@@ -81,9 +92,6 @@ describe('scriptureReadingService — getCoupleStats', () => {
         statusText: 'OK',
       });
 
-      const { scriptureReadingService } =
-        await import('../../../src/services/scriptureReadingService');
-
       const stats = await scriptureReadingService.getCoupleStats();
 
       expect(supabase.rpc).toHaveBeenCalledWith('scripture_get_couple_stats');
@@ -98,8 +106,6 @@ describe('scriptureReadingService — getCoupleStats', () => {
     });
 
     it('should validate RPC response against Zod schema and return null on invalid shape', async () => {
-      const { supabase } = await import('../../../src/api/supabaseClient');
-
       // Malformed response (missing required fields)
       vi.mocked(supabase.rpc).mockResolvedValue({
         data: { totalSessions: 'not-a-number' },
@@ -108,9 +114,6 @@ describe('scriptureReadingService — getCoupleStats', () => {
         status: 200,
         statusText: 'OK',
       });
-
-      const { scriptureReadingService } =
-        await import('../../../src/services/scriptureReadingService');
 
       const stats = await scriptureReadingService.getCoupleStats();
       expect(stats).toBeNull();
@@ -122,8 +125,6 @@ describe('scriptureReadingService — getCoupleStats', () => {
   // ============================================
   describe('getCoupleStats error handling', () => {
     it('should return null on Supabase RPC error', async () => {
-      const { supabase } = await import('../../../src/api/supabaseClient');
-
       vi.mocked(supabase.rpc).mockResolvedValue({
         data: null,
         error: { message: 'RPC failed', details: '', hint: '', code: '500' },
@@ -132,21 +133,13 @@ describe('scriptureReadingService — getCoupleStats', () => {
         statusText: 'Internal Server Error',
       });
 
-      const { scriptureReadingService } =
-        await import('../../../src/services/scriptureReadingService');
-
       const stats = await scriptureReadingService.getCoupleStats();
 
       expect(stats).toBeNull();
     });
 
     it('should return null on network exception', async () => {
-      const { supabase } = await import('../../../src/api/supabaseClient');
-
       vi.mocked(supabase.rpc).mockRejectedValue(new Error('Network timeout'));
-
-      const { scriptureReadingService } =
-        await import('../../../src/services/scriptureReadingService');
 
       const stats = await scriptureReadingService.getCoupleStats();
 

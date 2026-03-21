@@ -16,11 +16,11 @@
  * Cleanup: channel removed + interval cleared on unmount.
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../api/supabaseClient';
-import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
 import type { ScriptureError } from '../services/scriptureReadingService';
+import { handleScriptureError, ScriptureErrorCode } from '../services/scriptureReadingService';
 
 export interface PartnerPresenceInfo {
   view: 'verse' | 'response' | null;

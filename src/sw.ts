@@ -18,13 +18,13 @@
 
 /// <reference lib="webworker" />
 
-import { clientsClaim } from 'workbox-core';
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
-import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { CacheFirst, NetworkFirst } from 'workbox-strategies';
-import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
-import { getPendingMoods, getAuthToken, markMoodSynced, type StoredMoodEntry } from './sw-db';
+import { clientsClaim } from 'workbox-core';
+import { ExpirationPlugin } from 'workbox-expiration';
+import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
+import { getAuthToken, getPendingMoods, markMoodSynced, type StoredMoodEntry } from './sw-db';
 
 // Background Sync API types
 interface SyncEvent extends ExtendableEvent {

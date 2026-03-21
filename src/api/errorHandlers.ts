@@ -10,10 +10,10 @@
 import { PostgrestError } from '@supabase/supabase-js';
 
 /**
- * Custom error class for Supabase service errors
- * Provides structured error information for UI display
+ * Internal error class for Supabase service errors
+ * Used by error handlers in this module
  */
-export class SupabaseServiceError extends Error {
+class SupabaseServiceError extends Error {
   public readonly code: string | undefined;
   public readonly details: string | undefined;
   public readonly hint: string | undefined;
@@ -122,7 +122,7 @@ export const isPostgrestError = (error: unknown): error is PostgrestError => {
  * @param error - Error object to check
  * @returns true if error is SupabaseServiceError
  */
-export const isSupabaseServiceError = (error: unknown): error is SupabaseServiceError => {
+const isSupabaseServiceError = (error: unknown): error is SupabaseServiceError => {
   return error instanceof SupabaseServiceError;
 };
 
@@ -152,75 +152,4 @@ export const logSupabaseError = (context: string, error: unknown): void => {
   } else {
     console.error(`[Supabase] ${context}:`, error);
   }
-};
-
-/**
- * Retry configuration for network operations
- */
-export interface RetryConfig {
-  maxAttempts: number;
-  initialDelayMs: number;
-  maxDelayMs: number;
-  backoffMultiplier: number;
-}
-
-/**
- * Default retry configuration
- * Exponential backoff: 1s, 2s, 4s (max 3 attempts)
- */
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxAttempts: 3,
-  initialDelayMs: 1000,
-  maxDelayMs: 30000,
-  backoffMultiplier: 2,
-};
-
-/**
- * Execute async operation with exponential backoff retry
- *
- * @param operation - Async operation to retry
- * @param config - Retry configuration (optional)
- * @returns Result of successful operation
- * @throws Error after max attempts exceeded
- */
-export const retryWithBackoff = async <T>(
-  operation: () => Promise<T>,
-  config: RetryConfig = DEFAULT_RETRY_CONFIG
-): Promise<T> => {
-  let lastError: Error | undefined;
-  let delay = config.initialDelayMs;
-
-  for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error');
-
-      // Don't retry on last attempt
-      if (attempt === config.maxAttempts) {
-        break;
-      }
-
-      // Log retry attempt
-      console.warn(`[Supabase] Retry attempt ${attempt}/${config.maxAttempts} after ${delay}ms`);
-
-      // Wait before retry
-      await new Promise((resolve) => setTimeout(resolve, delay));
-
-      // Exponential backoff with max delay cap
-      delay = Math.min(delay * config.backoffMultiplier, config.maxDelayMs);
-    }
-  }
-
-  throw lastError || new Error('Operation failed after retries');
-};
-
-/**
- * Create a graceful error message for offline mode
- *
- * @param operation - Description of failed operation
- * @returns User-friendly offline message
- */
-export const createOfflineMessage = (operation: string): string => {
-  return `You're offline. ${operation} will sync automatically when you're back online.`;
 };

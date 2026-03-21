@@ -12,8 +12,8 @@
  * - NOT persisted (currentView is restored from URL on mount)
  */
 
-import type { AppStateCreator } from '../types';
 import { logger } from '../../utils/logger';
+import type { AppStateCreator } from '../types';
 
 export type ViewType = 'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture';
 

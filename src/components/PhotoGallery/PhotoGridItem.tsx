@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
-import type { PhotoWithUrls } from '../../services/photoService';
 import { User } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { PhotoWithUrls } from '../../services/photoService';
 import { logger } from '../../utils/logger';
 
 interface PhotoGridItemProps {

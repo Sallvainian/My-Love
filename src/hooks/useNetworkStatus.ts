@@ -12,7 +12,7 @@
  * Story 1.5: Task 1 - Network Status Detection (AC-1.5.1)
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '../utils/logger';
 
 export interface NetworkStatus {
@@ -112,5 +112,3 @@ export function useNetworkStatus(): NetworkStatus {
 
   return { isOnline, isConnecting };
 }
-
-export default useNetworkStatus;

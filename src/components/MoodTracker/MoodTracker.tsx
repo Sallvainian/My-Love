@@ -1,39 +1,39 @@
-import { useState, useEffect } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  Heart,
-  Smile,
-  Meh,
-  MessageCircle,
-  Sparkles,
-  Cloud,
-  CloudOff,
-  CheckCircle,
-  Calendar,
-  Frown,
   AlertCircle,
   Angry,
-  UserMinus,
   Battery,
-  WifiOff,
-  RefreshCw,
-  Zap,
+  Calendar,
+  CheckCircle,
+  Cloud,
+  CloudOff,
+  Frown,
+  Heart,
   List,
+  Meh,
+  MessageCircle,
+  RefreshCw,
+  Smile,
+  Sparkles,
+  UserMinus,
+  WifiOff,
+  Zap,
 } from 'lucide-react';
-import { useAppStore } from '../../stores/useAppStore';
-import { MoodButton } from './MoodButton';
-import { MoodHistoryCalendar } from '../MoodHistory';
-import { MoodHistoryTimeline } from './MoodHistoryTimeline';
-import { PartnerMoodDisplay } from './PartnerMoodDisplay';
-import type { MoodType } from '../../types';
-import { isValidationError } from '../../validation/errorMessages';
-import { registerBackgroundSync } from '../../utils/backgroundSync';
-import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
-import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
+import { useEffect, useState } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
+import { useAppStore } from '../../stores/useAppStore';
+import type { MoodType } from '../../types';
+import { registerBackgroundSync } from '../../utils/backgroundSync';
 import { formatDateISO } from '../../utils/dateUtils';
+import { triggerErrorHaptic, triggerMoodSaveHaptic } from '../../utils/haptics';
 import { logger } from '../../utils/logger';
+import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
+import { isValidationError } from '../../validation/errorMessages';
+import { MoodHistoryCalendar } from '../MoodHistory';
+import { MoodButton } from './MoodButton';
+import { MoodHistoryTimeline } from './MoodHistoryTimeline';
+import { PartnerMoodDisplay } from './PartnerMoodDisplay';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {

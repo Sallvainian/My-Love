@@ -12,8 +12,8 @@
  * @module partnerService
  */
 
-import { supabase } from './supabaseClient';
 import { logger } from '../utils/logger';
+import { supabase } from './supabaseClient';
 
 export interface UserSearchResult {
   id: string;

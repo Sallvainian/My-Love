@@ -1,30 +1,30 @@
 import { openDB } from 'idb';
 import { z } from 'zod/v4';
+import { supabase } from '../api/supabaseClient';
+import { CoupleStatsSchema } from '../api/validation/supabaseSchemas';
+import type { CoupleStats } from '../stores/types';
+import { logger } from '../utils/logger';
+import {
+  SupabaseBookmarkSchema,
+  SupabaseMessageSchema,
+  SupabaseReflectionSchema,
+  SupabaseSessionSchema,
+  type SupabaseBookmark,
+  type SupabaseMessage,
+  type SupabaseReflection,
+  type SupabaseSession,
+} from '../validation/schemas';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import {
-  type MyLoveDBSchema,
-  type ScriptureSession,
-  type ScriptureReflection,
-  type ScriptureBookmark,
-  type ScriptureMessage,
   DB_NAME,
   DB_VERSION,
   upgradeDb,
+  type MyLoveDBSchema,
+  type ScriptureBookmark,
+  type ScriptureMessage,
+  type ScriptureReflection,
+  type ScriptureSession,
 } from './dbSchema';
-import { supabase } from '../api/supabaseClient';
-import { logger } from '../utils/logger';
-import {
-  SupabaseSessionSchema,
-  SupabaseReflectionSchema,
-  SupabaseBookmarkSchema,
-  SupabaseMessageSchema,
-  type SupabaseSession,
-  type SupabaseReflection,
-  type SupabaseBookmark,
-  type SupabaseMessage,
-} from '../validation/schemas';
-import { CoupleStatsSchema } from '../api/validation/supabaseSchemas';
-import type { CoupleStats } from '../stores/types';
 
 // ============================================
 // Scripture Error Handling (AC: #3, Subtask 2.10)

@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
-import { imageCompressionService } from '../../services/imageCompressionService';
+import { AlertCircle, Camera, CheckCircle, Upload, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePhotos } from '../../hooks/usePhotos';
+import { imageCompressionService } from '../../services/imageCompressionService';
 import type { PhotoUploadInput } from '../../services/photoService';
 
 interface PhotoUploaderProps {

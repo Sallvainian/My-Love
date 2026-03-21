@@ -8,19 +8,19 @@
  * - useReadingDialogs — exit confirmation dialog, focus trap
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '../../../stores/useAppStore';
-import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
+import { useAppStore } from '../../../stores/useAppStore';
+import { useReadingDialogs } from './useReadingDialogs';
 import { useReadingNavigation } from './useReadingNavigation';
 import { useReportPhase } from './useReportPhase';
 import { useSessionPersistence } from './useSessionPersistence';
-import { useReadingDialogs } from './useReadingDialogs';
 
 // Re-export types for consumers that import from this module
 export type { SlideDirection } from './useReadingNavigation';
-export type { ReportSubPhase, ReportData } from './useReportPhase';
+export type { ReportData, ReportSubPhase } from './useReportPhase';
 
 export function useSoloReadingFlow() {
   const { crossfade, slide } = useMotionConfig();

@@ -40,32 +40,6 @@ export function calculateTimeRemaining(targetDate: Date): TimeRemaining {
 }
 
 /**
- * Get the next upcoming anniversary from a list
- * Filters to future dates, sorts by date ascending, returns nearest
- *
- * @param anniversaries - Array of anniversaries
- * @returns Nearest upcoming anniversary or null if none found
- */
-export function getNextAnniversary(anniversaries: Anniversary[]): Anniversary | null {
-  if (!anniversaries || anniversaries.length === 0) {
-    return null;
-  }
-
-  const now = new Date();
-
-  // Get anniversaries with their next occurrence dates
-  const upcomingAnniversaries = anniversaries
-    .map((anniversary) => {
-      const nextDate = getNextAnniversaryDate(anniversary.date);
-      return { anniversary, nextDate };
-    })
-    .filter(({ nextDate }) => nextDate > now)
-    .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
-
-  return upcomingAnniversaries.length > 0 ? upcomingAnniversaries[0].anniversary : null;
-}
-
-/**
  * Get next 'n' upcoming anniversaries
  *
  * @param anniversaries - Array of anniversaries
@@ -139,33 +113,6 @@ export function getNextAnniversaryDate(dateString: string): Date {
 export function shouldTriggerCelebration(targetDate: Date): boolean {
   const { days, hours, minutes } = calculateTimeRemaining(targetDate);
   return days === 0 && hours === 0 && minutes === 0;
-}
-
-/**
- * Check if an anniversary has passed (is in the past)
- *
- * @param anniversaryDate - ISO date string
- * @returns True if anniversary is in the past
- */
-export function isAnniversaryPast(anniversaryDate: string): boolean {
-  const nextDate = getNextAnniversaryDate(anniversaryDate);
-  const today = new Date();
-
-  // Reset time components for date-only comparison
-  today.setHours(0, 0, 0, 0);
-  nextDate.setHours(0, 0, 0, 0);
-
-  // If the next occurrence is in a future year, the anniversary has already passed this year
-  if (nextDate.getFullYear() > today.getFullYear()) {
-    return true;
-  }
-
-  // If next occurrence is same year, check if it has passed (strictly less than, not equal)
-  if (nextDate.getFullYear() === today.getFullYear()) {
-    return nextDate < today;
-  }
-
-  return false;
 }
 
 /**

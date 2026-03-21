@@ -13,7 +13,7 @@
  * - Keyboard navigation within rating radiogroup
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FOCUS_RING } from '../constants';
 const MAX_NOTE_LENGTH = 200;
 const CHAR_COUNTER_THRESHOLD = 150;

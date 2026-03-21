@@ -13,13 +13,13 @@
  * - AC-5.3.5: Graceful empty state handling
  */
 
-import { useEffect, useRef, useState } from 'react';
 import { m as motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import { usePartnerMood } from '../../hooks/usePartnerMood';
-import { NoMoodLoggedState } from './NoMoodLoggedState';
 import type { MoodType } from '../../types';
-import { getMoodEmoji } from '../../utils/moodEmojis';
 import { getRelativeTime, isJustNow } from '../../utils/dateUtils';
+import { getMoodEmoji } from '../../utils/moodEmojis';
+import { NoMoodLoggedState } from './NoMoodLoggedState';
 
 interface PartnerMoodDisplayProps {
   partnerId: string;

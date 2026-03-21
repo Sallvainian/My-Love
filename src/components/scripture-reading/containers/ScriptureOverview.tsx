@@ -24,19 +24,19 @@
  * - Passes props to presentational components
  */
 
-import { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '../../../stores/useAppStore';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
-import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
 import { useMotionConfig } from '../../../hooks/useMotionConfig';
-import { SoloReadingFlow } from './SoloReadingFlow';
+import { useNetworkStatus } from '../../../hooks/useNetworkStatus';
+import { useScriptureBroadcast } from '../../../hooks/useScriptureBroadcast';
+import { useAppStore } from '../../../stores/useAppStore';
+import { FOCUS_RING, scriptureTheme } from '../constants';
+import { StatsSection } from '../overview/StatsSection';
 import { LobbyContainer } from './LobbyContainer';
 import { ReadingContainer } from './ReadingContainer';
-import { StatsSection } from '../overview/StatsSection';
-import { useScriptureBroadcast } from '../../../hooks/useScriptureBroadcast';
-import { FOCUS_RING, scriptureTheme } from '../constants';
+import { SoloReadingFlow } from './SoloReadingFlow';
 
 // Partner status union type for explicit handling
 type PartnerStatus = 'loading' | 'linked' | 'unlinked';

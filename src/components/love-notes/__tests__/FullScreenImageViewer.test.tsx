@@ -7,9 +7,9 @@
  * Love Notes Images: Task 11 - Component tests (AC-9)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FullScreenImageViewer } from '../FullScreenImageViewer';
 
 type MotionDivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };

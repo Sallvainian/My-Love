@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Trash2, Loader2 } from 'lucide-react';
-import { useAppStore } from '../../stores/useAppStore';
+import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Loader2, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks';
 import type { PhotoWithUrls } from '../../services/photoService';
+import { useAppStore } from '../../stores/useAppStore';
 
 interface PhotoViewerProps {
   photos: PhotoWithUrls[];

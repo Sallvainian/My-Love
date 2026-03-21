@@ -11,8 +11,8 @@
  * - aria-live="polite" present
  */
 
-import { describe, test, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { describe, expect, test } from 'vitest';
 import { PartnerPosition } from '../reading/PartnerPosition';
 
 describe('PartnerPosition', () => {

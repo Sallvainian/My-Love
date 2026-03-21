@@ -7,10 +7,10 @@
  * Story 1.4: Task 1 — Auto-Save on App Close / Visibility Change (AC #1)
  */
 
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { ScriptureSession } from '../services/dbSchema';
 
-export interface UseAutoSaveOptions {
+interface UseAutoSaveOptions {
   session: ScriptureSession | null;
   saveSession: () => Promise<void>;
 }
@@ -45,5 +45,3 @@ export function useAutoSave({ session, saveSession }: UseAutoSaveOptions): void 
     };
   }, [handleVisibilityChange, handleBeforeUnload]);
 }
-
-export default useAutoSave;

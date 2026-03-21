@@ -70,11 +70,3 @@ export const NOTES_CONFIG = {
   /** Rate limit window duration in milliseconds (1 minute) */
   RATE_LIMIT_WINDOW_MS: 60000,
 } as const;
-
-/**
- * Type exports for readonly constant objects
- */
-export type ImageCompressionConfig = typeof IMAGE_COMPRESSION;
-export type ImageValidationConfig = typeof IMAGE_VALIDATION;
-export type ImageStorageConfig = typeof IMAGE_STORAGE;
-export type NotesConfig = typeof NOTES_CONFIG;

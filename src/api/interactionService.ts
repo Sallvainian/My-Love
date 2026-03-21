@@ -8,27 +8,22 @@
  * @module api/interactionService
  */
 
-import { supabase } from './supabaseClient';
-import type { Database } from './supabaseClient';
-import {
-  isOnline,
-  handleSupabaseError,
-  handleNetworkError,
-  logSupabaseError,
-  isPostgrestError,
-} from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { logger } from '../utils/logger';
+import {
+  handleNetworkError,
+  handleSupabaseError,
+  isOnline,
+  isPostgrestError,
+  logSupabaseError,
+} from './errorHandlers';
+import type { Database } from './supabaseClient';
+import { supabase } from './supabaseClient';
 
 /**
  * Supabase interaction record type (from database schema)
  */
 export type SupabaseInteractionRecord = Database['public']['Tables']['interactions']['Row'];
-
-/**
- * Interaction insert type (for creating new interactions)
- */
-export type InteractionInsert = Database['public']['Tables']['interactions']['Insert'];
 
 /**
  * Interaction type enum
@@ -124,7 +119,7 @@ export class InteractionService {
 
     try {
       // Create interaction insert payload
-      const interactionInsert: InteractionInsert = {
+      const interactionInsert: Database['public']['Tables']['interactions']['Insert'] = {
         type,
         from_user_id: userId,
         to_user_id: toUserId,
@@ -349,11 +344,3 @@ export class InteractionService {
     }
   }
 }
-
-/**
- * Singleton instance of InteractionService
- * Use this instance throughout the app for interaction operations
- */
-export const interactionService = new InteractionService();
-
-export default interactionService;

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { groupMoodsByDate } from '../moodGrouping';
+import { describe, expect, it } from 'vitest';
 import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
+import { groupMoodsByDate } from '../moodGrouping';
 
 describe('groupMoodsByDate', () => {
   it('groups moods by date correctly', () => {

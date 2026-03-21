@@ -5,18 +5,18 @@
  * report data loading, and related accessibility for the reading flow.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import type { ScriptureSession } from '../../../services/dbSchema';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PartnerInfo } from '../../../api/partnerService';
-import type { SessionPhase } from '../../../stores/slices/scriptureReadingSlice';
 import { MAX_STEPS } from '../../../data/scriptureSteps';
-import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
+import type { ScriptureSession } from '../../../services/dbSchema';
 import {
-  scriptureReadingService,
   handleScriptureError,
   ScriptureErrorCode,
+  scriptureReadingService,
 } from '../../../services/scriptureReadingService';
+import type { SessionPhase } from '../../../stores/slices/scriptureReadingSlice';
 import { logger } from '../../../utils/logger';
+import type { ReflectionSummarySubmission } from '../reflection/ReflectionSummary';
 
 // Story 2.3: Sub-phase within report phase
 export type ReportSubPhase = 'compose' | 'report' | 'complete-unlinked' | 'completion-error';

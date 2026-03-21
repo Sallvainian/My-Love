@@ -7,9 +7,9 @@
  * Story 1.5: Task 5.3 - Sync Completion Feedback (AC-1.5.4)
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, AlertCircle, Cloud, X } from 'lucide-react';
+import { AnimatePresence, m as motion } from 'framer-motion';
+import { AlertCircle, CheckCircle, Cloud, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface SyncResult {
   successCount: number;
@@ -147,5 +147,3 @@ export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncT
     </AnimatePresence>
   );
 }
-
-export default SyncToast;

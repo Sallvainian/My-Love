@@ -11,7 +11,7 @@ import { ZodError, type ZodIssue } from 'zod/v4';
  * Custom validation error class
  * Thrown when validation fails at service boundaries
  */
-export class ValidationError extends Error {
+class ValidationError extends Error {
   public readonly fieldErrors: Map<string, string>;
 
   constructor(message: string, fieldErrors?: Map<string, string>) {
@@ -114,7 +114,7 @@ function formatIssue(issue: ZodIssue): { field: string; message: string } {
  *   }
  * }
  */
-export function formatZodError(error: ZodError): string {
+function formatZodError(error: ZodError): string {
   const fieldErrors = error.issues.map(formatIssue);
 
   if (fieldErrors.length === 0) {
@@ -147,7 +147,7 @@ export function formatZodError(error: ZodError): string {
  *   }
  * }
  */
-export function getFieldErrors(error: ZodError): Map<string, string> {
+function getFieldErrors(error: ZodError): Map<string, string> {
   const fieldErrors = new Map<string, string>();
 
   error.issues.forEach((issue) => {

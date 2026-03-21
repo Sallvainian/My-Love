@@ -7,7 +7,7 @@
  * - CSS shimmer animation (better performance than JS animation)
  * - Responsive to match grid layout
  */
-export function PhotoGridSkeleton() {
+function PhotoGridSkeleton() {
   return (
     <div
       className="relative aspect-square overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700"

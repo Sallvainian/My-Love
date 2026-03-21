@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
 import { m as motion } from 'framer-motion';
-import { useAppStore } from '../../stores/useAppStore';
 import { Search } from 'lucide-react';
-import { MessageRow } from './MessageRow';
+import { useMemo, useState } from 'react';
+import { useAppStore } from '../../stores/useAppStore';
 import type { CustomMessage, MessageCategory } from '../../types';
+import { MessageRow } from './MessageRow';
 
 interface MessageListProps {
   onEdit: (message: CustomMessage) => void;

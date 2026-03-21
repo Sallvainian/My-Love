@@ -1,8 +1,8 @@
 // src/hooks/__tests__/useRealtimeMessages.test.ts
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
-import { useRealtimeMessages } from '../useRealtimeMessages';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useRealtimeMessages } from '../useRealtimeMessages';
 
 // Mock Supabase
 vi.mock('../../api/supabaseClient', () => ({

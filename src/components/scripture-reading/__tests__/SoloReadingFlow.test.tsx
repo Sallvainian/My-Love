@@ -23,10 +23,10 @@
  * - Story 1.4: Retry UI (AC #6)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_STEPS, SCRIPTURE_STEPS } from '../../../data/scriptureSteps';
 import { SoloReadingFlow } from '../containers/SoloReadingFlow';
-import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 
 // Mock framer-motion (project pattern)
 vi.mock('framer-motion', () => ({

@@ -1,4 +1,4 @@
-import { Heart, Camera, Smile, Users, LogOut, MessageCircle, BookOpen } from 'lucide-react';
+import { BookOpen, Camera, Heart, LogOut, MessageCircle, Smile, Users } from 'lucide-react';
 import type { ViewType } from '../../stores/slices/navigationSlice';
 
 interface BottomNavigationProps {

@@ -14,9 +14,9 @@
  * - NOT persisted (loaded fresh on mount from Supabase)
  */
 
-import type { AppStateCreator } from '../types';
-import { partnerService } from '../../api/partnerService';
 import type { PartnerInfo, PartnerRequest, UserSearchResult } from '../../api/partnerService';
+import { partnerService } from '../../api/partnerService';
+import type { AppStateCreator } from '../types';
 
 export interface PartnerSlice {
   // State

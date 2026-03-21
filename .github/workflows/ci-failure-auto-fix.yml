@@ -10,11 +10,9 @@ jobs:
   auto-fix:
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.pull_requests[0] &&
       github.event.workflow_run.head_branch != 'main' &&
-      github.event.workflow_run.head_branch != 'develop' &&
       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -29,9 +27,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
-          token: ${{ secrets.CLAUDE_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Setup git identity
         run: |
@@ -52,7 +58,7 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      - name: Get CI failure details
+      - name: Get CI failure details and logs
         id: failure_details
         uses: actions/github-script@v8.0.0
         with:
@@ -70,35 +76,87 @@ jobs:
             });
 
             const failedJobs = jobs.data.jobs.filter(job => job.conclusion === 'failure');
-            const failedJobDetails = failedJobs.map((job) => ({
-              name: job.name,
-              url: job.html_url,
-              conclusion: job.conclusion
-            }));
+
+            let errorLogs = [];
+            for (const job of failedJobs) {
+              try {
+                const logs = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  job_id: job.id
+                });
+                // Truncate logs to last 200 lines per job to stay within prompt limits
+                const lines = logs.data.split('\n');
+                const truncated = lines.slice(-200).join('\n');
+                errorLogs.push({
+                  jobName: job.name,
+                  logs: truncated
+                });
+              } catch (e) {
+                errorLogs.push({
+                  jobName: job.name,
+                  logs: `Failed to download logs: ${e.message}`
+                });
+              }
+            }
 
             return {
               runUrl: run.data.html_url,
               failedJobs: failedJobs.map(j => j.name),
-              failedJobDetails
+              errorLogs
             };
 
       - name: Fix CI failures with Claude
         id: claude
         uses: anthropics/claude-code-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.CLAUDE_PAT }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            /fix-ci
+            You are a CI failure auto-fix agent. A test workflow has failed on a pull request.
+            Your job is to diagnose the failure from the logs, fix the code, and push the fix.
+
+            ## Context
+
             Failed CI Run: ${{ fromJSON(steps.failure_details.outputs.result).runUrl }}
             Failed Jobs: ${{ join(fromJSON(steps.failure_details.outputs.result).failedJobs, ', ') }}
             PR Number: ${{ github.event.workflow_run.pull_requests[0].number }}
-            Branch Name: ${{ steps.branch.outputs.branch_name }}
-            Base Branch: ${{ github.event.workflow_run.head_branch }}
+            Fix Branch: ${{ steps.branch.outputs.branch_name }}
+            Source Branch: ${{ github.event.workflow_run.head_branch }}
             Repository: ${{ github.repository }}
 
-            Failed job details (logs intentionally omitted for security):
-            ${{ toJSON(fromJSON(steps.failure_details.outputs.result).failedJobDetails) }}
+            ## Error Logs
+
+            ${{ toJSON(fromJSON(steps.failure_details.outputs.result).errorLogs) }}
+
+            ## Instructions
+
+            1. Read the error logs above carefully. Identify the root cause of each failure.
+            2. Categorize the failure:
+               - **Lint/Format**: ESLint errors, Prettier violations, TypeScript type errors
+               - **Unit Test**: Vitest test failures
+               - **Build**: Vite/TypeScript compilation errors
+               - **Other**: Anything else
+            3. For each failure, find and fix the source code. Read the relevant files first.
+            4. After fixing, verify locally:
+               - For lint: run `npm run lint` and `npm run typecheck`
+               - For format: run `npm run format`
+               - For unit tests: run `npx vitest run <failed-test-file> --silent`
+               - For build: run `npm run build`
+            5. If the fix is correct and verification passes, commit and push:
+               - `git add <changed-files>`
+               - `git commit -m "fix: <description of what was fixed>"`
+               - `git push origin ${{ steps.branch.outputs.branch_name }}`
+            6. Then create a PR targeting the source branch:
+               - `gh pr create --base ${{ github.event.workflow_run.head_branch }} --head ${{ steps.branch.outputs.branch_name }} --title "fix(ci): <short description>" --body "<what failed and what was fixed>"`
+            7. Comment on the original PR (#${{ github.event.workflow_run.pull_requests[0].number }}) linking to the fix PR.
+
+            ## Rules
+
+            - Only fix what the CI logs say is broken. Do not refactor or improve other code.
+            - If the failure is a flaky test (passes locally but failed in CI), note it in the PR but do not change the test.
+            - If the failure requires changes you cannot verify (e.g., E2E tests needing Supabase), explain what you think the fix is in a comment on the original PR instead of pushing code.
+            - If you cannot determine the root cause, comment on the original PR with your analysis instead of guessing.
+
           claude_args: |
             --model claude-opus-4-6
+            --allowedTools "Edit,MultiEdit,Write,Read,Glob,Grep,Bash(git:*),Bash(npm:*),Bash(npx:*),Bash(gh:*),Bash(node:*)"

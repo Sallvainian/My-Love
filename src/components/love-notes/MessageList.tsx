@@ -18,14 +18,13 @@
  * Story 2.4: Message history with scroll performance
  */
 
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowDown, Heart, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
-import { useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Loader2, ArrowDown } from 'lucide-react';
-import { LoveNoteMessage } from './LoveNoteMessage';
 import type { LoveNote } from '../../types/models';
+import { LoveNoteMessage } from './LoveNoteMessage';
 
 /**
  * Props passed to MessageRow via rowProps
