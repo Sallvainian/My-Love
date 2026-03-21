@@ -22,7 +22,7 @@ import { useRealtimeMessages } from './useRealtimeMessages';
 /**
  * Return type for useLoveNotes hook
  */
-export interface UseLoveNotesResult {
+interface UseLoveNotesResult {
   /** Array of love notes in chat order (oldest first) */
   notes: LoveNote[];
   /** Whether notes are currently being fetched */

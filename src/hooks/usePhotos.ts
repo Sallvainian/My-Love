@@ -20,7 +20,7 @@ import { useAppStore } from '../stores/useAppStore';
 /**
  * Return type for usePhotos hook
  */
-export interface UsePhotosResult {
+interface UsePhotosResult {
   /** Array of photos (own + partner) sorted newest first */
   photos: SupabasePhoto[];
   /** Whether a photo is currently being uploaded */
@@ -144,5 +144,3 @@ export function usePhotos(autoLoad = true): UsePhotosResult {
     clearStorageWarning,
   };
 }
-
-export default usePhotos;

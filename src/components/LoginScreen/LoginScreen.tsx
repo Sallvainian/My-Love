@@ -17,7 +17,7 @@ import { useState, type FormEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
 import './LoginScreen.css';
 
-export interface LoginScreenProps {
+interface LoginScreenProps {
   /** Callback when login is successful */
   onLoginSuccess?: () => void;
 }

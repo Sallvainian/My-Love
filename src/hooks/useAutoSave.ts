@@ -10,7 +10,7 @@
 import { useCallback, useEffect } from 'react';
 import type { ScriptureSession } from '../services/dbSchema';
 
-export interface UseAutoSaveOptions {
+interface UseAutoSaveOptions {
   session: ScriptureSession | null;
   saveSession: () => Promise<void>;
 }

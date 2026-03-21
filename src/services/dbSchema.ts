@@ -31,7 +31,7 @@ export type ScriptureSessionPhase =
   | 'reflection'
   | 'report'
   | 'complete';
-export type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
+type ScriptureSessionStatus = 'pending' | 'in_progress' | 'complete' | 'abandoned';
 
 /**
  * Scripture session stored in IndexedDB for offline support

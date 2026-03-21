@@ -137,11 +137,3 @@ export const signInWithGoogle = async (): Promise<AuthError | null> => {
     return err as AuthError;
   }
 };
-
-export const actionService = {
-  signIn,
-  signUp,
-  signOut,
-  resetPassword,
-  signInWithGoogle,
-};

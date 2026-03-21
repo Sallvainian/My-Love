@@ -50,7 +50,7 @@ export interface PhotoWithUrls extends SupabasePhoto {
 /**
  * Storage quota information
  */
-export interface StorageQuota {
+interface StorageQuota {
   used: number; // bytes used
   quota: number; // total quota in bytes (1GB free tier)
   percent: number; // percentage used (0-100)

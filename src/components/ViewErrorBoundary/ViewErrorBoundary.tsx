@@ -150,5 +150,3 @@ export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErr
     return this.props.children;
   }
 }
-
-export default ViewErrorBoundary;

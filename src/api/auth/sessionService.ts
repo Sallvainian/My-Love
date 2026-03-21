@@ -91,12 +91,3 @@ export const onAuthStateChange = (callback: (session: Session | null) => void): 
     subscription.unsubscribe();
   };
 };
-
-export const sessionService = {
-  getSession,
-  getUser,
-  getCurrentUserId,
-  getCurrentUserIdOfflineSafe,
-  getAuthStatus,
-  onAuthStateChange,
-};
