@@ -14,9 +14,6 @@ import { createScriptureReadingSlice } from './slices/scriptureReadingSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
 import type { AppState } from './types';
 
-// Re-export AppState for consumers
-export type { AppState } from './types';
-
 // State validation helper
 function validateHydratedState(state: Partial<AppState> | undefined): {
   isValid: boolean;

@@ -147,5 +147,3 @@ export function SyncToast({ syncResult, onDismiss, autoDismissMs = 5000 }: SyncT
     </AnimatePresence>
   );
 }
-
-export default SyncToast;

@@ -112,5 +112,3 @@ export function useNetworkStatus(): NetworkStatus {
 
   return { isOnline, isConnecting };
 }
-
-export default useNetworkStatus;

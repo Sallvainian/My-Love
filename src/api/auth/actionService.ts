@@ -145,5 +145,3 @@ export const actionService = {
   resetPassword,
   signInWithGoogle,
 };
-
-export default actionService;

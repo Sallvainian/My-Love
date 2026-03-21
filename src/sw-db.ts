@@ -15,7 +15,7 @@ import type { MyLoveDBSchema, StoredAuthToken, StoredMoodEntry } from './service
 import { DB_NAME, DB_VERSION, STORE_NAMES } from './services/dbSchema';
 
 // Re-export types for consumers (sw.ts imports StoredMoodEntry)
-export type { StoredAuthToken, StoredMoodEntry } from './services/dbSchema';
+export type { StoredMoodEntry } from './services/dbSchema';
 
 /**
  * Open the database with migration support

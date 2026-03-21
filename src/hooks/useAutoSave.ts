@@ -45,5 +45,3 @@ export function useAutoSave({ session, saveSession }: UseAutoSaveOptions): void 
     };
   }, [handleVisibilityChange, handleBeforeUnload]);
 }
-
-export default useAutoSave;

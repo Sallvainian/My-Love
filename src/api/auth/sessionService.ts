@@ -100,5 +100,3 @@ export const sessionService = {
   getAuthStatus,
   onAuthStateChange,
 };
-
-export default sessionService;

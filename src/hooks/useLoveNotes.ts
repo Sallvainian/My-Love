@@ -153,5 +153,3 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     removeFailedMessage,
   };
 }
-
-export default useLoveNotes;

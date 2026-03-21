@@ -197,5 +197,3 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
     </div>
   );
 };
-
-export default DisplayNameSetup;

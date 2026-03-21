@@ -199,5 +199,3 @@ export function NetworkStatusDot({ className = '' }: { className?: string }) {
     />
   );
 }
-
-export default NetworkStatusIndicator;

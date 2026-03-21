@@ -1,1 +1,1 @@
-export { ViewErrorBoundary, default } from './ViewErrorBoundary';
+export { ViewErrorBoundary } from './ViewErrorBoundary';

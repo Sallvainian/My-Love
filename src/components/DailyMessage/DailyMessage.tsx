@@ -372,5 +372,3 @@ export function DailyMessage({ onShowWelcome }: DailyMessageProps) {
     </div>
   );
 }
-
-export default DailyMessage;

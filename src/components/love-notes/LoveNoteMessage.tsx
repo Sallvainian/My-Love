@@ -317,5 +317,3 @@ function LoveNoteMessageComponent({
 
 // Memoize to prevent unnecessary re-renders
 export const LoveNoteMessage = memo(LoveNoteMessageComponent);
-
-export default LoveNoteMessage;
