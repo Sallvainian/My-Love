@@ -21,7 +21,7 @@ interface StepRating {
   rating: number;
 }
 
-export interface DailyPrayerReportProps {
+interface DailyPrayerReportProps {
   userRatings: StepRating[];
   userBookmarks: number[];
   userStandoutVerses: number[];

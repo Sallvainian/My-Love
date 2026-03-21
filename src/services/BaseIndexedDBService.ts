@@ -1,4 +1,4 @@
-import type { IDBPDatabase, DBSchema, StoreNames, StoreValue, StoreKey } from 'idb';
+import type { DBSchema, IDBPDatabase, StoreKey, StoreNames, StoreValue } from 'idb';
 import { logger } from '../utils/logger';
 
 /**

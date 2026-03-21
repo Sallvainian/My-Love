@@ -1,4 +1,4 @@
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import { useState } from 'react';
 

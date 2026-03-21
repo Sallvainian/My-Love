@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { m as motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { moodService } from '../../services/moodService';
 import type { MoodEntry } from '../../types';
 import {
-  generateCalendarDays,
-  getMonthName,
-  navigateToPreviousMonth,
-  navigateToNextMonth,
   formatDateKey,
+  generateCalendarDays,
   getMonthBoundaries,
+  getMonthName,
+  navigateToNextMonth,
+  navigateToPreviousMonth,
 } from '../../utils/calendarHelpers';
-import { MoodDetailModal } from './MoodDetailModal';
-import { CalendarDay } from './CalendarDay';
 import { logger } from '../../utils/logger';
+import { CalendarDay } from './CalendarDay';
+import { MoodDetailModal } from './MoodDetailModal';
 
 /**
  * Debounce delay for month navigation (Task 9: Performance optimization)

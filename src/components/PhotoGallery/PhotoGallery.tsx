@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PhotoWithUrls } from '../../services/photoService';
+import { photoService } from '../../services/photoService';
 import { useAppStore } from '../../stores/useAppStore';
 import { PhotoGridItem } from './PhotoGridItem';
 import { PhotoGridSkeletonGrid } from './PhotoGridSkeleton';
 import { PhotoViewer } from './PhotoViewer';
-import { photoService } from '../../services/photoService';
-import type { PhotoWithUrls } from '../../services/photoService';
 
 interface PhotoGalleryProps {
   onUploadClick?: () => void;

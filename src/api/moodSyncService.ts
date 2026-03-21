@@ -10,14 +10,14 @@
  * @module api/moodSyncService
  */
 
-import { supabase, getPartnerId } from './supabaseClient';
-import { moodApi } from './moodApi';
-import type { SupabaseMood, MoodInsert } from './validation/supabaseSchemas';
-import { isOnline, handleNetworkError } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
+import { handleNetworkError, isOnline } from './errorHandlers';
+import { moodApi } from './moodApi';
+import { getPartnerId, supabase } from './supabaseClient';
+import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
 
 /**
  * Supabase mood record type (using validated schema)
@@ -25,14 +25,9 @@ import { logger } from '../utils/logger';
 export type SupabaseMoodRecord = SupabaseMood;
 
 /**
- * Mood entry insert type (using validated schema)
- */
-export type MoodEntryInsert = MoodInsert;
-
-/**
  * Sync result summary
  */
-export interface SyncResult {
+interface SyncResult {
   synced: number;
   failed: number;
   errors: string[];
@@ -47,7 +42,7 @@ export interface SyncResult {
  * - Subscribe to real-time partner mood updates
  * - Handle network errors and retry logic
  */
-export class MoodSyncService {
+class MoodSyncService {
   private realtimeChannel: RealtimeChannel | null = null;
 
   /**
@@ -86,7 +81,7 @@ export class MoodSyncService {
     // Transform local mood to Supabase insert format
     // Include mood_types array for multi-mood support
     const moodTypes = mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood];
-    const moodInsert: MoodEntryInsert = {
+    const moodInsert: MoodInsert = {
       user_id: mood.userId,
       mood_type: mood.mood,
       mood_types: moodTypes,
@@ -454,5 +449,3 @@ export class MoodSyncService {
  * Use this instance throughout the app for mood synchronization
  */
 export const moodSyncService = new MoodSyncService();
-
-export default moodSyncService;

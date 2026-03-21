@@ -6,12 +6,12 @@
  * offline/error indicators, and exit confirmation dialog.
  */
 
-import { type RefObject } from 'react';
 import { AnimatePresence, LazyMotion, m } from 'framer-motion';
-import { BookmarkFlag } from '../reading/BookmarkFlag';
+import { type RefObject } from 'react';
+import { MAX_STEPS, SCRIPTURE_STEPS } from '../../../data/scriptureSteps';
 import { FOCUS_RING, scriptureTheme } from '../constants';
-import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
 import type { SlideDirection } from '../hooks/useSoloReadingFlow';
+import { BookmarkFlag } from '../reading/BookmarkFlag';
 
 const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
 

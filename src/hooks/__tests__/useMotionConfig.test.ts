@@ -9,8 +9,8 @@
  * - shouldReduceMotion boolean reflects underlying hook value
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Control the mock return value per-test
 let mockReducedMotion: boolean | null = false;

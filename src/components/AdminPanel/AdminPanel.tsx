@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
+import { Download, Plus, Upload, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { X, Plus, Download, Upload } from 'lucide-react';
-import { MessageList } from './MessageList';
-import { CreateMessageForm } from './CreateMessageForm';
-import { EditMessageForm } from './EditMessageForm';
-import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import type { CustomMessage } from '../../types';
+import { CreateMessageForm } from './CreateMessageForm';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { EditMessageForm } from './EditMessageForm';
+import { MessageList } from './MessageList';
 
 interface AdminPanelProps {
   onExit?: () => void;

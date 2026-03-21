@@ -14,8 +14,8 @@
  * - Phase transition from A to B after 30s
  */
 
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
 
 describe('DisconnectionOverlay', () => {

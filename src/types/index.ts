@@ -43,13 +43,6 @@ export interface Photo {
   mimeType: string; // 'image/jpeg' | 'image/png' | 'image/webp'
 }
 
-// Photo upload types (Story 4.1)
-export interface PhotoUploadInput {
-  file: File;
-  caption?: string;
-  tags?: string; // Comma-separated string
-}
-
 export interface CompressionOptions {
   maxWidth: number; // Default: 2048px (Story 6.1)
   maxHeight: number; // Default: 2048px (Story 6.1)
@@ -89,53 +82,9 @@ export interface MoodEntry {
 // Re-export from interactionService for consistency
 export type {
   Interaction,
-  SupabaseInteractionRecord,
   InteractionType,
+  SupabaseInteractionRecord,
 } from '../api/interactionService';
-
-// Legacy Pocketbase Backend Types (DEPRECATED - kept for reference)
-/**
- * @deprecated Use InteractionType from interactionService instead
- */
-export type LegacyInteractionType = 'poke' | 'kiss';
-
-/**
- * @deprecated PocketBase replaced by Supabase in Epic 6
- */
-export interface PocketbaseUser {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-  created: string;
-  updated: string;
-}
-
-/**
- * @deprecated PocketBase replaced by Supabase in Epic 6
- */
-export interface PocketbaseMood {
-  id: string;
-  user: string; // User ID relation
-  type: 'happy' | 'sad' | 'excited' | 'calm' | 'anxious';
-  note?: string;
-  date: string; // Date string
-  created: string;
-  updated: string;
-}
-
-/**
- * @deprecated Use Interaction from interactionService instead
- */
-export interface PocketbaseInteraction {
-  id: string;
-  sender: string; // User ID relation
-  receiver: string; // User ID relation
-  type: LegacyInteractionType;
-  viewed: boolean;
-  created: string;
-  updated: string;
-}
 
 export interface Settings {
   themeName: ThemeName;
@@ -216,15 +165,6 @@ export interface CustomMessagesExport {
   }>;
 }
 
-export interface AppState {
-  settings: Settings | null;
-  messageHistory: MessageHistory;
-  messages: Message[];
-  photos: Photo[];
-  moods: MoodEntry[];
-  isOnboarded: boolean;
-}
-
 // Theme configuration
 export interface Theme {
   name: ThemeName;
@@ -240,13 +180,4 @@ export interface Theme {
     background: string;
     card: string;
   };
-}
-
-// Navigation
-export type RouteType = 'home' | 'memories' | 'moods' | 'countdown' | 'settings' | 'onboarding';
-
-export interface NavItem {
-  route: RouteType;
-  label: string;
-  icon: string;
 }

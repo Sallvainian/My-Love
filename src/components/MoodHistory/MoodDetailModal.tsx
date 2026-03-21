@@ -1,21 +1,21 @@
-import type { ReactElement } from 'react';
-import { useRef } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
-import { useFocusTrap } from '../../hooks';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  X,
-  Heart,
-  Smile,
-  Meh,
-  MessageCircle,
-  Sparkles,
-  Frown,
   AlertCircle,
   Angry,
-  UserMinus,
   Battery,
+  Frown,
+  Heart,
+  Meh,
+  MessageCircle,
+  Smile,
+  Sparkles,
+  UserMinus,
+  X,
   Zap,
 } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { useRef } from 'react';
+import { useFocusTrap } from '../../hooks';
 import type { MoodEntry, MoodType } from '../../types';
 import { formatModalDate, formatModalTime } from '../../utils/calendarHelpers';
 

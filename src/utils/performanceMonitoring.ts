@@ -10,17 +10,6 @@
 
 import { logger } from './logger';
 
-// Chrome-specific memory API (not in standard Performance interface)
-interface PerformanceMemory {
-  usedJSHeapSize: number;
-  totalJSHeapSize: number;
-  jsHeapSizeLimit: number;
-}
-
-interface PerformanceWithMemory extends Performance {
-  memory?: PerformanceMemory;
-}
-
 /**
  * Measure scroll performance and detect frame drops
  *
@@ -54,28 +43,4 @@ export function measureScrollPerformance(): PerformanceObserver {
 
   observer.observe({ entryTypes: ['measure'] });
   return observer;
-}
-
-/**
- * Measure current memory usage
- *
- * Returns the current JavaScript heap size in megabytes.
- * Only works in browsers that support performance.memory (Chrome, Edge).
- *
- * @returns Memory usage in MB, or 0 if not supported
- *
- * @example
- * ```typescript
- * const memoryUsage = measureMemoryUsage();
- * console.log('Current memory usage:', memoryUsage, 'MB');
- * ```
- */
-export function measureMemoryUsage(): number {
-  const perf = performance as PerformanceWithMemory;
-  if (perf.memory) {
-    const usedMB = perf.memory.usedJSHeapSize / 1048576;
-    logger.debug('[Memory] Used heap size:', usedMB.toFixed(2), 'MB');
-    return usedMB;
-  }
-  return 0;
 }

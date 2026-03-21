@@ -9,13 +9,13 @@
  * - Responsive mobile-first design
  */
 
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
+import { Calendar, Check, Edit2, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
-import { Calendar, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
-import type { Anniversary } from '../../types';
 import { useAppStore } from '../../stores/useAppStore';
-import { isValidationError } from '../../validation/errorMessages';
+import type { Anniversary } from '../../types';
 import { formatDateLong } from '../../utils/dateUtils';
+import { isValidationError } from '../../validation/errorMessages';
 
 export function AnniversarySettings() {
   const { settings, addAnniversary, removeAnniversary, updateSettings } = useAppStore();

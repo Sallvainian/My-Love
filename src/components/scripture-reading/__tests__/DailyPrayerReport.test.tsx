@@ -16,10 +16,10 @@
  * TDD Phase: GREEN — component implemented
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SCRIPTURE_STEPS } from '../../../data/scriptureSteps';
+import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
 
 describe('DailyPrayerReport', () => {
   const allRatings = Array.from({ length: 17 }, (_, i) => ({

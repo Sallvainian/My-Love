@@ -81,7 +81,7 @@ export const OFFLINE_RETRY_MESSAGE = "You're offline. Please check your connecti
 /**
  * Offline error handler result with user-friendly message and retry option
  */
-export interface OfflineErrorResult {
+interface OfflineErrorResult {
   message: string;
   isOffline: boolean;
   canRetry: boolean;
@@ -211,15 +211,3 @@ export async function safeOfflineOperation<T>(
     };
   }
 }
-
-export default {
-  OfflineError,
-  isOfflineError,
-  isOnline,
-  isOffline,
-  createOfflineErrorHandler,
-  withOfflineCheck,
-  safeOfflineOperation,
-  OFFLINE_ERROR_MESSAGE,
-  OFFLINE_RETRY_MESSAGE,
-};

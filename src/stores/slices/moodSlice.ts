@@ -15,13 +15,13 @@
  * - Will sync to Supabase backend in Story 6.4
  */
 
-import type { AppStateCreator } from '../types';
-import type { MoodEntry } from '../../types';
-import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
+import { moodService } from '../../services/moodService';
+import type { MoodEntry } from '../../types';
 import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
+import type { AppStateCreator } from '../types';
 
 export interface MoodSlice {
   // State

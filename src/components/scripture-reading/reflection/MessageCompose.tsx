@@ -14,8 +14,8 @@
  * - Focus moves to textarea on mount (configurable by parent)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FOCUS_RING } from '../constants';
 const MAX_MESSAGE_LENGTH = 300;
 const CHAR_COUNTER_THRESHOLD = 250;

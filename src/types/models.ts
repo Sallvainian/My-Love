@@ -7,25 +7,6 @@
  * @module types/models
  */
 
-// Photo types (Story 6.0)
-export type {
-  SupabasePhoto,
-  PhotoWithUrls,
-  StorageQuota,
-  PhotoUploadInput,
-} from '../services/photoService';
-
-// Scripture Reading types (Story 1.1)
-export type {
-  ScriptureSession,
-  ScriptureReflection,
-  ScriptureBookmark,
-  ScriptureMessage,
-  ScriptureSessionMode,
-  ScriptureSessionPhase,
-  ScriptureSessionStatus,
-} from '../services/dbSchema';
-
 // Love Notes types (Story 2.1)
 
 /**
@@ -50,26 +31,6 @@ export interface LoveNote {
   // Cached image data for retry flows (avoids re-compression)
   imageBlob?: Blob;
   imagePreviewUrl?: string;
-}
-
-/**
- * LoveNotesState interface - Zustand store state shape for Love Notes
- */
-export interface LoveNotesState {
-  notes: LoveNote[];
-  isLoading: boolean;
-  error: string | null;
-  hasMore: boolean;
-}
-
-/**
- * SendMessageInput interface - Input for sending a new love note
- * (Story 2.2)
- */
-export interface SendMessageInput {
-  content: string;
-  timestamp: string;
-  imageFile?: File;
 }
 
 /**

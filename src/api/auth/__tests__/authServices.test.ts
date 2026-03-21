@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session, User } from '@supabase/supabase-js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
 

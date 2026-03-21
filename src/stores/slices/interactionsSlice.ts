@@ -16,11 +16,11 @@
  * - Marked as viewed via Supabase API
  */
 
-import type { AppStateCreator } from '../types';
-import type { Interaction, SupabaseInteractionRecord } from '../../types';
 import { InteractionService } from '../../api/interactionService';
-import { validateInteraction, INTERACTION_ERRORS } from '../../utils/interactionValidation';
+import type { Interaction, SupabaseInteractionRecord } from '../../types';
+import { INTERACTION_ERRORS, validateInteraction } from '../../utils/interactionValidation';
 import { logger } from '../../utils/logger';
+import type { AppStateCreator } from '../types';
 
 // Initialize interaction service singleton
 const interactionService = new InteractionService();

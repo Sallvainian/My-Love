@@ -5,13 +5,13 @@
  * and auto-retry on reconnect for the reading flow.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import type { ScriptureSession } from '../../../services/dbSchema';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAutoSave } from '../../../hooks/useAutoSave';
+import type { ScriptureSession } from '../../../services/dbSchema';
 import {
-  scriptureReadingService,
   handleScriptureError,
   ScriptureErrorCode,
+  scriptureReadingService,
 } from '../../../services/scriptureReadingService';
 import type { PendingRetry } from '../../../stores/slices/scriptureReadingSlice';
 

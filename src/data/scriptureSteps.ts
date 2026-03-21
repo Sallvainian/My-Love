@@ -11,7 +11,7 @@
 
 export const MAX_STEPS = 17;
 
-export interface ScriptureStep {
+interface ScriptureStep {
   stepIndex: number;
   sectionTheme: string;
   verseReference: string;

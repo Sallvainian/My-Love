@@ -1,25 +1,25 @@
-import { useEffect, useRef, useState, lazy, Suspense } from 'react';
-import { useAppStore } from './stores/useAppStore';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
-import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { BottomNavigation } from './components/Navigation/BottomNavigation';
-import { TimeTogether, BirthdayCountdown, EventCountdown } from './components/RelationshipTimers';
+import { BirthdayCountdown, EventCountdown, TimeTogether } from './components/RelationshipTimers';
+import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { RELATIONSHIP_DATES } from './config/relationshipDates';
+import { useAppStore } from './stores/useAppStore';
 // PokeKissInterface moved to PartnerMoodView
-import { LoginScreen } from './components/LoginScreen';
-import { DisplayNameSetup } from './components/DisplayNameSetup';
-import { applyTheme } from './utils/themes';
-import { logStorageQuota } from './utils/storageMonitor';
-import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
+import type { Session } from '@supabase/supabase-js';
 import { signOut } from './api/auth/actionService';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
 import { getPartnerId } from './api/supabaseClient';
-import { setSentryUser, clearSentryUser } from './config/sentry';
-import type { Session } from '@supabase/supabase-js';
-import { isServiceWorkerSupported } from './utils/backgroundSync';
+import { DisplayNameSetup } from './components/DisplayNameSetup';
+import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
+import { clearSentryUser, setSentryUser } from './config/sentry';
+import { migrateCustomMessagesFromLocalStorage } from './services/migrationService';
+import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { logger } from './utils/logger';
+import { logStorageQuota } from './utils/storageMonitor';
+import { applyTheme } from './utils/themes';
 
 // Lazy load route components for code splitting
 const PhotoGallery = lazy(() =>

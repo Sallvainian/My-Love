@@ -1,17 +1,8 @@
 /**
  * Hooks Barrel File
  *
- * Re-exports all custom React hooks for convenient imports.
- *
- * @example
- * import { useNetworkStatus, useLoveNotes } from './hooks';
+ * Re-exports custom React hooks that are consumed via the barrel.
  */
 
-export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
-export { useAutoSave, type UseAutoSaveOptions } from './useAutoSave';
-export { useLoveNotes, type UseLoveNotesResult } from './useLoveNotes';
-export { useVibration, type UseVibrationReturn, type VibrationPattern } from './useVibration';
-export { useMotionConfig } from './useMotionConfig';
-export { useScriptureBroadcast } from './useScriptureBroadcast';
-export { useScripturePresence, type PartnerPresenceInfo } from './useScripturePresence';
 export { useFocusTrap } from './useFocusTrap';
+export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';

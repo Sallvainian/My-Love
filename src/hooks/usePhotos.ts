@@ -13,14 +13,14 @@
  * Story 6.2: Photo Upload with Progress Indicator
  */
 
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import type { PhotoUploadInput, SupabasePhoto } from '../services/photoService';
 import { useAppStore } from '../stores/useAppStore';
-import type { SupabasePhoto, PhotoUploadInput } from '../services/photoService';
 
 /**
  * Return type for usePhotos hook
  */
-export interface UsePhotosResult {
+interface UsePhotosResult {
   /** Array of photos (own + partner) sorted newest first */
   photos: SupabasePhoto[];
   /** Whether a photo is currently being uploaded */
@@ -144,5 +144,3 @@ export function usePhotos(autoLoad = true): UsePhotosResult {
     clearStorageWarning,
   };
 }
-
-export default usePhotos;

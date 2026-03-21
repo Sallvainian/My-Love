@@ -13,8 +13,8 @@
  * - Phase C: Countdown renders when countdownStartedAt is set
  */
 
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { LobbyContainer } from '../containers/LobbyContainer';
 
 // Mock framer-motion (project pattern)

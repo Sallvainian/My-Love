@@ -4,4 +4,3 @@
  */
 
 export { MoodHistoryCalendar } from './MoodHistoryCalendar';
-export { MoodDetailModal } from './MoodDetailModal';

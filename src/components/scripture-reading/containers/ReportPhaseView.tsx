@@ -8,12 +8,12 @@
  * - Daily Prayer Report display
  */
 
-import { type RefObject } from 'react';
 import { LazyMotion, m } from 'framer-motion';
-import { MessageCompose } from '../reflection/MessageCompose';
-import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
+import { type RefObject } from 'react';
 import { FOCUS_RING, scriptureTheme } from '../constants';
-import type { ReportSubPhase, ReportData } from '../hooks/useSoloReadingFlow';
+import type { ReportData, ReportSubPhase } from '../hooks/useSoloReadingFlow';
+import { DailyPrayerReport } from '../reflection/DailyPrayerReport';
+import { MessageCompose } from '../reflection/MessageCompose';
 
 const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
 

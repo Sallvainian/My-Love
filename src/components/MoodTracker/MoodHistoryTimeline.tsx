@@ -7,14 +7,14 @@
  * @module components/MoodTracker/MoodHistoryTimeline
  */
 
-import { useMemo, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { List } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
+import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
 import { useMoodHistory } from '../../hooks/useMoodHistory';
-import { MoodHistoryItem } from './MoodHistoryItem';
 import { groupMoodsByDate, type MoodGroup } from '../../utils/moodGrouping';
 import { measureScrollPerformance } from '../../utils/performanceMonitoring';
-import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
+import { MoodHistoryItem } from './MoodHistoryItem';
 
 interface MoodHistoryTimelineProps {
   userId: string;

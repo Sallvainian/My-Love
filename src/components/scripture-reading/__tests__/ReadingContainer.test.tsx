@@ -13,9 +13,9 @@
  * - Shows "Session updated" toast when SYNC_FAILED error present
  */
 
-import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ReadingContainer } from '../containers/ReadingContainer';
 
 // ============================================

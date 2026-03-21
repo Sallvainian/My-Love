@@ -11,12 +11,12 @@
  */
 
 import { LazyMotion, m } from 'framer-motion';
-import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
+import { MAX_STEPS, SCRIPTURE_STEPS } from '../../../data/scriptureSteps';
+import { scriptureTheme } from '../constants';
 import { useSoloReadingFlow } from '../hooks/useSoloReadingFlow';
 import { ReflectionSummary } from '../reflection/ReflectionSummary';
-import { scriptureTheme } from '../constants';
-import { ReportPhaseView } from './ReportPhaseView';
 import { ReadingPhaseView } from './ReadingPhaseView';
+import { ReportPhaseView } from './ReportPhaseView';
 
 const loadMotionFeatures = () => import('../motionFeatures').then((module) => module.default);
 

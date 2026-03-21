@@ -6,20 +6,23 @@
  * Follows StateCreator<AppState, AppMiddleware, [], ScriptureSlice> pattern.
  */
 
-import type { AppStateCreator, CoupleStats } from '../types';
-import { scriptureReadingService } from '../../services/scriptureReadingService';
-import type { ScriptureError } from '../../services/scriptureReadingService';
-import { ScriptureErrorCode, handleScriptureError } from '../../services/scriptureReadingService';
 import { supabase } from '../../api/supabaseClient';
+import { MAX_STEPS } from '../../data/scriptureSteps';
 import type {
   ScriptureSession,
-  ScriptureSessionPhase as SessionPhase,
   ScriptureSessionMode as SessionMode,
+  ScriptureSessionPhase as SessionPhase,
 } from '../../services/dbSchema';
-import { MAX_STEPS } from '../../data/scriptureSteps';
+import type { ScriptureError } from '../../services/scriptureReadingService';
+import {
+  ScriptureErrorCode,
+  handleScriptureError,
+  scriptureReadingService,
+} from '../../services/scriptureReadingService';
+import type { AppStateCreator, CoupleStats } from '../types';
 
 // Re-export for consumer convenience
-export type { SessionPhase, SessionMode, ScriptureSession };
+export type { SessionPhase };
 
 // Story 4.1: Role type for together-mode lobby
 export type SessionRole = 'reader' | 'responder';
@@ -78,7 +81,7 @@ export interface PendingRetry {
 // State interface (Subtask 3.3)
 // ============================================
 
-export interface ScriptureReadingState {
+interface ScriptureReadingState {
   session: ScriptureSession | null;
   scriptureLoading: boolean;
   isInitialized: boolean;

@@ -14,14 +14,14 @@
  * Love Notes Images: AC-7 (inline display), AC-9 (full-screen view)
  */
 
-import { memo, type ReactElement, useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
+import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { formatMessageTimestamp, formatFullTimestamp } from '../../utils/dateUtils';
-import { logger } from '../../utils/logger';
-import type { LoveNote } from '../../types/models';
+import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSignedImageUrl } from '../../services/loveNoteImageService';
+import type { LoveNote } from '../../types/models';
+import { formatFullTimestamp, formatMessageTimestamp } from '../../utils/dateUtils';
+import { logger } from '../../utils/logger';
 import { FullScreenImageViewer } from './FullScreenImageViewer';
 
 /** Maximum number of URL refresh attempts before giving up */
@@ -317,5 +317,3 @@ function LoveNoteMessageComponent({
 
 // Memoize to prevent unnecessary re-renders
 export const LoveNoteMessage = memo(LoveNoteMessageComponent);
-
-export default LoveNoteMessage;

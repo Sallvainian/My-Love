@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
-import type { Photo } from '../../types';
+import { useEffect, useMemo, useState } from 'react';
 import type { PhotoWithUrls } from '../../services/photoService';
+import type { Photo } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';
 
 // Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
