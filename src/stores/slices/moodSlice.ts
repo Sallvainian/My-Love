@@ -20,6 +20,7 @@ import type { MoodEntry } from '../../types';
 import { moodService } from '../../services/moodService';
 import { moodSyncService } from '../../api/moodSyncService';
 import { getPartnerId } from '../../api/supabaseClient';
+import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
 
 export interface MoodSlice {
@@ -65,7 +66,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
       }
 
       // Check if mood already exists for today
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateISO(new Date());
       const existingMood = get().moods.find((m) => m.date === today);
 
       if (existingMood && existingMood.id) {
@@ -201,6 +202,12 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
    * Story 6.4: AC #1 - Background sync with retry logic
    */
   syncPendingMoods: async () => {
+    // Concurrency guard: skip if already syncing to prevent duplicate DB rows
+    if (get().syncStatus.isSyncing) {
+      logger.debug('[MoodSlice] Skipping sync - already in progress');
+      return { synced: 0, failed: 0 };
+    }
+
     try {
       // Mark sync as in-progress
       set((state) => ({
@@ -310,7 +317,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => (
           mood: record.mood_type,
           moods: moods, // Include all selected moods
           note: record.note || undefined,
-          date: createdAt.split('T')[0], // Extract YYYY-MM-DD
+          date: formatDateISO(new Date(createdAt)), // Extract local YYYY-MM-DD
           timestamp: new Date(createdAt),
           synced: true, // Partner moods are always synced (from Supabase)
           supabaseId: record.id,

@@ -29,7 +29,7 @@ Documentation for the My-Love Progressive Web App -- a couples app for daily lov
 | Validation       | Zod 4.3.6 at all service boundaries                     |
 | Local Storage    | IndexedDB via idb 8.0.3 (8 object stores, schema v5)    |
 | PWA              | Custom InjectManifest SW with Workbox + Background Sync |
-| Testing          | Vitest 4.0.17 (unit) + Playwright 1.58.2 (E2E) + pgTAP  |
+| Testing          | Vitest 4.0.18 (unit) + Playwright 1.58.2 (E2E) + pgTAP  |
 | Deployment       | GitHub Pages at `/My-Love/` via GitHub Actions          |
 | Secrets          | fnox with age encryption provider                       |
 | Source Files     | 207 TypeScript/TSX files, ~45,102 lines in src/         |

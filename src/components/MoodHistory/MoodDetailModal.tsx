@@ -86,8 +86,11 @@ function MoodDetailContent({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  const moodConfig = MOOD_CONFIG[mood.mood as MoodType];
-  const Icon = moodConfig.icon;
+  // Read moods array, fall back to [mood.mood] for legacy entries
+  const allMoods: MoodType[] =
+    mood.moods && mood.moods.length > 0 ? mood.moods : [mood.mood as MoodType];
+
+  const primaryMoodConfig = MOOD_CONFIG[allMoods[0]];
   const moodDate = new Date(mood.timestamp);
   const formattedDate = formatModalDate(moodDate);
   const formattedTime = formatModalTime(moodDate);
@@ -138,18 +141,26 @@ function MoodDetailContent({
             <X className="h-5 w-5 text-gray-500" />
           </button>
 
-          {/* Mood icon and type - AC-4: Icon with color */}
+          {/* Mood icons and type - AC-4: Icons with color */}
           <div className="mb-6 flex items-center gap-4">
-            <div className={`rounded-full p-4 ${moodConfig.bgColor}`} aria-hidden="true">
-              <Icon className={`h-8 w-8 ${moodConfig.color}`} />
+            <div className="flex gap-2" aria-hidden="true">
+              {allMoods.map((m) => {
+                const cfg = MOOD_CONFIG[m];
+                const MoodIcon = cfg.icon;
+                return (
+                  <div key={m} className={`rounded-full p-4 ${cfg.bgColor}`}>
+                    <MoodIcon className={`h-8 w-8 ${cfg.color}`} />
+                  </div>
+                );
+              })}
             </div>
             <div>
               <h2
                 id="mood-modal-title"
-                className={`text-2xl font-semibold ${moodConfig.color}`}
+                className={`text-2xl font-semibold ${primaryMoodConfig.color}`}
                 data-testid="modal-mood-type"
               >
-                {moodConfig.label}
+                {allMoods.map((m) => MOOD_CONFIG[m].label).join(', ')}
               </h2>
               <p className="mt-1 text-sm text-gray-500">How you were feeling</p>
             </div>
