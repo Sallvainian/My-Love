@@ -93,50 +93,6 @@ export type {
   SupabaseInteractionRecord,
 } from '../api/interactionService';
 
-// Legacy Pocketbase Backend Types (DEPRECATED - kept for reference)
-/**
- * @deprecated Use InteractionType from interactionService instead
- */
-export type LegacyInteractionType = 'poke' | 'kiss';
-
-/**
- * @deprecated PocketBase replaced by Supabase in Epic 6
- */
-export interface PocketbaseUser {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-  created: string;
-  updated: string;
-}
-
-/**
- * @deprecated PocketBase replaced by Supabase in Epic 6
- */
-export interface PocketbaseMood {
-  id: string;
-  user: string; // User ID relation
-  type: 'happy' | 'sad' | 'excited' | 'calm' | 'anxious';
-  note?: string;
-  date: string; // Date string
-  created: string;
-  updated: string;
-}
-
-/**
- * @deprecated Use Interaction from interactionService instead
- */
-export interface PocketbaseInteraction {
-  id: string;
-  sender: string; // User ID relation
-  receiver: string; // User ID relation
-  type: LegacyInteractionType;
-  viewed: boolean;
-  created: string;
-  updated: string;
-}
-
 export interface Settings {
   themeName: ThemeName;
   notificationTime: string; // HH:MM format
