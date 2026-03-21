@@ -132,7 +132,7 @@ export function MoodTracker() {
 
   // Check if mood already exists for today (AC-5)
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateISO(new Date());
     const existingMood = getMoodForDate(today);
 
     if (existingMood) {
