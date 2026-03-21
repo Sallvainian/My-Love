@@ -10,7 +10,7 @@
 
 import { logger } from './logger';
 
-export interface StorageQuotaInfo {
+interface StorageQuotaInfo {
   used: number;
   total: number;
   available: number;
@@ -24,7 +24,7 @@ export interface StorageQuotaInfo {
  * Calculates approximate storage size by serializing all LocalStorage data.
  * Note: This is an estimate as actual browser storage accounting may differ.
  */
-export function getLocalStorageUsage(): number {
+function getLocalStorageUsage(): number {
   let totalBytes = 0;
 
   for (const key in localStorage) {
@@ -47,7 +47,7 @@ export function getLocalStorageUsage(): number {
  * Returns usage statistics and warning levels based on consumption.
  * Most browsers have a 5-10 MB LocalStorage limit per origin.
  */
-export function getStorageQuotaInfo(): StorageQuotaInfo {
+function getStorageQuotaInfo(): StorageQuotaInfo {
   const used = getLocalStorageUsage();
 
   // Conservative estimate: 5MB limit (typical browser minimum)

@@ -10,7 +10,7 @@
  * Calendar Day Cell
  * Represents a single day in the calendar grid
  */
-export interface CalendarDay {
+interface CalendarDay {
   date: Date | null; // null for empty cells (padding before month start)
   dayNumber: number | null; // 1-31 for actual days, null for empty cells
   isToday: boolean;
@@ -27,7 +27,7 @@ export interface CalendarDay {
  * getDaysInMonth(2025, 0) // 31 (January)
  * getDaysInMonth(2024, 1) // 29 (February leap year)
  */
-export function getDaysInMonth(year: number, month: number): number {
+function getDaysInMonth(year: number, month: number): number {
   // Create date for first day of next month, then get day 0 (last day of current month)
   return new Date(year, month + 1, 0).getDate();
 }
@@ -41,7 +41,7 @@ export function getDaysInMonth(year: number, month: number): number {
  * @example
  * getFirstDayOfMonth(2025, 10) // Returns day of week for Nov 1, 2025
  */
-export function getFirstDayOfMonth(year: number, month: number): number {
+function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay();
 }
 

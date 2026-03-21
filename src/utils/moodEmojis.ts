@@ -13,7 +13,7 @@ import type { MoodType } from '../types';
  * Mood to emoji mapping
  * Matches the 12 mood types defined in MoodType with visual emojis
  */
-export const MOOD_EMOJIS: Record<MoodType, string> = {
+const MOOD_EMOJIS: Record<MoodType, string> = {
   // Positive emotions
   loved: '❤️',
   happy: '😊',

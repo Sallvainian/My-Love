@@ -16,7 +16,7 @@ import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { logger } from '../utils/logger';
 
-export interface UseRealtimeMessagesOptions {
+interface UseRealtimeMessagesOptions {
   onNewMessage?: (message: LoveNote) => void;
   enabled?: boolean;
 }
@@ -145,5 +145,3 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
   // Note: Accessing refs during render is not recommended
   return {};
 }
-
-export default useRealtimeMessages;

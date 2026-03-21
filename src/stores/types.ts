@@ -41,7 +41,7 @@ export interface AppSlice {
  * Must match actual middleware in useAppStore.ts (persist only).
  * If store adds devtools/immer/etc, update HERE ONLY.
  */
-export type AppMiddleware = [['zustand/persist', unknown]];
+type AppMiddleware = [['zustand/persist', unknown]];
 
 /**
  * Composed AppState from ALL slices including AppSlice.

@@ -22,7 +22,7 @@ import {
 import type { AppStateCreator, CoupleStats } from '../types';
 
 // Re-export for consumer convenience
-export type { ScriptureSession, SessionMode, SessionPhase };
+export type { SessionPhase };
 
 // Story 4.1: Role type for together-mode lobby
 export type SessionRole = 'reader' | 'responder';
@@ -81,7 +81,7 @@ export interface PendingRetry {
 // State interface (Subtask 3.3)
 // ============================================
 
-export interface ScriptureReadingState {
+interface ScriptureReadingState {
   session: ScriptureSession | null;
   scriptureLoading: boolean;
   isInitialized: boolean;
