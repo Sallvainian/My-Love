@@ -7,7 +7,7 @@
  * Story 5.3: Partner Mood Viewing & Transparency
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { moodSyncService, type SupabaseMoodRecord } from '../api/moodSyncService';
 import { logger } from '../utils/logger';
 

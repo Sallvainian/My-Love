@@ -1,8 +1,8 @@
-import { supabase } from '../supabaseClient';
-import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import type { Session, User } from '@supabase/supabase-js';
-import type { AuthStatus } from './types';
+import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import { logger } from '../../utils/logger';
+import { supabase } from '../supabaseClient';
+import type { AuthStatus } from './types';
 
 export const getSession = async (): Promise<Session | null> => {
   try {

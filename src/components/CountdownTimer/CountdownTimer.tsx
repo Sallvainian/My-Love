@@ -9,19 +9,19 @@
  * - Responsive mobile-first design
  */
 
-import { m as motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import { Calendar, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import type { Anniversary } from '../../types';
 import {
   calculateTimeRemaining,
-  getUpcomingAnniversaries,
-  getNextAnniversaryDate,
-  shouldTriggerCelebration,
   formatCountdownDisplay,
+  getNextAnniversaryDate,
+  getUpcomingAnniversaries,
+  shouldTriggerCelebration,
   type TimeRemaining,
 } from '../../utils/countdownService';
-import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 
 export interface CountdownTimerProps {

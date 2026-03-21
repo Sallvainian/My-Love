@@ -8,11 +8,11 @@
  * @module services/syncService
  */
 
-import { moodService } from './moodService';
 import { moodApi } from '../api/moodApi';
-import type { MoodEntry } from '../types';
 import type { MoodInsert } from '../api/validation/supabaseSchemas';
+import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
+import { moodService } from './moodService';
 
 /**
  * Sync result for a single mood entry

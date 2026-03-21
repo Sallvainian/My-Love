@@ -9,18 +9,18 @@
 
 // Photo types (Story 6.0)
 export type {
-  SupabasePhoto,
+  PhotoUploadInput,
   PhotoWithUrls,
   StorageQuota,
-  PhotoUploadInput,
+  SupabasePhoto,
 } from '../services/photoService';
 
 // Scripture Reading types (Story 1.1)
 export type {
-  ScriptureSession,
-  ScriptureReflection,
   ScriptureBookmark,
   ScriptureMessage,
+  ScriptureReflection,
+  ScriptureSession,
   ScriptureSessionMode,
   ScriptureSessionPhase,
   ScriptureSessionStatus,

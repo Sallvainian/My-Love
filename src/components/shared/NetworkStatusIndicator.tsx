@@ -16,7 +16,7 @@
  * Story 1.5: Task 2 - Network Status Indicator Component (AC-1.5.1)
  */
 
-import { Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { Loader2, Wifi, WifiOff } from 'lucide-react';
 import { useNetworkStatus } from '../../hooks';
 
 interface NetworkStatusIndicatorProps {

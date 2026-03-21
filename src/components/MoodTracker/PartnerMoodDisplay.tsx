@@ -13,13 +13,12 @@
  * - AC-5.3.5: Graceful empty state handling
  */
 
-import { useEffect, useRef, useState } from 'react';
 import { m as motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import { usePartnerMood } from '../../hooks/usePartnerMood';
-import { NoMoodLoggedState } from './NoMoodLoggedState';
-import type { MoodType } from '../../types';
-import { getMoodEmoji } from '../../utils/moodEmojis';
 import { getRelativeTime, isJustNow } from '../../utils/dateUtils';
+import { getMoodEmoji } from '../../utils/moodEmojis';
+import { NoMoodLoggedState } from './NoMoodLoggedState';
 
 interface PartnerMoodDisplayProps {
   partnerId: string;
@@ -102,13 +101,7 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
     return <NoMoodLoggedState />;
   }
 
-  // Read mood_types array, fall back to [mood_type] for legacy entries
-  const allMoods: MoodType[] =
-    partnerMood.mood_types && partnerMood.mood_types.length > 0
-      ? (partnerMood.mood_types as MoodType[])
-      : [partnerMood.mood_type as MoodType];
-
-  const emojis = allMoods.map((m) => getMoodEmoji(m)).join('');
+  const emoji = getMoodEmoji(partnerMood.mood_type);
   const timestamp = getRelativeTime(partnerMood.created_at ?? new Date().toISOString());
   const showJustNowBadge = isJustNow(partnerMood.created_at ?? new Date().toISOString());
 
@@ -132,16 +125,16 @@ export function PartnerMoodDisplay({ partnerId }: PartnerMoodDisplayProps) {
           className="text-6xl"
           data-testid="partner-mood-emoji"
           role="img"
-          aria-label={`${allMoods.join(', ')} mood emoji`}
+          aria-label={`${partnerMood.mood_type} mood emoji`}
         >
-          {emojis}
+          {emoji}
         </span>
         <div className="flex-1">
           <h3
             className="text-2xl font-semibold text-slate-800 capitalize"
             data-testid="partner-mood-label"
           >
-            {allMoods.join(', ')}
+            {partnerMood.mood_type}
           </h3>
           <p className="text-sm text-slate-600" data-testid="partner-mood-timestamp">
             <time dateTime={partnerMood.created_at ?? undefined}>{timestamp}</time>

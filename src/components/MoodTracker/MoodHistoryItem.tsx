@@ -9,9 +9,8 @@
 
 import { useState } from 'react';
 import type { SupabaseMood } from '../../api/validation/supabaseSchemas';
-import type { MoodType } from '../../types';
-import { getMoodEmoji } from '../../utils/moodEmojis';
 import { getRelativeTime } from '../../utils/dateUtils';
+import { getMoodEmoji } from '../../utils/moodEmojis';
 
 interface MoodHistoryItemProps {
   mood: SupabaseMood;
@@ -35,12 +34,6 @@ const NOTE_TRUNCATE_LENGTH = 100;
 export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Read mood_types array, fall back to [mood_type] for legacy entries
-  const allMoods: MoodType[] =
-    mood.mood_types && mood.mood_types.length > 0
-      ? (mood.mood_types as MoodType[])
-      : [mood.mood_type as MoodType];
-
   const shouldTruncate = mood.note && mood.note.length > NOTE_TRUNCATE_LENGTH;
   const displayNote =
     shouldTruncate && !isExpanded
@@ -53,9 +46,9 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
       data-testid="mood-history-item"
       data-timestamp={mood.created_at}
     >
-      {/* Emojis - show all selected moods */}
+      {/* Emoji */}
       <div className="flex-shrink-0" data-testid="mood-emoji">
-        <span className="text-3xl">{allMoods.map((m) => getMoodEmoji(m)).join('')}</span>
+        <span className="text-3xl">{getMoodEmoji(mood.mood_type)}</span>
       </div>
 
       {/* Content */}
@@ -65,7 +58,7 @@ export function MoodHistoryItem({ mood }: MoodHistoryItemProps) {
             className="font-medium text-gray-900 capitalize dark:text-gray-100"
             data-testid="mood-label"
           >
-            {allMoods.join(', ')}
+            {mood.mood_type}
           </h4>
           <span className="text-sm text-gray-500 dark:text-gray-400" data-testid="mood-timestamp">
             {getRelativeTime(mood.created_at || '')}

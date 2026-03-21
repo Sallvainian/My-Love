@@ -1,12 +1,11 @@
 import { openDB } from 'idb';
+import { ZodError } from 'zod/v4';
 import type { MoodEntry } from '../types';
+import { logger } from '../utils/logger';
+import { createValidationError, isZodError } from '../validation/errorMessages';
+import { MoodEntrySchema } from '../validation/schemas';
 import { BaseIndexedDBService } from './BaseIndexedDBService';
 import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
-import { MoodEntrySchema } from '../validation/schemas';
-import { createValidationError, isZodError } from '../validation/errorMessages';
-import { ZodError } from 'zod/v4';
-import { formatDateISO } from '../utils/dateUtils';
-import { logger } from '../utils/logger';
 
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking
@@ -62,7 +61,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
    */
   async create(userId: string, moods: MoodEntry['mood'][], note?: string): Promise<MoodEntry> {
     try {
-      const today = formatDateISO(new Date());
+      const today = new Date().toISOString().split('T')[0];
       const primaryMood = moods[0]; // First mood is primary for backward compatibility
       const moodEntry: Omit<MoodEntry, 'id'> = {
         userId,
@@ -161,7 +160,7 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
     try {
       await this.init();
 
-      const dateString = formatDateISO(date);
+      const dateString = date.toISOString().split('T')[0];
       const tx = this.db!.transaction('moods', 'readonly');
       const index = tx.store.index('by-date');
       const mood = await index.get(dateString);
@@ -187,8 +186,8 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
     try {
       await this.init();
 
-      const startString = formatDateISO(start);
-      const endString = formatDateISO(end);
+      const startString = start.toISOString().split('T')[0];
+      const endString = end.toISOString().split('T')[0];
 
       const tx = this.db!.transaction('moods', 'readonly');
       const index = tx.store.index('by-date');

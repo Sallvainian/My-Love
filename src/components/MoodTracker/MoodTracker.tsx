@@ -1,39 +1,38 @@
-import { useState, useEffect } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import {
-  Heart,
-  Smile,
-  Meh,
-  MessageCircle,
-  Sparkles,
-  Cloud,
-  CloudOff,
-  CheckCircle,
-  Calendar,
-  Frown,
   AlertCircle,
   Angry,
-  UserMinus,
   Battery,
-  WifiOff,
-  RefreshCw,
-  Zap,
+  Calendar,
+  CheckCircle,
+  Cloud,
+  CloudOff,
+  Frown,
+  Heart,
   List,
+  Meh,
+  MessageCircle,
+  RefreshCw,
+  Smile,
+  Sparkles,
+  UserMinus,
+  WifiOff,
+  Zap,
 } from 'lucide-react';
-import { useAppStore } from '../../stores/useAppStore';
-import { MoodButton } from './MoodButton';
-import { MoodHistoryCalendar } from '../MoodHistory';
-import { MoodHistoryTimeline } from './MoodHistoryTimeline';
-import { PartnerMoodDisplay } from './PartnerMoodDisplay';
-import type { MoodType } from '../../types';
-import { isValidationError } from '../../validation/errorMessages';
-import { registerBackgroundSync } from '../../utils/backgroundSync';
-import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
-import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
+import { useEffect, useState } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
-import { formatDateISO } from '../../utils/dateUtils';
+import { useAppStore } from '../../stores/useAppStore';
+import type { MoodType } from '../../types';
+import { registerBackgroundSync } from '../../utils/backgroundSync';
+import { triggerErrorHaptic, triggerMoodSaveHaptic } from '../../utils/haptics';
 import { logger } from '../../utils/logger';
+import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
+import { isValidationError } from '../../validation/errorMessages';
+import { MoodHistoryCalendar } from '../MoodHistory';
+import { MoodButton } from './MoodButton';
+import { MoodHistoryTimeline } from './MoodHistoryTimeline';
+import { PartnerMoodDisplay } from './PartnerMoodDisplay';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
 const POSITIVE_MOODS = {
@@ -76,7 +75,6 @@ type MoodTabType = 'tracker' | 'history' | 'timeline';
  */
 export function MoodTracker() {
   const { addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods } = useAppStore();
-  const moods = useAppStore((s) => s.moods);
   const { user } = useAuth();
 
   // Story 5.2: AC-5.2.1 - Performance timing for < 5 second flow validation
@@ -134,7 +132,7 @@ export function MoodTracker() {
 
   // Check if mood already exists for today (AC-5)
   useEffect(() => {
-    const today = formatDateISO(new Date());
+    const today = new Date().toISOString().split('T')[0];
     const existingMood = getMoodForDate(today);
 
     if (existingMood) {
@@ -151,7 +149,7 @@ export function MoodTracker() {
         setShowNoteField(true);
       }
     }
-  }, [getMoodForDate, moods]);
+  }, [getMoodForDate]);
 
   const handleMoodSelect = (mood: MoodType) => {
     setSelectedMoods((prev) => {
@@ -203,11 +201,17 @@ export function MoodTracker() {
         `[Mood Log] Complete flow: ${(performance.now() - mountTime).toFixed(0)}ms (target: <5000ms)`
       );
 
-      // Story 1.5: Show offline notification and register background sync (AC-1.5.3)
-      // Note: syncPendingMoods is already called inside addMoodEntry (moodSlice) when online,
-      // so we only need to handle the offline case here.
-      if (!syncStatus.isOnline) {
+      // Story 6.4: AC #1 - Trigger background sync after mood entry
+      // Run in background (don't await) - sync should not block UI
+      if (syncStatus.isOnline) {
+        syncPendingMoods().catch((syncError) => {
+          // Log sync errors but don't show to user (graceful degradation)
+          console.error('[MoodTracker] Background sync failed:', syncError);
+        });
+      } else {
+        // Story 1.5: Show offline notification and register background sync (AC-1.5.3)
         setOfflineError(true);
+        // Register background sync to sync when connection is restored
         registerBackgroundSync('sync-pending-moods').catch((syncError) => {
           console.error('[MoodTracker] Failed to register background sync:', syncError);
         });

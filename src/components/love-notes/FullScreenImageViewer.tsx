@@ -11,9 +11,9 @@
  * - Centered image with max dimensions
  */
 
-import { memo, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 
 export interface FullScreenImageViewerProps {
   imageUrl: string | null;

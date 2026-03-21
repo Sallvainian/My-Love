@@ -1,10 +1,10 @@
-import { customMessageService } from './customMessageService';
-import type { CustomMessage } from '../types';
-import { CreateMessageInputSchema } from '../validation/schemas';
-import { isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
 import { LOG_TRUNCATE_LENGTH } from '../config/performance';
+import type { CustomMessage } from '../types';
 import { logger } from '../utils/logger';
+import { isZodError } from '../validation/errorMessages';
+import { CreateMessageInputSchema } from '../validation/schemas';
+import { customMessageService } from './customMessageService';
 
 /**
  * Migration Service - One-time migration from LocalStorage to IndexedDB

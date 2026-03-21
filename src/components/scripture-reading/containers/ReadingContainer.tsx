@@ -15,22 +15,22 @@
  * and persists through the lobby → reading transition.
  */
 
-import { useState, useEffect, useRef, useCallback, type ReactElement } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '../../../stores/useAppStore';
-import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
-import { ScriptureErrorCode } from '../../../services/scriptureReadingService';
-import { SCRIPTURE_STEPS, MAX_STEPS } from '../../../data/scriptureSteps';
-import { useScripturePresence } from '../../../hooks/useScripturePresence';
-import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { MAX_STEPS, SCRIPTURE_STEPS } from '../../../data/scriptureSteps';
 import { useFocusTrap } from '../../../hooks';
-import { BookmarkFlag } from '../reading/BookmarkFlag';
-import { RoleIndicator } from '../reading/RoleIndicator';
-import { PartnerPosition } from '../reading/PartnerPosition';
-import { LockInButton } from '../session/LockInButton';
-import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
+import { useMotionConfig } from '../../../hooks/useMotionConfig';
+import { useScripturePresence } from '../../../hooks/useScripturePresence';
+import { ScriptureErrorCode } from '../../../services/scriptureReadingService';
+import type { SessionRole } from '../../../stores/slices/scriptureReadingSlice';
+import { useAppStore } from '../../../stores/useAppStore';
 import { FOCUS_RING, scriptureTheme } from '../constants';
+import { BookmarkFlag } from '../reading/BookmarkFlag';
+import { PartnerPosition } from '../reading/PartnerPosition';
+import { RoleIndicator } from '../reading/RoleIndicator';
+import { DisconnectionOverlay } from '../session/DisconnectionOverlay';
+import { LockInButton } from '../session/LockInButton';
 
 export function ReadingContainer(): ReactElement | null {
   const { slide } = useMotionConfig();

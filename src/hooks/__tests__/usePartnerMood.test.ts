@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { usePartnerMood } from '../usePartnerMood';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { moodSyncService, type SupabaseMoodRecord } from '../../api/moodSyncService';
+import { usePartnerMood } from '../usePartnerMood';
 
 // Mock the supabaseClient to avoid initialization errors
 vi.mock('../../api/supabaseClient', () => ({

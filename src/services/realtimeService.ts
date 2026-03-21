@@ -1,5 +1,5 @@
-import { supabase } from '../api/supabaseClient';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { supabase } from '../api/supabaseClient';
 import type { SupabaseMood } from '../api/validation/supabaseSchemas';
 import { logger } from '../utils/logger';
 

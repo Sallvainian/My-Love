@@ -7,11 +7,11 @@
  * import { useNetworkStatus, useLoveNotes } from './hooks';
  */
 
-export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
 export { useAutoSave, type UseAutoSaveOptions } from './useAutoSave';
+export { useFocusTrap } from './useFocusTrap';
 export { useLoveNotes, type UseLoveNotesResult } from './useLoveNotes';
-export { useVibration, type UseVibrationReturn, type VibrationPattern } from './useVibration';
 export { useMotionConfig } from './useMotionConfig';
+export { useNetworkStatus, type NetworkStatus } from './useNetworkStatus';
 export { useScriptureBroadcast } from './useScriptureBroadcast';
 export { useScripturePresence, type PartnerPresenceInfo } from './useScripturePresence';
-export { useFocusTrap } from './useFocusTrap';
+export { useVibration, type UseVibrationReturn, type VibrationPattern } from './useVibration';

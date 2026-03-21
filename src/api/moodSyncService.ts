@@ -10,14 +10,14 @@
  * @module api/moodSyncService
  */
 
-import { supabase, getPartnerId } from './supabaseClient';
-import { moodApi } from './moodApi';
-import type { SupabaseMood, MoodInsert } from './validation/supabaseSchemas';
-import { isOnline, handleNetworkError } from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { moodService } from '../services/moodService';
 import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
+import { handleNetworkError, isOnline } from './errorHandlers';
+import { moodApi } from './moodApi';
+import { getPartnerId, supabase } from './supabaseClient';
+import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
 
 /**
  * Supabase mood record type (using validated schema)

@@ -1,18 +1,18 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AppState } from './types';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { logger } from '../utils/logger';
 import { createAppSlice } from './slices/appSlice';
 import { createAuthSlice } from './slices/authSlice';
-import { createMessagesSlice } from './slices/messagesSlice';
-import { createPhotosSlice } from './slices/photosSlice';
-import { createSettingsSlice } from './slices/settingsSlice';
-import { createNavigationSlice } from './slices/navigationSlice';
-import { createMoodSlice } from './slices/moodSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
-import { createPartnerSlice } from './slices/partnerSlice';
+import { createMessagesSlice } from './slices/messagesSlice';
+import { createMoodSlice } from './slices/moodSlice';
+import { createNavigationSlice } from './slices/navigationSlice';
 import { createNotesSlice } from './slices/notesSlice';
+import { createPartnerSlice } from './slices/partnerSlice';
+import { createPhotosSlice } from './slices/photosSlice';
 import { createScriptureReadingSlice } from './slices/scriptureReadingSlice';
-import { logger } from '../utils/logger';
+import { createSettingsSlice } from './slices/settingsSlice';
+import type { AppState } from './types';
 
 // Re-export AppState for consumers
 export type { AppState } from './types';

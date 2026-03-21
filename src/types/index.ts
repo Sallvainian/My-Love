@@ -89,8 +89,8 @@ export interface MoodEntry {
 // Re-export from interactionService for consistency
 export type {
   Interaction,
-  SupabaseInteractionRecord,
   InteractionType,
+  SupabaseInteractionRecord,
 } from '../api/interactionService';
 
 // Legacy Pocketbase Backend Types (DEPRECATED - kept for reference)

@@ -8,21 +8,21 @@
  * @module api/moodApi
  */
 
+import { ZodError } from 'zod/v4';
+import {
+  handleNetworkError,
+  handleSupabaseError,
+  isOnline,
+  isPostgrestError,
+  logSupabaseError,
+} from './errorHandlers';
 import { supabase } from './supabaseClient';
 import {
-  SupabaseMoodSchema,
   MoodArraySchema,
-  type SupabaseMood,
+  SupabaseMoodSchema,
   type MoodInsert,
+  type SupabaseMood,
 } from './validation/supabaseSchemas';
-import {
-  isOnline,
-  handleSupabaseError,
-  handleNetworkError,
-  logSupabaseError,
-  isPostgrestError,
-} from './errorHandlers';
-import { ZodError } from 'zod/v4';
 
 /**
  * Custom error for API validation failures

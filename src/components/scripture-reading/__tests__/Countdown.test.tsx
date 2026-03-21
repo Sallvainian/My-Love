@@ -13,8 +13,8 @@
  * - Reduced-motion: no animation applied
  */
 
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Countdown } from '../session/Countdown';
 
 // Mock framer-motion (project pattern)

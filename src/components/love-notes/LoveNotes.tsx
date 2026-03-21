@@ -16,15 +16,15 @@
  * Story 2.2: AC-2.2.1 (message input), AC-2.2.2 (send functionality)
  */
 
-import { useEffect, useState, type ReactElement } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
-import { useLoveNotes } from '../../hooks/useLoveNotes';
-import { useAppStore } from '../../stores/useAppStore';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { authService } from '../../api/authService';
 import { getPartnerDisplayName } from '../../api/supabaseClient';
+import { useLoveNotes } from '../../hooks/useLoveNotes';
+import { useAppStore } from '../../stores/useAppStore';
+import { MessageInput } from './MessageInput';
+import { MessageList } from './MessageList';
 
 /**
  * LoveNotes - Full chat page component

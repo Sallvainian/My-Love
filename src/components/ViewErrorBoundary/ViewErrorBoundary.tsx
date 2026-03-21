@@ -1,6 +1,6 @@
-import { Component } from 'react';
-import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/react';
+import type { ReactNode } from 'react';
+import { Component } from 'react';
 
 interface ViewErrorFallbackProps {
   error: Error | null;

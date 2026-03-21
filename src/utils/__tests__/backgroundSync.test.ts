@@ -5,11 +5,11 @@
  * isBackgroundSyncSupported functions with proper mocking of Service Worker APIs.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  isBackgroundSyncSupported,
   registerBackgroundSync,
   setupServiceWorkerListener,
-  isBackgroundSyncSupported,
 } from '../backgroundSync';
 
 // Mock Service Worker types

@@ -6,9 +6,9 @@
  * Updates every second for real-time countdown display.
  */
 
-import { useState, useEffect, useCallback } from 'react';
 import { m as motion } from 'framer-motion';
-import { Gem, Plane, Calendar } from 'lucide-react';
+import { Calendar, Gem, Plane } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { calculateTimeDifference, type TimeDifference } from '../../config/relationshipDates';
 
 type IconType = 'ring' | 'plane' | 'calendar';

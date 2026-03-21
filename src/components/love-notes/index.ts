@@ -7,5 +7,5 @@
  */
 
 export { LoveNoteMessage, type LoveNoteMessageProps } from './LoveNoteMessage';
-export { MessageList, type MessageListProps } from './MessageList';
 export { LoveNotes } from './LoveNotes';
+export { MessageList, type MessageListProps } from './MessageList';

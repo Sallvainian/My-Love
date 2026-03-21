@@ -1,5 +1,5 @@
 import type { DBSchema, IDBPDatabase } from 'idb';
-import type { MoodEntry, Message, Photo } from '../types';
+import type { Message, MoodEntry, Photo } from '../types';
 import { logger } from '../utils/logger';
 
 /**

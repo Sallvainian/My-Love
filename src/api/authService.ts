@@ -8,6 +8,14 @@
  */
 
 import {
+  actionService,
+  resetPassword,
+  signIn,
+  signInWithGoogle,
+  signOut,
+  signUp,
+} from './auth/actionService';
+import {
   getAuthStatus,
   getCurrentUserId,
   getCurrentUserIdOfflineSafe,
@@ -16,14 +24,6 @@ import {
   onAuthStateChange,
   sessionService,
 } from './auth/sessionService';
-import {
-  resetPassword,
-  signIn,
-  signInWithGoogle,
-  signOut,
-  signUp,
-  actionService,
-} from './auth/actionService';
 
 export type { AuthCredentials, AuthResult, AuthStatus } from './auth/types';
 

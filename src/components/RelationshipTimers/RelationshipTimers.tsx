@@ -9,10 +9,10 @@
  */
 
 import { m as motion } from 'framer-motion';
-import { TimeTogether } from './TimeTogether';
+import { RELATIONSHIP_DATES } from '../../config/relationshipDates';
 import { BirthdayCountdown } from './BirthdayCountdown';
 import { EventCountdown } from './EventCountdown';
-import { RELATIONSHIP_DATES } from '../../config/relationshipDates';
+import { TimeTogether } from './TimeTogether';
 
 export interface RelationshipTimersProps {
   className?: string;

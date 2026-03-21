@@ -8,17 +8,17 @@
  * @module api/interactionService
  */
 
-import { supabase } from './supabaseClient';
-import type { Database } from './supabaseClient';
-import {
-  isOnline,
-  handleSupabaseError,
-  handleNetworkError,
-  logSupabaseError,
-  isPostgrestError,
-} from './errorHandlers';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { logger } from '../utils/logger';
+import {
+  handleNetworkError,
+  handleSupabaseError,
+  isOnline,
+  isPostgrestError,
+  logSupabaseError,
+} from './errorHandlers';
+import type { Database } from './supabaseClient';
+import { supabase } from './supabaseClient';
 
 /**
  * Supabase interaction record type (from database schema)

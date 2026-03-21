@@ -16,14 +16,14 @@
  * @module components/love-notes/MessageInput
  */
 
-import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { ImageIcon } from 'lucide-react';
-import { logger } from '../../utils/logger';
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useVibration } from '../../hooks/useVibration';
-import { validateMessageContent, sanitizeMessageContent } from '../../utils/messageValidation';
 import { imageCompressionService } from '../../services/imageCompressionService';
+import { logger } from '../../utils/logger';
+import { sanitizeMessageContent, validateMessageContent } from '../../utils/messageValidation';
 import { ImagePreview } from './ImagePreview';
 
 const MAX_CHARACTERS = 1000;

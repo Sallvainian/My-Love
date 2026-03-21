@@ -11,20 +11,20 @@
  * - Depends on Settings (uses settings.relationship.startDate for message rotation)
  */
 
-import type { AppStateCreator } from '../types';
-import type {
-  Message,
-  MessageHistory,
-  CustomMessage,
-  CreateMessageInput,
-  UpdateMessageInput,
-  MessageFilter,
-} from '../../types';
-import { storageService } from '../../services/storage';
 import { customMessageService } from '../../services/customMessageService';
-import { getDailyMessage, getAvailableHistoryDays } from '../../utils/messageRotation';
+import { storageService } from '../../services/storage';
+import type {
+  CreateMessageInput,
+  CustomMessage,
+  Message,
+  MessageFilter,
+  MessageHistory,
+  UpdateMessageInput,
+} from '../../types';
 import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
+import { getAvailableHistoryDays, getDailyMessage } from '../../utils/messageRotation';
+import type { AppStateCreator } from '../types';
 
 export interface MessagesSlice {
   // State

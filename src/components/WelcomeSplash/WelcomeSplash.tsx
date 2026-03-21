@@ -1,5 +1,5 @@
 import { m as motion } from 'framer-motion';
-import { Heart, ArrowRight } from 'lucide-react';
+import { ArrowRight, Heart } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface WelcomeSplashProps {

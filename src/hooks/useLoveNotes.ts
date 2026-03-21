@@ -14,7 +14,7 @@
  * Story 2.3: Real-time message reception
  */
 
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { useRealtimeMessages } from './useRealtimeMessages';

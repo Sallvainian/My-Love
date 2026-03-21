@@ -1,8 +1,8 @@
-import { openDB } from 'idb';
 import type { IDBPDatabase } from 'idb';
-import type { Photo, Message } from '../types';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { openDB } from 'idb';
+import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDBSchema> | null = null;

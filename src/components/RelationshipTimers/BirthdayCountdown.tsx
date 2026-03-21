@@ -5,14 +5,14 @@
  * Updates every second for real-time countdown display.
  */
 
-import { useState, useEffect, useCallback } from 'react';
 import { m as motion } from 'framer-motion';
 import { Cake } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   type BirthdayInfo,
+  calculateTimeDifference,
   getNextBirthday,
   getUpcomingAge,
-  calculateTimeDifference,
   type TimeDifference,
 } from '../../config/relationshipDates';
 

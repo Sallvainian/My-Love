@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { m as motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MessageCategory } from '../../types';
 import { isValidationError } from '../../validation/errorMessages';

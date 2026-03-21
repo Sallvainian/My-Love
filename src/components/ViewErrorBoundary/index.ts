@@ -1,2 +1,1 @@
-export { ViewErrorBoundary } from './ViewErrorBoundary';
-export { default } from './ViewErrorBoundary';
+export { ViewErrorBoundary, default } from './ViewErrorBoundary';

@@ -12,9 +12,9 @@
  */
 
 import { supabase } from '../api/supabaseClient';
-import { imageCompressionService } from './imageCompressionService';
 import { IMAGE_STORAGE } from '../config/images';
 import { logger } from '../utils/logger';
+import { imageCompressionService } from './imageCompressionService';
 
 /** Edge Function URL for image upload with server-side validation */
 const UPLOAD_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-love-note-image`;

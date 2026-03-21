@@ -9,15 +9,15 @@ import type { StateCreator } from 'zustand';
 
 // Import slice interfaces (NOT the slice creators, NOT AppSlice)
 import type { AuthSlice } from './slices/authSlice';
-import type { MessagesSlice } from './slices/messagesSlice';
-import type { PhotosSlice } from './slices/photosSlice';
-import type { SettingsSlice } from './slices/settingsSlice';
-import type { NavigationSlice } from './slices/navigationSlice';
-import type { MoodSlice } from './slices/moodSlice';
 import type { InteractionsSlice } from './slices/interactionsSlice';
-import type { PartnerSlice } from './slices/partnerSlice';
+import type { MessagesSlice } from './slices/messagesSlice';
+import type { MoodSlice } from './slices/moodSlice';
+import type { NavigationSlice } from './slices/navigationSlice';
 import type { NotesSlice } from './slices/notesSlice';
+import type { PartnerSlice } from './slices/partnerSlice';
+import type { PhotosSlice } from './slices/photosSlice';
 import type { ScriptureSlice } from './slices/scriptureReadingSlice';
+import type { SettingsSlice } from './slices/settingsSlice';
 
 // Re-export Zod-inferred CoupleStats type (single source of truth — Story 3.1)
 export type { CoupleStats } from '../api/validation/supabaseSchemas';

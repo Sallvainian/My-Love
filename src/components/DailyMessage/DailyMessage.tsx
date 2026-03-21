@@ -1,13 +1,13 @@
-import { m as motion, AnimatePresence, type PanInfo } from 'framer-motion';
-import { useState, useEffect, useMemo } from 'react';
-import { useAppStore } from '../../stores/useAppStore';
-import { Heart, Share2, RefreshCw, AlertCircle } from 'lucide-react';
-import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
+import { AnimatePresence, m as motion, type PanInfo } from 'framer-motion';
+import { AlertCircle, Heart, RefreshCw, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { APP_CONFIG } from '../../config/constants';
+import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
+import { useAppStore } from '../../stores/useAppStore';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
-import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
-import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
 import { logger } from '../../utils/logger';
+import { CountdownTimer } from '../CountdownTimer/CountdownTimer';
+import { WelcomeButton } from '../WelcomeButton/WelcomeButton';
 
 interface DailyMessageProps {
   onShowWelcome?: () => void;

@@ -13,14 +13,14 @@
  * Does NOT import supabase directly (broadcast handled by hook).
  */
 
-import { useCallback } from 'react';
-import type { ReactElement } from 'react';
 import { ArrowLeft, BookOpen, MessageCircle } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/useAppStore';
 
-import { Countdown } from '../session/Countdown';
 import { FOCUS_RING, scriptureTheme } from '../constants';
+import { Countdown } from '../session/Countdown';
 
 export function LobbyContainer(): ReactElement {
   const {
