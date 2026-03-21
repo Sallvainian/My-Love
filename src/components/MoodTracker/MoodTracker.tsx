@@ -25,6 +25,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodType } from '../../types';
 import { registerBackgroundSync } from '../../utils/backgroundSync';
+import { formatDateISO } from '../../utils/dateUtils';
 import { triggerErrorHaptic, triggerMoodSaveHaptic } from '../../utils/haptics';
 import { logger } from '../../utils/logger';
 import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandler';
@@ -75,6 +76,7 @@ type MoodTabType = 'tracker' | 'history' | 'timeline';
  */
 export function MoodTracker() {
   const { addMoodEntry, getMoodForDate, syncStatus, loadMoods, syncPendingMoods } = useAppStore();
+  const moods = useAppStore((s) => s.moods);
   const { user } = useAuth();
 
   // Story 5.2: AC-5.2.1 - Performance timing for < 5 second flow validation
@@ -149,7 +151,7 @@ export function MoodTracker() {
         setShowNoteField(true);
       }
     }
-  }, [getMoodForDate]);
+  }, [getMoodForDate, moods]);
 
   const handleMoodSelect = (mood: MoodType) => {
     setSelectedMoods((prev) => {
@@ -201,17 +203,11 @@ export function MoodTracker() {
         `[Mood Log] Complete flow: ${(performance.now() - mountTime).toFixed(0)}ms (target: <5000ms)`
       );
 
-      // Story 6.4: AC #1 - Trigger background sync after mood entry
-      // Run in background (don't await) - sync should not block UI
-      if (syncStatus.isOnline) {
-        syncPendingMoods().catch((syncError) => {
-          // Log sync errors but don't show to user (graceful degradation)
-          console.error('[MoodTracker] Background sync failed:', syncError);
-        });
-      } else {
-        // Story 1.5: Show offline notification and register background sync (AC-1.5.3)
+      // Story 1.5: Show offline notification and register background sync (AC-1.5.3)
+      // Note: syncPendingMoods is already called inside addMoodEntry (moodSlice) when online,
+      // so we only need to handle the offline case here.
+      if (!syncStatus.isOnline) {
         setOfflineError(true);
-        // Register background sync to sync when connection is restored
         registerBackgroundSync('sync-pending-moods').catch((syncError) => {
           console.error('[MoodTracker] Failed to register background sync:', syncError);
         });
