@@ -522,6 +522,3 @@ class PhotoService {
 
 // Export singleton instance
 export const photoService = new PhotoService();
-
-// Export class for testing
-export { PhotoService };

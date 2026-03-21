@@ -80,12 +80,12 @@ function cleanCache(): void {
   }
 }
 
-export interface UploadResult {
+interface UploadResult {
   storagePath: string;
   compressedSize: number;
 }
 
-export interface SignedUrlResult {
+interface SignedUrlResult {
   url: string;
   expiresAt: number;
 }
@@ -291,88 +291,6 @@ export async function getSignedImageUrl(
   pendingRequests.set(storagePath, fetchPromise);
 
   return fetchPromise;
-}
-
-/**
- * Check if a signed URL needs to be refreshed (expired or about to expire)
- * Useful for components to proactively refresh URLs
- *
- * @param storagePath - Storage path to check
- * @returns true if URL should be refreshed
- */
-export function needsUrlRefresh(storagePath: string): boolean {
-  const cached = signedUrlCache.get(storagePath);
-  if (!cached) return true;
-  return !isCacheValid(cached);
-}
-
-/**
- * Clear the signed URL cache
- * Call on logout or when cleaning up
- */
-export function clearSignedUrlCache(): void {
-  signedUrlCache.clear();
-}
-
-/**
- * Batch fetch signed URLs for multiple storage paths
- * Uses parallel fetching with cache optimization and request deduplication
- *
- * @param storagePaths - Array of storage paths to fetch URLs for
- * @returns Map of storage path to signed URL result (null if failed)
- */
-export async function batchGetSignedUrls(
-  storagePaths: string[]
-): Promise<Map<string, SignedUrlResult | null>> {
-  const results = new Map<string, SignedUrlResult | null>();
-  const now = Date.now();
-
-  // Filter out paths that already have valid cached URLs
-  const pathsToFetch: string[] = [];
-  for (const path of storagePaths) {
-    const cached = signedUrlCache.get(path);
-    if (cached && isCacheValid(cached)) {
-      // Update last accessed for LRU tracking
-      cached.lastAccessed = now;
-      results.set(path, { url: cached.url, expiresAt: cached.expiresAt });
-    } else {
-      pathsToFetch.push(path);
-    }
-  }
-
-  if (pathsToFetch.length === 0) {
-    logger.debug('[LoveNoteImageService] Batch: all URLs from cache');
-    return results;
-  }
-
-  // Fetch remaining URLs in parallel (uses deduplication internally)
-  const fetchPromises = pathsToFetch.map(async (path) => {
-    try {
-      const result = await getSignedImageUrl(path);
-      return { path, result };
-    } catch (error) {
-      console.error('[LoveNoteImageService] Batch fetch failed for:', path, error);
-      return { path, result: null };
-    }
-  });
-
-  const fetchResults = await Promise.all(fetchPromises);
-
-  for (const { path, result } of fetchResults) {
-    results.set(path, result);
-  }
-
-  logger.debug(
-    `[LoveNoteImageService] Batch: ${storagePaths.length - pathsToFetch.length} cached, ${pathsToFetch.length} fetched`
-  );
-
-  // Clean cache after batch to handle edge case where parallel fetches
-  // exceed max size before individual cleanup checks can trigger
-  if (signedUrlCache.size > MAX_CACHE_SIZE) {
-    cleanCache();
-  }
-
-  return results;
 }
 
 /**

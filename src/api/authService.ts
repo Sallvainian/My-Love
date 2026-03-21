@@ -7,14 +7,7 @@
  * @module api/authService
  */
 
-import {
-  actionService,
-  resetPassword,
-  signIn,
-  signInWithGoogle,
-  signOut,
-  signUp,
-} from './auth/actionService';
+import { resetPassword, signIn, signInWithGoogle, signOut, signUp } from './auth/actionService';
 import {
   getAuthStatus,
   getCurrentUserId,
@@ -22,26 +15,7 @@ import {
   getSession,
   getUser,
   onAuthStateChange,
-  sessionService,
 } from './auth/sessionService';
-
-export type { AuthCredentials, AuthResult, AuthStatus } from './auth/types';
-
-export {
-  actionService,
-  getAuthStatus,
-  getCurrentUserId,
-  getCurrentUserIdOfflineSafe,
-  getSession,
-  getUser,
-  onAuthStateChange,
-  resetPassword,
-  sessionService,
-  signIn,
-  signInWithGoogle,
-  signOut,
-  signUp,
-};
 
 export const authService = {
   signIn,
@@ -56,5 +30,3 @@ export const authService = {
   resetPassword,
   signInWithGoogle,
 };
-
-export default authService;

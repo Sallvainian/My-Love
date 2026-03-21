@@ -27,7 +27,7 @@ import {
 /**
  * Custom error for API validation failures
  */
-export class ApiValidationError extends Error {
+class ApiValidationError extends Error {
   public readonly validationErrors: ZodError | null;
 
   constructor(message: string, validationErrors: ZodError | null = null) {
@@ -48,7 +48,7 @@ export class ApiValidationError extends Error {
  *
  * All responses are validated against Zod schemas to ensure data integrity.
  */
-export class MoodApi {
+class MoodApi {
   /**
    * Create a new mood entry in Supabase
    *
@@ -476,5 +476,3 @@ export class MoodApi {
  * Use this instance throughout the app for validated mood API operations
  */
 export const moodApi = new MoodApi();
-
-export default moodApi;

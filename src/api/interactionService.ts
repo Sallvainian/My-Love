@@ -26,11 +26,6 @@ import { supabase } from './supabaseClient';
 export type SupabaseInteractionRecord = Database['public']['Tables']['interactions']['Row'];
 
 /**
- * Interaction insert type (for creating new interactions)
- */
-export type InteractionInsert = Database['public']['Tables']['interactions']['Insert'];
-
-/**
  * Interaction type enum
  */
 export type InteractionType = 'poke' | 'kiss';
@@ -124,7 +119,7 @@ export class InteractionService {
 
     try {
       // Create interaction insert payload
-      const interactionInsert: InteractionInsert = {
+      const interactionInsert: Database['public']['Tables']['interactions']['Insert'] = {
         type,
         from_user_id: userId,
         to_user_id: toUserId,
@@ -349,11 +344,3 @@ export class InteractionService {
     }
   }
 }
-
-/**
- * Singleton instance of InteractionService
- * Use this instance throughout the app for interaction operations
- */
-export const interactionService = new InteractionService();
-
-export default interactionService;
