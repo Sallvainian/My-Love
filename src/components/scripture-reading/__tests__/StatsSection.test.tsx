@@ -16,10 +16,10 @@
  * - 3.1-UNIT-012 (P2): Stat values have aria-label attributes
  */
 
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { StatsSection } from '../overview/StatsSection';
+import { describe, expect, it } from 'vitest';
 import type { CoupleStats } from '../../../stores/types';
+import { StatsSection } from '../overview/StatsSection';
 
 const populatedStats: CoupleStats = {
   totalSessions: 12,

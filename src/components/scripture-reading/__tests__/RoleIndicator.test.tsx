@@ -10,8 +10,8 @@
  * - Correct aria-label for both roles
  */
 
-import { describe, test, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { describe, expect, test } from 'vitest';
 import { RoleIndicator } from '../reading/RoleIndicator';
 
 describe('RoleIndicator', () => {

@@ -1,8 +1,8 @@
-import { openDB } from 'idb';
 import type { IDBPDatabase } from 'idb';
-import type { Photo, Message } from '../types';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
+import { openDB } from 'idb';
+import type { Message, Photo } from '../types';
 import { logger } from '../utils/logger';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION } from './dbSchema';
 
 class StorageService {
   private db: IDBPDatabase<MyLoveDBSchema> | null = null;
@@ -335,40 +335,3 @@ class StorageService {
 
 // Singleton instance
 export const storageService = new StorageService();
-
-// LocalStorage helpers for settings and small data
-export const localStorageHelper = {
-  get<T>(key: string, defaultValue: T): T {
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
-    } catch (error) {
-      console.error(`Error reading ${key} from localStorage:`, error);
-      return defaultValue;
-    }
-  },
-
-  set<T>(key: string, value: T): void {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.error(`Error writing ${key} to localStorage:`, error);
-    }
-  },
-
-  remove(key: string): void {
-    try {
-      localStorage.removeItem(key);
-    } catch (error) {
-      console.error(`Error removing ${key} from localStorage:`, error);
-    }
-  },
-
-  clear(): void {
-    try {
-      localStorage.clear();
-    } catch (error) {
-      console.error('Error clearing localStorage:', error);
-    }
-  },
-};

@@ -15,12 +15,12 @@
  * - AC#6: Interaction history viewable (last 7 days)
  */
 
+import { AnimatePresence, m as motion } from 'framer-motion';
+import { ArrowLeft, ArrowRight, Hand, Heart, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, Hand, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { logger } from '../../utils/logger';
 import type { Interaction } from '../../types';
+import { logger } from '../../utils/logger';
 
 interface InteractionHistoryProps {
   isOpen: boolean;

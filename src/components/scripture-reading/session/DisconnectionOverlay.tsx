@@ -10,8 +10,8 @@
  * No blame or alarm language in visible text.
  */
 
-import { useState, useEffect, type ReactElement } from 'react';
 import { WifiOff } from 'lucide-react';
+import { useEffect, useState, type ReactElement } from 'react';
 
 import { FOCUS_RING } from '../constants';
 

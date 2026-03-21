@@ -1,6 +1,6 @@
 import type { Theme, ThemeName } from '../types';
 
-export const themes: Record<ThemeName, Theme> = {
+const themes: Record<ThemeName, Theme> = {
   sunset: {
     name: 'sunset',
     displayName: 'Sunset Romance',
@@ -63,7 +63,7 @@ export const themes: Record<ThemeName, Theme> = {
   },
 };
 
-export function getTheme(themeName: ThemeName): Theme {
+function getTheme(themeName: ThemeName): Theme {
   return themes[themeName];
 }
 
@@ -83,5 +83,3 @@ export function applyTheme(themeName: ThemeName): void {
   // Apply body background
   document.body.style.background = theme.gradients.background;
 }
-
-export default themes;

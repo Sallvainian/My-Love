@@ -16,15 +16,15 @@
  * - isOnboarded: Persisted to LocalStorage
  */
 
-import type { AppStateCreator } from '../types';
-import type { Settings, ThemeName, Anniversary } from '../../types';
-import { storageService } from '../../services/storage';
-import { loadDefaultMessages } from '../../data/defaultMessagesLoader';
-import { APP_CONFIG } from '../../config/constants';
-import { SettingsSchema } from '../../validation/schemas';
-import { createValidationError, isZodError } from '../../validation/errorMessages';
 import { ZodError } from 'zod/v4';
+import { APP_CONFIG } from '../../config/constants';
+import { loadDefaultMessages } from '../../data/defaultMessagesLoader';
+import { storageService } from '../../services/storage';
+import type { Anniversary, Settings, ThemeName } from '../../types';
 import { logger } from '../../utils/logger';
+import { createValidationError, isZodError } from '../../validation/errorMessages';
+import { SettingsSchema } from '../../validation/schemas';
+import type { AppStateCreator } from '../types';
 
 export interface SettingsSlice {
   // State
@@ -255,4 +255,4 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
 });
 
 // Export initialization guards for use in main store
-export { isInitializing, isInitialized };
+export { isInitialized, isInitializing };

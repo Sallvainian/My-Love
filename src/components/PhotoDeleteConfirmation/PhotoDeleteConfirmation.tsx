@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import type { Photo } from '../../types';
+import { useState } from 'react';
 import type { PhotoWithUrls } from '../../services/photoService';
+import type { Photo } from '../../types';
 
 // Support both IndexedDB Photo (number id) and Supabase PhotoWithUrls (string id)
 type PhotoLike = Photo | PhotoWithUrls;

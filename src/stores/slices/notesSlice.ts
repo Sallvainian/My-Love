@@ -16,13 +16,13 @@
  * Story 2.1: Foundation - UI and state management only
  */
 
-import type { AppStateCreator } from '../types';
-import type { LoveNote } from '../../types/models';
-import { supabase, getPartnerId } from '../../api/supabaseClient';
+import { getPartnerId, supabase } from '../../api/supabaseClient';
+import { NOTES_CONFIG } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
 import { uploadCompressedBlob } from '../../services/loveNoteImageService';
-import { NOTES_CONFIG } from '../../config/images';
+import type { LoveNote } from '../../types/models';
 import { logger } from '../../utils/logger';
+import type { AppStateCreator } from '../types';
 
 export interface NotesSlice {
   // State

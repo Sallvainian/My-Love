@@ -1,12 +1,12 @@
 import { openDB } from 'idb';
-import type { MoodEntry } from '../types';
-import { BaseIndexedDBService } from './BaseIndexedDBService';
-import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
-import { MoodEntrySchema } from '../validation/schemas';
-import { createValidationError, isZodError } from '../validation/errorMessages';
 import { ZodError } from 'zod/v4';
+import type { MoodEntry } from '../types';
 import { formatDateISO } from '../utils/dateUtils';
 import { logger } from '../utils/logger';
+import { createValidationError, isZodError } from '../validation/errorMessages';
+import { MoodEntrySchema } from '../validation/schemas';
+import { BaseIndexedDBService } from './BaseIndexedDBService';
+import { type MyLoveDBSchema, DB_NAME, DB_VERSION, upgradeDb } from './dbSchema';
 
 /**
  * Mood Service - IndexedDB CRUD operations for mood tracking

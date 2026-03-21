@@ -14,7 +14,7 @@
  * Story 2.3: Real-time message reception
  */
 
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { useRealtimeMessages } from './useRealtimeMessages';
@@ -22,7 +22,7 @@ import { useRealtimeMessages } from './useRealtimeMessages';
 /**
  * Return type for useLoveNotes hook
  */
-export interface UseLoveNotesResult {
+interface UseLoveNotesResult {
   /** Array of love notes in chat order (oldest first) */
   notes: LoveNote[];
   /** Whether notes are currently being fetched */
@@ -153,5 +153,3 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
     removeFailedMessage,
   };
 }
-
-export default useLoveNotes;

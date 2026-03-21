@@ -8,26 +8,26 @@
  * @module api/moodApi
  */
 
+import { ZodError } from 'zod/v4';
+import {
+  handleNetworkError,
+  handleSupabaseError,
+  isOnline,
+  isPostgrestError,
+  logSupabaseError,
+} from './errorHandlers';
 import { supabase } from './supabaseClient';
 import {
-  SupabaseMoodSchema,
   MoodArraySchema,
-  type SupabaseMood,
+  SupabaseMoodSchema,
   type MoodInsert,
+  type SupabaseMood,
 } from './validation/supabaseSchemas';
-import {
-  isOnline,
-  handleSupabaseError,
-  handleNetworkError,
-  logSupabaseError,
-  isPostgrestError,
-} from './errorHandlers';
-import { ZodError } from 'zod/v4';
 
 /**
  * Custom error for API validation failures
  */
-export class ApiValidationError extends Error {
+class ApiValidationError extends Error {
   public readonly validationErrors: ZodError | null;
 
   constructor(message: string, validationErrors: ZodError | null = null) {
@@ -48,7 +48,7 @@ export class ApiValidationError extends Error {
  *
  * All responses are validated against Zod schemas to ensure data integrity.
  */
-export class MoodApi {
+class MoodApi {
   /**
    * Create a new mood entry in Supabase
    *
@@ -476,5 +476,3 @@ export class MoodApi {
  * Use this instance throughout the app for validated mood API operations
  */
 export const moodApi = new MoodApi();
-
-export default moodApi;

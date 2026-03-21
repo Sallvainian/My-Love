@@ -10,8 +10,8 @@
  * Story 1.5: Task 1 - Network Status Detection Hook (AC-1.5.1)
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNetworkStatus } from '../useNetworkStatus';
 
 describe('useNetworkStatus hook', () => {

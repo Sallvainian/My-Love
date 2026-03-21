@@ -19,14 +19,14 @@
  * - AC#5: Mark interaction as viewed after animation
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
-import { Hand, History, Wind, Heart, X } from 'lucide-react';
-import { useAppStore } from '../../stores/useAppStore';
+import { AnimatePresence, m as motion } from 'framer-motion';
+import { Hand, Heart, History, Wind, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { getPartnerId } from '../../api/supabaseClient';
-import { InteractionHistory } from '../InteractionHistory';
-import { logger } from '../../utils/logger';
+import { useAppStore } from '../../stores/useAppStore';
 import type { Interaction } from '../../types';
+import { logger } from '../../utils/logger';
+import { InteractionHistory } from '../InteractionHistory';
 
 // Interaction animation type
 type AnimationType = 'poke' | 'kiss' | 'fart' | null;

@@ -16,7 +16,7 @@
  * Story 1.5: Task 2 - Network Status Indicator Component (AC-1.5.1)
  */
 
-import { Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { Loader2, Wifi, WifiOff } from 'lucide-react';
 import { useNetworkStatus } from '../../hooks';
 
 interface NetworkStatusIndicatorProps {
@@ -149,55 +149,3 @@ export function NetworkStatusIndicator({
     </div>
   );
 }
-
-/**
- * Compact inline network status dot (no banner)
- *
- * Use this for header/status bar integration where space is limited.
- *
- * @example
- * ```tsx
- * <header>
- *   <NetworkStatusDot />
- *   <h1>My App</h1>
- * </header>
- * ```
- */
-export function NetworkStatusDot({ className = '' }: { className?: string }) {
-  const { isOnline, isConnecting } = useNetworkStatus();
-
-  const getDotConfig = () => {
-    if (!isOnline && !isConnecting) {
-      return {
-        color: 'bg-[#FF6B6B]', // Error Coral Red
-        title: 'Offline',
-        animate: false,
-      };
-    }
-    if (isConnecting) {
-      return {
-        color: 'bg-[#FCC419]', // Warning Yellow
-        title: 'Connecting...',
-        animate: true,
-      };
-    }
-    return {
-      color: 'bg-[#51CF66]', // Success Green
-      title: 'Online',
-      animate: false,
-    };
-  };
-
-  const config = getDotConfig();
-
-  return (
-    <span
-      className={`inline-block h-2.5 w-2.5 rounded-full ${config.color} ${config.animate ? 'animate-pulse' : ''} ${className} `}
-      title={config.title}
-      role="status"
-      aria-label={`Network status: ${config.title}`}
-    />
-  );
-}
-
-export default NetworkStatusIndicator;
