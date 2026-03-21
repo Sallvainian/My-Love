@@ -62,11 +62,15 @@ filtered_output=$(echo "$output" | tail -n +3 | grep -Ev "$exclude_regex" || tru
 echo "$filtered_output"
 
 # Count stats
-total=$(echo "$output" | grep -c "^export\|^file" || true)
-filtered=$(echo "$filtered_output" | grep -c "^export\|^file" || true)
+total=$(echo "$output" | grep -E -c '^(export|file)' || true)
+filtered=$(echo "$filtered_output" | grep -E -c '^(export|file)' || true)
 hidden=$((total - filtered))
 
 echo ""
 echo "--- $filtered issues found ($hidden false positives filtered out) ---"
 
-exit $tsr_exit
+if [[ "$filtered" -gt 0 ]]; then
+  exit "$tsr_exit"
+else
+  exit 0
+fi
