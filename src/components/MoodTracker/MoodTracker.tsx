@@ -32,6 +32,7 @@ import { isOffline, OFFLINE_ERROR_MESSAGE } from '../../utils/offlineErrorHandle
 import { triggerMoodSaveHaptic, triggerErrorHaptic } from '../../utils/haptics';
 import { getPartnerId } from '../../api/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
+import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
 
 // Mood icon mapping - positive and challenging emotions (12 total for 3x4 grid)
@@ -133,7 +134,7 @@ export function MoodTracker() {
 
   // Check if mood already exists for today (AC-5)
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateISO(new Date());
     const existingMood = getMoodForDate(today);
 
     if (existingMood) {
