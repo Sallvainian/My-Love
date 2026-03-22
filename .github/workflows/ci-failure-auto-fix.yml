@@ -211,7 +211,11 @@ jobs:
 
           git fetch origin "$SOURCE_BRANCH" "$FIX_BRANCH"
           CHANGED_FILES=$(git diff --name-only "origin/$SOURCE_BRANCH...origin/$FIX_BRANCH")
-          FILE_COUNT=$(echo "$CHANGED_FILES" | grep -c . || echo 0)
+          if [ -z "$CHANGED_FILES" ]; then
+            FILE_COUNT=0
+          else
+            FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l)
+          fi
           TOTAL=$(git diff --shortstat "origin/$SOURCE_BRANCH...origin/$FIX_BRANCH" \
             | grep -oE '[0-9]+ (insertion|deletion)' | grep -oE '[0-9]+' \
             | paste -sd+ | bc || echo 0)
