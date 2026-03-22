@@ -8,12 +8,19 @@ on:
 
 jobs:
   auto-fix:
+    concurrency:
+      group: ci-auto-fix-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.pull_requests[0] &&
       github.event.workflow_run.head_branch != 'main' &&
-      !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')
+      !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-') &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.run_attempt == 1 &&
+      !startsWith(github.event.workflow_run.head_branch, 'dependabot/') &&
+      !startsWith(github.event.workflow_run.head_branch, 'renovate/')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -48,15 +55,34 @@ jobs:
         id: branch
         env:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          RUN_ID: ${{ github.run_id }}
         run: |
           SAFE_BRANCH=$(printf '%s' "$HEAD_BRANCH" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//' | cut -c1-80)
           if [ -z "$SAFE_BRANCH" ]; then
             SAFE_BRANCH="unknown-branch"
           fi
-          BRANCH_NAME="claude-auto-fix-ci-${SAFE_BRANCH}-${RUN_ID}"
-          git checkout -b "$BRANCH_NAME"
+          BRANCH_NAME="claude-auto-fix-ci-${SAFE_BRANCH}"
+          git checkout -B "$BRANCH_NAME"
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Check for existing fix PR
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          EXISTING=$(gh pr list \
+            --head "$BRANCH_NAME" \
+            --base "$HEAD_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "existing_pr=$EXISTING" >> $GITHUB_OUTPUT
+            echo "has_existing=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_existing=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Get CI failure details and logs
         id: failure_details
@@ -113,7 +139,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             You are a CI failure auto-fix agent. A test workflow has failed on a pull request.
-            Your job is to diagnose the failure from the logs, fix the code, and push the fix.
+            Your job is to diagnose the failure from the logs, fix ONLY the broken code, and push the fix.
 
             ## Context
 
@@ -123,6 +149,7 @@ jobs:
             Fix Branch: ${{ steps.branch.outputs.branch_name }}
             Source Branch: ${{ github.event.workflow_run.head_branch }}
             Repository: ${{ github.repository }}
+            Existing Fix PR: ${{ steps.existing_pr.outputs.existing_pr || 'none' }}
 
             ## Error Logs
 
@@ -142,21 +169,72 @@ jobs:
                - For format: run `npm run format`
                - For unit tests: run `npx vitest run <failed-test-file> --silent`
                - For build: run `npm run build`
-            5. If the fix is correct and verification passes, commit and push:
+            5. Before committing, run `git diff --stat` and verify every changed file is directly related to the CI error. Discard unrelated changes with `git checkout -- <file>`.
+            6. If the fix is correct and verification passes, commit and push:
                - `git add <changed-files>`
                - `git commit -m "fix: <description of what was fixed>"`
-               - `git push origin ${{ steps.branch.outputs.branch_name }}`
-            6. Then create a PR targeting the source branch:
+               - `git push --force-with-lease origin ${{ steps.branch.outputs.branch_name }}`
+            7. If an existing fix PR is open (PR ${{ steps.existing_pr.outputs.existing_pr || 'none' }}):
+               - Comment on the existing PR explaining what changed in this update.
+               Otherwise, create a new PR:
                - `gh pr create --base ${{ github.event.workflow_run.head_branch }} --head ${{ steps.branch.outputs.branch_name }} --title "fix(ci): <short description>" --body "<what failed and what was fixed>"`
-            7. Comment on the original PR (#${{ github.event.workflow_run.pull_requests[0].number }}) linking to the fix PR.
+               - Comment on the original PR (#${{ github.event.workflow_run.pull_requests[0].number }}) linking to the fix PR.
 
-            ## Rules
+            ## STRICT CONSTRAINTS
 
-            - Only fix what the CI logs say is broken. Do not refactor or improve other code.
-            - If the failure is a flaky test (passes locally but failed in CI), note it in the PR but do not change the test.
-            - If the failure requires changes you cannot verify (e.g., E2E tests needing Supabase), explain what you think the fix is in a comment on the original PR instead of pushing code.
-            - If you cannot determine the root cause, comment on the original PR with your analysis instead of guessing.
+            1. **Only touch files directly named in the error logs.** If a file path does not appear in the CI error output, DO NOT edit it.
+            2. **Never modify workflow files** (`.github/workflows/*.yml`, `.github/actions/**`). If a workflow is broken, comment on the original PR instead.
+            3. **Never modify `package.json` or `package-lock.json`** unless the error explicitly says a dependency is missing.
+            4. **Do not remove, rename, or refactor code** beyond the minimum change needed to fix the failing test or check.
+            5. **Before committing, run `git diff --stat` and verify every changed file appears in the error logs.** Discard any file that doesn't with `git checkout -- <file>`.
+            6. If the failure is a flaky test (passes locally but failed in CI), comment on the original PR instead of changing code.
+            7. If the failure requires changes you cannot verify (e.g., E2E tests needing Supabase, database tests), comment on the original PR with your analysis instead of pushing code.
+            8. If you cannot determine the root cause, comment on the original PR with your analysis instead of guessing.
 
           claude_args: |
             --model claude-opus-4-6
-            --allowedTools "Edit,MultiEdit,Write,Read,Glob,Grep,Bash(git:*),Bash(npm:*),Bash(npx:*),Bash(gh:*),Bash(node:*)"
+            --max-turns 20
+            --allowedTools "Edit,MultiEdit,Read,Glob,Grep,Bash(git:*),Bash(npm:*),Bash(npx:*),Bash(gh:*),Bash(node:*)"
+
+      - name: Validate fix scope
+        if: always() && steps.claude.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FIX_BRANCH: ${{ steps.branch.outputs.branch_name }}
+          SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # Check if Claude pushed anything
+          if ! git ls-remote --exit-code origin "refs/heads/$FIX_BRANCH" >/dev/null 2>&1; then
+            echo "No fix branch pushed — Claude likely commented instead"
+            exit 0
+          fi
+
+          git fetch origin "$SOURCE_BRANCH" "$FIX_BRANCH"
+          CHANGED_FILES=$(git diff --name-only "origin/$SOURCE_BRANCH...origin/$FIX_BRANCH")
+          FILE_COUNT=$(echo "$CHANGED_FILES" | grep -c . || echo 0)
+          TOTAL=$(git diff --shortstat "origin/$SOURCE_BRANCH...origin/$FIX_BRANCH" \
+            | grep -oE '[0-9]+ (insertion|deletion)' | grep -oE '[0-9]+' \
+            | paste -sd+ | bc || echo 0)
+
+          echo "Files changed: $FILE_COUNT, Lines changed: $TOTAL"
+          echo "$CHANGED_FILES"
+
+          # Guard: workflow files must not be touched
+          if echo "$CHANGED_FILES" | grep -q '\.github/'; then
+            echo "::error::Fix modifies .github/ files — auto-closing PR"
+            PR_NUM=$(gh pr list --head "$FIX_BRANCH" --json number --jq '.[0].number // empty')
+            [ -n "$PR_NUM" ] && gh pr close "$PR_NUM" \
+              --comment "Auto-closed: fix modified workflow/action files which is not allowed. Manual review needed."
+            exit 1
+          fi
+
+          # Guard: too many files (>5) or lines (>100)
+          if [ "$FILE_COUNT" -gt 5 ] || [ "${TOTAL:-0}" -gt 100 ]; then
+            echo "::error::Fix too broad: $FILE_COUNT files, $TOTAL lines changed"
+            PR_NUM=$(gh pr list --head "$FIX_BRANCH" --json number --jq '.[0].number // empty')
+            [ -n "$PR_NUM" ] && gh pr close "$PR_NUM" \
+              --comment "Auto-closed: fix touched $FILE_COUNT files / $TOTAL lines (limits: 5 files, 100 lines). Manual review needed."
+            exit 1
+          fi
+
+          echo "Fix scope validated: $FILE_COUNT files, $TOTAL lines changed"
