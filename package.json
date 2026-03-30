@@ -37,11 +37,11 @@
     "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
-    "@sentry/react": "^10.45.0",
-    "@supabase/supabase-js": "^2.99.3",
+    "@sentry/react": "^10.46.0",
+    "@supabase/supabase-js": "^2.100.1",
     "dompurify": "^3.3.3",
     "eventsource": "^4.1.0",
-    "framer-motion": "^12.35.2",
+    "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",
