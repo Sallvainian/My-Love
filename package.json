@@ -39,7 +39,7 @@
   "dependencies": {
     "@sentry/react": "^10.45.0",
     "@supabase/supabase-js": "^2.99.3",
-    "dompurify": "^3.3.3",
+    "dompurify": "^3.4.1",
     "eventsource": "^4.1.0",
     "framer-motion": "^12.35.2",
     "idb": "^8.0.3",
