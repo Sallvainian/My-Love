@@ -1,0 +1,277 @@
+# Instincts generated from https://github.com/Sallvainian/My-Love
+# Generated: 2026-04-26T00:08:58.334Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: My-Love-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Sallvainian/My-Love
+---
+
+# My Love Commit Length
+
+## Action
+
+Keep commit messages concise (~46 characters)
+
+## Evidence
+
+- Average commit message length: 46 chars
+- Based on 1 commits
+
+---
+id: My-Love-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Sallvainian/My-Love
+---
+
+# My Love Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: My-Love-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Sallvainian/My-Love
+---
+
+# My Love Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: My-Love-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Sallvainian/My-Love
+---
+
+# My Love Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: My-Love-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Sallvainian/My-Love
+---
+
+# My Love Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: my-love-instinct-file-naming-camelcase
+trigger: "When creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct File Naming Camelcase
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: my-love-instinct-function-naming-camelcase
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Function Naming Camelcase
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: my-love-instinct-class-naming-pascalcase
+trigger: "When defining a new class"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Class Naming Pascalcase
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: my-love-instinct-constant-naming-screaming-snake-case
+trigger: "When defining a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Constant Naming Screaming Snake Case
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: my-love-instinct-import-style-relative
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Import Style Relative
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: my-love-instinct-export-style-named
+trigger: "When exporting modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Export Style Named
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: my-love-instinct-git-commit-prefix-deps
+trigger: "When committing dependency updates"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Git Commit Prefix Deps
+
+## Action
+
+Prefix the commit message with 'deps(deps):'
+
+## Evidence
+
+- Seen in commit: deps(deps): Bump dompurify from 3.3.3 to 3.4.1
+
+---
+id: my-love-instinct-typescript-language
+trigger: "When writing new code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Typescript Language
+
+## Action
+
+Use TypeScript as the programming language
+
+## Evidence
+
+- Pattern in language: TypeScript
+
+---
+id: my-love-instinct-test-location-separate
+trigger: "When adding new tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: Sallvainian/My-Love
+---
+
+# My Love Instinct Test Location Separate
+
+## Action
+
+Place test files in a separate location from source files
+
+## Evidence
+
+- Pattern in testLocation: separate
+
