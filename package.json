@@ -37,19 +37,19 @@
     "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
-    "@sentry/react": "^10.45.0",
-    "@supabase/supabase-js": "^2.99.3",
-    "dompurify": "^3.3.3",
+    "@sentry/react": "^10.52.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "dompurify": "^3.4.2",
     "eventsource": "^4.1.0",
-    "framer-motion": "^12.35.2",
+    "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.577.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "react-window": "^2.2.7",
     "react-window-infinite-loader": "^2.0.1",
-    "workbox-window": "^7.4.0",
-    "zustand": "^5.0.12"
+    "workbox-window": "^7.4.1",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
