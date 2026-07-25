@@ -37,19 +37,19 @@
     "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
-    "@sentry/react": "^10.45.0",
-    "@supabase/supabase-js": "^2.99.3",
+    "@sentry/react": "^10.68.0",
+    "@supabase/supabase-js": "^2.110.8",
     "dompurify": "^3.4.12",
     "eventsource": "^4.1.0",
-    "framer-motion": "^12.35.2",
+    "framer-motion": "^12.42.2",
     "idb": "^8.0.3",
     "lucide-react": "^0.577.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-window": "^2.2.7",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-window": "^2.3.0",
     "react-window-infinite-loader": "^2.0.1",
-    "workbox-window": "^7.4.0",
-    "zustand": "^5.0.12"
+    "workbox-window": "^7.4.1",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
@@ -64,7 +64,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/dompurify": "^3.2.0",
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/react-window": "^2.0.0",
     "@vitejs/plugin-react": "^5.1.4",
