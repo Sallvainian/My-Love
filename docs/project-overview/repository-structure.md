@@ -4,24 +4,22 @@
 My-Love/
 |-- .github/
 |   |-- actions/
-|   |   +-- setup-supabase/           # Composite action: install Supabase CLI, start local, apply migrations, export credentials
+|   |   |-- setup-supabase/           # Composite action: install Supabase CLI, start local, apply migrations, export credentials
+|   |   +-- setup-playwright-e2e/     # Composite action: Node + deps + Playwright browsers + local Supabase
 |   |-- codeql/
 |   |   +-- codeql-config.yml         # CodeQL security analysis (security-extended + security-and-quality)
-|   |-- commands/                     # Gemini AI command configurations (5 TOML files)
-|   |-- workflows/                    # 19 GitHub Actions workflows
+|   |-- lighthouse/
+|   |   +-- lighthouserc.json         # Lighthouse CI assertion thresholds
+|   |-- workflows/                    # 9 GitHub Actions workflows
 |   |   |-- deploy.yml                # Build + smoke test + deploy to GitHub Pages + health check
 |   |   |-- test.yml                  # Full test pipeline: lint, unit, E2E, merge reports
 |   |   |-- supabase-migrations.yml   # Migration validation on PRs touching supabase/ paths
 |   |   |-- claude.yml                # Claude Code for @claude mentions in issues/PRs
 |   |   |-- claude-code-review.yml    # Automated PR code review with Claude
-|   |   |-- ci-failure-auto-fix.yml   # Auto-fix CI failures with Claude Code on non-main branches
 |   |   |-- codeql.yml                # CodeQL security scanning
 |   |   |-- dependency-review.yml     # Dependency vulnerability review on PRs
 |   |   |-- bundle-size.yml           # Bundle size tracking on PRs
-|   |   |-- lighthouse.yml            # Lighthouse performance auditing
-|   |   |-- manual-code-analysis.yml  # On-demand commit summarization or security review
-|   |   |-- bmad-story-sync.yml       # BMAD method story sync automation
-|   |   +-- gemini-*.yml              # Gemini AI workflows (dispatch, invoke, plan-execute, review, triage)
+|   |   +-- lighthouse.yml            # Lighthouse performance auditing
 |   +-- dependabot.yml                # Weekly npm + GitHub Actions dependency updates
 |
 |-- _bmad-output/

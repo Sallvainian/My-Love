@@ -13,7 +13,7 @@ The application serves exactly two users (a couple) and is scoped for personal u
 | UI Framework     | React               | 19.2.4  | Concurrent rendering, lazy loading, Suspense                     |
 | Language         | TypeScript          | 5.9.3   | Strict mode, ES2022 target, bundler module resolution            |
 | Build Tool       | Vite                | 7.3.1   | Dev server, HMR, manual chunk splitting, PWA plugin              |
-| Styling          | Tailwind CSS        | 4.1.17  | v4 with PostCSS, Prettier class sorting                          |
+| Styling          | Tailwind CSS        | 4.1.17  | v4 with PostCSS                                                  |
 | Animation        | Framer Motion       | 12.35.2 | Page transitions, micro-interactions, reduced-motion support     |
 | State Management | Zustand             | 5.0.11  | Single store, 11 slices, persist middleware                      |
 | Backend / Auth   | Supabase            | 2.99.0  | Auth, Postgres, Storage, Realtime (Broadcast + postgres_changes) |

@@ -135,62 +135,34 @@ ignores: [
 
 ```bash
 npm run lint         # Check for errors
-npm run lint:fix     # Auto-fix + Prettier format
+npm run lint:fix     # Auto-fix the rules that have fixers
 ```
 
 The lint command targets `src`, `tests`, and `scripts` directories with explicit ignore patterns for test report directories, BMAD artifacts, and Codex artifacts.
 
-## Prettier
+## Formatting Conventions
 
-Prettier 3.8 with `prettier-plugin-tailwindcss` for automatic Tailwind CSS class sorting.
+Automated formatting has been removed from the project: there is no formatter dependency, no
+formatter config, and no `format` / `format:check` scripts. **ESLint is now the only automated style
+gate**, and it does not check layout. The conventions below are followed by hand and are not
+enforced by tooling, so match the surrounding code when editing a file.
 
-### Configuration (`.prettierrc`)
+| Convention                 | Value                                                       |
+| -------------------------- | ----------------------------------------------------------- |
+| Indentation                | 2 spaces, never tabs                                        |
+| Line width                 | 100 characters                                              |
+| Quotes                     | Single in JavaScript/TypeScript, double in JSX attributes   |
+| Semicolons                 | Required                                                    |
+| Trailing commas            | ES5 style (objects, arrays -- not function parameter lists) |
+| Arrow function parentheses | Always, even for a single parameter (`(x) => x`)            |
+| Line endings               | LF (Unix-style)                                             |
 
-```json
-{
-  "printWidth": 100,
-  "tabWidth": 2,
-  "useTabs": false,
-  "semi": true,
-  "singleQuote": true,
-  "quoteProps": "as-needed",
-  "jsxSingleQuote": false,
-  "trailingComma": "es5",
-  "bracketSpacing": true,
-  "bracketSameLine": false,
-  "arrowParens": "always",
-  "endOfLine": "lf",
-  "plugins": ["prettier-plugin-tailwindcss"]
-}
-```
+### Tailwind Class Order
 
-Key settings:
-
-- **100-character line width** (wider than 80-char default)
-- **Single quotes** in JavaScript/TypeScript, double quotes in JSX
-- **ES5 trailing commas** (objects, arrays, function parameters)
-- **LF line endings** (Unix-style)
-- **Tailwind class sorting** via `prettier-plugin-tailwindcss`
-
-### Running
-
-```bash
-npm run format         # Format all files (writes changes)
-npm run format:check   # Check formatting (no writes, non-zero exit on violations)
-```
-
-### Ignored Files (`.prettierignore`)
-
-```
-node_modules/
-dist/
-dev-dist/
-coverage/
-.vscode/
-package-lock.json
-playwright-report/
-test-results/
-```
+Tailwind utility classes used to be sorted automatically by the `prettier-plugin-tailwindcss`
+formatter plugin. That plugin is gone, so **class order is now manual and unenforced**. Keep a
+sensible, readable grouping and follow the ordering already used in neighbouring markup rather than
+re-sorting existing class lists.
 
 ## Logger Utility
 

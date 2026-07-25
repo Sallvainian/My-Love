@@ -50,8 +50,7 @@ npm run dev:raw          # Vite dev server directly
 npm run build            # Production build (tsc + vite)
 npm run typecheck        # tsc --noEmit
 npm run lint             # ESLint
-npm run format:check     # Prettier check
-npm run format           # Prettier write
+npm run lint:fix         # ESLint --fix
 ```
 
 ## Testing
@@ -171,7 +170,7 @@ My-Love/
 
 Runs on every PR targeting `main`:
 
-- Lint & Type Check (Prettier + ESLint + tsc)
+- Lint & Type Check (ESLint + tsc)
 - Unit Tests (Vitest with coverage)
 - Database Tests (pgTAP)
 - Integration Tests (Playwright)

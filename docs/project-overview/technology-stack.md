@@ -86,8 +86,6 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | typescript-eslint           | 8.57.0  | TypeScript ESLint rules                                                               |
 | eslint-plugin-react-hooks   | 7.0.1   | React hooks linting (including React 19 rules for `set-state-in-effect` and `purity`) |
 | eslint-plugin-react-refresh | 0.5.2   | React Refresh HMR validation                                                          |
-| Prettier                    | 3.8.1   | Code formatting                                                                       |
-| prettier-plugin-tailwindcss | 0.7.2   | Tailwind class sorting                                                                |
 | fnox (age provider)         | --      | Encrypted secrets management (age encryption, committed in `fnox.toml`)               |
 | vite-plugin-checker         | 0.12.0  | Vite-integrated TypeScript type checking overlay                                      |
 | rollup-plugin-visualizer    | 6.0.5   | Bundle analysis (generates `dist/stats.html` with gzip and brotli sizes)              |

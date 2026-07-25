@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 import { supabase } from '../api/supabaseClient';
 import { CoupleStatsSchema } from '../api/validation/supabaseSchemas';
 import type { CoupleStats } from '../stores/types';
+import type { Database } from '../types/database.types';
 import { logger } from '../utils/logger';
 import {
   SupabaseBookmarkSchema,
@@ -266,8 +267,11 @@ class ScriptureReadingService extends BaseIndexedDBService<
       >
     >
   ): Promise<void> {
-    // Build snake_case update payload for Supabase
-    const supabaseUpdates: Record<string, unknown> = {};
+    // Build snake_case update payload for Supabase.
+    // Typed with the generated Update row rather than Record<string, unknown>:
+    // postgrest-js (>= supabase-js 2.105) wraps .update() payloads in
+    // RejectExcessProperties, which resolves an index signature to `never`.
+    const supabaseUpdates: Database['public']['Tables']['scripture_sessions']['Update'] = {};
     if (updates.currentPhase !== undefined) supabaseUpdates.current_phase = updates.currentPhase;
     if (updates.currentStepIndex !== undefined)
       supabaseUpdates.current_step_index = updates.currentStepIndex;

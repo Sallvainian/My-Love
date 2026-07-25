@@ -139,7 +139,7 @@
 - **[build-process.md](./development-guide/build-process.md)** -- Production build pipeline, code splitting, PWA generation
 - **[project-structure.md](./development-guide/project-structure.md)** -- Annotated directory layout
 - **[testing.md](./development-guide/testing.md)** -- Unit, E2E, database, smoke, and burn-in tests
-- **[code-style.md](./development-guide/code-style.md)** -- TypeScript, ESLint, Prettier conventions
+- **[code-style.md](./development-guide/code-style.md)** -- TypeScript, ESLint, formatting conventions
 - **[database-migrations.md](./development-guide/database-migrations.md)** -- 25 migrations, Supabase CLI, pgTAP tests
 - **[deployment.md](./development-guide/deployment.md)** -- 19 CI/CD workflows, GitHub Pages, health checks
 - **[troubleshooting.md](./development-guide/troubleshooting.md)** -- 13 common issues and solutions
