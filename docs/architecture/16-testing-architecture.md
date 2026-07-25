@@ -14,7 +14,7 @@
 
 ### Configuration
 
-- **Runner**: Vitest 4.0.17 (`vitest.config.ts`)
+- **Runner**: Vitest 4.1.10 (`vitest.config.ts`)
 - **DOM**: happy-dom 20.8.3 (lightweight DOM implementation)
 - **Setup**: `tests/setup.ts` (global test setup)
 - **Coverage**: V8 coverage with 25% threshold (lines, functions, branches, statements)
@@ -94,7 +94,7 @@ test('creates mood entry', async () => {
 
 ### Configuration
 
-- **Runner**: Playwright 1.58.2 (`playwright.config.ts`)
+- **Runner**: Playwright 1.62.0 (`playwright.config.ts`)
 - **Fixtures**: Merged from `@seontechnologies/playwright-utils` and custom fixtures
 - **Auth Setup**: Worker-isolated test users via Supabase Admin API
 - **Imports**: Always from `tests/support/merged-fixtures.ts`
@@ -111,14 +111,25 @@ npm run test:p1                # Priority 0 + 1 tests
 npx playwright test tests/e2e/mood/mood-tracker.spec.ts  # Single file
 ```
 
-### Auth Setup (`tests/support/auth-setup.ts`)
+### Auth Setup (`tests/support/auth/`)
 
-Creates worker-isolated test users before tests run:
+Three modules, wired through `playwright.config.ts`:
 
-- Each parallel Playwright worker gets its own user pair (user + partner)
-- Users are created via Supabase Admin API
-- Auth state is stored in `tests/.auth/worker-{n}.json`
-- This prevents cross-contamination between parallel test workers
+| File                         | Role                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `global-setup.ts`            | Runs once via `globalSetup`. Provisions test users in Supabase and links them as partner pairs.           |
+| `setup.ts`                   | `initializeAuthSystem()` -- registers `SupabaseAuthProvider` with the auth-session library. Idempotent.   |
+| `supabase-auth-provider.ts`  | The provider implementation the library calls into.                                                       |
+
+Behaviour:
+
+- Each parallel Playwright worker gets its own user pair (user + partner), preventing cross-contamination
+- Users are provisioned via the Supabase Admin API with a shared test password
+- Worker count is derived from `os.cpus()`
+- **Tokens are fetched lazily per worker on first test** by `@seontechnologies/playwright-utils/auth-session` -- global setup does *not* pre-fetch them
+- `configureAuthSession()` is deliberately skipped; the library creates its storage directories on demand, and calling it explicitly produces noisy console/dotenv output
+
+> Renamed since the 2026-03 scan: there is no `tests/support/auth-setup.ts`. The logic now lives in the `tests/support/auth/` directory above.
 
 ### Fixture Pattern
 

@@ -2,7 +2,7 @@
 
 All migrations in `supabase/migrations/`, applied in filename-sorted order via `supabase db reset`.
 
-## Migration Index (24 files)
+## Migration Index (25 files)
 
 | #   | Timestamp      | Name                                        | Summary                                                                                                                                                                                                         |
 | --- | -------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,6 +30,7 @@ All migrations in `supabase/migrations/`, applied in filename-sorted order via `
 | 22  | 20260309000001 | at_reflection_preset                        | Add 'at_reflection' preset + p_bookmark_steps parameter to seed function                                                                                                                                        |
 | 23  | 20260313000001 | fix_lock_in_last_step                       | Last step (16) transitions to reflection but keeps status='in_progress' (was incorrectly setting 'complete')                                                                                                    |
 | 24  | 20260315044923 | fix_avg_rating_precision                    | Change `round(v_avg_rating, 2)` to `round(v_avg_rating, 1)` in scripture_get_couple_stats                                                                                                                       |
+| 25  | 20260316031209 | create_claude_bot_config                    | `claude_bot_config` key/value table for CI bot test credentials; RLS enabled with **no policies** (service_role only)                                                                                           |
 
 ## Key Patterns
 

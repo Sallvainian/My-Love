@@ -14,7 +14,7 @@ Complete file counts, line counts, and quick reference for the entire codebase.
 | SQL migrations                           | 25      | --          |
 | pgTAP database tests                     | 14      | --          |
 | GitHub Actions workflows                 | 19      | --          |
-| **Total TypeScript/TSX in `src/`**       | **207** | **~45,102** |
+| **Total TypeScript/TSX in `src/`**       | **197** | **~43,133** |
 
 ## Source Files by Directory
 
@@ -97,11 +97,13 @@ Sorted by total lines (excluding test files colocated in `src/`):
 
 | Extension | Count | Description                                         |
 | --------- | ----- | --------------------------------------------------- |
-| `.tsx`    | 86    | React components with JSX                           |
-| `.ts`     | 121   | TypeScript modules (services, utils, types, config) |
+| `.tsx`    | 82    | React components with JSX (66 non-test)             |
+| `.ts`     | 115   | TypeScript modules (services, utils, types, config) |
 | `.sql`    | 39    | Database migrations (25) + pgTAP tests (14)         |
-| `.yml`    | 19    | GitHub Actions workflow definitions                 |
-| `.md`     | 30+   | Documentation files                                 |
+| `.yml`    | 9     | GitHub Actions workflow definitions                 |
+| `.md`     | 100+  | Documentation files                                 |
+
+Totals for `src/`: **197** `.ts`/`.tsx` files (43,133 lines), of which **168 are non-test** (33,974 lines) and 29 are co-located tests. Plus 4 `.css` files.
 
 ## Component Count by Feature
 
@@ -110,7 +112,7 @@ Sorted by total lines (excluding test files colocated in `src/`):
 | Scripture Reading   | 10         | 6          | 8 (broadcast, presence, 5 decomposed hooks, motionConfig) |
 | Love Notes          | 5          | 0          | 2 (useLoveNotes, useRealtimeMessages)                     |
 | Mood Tracking       | 6          | 0          | 3 (useMoodHistory, usePartnerMood, useAuth)               |
-| Photos              | 8          | 0          | 2 (usePhotos, useImageCompression)                        |
+| Photos              | 8          | 0          | 1 (usePhotos)                                             |
 | Admin Panel         | 5          | 0          | 0                                                         |
 | Relationship Timers | 4          | 0          | 0                                                         |
 | Settings            | 2          | 0          | 0                                                         |
@@ -121,38 +123,41 @@ Sorted by total lines (excluding test files colocated in `src/`):
 
 | Slice                      | Lines | Actions | Key Responsibility                |
 | -------------------------- | ----- | ------- | --------------------------------- |
-| `scriptureReadingSlice.ts` | 1,021 | 15+     | Scripture session state machine   |
-| `notesSlice.ts`            | 608   | 8       | Love notes CRUD, rate limiting    |
-| `messagesSlice.ts`         | 527   | 10      | Daily messages, favorites, custom |
-| `moodSlice.ts`             | 339   | 6       | Mood tracking, partner sync       |
-| `settingsSlice.ts`         | 258   | 3       | Init, theme, relationship config  |
-| `interactionsSlice.ts`     | 253   | 4       | Poke/kiss/fart interactions       |
-| `photosSlice.ts`           | 208   | 5       | Photo gallery state               |
-| `partnerSlice.ts`          | 141   | 3       | Partner data, display name        |
-| `navigationSlice.ts`       | 85    | 2       | View routing                      |
+| `scriptureReadingSlice.ts` | 1,013 | 25      | Scripture session state machine   |
+| `notesSlice.ts`            | 608   | 11      | Love notes CRUD, rate limiting    |
+| `messagesSlice.ts`         | 527   | 15      | Daily messages, favorites, custom |
+| `moodSlice.ts`             | 346   | 8       | Mood tracking, partner sync       |
+| `settingsSlice.ts`         | 258   | 7       | Init, theme, relationship config  |
+| `interactionsSlice.ts`     | 253   | 8       | Poke/kiss interactions            |
+| `photosSlice.ts`           | 208   | 8       | Photo gallery state               |
+| `partnerSlice.ts`          | 141   | 8       | Partner data, requests, search    |
+| `navigationSlice.ts`       | 85    | 7       | View routing                      |
 | `authSlice.ts`             | 50    | 2       | User identity, isAuthenticated    |
-| `appSlice.ts`              | 28    | 1       | Loading state                     |
+| `appSlice.ts`              | 28    | 3       | Loading, error, hydration flag    |
 
 ## Service Layer Sizes
 
 | Service                      | Lines | Storage          | Key Operations                                 |
 | ---------------------------- | ----- | ---------------- | ---------------------------------------------- |
-| `scriptureReadingService.ts` | 958   | IDB + Supabase   | Session CRUD, reflections, bookmarks, messages |
-| `photoService.ts`            | 527   | Supabase Storage | Upload, fetch, delete, signed URLs             |
-| `moodApi.ts` (API)           | 480   | Supabase         | CRUD, pagination, partner mood fetch           |
-| `moodSyncService.ts` (API)   | 458   | Supabase         | Bidirectional sync, conflict resolution        |
-| `loveNoteImageService.ts`    | 391   | Supabase Storage | Image upload/download for notes                |
-| `storage.ts`                 | 374   | IDB              | Message storage operations                     |
-| `photoStorageService.ts`     | 334   | IDB              | Local photo blob caching                       |
+| `scriptureReadingService.ts` | 962   | IDB + Supabase   | Session CRUD, reflections, bookmarks, messages |
+| `photoService.ts`            | 524   | Supabase Storage | Upload, fetch, delete, signed URLs             |
+| `moodApi.ts` (API)           | 478   | Supabase         | Validated CRUD, pagination, date-range fetch   |
+| `moodSyncService.ts` (API)   | 451   | Supabase         | Upward sync with backoff, mood broadcast       |
+| `interactionService.ts` (API)| 346   | Supabase         | Poke/kiss send, postgres_changes subscription  |
+| `partnerService.ts` (API)    | 340   | Supabase         | Search, requests, accept/decline               |
+| `storage.ts`                 | 337   | IDB              | Legacy message + photo storage operations      |
+| `loveNoteImageService.ts`    | 309   | Supabase Storage | Edge Function upload, signed URL LRU cache     |
 | `BaseIndexedDBService.ts`    | 307   | IDB              | Abstract CRUD base class                       |
-| `customMessageService.ts`    | 301   | IDB              | Custom message CRUD                            |
-| `dbSchema.ts`                | 280   | IDB              | Schema v5, 8 object stores, migrations         |
-| `moodService.ts`             | 255   | IDB              | Local mood CRUD                                |
-| `syncService.ts`             | 217   | IDB + Supabase   | Mood sync coordination                         |
+| `customMessageService.ts`    | 300   | IDB              | Custom message CRUD, import/export             |
+| `supabaseSchemas.ts` (API)   | 295   | --               | Zod schemas for Supabase responses             |
+| `dbSchema.ts`                | 272   | IDB              | Schema v5, 8 object stores, `upgradeDb()`      |
+| `moodService.ts`             | 256   | IDB              | Local mood CRUD                                |
 | `imageCompressionService.ts` | 203   | --               | Canvas-based image resize                      |
-| `realtimeService.ts`         | 151   | --               | Realtime subscription management               |
+| `supabaseClient.ts` (API)    | 158   | --               | Singleton client, partner helpers              |
+| `errorHandlers.ts` (API)     | 155   | --               | Postgrest/network error mapping                |
 | `migrationService.ts`        | 149   | IDB              | localStorage -> IndexedDB migration            |
-| `performanceMonitor.ts`      | 142   | --               | Async operation timing                         |
+
+**Deleted in the dead-code sweep:** `syncService.ts` (217), `realtimeService.ts` (151), `performanceMonitor.ts` (142), `photoStorageService.ts` (334), `realtimeChannel.ts` (50), `useImageCompression.ts` (87), `validation/index.ts` (37), `RelationshipTimers.tsx`, plus the `CountdownTimer/index.ts` and `Settings/index.ts` barrels.
 
 ## Related Documentation
 

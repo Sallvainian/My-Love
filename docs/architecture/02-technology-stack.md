@@ -4,18 +4,18 @@
 
 | Package                        | Version  | Purpose                                              |
 | ------------------------------ | -------- | ---------------------------------------------------- |
-| `react`                        | ^19.2.4  | UI framework (React 19 with concurrent features)     |
-| `react-dom`                    | ^19.2.4  | React DOM renderer                                   |
-| `@supabase/supabase-js`        | ^2.99.0  | Backend client (auth, database, storage, realtime)   |
-| `zustand`                      | ^5.0.11  | Lightweight state management with slice pattern      |
+| `react`                        | ^19.2.8  | UI framework (React 19 with concurrent features)     |
+| `react-dom`                    | ^19.2.8  | React DOM renderer                                   |
+| `@supabase/supabase-js`        | ^2.110.8  | Backend client (auth, database, storage, realtime)   |
+| `zustand`                      | ^5.0.14  | Lightweight state management with slice pattern      |
 | `idb`                          | ^8.0.3   | Promise-based IndexedDB wrapper for local storage    |
-| `framer-motion`                | ^12.35.2 | Animation library with `LazyMotion` for tree-shaking |
+| `framer-motion`                | ^12.42.2 | Animation library with `LazyMotion` for tree-shaking |
 | `lucide-react`                 | ^0.577.0 | Icon library (tree-shakeable SVG icons)              |
-| `react-window`                 | ^2.2.7   | Virtualized list rendering for performance           |
+| `react-window`                 | ^2.3.0   | Virtualized list rendering for performance           |
 | `react-window-infinite-loader` | ^2.0.1   | Infinite scroll integration with react-window        |
-| `dompurify`                    | ^3.3.2   | XSS sanitization for user-generated content          |
-| `@sentry/react`                | ^10.42.0 | Error tracking and performance monitoring            |
-| `workbox-window`               | ^7.4.0   | Service worker lifecycle management                  |
+| `dompurify`                    | ^3.4.12   | XSS sanitization for user-generated content          |
+| `@sentry/react`                | ^10.68.0 | Error tracking and performance monitoring            |
+| `workbox-window`               | ^7.4.1   | Service worker lifecycle management                  |
 | `eventsource`                  | ^4.1.0   | SSE polyfill for Supabase realtime                   |
 
 ## Development Dependencies
@@ -24,10 +24,10 @@
 
 | Package                    | Version | Purpose                               |
 | -------------------------- | ------- | ------------------------------------- |
-| `vite`                     | ^7.3.1  | Build tool and dev server             |
+| `vite`                     | ^7.3.6  | Build tool and dev server             |
 | `@vitejs/plugin-react`     | ^5.1.4  | React Fast Refresh for Vite           |
 | `typescript`               | ~5.9.3  | Type checking and compilation         |
-| `vite-plugin-pwa`          | ^1.2.0  | PWA support (InjectManifest strategy) |
+| `vite-plugin-pwa`          | ^1.3.0  | PWA support (InjectManifest strategy) |
 | `vite-plugin-checker`      | ^0.12.0 | In-editor type checking overlay       |
 | `@sentry/vite-plugin`      | ^5.0.0  | Sentry source map upload during build |
 | `rollup-plugin-visualizer` | ^6.0.5  | Bundle size analysis                  |
@@ -46,15 +46,15 @@
 
 | Package                              | Version | Purpose                                  |
 | ------------------------------------ | ------- | ---------------------------------------- |
-| `vitest`                             | ^4.0.17 | Unit test runner (Vite-native)           |
-| `@vitest/coverage-v8`                | ^4.0.18 | Code coverage via V8                     |
-| `@vitest/ui`                         | ^4.0.17 | Browser-based test UI                    |
+| `vitest`                             | ^4.1.10 | Unit test runner (Vite-native)           |
+| `@vitest/coverage-v8`                | ^4.1.10 | Code coverage via V8                     |
+| `@vitest/ui`                         | ^4.1.10 | Browser-based test UI                    |
 | `@testing-library/react`             | ^16.3.2 | React component testing utilities        |
 | `@testing-library/jest-dom`          | ^6.9.1  | Custom DOM matchers                      |
 | `@testing-library/user-event`        | ^14.6.1 | User interaction simulation              |
 | `happy-dom`                          | ^20.8.3 | Lightweight DOM implementation for tests |
 | `fake-indexeddb`                     | ^6.2.5  | IndexedDB mock for unit tests            |
-| `@playwright/test`                   | ^1.58.2 | End-to-end test framework                |
+| `@playwright/test`                   | ^1.62.0 | End-to-end test framework                |
 | `@seontechnologies/playwright-utils` | ^3.14.0 | Playwright fixture utilities             |
 | `@axe-core/playwright`               | ^4.11.1 | Accessibility testing                    |
 | `@faker-js/faker`                    | ^10.3.0 | Test data generation                     |
@@ -63,7 +63,7 @@
 
 | Package | Version | Purpose                                         |
 | ------- | ------- | ----------------------------------------------- |
-| `zod`   | ^4.3.6  | Runtime schema validation at service boundaries |
+| `zod`   | ^4.4.3  | Runtime schema validation at service boundaries |
 
 ### Linting
 
@@ -71,7 +71,7 @@
 | ----------------------------- | ------- | ---------------------------------- |
 | `eslint`                      | ^9.39.2 | Code linting (flat config)         |
 | `@eslint/js`                  | ^9.39.2 | ESLint core rules                  |
-| `typescript-eslint`           | ^8.57.0 | TypeScript-specific ESLint rules   |
+| `typescript-eslint`           | ^8.65.0 | TypeScript-specific ESLint rules   |
 | `eslint-plugin-react-hooks`   | ^7.0.1  | React hooks linting                |
 | `eslint-plugin-react-refresh` | ^0.5.2  | Fast Refresh compatibility linting |
 

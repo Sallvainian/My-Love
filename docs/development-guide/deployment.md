@@ -69,7 +69,7 @@ All workflows are in `.github/workflows/`:
 | Workflow            | File                      | Trigger                                             | Purpose                                                             |
 | ------------------- | ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------- |
 | Deploy              | `deploy.yml`              | Push to `main`, manual dispatch                     | Build, smoke test, deploy to GitHub Pages, health check             |
-| Tests               | `test.yml`                | Push to `main`, PRs, weekly Sunday 2 AM UTC, manual | Lint, unit, DB, integration, API, E2E P0 gate, E2E sharded, burn-in |
+| Tests               | `test.yml`                | Push to `main`, PRs, weekly Sunday 2 AM UTC, manual | Change detection, lint, unit, DB, backend (integration + API), E2E sharded, burn-in |
 | Supabase Migrations | `supabase-migrations.yml` | PRs touching `supabase/` paths, manual              | Migration validation with local Supabase, RLS policy linting        |
 
 ### AI-Powered Workflows (Claude)
@@ -92,23 +92,29 @@ All workflows are in `.github/workflows/`:
 
 | Action               | Path                                    | Purpose                                                                  |
 | -------------------- | --------------------------------------- | ------------------------------------------------------------------------ |
-| Setup Supabase       | `.github/actions/setup-supabase/`       | Install CLI (v2.72.7), start local, apply migrations, export credentials |
+| Setup Supabase       | `.github/actions/setup-supabase/`       | Install CLI (default v2.77.1), start local, apply migrations, export credentials |
 | Setup Playwright E2E | `.github/actions/setup-playwright-e2e/` | Install deps, Playwright browsers, setup Supabase for E2E tests          |
 
 ### Test Pipeline Stages
 
-The `test.yml` workflow runs an 8-stage pipeline (see [Testing](./testing.md#ci-test-pipeline) for full details):
+The `test.yml` workflow runs 9 jobs (see [Testing](./testing.md#ci-test-pipeline) for full details):
 
-1. **Lint and Type Check** (5-min timeout)
-2. **Unit Tests** (10-min timeout)
-3. **Database Tests** (10-min timeout)
-4. **Integration Tests** (15-min timeout)
-5. **API Tests** (15-min timeout)
-6. **E2E P0 Gate** (15-min timeout) -- P0-tagged Playwright tests with local Supabase
-7. **E2E Sharded** (30-min timeout) -- Full E2E suite sharded across 2 workers
-8. **Burn-In** (30-min timeout) -- Flaky detection on changed test files (PRs to `main` only)
-9. **Merge Reports** -- Combines shard artifacts into unified HTML report
-10. **Test Summary** -- Branch protection target, evaluates all stages
+| Stage | Job             | Timeout | Notes                                                                       |
+| ----- | --------------- | ------- | --------------------------------------------------------------------------- |
+| 0     | `changes`       | 5 min   | Change detection -- docs-only PRs skip every app stage below                 |
+| 1     | `lint`          | 5 min   | Lint + type check                                                            |
+| 2     | `unit-tests`    | 10 min  | Vitest                                                                       |
+| 3     | `db-tests`      | 10 min  | pgTAP via `supabase test db`                                                 |
+| 4     | `backend-tests` | 15 min  | Matrix over the `integration` and `api` Playwright projects (no browser)     |
+| 5     | `e2e-tests`     | 30 min  | Full E2E suite, **4 shards**, chromium only, 2 Playwright workers per shard  |
+| 6     | `burn-in`       | 30 min  | Flaky detection on changed specs (PRs to `main`; weekly full run on Sundays) |
+| 7     | `merge-reports` | --      | Combines shard artifacts into a unified HTML report                          |
+| 8     | `test-summary`  | --      | Branch-protection target; evaluates all stages, runs with `if: always()`     |
+
+Two structural changes since the 2026-03 scan:
+
+- **The E2E P0 gate job was removed.** It previously ran `--grep "[P0]"` ahead of the shards, with `e2e-tests` gated on it via `needs`; the shards now start immediately.
+- **Shards went from 2 to 4.** At 2 shards the split was duration-skewed (equal test counts but 5.4 min vs 9.6 min); with a fixed ~2.5 min per-shard provisioning floor, 4 is the better trade. `burn-in` no longer `needs` the shards either, since it re-runs specs from scratch and consumed nothing they produced.
 
 ## Required GitHub Secrets
 

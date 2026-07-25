@@ -21,17 +21,17 @@ Documentation for the My-Love Progressive Web App -- a couples app for daily lov
 
 | Dimension        | Value                                                   |
 | ---------------- | ------------------------------------------------------- |
-| Framework        | React 19.2.4 + TypeScript 5.9.3                         |
-| Build Tool       | Vite 7.3.1 with manual chunk splitting                  |
-| State Management | Zustand 5.0.11 (single store, 11 slices, persist)       |
-| Backend          | Supabase 2.99.0 (Auth, Postgres, Storage, Realtime)     |
+| Framework        | React 19.2.8 + TypeScript 5.9.3                         |
+| Build Tool       | Vite 7.3.6 with manual chunk splitting                  |
+| State Management | Zustand 5.0.14 (single store, 11 slices, persist)       |
+| Backend          | Supabase 2.110.8 (Auth, Postgres, Storage, Realtime)     |
 | Styling          | Tailwind CSS 4.1.17 with 4 custom themes                |
-| Validation       | Zod 4.3.6 at all service boundaries                     |
+| Validation       | Zod 4.4.3 at all service boundaries                     |
 | Local Storage    | IndexedDB via idb 8.0.3 (8 object stores, schema v5)    |
 | PWA              | Custom InjectManifest SW with Workbox + Background Sync |
-| Testing          | Vitest 4.0.18 (unit) + Playwright 1.58.2 (E2E) + pgTAP  |
+| Testing          | Vitest 4.1.10 (unit) + Playwright 1.62.0 (E2E) + pgTAP  |
 | Deployment       | GitHub Pages at `/My-Love/` via GitHub Actions          |
 | Secrets          | fnox with age encryption provider                       |
-| Source Files     | 207 TypeScript/TSX files, ~45,102 lines in src/         |
+| Source Files     | 197 TypeScript/TSX files, ~43,133 lines in src/         |
 | Migrations       | 25 SQL migrations in supabase/migrations/               |
 | CI Workflows     | 9 GitHub Actions workflows                              |

@@ -157,21 +157,19 @@ customMessageService.ts
   -> services/dbSchema.ts
   -> config/performance.ts
 
-photoStorageService.ts
-  -> BaseIndexedDBService.ts
-  -> services/dbSchema.ts
-  -> validation/schemas.ts
-  -> validation/errorMessages.ts
-  -> config/performance.ts
-  -> services/performanceMonitor.ts
-
 scriptureReadingService.ts
   -> BaseIndexedDBService.ts
+  -> services/dbSchema.ts
   -> api/supabaseClient.ts
   -> api/validation/supabaseSchemas.ts
+  -> validation/schemas.ts
+  -> types/database.types.ts
   -> stores/types.ts
 
-storage.ts (message storage)
+photoService.ts
+  -> api/supabaseClient.ts
+
+storage.ts (legacy message + photo storage)
   -> services/dbSchema.ts
 ```
 
@@ -183,6 +181,8 @@ supabaseClient.ts
 
 moodApi.ts
   -> supabaseClient.ts
+  -> errorHandlers.ts
+  -> validation/supabaseSchemas.ts
 
 moodSyncService.ts
   -> supabaseClient.ts
@@ -225,16 +225,9 @@ migrationService.ts
   -> validation/schemas.ts
   -> validation/errorMessages.ts
   -> config/performance.ts
-
-realtimeService.ts
-  -> api/supabaseClient.ts
-  -> api/validation/supabaseSchemas.ts
-
-syncService.ts
-  -> moodService.ts
-  -> api/moodApi.ts
-  -> api/validation/supabaseSchemas.ts
 ```
+
+> `realtimeService.ts` and `syncService.ts` were deleted. Mood syncing is now entirely inside `api/moodSyncService.ts`; realtime subscriptions are owned per-feature (see the Hook Dependencies below).
 
 ## Service Worker Dependencies
 
@@ -253,7 +246,6 @@ The service worker operates in a separate JS context. It duplicates IndexedDB ac
 ```
 useAuth.ts -> api/supabaseClient.ts
 useAutoSave.ts -> services/dbSchema.ts
-useImageCompression.ts -> services/imageCompressionService.ts
 useLoveNotes.ts -> stores/useAppStore.ts, hooks/useRealtimeMessages.ts
 useMoodHistory.ts -> api/moodApi.ts, api/validation/supabaseSchemas.ts
 useNetworkStatus.ts -> (browser APIs only)
