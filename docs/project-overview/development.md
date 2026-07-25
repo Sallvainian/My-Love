@@ -100,7 +100,7 @@ npx playwright test --grep "mood tracker"
 - **ESLint**: `no-explicit-any` is enforced as an error; ESLint is the only automated style gate
 - **Formatting**: No automated formatter -- follow the conventions in [Code Style](../development-guide/code-style.md#formatting-conventions) by hand
 - **Secrets**: Managed via [fnox](https://fnox.jdx.dev) with age encryption provider; encrypted ciphertext committed in `fnox.toml`
-- **CI workflows**: Located in `.github/workflows/` -- 19 workflows covering deploy, test, migrations, code review, security, and AI assistance
+- **CI workflows**: Located in `.github/workflows/` -- 9 workflows covering deploy, test, migrations, code review, security, and AI assistance
 - **Base path**: Production uses `/My-Love/`, development uses `/`
 - **Module system**: ESM (`"type": "module"` in `package.json`)
 - **Browser target**: `defaults and supports es6-module`
