@@ -79,7 +79,6 @@
     "postcss": "^8.5.23",
     "rollup-plugin-visualizer": "^6.0.5",
     "tailwindcss": "^4.1.17",
-    "tdd-guard-vitest": "^0.2.0",
     "tsx": "^4.23.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.65.0",

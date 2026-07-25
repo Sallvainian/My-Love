@@ -113,7 +113,6 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **E2E fixtures:** Always import `{ test, expect }` from `tests/support/merged-fixtures` -- never from `@playwright/test` directly
 - **E2E auth setup:** Worker-isolated test users created via Supabase Admin API (`tests/support/auth-setup.ts`). Each parallel worker gets its own user pair. Auth state in `tests/.auth/worker-{n}.json`
 - **Coverage thresholds:** 25% minimum for lines, functions, branches, statements (V8 provider)
-- **TDD Guard:** `tdd-guard-vitest` reporter is active -- follows TDD workflow enforcement
 - **Test env vars:** Vitest config injects mock `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` -- do not use real credentials in tests
 - **Test file relaxations:** Test files allow `@ts-ignore`, unused vars, empty patterns, non-standard hook usage -- see `eslint.config.js` test overrides
 - **E2E local Supabase:** Playwright config auto-detects local Supabase via `supabase status -o env` and re-signs JWT tokens when GoTrue uses ES256 signing keys -- E2E tests require `supabase start` running locally

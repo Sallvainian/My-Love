@@ -62,7 +62,6 @@
 | @seontechnologies/playwright-utils | 3.14.0  | Playwright fixture utilities |
 | @axe-core/playwright               | 4.11.1  | Accessibility testing        |
 | @faker-js/faker                    | 10.3.0  | Test data generation         |
-| tdd-guard-vitest                   | 0.1.6   | TDD enforcement              |
 
 ## Code Quality
 
