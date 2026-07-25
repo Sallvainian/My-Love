@@ -122,7 +122,7 @@ test.describe('Scripture Session - Save & Resume', () => {
       // THEN: Confirmation dialog appears
       await expect(page.getByTestId('exit-confirm-dialog')).toBeVisible();
       await expect(page.getByTestId('exit-confirm-dialog')).toContainText(
-        /save your progress\?.*you can continue later/i
+        /save your progress\?.*you can continue where you left off/i
       );
 
       // AND: "Save & Exit" button is available
