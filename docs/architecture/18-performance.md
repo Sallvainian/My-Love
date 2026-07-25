@@ -34,7 +34,7 @@ Individual components can opt into additional motion features via `motionFeature
 
 ### Infinite Scroll Lists
 
-Love notes and mood history use `react-window` (v2.2.7) with `react-window-infinite-loader` for virtualized rendering:
+Love notes and mood history use `react-window` (v2.3.0) with `react-window-infinite-loader` for virtualized rendering:
 
 - Only visible items are rendered in the DOM
 - Scroll position is maintained during data loading
@@ -74,7 +74,9 @@ Love note image URLs are cached with LRU eviction:
 | Cache size            | Max 100 entries                                    |
 | URL expiry            | 1 hour (Supabase signed URL default)               |
 | Request deduplication | Concurrent requests for same image share one fetch |
-| Batch fetching        | Multiple URLs fetched in a single request          |
+| Refresh buffer        | URL treated as stale 5 minutes before expiry       |
+
+> The `batchGetSignedUrls()` helper was removed in the dead-code sweep; callers request URLs individually and rely on the deduplication map.
 
 ## IndexedDB Performance
 
@@ -107,23 +109,9 @@ The `moods` store has a `by-date` index (unique on the `date` field) for efficie
 
 ## Performance Monitoring
 
-### PerformanceMonitor Service (`src/services/performanceMonitor.ts`)
-
-Singleton service for tracking async operation timing:
-
-```typescript
-const result = await performanceMonitor.measureAsync('loadMoods', async () => {
-  return await moodService.getAll();
-});
-```
-
-Tracks per-operation metrics:
-
-- Call count
-- Average duration
-- Min/Max duration
-
-The `getReport()` method generates a human-readable summary for development debugging.
+> **Removed (2026-07).** `src/services/performanceMonitor.ts` -- the singleton with `measureAsync()`, `recordMetric()`, `getReport()`, and per-operation count/avg/min/max tracking -- was deleted in the dead-code sweep, as was `measureMemoryUsage()`. `src/utils/performanceMonitoring.ts` is the only performance utility that remains, and it exports exactly one function.
+>
+> Production performance signal now comes from Sentry (`src/config/sentry.ts`), the Lighthouse PWA audit workflow, and the `bundle-size` CI check.
 
 ### Scroll Performance (`src/utils/performanceMonitoring.ts`)
 
@@ -143,23 +131,9 @@ export function measureScrollPerformance(): PerformanceObserver {
 }
 ```
 
-### Memory Usage (`src/utils/performanceMonitoring.ts`)
-
-Chrome-specific memory monitoring via `performance.memory`:
-
-```typescript
-export function measureMemoryUsage(): number {
-  const perf = performance as PerformanceWithMemory;
-  if (perf.memory) {
-    return perf.memory.usedJSHeapSize / 1048576; // MB
-  }
-  return 0;
-}
-```
-
 ## LocalStorage Quota Monitoring
 
-`src/utils/storageMonitor.ts` proactively monitors localStorage usage:
+`src/utils/storageMonitor.ts` proactively monitors localStorage usage. Only `logStorageQuota()` is exported (called once from `App.tsx` during the deferred migration pass); `getLocalStorageUsage()` and `getStorageQuotaInfo()` are module-private:
 
 | Threshold | Level      | Action                                        |
 | --------- | ---------- | --------------------------------------------- |
@@ -212,22 +186,25 @@ Uses `rollup-plugin-visualizer` to generate a visual bundle size report at `dist
 
 ## Configuration Constants
 
-From `src/config/performance.ts` (all `as const` for literal types):
+From `src/config/performance.ts` (all `as const` for literal types). This file was trimmed in the dead-code sweep -- `PAGINATION` and `STORAGE_QUOTAS` were removed along with `photoStorageService.ts`, their only consumer:
 
 ```typescript
-export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 20, // Photos, messages
-  MAX_PAGE_SIZE: 100, // Upper bound
-  MIN_PAGE_SIZE: 1, // Lower bound
+export const VALIDATION_LIMITS = {
+  MESSAGE_TEXT_MAX_LENGTH: 1000,
+  CAPTION_MAX_LENGTH: 500,
+  NOTE_MAX_LENGTH: 1000,
+  PARTNER_NAME_MAX_LENGTH: 50,
 };
 
-export const STORAGE_QUOTAS = {
-  WARNING_THRESHOLD_PERCENT: 80, // Show warning banner
-  ERROR_THRESHOLD_PERCENT: 95, // Block uploads
-  DEFAULT_QUOTA_MB: 50, // Fallback for Storage API
-  DEFAULT_QUOTA_BYTES: 50 * 1024 * 1024,
-  MONITORING_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
-};
+export const LOG_TRUNCATE_LENGTH = 50;
+```
+
+Remote storage thresholds now live as private constants in `src/services/photoService.ts`:
+
+```typescript
+const STORAGE_QUOTA = 1024 * 1024 * 1024; // 1 GiB free tier
+const WARNING_THRESHOLD = 0.8; // 80% -- warn
+const CRITICAL_THRESHOLD = 0.95; // 95% -- block uploads
 ```
 
 From `src/config/images.ts`:

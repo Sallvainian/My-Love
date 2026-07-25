@@ -1,18 +1,18 @@
 # My-Love -- Project Documentation
 
-> **Auto-generated:** 2026-03-20 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** ~178 source files (207 incl. co-located tests), ~45,102 lines
+> **Auto-generated:** 2026-07-25 | **Scan level:** Exhaustive | **Project type:** Web Application (React PWA) | **Total:** 168 non-test source files (197 incl. co-located tests), ~43,133 lines
 
 ## Quick Reference
 
 | Attribute            | Value                                                               |
 | -------------------- | ------------------------------------------------------------------- |
-| **Framework**        | React 19.2.4 + TypeScript 5.9.3 + Vite 7.3.1                        |
-| **State Management** | Zustand 5.0.11 (11 slices)                                          |
-| **Backend**          | Supabase 2.99.0 (Auth, Postgres, Storage, Realtime, Edge Functions) |
-| **Monitoring**       | Sentry 10.42.0 (error tracking + sourcemaps)                        |
-| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.35.2                         |
-| **Validation**       | Zod 4.3.6                                                           |
-| **Testing**          | Vitest 4.0.18 + Playwright 1.58.2                                   |
+| **Framework**        | React 19.2.8 + TypeScript 5.9.3 + Vite 7.3.6                        |
+| **State Management** | Zustand 5.0.14 (11 slices)                                          |
+| **Backend**          | Supabase 2.110.8 (Auth, Postgres, Storage, Realtime, Edge Functions) |
+| **Monitoring**       | Sentry 10.68.0 (error tracking + sourcemaps)                        |
+| **Styling**          | Tailwind CSS 4.1.17 + Framer Motion 12.42.2                         |
+| **Validation**       | Zod 4.4.3                                                           |
+| **Testing**          | Vitest 4.1.10 + Playwright 1.62.0                                   |
 | **Deployment**       | PWA with Service Worker (Workbox InjectManifest) on GitHub Pages    |
 
 ---
@@ -82,7 +82,7 @@
 - **[11-service-worker-background-sync.md](./api-reference/11-service-worker-background-sync.md)** -- Workbox caching, background mood sync, SW-DB helpers
 - **[12-real-time-subscriptions.md](./api-reference/12-real-time-subscriptions.md)** -- Broadcast API, postgres_changes, channel management
 - **[13-scripture-reading-service.md](./api-reference/13-scripture-reading-service.md)** -- Cache-first CRUD for scripture reading sessions
-- **[14-additional-services.md](./api-reference/14-additional-services.md)** -- performanceMonitor, migrationService, storageService, syncService
+- **[14-additional-services.md](./api-reference/14-additional-services.md)** -- logger, migrationService, storageService, utility modules
 
 #### [Data Models](./data-models/index.md)
 
@@ -119,7 +119,7 @@
 - **[navigation-slice.md](./state-management/navigation-slice.md)** -- ViewType routing with browser history
 - **[messages-slice.md](./state-management/messages-slice.md)** -- Messages, messageHistory (Map), favorites, IndexedDB
 - **[mood-slice.md](./state-management/mood-slice.md)** -- 12 mood types, offline-first sync, partner moods
-- **[interactions-slice.md](./state-management/interactions-slice.md)** -- Poke/kiss/fart, realtime subscriptions
+- **[interactions-slice.md](./state-management/interactions-slice.md)** -- Poke/kiss, realtime subscriptions
 - **[partner-slice.md](./state-management/partner-slice.md)** -- Partner connection lifecycle, search, requests
 - **[notes-slice.md](./state-management/notes-slice.md)** -- Love notes chat, optimistic updates, rate limiting
 - **[photos-slice.md](./state-management/photos-slice.md)** -- Photo gallery, upload, storage quota
@@ -133,7 +133,7 @@
 - **[installation.md](./development-guide/installation.md)** -- Clone, install, and verify
 - **[environment-setup.md](./development-guide/environment-setup.md)** -- fnox/age secrets management, Supabase keys
 - **[configuration-customization.md](./development-guide/configuration-customization.md)** -- Vite, TypeScript, PostCSS, Tailwind, ESLint configs
-- **[available-scripts.md](./development-guide/available-scripts.md)** -- All 30 npm scripts documented
+- **[available-scripts.md](./development-guide/available-scripts.md)** -- All 32 npm scripts documented
 - **[local-development-url.md](./development-guide/local-development-url.md)** -- Dev vs production base paths
 - **[development-workflow.md](./development-guide/development-workflow.md)** -- Branch strategy, commit format, PR process
 - **[build-process.md](./development-guide/build-process.md)** -- Production build pipeline, code splitting, PWA generation
@@ -141,7 +141,7 @@
 - **[testing.md](./development-guide/testing.md)** -- Unit, E2E, database, smoke, and burn-in tests
 - **[code-style.md](./development-guide/code-style.md)** -- TypeScript, ESLint, formatting conventions
 - **[database-migrations.md](./development-guide/database-migrations.md)** -- 25 migrations, Supabase CLI, pgTAP tests
-- **[deployment.md](./development-guide/deployment.md)** -- 19 CI/CD workflows, GitHub Pages, health checks
+- **[deployment.md](./development-guide/deployment.md)** -- 9 CI/CD workflows, GitHub Pages, health checks
 - **[troubleshooting.md](./development-guide/troubleshooting.md)** -- 13 common issues and solutions
 
 ### Performance
@@ -158,50 +158,60 @@
 ## Project Structure Summary
 
 ```
-src/                    # ~178 non-test files (207 total), ~45,102 lines
-  components/           # 26 component folders, feature + shared components
+src/                    # 168 non-test files (197 total), ~43,133 lines
+  components/           # 26 component folders, 66 non-test components
   stores/               # Zustand store with 11 slices
-  services/             # 12 service modules (Supabase, IndexedDB, sync)
-  api/                  # API layer (auth, mood, partner, interactions)
+  services/             # 10 service modules (1 base + 9 concrete)
+  api/                  # API layer (auth, mood, partner, interactions, validation)
   validation/           # Zod schemas and error messages
-  hooks/                # 15 custom React hooks (1 barrel + 14)
-  utils/                # Date helpers, formatters, logger
-  types/                # TypeScript type definitions
-  config/               # Performance, image, and feature config
+  hooks/                # 14 files: 1 barrel + 13 custom React hooks
+  utils/                # 15 modules: date helpers, formatters, logger, validation
+  types/                # TypeScript type definitions (incl. generated database.types.ts)
+  config/               # Constants, images, performance, relationship dates, Sentry
+  data/                 # Default messages + 17 scripture steps
   sw.ts                 # Service Worker (Background Sync)
   sw-db.ts              # SW IndexedDB helpers
 supabase/
-  functions/            # Edge Functions (image upload)
+  functions/            # 1 Edge Function (upload-love-note-image)
   migrations/           # 25 Postgres migrations
   tests/database/       # 14 pgTAP test files
+tests/                  # 85 external test files
+  e2e/                  # 28 Playwright specs across 9 feature areas
+  api/                  # 4 API-level specs (no browser)
+  integration/          # 1 integration spec
+  unit/                 # 27 Vitest specs
+  support/              # Fixtures, factories, helpers, reporters
 ```
 
 ---
 
 ## Feature Map
 
-| Feature        | Components                                        | Store                               | Service                               | API                                    |
-| -------------- | ------------------------------------------------- | ----------------------------------- | ------------------------------------- | -------------------------------------- |
-| Daily Messages | `DailyMessage/`                                   | `messagesSlice`                     | `customMessageService`                | --                                     |
-| Mood Tracking  | `MoodTracker/`, `MoodHistory/`                    | `moodSlice`                         | `moodService`                         | `moodApi`                              |
-| Love Notes     | `love-notes/`                                     | `notesSlice`                        | `loveNoteImageService`                | Supabase direct                        |
-| Photos         | `PhotoGallery/`, `PhotoUpload/`, `PhotoCarousel/` | `photosSlice`                       | `photoService`, `photoStorageService` | Supabase Storage                       |
-| Scripture      | `scripture-reading/`                              | `scriptureReadingSlice`             | `scriptureReadingService`             | Supabase RPC                           |
-| Partner        | `PartnerMoodView/`, `PokeKissInterface/`          | `partnerSlice`, `interactionsSlice` | `realtimeService`                     | `partnerService`, `interactionService` |
+| Feature        | Components                                        | Store                               | Service                                        | API / Transport                        |
+| -------------- | ------------------------------------------------- | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
+| Daily Messages | `DailyMessage/`, `AdminPanel/`                    | `messagesSlice`                     | `customMessageService`, `storage`              | IndexedDB only                         |
+| Mood Tracking  | `MoodTracker/`, `MoodHistory/`                    | `moodSlice`                         | `moodService`                                  | `moodApi`, `moodSyncService` (Broadcast) |
+| Love Notes     | `love-notes/`                                     | `notesSlice`                        | `loveNoteImageService`, `imageCompressionService` | Supabase direct + Broadcast          |
+| Photos         | `PhotoGallery/`, `PhotoUpload/`, `PhotoCarousel/` | `photosSlice`                       | `photoService`                                 | Supabase Storage (signed URLs)         |
+| Scripture      | `scripture-reading/`                              | `scriptureReadingSlice`             | `scriptureReadingService`                      | Supabase RPC + private Broadcast       |
+| Partner        | `PartnerMoodView/`, `PokeKissInterface/`          | `partnerSlice`, `interactionsSlice` | --                                             | `partnerService`, `interactionService` (postgres_changes) |
+| Timers         | `RelationshipTimers/`, `CountdownTimer/`          | -- (reads config)                   | --                                             | `config/relationshipDates.ts`          |
 
 ---
 
 ## Planning Artifacts
 
-| Document                                                                         | Description                               | Date       |
-| -------------------------------------------------------------------------------- | ----------------------------------------- | ---------- |
-| [PRD](../_bmad-output/planning-artifacts/prd/index.md)                           | Product Requirements Document (11 shards) | 2026-01-25 |
-| [UX Design](../_bmad-output/planning-artifacts/ux-design-specification/index.md) | UX Design Specification (11 shards)       | 2026-01-25 |
-| [Architecture](../_bmad-output/planning-artifacts/architecture/index.md)         | Feature Architecture (5 shards)           | 2026-01-26 |
-| [Epics & Stories](../_bmad-output/planning-artifacts/epics/index.md)             | Implementation breakdown (8 shards)       | 2026-01-26 |
-| [Test Design - Arch](../_bmad-output/test-design-architecture.md)                | Test architecture & risks                 | 2026-01-27 |
-| [Test Design - QA](../_bmad-output/test-design-qa.md)                            | QA execution recipe                       | 2026-01-27 |
-| [Sprint Status](../_bmad-output/implementation-artifacts/sprint-status.yaml)     | Current sprint progress                   | --         |
+| Document                                                                           | Description                                                    |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [Architecture](../_bmad-output/planning-artifacts/architecture.md)                 | Feature architecture for Scripture Reading                     |
+| [UX Design Spec](../_bmad-output/planning-artifacts/ux-design-specification.md)    | UX design specification                                        |
+| [UX Design Directions](../_bmad-output/planning-artifacts/ux-design-directions.html) | UX direction explorations (HTML)                             |
+| [Project Context](../_bmad-output/project-context.md)                              | Condensed AI-agent rule file (~120 rules)                      |
+| [Deferred Work](../_bmad-output/implementation-artifacts/deferred-work.md)         | Ledger of deferred items                                       |
+| `_bmad-output/implementation-artifacts/tech-spec-*.md`                             | Per-change technical specs                                     |
+| `_bmad-output/test-artifacts/`, `_bmad-output/tea-docs/`                           | Test reviews, NFR assessments, traceability, TEA reference docs |
+
+> The sharded `planning-artifacts/prd/` and `planning-artifacts/epics/` directories, plus `implementation-artifacts/sprint-status.yaml` and the two `test-design-*.md` files, were retired after all four Scripture Reading epics shipped. See [Active Development Epics](./project-overview/active-development-epics.md) for the epic history.
 
 ---
 
@@ -217,4 +227,4 @@ supabase/
 
 ---
 
-_Generated by BMAD Document-Project Workflow v1.3.0 -- Last updated 2026-03-20 (exhaustive rescan, single context window)_
+_Generated by BMAD Document-Project Workflow v1.3.0 -- Last updated 2026-07-25 (exhaustive rescan, single context window)_

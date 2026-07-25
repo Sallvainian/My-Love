@@ -4,8 +4,13 @@
 
 - `src/validation/schemas.ts` -- App-level Zod schemas (IndexedDB boundaries)
 - `src/validation/errorMessages.ts` -- Error formatting and ValidationError class
-- `src/validation/index.ts` -- Centralized exports
 - `src/api/validation/supabaseSchemas.ts` -- Supabase API response schemas
+
+> The `src/validation/index.ts` barrel was removed in the dead-code sweep. Import from `schemas.ts` and `errorMessages.ts` directly.
+
+### Don't mix the two layers
+
+`src/validation/` validates **local data entering IndexedDB**. `src/api/validation/` validates **API responses coming back from Supabase**. Using the wrong layer causes silent data corruption or false validation failures.
 
 ## App-Level Schemas (`src/validation/schemas.ts`)
 

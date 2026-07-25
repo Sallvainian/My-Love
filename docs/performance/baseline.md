@@ -1,6 +1,6 @@
 # Performance Baseline
 
-Captured from `vite build` output on 2026-03-20 using Vite 7.3.1. All sizes are post-minification.
+Captured from `vite build` output on 2026-03-20 using Vite 7.3.6. All sizes are post-minification.
 
 Last reviewed: 2026-03-20
 
@@ -8,7 +8,7 @@ Last reviewed: 2026-03-20
 
 | Metric              | Value                 |
 | ------------------- | --------------------- |
-| Vite version        | 7.3.1                 |
+| Vite version        | 7.3.6                 |
 | Modules transformed | 2,687                 |
 | Build time          | 7.96s                 |
 | SW modules          | 85                    |
@@ -128,32 +128,24 @@ This targets browsers with ES module support, which aligns with the ES2022 TypeS
 
 ## Performance Monitoring Infrastructure
 
-The project includes built-in performance monitoring utilities:
+The project's in-app performance tooling was substantially reduced in the 2026-07 dead-code sweep.
 
-### PerformanceMonitor Service (`src/services/performanceMonitor.ts`)
+### Scroll Monitoring (`src/utils/performanceMonitoring.ts`)
 
-A singleton service that tracks operation execution times using the Web Performance API:
+The only remaining performance utility. Exports exactly one function:
 
-- `measureAsync(name, operation)` -- Measure execution time of async operations
-- `recordMetric(name, duration)` -- Record custom performance metrics
-- `getMetrics(name)` -- Get metrics for a specific operation (count, avg, min, max, total)
-- `getReport()` -- Generate a human-readable performance report sorted by total duration
-- In development mode, each measurement is logged to the console with `[PerfMonitor]` prefix
+- `measureScrollPerformance()` -- Creates a `PerformanceObserver` that warns when frame drops occur (> 16.67ms per frame)
 
-### Scroll and Memory Monitoring (`src/utils/performanceMonitoring.ts`)
-
-Development-mode utilities for detecting performance issues:
-
-- `measureScrollPerformance()` -- Creates a PerformanceObserver that warns when frame drops occur (> 16.67ms per frame)
-- `measureMemoryUsage()` -- Returns current JavaScript heap size in MB (Chrome/Edge only via `performance.memory`)
+> **Removed:** `src/services/performanceMonitor.ts` (the singleton with `measureAsync`, `recordMetric`, `getMetrics`, `getReport` and the `[PerfMonitor]` dev logging) and `measureMemoryUsage()` were both deleted. Production performance signal now comes from Sentry, the Lighthouse PWA audit workflow, and the `bundle-size` CI check.
 
 ### Performance Constants (`src/config/performance.ts`)
 
-Centralized configuration for performance-related magic numbers:
+Trimmed to the validation limits and a log helper:
 
-- **Pagination**: Default page size (20), max page size (100)
-- **Storage Quotas**: Warning threshold (80%), error threshold (95%), default quota (50MB), monitoring interval (5 minutes)
-- **Validation Limits**: Message text max (1000), caption max (500), mood note max (1000), partner name max (50)
+- **Validation Limits**: message text max (1000), caption max (500), mood note max (1000), partner name max (50)
+- **`LOG_TRUNCATE_LENGTH`**: 50 -- used when logging message text during migration
+
+`PAGINATION` and `STORAGE_QUOTAS` were removed with `photoStorageService.ts`, their only consumer. Remote storage thresholds are now private constants in `photoService.ts` (1 GiB quota, 80% warn, 95% block).
 
 ### Logger Utility (`src/utils/logger.ts`)
 

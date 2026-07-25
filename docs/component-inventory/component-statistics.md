@@ -80,24 +80,27 @@
 | CSS animations only (animate-pulse, animate-spin) | ~8 components  |
 | No animations                                     | ~29 components |
 
-## Custom Hooks (14 total)
+## Custom Hooks (13 total)
 
 | Hook                  | File                                 | Purpose                                                 | Exported from barrel |
 | --------------------- | ------------------------------------ | ------------------------------------------------------- | -------------------- |
 | useAuth               | `src/hooks/useAuth.ts`               | Authentication state from AuthSlice (userId, email)     | No                   |
-| useAutoSave           | `src/hooks/useAutoSave.ts`           | Visibility change / beforeunload auto-save              | Yes                  |
-| useFocusTrap          | `src/hooks/useFocusTrap.ts`          | Focus trap for modals/dialogs                           | Yes                  |
-| useImageCompression   | `src/hooks/useImageCompression.ts`   | Client-side image compression                           | No                   |
-| useLoveNotes          | `src/hooks/useLoveNotes.ts`          | Love notes CRUD + realtime + preview URL cleanup        | Yes                  |
+| useAutoSave           | `src/hooks/useAutoSave.ts`           | Visibility change / beforeunload auto-save              | No                   |
+| useFocusTrap          | `src/hooks/useFocusTrap.ts`          | Focus trap for modals/dialogs                           | **Yes**              |
+| useLoveNotes          | `src/hooks/useLoveNotes.ts`          | Love notes CRUD + realtime + preview URL cleanup        | No                   |
 | useMoodHistory        | `src/hooks/useMoodHistory.ts`        | Mood history pagination (offset-based, page size 50)    | No                   |
-| useMotionConfig       | `src/hooks/useMotionConfig.ts`       | Reduced motion detection + animation configs            | Yes                  |
-| useNetworkStatus      | `src/hooks/useNetworkStatus.ts`      | Online/offline/connecting state                         | Yes                  |
+| useMotionConfig       | `src/hooks/useMotionConfig.ts`       | Reduced motion detection + animation configs            | No                   |
+| useNetworkStatus      | `src/hooks/useNetworkStatus.ts`      | Online/offline/connecting state                         | **Yes**              |
 | usePartnerMood        | `src/hooks/usePartnerMood.ts`        | Partner mood realtime fetching + broadcast subscription | No                   |
 | usePhotos             | `src/hooks/usePhotos.ts`             | Photo operations wrapper (upload, delete, load, clear)  | No                   |
 | useRealtimeMessages   | `src/hooks/useRealtimeMessages.ts`   | Supabase realtime broadcast for notes                   | No                   |
-| useScriptureBroadcast | `src/hooks/useScriptureBroadcast.ts` | Scripture session broadcast channel                     | Yes                  |
-| useScripturePresence  | `src/hooks/useScripturePresence.ts`  | Scripture partner presence tracking                     | Yes                  |
-| useVibration          | `src/hooks/useVibration.ts`          | Navigator.vibrate API wrapper                           | Yes                  |
+| useScriptureBroadcast | `src/hooks/useScriptureBroadcast.ts` | Scripture session broadcast channel                     | No                   |
+| useScripturePresence  | `src/hooks/useScripturePresence.ts`  | Scripture partner presence tracking                     | No                   |
+| useVibration          | `src/hooks/useVibration.ts`          | Navigator.vibrate API wrapper                           | No                   |
+
+> **`useImageCompression` was deleted.** Callers now invoke `imageCompressionService.compressImage()` directly -- see `notesSlice.sendNote()`.
+>
+> **The barrel shrank.** `src/hooks/index.ts` now re-exports only `useFocusTrap` and `useNetworkStatus` (plus the `NetworkStatus` type). Every other hook must be imported from its own module path.
 
 ### Scripture Reading Sub-Hooks (co-located with components)
 
