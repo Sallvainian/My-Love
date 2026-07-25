@@ -85,7 +85,7 @@ All workflows are in `.github/workflows/`:
 | ----------------- | ----------------------- | ------------------------------------------ | ------------------------------------------------------------- |
 | Bundle Size       | `bundle-size.yml`       | PRs to main/develop                        | Brotli-compressed bundle size tracking with regression alerts |
 | Lighthouse        | `lighthouse.yml`        | After Deploy workflow succeeds, manual     | Lighthouse PWA audit (2 runs, public storage)                 |
-| CodeQL            | `codeql.yml`            | Push to main, PRs, weekly Monday 10 AM UTC | JavaScript/TypeScript security analysis                       |
+| CodeQL            | `codeql.yml`            | Push to main, PRs, weekly Monday 10 AM UTC | Security analysis (javascript-typescript, actions, python)    |
 | Dependency Review | `dependency-review.yml` | PRs to main/develop                        | Dependency vulnerability scanning (fails on moderate+)        |
 
 ### Composite Actions
