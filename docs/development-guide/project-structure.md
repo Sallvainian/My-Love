@@ -300,5 +300,5 @@ tsconfig.app.json                   # App TypeScript config (ES2022, strict, rea
 tsconfig.node.json                  # Node TypeScript config (vite.config.ts, vitest.config.ts)
 tsconfig.test.json                  # Test TypeScript config (extends app, adds vitest/jest-dom types)
 vite.config.ts                      # Vite: base path, manual chunks, PWA, visualizer, checker, Sentry
-vitest.config.ts                    # Vitest: happy-dom, @/ alias, coverage thresholds, JUnit, tdd-guard
+vitest.config.ts                    # Vitest: happy-dom, @/ alias, coverage thresholds, JUnit
 ```

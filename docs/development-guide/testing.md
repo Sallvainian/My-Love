@@ -49,7 +49,7 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
-    reporters: ['default', new VitestReporter(process.cwd()), 'junit'],
+    reporters: ['default', 'junit'],
     outputFile: { junit: 'test-results/vitest-junit.xml' },
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
@@ -73,7 +73,6 @@ Key details:
 
 - **Path alias**: `@/` maps to `src/` for imports like `import { moodService } from '@/services/moodService'`
 - **Coverage thresholds**: 25% minimum on lines, functions, branches, and statements.
-- **TDD enforcement**: The `tdd-guard-vitest` reporter is configured to enforce test-first development practices.
 - **JUnit output**: `test-results/vitest-junit.xml` for CI integration.
 - **Supabase env vars**: Hardcoded test values so unit tests can import modules that reference `import.meta.env.VITE_SUPABASE_URL`.
 
