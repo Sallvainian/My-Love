@@ -392,9 +392,8 @@ scripts/                           # Utility scripts (12 files)
 ```
 .github/
   dependabot.yml                   # Dependabot configuration
-  copilot-instructions.md          # GitHub Copilot instructions
 
-  workflows/                       # GitHub Actions workflows (19 files)
+  workflows/                       # GitHub Actions workflows (9 files)
     deploy.yml                     # Build + deploy to GitHub Pages (3 jobs)
     test.yml                       # Unit + E2E test suite
     bundle-size.yml                # Bundle size tracking
@@ -404,25 +403,15 @@ scripts/                           # Utility scripts (12 files)
     supabase-migrations.yml        # Migration validation
     claude.yml                     # Claude AI assistant
     claude-code-review.yml         # Claude code review
-    claude-flaky-tests.yml         # Auto-retry flaky tests on test completion
-    ci-failure-auto-fix.yml        # Auto-fix CI failures
-    manual-code-analysis.yml       # Manual code analysis trigger
-    bmad-story-sync.yml            # BMAD story sync automation
-    gemini-dispatch.yml            # Gemini AI dispatch
-    gemini-invoke.yml              # Gemini AI invoke
-    gemini-plan-execute.yml        # Gemini plan + execute
-    gemini-review.yml              # Gemini code review
-    gemini-scheduled-triage.yml    # Gemini scheduled triage
-    gemini-triage.yml              # Gemini issue triage
 
   actions/                         # Custom composite actions
     setup-supabase/
       action.yml                   # Supabase CLI setup action
+    setup-playwright-e2e/
+      action.yml                   # Node + deps + Playwright browsers + local Supabase
 
   codeql/
     codeql-config.yml              # CodeQL analysis configuration
-
-  commands/                        # Gemini command configurations (5 TOML files)
 
   lighthouse/
     lighthouserc.json              # Lighthouse CI configuration

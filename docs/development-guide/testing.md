@@ -259,7 +259,6 @@ The `test.yml` workflow runs an 8-stage pipeline:
 
 - ESLint on `src/`, `tests/`, `scripts/`
 - TypeScript type check (`tsc -b --force`)
-- Prettier formatting check
 
 ### Stage 2: Unit Tests (10-minute timeout)
 

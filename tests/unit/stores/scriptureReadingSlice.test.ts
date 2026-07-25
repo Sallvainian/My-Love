@@ -160,6 +160,36 @@ describe('scriptureReadingSlice', () => {
       expect(store.getState().isInitialized).toBe(true);
     });
 
+    // Story 4.3 AC#5/#6: a reconnecting partner resyncs via loadSession, so the
+    // session must stay in together mode. ReadingContainer and useScriptureBroadcast
+    // both call loadSession on reconnect — rewriting mode here would silently drop
+    // both partners out of a live together session.
+    it('should preserve together mode when resuming a together session', async () => {
+      const { scriptureReadingService } =
+        await import('../../../src/services/scriptureReadingService');
+
+      vi.mocked(scriptureReadingService.getSession).mockResolvedValue({
+        id: 'session-1',
+        mode: 'together',
+        currentPhase: 'reading',
+        currentStepIndex: 1,
+        version: 7,
+        userId: 'user-123',
+        partnerId: 'user-456',
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+
+      const store = createTestStore();
+      store.setState({ userId: 'user-123' });
+      await store.getState().loadSession('session-1');
+
+      expect(store.getState().session!.mode).toBe('together');
+      expect(store.getState().session!.currentPhase).toBe('reading');
+      expect(store.getState().session!.currentStepIndex).toBe(1);
+      expect(scriptureReadingService.updateSession).not.toHaveBeenCalled();
+    });
+
     it('should set error when session not found', async () => {
       const { scriptureReadingService } =
         await import('../../../src/services/scriptureReadingService');

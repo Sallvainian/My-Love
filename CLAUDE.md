@@ -19,9 +19,7 @@ npm run preview          # Preview production build
 npm run build            # Production build (tsc + vite)
 npm run typecheck        # tsc -b (checks all project references)
 npm run lint             # ESLint (src, tests, scripts)
-npm run lint:fix         # ESLint fix + Prettier
-npm run format           # Prettier write
-npm run format:check     # Prettier check
+npm run lint:fix         # ESLint --fix
 ```
 
 ### Testing
@@ -120,7 +118,7 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 - Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
 - Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
 - ESLint enforces `no-explicit-any` as error
-- Prettier with `tailwindcss` plugin for class sorting
+- No automated formatter. Match the existing style by hand: 2-space indent, single quotes (double in JSX), semicolons, 100-char lines, `es5` trailing commas, always-parenthesized arrow params, LF endings
 - CI workflows in `.github/workflows/`: deploy, test, migrations, code review
 
 ## General Rules
@@ -139,8 +137,4 @@ Production builds use `/My-Love/` base path for GitHub Pages deployment. Develop
 
 ## CI/CD
 
-- When asked to fix CI, always check ALL failure modes (formatting, lint, coverage thresholds, tests) before pushing — never fix one issue and leave others broken.
-
-## Git & Commits
-
-- Always run Prettier/formatting on all new or modified files before committing. Run `npm run format` on changed files as a pre-commit step.
+- When asked to fix CI, always check ALL failure modes (lint, typecheck, coverage thresholds, tests) before pushing — never fix one issue and leave others broken.

@@ -40,9 +40,6 @@ if [ "$SKIP_LINT" = false ]; then
   echo "Running TypeScript type check..."
   npm run typecheck || { echo "❌ Type check failed"; exit 1; }
 
-  echo "Checking formatting..."
-  npm run format:check || { echo "❌ Format check failed"; exit 1; }
-
   echo "✅ Lint & Type Check passed"
   echo ""
 else

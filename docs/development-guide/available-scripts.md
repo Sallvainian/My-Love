@@ -19,12 +19,10 @@ Every npm script defined in `package.json`, organized by category.
 
 ## Code Quality
 
-| Script                 | Command                                  | Description                                                                                                            |
-| ---------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `npm run lint`         | `eslint src tests scripts ...`           | Run ESLint on `src/`, `tests/`, and `scripts/` directories. Ignores Playwright report directories and build artifacts. |
-| `npm run lint:fix`     | `eslint ... --fix && prettier --write .` | Auto-fix ESLint issues, then format all files with Prettier.                                                           |
-| `npm run format`       | `prettier --write .`                     | Format all files with Prettier (writes changes).                                                                       |
-| `npm run format:check` | `prettier --check .`                     | Check formatting without modifying files. Returns non-zero exit code if any file needs formatting.                     |
+| Script             | Command                        | Description                                                                                                            |
+| ------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`     | `eslint src tests scripts ...` | Run ESLint on `src/`, `tests/`, and `scripts/` directories. Ignores Playwright report directories and build artifacts. |
+| `npm run lint:fix` | `eslint ... --fix`             | Auto-fix the ESLint issues that have fixers. There is no separate formatting script.                                   |
 
 ## Testing
 

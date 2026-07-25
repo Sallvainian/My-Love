@@ -250,23 +250,10 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
         return;
       }
 
-      // If resuming a together-mode session, convert to solo on both client and server.
-      // This ensures ScriptureOverview routing (session.mode === 'solo')
-      // sends the user to SoloReadingFlow instead of ReadingContainer/LobbyContainer.
-      if (session.mode === 'together') {
-        const soloSession = { ...session, mode: 'solo' as SessionMode };
-        set({ session: soloSession, scriptureLoading: false, isInitialized: true });
-        // Persist mode change to server (fire-and-forget, non-blocking)
-        void scriptureReadingService.updateSession(sessionId, { mode: 'solo' }).catch((err) => {
-          handleScriptureError({
-            code: ScriptureErrorCode.SYNC_FAILED,
-            message: 'Failed to convert session to solo mode',
-            details: err,
-          });
-        });
-        return;
-      }
-
+      // Session mode is preserved as-is. ScriptureOverview routes on
+      // (mode, phase), so together-mode sessions reach the right container in
+      // every phase without rewriting mode here. Converting to solo is a
+      // lobby-only, user-initiated action (scripture_convert_to_solo RPC).
       set({ session, scriptureLoading: false, isInitialized: true });
     } catch (error) {
       const scriptureError: ScriptureError = isScriptureError(error)

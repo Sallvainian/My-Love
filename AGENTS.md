@@ -19,9 +19,7 @@ npm run preview          # Preview production build
 npm run build            # Production build (tsc + vite)
 npm run typecheck        # tsc --noEmit
 npm run lint             # ESLint (src, tests, scripts)
-npm run lint:fix         # ESLint fix + Prettier
-npm run format           # Prettier write
-npm run format:check     # Prettier check
+npm run lint:fix         # ESLint --fix
 ```
 
 ### Testing
@@ -183,5 +181,5 @@ tests/e2e/
 - Path alias: `@/` maps to `src/` (configured in vitest.config.ts, not in vite.config.ts)
 - Generated types: `src/types/database.types.ts` is auto-generated from Supabase schema - do not edit manually
 - ESLint enforces `no-explicit-any` as error
-- Prettier with `tailwindcss` plugin for class sorting
+- No automated formatter. Match the existing style by hand: 2-space indent, single quotes (double in JSX), semicolons, 100-char lines, `es5` trailing commas, always-parenthesized arrow params, LF endings
 - CI workflows in `.github/workflows/`: deploy, test, migrations, code review

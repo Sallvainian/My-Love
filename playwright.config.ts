@@ -30,8 +30,14 @@ function signES256(payload: object, jwk: crypto.JsonWebKey & { kid?: string }): 
  * what made the Together-Mode scripture P0 specs fail in CI but pass locally.
  * `??=` below still preserves any externally-provided SUPABASE_* values.
  */
+// Suppress stderr via stdio rather than a `2>/dev/null` redirect: execSync shells
+// through cmd.exe on Windows, which treats that as a path and fails the command
+// outright, so the whole block silently fell into the catch and no local Supabase
+// env vars were ever set.
+const execOpts = { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] } as const;
+
 try {
-  const output = execSync('supabase status -o env 2>/dev/null', { encoding: 'utf-8' });
+  const output = execSync('supabase status -o env', execOpts);
   const vars: Record<string, string> = {};
   for (const line of output.split('\n')) {
     const match = line.match(/^(\w+)="(.+)"$/);
@@ -43,9 +49,11 @@ try {
 
   // Detect HS256/ES256 mismatch: if GoTrue has GOTRUE_JWT_KEYS, re-sign tokens.
   try {
+    // Double quotes, not single: cmd.exe does not treat ' as a quote character,
+    // so a single-quoted --format string arrives as separate argv entries there.
     const jwtKeysRaw = execSync(
-      "docker inspect supabase_auth_My-Love --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null",
-      { encoding: 'utf-8' }
+      'docker inspect supabase_auth_My-Love --format "{{range .Config.Env}}{{println .}}{{end}}"',
+      execOpts
     );
     const jwtKeysLine = jwtKeysRaw.split('\n').find((l) => l.startsWith('GOTRUE_JWT_KEYS='));
     if (jwtKeysLine) {
