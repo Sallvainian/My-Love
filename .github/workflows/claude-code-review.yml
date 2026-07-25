@@ -45,7 +45,8 @@ jobs:
 
             1. Run `gh pr diff ${{ github.event.pull_request.number }}` to get the full diff.
             2. Check if the diff ONLY contains lockfiles, markdown, version bumps, auto-generated files,
-               or `database.types.ts`. If so, skip the review entirely and post a single comment: "No reviewable changes."
+               or `database.types.ts`. If so, skip the review entirely and make your comment
+               read exactly: "No reviewable changes."
             3. This workflow re-runs on every push. Your comment is reused and rewritten
                in place, so write it as a complete standalone review of the CURRENT diff —
                not a delta against your last one. If something you previously flagged is
@@ -72,7 +73,11 @@ jobs:
 
             ## Output Format
 
-            Post exactly ONE comment, via `gh pr comment`, containing the entire review.
+            `track_progress: true` means the action already created a comment for you
+            and owns it. Deliver the ENTIRE review by updating that comment with
+            `mcp__github_comment__update_claude_comment`. Do not call `gh pr comment`
+            — that creates a second, unowned comment which `use_sticky_comment`
+            cannot dedupe, which is exactly the accumulation this setup avoids.
             Never post inline comments. Never split findings across several comments.
 
             Use this structure, omitting any section that would be empty:
@@ -102,4 +107,4 @@ jobs:
 
           claude_args: |
             --model claude-opus-5
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
