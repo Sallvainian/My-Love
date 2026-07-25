@@ -138,17 +138,27 @@ if (result.offline) {
 }
 ```
 
-## Sync Service (`src/services/syncService.ts`)
+## Mood Sync Service (`src/api/moodSyncService.ts`)
 
-The `SyncService` class transforms local `MoodEntry` objects (IndexedDB format) into the Supabase `moods` table insert format:
+> `src/services/syncService.ts` was **deleted**. All mood syncing now lives in `moodSyncService`, which both transforms and uploads.
+
+`MoodSyncService` transforms local `MoodEntry` objects (IndexedDB format) into the Supabase `moods` insert format and uploads them:
 
 ```typescript
-class SyncService {
-  async syncPendingMoods(): Promise<{ synced: number; failed: number }>;
-  async hasPendingSync(): Promise<boolean>;
-  async getPendingCount(): Promise<number>;
+class MoodSyncService {
+  async syncMood(mood: MoodEntry): Promise<SupabaseMoodRecord>;
+  async syncPendingMoods(): Promise<{ synced: number; failed: number; errors: string[] }>;
+  async fetchMoods(userId: string, limit?: number): Promise<SupabaseMoodRecord[]>;
+  async getLatestPartnerMood(userId: string): Promise<SupabaseMoodRecord | null>;
+  async subscribeMoodUpdates(callback, onStatusChange?): Promise<() => void>;
 }
 ```
+
+Writes go through the validated `moodApi.create()`, so every uploaded row is checked against `SupabaseMoodSchema` before it reaches state.
+
+**Retry strategy.** `syncPendingMoods()` calls a private `syncMoodWithRetry()` per entry: up to 3 retries (4 total attempts) with delays of 1s / 2s / 4s, re-checking `navigator.onLine` before each attempt. On success the entry is marked via `moodService.markAsSynced(localId, supabaseId)`.
+
+**Concurrency guard.** `moodSlice.syncPendingMoods()` returns early when `syncStatus.isSyncing` is already true, preventing duplicate rows from overlapping sync passes (mount sync + reconnect sync + the 5-minute interval can otherwise collide).
 
 **Field mapping (local to remote):**
 
@@ -157,10 +167,14 @@ class SyncService {
 | `mood`                    | `mood_type`                               |
 | `moods`                   | `mood_types`                              |
 | `note`                    | `note`                                    |
-| `date`                    | `created_at` (converted to ISO timestamp) |
+| `timestamp`               | `created_at` (converted to ISO timestamp) |
 | `userId`                  | `user_id`                                 |
 
-**Partial failure handling:** If an individual mood entry fails to sync (e.g., network error, RLS violation), the service continues with the remaining entries. Failed entries retain `synced: false` and are retried on the next sync pass.
+When `moods` is empty the primary `mood` is used as a single-element `mood_types` array, preserving backward compatibility with legacy single-mood rows.
+
+**Partial failure handling:** If an individual mood entry fails to sync (e.g., network error, RLS violation), the service continues with the remaining entries and records the failure in `errors[]`. Failed entries retain `synced: false` and are retried on the next sync pass.
+
+**Post-sync broadcast:** after a successful `syncMood()`, the service fires `broadcastMoodToPartner()` on `mood-updates:{partnerId}` as a fire-and-forget side effect. Broadcast failures are logged, never thrown, and never fail the sync.
 
 ## Offline-Safe Authentication
 

@@ -27,10 +27,10 @@ Countdown display with celebration animations when countdown reaches zero. Pure 
 
 ### RelationshipTimers
 
-**File:** `src/components/RelationshipTimers/RelationshipTimers.tsx`
+**Directory:** `src/components/RelationshipTimers/` (barrel: `index.ts`)
 **Type:** Presentational
 
-Container component that renders all timer cards. Reads from `RELATIONSHIP_DATES` config (not from store). Contains:
+There is no longer a `RelationshipTimers.tsx` wrapper component -- it was deleted in the dead-code sweep. `App.tsx` imports the three timer cards directly from the barrel and lays them out itself (a `TimeTogether` row, then a two-column grid of birthdays on the left and wedding/visits on the right). All three read from the `RELATIONSHIP_DATES` config, not from the store:
 
 - `TimeTogether` -- Real-time count-up from dating start date. Uses `setInterval(1000)` for live seconds display. Shows years, days, hours, minutes, seconds with padded formatting.
 - `BirthdayCountdown` -- Countdown to next birthday with upcoming age. Special "Happy Birthday" state with celebration animation when date matches.

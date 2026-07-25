@@ -92,4 +92,4 @@ Each view is wrapped in a `ViewErrorBoundary` component (`src/components/ViewErr
 ## Related Documentation
 
 - [Component Hierarchy](./06-component-hierarchy.md)
-- [State Management - Slice Details](../state-management/02-slice-details.md)
+- [State Management - Navigation Slice](../state-management/navigation-slice.md)

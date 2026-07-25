@@ -1,8 +1,8 @@
 # State Management Documentation
 
-Zustand 5.0.11-based state management architecture for the **My-Love** PWA with 11 slices (including AuthSlice), localStorage persistence, custom Map serialization, and IndexedDB for large data.
+Zustand 5.0.14-based state management architecture for the **My-Love** PWA with 11 slices (including AuthSlice), localStorage persistence, custom Map serialization, and IndexedDB for large data.
 
-> Last updated: 2026-03-20
+> Last updated: 2026-07-25
 
 ## Documentation Files
 
@@ -15,7 +15,7 @@ Zustand 5.0.11-based state management architecture for the **My-Love** PWA with 
 | [Navigation Slice](./navigation-slice.md)               | View routing with browser history integration                               |
 | [Messages Slice](./messages-slice.md)                   | Daily love messages, favorites, history tracking, custom messages           |
 | [Mood Slice](./mood-slice.md)                           | Mood tracking, partner moods, offline sync                                  |
-| [Interactions Slice](./interactions-slice.md)           | Poke/kiss/fart interactions, realtime subscriptions                         |
+| [Interactions Slice](./interactions-slice.md)           | Poke/kiss interactions, realtime subscriptions                              |
 | [Partner Slice](./partner-slice.md)                     | Partner connection, requests, user search                                   |
 | [Notes Slice](./notes-slice.md)                         | Love notes chat, rate limiting, optimistic updates                          |
 | [Photos Slice](./photos-slice.md)                       | Photo gallery, upload, storage quota management                             |

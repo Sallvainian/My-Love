@@ -83,7 +83,7 @@ The `upgradeDb()` function in `dbSchema.ts` handles all schema migrations centra
 | v4      | Create `sw-auth` store for Background Sync auth token storage                                     | `sw-auth`                                                                                  |
 | v5      | Create four scripture stores with `by-user` and `by-session` indexes                              | `scripture-sessions`, `scripture-reflections`, `scripture-bookmarks`, `scripture-messages` |
 
-**Special migration note**: The v1-to-v2 photos migration requires data preservation (renaming `blob` to `imageBlob`). This is handled in `photoStorageService.ts` via async transaction access, since `upgradeDb()` does not have access to the transaction object. The `photoStorageService._doInit()` reads existing v1 photos, lets `upgradeDb()` recreate the store, then re-inserts the migrated data.
+**Special migration note**: the v1-to-v2 photos step is **destructive**. `upgradeDb()` deletes the old `photos` store (which used a `blob` field) and recreates it with the `imageBlob` schema. The data-preserving path that previously ran in `photoStorageService._doInit()` no longer exists -- that service was deleted in the dead-code sweep -- so any v1-era locally cached photos are dropped on upgrade. This is acceptable because photos now live in Supabase Storage and the IndexedDB `photos` store is only a legacy cache. The comment in `dbSchema.ts` still refers to `photoStorageService` and is stale.
 
 ### Service Layer Architecture
 
@@ -345,4 +345,4 @@ All schemas are defined in two locations:
 - [Architecture Patterns](./03-architecture-patterns.md)
 - [Offline Strategy](./12-offline-strategy.md)
 - [Validation Layer](./14-validation-layer.md)
-- [State Management - Persistence Strategy](../state-management/05-persistence-strategy.md)
+- [State Management - Store Architecture](../state-management/store-architecture.md)
