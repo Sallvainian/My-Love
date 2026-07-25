@@ -72,8 +72,6 @@
 | typescript-eslint           | 8.57.0  | TypeScript ESLint rules                         |
 | eslint-plugin-react-hooks   | 7.0.1   | React hooks linting                             |
 | eslint-plugin-react-refresh | 0.5.2   | Fast Refresh compatibility linting              |
-| Prettier                    | 3.8.1   | Code formatting                                 |
-| prettier-plugin-tailwindcss | 0.7.2   | Tailwind class sorting                          |
 
 ## Infrastructure
 

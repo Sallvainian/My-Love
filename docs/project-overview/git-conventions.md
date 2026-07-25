@@ -62,7 +62,7 @@ Dependabot runs weekly on Mondays and creates grouped PRs:
 
 ## CI Workflows
 
-The project has 19 GitHub Actions workflows:
+The project has 9 GitHub Actions workflows:
 
 | Workflow                      | Trigger                                                  | Purpose                                                 |
 | ----------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
@@ -71,17 +71,7 @@ The project has 19 GitHub Actions workflows:
 | `supabase-migrations.yml`     | PRs touching `supabase/` paths, manual                   | Migration validation with local Supabase                |
 | `claude.yml`                  | `@claude` mentions in issues/PRs                         | Claude Code AI assistance                               |
 | `claude-code-review.yml`      | PR opened/synchronized/ready                             | Automated PR code review with Claude                    |
-| `ci-failure-auto-fix.yml`     | Test workflow failure on non-main branches with open PRs | Auto-fix CI failures with Claude Code                   |
-| `claude-flaky-tests.yml`      | Test workflow completion                                 | Auto-retry flaky tests                                  |
-| `manual-code-analysis.yml`    | Manual dispatch                                          | On-demand commit summarization or security review       |
 | `codeql.yml`                  | Scheduled/PR                                             | CodeQL security scanning                                |
 | `dependency-review.yml`       | PRs                                                      | Dependency vulnerability review                         |
 | `bundle-size.yml`             | PRs                                                      | Bundle size tracking                                    |
 | `lighthouse.yml`              | Scheduled/manual                                         | Lighthouse performance auditing                         |
-| `bmad-story-sync.yml`         | Manual                                                   | BMAD method story sync                                  |
-| `gemini-dispatch.yml`         | Manual                                                   | Gemini AI dispatch                                      |
-| `gemini-invoke.yml`           | Workflow call                                            | Gemini AI invocation                                    |
-| `gemini-plan-execute.yml`     | Manual                                                   | Gemini AI plan execution                                |
-| `gemini-review.yml`           | PRs                                                      | Gemini AI code review                                   |
-| `gemini-scheduled-triage.yml` | Scheduled                                                | Gemini AI scheduled triage                              |
-| `gemini-triage.yml`           | Issues                                                   | Gemini AI issue triage                                  |

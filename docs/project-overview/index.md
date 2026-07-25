@@ -34,4 +34,4 @@ Documentation for the My-Love Progressive Web App -- a couples app for daily lov
 | Secrets          | fnox with age encryption provider                       |
 | Source Files     | 207 TypeScript/TSX files, ~45,102 lines in src/         |
 | Migrations       | 25 SQL migrations in supabase/migrations/               |
-| CI Workflows     | 19 GitHub Actions workflows                             |
+| CI Workflows     | 9 GitHub Actions workflows                              |

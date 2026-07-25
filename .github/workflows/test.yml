@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   # ============================================
-  # Stage 1: Lint, Type Check, Format
+  # Stage 1: Lint, Type Check
   # ============================================
   lint:
     name: Lint & Type Check
@@ -44,9 +44,6 @@ jobs:
 
       - name: TypeScript
         run: npm run typecheck
-
-      - name: Prettier
-        run: npm run format:check
 
   # ============================================
   # Stage 2: Unit Tests (Vitest)

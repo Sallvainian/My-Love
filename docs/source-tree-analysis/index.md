@@ -20,5 +20,5 @@ Complete directory analysis and entry point tracing for the **My-Love** PWA code
 - **Test directories:** `tests/` (E2E, API, integration, unit), co-located `__tests__/` (unit)
 - **Supabase:** `supabase/` (25 migrations, 14 pgTAP tests, 1 edge function, config)
 - **Documentation:** `docs/` (9 sections: architecture, state management, source tree, API, data models, components, development guide, performance, project overview)
-- **GitHub Actions:** `.github/workflows/` (19 workflows)
+- **GitHub Actions:** `.github/workflows/` (9 workflows)
 - **Scripts:** `scripts/` (12 utility scripts)

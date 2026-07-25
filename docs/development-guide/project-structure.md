@@ -264,17 +264,6 @@ scripts/
     # AI: Claude
     claude.yml                      # Claude Code for @claude mentions in issues/PRs (claude-opus-4-6)
     claude-code-review.yml          # Automated PR code review with Claude /review skill
-    claude-flaky-tests.yml          # Auto-detect flaky test failures and retry (triggered by Tests workflow failure)
-    manual-code-analysis.yml        # On-demand commit summarization or security review
-    ci-failure-auto-fix.yml         # Auto-fix CI failures with Claude Code on non-main branches
-
-    # AI: Gemini
-    gemini-dispatch.yml             # Central dispatcher: routes to triage/review/invoke/plan-execute
-    gemini-review.yml               # PR code review with Gemini CLI + GitHub MCP server
-    gemini-triage.yml               # AI-powered issue labeling
-    gemini-scheduled-triage.yml     # Hourly batch triage of unlabeled issues
-    gemini-invoke.yml               # General-purpose Gemini CLI invocation
-    gemini-plan-execute.yml         # Plan execution with write access
 
     # Quality and security
     bundle-size.yml                 # Bundle size tracking and regression detection (brotli)
@@ -282,11 +271,11 @@ scripts/
     codeql.yml                      # CodeQL security analysis (javascript-typescript)
     dependency-review.yml           # Dependency vulnerability scanning (fails on moderate+)
 
-    # Project management
-    bmad-story-sync.yml             # BMAD workflow story synchronization on issue close
-
   codeql/
     codeql-config.yml               # CodeQL security analysis configuration
+
+  lighthouse/
+    lighthouserc.json               # Lighthouse CI assertion thresholds
 ```
 
 ## Configuration Files (Root)
@@ -297,8 +286,6 @@ fnox.toml                           # Age-encrypted secrets (Supabase, Sentry) -
 .node-version                       # Node version file for CI (24.13.0)
 .env.example                        # Template showing required variables
 .env.test                           # Plain-text local Supabase values for E2E testing
-.prettierrc                         # Prettier config (100 char width, single quotes, tailwind plugin)
-.prettierignore                     # Prettier ignore rules
 .gitignore                          # Git ignore (node_modules, dist, .env, test artifacts)
 CLAUDE.md                           # Claude Code guidance (architecture, commands, conventions)
 AGENTS.md                           # AI coding agent guidance (architecture, E2E patterns, conventions)

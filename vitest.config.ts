@@ -20,7 +20,7 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
-    reporters: ['default', new VitestReporter(process.cwd()), 'junit'],
+    reporters: ['default', new VitestReporter({ projectRoot: process.cwd() }), 'junit'],
     outputFile: {
       junit: 'test-results/vitest-junit.xml',
     },

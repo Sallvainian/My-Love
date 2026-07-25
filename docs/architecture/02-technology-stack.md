@@ -35,13 +35,12 @@
 
 ### CSS and Styling
 
-| Package                       | Version  | Purpose                            |
-| ----------------------------- | -------- | ---------------------------------- |
-| `tailwindcss`                 | ^4.1.17  | Utility-first CSS framework (v4)   |
-| `@tailwindcss/postcss`        | ^4.2.1   | PostCSS integration for Tailwind   |
-| `postcss`                     | ^8.5.8   | CSS transformation pipeline        |
-| `autoprefixer`                | ^10.4.27 | Vendor prefix automation           |
-| `prettier-plugin-tailwindcss` | ^0.7.2   | Tailwind class sorting in Prettier |
+| Package                | Version  | Purpose                          |
+| ---------------------- | -------- | -------------------------------- |
+| `tailwindcss`          | ^4.1.17  | Utility-first CSS framework (v4) |
+| `@tailwindcss/postcss` | ^4.2.1   | PostCSS integration for Tailwind |
+| `postcss`              | ^8.5.8   | CSS transformation pipeline      |
+| `autoprefixer`         | ^10.4.27 | Vendor prefix automation         |
 
 ### Testing
 
@@ -67,7 +66,7 @@
 | ------- | ------- | ----------------------------------------------- |
 | `zod`   | ^4.3.6  | Runtime schema validation at service boundaries |
 
-### Linting and Formatting
+### Linting
 
 | Package                       | Version | Purpose                            |
 | ----------------------------- | ------- | ---------------------------------- |
@@ -76,7 +75,6 @@
 | `typescript-eslint`           | ^8.57.0 | TypeScript-specific ESLint rules   |
 | `eslint-plugin-react-hooks`   | ^7.0.1  | React hooks linting                |
 | `eslint-plugin-react-refresh` | ^0.5.2  | Fast Refresh compatibility linting |
-| `prettier`                    | ^3.8.1  | Code formatter                     |
 
 ### Type Definitions
 
