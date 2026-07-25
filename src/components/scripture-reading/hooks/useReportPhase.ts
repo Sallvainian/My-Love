@@ -167,8 +167,15 @@ export function useReportPhase({
     return false;
   }, [session, updatePhase]);
 
+  // Kept in a ref so the effects below can call the latest version without
+  // listing it as a dependency (which would re-trigger them on every render).
+  // Assigned in an effect, not during render: a render-phase ref write is not
+  // idempotent, so it misbehaves under StrictMode's double render and can tear
+  // under concurrent rendering.
   const markSessionCompleteRef = useRef(markSessionComplete);
-  markSessionCompleteRef.current = markSessionComplete;
+  useEffect(() => {
+    markSessionCompleteRef.current = markSessionComplete;
+  }, [markSessionComplete]);
 
   // Story 2.3: Handle message send
   const handleMessageSend = useCallback(
