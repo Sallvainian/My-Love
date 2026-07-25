@@ -75,7 +75,6 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | @seontechnologies/playwright-utils | 3.14.0  | Playwright fixture utilities (apiRequest, recurse, log, networkErrorMonitor)      |
 | @axe-core/playwright               | 4.11.1  | Accessibility testing integration                                                 |
 | @faker-js/faker                    | 10.3.0  | Test data generation                                                              |
-| tdd-guard-vitest                   | 0.1.6   | TDD enforcement reporter for Vitest                                               |
 | pgTAP (via Supabase CLI)           | --      | Database unit testing (14 test files in `supabase/tests/database/`)               |
 
 ## Developer Tooling
