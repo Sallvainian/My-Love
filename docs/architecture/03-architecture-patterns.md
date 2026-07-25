@@ -190,27 +190,30 @@ Two realtime patterns are used:
 
 ```typescript
 // src/hooks/useRealtimeMessages.ts
-channel.on('broadcast', { event: 'new_note' }, (payload) => {
-  // Handle incoming love note
+channel.on('broadcast', { event: 'new_message' }, (payload) => {
+  // payload.payload.message is a LoveNote row
 });
 ```
 
-**postgres_changes** (Interactions, legacy Mood Realtime):
+**postgres_changes** (Interactions only):
 
 ```typescript
-// src/services/realtimeService.ts
+// src/api/interactionService.ts
 channel.on(
   'postgres_changes',
   {
     event: 'INSERT',
     schema: 'public',
-    table: 'moods',
+    table: 'interactions',
+    filter: `to_user_id=eq.${userId}`,
   },
   callback
 );
 ```
 
-Both patterns include exponential backoff retry logic (max 5 retries, 1s-30s delay).
+Interactions are the only remaining `postgres_changes` consumer. Moods cannot use it -- the RLS policy on `moods` needs a partner-lookup subquery that Supabase Realtime cannot evaluate -- so mood updates go over Broadcast instead. The general-purpose `realtimeService.ts` that used to wrap this pattern was deleted; each feature owns its channel.
+
+Broadcast-based subscriptions include exponential backoff retry logic (love notes: `baseDelay * 2^n` clamped to `maxDelay`; scripture: up to 5 retries).
 
 ## Related Documentation
 

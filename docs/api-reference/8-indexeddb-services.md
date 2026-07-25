@@ -6,7 +6,8 @@
 - `src/services/dbSchema.ts` -- Shared schema, upgrade function, constants
 - `src/services/moodService.ts` -- Mood IndexedDB CRUD
 - `src/services/customMessageService.ts` -- Message IndexedDB CRUD
-- `src/services/photoStorageService.ts` -- Photo IndexedDB CRUD
+- `src/services/scriptureReadingService.ts` -- Scripture cache (see [doc 13](./13-scripture-reading-service.md))
+- `src/services/storage.ts` -- Legacy direct CRUD for `photos` and `messages` (see [doc 14](./14-additional-services.md))
 
 ## BaseIndexedDBService
 
@@ -21,7 +22,7 @@ abstract class BaseIndexedDBService<T extends { id?: number | string }, DBTypes,
 | Method      | Signature                           | Returns             | Error Strategy                |
 | ----------- | ----------------------------------- | ------------------- | ----------------------------- |
 | `init()`    | `(): Promise<void>`                 | void                | Guard against concurrent init |
-| `add()`     | `(item: Omit<T, 'id'>): Promise<T>` | T with generated id | **Throws**                    |
+| `add()`     | `(item: Omit<T, 'id'>): Promise<T>` | T with generated id | **Throws** (`protected`)      |
 | `get()`     | `(id): Promise<T \| null>`          | T or null           | **Returns null**              |
 | `getAll()`  | `(): Promise<T[]>`                  | Array               | **Returns []**                |
 | `update()`  | `(id, updates): Promise<void>`      | void                | **Throws**                    |
@@ -29,16 +30,35 @@ abstract class BaseIndexedDBService<T extends { id?: number | string }, DBTypes,
 | `clear()`   | `(): Promise<void>`                 | void                | **Throws**                    |
 | `getPage()` | `(offset, limit): Promise<T[]>`     | Array               | **Returns []**                |
 
+`add()` is `protected` so that services are forced to expose a validating `create()` wrapper rather than letting callers write unvalidated rows.
+
 ### Abstract Methods (each service implements)
 
 - `getStoreName(): StoreName`
 - `_doInit(): Promise<void>`
+
+Also provided: `getTypedDB()` (centralizes the `IDBPDatabase<DBTypes>` assertion), `handleError(operation, error): never`, and `handleQuotaExceeded(): never`.
+
+### Error Handling Strategy
+
+- **Read operations** (`get`, `getAll`, `getPage`) return `null` / `[]` on error -- graceful degradation, the app keeps working with empty state
+- **Write operations** (`add`, `update`, `delete`, `clear`) throw -- mutations must succeed or fail explicitly
 
 ## Database Schema (`dbSchema.ts`)
 
 - **Database name:** `my-love-db`
 - **Current version:** 5
 - **Stores:** messages, photos, moods, sw-auth, scripture-sessions, scripture-reflections, scripture-bookmarks, scripture-messages
+
+`upgradeDb(db, oldVersion, newVersion)` is the centralized upgrade function that every service passes to `openDB`, so store creation is not duplicated per service:
+
+| Version | Change                                                                                       |
+| ------- | -------------------------------------------------------------------------------------------- |
+| v1      | `messages` store with `by-category` and `by-date` indexes                                      |
+| v2      | `photos` store rebuilt with the enhanced schema (`imageBlob`), `by-date` index                 |
+| v3      | `moods` store with a **unique** `by-date` index                                                |
+| v4      | `sw-auth` store for Background Sync token handoff                                              |
+| v5      | Four scripture stores: sessions (`by-user`), reflections / bookmarks / messages (`by-session`) |
 
 See [IndexedDB Stores](../data-models/3-indexeddb-stores.md) for full store definitions.
 
@@ -98,26 +118,16 @@ Exports all custom messages as JSON with version `'1.0'`.
 
 Validates with `CustomMessagesExportSchema`, deduplicates by normalized text.
 
-## PhotoStorageService
+## ScriptureReadingService
 
-Extends `BaseIndexedDBService<Photo, MyLoveDBSchema, 'photos'>`. Singleton: `photoStorageService`.
+Extends `BaseIndexedDBService<ScriptureSession, MyLoveDBSchema, 'scripture-sessions'>`. Singleton: `scriptureReadingService`.
 
-### `create(photo: Omit<Photo, 'id'>): Promise<Photo>`
+Unlike the services above it is **online-first** -- Supabase is the source of truth and IndexedDB is only a read cache. The three sibling stores (reflections, bookmarks, messages) are accessed through the raw `db` handle rather than the base-class helpers. See [Scripture Reading Service](./13-scripture-reading-service.md) for the full surface.
 
-Validates with `PhotoSchema`, records performance metrics.
+## Photo storage in IndexedDB
 
-### `getAll(): Promise<Photo[]>`
+`src/services/photoStorageService.ts` was **deleted** in the dead-code sweep. There is no longer a `BaseIndexedDBService` subclass for photos.
 
-Overrides base -- uses `by-date` index, returns newest first.
+The `photos` object store still exists in the schema (v2, `by-date` index) and is served by the legacy `storageService` (`addPhoto`, `getPhoto`, `getAllPhotos`, `updatePhoto`, `deletePhoto`). Cloud photos -- the primary path -- go through `photoService` against Supabase Storage; see [Photo Services](./9-photo-services.md).
 
-### `getPage(offset?, limit?): Promise<Photo[]>`
-
-Overrides base -- uses descending cursor on `by-date` index. Default limit from `PAGINATION.DEFAULT_PAGE_SIZE`.
-
-### `getStorageSize(): Promise<number>`
-
-Sums `compressedSize` across all photos. Returns bytes.
-
-### `estimateQuotaRemaining(): Promise<{ used, quota, remaining, percentUsed }>`
-
-Uses `navigator.storage.estimate()` with fallback.
+Removed along with it: `getStorageSize()`, `estimateQuotaRemaining()`, and the `PAGINATION.DEFAULT_PAGE_SIZE` config constant. Remote quota checks now live in `photoService.checkStorageQuota()`; LocalStorage quota reporting lives in `storageMonitor.logStorageQuota()`.

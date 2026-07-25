@@ -64,7 +64,6 @@ src/components/
     MessageRow.tsx              # Individual message row
   CountdownTimer/
     CountdownTimer.tsx          # Anniversary countdown display
-    index.ts                   # Barrel export
   DailyMessage/
     DailyMessage.tsx            # Daily love message card with history nav
   DisplayNameSetup/
@@ -123,7 +122,6 @@ src/components/
     PokeKissInterface.tsx       # Poke/kiss send interface
     index.ts
   RelationshipTimers/
-    RelationshipTimers.tsx      # Timer container
     BirthdayCountdown.tsx       # Birthday countdown widget
     EventCountdown.tsx          # Generic event countdown
     TimeTogether.tsx            # Time since relationship start
@@ -153,7 +151,7 @@ src/components/
   Settings/
     Settings.tsx                # Settings panel
     AnniversarySettings.tsx     # Anniversary management
-    index.ts
+    Settings.css                # Component-scoped CSS
   shared/
     NetworkStatusIndicator.tsx  # Online/offline status bar
     SyncToast.tsx               # Sync completion toast
@@ -170,4 +168,4 @@ src/components/
 ## Related Documentation
 
 - [Navigation Architecture](./09-navigation.md)
-- [State Management - React Hooks](../state-management/06-react-hooks.md)
+- [Component Statistics - Custom Hooks](../component-inventory/component-statistics.md)

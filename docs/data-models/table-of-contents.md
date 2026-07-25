@@ -8,7 +8,7 @@
 6. [Supabase RPC Functions](./6-supabase-rpc-functions.md) -- 13 Postgres functions, RPC endpoints
 7. [Storage Buckets](./7-storage-buckets.md) -- Photos and love-notes-images buckets
 8. [RLS Policies](./8-rls-policies.md) -- Row Level Security per table/bucket
-9. [Migration History](./9-migration-history.md) -- All 24 migrations documented
+9. [Migration History](./9-migration-history.md) -- All 25 migrations documented
 
 ---
 

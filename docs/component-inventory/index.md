@@ -20,13 +20,13 @@
 
 ## Tech Stack
 
-- **React** 19.2.4 with TypeScript
-- **State Management**: Zustand 5.0.11 (`useAppStore`) with `useShallow` selector
-- **Animations**: Framer Motion 12.35.2 (imported as `m as motion` for tree-shaking; `LazyMotion` in scripture)
+- **React** 19.2.8 with TypeScript
+- **State Management**: Zustand 5.0.14 (`useAppStore`) with `useShallow` selector
+- **Animations**: Framer Motion 12.42.2 (imported as `m as motion` for tree-shaking; `LazyMotion` in scripture)
 - **Icons**: Lucide React (Heart, Camera, Upload, X, Sparkles, Calendar, Bookmark, etc.)
 - **Virtualization**: react-window v2 (`List`, `useListRef`) + react-window-infinite-loader (`useInfiniteLoader`)
 - **Backend**: Supabase (Auth with email/password + Google OAuth, Database, Realtime Broadcast)
-- **Styling**: Tailwind CSS 4.2.1 (utility-first, dark mode via class)
+- **Styling**: Tailwind CSS 4.1.17 (utility-first, dark mode via class)
 - **Sanitization**: DOMPurify (XSS prevention in LoveNoteMessage)
 - **Image Processing**: imageCompressionService (client-side compression before upload)
 - **Error Tracking**: Sentry (`@sentry/react`)

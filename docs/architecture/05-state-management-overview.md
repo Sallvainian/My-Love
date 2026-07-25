@@ -99,7 +99,7 @@ if (import.meta.env.MODE !== 'production') {
 
 ## Related Documentation
 
-- [Zustand Store Configuration](../state-management/01-zustand-store-configuration.md)
-- [Slice Details](../state-management/02-slice-details.md)
-- [Data Flow Patterns](../state-management/04-data-flow.md)
-- [Persistence Strategy](../state-management/05-persistence-strategy.md)
+- [Store Architecture](../state-management/store-architecture.md)
+- [Slice Documentation Index](../state-management/index.md)
+- [Scripture Reading Slice](../state-management/scripture-reading-slice.md)
+- [Persistence and Hydration](../state-management/store-architecture.md)

@@ -1,6 +1,6 @@
 # Bundle Size Report
 
-Generated from `vite build` output on 2026-03-20. Vite 7.3.1, 2687 modules transformed in 7.96s.
+Generated from `vite build` output on 2026-03-20. Vite 7.3.6, 2687 modules transformed in 7.96s.
 
 ## JavaScript Chunks
 

@@ -1,14 +1,17 @@
 # Available Scripts
 
-Every npm script defined in `package.json`, organized by category.
+All 32 npm scripts defined in `package.json`, organized by category.
 
 ## Development
 
-| Script            | Command                         | Description                                                                                                                                                                                 |
-| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`     | `./scripts/dev-with-cleanup.sh` | Start Vite dev server with signal-trapped process cleanup. Use `fnox exec -- npm run dev` to inject secrets. Runs `npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
-| `npm run dev:raw` | `vite`                          | Start Vite dev server directly without cleanup wrapper. Useful for quick restarts or when running inside an existing fnox context.                                                          |
-| `npm run preview` | `npx vite preview`              | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/My-Love/`.                                                                   |
+| Script                  | Command                         | Description                                                                                                                                                                                 |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | `./scripts/dev-with-cleanup.sh` | Start Vite dev server with signal-trapped process cleanup. Use `fnox exec -- npm run dev` to inject secrets. Runs `npx vite` in a subprocess, kills child processes on SIGINT/SIGTERM/EXIT. |
+| `npm run dev:raw`       | `vite`                          | Start Vite dev server directly without cleanup wrapper. Useful for quick restarts or when running inside an existing fnox context.                                                          |
+| `npm run dev:local`     | `vite --mode test`              | Start the dev server in `test` mode, which loads `.env.test` and points the app at the local Supabase stack.                                                                                |
+| `npm run preview`       | `npx vite preview`              | Preview the production build locally. Requires `npm run build` first. Serves `dist/` at `http://localhost:4173/My-Love/`.                                                                   |
+| `npm run supabase:up`   | `npx supabase start`            | Start the local Supabase stack (convenience wrapper around the CLI).                                                                                                                        |
+| `npm run supabase:down` | `npx supabase stop`             | Stop the local Supabase stack.                                                                                                                                                              |
 
 ## Build
 
@@ -21,8 +24,9 @@ Every npm script defined in `package.json`, organized by category.
 
 | Script             | Command                        | Description                                                                                                            |
 | ------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `npm run lint`     | `eslint src tests scripts ...` | Run ESLint on `src/`, `tests/`, and `scripts/` directories. Ignores Playwright report directories and build artifacts. |
+| `npm run lint`     | `eslint src tests scripts ...` | Run ESLint on `src/`, `tests/`, and `scripts/` directories. Ignores Playwright report directories, build artifacts, `_bmad*`, and `.codex/`. |
 | `npm run lint:fix` | `eslint ... --fix`             | Auto-fix the ESLint issues that have fixers. There is no separate formatting script.                                   |
+| `npm run deadcode` | `bash scripts/deadcode.sh`     | Dead-code analysis via `tsr` (TypeScript Remove). Filters known false positives: `React.lazy()` dynamic imports that `tsr` cannot follow through `import().then()`, the generated `database.types.ts`, and Vitest setup files that are configured rather than imported. |
 
 ## Testing
 
@@ -31,14 +35,14 @@ Every npm script defined in `package.json`, organized by category.
 | `npm run test:unit`          | `vitest run`                                                                             | Run all Vitest unit tests (single run, no watch).                                                                                              |
 | `npm run test:unit:watch`    | `vitest`                                                                                 | Run Vitest in watch mode. Re-runs tests on file changes.                                                                                       |
 | `npm run test:unit:ui`       | `vitest --ui`                                                                            | Open Vitest interactive browser UI for exploring and running tests.                                                                            |
-| `npm run test:unit:coverage` | `vitest run --coverage`                                                                  | Run unit tests with V8 coverage report. Enforces thresholds on lines, functions, branches, and statements.                                     |
+| `npm run test:unit:coverage` | `vitest run --coverage`                                                                  | Run unit tests with V8 coverage report. Enforces a **25%** threshold on lines, functions, branches, and statements.                            |
 | `npm run test:e2e`           | `./scripts/test-with-cleanup.sh`                                                         | Run all Playwright E2E tests with signal-trapped process cleanup. Ensures Vite dev server and child processes are killed on exit.              |
 | `npm run test:e2e:raw`       | `playwright test`                                                                        | Run Playwright directly without cleanup wrapper.                                                                                               |
 | `npm run test:e2e:ui`        | `playwright test --ui`                                                                   | Open Playwright interactive UI mode for running and debugging tests visually.                                                                  |
 | `npm run test:e2e:debug`     | `playwright test --debug`                                                                | Run Playwright in step-through debug mode with the Playwright Inspector.                                                                       |
-| `npm run test:integration`   | `playwright test --project=integration`                                                  | Run integration tests (Playwright integration project).                                                                                        |
-| `npm run test:p0`            | `playwright test --grep '\\[P0\\]'`                                                      | Run only Priority 0 (critical path) E2E tests.                                                                                                 |
-| `npm run test:p1`            | `playwright test --grep '\\[P0\\]                                                        | \\[P1\\]'`                                                                                                                                     | Run Priority 0 and Priority 1 E2E tests. |
+| `npm run test:integration`   | `playwright test --project=integration`                                                  | Run integration tests (`tests/integration/`, no browser context).                                                                              |
+| `npm run test:p0`            | `playwright test --grep '\[P0\]'`                                                        | Run only Priority 0 (critical path) E2E tests.                                                                                                 |
+| `npm run test:p1`            | `playwright test --grep '\[P0\]\|\[P1\]'`                                                | Run Priority 0 and Priority 1 E2E tests.                                                                                                       |
 | `npm run test:db`            | `supabase test db`                                                                       | Run pgTAP database tests via the Supabase CLI. Requires `supabase start`.                                                                      |
 | `npm run test:smoke`         | `node scripts/smoke-tests.cjs`                                                           | Run pre-deploy smoke tests against the `dist/` directory. Validates index.html structure, PWA manifest, icons, JS bundles, and service worker. |
 | `npm run test:burn-in`       | `bash scripts/burn-in.sh`                                                                | Run flaky test detection. Executes Playwright tests in a configurable loop (default 10 iterations). Detects intermittent failures.             |

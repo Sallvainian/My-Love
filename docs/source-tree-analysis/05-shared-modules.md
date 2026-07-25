@@ -14,13 +14,13 @@ Used by every component and hook. Composes 11 slices into a single Zustand store
 
 Single `SupabaseClient<Database>` instance used by all API services, slices, and hooks. Validates environment variables at import time. Provides helper functions `getPartnerId()` and `getPartnerDisplayName()`.
 
-**Consumers**: `moodApi.ts`, `moodSyncService.ts`, `interactionService.ts`, `partnerService.ts`, `authService.ts`, `realtimeService.ts`, `scriptureReadingService.ts`, all realtime hooks
+**Consumers**: `moodApi.ts`, `moodSyncService.ts`, `interactionService.ts`, `partnerService.ts`, `auth/sessionService.ts`, `auth/actionService.ts`, `scriptureReadingService.ts`, `notesSlice.ts`, `scriptureReadingSlice.ts`, `useScriptureBroadcast.ts`, `useScripturePresence.ts`
 
 ### `src/services/BaseIndexedDBService.ts` -- IndexedDB Base Class
 
 Abstract class providing CRUD operations for all IndexedDB services. Implements the split error strategy (read=graceful, write=throw).
 
-**Consumers**: `MoodService`, `CustomMessageService`, `PhotoStorageService`, `ScriptureReadingService`
+**Consumers**: `MoodService`, `CustomMessageService`, `ScriptureReadingService`
 
 ### `src/services/dbSchema.ts` -- IndexedDB Schema Definition
 
@@ -37,11 +37,7 @@ Introduced in the 2026-03-13 refactor, replacing raw `console.log`/`info`/`debug
 
 **Consumers**: Nearly every file in `src/api/`, `src/services/`, `src/stores/slices/`, `src/hooks/`, and `src/components/`. The `sw.ts` service worker does NOT use logger (uses raw `console.log` since `import.meta.env.DEV` is unavailable in SW context).
 
-### `src/api/realtimeChannel.ts` -- Private Channel Auth Setup
-
-Shared utility for subscribing to private Supabase Realtime channels. Extracts the duplicated auth+channel setup pattern from `useScriptureBroadcast` and `useScripturePresence` into a single reusable function.
-
-**Consumers**: `useScriptureBroadcast.ts`, `useScripturePresence.ts`
+> **Removed:** `src/api/realtimeChannel.ts` (the shared private-channel auth helper) and `src/services/realtimeService.ts` (the subscription manager) were both deleted. Each realtime hook now calls `channel.setAuth()` inline and owns its own channel lifecycle -- see [Real-Time Subscriptions](../api-reference/12-real-time-subscriptions.md).
 
 ## Validation Modules
 
@@ -49,7 +45,7 @@ Shared utility for subscribing to private Supabase Realtime channels. Extracts t
 
 All Zod schemas for local data validation: `MessageSchema`, `CreateMessageInputSchema`, `PhotoSchema`, `MoodEntrySchema`, `SettingsSchema`, `SupabaseSessionSchema`, `SupabaseReflectionSchema`, `SupabaseBookmarkSchema`, `SupabaseMessageSchema`.
 
-**Consumers**: `moodService.ts`, `customMessageService.ts`, `photoStorageService.ts`, `settingsSlice.ts`, `scriptureReadingService.ts`
+**Consumers**: `moodService.ts`, `customMessageService.ts`, `migrationService.ts`, `settingsSlice.ts`, `scriptureReadingService.ts`
 
 ### `src/api/validation/supabaseSchemas.ts` -- API Response Schemas
 
@@ -95,9 +91,14 @@ Zod schemas for validating Supabase query responses: `SupabaseMoodSchema`, `Supa
 
 ### `src/config/performance.ts` -- Performance Constants
 
-`PAGINATION` (20/100/1), `STORAGE_QUOTAS` (80%/95% thresholds, 50MB default), `VALIDATION_LIMITS` (1000 msg, 500 caption, 200 note).
+Trimmed to two exports in the dead-code sweep:
 
-**Consumers**: `schemas.ts` (validation limits), `photoStorageService.ts` (quota), `moodApi.ts` (pagination)
+- `VALIDATION_LIMITS` -- `MESSAGE_TEXT_MAX_LENGTH: 1000`, `CAPTION_MAX_LENGTH: 500`, `NOTE_MAX_LENGTH: 1000`, `PARTNER_NAME_MAX_LENGTH: 50`
+- `LOG_TRUNCATE_LENGTH: 50`
+
+**Consumers**: `schemas.ts` (validation limits), `migrationService.ts` (log truncation)
+
+> `PAGINATION` and `STORAGE_QUOTAS` were removed along with `photoStorageService.ts`. Storage thresholds now live as private constants in `photoService.ts` (`WARNING_THRESHOLD = 0.8`, `CRITICAL_THRESHOLD = 0.95`, `STORAGE_QUOTA = 1 GiB`); page sizes are per-call defaults (`NOTES_CONFIG.PAGE_SIZE = 50`, `moodApi` defaults to 50).
 
 ### `src/config/images.ts` -- Image Configuration
 
