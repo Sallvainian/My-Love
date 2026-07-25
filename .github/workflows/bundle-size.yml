@@ -32,7 +32,13 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-        uses: preactjs/compressed-size-action@v3
+        # Pinned to v2 deliberately. `v3` is an unreleased development BRANCH, not a
+        # release tag — the newest actual release is 2.10.0 and there is no v3 tag.
+        # Dependabot mistook the branch for a version in dee216f, and the v3 code
+        # invokes the build script as a bare executable, so every run since has died
+        # with "Unable to locate executable file: build". Do not let this be bumped to
+        # v3 again until an actual v3 release exists.
+        uses: preactjs/compressed-size-action@v2
         with:
           build-script: build
           pattern: './dist/**/*.{js,mjs,cjs,css}'
