@@ -113,6 +113,23 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
     };
   }, [scale]);
 
+  // Measured, not computed during render. Calling calculateDragConstraints()
+  // inline in JSX read imageRef.current while rendering, and on the first render
+  // the <img> is not mounted yet — so it returned the zero box and the image
+  // could not be panned until an unrelated re-render happened to recompute it.
+  // isLoading flips in the image's onLoad handler, which is exactly when
+  // naturalWidth/naturalHeight become readable.
+  const [dragConstraints, setDragConstraints] = useState({
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  });
+
+  useEffect(() => {
+    setDragConstraints(calculateDragConstraints());
+  }, [calculateDragConstraints, currentIndex, isLoading]);
+
   // AC 6.4.11: Photo preloading
   useEffect(() => {
     if (!photos || photos.length === 0) return;
@@ -397,7 +414,7 @@ export function PhotoViewer({ photos, selectedPhotoId, onClose }: PhotoViewerPro
         <div className="relative flex h-full w-full items-center justify-center p-4">
           <motion.div
             drag={scale === MIN_ZOOM ? true : scale > MIN_ZOOM}
-            dragConstraints={calculateDragConstraints()}
+            dragConstraints={dragConstraints}
             dragElastic={scale === MIN_ZOOM ? 0.2 : 0.1}
             onDragEnd={handleDragEnd}
             onClick={handleDoubleTap}
