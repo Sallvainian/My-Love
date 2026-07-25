@@ -268,7 +268,7 @@ scripts/
     # Quality and security
     bundle-size.yml                 # Bundle size tracking and regression detection (brotli)
     lighthouse.yml                  # Lighthouse PWA performance audit
-    codeql.yml                      # CodeQL security analysis (javascript-typescript)
+    codeql.yml                      # CodeQL security analysis (javascript-typescript, actions, python)
     dependency-review.yml           # Dependency vulnerability scanning (fails on moderate+)
 
   codeql/
