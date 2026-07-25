@@ -176,15 +176,32 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
   },
 
   /**
-   * Update a photo's metadata (caption, tags)
+   * Update a photo's caption.
+   *
+   * Caption is the only mutable column: `photos` is (id, user_id, storage_path,
+   * filename, caption, mime_type, file_size, width, height, created_at), and
+   * photoService.updatePhoto drops everything else. Anything extra passed in
+   * here — `tags`, most notably — is therefore NOT persisted, so it must not be
+   * merged into local state either.
    */
   updatePhoto: async (photoId: string, updates: Partial<SupabasePhoto>) => {
     try {
-      await photoService.updatePhoto(photoId, updates);
+      // Returns false on a rejected write or when no updatable field was
+      // supplied. Previously unchecked, so a failed save still updated the UI
+      // and the change silently disappeared on reload.
+      const persisted = await photoService.updatePhoto(photoId, updates);
 
-      // Update in state on successful update
+      if (!persisted) {
+        set({ error: 'Failed to save photo changes' });
+        return;
+      }
+
       set((state) => ({
-        photos: state.photos.map((p) => (p.id === photoId ? { ...p, ...updates } : p)),
+        photos: state.photos.map((p) =>
+          p.id === photoId
+            ? { ...p, ...(updates.caption !== undefined ? { caption: updates.caption } : {}) }
+            : p
+        ),
       }));
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Update failed';
