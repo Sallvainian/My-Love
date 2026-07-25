@@ -94,7 +94,21 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // CI ran strictly serial (workers: 1), which left the slowest shard as the
+  // whole pipeline's critical path: shards are balanced by test *count*
+  // (28/28/27/27) but the scripture specs sort into one contiguous block, so
+  // shard 3 took 9m against ~4m for the others.
+  //
+  // These specs are wait-bound, not CPU-bound — disconnect timeouts, realtime
+  // propagation, waitForPartnerDisconnected — so the time is mostly spent
+  // idle and parallelises nearly free. global-setup already provisions 24
+  // isolated worker pairs, so per-worker data isolation is built for this.
+  //
+  // 2, not 4: ubuntu-latest is 4 vCPU and each shard also runs the local
+  // Supabase stack plus a Vite server, so 2 workers means ~2 Chromium
+  // contexts sharing 4 cores. Higher risks starving the realtime tests into
+  // timeout-driven flakes, which would cost far more than the minutes saved.
+  workers: process.env.CI ? 2 : undefined,
 
   // Timeouts
   timeout: 60 * 1000, // Test timeout: 60s
