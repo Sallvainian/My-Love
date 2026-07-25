@@ -29,6 +29,14 @@ runs:
         echo "SUPABASE_URL=$(supabase status --output json | jq -re '.API_URL')" >> $GITHUB_ENV
         echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -re '.ANON_KEY')" >> $GITHUB_ENV
         echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -re '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
+        # The Vite dev server Playwright boots reads the VITE_-prefixed names. Without
+        # these, it falls back to .env.test's SUPABASE_TEST_ANON_KEY_PLACEHOLDER, which
+        # Kong forwards verbatim and Realtime rejects with a 403 on the WebSocket
+        # handshake — silently breaking every Realtime-dependent E2E spec while REST
+        # calls keep succeeding on the bearer token. Vite's loadEnv gives process.env
+        # priority over .env files, so these win.
+        echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -re '.API_URL')" >> $GITHUB_ENV
+        echo "VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=$(supabase status --output json | jq -re '.ANON_KEY')" >> $GITHUB_ENV
         echo "Supabase credentials exported"
 
     - name: Verify Supabase connectivity

@@ -615,7 +615,9 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
       // Derive partnerJoined from snapshot: if partner's role is set, they're present.
       // This handles the case where User A selected a role before User B subscribed
       // to the broadcast channel, so User B missed the partner_joined broadcast.
-      const isUser1 = currentUserId !== null && currentUserId === session.userId;
+      // `currentUserId` is already narrowed to a non-empty string by the guard above,
+      // so no null check is needed here (unlike the un-guarded site further down).
+      const isUser1 = currentUserId === session.userId;
       const partnerRole = isUser1 ? snapshot.user2Role : snapshot.user1Role;
 
       set({

@@ -41,6 +41,13 @@ updates:
     labels:
       - 'dependencies'
       - 'github-actions'
+    ignore:
+      # `v3` is an unreleased development branch of this action, not a release tag
+      # (newest release is 2.10.0). Dependabot resolved the branch as a version and
+      # bumped us onto it, which broke the Bundle Size check on every PR. Stay on v2
+      # until a real v3 release exists.
+      - dependency-name: 'preactjs/compressed-size-action'
+        update-types: ['version-update:semver-major']
     groups:
       actions:
         patterns:
