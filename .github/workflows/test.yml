@@ -21,12 +21,69 @@ permissions:
 
 jobs:
   # ============================================
+  # Stage 0: Change detection
+  # Documentation-only PRs skip the app test stages. Deliberately keyed on
+  # "can this change affect the app", NOT on "did test files change" — tests
+  # exist to validate source changes, so gating them on test-file edits would
+  # leave every source and dependency PR untested.
+  # ============================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect app-affecting changes
+        id: filter
+        run: |
+          set -euo pipefail
+
+          # Only pull_request events have a base to diff against. Pushes to main,
+          # the weekly cron and manual dispatches always run the full suite.
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "Event is ${{ github.event_name }} — running full suite"
+            exit 0
+          fi
+
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Fail safe: an empty diff runs everything rather than nothing.
+          if [[ -z "$CHANGED" ]]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "Empty diff — running full suite"
+            exit 0
+          fi
+
+          NON_DOCS=$(echo "$CHANGED" | grep -vE '(^docs/|^_bmad-output/|\.md$)' || true)
+          if [[ -z "$NON_DOCS" ]]; then
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            echo "Documentation-only change — app test stages will be skipped"
+          else
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "App-affecting files changed:"
+            echo "$NON_DOCS"
+          fi
+
+  # ============================================
   # Stage 1: Lint, Type Check
   # ============================================
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [changes]
+    if: needs.changes.outputs.app == 'true'
     permissions:
       contents: read
     steps:
@@ -52,6 +109,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [changes]
+    if: needs.changes.outputs.app == 'true'
     permissions:
       contents: read
     steps:
@@ -250,14 +309,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Setup Playwright E2E
-        uses: ./.github/actions/setup-playwright-e2e
-
+      # Detect BEFORE provisioning. Setup Playwright E2E costs ~2.5 minutes
+      # (deps + browsers + local Supabase) and used to run ahead of this check,
+      # so every PR that touched no E2E spec paid for a job that then skipped.
       - name: Detect changed E2E test files
         id: changed-tests
         run: |
@@ -266,6 +320,20 @@ jobs:
           echo "specs<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CHANGED" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Skip burn-in (no E2E test changes)
+        if: steps.changed-tests.outputs.specs == ''
+        run: echo "No E2E test files changed — burn-in skipped"
+
+      - uses: actions/setup-node@v6
+        if: steps.changed-tests.outputs.specs != ''
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Setup Playwright E2E
+        if: steps.changed-tests.outputs.specs != ''
+        uses: ./.github/actions/setup-playwright-e2e
 
       - name: Run burn-in (5 iterations)
         if: steps.changed-tests.outputs.specs != ''
@@ -279,16 +347,12 @@ jobs:
           done
           echo "Burn-in passed: 5/5 stable"
 
-      - name: Skip burn-in (no E2E test changes)
-        if: steps.changed-tests.outputs.specs == ''
-        run: echo "No E2E test files changed — burn-in skipped"
-
       - name: Stop Supabase
-        if: always()
+        if: always() && steps.changed-tests.outputs.specs != ''
         run: supabase stop --no-backup
 
       - name: Upload burn-in failures
-        if: failure()
+        if: failure() && steps.changed-tests.outputs.specs != ''
         uses: actions/upload-artifact@v7
         with:
           name: burn-in-failures
@@ -306,7 +370,7 @@ jobs:
     permissions:
       contents: read
     needs: [e2e-tests]
-    if: always() && needs.e2e-tests.result != 'cancelled'
+    if: always() && needs.e2e-tests.result != 'cancelled' && needs.e2e-tests.result != 'skipped'
     steps:
       - uses: actions/checkout@v6
 
@@ -349,11 +413,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: [lint, unit-tests, db-tests, backend-tests, e2e-tests, burn-in]
+    needs: [changes, lint, unit-tests, db-tests, backend-tests, e2e-tests, burn-in]
     if: always()
     steps:
       - name: Evaluate results
         run: |
+          # This job is the sole required status check, so it must always report.
+          # Never skip it via paths-ignore: a required check that never runs is
+          # treated as pending, and the PR stays blocked forever.
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "Change detection did not succeed — cannot verify what to run"
+            exit 1
+          fi
+
+          if [[ "${{ needs.changes.outputs.app }}" != "true" ]]; then
+            echo "Documentation-only change — app test stages skipped"
+            exit 0
+          fi
+
           echo "Lint:              ${{ needs.lint.result }}"
           echo "Unit Tests:        ${{ needs.unit-tests.result }}"
           echo "DB Tests:          ${{ needs.db-tests.result }}"
