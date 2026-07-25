@@ -229,16 +229,6 @@ Alternatively, run the cleanup script from `scripts/clear-caches.js` in the brow
    supabase migration list
    ```
 
-## Prettier and ESLint Conflicts
-
-**Cause**: Formatting rules conflicting between tools.
-
-**Fix**: Always run `npm run lint:fix` which runs ESLint fix followed by Prettier write. This ensures ESLint fixes are applied first, then Prettier formats the result.
-
-```bash
-npm run lint:fix    # eslint --fix && prettier --write .
-```
-
 ## Unit Tests Fail with IndexedDB Errors
 
 **Cause**: `fake-indexeddb` is not loaded, or the test setup file is not configured.

@@ -159,14 +159,13 @@ jobs:
 
             1. Read the error logs above carefully. Identify the root cause of each failure.
             2. Categorize the failure:
-               - **Lint/Format**: ESLint errors, Prettier violations, TypeScript type errors
+               - **Lint/Types**: ESLint errors, TypeScript type errors
                - **Unit Test**: Vitest test failures
                - **Build**: Vite/TypeScript compilation errors
                - **Other**: Anything else
             3. For each failure, find and fix the source code. Read the relevant files first.
             4. After fixing, verify locally:
                - For lint: run `npm run lint` and `npm run typecheck`
-               - For format: run `npm run format`
                - For unit tests: run `npx vitest run <failed-test-file> --silent`
                - For build: run `npm run build`
             5. Before committing, run `git diff --stat` and verify every changed file is directly related to the CI error. Discard unrelated changes with `git checkout -- <file>`.

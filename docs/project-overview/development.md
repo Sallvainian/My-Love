@@ -34,12 +34,10 @@ The dev server runs at `http://localhost:5173/` (development uses `/` base path;
 
 ### Code Quality
 
-| Command                | Description                                     |
-| ---------------------- | ----------------------------------------------- |
-| `npm run lint`         | ESLint on `src`, `tests`, `scripts` directories |
-| `npm run lint:fix`     | ESLint fix + Prettier write                     |
-| `npm run format`       | Prettier write on all files                     |
-| `npm run format:check` | Prettier check (no modifications)               |
+| Command            | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| `npm run lint`     | ESLint on `src`, `tests`, `scripts` directories |
+| `npm run lint:fix` | ESLint auto-fix (no formatter step)             |
 
 ### Testing
 
@@ -99,8 +97,8 @@ npx playwright test --grep "mood tracker"
 - **Node version**: v24.13.0 (see `.mise.toml`)
 - **Path alias**: `@/` maps to `src/` (configured in `vitest.config.ts`, not in `vite.config.ts`)
 - **Generated types**: `src/types/database.types.ts` is auto-generated from Supabase schema -- do not edit manually
-- **ESLint**: `no-explicit-any` is enforced as an error
-- **Prettier**: Uses `prettier-plugin-tailwindcss` for Tailwind class sorting
+- **ESLint**: `no-explicit-any` is enforced as an error; ESLint is the only automated style gate
+- **Formatting**: No automated formatter -- follow the conventions in [Code Style](../development-guide/code-style.md#formatting-conventions) by hand
 - **Secrets**: Managed via [fnox](https://fnox.jdx.dev) with age encryption provider; encrypted ciphertext committed in `fnox.toml`
 - **CI workflows**: Located in `.github/workflows/` -- 19 workflows covering deploy, test, migrations, code review, security, and AI assistance
 - **Base path**: Production uses `/My-Love/`, development uses `/`

@@ -57,11 +57,11 @@ Last updated: 2026-03-20
   - [Burn-In (Flaky Detection)](./testing.md#burn-in-flaky-detection)
   - [CI Test Pipeline](./testing.md#ci-test-pipeline)
   - [Priority Tags](./testing.md#priority-tags)
-- [Code Style](./code-style.md) -- TypeScript, ESLint, Prettier, logger utility, no-console rule
+- [Code Style](./code-style.md) -- TypeScript, ESLint, formatting conventions, logger utility, no-console rule
   - [TypeScript](./code-style.md#typescript)
   - [ESLint](./code-style.md#eslint)
   - [Logger Utility](./code-style.md#logger-utility)
-  - [Prettier](./code-style.md#prettier)
+  - [Formatting Conventions](./code-style.md#formatting-conventions)
   - [Naming and Import Conventions](./code-style.md#naming-and-import-conventions)
 - [Database Migrations](./database-migrations.md) -- All 25 migrations, Supabase CLI, pgTAP tests
   - [Local Supabase Setup](./database-migrations.md#local-supabase-setup)
