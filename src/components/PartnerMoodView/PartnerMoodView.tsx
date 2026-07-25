@@ -104,6 +104,28 @@ export function PartnerMoodView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [partnerError, setPartnerError] = useState<string | null>(null);
 
+  // Story 6.4: Task 11 - Performance optimization with useCallback
+  // Declared before the effect that calls it: it used to live further down the
+  // component, so the effect closed over it before initialization and had to
+  // suppress exhaustive-deps to stay quiet.
+  const handleRefresh = useCallback(async () => {
+    if (!syncStatus.isOnline) {
+      setError('Cannot fetch moods while offline');
+      return;
+    }
+
+    try {
+      setIsRefreshing(true);
+      setError(null);
+      await fetchPartnerMoods(30); // Fetch last 30 moods
+    } catch (err) {
+      console.error('[PartnerMoodView] Failed to fetch partner moods:', err);
+      setError('Failed to load partner moods. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [syncStatus.isOnline, fetchPartnerMoods]);
+
   // Load partner and pending requests on mount
   useEffect(() => {
     if (syncStatus.isOnline) {
@@ -112,12 +134,15 @@ export function PartnerMoodView() {
     }
   }, [syncStatus.isOnline, loadPartner, loadPendingRequests]);
 
-  // Load partner moods only if partner is connected
+  // Load partner moods only if partner is connected.
+  // syncStatus.isOnline belongs in the dependency list: the suppressed version
+  // re-ran only when `partner` changed, so reconnecting with the same partner
+  // still showed the moods fetched before going offline.
   useEffect(() => {
     if (syncStatus.isOnline && partner) {
       handleRefresh();
     }
-  }, [partner]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [syncStatus.isOnline, partner, handleRefresh]);
 
   // Story 6.4: Task 6 & 7 - Real-time subscription with connection status (AC #4)
   useEffect(() => {
@@ -191,25 +216,6 @@ export function PartnerMoodView() {
       }
     };
   }, [syncStatus.isOnline, fetchPartnerMoods]); // Re-subscribe if online status changes
-
-  // Story 6.4: Task 11 - Performance optimization with useCallback
-  const handleRefresh = useCallback(async () => {
-    if (!syncStatus.isOnline) {
-      setError('Cannot fetch moods while offline');
-      return;
-    }
-
-    try {
-      setIsRefreshing(true);
-      setError(null);
-      await fetchPartnerMoods(30); // Fetch last 30 moods
-    } catch (err) {
-      console.error('[PartnerMoodView] Failed to fetch partner moods:', err);
-      setError('Failed to load partner moods. Please try again.');
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [syncStatus.isOnline, fetchPartnerMoods]);
 
   // Format date for display - memoized for performance
   const formatDate = useCallback((date: string): string => {
