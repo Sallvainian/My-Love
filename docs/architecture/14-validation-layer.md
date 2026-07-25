@@ -2,13 +2,17 @@
 
 ## Architecture
 
-Runtime validation uses Zod v4 schemas at service boundaries, complementing TypeScript's compile-time type checking. The validation layer is organized into three files:
+Runtime validation uses Zod v4 schemas at service boundaries, complementing TypeScript's compile-time type checking. The validation layer spans two directories:
 
-| File                              | Purpose                                         |
-| --------------------------------- | ----------------------------------------------- |
-| `src/validation/schemas.ts`       | Zod schema definitions for all data models      |
-| `src/validation/errorMessages.ts` | Error transformation and user-friendly messages |
-| `src/validation/index.ts`         | Barrel exports for the validation module        |
+| File                                   | Layer         | Purpose                                                  |
+| -------------------------------------- | ------------- | -------------------------------------------------------- |
+| `src/validation/schemas.ts`            | Local writes  | Zod schemas validating data before IndexedDB writes       |
+| `src/validation/errorMessages.ts`      | Local writes  | Error transformation and user-friendly messages           |
+| `src/api/validation/supabaseSchemas.ts` | API responses | Zod schemas validating rows returned from Supabase        |
+
+> The `src/validation/index.ts` barrel was removed in the dead-code sweep -- import from `schemas.ts` / `errorMessages.ts` directly.
+
+**Do not mix the layers.** `src/validation/` guards data entering IndexedDB; `src/api/validation/` guards data arriving from Supabase. Using the wrong one causes silent corruption or spurious validation failures.
 
 ## Schema Definitions (`schemas.ts`)
 

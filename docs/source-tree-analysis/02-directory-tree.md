@@ -21,8 +21,7 @@ src/
     moodApi.ts                     # Mood CRUD via Supabase queries
     interactionService.ts          # Poke/kiss interaction service + realtime
     partnerService.ts              # Partner search, requests, linking
-    errorHandlers.ts               # SupabaseServiceError, retryWithBackoff, handleNetworkError
-    realtimeChannel.ts             # Shared private channel auth setup utility
+    errorHandlers.ts               # Postgrest/network error mapping, isOnline, logSupabaseError
     auth/
       sessionService.ts            # Session management, token storage for SW
       actionService.ts             # Auth actions (sign-in, sign-up, sign-out, Google OAuth)
@@ -45,7 +44,6 @@ src/
       MessageRow.tsx               # Individual message row
     CountdownTimer/
       CountdownTimer.tsx           # Anniversary countdown display
-      index.ts
     DailyMessage/
       DailyMessage.tsx             # Daily love message card + history nav
     DisplayNameSetup/
@@ -113,7 +111,6 @@ src/
       PokeKissInterface.tsx        # Poke/kiss send interface
       index.ts
     RelationshipTimers/
-      RelationshipTimers.tsx       # Timer container
       BirthdayCountdown.tsx        # Birthday countdown widget
       EventCountdown.tsx           # Generic event countdown
       TimeTogether.tsx             # Time since relationship start
@@ -168,7 +165,6 @@ src/
       Settings.tsx                 # Settings panel
       AnniversarySettings.tsx      # Anniversary management
       Settings.css
-      index.ts
     shared/
       NetworkStatusIndicator.tsx   # Online/offline status bar
       SyncToast.tsx                # Sync completion toast
@@ -196,12 +192,11 @@ src/
     defaultMessagesLoader.ts       # Lazy loader for default messages
     scriptureSteps.ts              # Scripture reading step definitions
 
-  hooks/                           # React hooks (15: 1 barrel + 14 hooks)
-    index.ts                       # Barrel exports
+  hooks/                           # React hooks (14: 1 barrel + 13 hooks)
+    index.ts                       # Barrel: re-exports only useFocusTrap + useNetworkStatus
     useAuth.ts                     # Supabase auth state
     useAutoSave.ts                 # Scripture auto-save on visibility change
     useFocusTrap.ts                # Focus trap for modal dialogs (accessibility)
-    useImageCompression.ts         # Image compression state wrapper
     useLoveNotes.ts                # Love notes + realtime composition
     useMoodHistory.ts              # Paginated mood history (Supabase API)
     useMotionConfig.ts             # Reduced motion preferences
@@ -218,21 +213,17 @@ src/
       usePartnerMood.test.ts
       useRealtimeMessages.test.ts
 
-  services/                        # Data services (14: 1 base + 13 concrete)
+  services/                        # Data services (10: 1 base + 9 concrete)
     BaseIndexedDBService.ts        # Abstract CRUD for IndexedDB
-    dbSchema.ts                    # Shared IndexedDB schema (v5, 8 stores)
+    dbSchema.ts                    # Shared IndexedDB schema (v5, 8 stores) + upgradeDb()
     storage.ts                     # StorageService for messages + photos
     moodService.ts                 # MoodService (Zod validation, sync tracking)
-    syncService.ts                 # SyncService (mood -> Supabase transform)
     customMessageService.ts        # CustomMessageService (CRUD, import/export)
     photoService.ts                # Supabase Storage operations
-    photoStorageService.ts         # PhotoStorageService (IndexedDB, migration)
     imageCompressionService.ts     # Canvas API image compression
     loveNoteImageService.ts        # Edge Function upload, signed URL cache
-    realtimeService.ts             # Realtime subscription management
     scriptureReadingService.ts     # Online-first with IDB cache, error codes
     migrationService.ts            # localStorage -> IndexedDB migration
-    performanceMonitor.ts          # Async operation timing
     __tests__/
       loveNoteImageService.test.ts
 
@@ -257,7 +248,7 @@ src/
     models.ts                      # Supabase models (LoveNote, etc.)
     database.types.ts              # Auto-generated Supabase database types (DO NOT EDIT)
 
-  utils/                           # Utility functions (16 files)
+  utils/                           # Utility functions (15 files)
     backgroundSync.ts              # Background Sync API registration
     calendarHelpers.ts             # Calendar grid calculations
     countdownService.ts            # Anniversary countdown calculations
@@ -271,17 +262,18 @@ src/
     moodEmojis.ts                  # Mood type -> emoji mappings
     moodGrouping.ts                # Group moods by date for timeline
     offlineErrorHandler.ts         # OfflineError class, withOfflineCheck wrapper
-    performanceMonitoring.ts       # Scroll perf + memory monitoring
-    storageMonitor.ts              # localStorage quota monitoring
+    performanceMonitoring.ts       # Scroll perf observer (measureScrollPerformance)
+    storageMonitor.ts              # localStorage quota monitoring (logStorageQuota)
     themes.ts                      # Theme definitions + CSS variable application
     __tests__/
       (co-located unit tests)
 
-  validation/                      # Zod validation layer
-    schemas.ts                     # All Zod schemas (Message, Photo, Mood, Settings, Scripture)
-    errorMessages.ts               # ValidationError class, formatZodError, getFieldErrors
-    index.ts                       # Barrel exports
+  validation/                      # Zod validation layer (local writes)
+    schemas.ts                     # Zod schemas (Message, Photo, Mood, Settings, Scripture rows)
+    errorMessages.ts               # ValidationError class, createValidationError, isZodError
 ```
+
+> `src/validation/index.ts` was removed -- import from `schemas.ts` / `errorMessages.ts` directly.
 
 ## Supabase Directory (`supabase/`)
 
