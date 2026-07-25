@@ -99,7 +99,6 @@ export interface ScriptureMessage {
  *
  * Used by:
  * - moodService.ts
- * - photoStorageService.ts
  * - customMessageService.ts
  * - BaseIndexedDBService.ts (type constraints)
  *
@@ -217,8 +216,17 @@ export function upgradeDb(
   }
 
   // v2: photos store
-  // Note: v1→v2 migration with data preservation is handled in photoStorageService
-  // because it requires async transaction access. For fresh installs or v2+, we just create the store.
+  //
+  // This upgrade is DESTRUCTIVE for a v1 database: the v1 store is dropped and
+  // recreated, losing any cached rows. The data-preserving path used to live in
+  // photoStorageService.ts (it needed async transaction access, which an
+  // upgrade callback cannot do), and that file no longer exists.
+  //
+  // Left destructive deliberately. Photos are Supabase-first — IndexedDB is a
+  // read cache, so a dropped store refills on the next fetch. A v1 database
+  // also predates the current schema by a wide margin. Restoring preservation
+  // would mean reintroducing an async migration step for a cache that costs
+  // nothing to rebuild.
   if (oldVersion < 2) {
     // Delete old v1 store if it exists (had 'blob' instead of 'imageBlob')
     if (db.objectStoreNames.contains('photos')) {
