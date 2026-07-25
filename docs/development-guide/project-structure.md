@@ -262,7 +262,7 @@ scripts/
     supabase-migrations.yml         # Migration validation on PRs touching supabase/ paths
 
     # AI: Claude
-    claude.yml                      # Claude Code for @claude mentions in issues/PRs (claude-opus-4-6)
+    claude.yml                      # Claude Code for @claude mentions in issues/PRs (claude-opus-5)
     claude-code-review.yml          # Automated PR code review with Claude /review skill
 
     # Quality and security

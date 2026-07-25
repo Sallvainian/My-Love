@@ -76,7 +76,7 @@ All workflows are in `.github/workflows/`:
 
 | Workflow             | File                       | Trigger                                                    | Purpose                                                       |
 | -------------------- | -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs/reviews                   | Claude Code AI assistance (model: claude-opus-4-6)            |
+| Claude Code          | `claude.yml`               | `@claude` mentions in issues/PRs/reviews                   | Claude Code AI assistance (model: claude-opus-5)              |
 | Claude Code Review   | `claude-code-review.yml`   | PR opened/synchronized/ready (non-draft)                   | Automated PR code review with Claude `/review` skill          |
 
 ### Security and Quality
