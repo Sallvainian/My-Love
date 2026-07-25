@@ -226,7 +226,7 @@ Zustand with one slice per domain area (11 slices). The main store is composed i
 
 ### Validation
 
-Zod 4.3.6 schemas for all runtime data validation. Schemas are defined in `src/validation/` with user-facing error messages in `src/validation/errorMessages.ts`.
+Zod 4.4.3 schemas for all runtime data validation. Schemas are defined in `src/validation/` with user-facing error messages in `src/validation/errorMessages.ts`.
 
 ### Component Organization
 

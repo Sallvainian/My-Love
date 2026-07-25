@@ -16,7 +16,7 @@ src/
       __tests__/                    # Auth service unit tests
     moodApi.ts                      # Mood API calls
     moodSyncService.ts              # Mood data sync between IndexedDB and Supabase
-    interactionService.ts           # Poke/kiss/fart partner interaction API calls
+    interactionService.ts           # Poke/kiss partner interaction API calls
     partnerService.ts               # Partner data API calls
     errorHandlers.ts                # Centralized error handling utilities for API responses
     validation/
@@ -49,7 +49,7 @@ src/
     PhotoCarousel/                  # Photo carousel viewer (lazy-loaded modal)
     PhotoGallery/                   # Photo grid with lazy loading (react-window)
     PhotoUpload/                    # Photo upload dialog (lazy-loaded modal)
-    PokeKissInterface/              # Playful partner interactions (poke, kiss, fart)
+    PokeKissInterface/              # Playful partner interactions (poke, kiss persisted; fart is a local-only animation)
     RelationshipTimers/             # TimeTogether, BirthdayCountdown, EventCountdown
     scripture-reading/              # Scripture reading flow (solo/together modes, reflection)
       containers/                   # Container components (ESLint enforces no direct Supabase imports)
@@ -80,7 +80,6 @@ src/
 
   hooks/                            # Custom React hooks
     useAuth.ts                      # Authentication hook
-    useImageCompression.ts          # Image compression hook
     useMoodHistory.ts               # Mood history data hook
     useNetworkStatus.ts             # Online/offline detection hook
     usePhotos.ts                    # Photo management hook
@@ -94,12 +93,8 @@ src/
     imageCompressionService.ts      # Image compression utility
     migrationService.ts             # LocalStorage to IndexedDB migration
     moodService.ts                  # Mood tracking service
-    performanceMonitor.ts           # Operation timing and metrics (singleton)
-    photoStorageService.ts          # Photo storage management
-    realtimeService.ts              # Supabase Realtime subscription management
     scriptureReadingService.ts      # Scripture reading session service
     storage.ts                      # IndexedDB and localStorage utilities
-    syncService.ts                  # Data synchronization service
 
   stores/
     useAppStore.ts                  # Zustand store composed from 11 slices
@@ -110,7 +105,7 @@ src/
       navigationSlice.ts            # Navigation and routing state (setView, currentView)
       messagesSlice.ts              # Daily love message selection and rotation
       moodSlice.ts                  # Mood tracking entries, history, sync
-      interactionsSlice.ts          # Partner interactions (pokes, kisses, farts)
+      interactionsSlice.ts          # Partner interactions (pokes, kisses)
       partnerSlice.ts               # Partner data, status, and linking
       notesSlice.ts                 # Love notes chat messages
       photosSlice.ts                # Photo gallery state
@@ -139,7 +134,7 @@ src/
     moodEmojis.ts                   # Mood emoji definitions
     moodGrouping.ts                 # Mood data grouping for history
     offlineErrorHandler.ts          # Offline-aware error handling
-    performanceMonitoring.ts        # Scroll performance and memory monitoring
+    performanceMonitoring.ts        # Scroll performance observer
     storageMonitor.ts               # Storage quota monitoring
     themes.ts                       # Theme configurations + applyTheme()
     __tests__/                      # Utility unit tests
@@ -256,7 +251,7 @@ scripts/
   workflows/
     # Core pipelines
     deploy.yml                      # Build + smoke test + deploy to GitHub Pages + health check
-    test.yml                        # Full test pipeline: lint, unit, DB, integration, API, E2E P0 gate, E2E sharded, burn-in
+    test.yml                        # 9-job pipeline: change detection, lint, unit, DB, backend (integration+api), E2E x4 shards, burn-in, merge-reports, summary
 
     # Database
     supabase-migrations.yml         # Migration validation on PRs touching supabase/ paths

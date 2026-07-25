@@ -6,10 +6,10 @@ The project uses multiple testing layers:
 
 | Layer             | Framework         | Location                                | Environment                            |
 | ----------------- | ----------------- | --------------------------------------- | -------------------------------------- |
-| Unit tests        | Vitest 4.0.18     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
-| E2E tests         | Playwright 1.58.2 | `tests/e2e/`                            | Real Chromium browser + local Supabase |
-| API tests         | Playwright 1.58.2 | `tests/api/`                            | Supabase API endpoints                 |
-| Integration tests | Playwright 1.58.2 | `tests/integration/`                    | Playwright integration project         |
+| Unit tests        | Vitest 4.1.10     | `tests/unit/`, `src/**/*.test.{ts,tsx}` | happy-dom                              |
+| E2E tests         | Playwright 1.62.0 | `tests/e2e/`                            | Real Chromium browser + local Supabase |
+| API tests         | Playwright 1.62.0 | `tests/api/`                            | Supabase API endpoints                 |
+| Integration tests | Playwright 1.62.0 | `tests/integration/`                    | Playwright integration project         |
 | Database tests    | pgTAP             | `supabase/tests/database/`              | Local Supabase Postgres 17             |
 
 Additional test types: smoke tests (pre-deploy validation), burn-in (flaky detection), and failure analysis (AI-friendly Markdown summaries).
@@ -102,7 +102,7 @@ npm run test:p1                # Priority 0 + Priority 1 tests
 Single file:
 
 ```bash
-npx playwright test tests/e2e/scripture/reflection.spec.ts
+npx playwright test tests/e2e/scripture/scripture-reflection-2.2.spec.ts
 ```
 
 By pattern:
@@ -118,7 +118,7 @@ npx playwright test --grep "mood tracker"
 | Test directory     | `./tests`                  |
 | Fully parallel     | Yes                        |
 | Retries            | 0 locally, 2 in CI         |
-| Workers            | Unlimited locally, 1 in CI |
+| Workers            | Unlimited locally, 2 in CI |
 | Test timeout       | 60 seconds                 |
 | Assertion timeout  | 15 seconds                 |
 | Action timeout     | 15 seconds                 |
@@ -252,7 +252,12 @@ The `pw-failures.mjs` script parses Playwright JSON output, groups failures by r
 
 ## CI Test Pipeline
 
-The `test.yml` workflow runs an 8-stage pipeline:
+The `test.yml` workflow runs 9 jobs. Every app stage is gated on `needs.changes.outputs.app == 'true'`, so documentation-only PRs skip the whole suite.
+
+### Stage 0: Change Detection (5-minute timeout)
+
+- Job `changes`; decides whether the change can affect the app at all
+- Deliberately keyed on "can this change affect the app", **not** on "did test files change" -- gating on test-file edits would leave every source and dependency PR untested
 
 ### Stage 1: Lint and Type Check (5-minute timeout)
 
@@ -269,47 +274,39 @@ The `test.yml` workflow runs an 8-stage pipeline:
 - Sets up local Supabase via composite action
 - Runs pgTAP tests via `npx supabase test db`
 
-### Stage 4: Integration Tests (15-minute timeout)
+### Stage 4: Backend Tests (15-minute timeout)
 
-- Sets up local Supabase
-- Runs Playwright integration project tests
+A single `backend-tests` job with a `matrix: project: [integration, api]` and `fail-fast: false`. Each leg sets up local Supabase and runs `npx playwright test --project=${{ matrix.project }}`. Both projects run without a browser context. `supabase stop --no-backup` runs in an `always()` step.
 
-### Stage 5: API Tests (15-minute timeout)
+> This replaces the separate "Integration Tests" and "API Tests" stages described in the 2026-03 scan.
 
-- Sets up local Supabase
-- Runs Playwright API project tests
+### Stage 5: E2E Sharded (30-minute timeout)
 
-### Stage 6a: E2E P0 Gate (15-minute timeout)
-
-- Requires lint to pass
-- Sets up local Supabase via composite action (`.github/actions/setup-supabase/`)
-- Runs only P0-tagged tests (`--grep "\[P0\]"`)
-- Caches Playwright browsers keyed by `package-lock.json` hash
-
-### Stage 6b: E2E Sharded (30-minute timeout)
-
-- Requires P0 gate to pass
-- Runs full E2E suite sharded across 2 workers (`--shard=1/2`, `--shard=2/2`)
+- Runs the full E2E suite across **4 shards**, chromium only: `npx playwright test --project=chromium --shard=${{ matrix.shard }}/4`
+- 2 Playwright workers per shard
 - `fail-fast: false` -- all shards run even if one fails
-- Results uploaded with 30-day retention
+- Results uploaded per shard as `e2e-results-shard-*` with 30-day retention
 
-### Stage 7: Burn-In (30-minute timeout)
+> **The E2E P0 gate job was removed.** It previously ran `--grep "[P0]"` ahead of this stage with `e2e-tests` gated on it via `needs`; the shards now start as soon as change detection passes.
+>
+> **Shards went 2 → 4.** Playwright splits by test count, but the suite is duration-skewed: at 2 shards both got 55 tests yet ran 5.4 min vs 9.6 min. Per-shard provisioning has a fixed ~2.5 min floor, so 4 is the better trade.
 
-- Only runs on PRs to `main`
-- Requires E2E to pass
-- Detects changed test files via `git diff`
-- Runs 5 iterations on changed specs only
+### Stage 6: Burn-In (30-minute timeout)
 
-### Stage 8: Merge Reports
+- Runs on PRs to `main` (and on the weekly Sunday schedule)
+- Detects changed test files via `git diff` and runs 5 iterations on changed specs only
+- **No longer `needs` the E2E shards** -- it re-runs specs from scratch and consumed nothing the shards produced, so waiting on them only added the slowest shard to the critical path
 
-- Runs after E2E regardless of success/failure
-- Downloads all shard artifacts
+### Stage 7: Merge Reports
+
+- Runs after E2E regardless of success/failure (skipped only if E2E was cancelled or skipped)
+- Downloads all `e2e-results-shard-*` artifacts
 - Merges HTML reports via `npx playwright merge-reports`
 - Uploads merged report with 30-day retention
 
-### Test Summary
+### Stage 8: Test Summary
 
-A final `test-summary` job evaluates results from all stages and serves as the branch protection target. It requires lint, unit tests, DB tests, integration tests, API tests, and E2E tests to succeed. Burn-in is allowed to be skipped (non-PR events) but not failed.
+The `test-summary` job runs with `if: always()`, evaluates results from all stages, and serves as the branch-protection target. It requires lint, unit tests, DB tests, backend tests, and E2E tests to succeed. Burn-in is allowed to be skipped (non-PR events) but not failed.
 
 ### Concurrency
 
@@ -325,7 +322,7 @@ New pushes to the same branch cancel in-progress test runs.
 
 - Push to `main`
 - Pull requests
-- Weekly schedule: Sundays at 2 AM UTC (burn-in)
+- Weekly schedule: Sundays at 2 AM UTC (`cron: '0 2 * * 0'`, full burn-in)
 - Manual dispatch
 
 ## Priority Tags
@@ -334,10 +331,12 @@ E2E tests use priority tags in their test names for selective execution:
 
 | Tag    | Meaning                               | When Run                       |
 | ------ | ------------------------------------- | ------------------------------ |
-| `[P0]` | Critical path -- must never break     | P0 gate (every push), full E2E |
+| `[P0]` | Critical path -- must never break     | `npm run test:p0`, full E2E    |
 | `[P1]` | High priority -- core features        | `npm run test:p1`, full E2E    |
 | `[P2]` | Medium priority -- secondary features | Full E2E only                  |
 | `[P3]` | Low priority -- edge cases            | Full E2E only                  |
+
+Since the CI P0 gate job was removed, the tags are now used for **local** selective runs and for reasoning about risk -- CI always runs the whole suite across its 4 shards.
 
 Example test title:
 
@@ -358,7 +357,7 @@ npm run test:p1    # P0 + P1
 
 For Epic 2 and beyond, acceptance tests are written before implementation. Each story's acceptance criteria from the epic breakdown maps to specific E2E test cases. The workflow is:
 
-1. Read acceptance criteria from `_bmad-output/planning-artifacts/epics/`
+1. Read acceptance criteria from the relevant tech spec in `_bmad-output/implementation-artifacts/` (the sharded `planning-artifacts/epics/` directory was retired once all four Scripture Reading epics shipped)
 2. Write failing E2E tests that encode each criterion
 3. Implement the feature until tests pass
 4. Review coverage against all acceptance criteria

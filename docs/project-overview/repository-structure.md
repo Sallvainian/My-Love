@@ -23,12 +23,11 @@ My-Love/
 |   +-- dependabot.yml                # Weekly npm + GitHub Actions dependency updates
 |
 |-- _bmad-output/
-|   |-- implementation-artifacts/     # Sprint status, story files, retrospectives
-|   |   +-- sprint-status.yaml       # Machine-readable epic/story status tracking
-|   |-- planning-artifacts/           # BMAD method planning documents
-|   |   |-- prd/                     # Product Requirements Document
-|   |   +-- epics/                   # Epic breakdowns with story definitions and ACs
-|   +-- test-artifacts/              # Test reviews, NFR assessments, traceability
+|   |-- implementation-artifacts/     # Per-change tech specs + deferred-work.md ledger
+|   |-- planning-artifacts/           # architecture.md, ux-design-specification.md, ux-design-directions.html
+|   |-- tea-docs/                     # Test-architecture reference docs
+|   |-- test-artifacts/               # Test reviews, NFR assessments, traceability
+|   +-- project-context.md            # AI-agent rule file (see also CLAUDE.md, AGENTS.md)
 |
 |-- docs/                             # Project documentation (9 sections)
 |   |-- api-reference/               # Supabase client, auth, services, validation, SW, realtime
@@ -45,10 +44,11 @@ My-Love/
 |   |-- 404.html                     # GitHub Pages SPA redirect handler
 |   +-- icons/                       # PWA icons (icon-192.png, icon-512.png, icon.svg)
 |
-|-- scripts/                          # Utility scripts (12 files)
+|-- scripts/                          # Utility scripts (13 files)
 |   |-- dev-with-cleanup.sh          # Dev server with signal trapping and process cleanup
 |   |-- test-with-cleanup.sh         # E2E test runner with signal trapping and process cleanup
 |   |-- burn-in.sh                   # Flaky test detection (configurable iterations, default 10)
+|   |-- deadcode.sh                  # Dead-code analysis via tsr, filters React.lazy false positives
 |   |-- ci-local.sh                  # Mirror CI pipeline locally (lint, unit, E2E, burn-in)
 |   |-- smoke-tests.cjs              # Pre-deploy build validation (dist/ structure, manifests, bundles)
 |   |-- validate-messages.cjs        # 365-message library validation (count, categories, duplicates)
@@ -59,7 +59,7 @@ My-Love/
 |   |-- inspect-db.sh                # Database inspection utility for local Supabase
 |   +-- fetch_comments.py            # GitHub PR comment fetcher
 |
-|-- src/                              # Application source (207 TypeScript/TSX files, ~45,102 lines)
+|-- src/                              # Application source (197 TypeScript/TSX files, ~43,133 lines; 168 non-test)
 |   |-- App.tsx                       # Main application component (auth, routing, sync setup, ~610 lines)
 |   |-- main.tsx                      # Entry point (StrictMode, LazyMotion, SW registration)
 |   |-- index.css                     # Global CSS (Tailwind imports)
@@ -75,16 +75,15 @@ My-Love/
 |   |   |   |-- sessionService.ts     # getSession, getUser, getCurrentUserId, onAuthStateChange
 |   |   |   +-- types.ts              # Auth type definitions
 |   |   |-- authService.ts            # Facade re-exporting both session and action services
-|   |   |-- errorHandlers.ts          # SupabaseServiceError, retry with backoff, offline messages
+|   |   |-- errorHandlers.ts          # Postgrest/network error mapping, isOnline, logSupabaseError
 |   |   |-- interactionService.ts     # Poke/kiss interaction CRUD + realtime subscriptions
 |   |   |-- moodApi.ts                # Mood CRUD with Zod-validated responses
 |   |   |-- moodSyncService.ts        # Mood sync: IndexedDB -> Supabase
 |   |   |-- partnerService.ts         # Partner search, requests, linking
-|   |   |-- realtimeChannel.ts        # Shared private channel auth setup utility
 |   |   +-- validation/
 |   |       +-- supabaseSchemas.ts    # Zod schemas for all Supabase API responses
 |   |
-|   |-- components/                   # React components (26 directories, ~80 files)
+|   |-- components/                   # React components (26 directories, 66 non-test files)
 |   |   |-- AdminPanel/               # Admin interface (6 files: panel, forms, list, row, dialog)
 |   |   |-- CountdownTimer/           # Generic countdown component
 |   |   |-- DailyMessage/             # Main message card with rotation
@@ -133,11 +132,10 @@ My-Love/
 |   |   |-- defaultMessagesLoader.ts  # Lazy loader for default messages
 |   |   +-- scriptureSteps.ts         # 17 scripture steps with NKJV verses and response prayers
 |   |
-|   |-- hooks/                        # Custom React hooks (15: 1 barrel + 14 hooks)
+|   |-- hooks/                        # Custom React hooks (14: 1 barrel + 13 hooks)
 |   |   |-- useAuth.ts                # Authentication state hook
 |   |   |-- useAutoSave.ts            # Auto-save with visibility change detection
 |   |   |-- useFocusTrap.ts           # Focus trap for modal dialogs (accessibility)
-|   |   |-- useImageCompression.ts    # Image compression state wrapper
 |   |   |-- useLoveNotes.ts           # Love notes chat state + realtime subscription
 |   |   |-- useMoodHistory.ts         # Paginated mood history via Supabase API
 |   |   |-- useMotionConfig.ts        # Framer Motion reduced-motion config
@@ -149,7 +147,7 @@ My-Love/
 |   |   |-- useScripturePresence.ts   # Ephemeral presence for partner position tracking
 |   |   +-- useVibration.ts           # Haptic feedback hook
 |   |
-|   |-- services/                     # Business logic services (14: 1 base + 13 concrete)
+|   |-- services/                     # Business logic services (10: 1 base + 9 concrete)
 |   |   |-- BaseIndexedDBService.ts   # Abstract CRUD base class for IndexedDB
 |   |   |-- dbSchema.ts               # IndexedDB schema definition (v5, 8 object stores)
 |   |   |-- customMessageService.ts   # Custom message CRUD with import/export
@@ -157,13 +155,9 @@ My-Love/
 |   |   |-- loveNoteImageService.ts   # Love note image upload + signed URL cache
 |   |   |-- migrationService.ts       # localStorage to IndexedDB migration
 |   |   |-- moodService.ts            # Mood CRUD with Zod validation + sync tracking
-|   |   |-- performanceMonitor.ts     # Async operation timing
 |   |   |-- photoService.ts           # Photo operations (Supabase Storage)
-|   |   |-- photoStorageService.ts    # Photo IndexedDB storage with v1-v2 migration
-|   |   |-- realtimeService.ts        # Supabase Realtime subscription singleton
 |   |   |-- scriptureReadingService.ts # Scripture API adapter + IndexedDB cache + corruption recovery
-|   |   |-- storage.ts                # Legacy StorageService for messages + photos
-|   |   +-- syncService.ts            # Mood sync orchestration (local -> Supabase transform)
+|   |   +-- storage.ts                # Legacy StorageService for messages + photos
 |   |
 |   |-- stores/                       # Zustand state management (13 files)
 |   |   |-- useAppStore.ts            # Main store (compose 11 slices + persist middleware)
@@ -188,7 +182,7 @@ My-Love/
 |   |   |-- moodEmojis.ts             # Mood type -> emoji mappings
 |   |   |-- moodGrouping.ts           # Group moods by date for timeline
 |   |   |-- offlineErrorHandler.ts    # OfflineError class, withOfflineCheck wrapper
-|   |   |-- performanceMonitoring.ts  # Scroll perf + memory monitoring (dev-only)
+|   |   |-- performanceMonitoring.ts  # Scroll perf observer (dev-only)
 |   |   |-- storageMonitor.ts         # localStorage quota monitoring
 |   |   +-- themes.ts                 # Theme definitions + CSS variable application
 |   |
@@ -222,7 +216,8 @@ My-Love/
 |-- eslint.config.js                  # ESLint flat config (typescript-eslint, react-hooks, react-refresh)
 |-- fnox.toml                         # Encrypted secrets (age provider, committed to git)
 |-- index.html                        # HTML entry point with SPA redirect handler for GitHub Pages
-|-- package.json                      # npm scripts, dependencies, browserslist
+|-- license.md                        # Project license
+|-- package.json                      # 32 npm scripts, dependencies, overrides, browserslist
 |-- playwright.config.ts              # Playwright: projects (chromium, api, integration), global setup
 |-- postcss.config.js                 # PostCSS plugins (@tailwindcss/postcss, autoprefixer)
 |-- tailwind.config.js                # Tailwind theme: custom colors, fonts, animations, keyframes
@@ -230,6 +225,9 @@ My-Love/
 |-- tsconfig.app.json                 # App TypeScript config (ES2022 target, strict, react-jsx)
 |-- tsconfig.node.json                # Node TypeScript config (vite.config.ts, vitest.config.ts)
 |-- tsconfig.test.json                # Test TypeScript config
+|-- tsconfig.tsr.json                 # Config for the tsr dead-code analyser (npm run deadcode)
+|-- README.md                         # Project readme with feature list and quick start
+|-- skills-lock.json                  # Pinned versions for installed agent skills
 |-- vite.config.ts                    # Vite: base path, manual chunks, PWA plugin, visualizer, Sentry
 +-- vitest.config.ts                  # Vitest: happy-dom, path alias @/, coverage thresholds (25%)
 ```

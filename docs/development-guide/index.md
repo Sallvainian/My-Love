@@ -70,7 +70,7 @@ Last updated: 2026-03-20
   - [Generating TypeScript Types](./database-migrations.md#generating-typescript-types)
   - [CI Migration Validation](./database-migrations.md#ci-migration-validation)
   - [Database Tests (pgTAP)](./database-migrations.md#database-tests-pgtap)
-- [Deployment](./deployment.md) -- All 19 CI/CD workflows, GitHub Pages, health checks
+- [Deployment](./deployment.md) -- All 9 CI/CD workflows, GitHub Pages, health checks
   - [Automatic Deployment](./deployment.md#automatic-deployment)
   - [CI/CD Workflows](./deployment.md#cicd-workflows)
   - [Required GitHub Secrets](./deployment.md#required-github-secrets)
@@ -82,9 +82,9 @@ Last updated: 2026-03-20
 | Item            | Value                                                          |
 | --------------- | -------------------------------------------------------------- |
 | Live URL        | <https://sallvainian.github.io/My-Love/>                       |
-| Stack           | React 19.2.4, TypeScript 5.9.3, Vite 7.3.1, Tailwind CSS 4.2.1 |
-| Backend         | Supabase 2.99.0 (Auth, Database, Realtime, Storage)            |
-| Testing         | Vitest 4.0.18, Playwright 1.58.2, pgTAP                        |
+| Stack           | React 19.2.8, TypeScript 5.9.3, Vite 7.3.6, Tailwind CSS 4.1.17 |
+| Backend         | Supabase 2.110.8 (Auth, Database, Realtime, Storage)            |
+| Testing         | Vitest 4.1.10, Playwright 1.62.0, pgTAP                        |
 | Node            | v24.13.0 (managed by mise, pinned in `.node-version`)          |
 | Package manager | npm                                                            |
 | Secrets         | fnox with age provider (`fnox.toml`)                           |

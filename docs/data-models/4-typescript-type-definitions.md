@@ -8,7 +8,15 @@
 
 ## Generated Database Types (`database.types.ts`)
 
-Auto-generated via `supabase gen types typescript --local`. Defines `Database` type with `public.Tables`, `public.Functions`, `public.Enums`.
+Auto-generated via `supabase gen types typescript --local`. Defines the `Database` type with `public.Tables`, `public.Functions`, `public.Enums`.
+
+Never edit this file by hand. Regenerate with:
+
+```bash
+supabase gen types typescript --local | grep -v '^Connecting to' > src/types/database.types.ts
+```
+
+> **Currently stale.** The generated file lists **11 tables** and does not include `claude_bot_config`, which was added by migration `20260316031209_create_claude_bot_config.sql`. The app never reads that table from the client (it is service-role only), so nothing is broken -- but the next regeneration will add it.
 
 ### Table Row/Insert/Update Types
 
@@ -20,7 +28,9 @@ Each table has three type variants:
 
 ### Function Types
 
-All 13 RPC functions with `Args` and `Returns` types.
+All 14 app RPC functions with `Args` and `Returns` types, plus the `pg_graphql` extension's `graphql` function.
+
+> `postgrest-js` (>= supabase-js 2.105) wraps `.update()` payloads in `RejectExcessProperties`, which resolves an index signature to `never`. Type update payloads with the generated `Database['public']['Tables'][T]['Update']` row rather than `Record<string, unknown>` -- see `scriptureReadingService.updateSession()`.
 
 ### Enum Types
 
@@ -45,7 +55,14 @@ scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned' |
 - `ThemeName`: `'sunset' | 'ocean' | 'lavender' | 'rose'`
 - `MessageCategory`: `'reason' | 'memory' | 'affirmation' | 'future' | 'custom'`
 - `MoodType`: 12 mood values (loved, happy, content, excited, thoughtful, grateful, sad, anxious, frustrated, angry, lonely, tired)
-- `RouteType`: `'home' | 'memories' | 'moods' | 'countdown' | 'settings' | 'onboarding'`
+- `Theme`: name, displayName, `colors` (primary/secondary/background/text/accent), `gradients` (background/card)
+- `Anniversary`: id, date (ISO string), label, description?
+
+> `RouteType` no longer exists. View routing is typed by `ViewType` in `src/stores/slices/navigationSlice.ts`: `'home' | 'photos' | 'mood' | 'partner' | 'notes' | 'scripture'`.
+
+### Re-exported Interaction Types
+
+`src/types/index.ts` re-exports `Interaction`, `InteractionType`, and `SupabaseInteractionRecord` from `../api/interactionService` so consumers get one import site.
 
 ### Data Interfaces
 
@@ -68,22 +85,23 @@ scripture_session_status: 'pending' | 'in_progress' | 'complete' | 'abandoned' |
 - `CompressionOptions`: maxWidth, maxHeight, quality
 - `CompressionResult`: blob, width, height, originalSize, compressedSize, fallbackUsed?
 
-## Model Re-exports (`src/types/models.ts`)
+## Love Notes Types (`src/types/models.ts`)
 
-### Photo Types (from `photoService.ts`)
+This file was trimmed in the dead-code sweep. It no longer re-exports photo or scripture types -- it now defines exactly two interfaces:
 
-`SupabasePhoto`, `PhotoWithUrls`, `StorageQuota`, `PhotoUploadInput`
-
-### Scripture Types (from `dbSchema.ts`)
-
-`ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, `ScriptureSessionMode`, `ScriptureSessionPhase`, `ScriptureSessionStatus`
-
-### Love Notes Types (defined here)
-
-**`LoveNote`**: id, from_user_id, to_user_id, content, created_at, image_url?, sending?, error?, tempId?, imageUploading?, imageBlob?, imagePreviewUrl?
-
-**`LoveNotesState`**: notes[], isLoading, error, hasMore
-
-**`SendMessageInput`**: content, timestamp, imageFile?
+**`LoveNote`**: id, from_user_id, to_user_id, content, created_at, image_url?, plus client-only optimistic-update fields: sending?, error?, tempId?, imageUploading?, imageBlob?, imagePreviewUrl?
 
 **`MessageValidationResult`**: valid, error?
+
+> Removed: `LoveNotesState` and `SendMessageInput` (state now lives inline on `NotesSlice`), and the `SupabasePhoto` / `PhotoWithUrls` / `StorageQuota` / `PhotoUploadInput` / scripture re-exports.
+
+### Where those types live now
+
+| Type family                                                                                | Canonical source                                          |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `SupabasePhoto`, `PhotoWithUrls`, `PhotoUploadInput`                                        | `src/services/photoService.ts`                            |
+| `ScriptureSession`, `ScriptureReflection`, `ScriptureBookmark`, `ScriptureMessage`, mode/phase | `src/services/dbSchema.ts`                              |
+| `CoupleStats`                                                                               | `src/api/validation/supabaseSchemas.ts` (Zod-inferred)    |
+| `SessionRole`, `StateUpdatePayload`, `PendingRetry`                                         | `src/stores/slices/scriptureReadingSlice.ts`              |
+
+Zod-inferred types consumed by UI components must be re-exported through `src/stores/types.ts` (e.g. `export type { CoupleStats } from '../api/validation/supabaseSchemas'`) -- that barrel is the single source of truth. Never import from `supabaseSchemas.ts` directly in a component.

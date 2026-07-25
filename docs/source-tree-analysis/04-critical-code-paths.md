@@ -146,7 +146,7 @@ SW background sync:
 
 ## 6. IndexedDB Schema Migration Path
 
-**Files**: `src/services/dbSchema.ts` -> `src/services/photoStorageService.ts`
+**Files**: `src/services/dbSchema.ts` (centralized `upgradeDb()`), consumed by every service's `_doInit()`
 
 Schema migrations must be handled carefully to avoid data loss.
 
@@ -161,25 +161,22 @@ upgradeDb(db, oldVersion, newVersion):
   |-- v3: Create moods store (by-date unique index)
   |-- v4: Create sw-auth store
   |-- v5: Create 4 scripture stores (sessions, reflections, bookmarks, messages)
-
-Special case: v1->v2 photos migration
-  |-- photoStorageService._doInit() reads v1 photos BEFORE upgrade
-  |-- upgradeDb() recreates photos store
-  |-- photoStorageService re-inserts migrated data AFTER upgrade
 ```
+
+**v1->v2 photos note.** `upgradeDb()` *drops and recreates* the `photos` store at v2 (the v1 store used a `blob` field; v2 uses `imageBlob`). The data-preserving migration that used to run in `photoStorageService._doInit()` no longer exists -- that service was deleted. Any v1-era local photos are discarded on upgrade. This is acceptable because photos are now stored in Supabase Storage and the IndexedDB `photos` store is only a legacy local cache. The comment in `dbSchema.ts` still references `photoStorageService` and is stale.
 
 ## Critical File Impact Rankings
 
 | File                                         | Lines | Impact | Reason                                           |
 | -------------------------------------------- | ----- | ------ | ------------------------------------------------ |
 | `src/App.tsx`                                | 610   | High   | Auth gate, routing, sync setup, lazy loading     |
-| `src/stores/slices/scriptureReadingSlice.ts` | 1021  | High   | Largest slice, complex state machine             |
-| `src/stores/useAppStore.ts`                  | 290   | High   | All app state, persist config, Map serialization |
-| `src/services/dbSchema.ts`                   | 280   | High   | Shared IndexedDB schema, all migration logic     |
-| `src/api/supabaseClient.ts`                  | 159   | High   | Singleton client, env var validation at import   |
+| `src/stores/slices/scriptureReadingSlice.ts` | 1013  | High   | Largest slice, complex state machine             |
+| `src/stores/useAppStore.ts`                  | 287   | High   | All app state, persist config, Map serialization |
+| `src/services/dbSchema.ts`                   | 272   | High   | Shared IndexedDB schema, all migration logic     |
+| `src/api/supabaseClient.ts`                  | 158   | High   | Singleton client, env var validation at import   |
 | `src/stores/slices/notesSlice.ts`            | 608   | Medium | Realtime chat, rate limiting, image handling     |
 | `src/stores/slices/messagesSlice.ts`         | 527   | Medium | Message rotation, custom CRUD, history           |
-| `src/stores/slices/moodSlice.ts`             | 339   | Medium | Offline sync, partner mood, auto-update          |
+| `src/stores/slices/moodSlice.ts`             | 346   | Medium | Offline sync, partner mood, auto-update          |
 | `src/sw.ts`                                  | 261   | Medium | Background sync, cache strategies                |
 | `src/stores/slices/settingsSlice.ts`         | 258   | Medium | initializeApp, hydration validation              |
 

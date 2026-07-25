@@ -17,7 +17,7 @@ npm run dev              # Start dev server (runs cleanup script wrapper)
 npm run dev:raw          # Start Vite dev server directly
 npm run preview          # Preview production build
 npm run build            # Production build (tsc + vite)
-npm run typecheck        # tsc --noEmit
+npm run typecheck        # tsc -b --force (checks all project references)
 npm run lint             # ESLint (src, tests, scripts)
 npm run lint:fix         # ESLint --fix
 ```
@@ -29,7 +29,7 @@ npm run lint:fix         # ESLint --fix
 npm run test:unit              # Run all unit tests
 npm run test:unit:watch        # Watch mode
 npm run test:unit:ui           # Vitest UI
-npm run test:unit:coverage     # With coverage (80% threshold)
+npm run test:unit:coverage     # With coverage (25% threshold)
 
 # E2E tests (Playwright, requires local Supabase running)
 npm run test:e2e               # All E2E tests (cleanup wrapper)
@@ -74,9 +74,10 @@ supabase gen types typescript --local | grep -v '^Connecting to' > src/types/dat
 
 ### State Management: Zustand Sliced Store
 
-Single Zustand store (`src/stores/useAppStore.ts`) composed from 10 slices via the slice pattern:
+Single Zustand store (`src/stores/useAppStore.ts`) composed from 11 slices via the slice pattern:
 
-- `appSlice` - initialization, loading states
+- `appSlice` - initialization, loading states (composed FIRST, owns `isLoading`/`error`/`__isHydrated`)
+- `authSlice` - single source of truth for `userId`/`userEmail`/`isAuthenticated` (not persisted)
 - `settingsSlice` - theme, relationship config
 - `navigationSlice` - current view routing
 - `messagesSlice` - daily love messages, favorites

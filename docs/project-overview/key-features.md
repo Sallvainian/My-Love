@@ -207,7 +207,7 @@ Accessible via the `/admin` route. Lazy-loaded as `AdminPanel` component. Provid
 
 ## Error Tracking
 
-Sentry (`@sentry/react` 10.42.0) provides production error tracking:
+Sentry (`@sentry/react` 10.68.0) provides production error tracking:
 
 - Initialized in `src/config/sentry.ts` with 20% trace sample rate
 - PII stripping: only UUIDs reach Sentry (email and IP address removed)

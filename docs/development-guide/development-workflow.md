@@ -56,8 +56,8 @@ npm run test:ci-local  # lint + unit + E2E + burn-in (3 iterations)
 ### 5. Commit with Standard Format
 
 ```bash
-git add src/components/scripture-reading/ReflectionScreen.tsx
-git add tests/e2e/scripture/reflection.spec.ts
+git add src/components/scripture-reading/reflection/ReflectionSummary.tsx
+git add tests/e2e/scripture/scripture-reflection-2.2.spec.ts
 git commit -m "feat(epic-2): add per-step reflection rating UI"
 ```
 
@@ -117,10 +117,10 @@ When uncommitted changes span multiple stories:
 2. Stage and commit each story group separately:
 
    ```bash
-   git add src/components/scripture-reading/ReflectionScreen.tsx tests/e2e/scripture/reflection.spec.ts
+   git add src/components/scripture-reading/reflection/ReflectionSummary.tsx tests/e2e/scripture/scripture-reflection-2.2.spec.ts
    git commit -m "feat(epic-2): add per-step reflection system (Story 2.1)"
 
-   git add src/components/scripture-reading/SessionSummary.tsx tests/e2e/scripture/session-summary.spec.ts
+   git add src/components/scripture-reading/containers/ReportPhaseView.tsx tests/e2e/scripture/scripture-reflection-2.3.spec.ts
    git commit -m "feat(epic-2): add end-of-session reflection summary (Story 2.2)"
    ```
 
@@ -138,7 +138,7 @@ When uncommitted changes span multiple stories:
 
 When a PR is opened or synchronized:
 
-1. **`test.yml`** runs the full test pipeline (lint, unit, DB tests, integration tests, API tests, E2E P0 gate, E2E sharded, burn-in for PRs to main)
+1. **`test.yml`** runs the full test pipeline (change detection, lint, unit, DB tests, backend tests, E2E across 4 shards, burn-in for PRs to main)
 2. **`claude-code-review.yml`** runs automated code review with Claude
 3. **`supabase-migrations.yml`** runs if any files under `supabase/` are modified
 4. Human reviewers are assigned for final approval

@@ -2,7 +2,7 @@
 
 The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on all tables. The schema covers two primary feature areas: the core couples app and the scripture reading feature.
 
-## Tables (10 total)
+## Tables (12 total)
 
 ### Core App Tables
 
@@ -14,6 +14,14 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 | `interactions`     | Poke/kiss interactions             | `users(id)` via `from_user_id`, `to_user_id`      |
 | `partner_requests` | Partner connection requests        | `users(id)` via `from_user_id`, `to_user_id`      |
 | `photos`           | Photo metadata (storage in bucket) | `auth.users(id)` via `user_id`                    |
+
+### Infrastructure Tables
+
+| Table                | Purpose                                | FK References |
+| -------------------- | -------------------------------------- | ------------- |
+| `claude_bot_config`  | CI bot test credentials (key/value)    | none          |
+
+`claude_bot_config` (added 2026-03-16) stores the login for the automated review bot used in CI. RLS is **enabled with no policies at all**, which means `anon` and `authenticated` have no access whatsoever -- only `service_role` can read it. It is deliberately excluded from the app's client-side type usage.
 
 ### Scripture Reading Tables
 
@@ -43,7 +51,26 @@ The Supabase database uses PostgreSQL with Row Level Security (RLS) enabled on a
 | `photos`            | No     | 10MB       | Photo gallery images             |
 | `love-notes-images` | No     | -          | Love note chat image attachments |
 
-## RPC Functions (13)
+## RPC Functions (14 callable + 1 internal helper)
+
+| Function                          | Purpose                                            |
+| --------------------------------- | -------------------------------------------------- |
+| `accept_partner_request`          | Links two users, marks request accepted             |
+| `decline_partner_request`         | Marks request declined                              |
+| `get_my_partner_id`               | SECURITY DEFINER helper, breaks RLS recursion       |
+| `is_scripture_session_member`     | Membership predicate used by RLS policies           |
+| `scripture_create_session`        | Creates solo/together session (together → lobby)    |
+| `scripture_select_role`           | Lobby: pick reader/responder                        |
+| `scripture_toggle_ready`          | Lobby: toggle ready, starts countdown when both     |
+| `scripture_convert_to_solo`       | Lobby: detach partner, continue solo                |
+| `scripture_lock_in`               | Reading: lock step, advance when both locked        |
+| `scripture_undo_lock_in`          | Reading: release a lock                             |
+| `scripture_end_session`           | Ends session early (`ended_early` status)           |
+| `scripture_submit_reflection`     | Upsert a per-step reflection                        |
+| `scripture_get_couple_stats`      | CTE-based couple aggregate for the stats panel      |
+| `scripture_seed_test_data`        | Test-only seeding (presets incl. `unlinked`, `at_reflection`) |
+
+`graphql` also appears in the generated types; it belongs to the `pg_graphql` extension, not this app.
 
 See [RPC Functions](./6-supabase-rpc-functions.md) for full documentation.
 

@@ -7,10 +7,10 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 | Technology   | Version | Purpose                                                   |
 | ------------ | ------- | --------------------------------------------------------- |
 | Node.js      | 24.13.0 | Runtime (pinned via `.mise.toml`)                         |
-| React        | 19.2.4  | UI framework                                              |
-| React DOM    | 19.2.4  | DOM rendering                                             |
+| React        | 19.2.8  | UI framework                                              |
+| React DOM    | 19.2.8  | DOM rendering                                             |
 | TypeScript   | ~5.9.3  | Static type checking (strict mode enabled)                |
-| Vite         | 7.3.1   | Build tool and dev server                                 |
+| Vite         | 7.3.6   | Build tool and dev server                                 |
 | Tailwind CSS | 4.1.17  | Utility-first CSS framework (v4 with PostCSS integration) |
 | PostCSS      | 8.5.8   | CSS post-processing                                       |
 | Autoprefixer | 10.4.27 | Vendor prefix automation                                  |
@@ -25,10 +25,10 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology            | Version | Purpose                                                 |
 | --------------------- | ------- | ------------------------------------------------------- |
-| Zustand               | 5.0.11  | Client-side state management (11-slice store pattern)   |
-| Zod                   | 4.3.6   | Schema validation for forms and API responses           |
+| Zustand               | 5.0.14  | Client-side state management (11-slice store pattern)   |
+| Zod                   | 4.4.3   | Schema validation for forms and API responses           |
 | idb                   | 8.0.3   | IndexedDB wrapper (offline-first local storage)         |
-| @supabase/supabase-js | 2.99.0  | Supabase client SDK (auth, database, storage, realtime) |
+| @supabase/supabase-js | 2.110.8  | Supabase client SDK (auth, database, storage, realtime) |
 
 **Why Zustand?** Zustand provides a lightweight, boilerplate-free store. The project uses the slice pattern with 11 slices composed into a single store (`useAppStore.ts`). State is persisted to `localStorage` via `zustand/persist` with custom serialization for `Map` objects.
 
@@ -38,10 +38,10 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology                   | Version | Purpose                                                              |
 | ---------------------------- | ------- | -------------------------------------------------------------------- |
-| Framer Motion                | 12.35.2 | Animation library (lazy-loaded via `LazyMotion` with `domAnimation`) |
+| Framer Motion                | 12.42.2 | Animation library (lazy-loaded via `LazyMotion` with `domAnimation`) |
 | Lucide React                 | 0.577.0 | Icon library (tree-shakeable)                                        |
-| DOMPurify                    | 3.3.2   | HTML sanitization for user-generated content                         |
-| react-window                 | 2.2.7   | Virtualized list rendering for photo gallery and love notes          |
+| DOMPurify                    | 3.4.12   | HTML sanitization for user-generated content                         |
+| react-window                 | 2.3.0   | Virtualized list rendering for photo gallery and love notes          |
 | react-window-infinite-loader | 2.0.1   | Infinite scroll for virtualized lists                                |
 
 ## PWA
@@ -55,7 +55,7 @@ My-Love is a Progressive Web App built with a modern TypeScript-first frontend s
 
 | Technology    | Version | Purpose                                                     |
 | ------------- | ------- | ----------------------------------------------------------- |
-| @sentry/react | 10.42.0 | Error tracking and performance monitoring (20% sample rate) |
+| @sentry/react | 10.68.0 | Error tracking and performance monitoring (20% sample rate) |
 
 Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs reach Sentry). Source maps are uploaded during CI builds via `@sentry/vite-plugin` and deleted from the `dist/` directory after upload.
 
@@ -63,15 +63,15 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 
 | Technology                         | Version | Purpose                                                                           |
 | ---------------------------------- | ------- | --------------------------------------------------------------------------------- |
-| Vitest                             | 4.0.17  | Unit test runner                                                                  |
-| @vitest/coverage-v8                | 4.0.18  | Code coverage (V8 provider, 25% threshold on lines/functions/branches/statements) |
-| @vitest/ui                         | 4.0.17  | Vitest interactive browser UI                                                     |
+| Vitest                             | 4.1.10  | Unit test runner                                                                  |
+| @vitest/coverage-v8                | 4.1.10  | Code coverage (V8 provider, 25% threshold on lines/functions/branches/statements) |
+| @vitest/ui                         | 4.1.10  | Vitest interactive browser UI                                                     |
 | happy-dom                          | 20.8.3  | DOM environment for unit tests                                                    |
 | @testing-library/react             | 16.3.2  | React component testing utilities                                                 |
 | @testing-library/jest-dom          | 6.9.1   | Custom DOM matchers (`toBeInTheDocument`, `toHaveTextContent`, etc.)              |
 | @testing-library/user-event        | 14.6.1  | User interaction simulation                                                       |
 | fake-indexeddb                     | 6.2.5   | IndexedDB mock for unit tests                                                     |
-| Playwright                         | 1.58.2  | E2E browser testing                                                               |
+| Playwright                         | 1.62.0  | E2E browser testing                                                               |
 | @seontechnologies/playwright-utils | 3.14.0  | Playwright fixture utilities (apiRequest, recurse, log, networkErrorMonitor)      |
 | @axe-core/playwright               | 4.11.1  | Accessibility testing integration                                                 |
 | @faker-js/faker                    | 10.3.0  | Test data generation                                                              |
@@ -82,7 +82,7 @@ Sentry is initialized in `src/config/sentry.ts` with PII stripping (only UUIDs r
 | Technology                  | Version | Purpose                                                                               |
 | --------------------------- | ------- | ------------------------------------------------------------------------------------- |
 | ESLint                      | 9.39.2  | Linting (flat config format, `eslint.config.js`)                                      |
-| typescript-eslint           | 8.57.0  | TypeScript ESLint rules                                                               |
+| typescript-eslint           | 8.65.0  | TypeScript ESLint rules                                                               |
 | eslint-plugin-react-hooks   | 7.0.1   | React hooks linting (including React 19 rules for `set-state-in-effect` and `purity`) |
 | eslint-plugin-react-refresh | 0.5.2   | React Refresh HMR validation                                                          |
 | fnox (age provider)         | --      | Encrypted secrets management (age encryption, committed in `fnox.toml`)               |
