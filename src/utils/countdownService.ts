@@ -54,7 +54,8 @@ export function getUpcomingAnniversaries(
     return [];
   }
 
-  const now = new Date();
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   // Get anniversaries with their next occurrence dates
   const upcomingAnniversaries = anniversaries
@@ -62,7 +63,7 @@ export function getUpcomingAnniversaries(
       const nextDate = getNextAnniversaryDate(anniversary.date);
       return { anniversary, nextDate };
     })
-    .filter(({ nextDate }) => nextDate > now)
+    .filter(({ nextDate }) => nextDate >= startOfToday)
     .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())
     .slice(0, count);
 
@@ -78,6 +79,7 @@ export function getUpcomingAnniversaries(
  */
 export function getNextAnniversaryDate(dateString: string): Date {
   const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const [, month, day] = dateString.split('-').map(Number);
 
   // Try current year first
@@ -90,7 +92,7 @@ export function getNextAnniversaryDate(dateString: string): Date {
   }
 
   // If anniversary has already passed this year, try next year
-  if (nextDate <= today) {
+  if (nextDate < startOfToday) {
     nextDate = new Date(today.getFullYear() + 1, month - 1, day);
 
     // Handle leap year edge case (Feb 29 in non-leap year)

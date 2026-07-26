@@ -109,7 +109,7 @@ function flattenMoodGroups(groups: MoodGroup[]): TimelineItem[] {
  * @param isPartnerView - Whether viewing partner's moods (optional)
  */
 export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHistoryTimelineProps) {
-  const { moods, isLoading, hasMore, loadMore, error } = useMoodHistory(userId);
+  const { moods, isLoading, hasMore, loadMore, error, retry } = useMoodHistory(userId);
 
   // Performance monitoring in development
   useEffect(() => {
@@ -161,12 +161,8 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
     minimumBatchSize: 10,
   });
 
-  // Show empty state
-  if (!isLoading && moods.length === 0) {
-    return <EmptyMoodHistoryState />;
-  }
-
-  // Show error state
+  // Show error state — checked BEFORE the empty state, otherwise a failed first
+  // page renders "No mood history yet" to a user who has months of moods
   if (error) {
     return (
       <div className="py-12 text-center" data-testid="error-state">
@@ -175,8 +171,20 @@ export function MoodHistoryTimeline({ userId, isPartnerView = false }: MoodHisto
           Failed to load mood history
         </h3>
         <p className="text-gray-600 dark:text-gray-400">{error}</p>
+        <button
+          onClick={() => void retry()}
+          className="mt-4 rounded-lg bg-pink-500 px-6 py-3 font-medium text-white transition-colors hover:bg-pink-600"
+          data-testid="mood-history-retry"
+        >
+          Try Again
+        </button>
       </div>
     );
+  }
+
+  // Show empty state
+  if (!isLoading && moods.length === 0) {
+    return <EmptyMoodHistoryState />;
   }
 
   // Row component for List

@@ -13,8 +13,10 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ onExit }: AdminPanelProps) {
-  const { loadCustomMessages, customMessagesLoaded, exportCustomMessages, importCustomMessages } =
-    useAppStore();
+  const customMessagesLoaded = useAppStore((s) => s.customMessagesLoaded);
+  const loadCustomMessages = useAppStore((s) => s.loadCustomMessages);
+  const exportCustomMessages = useAppStore((s) => s.exportCustomMessages);
+  const importCustomMessages = useAppStore((s) => s.importCustomMessages);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingMessage, setEditingMessage] = useState<CustomMessage | null>(null);
   const [deletingMessage, setDeletingMessage] = useState<CustomMessage | null>(null);

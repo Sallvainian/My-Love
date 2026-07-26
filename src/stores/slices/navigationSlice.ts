@@ -53,7 +53,13 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
       // Respect base URL in production (e.g., /My-Love/ for GitHub Pages)
       const base = import.meta.env.BASE_URL || '/';
       const fullPath = base === '/' ? basePath : base.slice(0, -1) + basePath;
-      window.history.pushState({ view }, '', fullPath);
+      // Tapping the already-active tab must not stack an identical history entry —
+      // it would cost one Back press per tap before the user can leave the view.
+      if (window.location.pathname === fullPath) {
+        window.history.replaceState({ view }, '', fullPath);
+      } else {
+        window.history.pushState({ view }, '', fullPath);
+      }
       logger.info(`[AppStore] View changed to '${view}', URL: ${fullPath}`);
     }
   },
