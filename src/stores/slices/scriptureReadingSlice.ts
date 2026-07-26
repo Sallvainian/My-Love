@@ -664,6 +664,13 @@ export const createScriptureReadingSlice: AppStateCreator<ScriptureSlice> = (set
           snapshot.countdownStartedAt !== undefined
             ? snapshot.countdownStartedAt
             : currentState.countdownStartedAt,
+        // Re-assert myReady. The RPC sets the caller's own flag to p_is_ready, so on
+        // success isReady is authoritative for us. Without this, a partner-authored
+        // state_updated broadcast landing between the optimistic set above and this
+        // response overwrites us with our own pre-toggle `false` — onBroadcastReceived
+        // reconciles via `??`, which does not filter a boolean false — and nothing
+        // afterwards puts it back.
+        myReady: isReady,
       }));
 
       // Client-side broadcast: notify partner of state update
