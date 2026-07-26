@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { logger } from '../utils/logger';
+import { SettingsSchema } from '../validation/schemas';
 import { createAppSlice } from './slices/appSlice';
 import { createAuthSlice } from './slices/authSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
@@ -103,6 +104,21 @@ export const useAppStore = create<AppState>()(
 
               // Return null so Zustand uses initial state defaults
               return null;
+            }
+
+            // Schema-validate persisted settings; drop just `settings` on failure
+            // so Zustand's shallow merge falls back to the settingsSlice defaults.
+            if (data.state?.settings) {
+              const settingsResult = SettingsSchema.safeParse(data.state.settings);
+              if (!settingsResult.success) {
+                console.error(
+                  '[Storage] Persisted settings failed schema validation:',
+                  settingsResult.error.issues
+                );
+                console.warn('[Storage] Dropping persisted settings - defaults will be used');
+                delete data.state.settings;
+                return JSON.stringify(data);
+              }
             }
 
             // Validation passed - return data for Zustand to deserialize

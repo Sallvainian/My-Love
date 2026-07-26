@@ -1,6 +1,7 @@
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { Camera, Loader, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { imageCompressionService } from '../../services/imageCompressionService';
 import { useAppStore } from '../../stores/useAppStore';
 
 interface PhotoUploadProps {
@@ -33,18 +34,15 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
     setError('');
     setWarning('');
 
-    // Validate file type (defense-in-depth)
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setError('Please select a valid image file (JPEG, PNG, or WebP)');
+    // Validate type and size through the compression service so the gate matches
+    // what the upload path can actually process (JPEG/PNG/WebP, 25MB)
+    const validation = imageCompressionService.validateImageFile(file);
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid file');
       return;
     }
-
-    // Validate file size (prevent huge files)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      setError('File size must be less than 50MB');
-      return;
+    if (validation.warning) {
+      setWarning(validation.warning);
     }
 
     setSelectedFile(file);
@@ -73,18 +71,26 @@ export function PhotoUpload({ isOpen, onClose }: PhotoUploadProps) {
         img.src = imageUrl;
       });
 
+      const result = await imageCompressionService.compressImage(selectedFile);
+
       const input = {
-        file: selectedFile,
+        file: result.blob,
         filename: selectedFile.name,
         caption: caption.trim() || undefined,
-        mimeType: selectedFile.type as 'image/jpeg' | 'image/png' | 'image/webp',
-        width: img.naturalWidth,
-        height: img.naturalHeight,
+        mimeType: result.blob.type as 'image/jpeg' | 'image/png' | 'image/webp',
+        width: result.width || img.naturalWidth,
+        height: result.height || img.naturalHeight,
       };
 
       URL.revokeObjectURL(imageUrl);
 
-      await uploadPhoto(input);
+      const uploadResult = await uploadPhoto(input);
+
+      if (!uploadResult.success) {
+        setError(uploadResult.error || 'Failed to upload photo');
+        setStep('error');
+        return;
+      }
 
       setStep('success');
 

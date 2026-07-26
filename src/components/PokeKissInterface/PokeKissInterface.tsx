@@ -85,8 +85,6 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
-  const subscriptionRef = useRef<(() => void) | null>(null);
-  const isSubscribingRef = useRef(false);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -118,31 +116,28 @@ export function PokeKissInterface({ expandDirection = 'up' }: PokeKissInterfaceP
 
   // Subscribe to real-time interactions on mount
   useEffect(() => {
-    if (isSubscribingRef.current || subscriptionRef.current) {
-      logger.debug('[PokeKissInterface] Subscription already active, skipping');
-      return;
-    }
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
 
-    isSubscribingRef.current = true;
-
-    const setupSubscription = async () => {
-      try {
-        const unsubscribe = await subscribeToInteractions();
-        subscriptionRef.current = unsubscribe;
+    subscribeToInteractions()
+      .then((fn) => {
+        if (cancelled) {
+          // Unmounted before the subscribe promise resolved — tear down now.
+          fn();
+          return;
+        }
+        unsubscribe = fn;
         logger.info('[PokeKissInterface] Subscribed to real-time interactions');
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error('[PokeKissInterface] Failed to subscribe:', error);
-      } finally {
-        isSubscribingRef.current = false;
-      }
-    };
-
-    setupSubscription();
+      });
 
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current();
-        subscriptionRef.current = null;
+      cancelled = true;
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
         logger.debug('[PokeKissInterface] Unsubscribed from interactions');
       }
     };

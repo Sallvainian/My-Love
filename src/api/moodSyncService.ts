@@ -89,8 +89,29 @@ class MoodSyncService {
       created_at: mood.timestamp.toISOString(),
     };
 
-    // Use validated moodApi.create() for insert with automatic validation
-    const syncedMood = await moodApi.create(moodInsert);
+    // Update in place when this local mood already has a server row, so editing
+    // today's mood does not append a second "today" entry for the partner.
+    // user_id/created_at are deliberately omitted so the original log time survives.
+    let syncedMood: SupabaseMoodRecord;
+
+    if (mood.supabaseId) {
+      try {
+        syncedMood = await moodApi.update(mood.supabaseId, {
+          mood_type: moodInsert.mood_type,
+          mood_types: moodInsert.mood_types,
+          note: moodInsert.note,
+        });
+      } catch (error) {
+        // PGRST116 = row not found (deleted server-side); fall back to insert
+        if ((error as { code?: string }).code === 'PGRST116') {
+          syncedMood = await moodApi.create(moodInsert);
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      syncedMood = await moodApi.create(moodInsert);
+    }
 
     // Broadcast to partner after successful sync (fire-and-forget)
     const partnerId = await getPartnerId();
@@ -371,6 +392,7 @@ class MoodSyncService {
           id: payload.payload.id,
           user_id: payload.payload.user_id,
           mood_type: payload.payload.mood_type,
+          mood_types: payload.payload.mood_types,
           note: payload.payload.note,
           created_at: payload.payload.created_at,
           updated_at: payload.payload.created_at, // Use created_at as fallback
