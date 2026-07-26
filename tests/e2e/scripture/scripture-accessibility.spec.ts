@@ -150,10 +150,16 @@ test.describe('Scripture Accessibility', () => {
       });
 
       await page.getByTestId('scripture-next-verse-button').click();
-      await stepAdvance;
 
-      // THEN: Live region announces the transition
+      // THEN: Live region announces the transition.
+      // Assert BEFORE awaiting the PATCH. The announcement is driven by the
+      // optimistic store update in scriptureReadingSlice.advanceStep, which runs
+      // before the network call, and useSoloReadingFlow clears it 1s later. Waiting
+      // on the round trip first lets a slow PATCH wipe the text before we look.
       await expect(liveRegion).toContainText(/verse 2/i);
+
+      // Settle the in-flight write so teardown doesn't race it.
+      await stepAdvance;
     });
   });
 
