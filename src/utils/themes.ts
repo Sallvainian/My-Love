@@ -64,7 +64,7 @@ const themes: Record<ThemeName, Theme> = {
 };
 
 function getTheme(themeName: ThemeName): Theme {
-  return themes[themeName];
+  return themes[themeName] ?? themes.sunset;
 }
 
 export function applyTheme(themeName: ThemeName): void {

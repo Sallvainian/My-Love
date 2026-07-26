@@ -67,12 +67,13 @@ export const RELATIONSHIP_DATES = {
 export function getNextBirthday(birthday: BirthdayInfo): Date {
   const today = new Date();
   const thisYear = today.getFullYear();
+  const startOfToday = new Date(thisYear, today.getMonth(), today.getDate());
 
   // Create date for this year's birthday
   const birthdayThisYear = new Date(thisYear, birthday.month - 1, birthday.day);
 
-  // If birthday has passed this year, use next year
-  if (birthdayThisYear <= today) {
+  // If birthday has already passed this year, use next year
+  if (birthdayThisYear < startOfToday) {
     return new Date(thisYear + 1, birthday.month - 1, birthday.day);
   }
 

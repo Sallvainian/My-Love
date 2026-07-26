@@ -19,7 +19,7 @@
 import { getPartnerId, supabase } from '../../api/supabaseClient';
 import { NOTES_CONFIG } from '../../config/images';
 import { imageCompressionService } from '../../services/imageCompressionService';
-import { uploadCompressedBlob } from '../../services/loveNoteImageService';
+import { deleteLoveNoteImage, uploadCompressedBlob } from '../../services/loveNoteImageService';
 import type { LoveNote } from '../../types/models';
 import { logger } from '../../utils/logger';
 import type { AppStateCreator } from '../types';
@@ -58,6 +58,21 @@ function revokePreviewUrlsFromNotes(notes: LoveNote[]): void {
       URL.revokeObjectURL(note.imagePreviewUrl);
     }
   });
+}
+
+/**
+ * Helper: Best-effort delete of an image whose love_notes row insert failed.
+ * Swallows delete errors — the note is already marked failed and the user-facing
+ * error must not be masked by a storage cleanup failure.
+ */
+async function discardOrphanedImage(storagePath: string | null): Promise<void> {
+  if (!storagePath) return;
+  try {
+    await deleteLoveNoteImage(storagePath);
+    logger.debug('[NotesSlice] Deleted orphaned image after failed insert:', storagePath);
+  } catch (deleteError) {
+    console.warn('[NotesSlice] Failed to delete orphaned image:', storagePath, deleteError);
+  }
 }
 
 export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) => ({
@@ -377,6 +392,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         .single();
 
       if (error) {
+        await discardOrphanedImage(storagePath);
+
         // Mark message as failed (preserve imageBlob for retry)
         set((state) => ({
           notes: state.notes.map((note) =>
@@ -530,6 +547,8 @@ export const createNotesSlice: AppStateCreator<NotesSlice> = (set, get, _api) =>
         .single();
 
       if (error) {
+        await discardOrphanedImage(storagePath);
+
         // Mark as failed again
         set((state) => ({
           notes: state.notes.map((note) =>

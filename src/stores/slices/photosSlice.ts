@@ -21,6 +21,13 @@ import type { PhotoUploadInput, PhotoWithUrls, SupabasePhoto } from '../../servi
 import { photoService } from '../../services/photoService';
 import type { AppStateCreator } from '../types';
 
+/**
+ * Outcome of an upload attempt. The failure message is returned directly rather
+ * than read back off the store, so callers get the message for *their* upload
+ * and not whatever unrelated error the shared `error` key happens to hold.
+ */
+export type PhotoUploadResult = { success: true } | { success: false; error: string };
+
 export interface PhotosSlice {
   // State
   photos: PhotoWithUrls[];
@@ -31,7 +38,7 @@ export interface PhotosSlice {
   storageWarning: string | null;
 
   // Actions
-  uploadPhoto: (input: PhotoUploadInput) => Promise<void>;
+  uploadPhoto: (input: PhotoUploadInput) => Promise<PhotoUploadResult>;
   loadPhotos: () => Promise<void>;
   deletePhoto: (photoId: string) => Promise<void>;
   updatePhoto: (photoId: string, updates: Partial<SupabasePhoto>) => Promise<void>;
@@ -73,7 +80,10 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
           isUploading: false,
           uploadProgress: 0,
         });
-        return;
+        return {
+          success: false,
+          error: `Storage nearly full (${quota.percent}%) - delete photos to continue`,
+        };
       }
       if (quota.percent >= 80) {
         // AC 6.2.10: Warning if approaching limit
@@ -114,6 +124,8 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
         const warningMsg = `Storage ${newQuota.percent}% full - consider deleting old photos`;
         set({ storageWarning: warningMsg });
       }
+
+      return { success: true };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Upload failed';
       set({
@@ -121,6 +133,8 @@ export const createPhotosSlice: AppStateCreator<PhotosSlice> = (set, get, _api) 
         isUploading: false,
         uploadProgress: 0,
       });
+
+      return { success: false, error: errorMsg };
     }
   },
 
