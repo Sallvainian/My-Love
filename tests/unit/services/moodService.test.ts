@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { moodService } from '@/services/moodService';
 
@@ -12,6 +12,10 @@ describe('moodService', () => {
     } catch {
       // Ignore if db not initialized yet
     }
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('create', () => {
@@ -81,12 +85,27 @@ describe('moodService', () => {
       // `timestamp` is sent as created_at and (user_id, created_at) is the row's
       // identity. Moving it on edit would let an edit of a never-synced mood
       // insert a second row instead of resolving to the orphaned one.
-      const created = await moodService.create(userId, ['happy'], 'first');
-      const updated = await moodService.updateMood(created.id!, ['sad'], 'edited');
+      //
+      // Moving the clock between the two calls is load-bearing: they otherwise
+      // run in the same millisecond, so `new Date()` on both sides yields an
+      // equal value and this assertion holds even with the regression present.
+      //
+      // Only `Date` is faked. Faking the timer functions too hangs
+      // fake-indexeddb, which drives its request callbacks off real setTimeout,
+      // and every later test in this file times out.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date('2026-07-26T06:00:00.000Z'));
+        const created = await moodService.create(userId, ['happy'], 'first');
+        vi.setSystemTime(new Date('2026-07-26T06:00:05.000Z'));
+        const updated = await moodService.updateMood(created.id!, ['sad'], 'edited');
 
-      expect(updated.timestamp.getTime()).toBe(created.timestamp.getTime());
-      expect(updated.note).toBe('edited');
-      expect(updated.synced).toBe(false);
+        expect(updated.timestamp.getTime()).toBe(created.timestamp.getTime());
+        expect(updated.note).toBe('edited');
+        expect(updated.synced).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

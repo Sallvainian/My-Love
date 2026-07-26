@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MoodEntry } from '@/types';
+import { FakeMoodsBackend } from '../api/fakeMoodsBackend';
 
 vi.mock('workbox-cacheable-response', () => ({ CacheableResponsePlugin: class {} }));
 vi.mock('workbox-core', () => ({ clientsClaim: vi.fn() }));
@@ -182,5 +183,80 @@ describe('service worker mood background sync', () => {
     // The idempotency key: client-supplied, reproduced identically on every resend.
     expect(call.body).toMatchObject({ user_id: USER_ID, created_at: LOG_TIME });
     expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, SERVER_ROW_ID);
+  });
+
+  // The tests above assert request SHAPE against canned responses, which cannot
+  // show a request resolving to a row that is already there — the mock hands
+  // back a fresh id no matter what is stored. These drive the worker against a
+  // real table so the main thread and the worker share one store, which is the
+  // only way "both writers fire, exactly one row" is actually verified rather
+  // than inferred from two separately-mocked halves.
+  describe('against a shared table', () => {
+    let backend: FakeMoodsBackend;
+
+    beforeEach(() => {
+      backend = new FakeMoodsBackend();
+      fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+        const parsed = new URL(url);
+        const body = JSON.parse(init.body as string) as Record<string, unknown>;
+        const query = backend.client().from('moods');
+
+        if (init.method === 'PATCH') {
+          const id = (parsed.searchParams.get('id') ?? '').replace('eq.', '');
+          const { data } = await query.update(body).eq('id', id);
+          return jsonResponse(200, data);
+        }
+
+        const onConflict = parsed.searchParams.get('on_conflict');
+        const { data, error } = onConflict
+          ? await query.upsert(body, { onConflict })
+          : await query.insert(body);
+        if (error) {
+          return jsonResponse(409, error);
+        }
+        return jsonResponse(201, data);
+      });
+    });
+
+    it('[A: two writers race] adopts the row the main thread already wrote', async () => {
+      // The main thread committed this row and the worker never learned its id.
+      const existing = backend.seed({
+        user_id: USER_ID,
+        created_at: LOG_TIME,
+        note: 'a note',
+        mood_type: 'happy',
+        mood_types: ['happy'],
+      });
+      mockedGetPendingMoods.mockResolvedValue([pendingMood()]);
+
+      await fireBackgroundSync();
+
+      expect(backend.rows).toHaveLength(1);
+      // The pre-existing id, not a freshly minted one — this is what stops the
+      // local record from being re-synced as a second row later.
+      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, existing.id);
+    });
+
+    it('[A: SW syncs an edited record] edits in place without adding a row', async () => {
+      const existing = backend.seed({
+        user_id: USER_ID,
+        created_at: LOG_TIME,
+        note: 'original',
+        mood_type: 'happy',
+        mood_types: ['happy'],
+      });
+      mockedGetPendingMoods.mockResolvedValue([
+        pendingMood({ supabaseId: existing.id, note: 'edited', mood: 'sad', moods: ['sad'] }),
+      ]);
+
+      await fireBackgroundSync();
+
+      expect(backend.rows).toHaveLength(1);
+      expect(backend.rows[0].note).toBe('edited');
+      expect(backend.rows[0].mood_type).toBe('sad');
+      // created_at is the row's identity and must survive the edit.
+      expect(backend.rows[0].created_at).toBe(LOG_TIME);
+      expect(mockedMarkMoodSynced).toHaveBeenCalledWith(1, existing.id);
+    });
   });
 });
