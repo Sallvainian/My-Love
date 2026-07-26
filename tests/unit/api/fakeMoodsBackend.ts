@@ -4,10 +4,12 @@
  *
  * Two behaviours matter for the duplicate-mood spec and are modelled faithfully:
  *
- * 1. `(user_id, created_at)` is UNIQUE. `.insert()` always appends a row;
+ * 1. `(user_id, created_at)` is UNIQUE, and the index is modelled rather than
+ *    assumed: `.insert()` of an existing key returns 23505, and `.upsert()`
+ *    naming a conflict target the index does not cover returns 42P10 — the
+ *    error production raises when the migration has not been applied.
  *    `.upsert(values, { onConflict: 'user_id,created_at' })` resolves to the
- *    existing row. A test that ends with two rows therefore proves the code
- *    under test still inserts.
+ *    existing row, overwriting its columns with `excluded.*` semantics.
  * 2. Rows tied on every ORDER BY key come back in an arbitrary order in
  *    Postgres, and that order may differ between two queries. `selectScramble`
  *    alternates the pre-sort order between queries so a page boundary that
@@ -187,10 +189,31 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     }
 
     switch (this.op) {
-      case 'insert':
+      case 'insert': {
+        // The unique index is modelled, so a plain insert of an existing key
+        // fails the way Postgres fails it rather than silently appending.
+        if (this.findConflict()) {
+          return this.fail({
+            code: '23505',
+            message:
+              'duplicate key value violates unique constraint "moods_user_id_created_at_key"',
+          });
+        }
         return this.wrap([this.appendRow()]);
-      case 'upsert':
+      }
+      case 'upsert': {
+        // ON CONFLICT naming columns no index covers is a hard error in
+        // Postgres, not a silent success — this is what production returns if
+        // the migration has not been applied.
+        if (this.onConflict !== 'user_id,created_at') {
+          return this.fail({
+            code: '42P10',
+            message:
+              'there is no unique or exclusion constraint matching the ON CONFLICT specification',
+          });
+        }
         return this.wrap([this.upsertRow()]);
+      }
       case 'update':
         return this.wrap(this.updateRows());
       case 'delete':
@@ -198,6 +221,24 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
       default:
         return this.wrap(this.selectRows());
     }
+  }
+
+  /** The row this write would collide with under the modelled unique index */
+  private findConflict(): FakeMoodRow | undefined {
+    const values = this.payload ?? {};
+    return this.backend.rows.find(
+      (row) => row.user_id === values.user_id && row.created_at === values.created_at
+    );
+  }
+
+  /** Record the operation, then return a Postgres-shaped error */
+  private fail(error: { code: string; message: string }): { data: unknown; error: unknown } {
+    this.backend.operations.push({
+      op: this.op,
+      onConflict: this.onConflict,
+      orders: this.orders,
+    });
+    return { data: null, error };
   }
 
   private wrap(matched: FakeMoodRow[]): { data: unknown; error: unknown } {
@@ -245,23 +286,20 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
 
   private upsertRow(): FakeMoodRow {
     const values = this.payload ?? {};
-    const existing =
-      this.onConflict === 'user_id,created_at'
-        ? this.backend.rows.find(
-            (row) => row.user_id === values.user_id && row.created_at === values.created_at
-          )
-        : undefined;
+    const existing = this.findConflict();
 
     if (!existing) {
       return this.appendRow();
     }
 
-    // ON CONFLICT DO UPDATE: the conflicting row absorbs the new column values
-    // and keeps its id and created_at.
+    // ON CONFLICT DO UPDATE SET col = excluded.col — the conflicting row takes
+    // the incoming values wholesale and keeps only its id and created_at.
+    // This OVERWRITES with null rather than preserving, which is what Postgres
+    // does; merging instead would hide a real note-loss path from every test.
     Object.assign(existing, {
-      mood_type: (values.mood_type as string) ?? existing.mood_type,
-      mood_types: (values.mood_types as string[] | undefined) ?? existing.mood_types,
-      note: (values.note as string | null | undefined) ?? existing.note,
+      mood_type: values.mood_type as string,
+      mood_types: (values.mood_types as string[] | undefined) ?? null,
+      note: (values.note as string | null | undefined) ?? null,
     });
     return existing;
   }
