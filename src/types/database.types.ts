@@ -536,6 +536,8 @@ export type Database = {
           p_include_reflections?: boolean
           p_preset?: string
           p_session_count?: number
+          p_user1_id?: string
+          p_user2_id?: string
         }
         Returns: Json
       }

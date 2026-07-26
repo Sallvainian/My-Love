@@ -321,9 +321,14 @@ jobs:
           SPECS: ${{ steps.changed-tests.outputs.specs }}
         run: |
           echo "Running 5 iterations on changed E2E test files"
+          # --retries=0 is load-bearing. The job sets CI=true, and
+          # playwright.config.ts reads `retries: process.env.CI ? 2 : 0`, so
+          # without this flag each iteration retries a failure twice and burn-in
+          # reports "5/5 stable" for a spec that flaked up to 10 times. A flake
+          # detector that retries flakes away detects nothing.
           for i in {1..5}; do
             echo "--- Burn-in iteration $i/5 ---"
-            npx playwright test --project=chromium $SPECS || exit 1
+            npx playwright test --project=chromium --retries=0 $SPECS || exit 1
           done
           echo "Burn-in passed: 5/5 stable"
 

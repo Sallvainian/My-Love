@@ -8,6 +8,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../../src/types/database.types';
+import { getWorkerPairEmails } from '../auth/worker-pool';
 
 /**
  * Typed Supabase client with project schema for compile-time table/RPC validation
@@ -51,6 +52,46 @@ export interface CreateTestSessionOptions {
   includeMessages?: boolean;
   preset?: SeedPreset;
   bookmarkSteps?: number[];
+  /**
+   * Seed for this specific user rather than letting the RPC pick one.
+   *
+   * Omitting it falls back to the RPC's legacy global lookup — the first row in
+   * auth.users by created_at — which hands every parallel worker the same user.
+   * global-setup.ts provisions a dedicated pair per worker; pass that worker's
+   * IDs so seeded data cannot collide with another worker's.
+   */
+  user1Id?: string;
+  /** Partner for `user1Id`. Omit for a solo session. */
+  user2Id?: string;
+}
+
+/**
+ * email → public.users.id, memoised for the life of the worker process.
+ *
+ * The worker pool is provisioned once by global-setup and never changes during
+ * a run, so a worker resolves its own two ids on first seed and never again.
+ */
+const appUserIdByEmail = new Map<string, string>();
+
+async function resolveAppUserIdByEmail(
+  supabase: TypedSupabaseClient,
+  email: string
+): Promise<string> {
+  const cached = appUserIdByEmail.get(email);
+  if (cached !== undefined) return cached;
+
+  const { data, error } = await supabase.from('users').select('id').eq('email', email).single();
+
+  if (error || !data?.id) {
+    throw new Error(
+      `Could not resolve app user for ${email}: ${error?.message ?? 'not found'}. ` +
+        'The worker pool is created by tests/support/auth/global-setup.ts — if this ' +
+        'fires, globalSetup did not run or PLAYWRIGHT_AUTH_POOL_SIZE shrank between runs.'
+    );
+  }
+
+  appUserIdByEmail.set(email, data.id);
+  return data.id;
 }
 
 /**
@@ -75,12 +116,42 @@ export async function createTestSession(
   supabase: TypedSupabaseClient,
   options?: CreateTestSessionOptions
 ): Promise<SeedResult> {
+  let user1Id = options?.user1Id;
+  let user2Id = options?.user2Id;
+
+  if (user1Id === undefined) {
+    if (user2Id !== undefined) {
+      throw new Error(
+        'createTestSession: user2Id was given without user1Id. Pass both, or neither ' +
+          "to seed for this worker's own pair."
+      );
+    }
+
+    // Default to the calling worker's dedicated pair, so parallel workers never
+    // seed onto each other's users. Callers do not opt in — isolation is the
+    // default and an explicit user1Id/user2Id is the only way out of it.
+    //
+    // getWorkerPairEmails() returns null when there is no worker identity —
+    // globalSetup, a reporter, an ad-hoc script. In that case BOTH ids stay
+    // undefined and the RPC falls back to its legacy global lookup, which is
+    // exactly what those callers got before. Do not replace this null branch
+    // with a default index: worker 0 is a real worker, and seeding its
+    // accounts from outside a worker corrupts a live test run.
+    const pair = getWorkerPairEmails();
+    if (pair !== null) {
+      user1Id = await resolveAppUserIdByEmail(supabase, pair.user1Email);
+      user2Id = await resolveAppUserIdByEmail(supabase, pair.user2Email);
+    }
+  }
+
   const { data, error } = await supabase.rpc('scripture_seed_test_data', {
     p_session_count: options?.sessionCount ?? 1,
     p_include_reflections: options?.includeReflections ?? false,
     p_include_messages: options?.includeMessages ?? false,
     p_preset: options?.preset,
     p_bookmark_steps: options?.bookmarkSteps,
+    p_user1_id: user1Id,
+    p_user2_id: user2Id,
   });
 
   if (error) {

@@ -5,6 +5,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import type { TypedSupabaseClient } from '../factories';
+import { TEST_USER_PASSWORD } from '../test-credentials';
 
 /**
  * Create a Supabase client authenticated as a specific user.
@@ -25,7 +26,7 @@ export async function createUserClient(supabaseAdmin: TypedSupabaseClient, userI
 
   const { error: signInError } = await userClient.auth.signInWithPassword({
     email: sessionData.user.email!,
-    password: 'testpassword123',
+    password: TEST_USER_PASSWORD,
   });
 
   if (signInError) {
@@ -45,7 +46,7 @@ export async function createOutsiderClient(
 ) {
   const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
     email: `${emailPrefix}-${Date.now()}@test.example.com`,
-    password: 'testpassword123',
+    password: TEST_USER_PASSWORD,
     email_confirm: true,
   });
 
