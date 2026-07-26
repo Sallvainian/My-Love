@@ -75,12 +75,13 @@ const mockStoreState = {
   onPartnerLockInChanged: mockOnPartnerLockInChanged,
   setPartnerDisconnected: mockSetPartnerDisconnected,
   userId: 'user-1',
-  session: { userId: 'user-1' },
+  session: { userId: 'user-1', currentStepIndex: 0 },
 };
 
 vi.mock('../../../src/stores/useAppStore', () => ({
-  useAppStore: vi.fn((selector: (state: typeof mockStoreState) => unknown) =>
-    selector(mockStoreState)
+  useAppStore: Object.assign(
+    vi.fn((selector: (state: typeof mockStoreState) => unknown) => selector(mockStoreState)),
+    { getState: () => mockStoreState }
   ),
 }));
 
@@ -136,7 +137,7 @@ describe('useScriptureBroadcast', () => {
     mockHandleScriptureError.mockReset();
     Object.assign(mockStoreState, {
       userId: 'user-1',
-      session: { userId: 'user-1' },
+      session: { userId: 'user-1', currentStepIndex: 0 },
     });
   });
 
@@ -184,7 +185,7 @@ describe('useScriptureBroadcast', () => {
 
     Object.assign(mockStoreState, {
       userId: 'user-2',
-      session: { userId: 'user-1' },
+      session: { userId: 'user-1', currentStepIndex: 0 },
     });
 
     await act(async () => {
@@ -246,6 +247,21 @@ describe('useScriptureBroadcast', () => {
     });
 
     expect(mockOnPartnerLockInChanged).toHaveBeenCalledWith(true);
+  });
+
+  test('[P1] ignores lock_in_status_changed for a superseded step', async () => {
+    mockStoreState.session.currentStepIndex = 1;
+
+    await act(async () => {
+      renderHook(() => useScriptureBroadcast('session-abc'));
+    });
+
+    // Broadcast for step 0, but the session has already advanced to step 1
+    broadcastHandlers['lock_in_status_changed']?.({
+      payload: { step_index: 0, user1_locked: false, user2_locked: true },
+    });
+
+    expect(mockOnPartnerLockInChanged).not.toHaveBeenCalled();
   });
 
   test('[P1] calls removeChannel on unmount', async () => {
