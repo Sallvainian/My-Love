@@ -76,6 +76,18 @@ describe('moodService', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await expect(moodService.updateMood(created.id!, ['bad' as any])).rejects.toThrow();
     });
+
+    it('[A: edit after failed first sync] leaves timestamp untouched', async () => {
+      // `timestamp` is sent as created_at and (user_id, created_at) is the row's
+      // identity. Moving it on edit would let an edit of a never-synced mood
+      // insert a second row instead of resolving to the orphaned one.
+      const created = await moodService.create(userId, ['happy'], 'first');
+      const updated = await moodService.updateMood(created.id!, ['sad'], 'edited');
+
+      expect(updated.timestamp.getTime()).toBe(created.timestamp.getTime());
+      expect(updated.note).toBe('edited');
+      expect(updated.synced).toBe(false);
+    });
   });
 
   describe('getMoodForDate', () => {

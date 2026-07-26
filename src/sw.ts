@@ -138,6 +138,60 @@ function transformMoodForSupabase(mood: StoredMoodEntry, userId: string): Record
   };
 }
 
+const MOODS_ENDPOINT = `${SUPABASE_URL}/rest/v1/moods`;
+
+/**
+ * Build the shared REST headers for a mood write
+ */
+function moodRequestHeaders(accessToken: string, prefer: string): HeadersInit {
+  return {
+    'Content-Type': 'application/json',
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${accessToken}`,
+    Prefer: prefer,
+  };
+}
+
+/**
+ * Insert a mood, resolving to the existing row on conflict
+ *
+ * (user_id, created_at) is unique and created_at is the client-supplied log
+ * time, so a record this device already wrote — by a retry, a second tab, or
+ * the main thread — resolves to that row instead of adding another one.
+ */
+async function upsertMood(
+  supabaseMood: Record<string, unknown>,
+  accessToken: string
+): Promise<Response> {
+  return fetch(`${MOODS_ENDPOINT}?on_conflict=user_id,created_at`, {
+    method: 'POST',
+    headers: moodRequestHeaders(accessToken, 'resolution=merge-duplicates,return=representation'),
+    body: JSON.stringify(supabaseMood),
+  });
+}
+
+/**
+ * Update an already-synced mood in place
+ *
+ * Mirrors moodSyncService.syncMood: user_id and created_at are deliberately
+ * omitted from the body so the original log time survives the edit.
+ */
+async function patchMood(
+  supabaseMood: Record<string, unknown>,
+  accessToken: string,
+  supabaseId: string
+): Promise<Response> {
+  return fetch(`${MOODS_ENDPOINT}?id=eq.${encodeURIComponent(supabaseId)}`, {
+    method: 'PATCH',
+    headers: moodRequestHeaders(accessToken, 'return=representation'),
+    body: JSON.stringify({
+      mood_type: supabaseMood.mood_type,
+      mood_types: supabaseMood.mood_types,
+      note: supabaseMood.note,
+    }),
+  });
+}
+
 /**
  * Sync pending moods from IndexedDB to Supabase
  *
@@ -191,17 +245,29 @@ async function syncPendingMoods(): Promise<void> {
       try {
         const supabaseMood = transformMoodForSupabase(mood, authToken.userId);
 
-        // Call Supabase REST API directly
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/moods`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${authToken.accessToken}`,
-            Prefer: 'return=representation',
-          },
-          body: JSON.stringify(supabaseMood),
-        });
+        // Call Supabase REST API directly. A record that already has a server
+        // row is edited in place; everything else upserts, so this worker can
+        // never duplicate a row the main thread already wrote.
+        let response: Response;
+        let rows: Array<{ id?: string }> = [];
+
+        if (mood.supabaseId) {
+          response = await patchMood(supabaseMood, authToken.accessToken, mood.supabaseId);
+          if (response.ok) {
+            rows = await response.json();
+          }
+
+          // Row deleted server-side: PostgREST reports that as a 404, or as a
+          // 200 with an empty array. Either way fall back to the upsert so the
+          // edit is not lost.
+          if (response.status === 404 || (response.ok && rows.length === 0)) {
+            response = await upsertMood(supabaseMood, authToken.accessToken);
+            rows = response.ok ? await response.json() : [];
+          }
+        } else {
+          response = await upsertMood(supabaseMood, authToken.accessToken);
+          rows = response.ok ? await response.json() : [];
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -214,8 +280,8 @@ async function syncPendingMoods(): Promise<void> {
           continue;
         }
 
-        // Parse response to get Supabase ID
-        const [created] = await response.json();
+        // Read the Supabase ID out of the representation returned above
+        const [created] = rows;
 
         if (!created?.id) {
           console.error('[ServiceWorker] No ID in Supabase response for mood', mood.id);

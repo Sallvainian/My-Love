@@ -125,11 +125,14 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
       });
 
       // Update via base class (id, updates)
+      // `timestamp` is deliberately NOT touched: it is the log time, it is what
+      // gets sent as created_at, and (user_id, created_at) is the row's identity.
+      // Moving it on edit would let an edit of a never-synced mood insert a second
+      // row instead of resolving to the orphaned one.
       await super.update(id, {
         mood: primaryMood,
         moods, // Store all selected moods
         note: note || '',
-        timestamp: new Date(), // Update timestamp
         synced: false, // Mark as unsynced after update
       });
 
